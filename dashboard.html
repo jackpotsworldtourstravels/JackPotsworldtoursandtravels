@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Account — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A2540; --navy-2:#123157; --navy-3:#1B4577;
+  --coral:#FF4D4D; --coral-dark:#E63946; --coral-hover:#FFF0F0;
+  --bg:#F8FAFC; --white:#FFFFFF; --sky:#2F80ED; --emerald:#12B76A; --gold:#FFB020;
+  --ink:#0A2540; --muted:#5B6B82; --line:rgba(10,37,64,0.10);
+  --shadow-sm:0 8px 24px -12px rgba(10,37,64,0.18); --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35);
+  --radius:20px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--ink); font-family:var(--ff); -webkit-font-smoothing:antialiased;}
+button,input{font-family:var(--ff);}
+button{cursor:pointer; border:none; background:none;}
+a{color:inherit; text-decoration:none;}
+h1,h2,h3{font-weight:800; color:var(--navy);}
+.wrap{max-width:920px; margin:0 auto; padding:40px 24px 80px;}
+
+header.topbar{background:var(--navy); padding:20px 0;}
+header.topbar .wrap{display:flex; align-items:center; justify-content:space-between; padding:0 24px; max-width:920px;}
+header.topbar .brand{color:#fff; font-weight:800; font-size:17px;}
+header.topbar .brand span{color:var(--gold);}
+header.topbar nav{display:flex; gap:18px; align-items:center;}
+header.topbar nav a{color:rgba(255,255,255,0.75); font-size:13.5px; font-weight:700;}
+header.topbar nav a:hover{color:#fff;}
+
+h1.page-title{font-size:28px; margin-bottom:26px;}
+.tabs{display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap;}
+.tab-btn{padding:10px 20px; border-radius:100px; font-size:13.5px; font-weight:700; color:var(--navy); background:rgba(10,37,64,0.06);}
+.tab-btn.active{background:var(--navy); color:#fff;}
+
+.panel{background:#fff; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:28px; margin-bottom:22px;}
+.panel h2{font-size:17px; margin-bottom:18px;}
+.tab-section{display:none;} .tab-section.active{display:block;}
+
+.form-field{margin-bottom:16px; max-width:360px;}
+.form-field label{display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); margin-bottom:6px;}
+.form-field input{width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line); font-size:14.5px; color:var(--navy);}
+.form-field input:focus{outline:none; border-color:var(--coral);}
+
+.btn{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:14px; padding:12px 24px; border-radius:100px; transition:filter .2s ease;}
+.btn:hover{filter:brightness(1.06);}
+.btn-coral{background:var(--coral); color:#fff;}
+.btn-navy{background:var(--navy); color:#fff;}
+.btn-ghost{background:rgba(10,37,64,0.06); color:var(--navy);}
+.btn-sm{padding:8px 16px; font-size:12.5px;}
+.msg{margin-top:12px; font-size:13.5px; font-weight:600;}
+.msg.error{color:var(--coral-dark);} .msg.success{color:var(--emerald);}
+
+.booking-card{border:1px solid var(--line); border-radius:var(--radius-sm); padding:18px 20px; margin-bottom:14px; display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+.booking-main{flex:1; min-width:220px;}
+.booking-title{font-weight:700; font-size:15px; text-transform:capitalize;}
+.booking-sub{font-size:13px; color:var(--muted); margin-top:4px;}
+.badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700;}
+.badge.confirmed{background:rgba(18,183,106,0.12); color:var(--emerald);}
+.badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.cancelled{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.booking-actions{display:flex; gap:8px; flex-wrap:wrap;}
+.empty-state{color:var(--muted); font-size:13.5px; padding:20px 0; text-align:center;}
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+th{text-align:left; padding:10px 12px; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--line);}
+td{padding:12px; border-bottom:1px solid var(--line);}
+tr:last-child td{border-bottom:none;}
+
+.confirm-overlay{position:fixed; inset:0; background:rgba(10,37,64,0.6); display:none; align-items:center; justify-content:center; z-index:300; padding:20px;}
+.confirm-overlay.open{display:flex;}
+.confirm-card{background:#fff; border-radius:var(--radius); padding:40px; max-width:460px; width:100%; box-shadow:var(--shadow-lg);}
+.confirm-card h2{font-size:20px; margin-bottom:4px;}
+.confirm-card .sub{color:var(--muted); font-size:13px; margin-bottom:22px;}
+.confirm-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed var(--line); font-size:14px;}
+.confirm-row span:first-child{color:var(--muted);}
+.confirm-row span:last-child{font-weight:700; color:var(--navy);}
+.confirm-actions{display:flex; gap:10px; margin-top:24px;}
+@media print{
+  header.topbar, .tabs, .booking-actions, #confirmCloseBtn, #confirmPrintBtn{display:none !important;}
+  .confirm-overlay{position:static; background:none;}
+  .confirm-card{box-shadow:none; margin:0 auto;}
+  body *{visibility:hidden;}
+  .confirm-overlay, .confirm-overlay *{visibility:visible;}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">JackPots <span>World Tours</span></div>
+    <nav>
+      <a href="index.html">&larr; Back to site</a>
+      <a href="#" id="logoutBtn">Logout</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="page-title">My Account</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="bookings">My Bookings</button>
+    <button class="tab-btn" data-tab="payments">Payment History</button>
+    <button class="tab-btn" data-tab="profile">Profile</button>
+  </div>
+
+  <section class="tab-section active" id="tab-bookings">
+    <div class="panel">
+      <h2>My bookings</h2>
+      <div id="bookingsList"><div class="empty-state">Loading…</div></div>
+    </div>
+  </section>
+
+  <section class="tab-section" id="tab-payments">
+    <div class="panel">
+      <h2>Payment history</h2>
+      <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="tab-section" id="tab-profile">
+    <div class="panel">
+      <h2>Update profile</h2>
+      <form id="profileForm">
+        <div class="form-field"><label>Full Name</label><input id="profileName" type="text" required></div>
+        <div class="form-field"><label>Email</label><input id="profileEmail" type="email" disabled></div>
+        <button type="submit" class="btn btn-coral">Save Changes</button>
+        <div class="msg" id="profileMsg"></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>Change password</h2>
+      <form id="passwordForm">
+        <div class="form-field"><label>Current Password</label><input id="currentPassword" type="password" required></div>
+        <div class="form-field"><label>New Password</label><input id="newPassword" type="password" required minlength="8"></div>
+        <button type="submit" class="btn btn-navy">Change Password</button>
+        <div class="msg" id="passwordMsg"></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-card" id="confirmCard">
+    <h2>Booking Confirmation</h2>
+    <p class="sub">JackPots World Tours &amp; Travels</p>
+    <div id="confirmBody"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-coral" id="confirmPrintBtn">Print / Save as PDF</button>
+      <button class="btn btn-ghost" id="confirmCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+'use strict';
+const API_BASE = 'http://127.0.0.1:8000';
+
+const access = localStorage.getItem('jwt_access');
+if (!access) {
+  window.location.href = 'index.html';
+}
+
+function authHeaders() {
+  return { Authorization: `Bearer ${localStorage.getItem('jwt_access')}` };
+}
+function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+
+document.getElementById('logoutBtn').addEventListener('click', e => {
+  e.preventDefault();
+  localStorage.removeItem('jwt_access');
+  localStorage.removeItem('jwt_refresh');
+  localStorage.removeItem('jwt_user_name');
+  localStorage.removeItem('jwt_user_role');
+  window.location.href = 'index.html';
+});
+
+/* ---------- Tabs ---------- */
+const loadedTabs = new Set();
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === `tab-${btn.dataset.tab}`));
+    if (!loadedTabs.has(btn.dataset.tab)) {
+      loadedTabs.add(btn.dataset.tab);
+      loadTab(btn.dataset.tab);
+    }
+  });
+});
+function loadTab(name) {
+  if (name === 'payments') return loadPayments();
+  if (name === 'profile') return loadProfile();
+}
+
+/* ---------- Bookings ---------- */
+async function loadBookings() {
+  const container = document.getElementById('bookingsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="empty-state">No bookings yet — go find your next trip!</div>';
+      return;
+    }
+    container.innerHTML = data.map(b => `
+      <div class="booking-card">
+        <div class="booking-main">
+          <div class="booking-title">${b.booking_type} — #${b.item_id}</div>
+          <div class="booking-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel date ' + fmtDate(b.travel_date) : ''} · ${money(b.total_price)}</div>
+        </div>
+        <span class="badge ${b.status}">${b.status}</span>
+        <div class="booking-actions">
+          <button class="btn btn-ghost btn-sm" data-confirm-id="${b.id}">View Confirmation</button>
+          ${b.status !== 'cancelled' ? `<button class="btn btn-sm" style="background:rgba(230,57,70,0.12); color:var(--coral-dark);" data-cancel-id="${b.id}">Cancel</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+    container.dataset.bookings = JSON.stringify(data);
+    container.querySelectorAll('[data-confirm-id]').forEach(btn => {
+      btn.addEventListener('click', () => showConfirmation(btn.dataset.confirmId));
+    });
+    container.querySelectorAll('[data-cancel-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Cancel this booking?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/bookings/${btn.dataset.cancelId}`, { headers: authHeaders() });
+          loadBookings();
+        } catch (err) { alert('Failed to cancel booking.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state">Failed to load bookings.</div>';
+  }
+}
+
+function showConfirmation(bookingId) {
+  const bookings = JSON.parse(document.getElementById('bookingsList').dataset.bookings || '[]');
+  const booking = bookings.find(b => String(b.id) === String(bookingId));
+  if (!booking) return;
+  document.getElementById('confirmBody').innerHTML = `
+    <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
+    <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
+    <div class="confirm-row"><span>Item</span><span>#${booking.item_id}</span></div>
+    <div class="confirm-row"><span>Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
+    <div class="confirm-row"><span>Total Paid</span><span>${money(booking.total_price)}</span></div>
+    <div class="confirm-row"><span>Travel Date</span><span>${fmtDate(booking.travel_date)}</span></div>
+    <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
+  `;
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+document.getElementById('confirmCloseBtn').addEventListener('click', () => {
+  document.getElementById('confirmOverlay').classList.remove('open');
+});
+document.getElementById('confirmPrintBtn').addEventListener('click', () => window.print());
+
+/* ---------- Payments ---------- */
+async function loadPayments() {
+  const tbody = document.querySelector('#paymentsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(p => `
+      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${p.method}</td><td style="text-transform:capitalize">${p.status}</td><td>${p.transaction_ref}</td></tr>
+    `).join('') || `<tr><td colspan="5" class="empty-state">No payments yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load payment history.</td></tr>`;
+  }
+}
+
+/* ---------- Profile ---------- */
+async function loadProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    document.getElementById('profileName').value = data.full_name;
+    document.getElementById('profileEmail').value = data.email;
+  } catch (err) { /* ignore — fields stay blank */ }
+}
+document.getElementById('profileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('profileMsg');
+  try {
+    const { data } = await axios.put(`${API_BASE}/api/users/me`, { full_name: document.getElementById('profileName').value }, { headers: authHeaders() });
+    localStorage.setItem('jwt_user_name', data.full_name);
+    msg.textContent = 'Profile updated.';
+    msg.className = 'msg success';
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.className = 'msg error';
+  }
+});
+document.getElementById('passwordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('passwordMsg');
+  try {
+    await axios.post(`${API_BASE}/api/users/change-password`, {
+      current_password: document.getElementById('currentPassword').value,
+      new_password: document.getElementById('newPassword').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Password changed successfully.';
+    msg.className = 'msg success';
+    e.target.reset();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
+    msg.className = 'msg error';
+  }
+});
+
+loadBookings();
+</script>
+</body>
+</html>

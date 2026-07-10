@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A2540; --navy-2:#123157; --navy-3:#1B4577;
+  --coral:#FF4D4D; --coral-dark:#E63946; --coral-hover:#FFF0F0;
+  --bg:#F8FAFC; --white:#FFFFFF; --sky:#2F80ED; --emerald:#12B76A; --gold:#FFB020;
+  --ink:#0A2540; --muted:#5B6B82; --line:rgba(10,37,64,0.10);
+  --shadow-sm:0 8px 24px -12px rgba(10,37,64,0.18); --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35);
+  --radius:20px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--ink); font-family:var(--ff); -webkit-font-smoothing:antialiased;}
+button,input,select,textarea{font-family:var(--ff);}
+button{cursor:pointer; border:none; background:none;}
+a{color:inherit; text-decoration:none;}
+h1,h2,h3{font-weight:800; color:var(--navy);}
+
+.layout{display:flex; min-height:100vh;}
+.sidebar{width:250px; flex-shrink:0; background:var(--navy); color:#fff; display:flex; flex-direction:column; padding:26px 0;}
+.sidebar .brand{padding:0 24px 24px; font-size:17px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:12px;}
+.sidebar .brand span{color:var(--gold);}
+.nav-item{display:flex; align-items:center; gap:10px; padding:13px 24px; font-size:14px; font-weight:600; color:rgba(255,255,255,0.65); transition:background .2s ease, color .2s ease;}
+.nav-item:hover{background:rgba(255,255,255,0.06); color:#fff;}
+.nav-item.active{background:rgba(255,77,77,0.15); color:#fff; border-right:3px solid var(--coral);}
+.sidebar .spacer{flex:1;}
+.sidebar .nav-item.logout{color:var(--coral); margin-top:8px;}
+
+.main{flex:1; padding:36px 40px; max-width:1200px;}
+.topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:28px;}
+.topbar h1{font-size:26px;}
+.topbar .back-link{font-size:13px; font-weight:700; color:var(--sky);}
+
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:18px; margin-bottom:28px;}
+.stat-card{background:#fff; border-radius:var(--radius-sm); padding:20px 22px; box-shadow:var(--shadow-sm);}
+.stat-card .num{font-size:28px; font-weight:800; color:var(--navy);}
+.stat-card .label{font-size:12.5px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-top:4px;}
+
+.panel{background:#fff; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:26px; margin-bottom:24px;}
+.panel h2{font-size:17px; margin-bottom:16px;}
+
+.btn{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13.5px; padding:10px 18px; border-radius:100px; transition:filter .2s ease;}
+.btn:hover{filter:brightness(1.06);}
+.btn-coral{background:var(--coral); color:#fff;}
+.btn-navy{background:var(--navy); color:#fff;}
+.btn-ghost{background:rgba(10,37,64,0.06); color:var(--navy);}
+.btn-danger{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.btn-sm{padding:7px 14px; font-size:12.5px;}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+th{text-align:left; padding:10px 12px; color:var(--muted); font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--line);}
+td{padding:12px; border-bottom:1px solid var(--line); vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.table-wrap{overflow-x:auto;}
+.badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700;}
+.badge.confirmed, .badge.success, .badge.active{background:rgba(18,183,106,0.12); color:var(--emerald);}
+.badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.cancelled, .badge.failed, .badge.inactive{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+
+.form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px;}
+.form-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:5px;}
+.form-field input, .form-field select, .form-field textarea{
+  width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; color:var(--navy);
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus{outline:none; border-color:var(--coral);}
+
+.status-select{padding:6px 8px; border-radius:8px; border:1.5px solid var(--line); font-size:12.5px;}
+.msg{margin-top:12px; font-size:13px; font-weight:600;}
+.msg.error{color:var(--coral-dark);} .msg.success{color:var(--emerald);}
+.section{display:none;} .section.active{display:block;}
+.empty-state{color:var(--muted); font-size:13.5px; padding:20px 0; text-align:center;}
+@media (max-width:900px){
+  .layout{flex-direction:column;}
+  .sidebar{width:100%; flex-direction:row; overflow-x:auto; padding:14px 0;}
+  .sidebar .brand{display:none;}
+  .sidebar .spacer{display:none;}
+  .nav-item{white-space:nowrap;}
+  .main{padding:24px 18px;}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand">JackPots <span>Admin</span></div>
+    <a href="#" class="nav-item active" data-section="reports">Dashboard</a>
+    <a href="#" class="nav-item" data-section="users">Users</a>
+    <a href="#" class="nav-item" data-section="flights">Flights</a>
+    <a href="#" class="nav-item" data-section="hotels">Hotels</a>
+    <a href="#" class="nav-item" data-section="cruises">Cruises</a>
+    <a href="#" class="nav-item" data-section="packages">Tour Packages</a>
+    <a href="#" class="nav-item" data-section="bookings">Bookings</a>
+    <a href="#" class="nav-item" data-section="payments">Payments</a>
+    <a href="#" class="nav-item" data-section="contact">Contact Messages</a>
+    <a href="#" class="nav-item" data-section="newsletter">Newsletter</a>
+    <div class="spacer"></div>
+    <a href="index.html" class="nav-item">&larr; Back to site</a>
+    <a href="#" class="nav-item logout" id="logoutBtn">Logout</a>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Dashboard</h1>
+      <span id="adminName" class="back-link"></span>
+    </div>
+
+    <section class="section active" id="section-reports">
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="panel">
+        <h2>Bookings by type</h2>
+        <div id="bookingsByType" class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <section class="section" id="section-users">
+      <div class="panel">
+        <h2>All users</h2>
+        <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-flights"></section>
+    <section class="section" id="section-hotels"></section>
+    <section class="section" id="section-cruises"></section>
+    <section class="section" id="section-packages"></section>
+
+    <section class="section" id="section-bookings">
+      <div class="panel">
+        <h2>All bookings</h2>
+        <div class="table-wrap"><table id="bookingsTable"><thead><tr><th>Customer</th><th>Type</th><th>Item</th><th>Price</th><th>Travel date</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-payments">
+      <div class="panel">
+        <h2>All payments</h2>
+        <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th><th>Date</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-contact">
+      <div class="panel">
+        <h2>Contact messages</h2>
+        <div class="table-wrap"><table id="contactTable"><thead><tr><th>Name</th><th>Email</th><th>Subject</th><th>Message</th><th>Date</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-newsletter">
+      <div class="panel">
+        <h2>Newsletter subscribers</h2>
+        <div class="table-wrap"><table id="newsletterTable"><thead><tr><th>Email</th><th>Subscribed</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+'use strict';
+const API_BASE = 'http://127.0.0.1:8000';
+
+const access = localStorage.getItem('jwt_access');
+const role = localStorage.getItem('jwt_user_role');
+if (!access || role !== 'admin') {
+  window.location.href = 'index.html';
+}
+document.getElementById('adminName').textContent = localStorage.getItem('jwt_user_name') || '';
+
+function authHeaders() {
+  return { Authorization: `Bearer ${localStorage.getItem('jwt_access')}` };
+}
+function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+
+document.getElementById('logoutBtn').addEventListener('click', e => {
+  e.preventDefault();
+  localStorage.removeItem('jwt_access');
+  localStorage.removeItem('jwt_refresh');
+  localStorage.removeItem('jwt_user_name');
+  localStorage.removeItem('jwt_user_role');
+  window.location.href = 'index.html';
+});
+
+/* ---------- Section navigation ---------- */
+const sectionTitles = {
+  reports: 'Dashboard', users: 'Users', flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
+  packages: 'Tour Packages', bookings: 'Bookings', payments: 'Payments', contact: 'Contact Messages', newsletter: 'Newsletter',
+};
+const loadedSections = new Set();
+document.querySelectorAll('.nav-item[data-section]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const name = link.dataset.section;
+    document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l === link));
+    document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${name}`));
+    document.getElementById('pageTitle').textContent = sectionTitles[name];
+    if (!loadedSections.has(name)) {
+      loadedSections.add(name);
+      loadSection(name);
+    }
+  });
+});
+
+function loadSection(name) {
+  if (name === 'reports') return loadReports();
+  if (name === 'users') return loadUsers();
+  if (name === 'bookings') return loadBookings();
+  if (name === 'payments') return loadPayments();
+  if (name === 'contact') return loadContact();
+  if (name === 'newsletter') return loadNewsletter();
+  if (['flights', 'hotels', 'cruises', 'packages'].includes(name)) return renderContentSection(name);
+}
+
+/* ---------- Reports ---------- */
+async function loadReports() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/reports`, { headers: authHeaders() });
+    document.getElementById('statGrid').innerHTML = `
+      <div class="stat-card"><div class="num">${data.total_users}</div><div class="label">Total Users</div></div>
+      <div class="stat-card"><div class="num">${data.total_bookings}</div><div class="label">Total Bookings</div></div>
+      <div class="stat-card"><div class="num">${money(data.total_revenue)}</div><div class="label">Total Revenue</div></div>
+      <div class="stat-card"><div class="num">${data.newsletter_subscribers}</div><div class="label">Newsletter Subs</div></div>
+      <div class="stat-card"><div class="num">${data.contact_messages}</div><div class="label">Contact Messages</div></div>
+    `;
+    const types = Object.entries(data.bookings_by_type);
+    document.getElementById('bookingsByType').outerHTML = types.length
+      ? `<div class="table-wrap"><table id="bookingsByType"><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>${
+          types.map(([type, count]) => `<tr><td style="text-transform:capitalize">${type}</td><td>${count}</td></tr>`).join('')
+        }</tbody></table></div>`
+      : '<div class="empty-state" id="bookingsByType">No bookings yet.</div>';
+  } catch (err) {
+    document.getElementById('statGrid').innerHTML = `<div class="msg error">Failed to load reports.</div>`;
+  }
+}
+
+/* ---------- Users ---------- */
+async function loadUsers() {
+  const tbody = document.querySelector('#usersTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/users`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td>${u.full_name}</td>
+        <td>${u.email}</td>
+        <td style="text-transform:capitalize">${u.role}</td>
+        <td><span class="badge ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>${u.role === 'admin' ? '' : `<button class="btn btn-sm ${u.is_active ? 'btn-danger' : 'btn-navy'}" data-toggle-user="${u.id}" data-next="${!u.is_active}">${u.is_active ? 'Deactivate' : 'Activate'}</button>`}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="5" class="empty-state">No users yet.</td></tr>`;
+    tbody.querySelectorAll('[data-toggle-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/admin/users/${btn.dataset.toggleUser}`, { is_active: btn.dataset.next === 'true' }, { headers: authHeaders() });
+          loadUsers();
+        } catch (err) { alert('Failed to update user.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load users.</td></tr>`;
+  }
+}
+
+/* ---------- Bookings ---------- */
+async function loadBookings() {
+  const tbody = document.querySelector('#bookingsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/bookings`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(b => `
+      <tr>
+        <td>${b.user_email}</td>
+        <td style="text-transform:capitalize">${b.booking_type}</td>
+        <td>#${b.item_id}</td>
+        <td>${money(b.total_price)}</td>
+        <td>${fmtDate(b.travel_date)}</td>
+        <td>
+          <select class="status-select" data-booking-id="${b.id}">
+            ${['pending', 'confirmed', 'cancelled'].map(s => `<option value="${s}" ${s === b.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="6" class="empty-state">No bookings yet.</td></tr>`;
+    tbody.querySelectorAll('[data-booking-id]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/admin/bookings/${sel.dataset.bookingId}`, { status: sel.value }, { headers: authHeaders() });
+        } catch (err) { alert('Failed to update booking status.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load bookings.</td></tr>`;
+  }
+}
+
+/* ---------- Payments ---------- */
+async function loadPayments() {
+  const tbody = document.querySelector('#paymentsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/payments`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${p.user_email}</td>
+        <td>${money(p.amount)}</td>
+        <td style="text-transform:capitalize">${p.method}</td>
+        <td><span class="badge ${p.status}">${p.status}</span></td>
+        <td>${p.transaction_ref}</td>
+        <td>${fmtDate(p.created_at)}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="6" class="empty-state">No payments yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load payments.</td></tr>`;
+  }
+}
+
+/* ---------- Contact ---------- */
+async function loadContact() {
+  const tbody = document.querySelector('#contactTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/contact`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(c => `
+      <tr><td>${c.name}</td><td>${c.email}</td><td>${c.subject || '—'}</td><td>${c.message}</td><td>${fmtDate(c.created_at)}</td></tr>
+    `).join('') || `<tr><td colspan="5" class="empty-state">No messages yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load messages.</td></tr>`;
+  }
+}
+
+/* ---------- Newsletter ---------- */
+async function loadNewsletter() {
+  const tbody = document.querySelector('#newsletterTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/newsletter`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(n => `<tr><td>${n.email}</td><td>${fmtDate(n.subscribed_at)}</td></tr>`).join('')
+      || `<tr><td colspan="2" class="empty-state">No subscribers yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2" class="empty-state">Failed to load subscribers.</td></tr>`;
+  }
+}
+
+/* ---------- Content CRUD (Flights / Hotels / Cruises / Packages) ---------- */
+const contentConfig = {
+  flights: {
+    endpoint: 'flights', title: 'Flights',
+    columns: [
+      { key: 'airline', label: 'Airline' },
+      { key: 'from_airport', label: 'From' },
+      { key: 'to_airport', label: 'To' },
+      { key: 'departure_time', label: 'Departs', fmt: v => new Date(v).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) },
+      { key: 'cabin_class', label: 'Cabin' },
+      { key: 'price', label: 'Price', fmt: money },
+      { key: 'seats_available', label: 'Seats' },
+    ],
+    fields: [
+      { key: 'airline', label: 'Airline', type: 'text' },
+      { key: 'from_airport', label: 'From Airport', type: 'text' },
+      { key: 'to_airport', label: 'To Airport', type: 'text' },
+      { key: 'departure_time', label: 'Departure', type: 'datetime-local' },
+      { key: 'arrival_time', label: 'Arrival', type: 'datetime-local' },
+      { key: 'cabin_class', label: 'Cabin Class', type: 'text', default: 'Economy' },
+      { key: 'price', label: 'Price (₹)', type: 'number' },
+      { key: 'seats_available', label: 'Seats Available', type: 'number', default: 0 },
+    ],
+  },
+  hotels: {
+    endpoint: 'hotels', title: 'Hotels',
+    columns: [
+      { key: 'name', label: 'Name' }, { key: 'location', label: 'Location' },
+      { key: 'price_per_night', label: 'Price/night', fmt: money }, { key: 'rating', label: 'Rating' },
+      { key: 'rooms_available', label: 'Rooms' },
+    ],
+    fields: [
+      { key: 'name', label: 'Hotel Name', type: 'text' },
+      { key: 'location', label: 'Location', type: 'text' },
+      { key: 'price_per_night', label: 'Price/night (₹)', type: 'number' },
+      { key: 'rating', label: 'Rating', type: 'number', step: '0.1', default: 4.5 },
+      { key: 'amenities', label: 'Amenities', type: 'text' },
+      { key: 'image_url', label: 'Image URL', type: 'text' },
+      { key: 'rooms_available', label: 'Rooms Available', type: 'number', default: 0 },
+    ],
+  },
+  cruises: {
+    endpoint: 'cruises', title: 'Cruises',
+    columns: [
+      { key: 'name', label: 'Name' }, { key: 'cruise_type', label: 'Type' }, { key: 'departure_port', label: 'Departs From' },
+      { key: 'duration_days', label: 'Days' }, { key: 'price', label: 'Price', fmt: money }, { key: 'departure_month', label: 'Month' },
+    ],
+    fields: [
+      { key: 'name', label: 'Cruise Name', type: 'text' },
+      { key: 'cruise_type', label: 'Cruise Type', type: 'text' },
+      { key: 'departure_port', label: 'Departure Port', type: 'text' },
+      { key: 'duration_days', label: 'Duration (Days)', type: 'number' },
+      { key: 'price', label: 'Price (₹)', type: 'number' },
+      { key: 'departure_month', label: 'Departure Month', type: 'text' },
+    ],
+  },
+  packages: {
+    endpoint: 'packages', title: 'Tour Packages',
+    columns: [
+      { key: 'title', label: 'Title' }, { key: 'package_type', label: 'Type' }, { key: 'duration_days', label: 'Days' },
+      { key: 'price', label: 'Price', fmt: money }, { key: 'rating', label: 'Rating' },
+    ],
+    fields: [
+      { key: 'title', label: 'Package Title', type: 'text' },
+      { key: 'package_type', label: 'Package Type', type: 'text' },
+      { key: 'duration_days', label: 'Duration (Days)', type: 'number' },
+      { key: 'price', label: 'Price (₹)', type: 'number' },
+      { key: 'rating', label: 'Rating', type: 'number', step: '0.1', default: 4.5 },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'image_url', label: 'Image URL', type: 'text' },
+    ],
+  },
+};
+
+function renderContentSection(name) {
+  const cfg = contentConfig[name];
+  const section = document.getElementById(`section-${name}`);
+  section.innerHTML = `
+    <div class="panel">
+      <h2>Add new ${cfg.title.replace(/s$/, '')}</h2>
+      <form id="form-${name}">
+        <div class="form-grid">
+          ${cfg.fields.map(f => `
+            <div class="form-field">
+              <label>${f.label}</label>
+              <input name="${f.key}" type="${f.type}" ${f.step ? `step="${f.step}"` : ''} value="${f.default ?? ''}" ${f.type !== 'text' ? 'required' : ''}>
+            </div>
+          `).join('')}
+        </div>
+        <button type="submit" class="btn btn-coral">Add ${cfg.title.replace(/s$/, '')}</button>
+        <div class="msg" id="msg-${name}"></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h2>${cfg.title}</h2>
+      <div class="table-wrap">
+        <table id="table-${name}">
+          <thead><tr>${cfg.columns.map(c => `<th>${c.label}</th>`).join('')}<th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById(`form-${name}`).addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target;
+    const payload = {};
+    cfg.fields.forEach(f => {
+      const raw = form.elements[f.key].value;
+      payload[f.key] = f.type === 'number' ? Number(raw) : raw;
+    });
+    const msg = document.getElementById(`msg-${name}`);
+    try {
+      await axios.post(`${API_BASE}/api/${cfg.endpoint}`, payload, { headers: authHeaders() });
+      msg.textContent = 'Added successfully.';
+      msg.className = 'msg success';
+      form.reset();
+      loadContentTable(name);
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to add.';
+      msg.className = 'msg error';
+    }
+  });
+
+  loadContentTable(name);
+}
+
+async function loadContentTable(name) {
+  const cfg = contentConfig[name];
+  const tbody = document.querySelector(`#table-${name} tbody`);
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/${cfg.endpoint}`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(item => `
+      <tr>
+        ${cfg.columns.map(c => `<td>${c.fmt ? c.fmt(item[c.key]) : (item[c.key] ?? '—')}</td>`).join('')}
+        <td><button class="btn btn-sm btn-danger" data-delete-id="${item.id}">Delete</button></td>
+      </tr>
+    `).join('') || `<tr><td colspan="${cfg.columns.length + 1}" class="empty-state">Nothing here yet.</td></tr>`;
+    tbody.querySelectorAll('[data-delete-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this item?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/${cfg.endpoint}/${btn.dataset.deleteId}`, { headers: authHeaders() });
+          loadContentTable(name);
+        } catch (err) { alert('Failed to delete.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="${cfg.columns.length + 1}" class="empty-state">Failed to load.</td></tr>`;
+  }
+}
+
+loadReports();
+</script>
+</body>
+</html>

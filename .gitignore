@@ -1,0 +1,9 @@
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/venv/
+backend/.venv/
+*.pyc
+*.db
+.netlify/
+.claude/settings.local.json
