@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_admin, get_current_user
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.auth import MessageResponse, UserResponse
-from app.schemas.user import ChangePasswordRequest, ProfileUpdate, SetActiveRequest
-from app.services import user_service
+from app.schemas.pagination import Page
+from app.schemas.user import AdminUserCreate, AdminUserUpdate, ChangePasswordRequest, ProfileUpdate, SetActiveRequest
+from app.services import activity_service, user_service
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 admin_router = APIRouter(prefix="/api/admin/users", tags=["admin"])
@@ -18,7 +19,12 @@ def _user_response(user: User) -> UserResponse:
     )
 
 
-@router.put("/me", response_model=UserResponse)
+@router.put(
+    "/me",
+    response_model=UserResponse,
+    summary="Update my profile",
+    description="Requires authentication. Updates the current user's full name.",
+)
 def update_my_profile(
     payload: ProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -26,7 +32,12 @@ def update_my_profile(
     return _user_response(user)
 
 
-@router.post("/change-password", response_model=MessageResponse)
+@router.post(
+    "/change-password",
+    response_model=MessageResponse,
+    summary="Change my password",
+    description="Requires authentication. Verifies the current password and sets a new one.",
+)
 def change_my_password(
     payload: ChangePasswordRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -34,14 +45,76 @@ def change_my_password(
     return MessageResponse(message="Password updated successfully")
 
 
-@admin_router.get("", response_model=list[UserResponse])
-def list_users(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
-    return [_user_response(u) for u in user_service.list_all_users(db)]
+@admin_router.get(
+    "",
+    response_model=Page[UserResponse],
+    summary="List all users (admin)",
+    description="Requires admin role. Returns a paginated list of all user accounts.",
+)
+def list_users(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    users, total = user_service.list_all_users_paginated(db, page, page_size)
+    return Page.build([_user_response(u) for u in users], total, page, page_size)
 
 
-@admin_router.patch("/{user_id}", response_model=UserResponse)
+@admin_router.post(
+    "",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a user (admin)",
+    description="Requires admin role. Creates a new user account with the given role.",
+)
+def create_user(
+    payload: AdminUserCreate, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    user = user_service.create_user_by_admin(db, payload.full_name, payload.email, payload.password, payload.role)
+    activity_service.log_activity(db, _admin.id, f"Admin created user {user.email}")
+    return _user_response(user)
+
+
+@admin_router.put(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Update a user (admin)",
+    description="Requires admin role. Updates a user's name, email, and role.",
+)
+def update_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    user = user_service.update_user_by_admin(db, user_id, payload.full_name, payload.email, payload.role)
+    activity_service.log_activity(db, _admin.id, f"Admin updated user {user.email}")
+    return _user_response(user)
+
+
+@admin_router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a user (admin)",
+    description="Requires admin role. Permanently deletes a user account.",
+)
+def delete_user(user_id: int, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    user_service.delete_user(db, user_id)
+    activity_service.log_activity(db, _admin.id, f"Admin deleted user #{user_id}")
+
+
+@admin_router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Activate/deactivate a user (admin)",
+    description="Requires admin role. Sets whether a user account is active, which controls their ability to log in.",
+)
 def set_user_active(
     user_id: int, payload: SetActiveRequest, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
 ):
     user = user_service.set_user_active(db, user_id, payload.is_active)
+    activity_service.log_activity(
+        db, _admin.id, f"Admin {'activated' if payload.is_active else 'deactivated'} user {user.email}"
+    )
     return _user_response(user)

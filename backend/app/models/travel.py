@@ -59,4 +59,5 @@ class TourPackage(Base):
     rating: Mapped[float] = mapped_column(default=0)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    available_month: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)

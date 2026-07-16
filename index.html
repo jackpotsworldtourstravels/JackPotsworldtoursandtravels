@@ -260,6 +260,33 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   .result-book{order:3; width:100%; justify-content:center;}
 }
 
+/* ---------- WISHLIST + REVIEWS controls (shared by result cards and package cards) ---------- */
+.card-actions{display:flex; align-items:center; gap:10px;}
+.wl-btn{width:38px; height:38px; border-radius:50%; background:rgba(10,37,64,0.06); color:var(--muted); font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s ease, color .2s ease; flex-shrink:0;}
+.wl-btn:hover{background:var(--coral-hover); color:var(--coral);}
+.wl-btn.saved{color:var(--coral); background:var(--coral-hover);}
+.review-link{font-size:12.5px; font-weight:700; color:var(--sky); white-space:nowrap;}
+.review-link:hover{text-decoration:underline;}
+.pkg-actions{display:flex; align-items:center; gap:10px; margin-top:12px;}
+.review-item{border-bottom:1px solid var(--line); padding:14px 0;}
+.review-item:last-child{border-bottom:none;}
+.review-item .stars{color:var(--gold); letter-spacing:1px; font-size:14px;}
+.review-item .rname{font-weight:700; font-size:13.5px; color:var(--navy);}
+.review-item .rdate{font-size:12px; color:var(--muted);}
+.review-item .rcomment{font-size:13.5px; color:var(--navy); margin-top:6px; line-height:1.5;}
+.review-item .ractions{margin-top:8px; display:flex; gap:14px;}
+.review-item .ractions button{font-size:12px; font-weight:700; color:var(--coral-dark);}
+.star-input{display:flex; gap:6px; margin-bottom:16px; font-size:26px; color:var(--line);}
+.star-input span{cursor:pointer; transition:color .15s ease;}
+.star-input span.active{color:var(--gold);}
+.details-link{font-size:12.5px; font-weight:700; color:var(--navy); white-space:nowrap;}
+.details-link:hover{text-decoration:underline;}
+#detailsModalOverlay .modal-card{max-width:480px;}
+.detail-row{display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-bottom:1px dashed var(--line); font-size:14px;}
+.detail-row span:first-child{color:var(--muted);}
+.detail-row span:last-child{font-weight:700; color:var(--navy); text-align:right;}
+.detail-desc{font-size:13.5px; color:var(--navy); line-height:1.6; margin:14px 0; padding:14px; background:var(--bg); border-radius:12px;}
+
 /* ---------- OFFERS ---------- */
 .offers-section{background:var(--white); overflow:hidden;}
 .offers-track-wrap{overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);}
@@ -392,25 +419,6 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .stat-label{font-size:14px; color:rgba(255,255,255,0.65); margin-top:8px; font-weight:600;}
 @media (max-width:760px){.stats-grid{grid-template-columns:repeat(2,1fr); gap:36px;}}
 
-/* ---------- GALLERY ---------- */
-.gallery-section{background:var(--white);}
-.gallery-filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:36px;}
-.gfilter{padding:9px 18px; border-radius:100px; font-size:13.5px; font-weight:700; border:1px solid var(--line); color:var(--navy); transition:all .2s ease;}
-.gfilter.active, .gfilter:hover{background:var(--navy); color:#fff; border-color:var(--navy);}
-.masonry{column-count:4; column-gap:18px;}
-.g-item{break-inside:avoid; margin-bottom:18px; position:relative; border-radius:18px; overflow:hidden; cursor:pointer;}
-.g-item img{width:100%; display:block; transition:transform .5s ease; background:var(--navy-2);}
-.g-item:hover img{transform:scale(1.06);}
-.g-item::after{content:''; position:absolute; inset:0; background:linear-gradient(0deg, rgba(10,37,64,0.75), transparent 55%); opacity:0; transition:opacity .3s ease;}
-.g-item:hover::after{opacity:1;}
-.g-cat{position:absolute; left:14px; bottom:14px; z-index:2; color:#fff; font-weight:700; font-size:14px;}
-.g-explore{position:absolute; right:14px; bottom:14px; z-index:2; color:#fff; font-size:12.5px; font-weight:700; opacity:0; transform:translateX(-8px); transition:opacity .3s ease, transform .3s ease;}
-.g-item:hover .g-explore{opacity:1; transform:translateX(0);}
-.g-item.hidden{display:none;}
-@media (max-width:1000px){.masonry{column-count:3;}}
-@media (max-width:700px){.masonry{column-count:2;}}
-@media (max-width:460px){.masonry{column-count:1;}}
-
 /* ---------- PARTNERS ---------- */
 .partners-section{background:var(--white); padding:70px 0;}
 .partners-track-wrap{overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);}
@@ -434,6 +442,18 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .newsletter-msg{margin-top:14px; font-size:13.5px; font-weight:700; color:#fff; opacity:0; transition:opacity .3s ease;}
 .newsletter-msg.show{opacity:1;}
 @media (max-width:520px){.newsletter-form{flex-direction:column; border-radius:22px;} .newsletter-form input{padding:12px 14px;}}
+
+/* ---------- CONTACT FORM ---------- */
+.contact-section{background:var(--bg);}
+.contact-form-card{max-width:640px; margin:0 auto; background:#fff; border-radius:22px; box-shadow:var(--shadow-sm); padding:44px;}
+.contact-form-card .form-row{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.contact-form-card .modal-field textarea{
+  width:100%; padding:13px 16px; border-radius:12px; border:1.5px solid var(--line);
+  font-size:15px; font-family:var(--ff-body); color:var(--navy); outline:none; transition:border-color .2s ease;
+  resize:vertical; min-height:120px;
+}
+.contact-form-card .modal-field textarea:focus{border-color:var(--coral);}
+@media (max-width:560px){.contact-form-card{padding:26px;} .contact-form-card .form-row{grid-template-columns:1fr;}}
 
 /* ---------- CHATBOT ---------- */
 .chatbot-toggle{
@@ -930,9 +950,30 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
     <div class="newsletter-msg" id="newsletterMsg">You're subscribed! Watch your inbox for deals.</div>
   </div>
 </section>
+
+<section class="contact-section" id="contact" aria-labelledby="contactHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">We usually reply within a few hours</div><h2 id="contactHead">Get in touch</h2></div>
+      <p>Questions about a booking, a refund, or just want to plan something big? Send us a message.</p>
+    </div>
+    <div class="contact-form-card reveal">
+      <form id="contactForm" novalidate>
+        <div class="form-row">
+          <div class="modal-field"><label for="cName">Full Name</label><input id="cName" type="text" autocomplete="name" required placeholder="Your name"></div>
+          <div class="modal-field"><label for="cEmail">Email Address</label><input id="cEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+        </div>
+        <div class="modal-field"><label for="cSubject">Subject</label><input id="cSubject" type="text" placeholder="What's this about?"></div>
+        <div class="modal-field"><label for="cMessage">Message</label><textarea id="cMessage" required placeholder="Tell us more..."></textarea></div>
+        <button type="submit" class="btn btn-coral">Send Message</button>
+        <div class="modal-msg" id="contactMsg"></div>
+      </form>
+    </div>
+  </div>
+</section>
 </main>
 
-<footer id="contact">
+<footer>
   <div class="wrap">
     <div class="foot-grid">
       <div>
@@ -1022,12 +1063,56 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
   </div>
 </div>
 
+<div class="modal-overlay" id="reviewsModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reviewsModalTitle">
+    <button class="modal-close" id="reviewsModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <h2 id="reviewsModalTitle">Reviews</h2>
+    <p class="modal-sub" id="reviewsModalSub"></p>
+    <div id="reviewFormWrap">
+      <div class="star-input" id="reviewStarInput">
+        <span data-star="1">&#9733;</span><span data-star="2">&#9733;</span><span data-star="3">&#9733;</span><span data-star="4">&#9733;</span><span data-star="5">&#9733;</span>
+      </div>
+      <form id="reviewForm">
+        <div class="modal-field"><label for="reviewComment">Your review (optional)</label><input id="reviewComment" type="text" placeholder="Share your experience..."></div>
+        <button type="submit" class="btn btn-coral modal-submit" id="reviewSubmitBtn">Submit Review</button>
+        <div class="modal-msg" id="reviewFormMsg"></div>
+      </form>
+    </div>
+    <div id="reviewsList" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailsModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
+    <button class="modal-close" id="detailsModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <h2 id="detailsModalTitle">Details</h2>
+    <p class="modal-sub" id="detailsModalSub"></p>
+    <div id="detailsBody"></div>
+    <div class="modal-field" id="detailsDateField" style="display:none;">
+      <label for="detailsDate">Travel Date</label>
+      <input id="detailsDate" type="date">
+    </div>
+    <div class="modal-field">
+      <label id="detailsQtyLabel" for="detailsQty">Quantity</label>
+      <input id="detailsQty" type="number" min="1" value="1">
+    </div>
+    <button type="button" class="btn btn-coral modal-submit" id="detailsBookBtn">Book Now</button>
+    <div class="modal-msg" id="detailsMsg"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
 'use strict';
 
 /* Backend API base — update to your deployed backend URL once it's hosted */
 const API_BASE = 'http://127.0.0.1:8000';
+
+/* Escape user-supplied text before inserting into innerHTML templates */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
 
 /* Nav: header fades from transparent to solid black gradually over a long scroll range */
 const header = document.getElementById('siteHeader');
@@ -1213,18 +1298,6 @@ document.querySelectorAll('.stat-num').forEach(stat => {
   statObserver.observe(stat);
 });
 
-/* Gallery filter */
-document.querySelectorAll('.gfilter').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.gfilter').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const filter = btn.dataset.filter;
-    document.querySelectorAll('.g-item').forEach(item => {
-      item.classList.toggle('hidden', filter !== 'all' && item.dataset.cat !== filter);
-    });
-  });
-});
-
 /* Newsletter subscribe */
 document.getElementById('newsletterForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -1239,6 +1312,30 @@ document.getElementById('newsletterForm').addEventListener('submit', async e => 
   msg.classList.add('show');
   e.target.reset();
   setTimeout(() => msg.classList.remove('show'), 4000);
+});
+
+/* Contact form */
+document.getElementById('contactForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('contactMsg');
+  const payload = {
+    name: document.getElementById('cName').value,
+    email: document.getElementById('cEmail').value,
+    subject: document.getElementById('cSubject').value || undefined,
+    message: document.getElementById('cMessage').value,
+  };
+  try {
+    await axios.post(`${API_BASE}/api/contact`, payload);
+    msg.textContent = "Thanks for reaching out — our team will get back to you shortly.";
+    msg.style.color = 'var(--emerald)';
+    msg.classList.add('show');
+    e.target.reset();
+  } catch (err) {
+    const detail = err.response?.data?.detail;
+    msg.textContent = Array.isArray(detail) ? detail.map(d => d.msg).join(' ') : (detail || 'Something went wrong — please try again.');
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  }
 });
 
 /* Toast: lightweight confirmation banner, styled with existing design tokens */
@@ -1262,7 +1359,7 @@ function showToast(text, isError) {
 }
 
 /* Booking: shared handler for every "Book Now" button (package cards + search results) */
-async function handleBookNow(type, id, price, label) {
+async function handleBookNow(type, id, price, label, quantity = 1, travelDate = null) {
   const { access } = getStoredAuth();
   if (!access) {
     showToast('Please log in to book — opening login.', true);
@@ -1272,7 +1369,10 @@ async function handleBookNow(type, id, price, label) {
   try {
     await axios.post(
       `${API_BASE}/api/bookings`,
-      { booking_type: type, item_id: Number(id), total_price: Number(price) },
+      {
+        booking_type: type, item_id: Number(id), total_price: Number(price),
+        quantity: Number(quantity) || 1, travel_date: travelDate || undefined,
+      },
       { headers: { Authorization: `Bearer ${access}` } }
     );
     showToast(`Booked "${label}" — confirmation sent instantly!`);
@@ -1285,6 +1385,255 @@ document.addEventListener('click', e => {
   if (!bookBtn) return;
   e.preventDefault();
   handleBookNow(bookBtn.dataset.bookType, bookBtn.dataset.bookId, bookBtn.dataset.bookPrice, bookBtn.dataset.bookLabel);
+});
+
+/* Wishlist: "type:id" -> wishlist entry id, refreshed on load and after login */
+let wishlistMap = new Map();
+async function refreshWishlistState() {
+  wishlistMap = new Map();
+  const { access } = getStoredAuth();
+  if (!access) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
+    data.forEach(w => wishlistMap.set(`${w.item_type}:${w.item_id}`, w.id));
+  } catch (err) { /* ignore — hearts stay unfilled */ }
+}
+function applyWishlistState(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-wl-type]').forEach(btn => {
+    const saved = wishlistMap.has(`${btn.dataset.wlType}:${btn.dataset.wlId}`);
+    btn.classList.toggle('saved', saved);
+    btn.textContent = saved ? '♥' : '♡';
+  });
+}
+function cardActionsHtml(type, item, label) {
+  const id = item.id;
+  const detailsJson = JSON.stringify(item).replace(/'/g, '&apos;');
+  return `
+    <div class="card-actions">
+      <button type="button" class="wl-btn" data-wl-type="${type}" data-wl-id="${id}" aria-label="Save to wishlist">&#9825;</button>
+      <button type="button" class="review-link" data-review-type="${type}" data-review-id="${id}" data-review-label="${label}">&#9733; Reviews</button>
+      <button type="button" class="details-link" data-details-type="${type}" data-details-item='${detailsJson}'>View Details</button>
+    </div>`;
+}
+document.addEventListener('click', async e => {
+  const wlBtn = e.target.closest('[data-wl-type]');
+  if (!wlBtn) return;
+  e.preventDefault();
+  const { access } = getStoredAuth();
+  if (!access) { showToast('Please log in to save items — opening login.', true); openAuth('login'); return; }
+  const type = wlBtn.dataset.wlType;
+  const id = Number(wlBtn.dataset.wlId);
+  const key = `${type}:${id}`;
+  try {
+    if (wishlistMap.has(key)) {
+      await axios.delete(`${API_BASE}/api/wishlist/${wishlistMap.get(key)}`, { headers: { Authorization: `Bearer ${access}` } });
+      wishlistMap.delete(key);
+      showToast('Removed from wishlist.');
+    } else {
+      const { data } = await axios.post(
+        `${API_BASE}/api/wishlist`, { item_type: type, item_id: id }, { headers: { Authorization: `Bearer ${access}` } }
+      );
+      wishlistMap.set(key, data.id);
+      showToast('Saved to wishlist!');
+    }
+    applyWishlistState(wlBtn.closest('.pkg-grid, .search-results-list'));
+  } catch (err) { showToast(err.response?.data?.detail || 'Wishlist update failed.', true); }
+});
+refreshWishlistState();
+
+/* Reviews modal: shared by result cards and package cards */
+const reviewsModalOverlay = document.getElementById('reviewsModalOverlay');
+const reviewForm = document.getElementById('reviewForm');
+const reviewStarInput = document.getElementById('reviewStarInput');
+let currentReviewItem = null;
+let currentReviewRating = 0;
+let myReviewId = null;
+
+function setReviewStars(n) {
+  currentReviewRating = n;
+  reviewStarInput.querySelectorAll('span').forEach(s => s.classList.toggle('active', Number(s.dataset.star) <= n));
+}
+reviewStarInput.querySelectorAll('span').forEach(s => s.addEventListener('click', () => setReviewStars(Number(s.dataset.star))));
+
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
+
+async function openReviewsModal(type, id, label) {
+  currentReviewItem = { type, id };
+  myReviewId = null;
+  setReviewStars(0);
+  reviewForm.reset();
+  document.getElementById('reviewFormMsg').textContent = '';
+  document.getElementById('reviewSubmitBtn').textContent = 'Submit Review';
+  document.getElementById('reviewsModalSub').textContent = label;
+  document.getElementById('reviewsList').innerHTML = '<div class="empty-state">Loading reviews…</div>';
+  reviewsModalOverlay.classList.add('open');
+  const { access, userId } = getStoredAuth();
+  document.getElementById('reviewFormWrap').style.display = access ? 'block' : 'none';
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/reviews`, { params: { item_type: type, item_id: id } });
+    if (access && userId) {
+      const mine = data.find(r => String(r.user_id) === String(userId));
+      if (mine) {
+        myReviewId = mine.id;
+        setReviewStars(mine.rating);
+        document.getElementById('reviewComment').value = mine.comment || '';
+        document.getElementById('reviewSubmitBtn').textContent = 'Update Review';
+      }
+    }
+    document.getElementById('reviewsList').innerHTML = data.length
+      ? data.map(r => `
+        <div class="review-item">
+          <div class="rname">${escapeHtml(r.user_name)}</div>
+          <div class="stars">${starString(r.rating)}</div>
+          <div class="rdate">${new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+          ${r.comment ? `<div class="rcomment">${escapeHtml(r.comment)}</div>` : ''}
+          ${access && userId && String(r.user_id) === String(userId) ? `<div class="ractions"><button type="button" data-delete-review="${r.id}">Delete my review</button></div>` : ''}
+        </div>
+      `).join('')
+      : '<div class="empty-state">No reviews yet — be the first!</div>';
+    document.querySelectorAll('[data-delete-review]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete your review?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: { Authorization: `Bearer ${access}` } });
+          openReviewsModal(type, id, label);
+        } catch (err) { showToast('Failed to delete review.', true); }
+      });
+    });
+  } catch (err) {
+    document.getElementById('reviewsList').innerHTML = '<div class="empty-state">Failed to load reviews.</div>';
+  }
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-review-type]');
+  if (!btn) return;
+  e.preventDefault();
+  openReviewsModal(btn.dataset.reviewType, Number(btn.dataset.reviewId), btn.dataset.reviewLabel);
+});
+document.getElementById('reviewsModalCloseBtn').addEventListener('click', () => reviewsModalOverlay.classList.remove('open'));
+reviewsModalOverlay.addEventListener('click', e => { if (e.target === reviewsModalOverlay) reviewsModalOverlay.classList.remove('open'); });
+
+reviewForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('reviewFormMsg');
+  const { access } = getStoredAuth();
+  if (!currentReviewRating) {
+    msg.textContent = 'Please select a star rating.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+    return;
+  }
+  const comment = document.getElementById('reviewComment').value;
+  try {
+    if (myReviewId) {
+      await axios.put(`${API_BASE}/api/reviews/${myReviewId}`, { rating: currentReviewRating, comment }, { headers: { Authorization: `Bearer ${access}` } });
+    } else {
+      await axios.post(
+        `${API_BASE}/api/reviews`,
+        { item_type: currentReviewItem.type, item_id: currentReviewItem.id, rating: currentReviewRating, comment },
+        { headers: { Authorization: `Bearer ${access}` } }
+      );
+    }
+    msg.textContent = 'Thanks for your review!';
+    msg.style.color = 'var(--emerald)';
+    msg.classList.add('show');
+    openReviewsModal(currentReviewItem.type, currentReviewItem.id, document.getElementById('reviewsModalSub').textContent);
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to submit review.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  }
+});
+
+/* Details modal: shared by result cards and package cards */
+const detailsModalOverlay = document.getElementById('detailsModalOverlay');
+let currentDetailsItem = null;
+let currentDetailsType = null;
+let currentDetailsUnitPrice = 0;
+
+const detailsConfig = {
+  flight: {
+    qtyLabel: 'Passengers',
+    unitPrice: f => f.price,
+    rows: f => [
+      ['Airline', f.airline], ['From', f.from_airport], ['To', f.to_airport],
+      ['Departure', new Date(f.departure_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })],
+      ['Arrival', new Date(f.arrival_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })],
+      ['Cabin Class', f.cabin_class], ['Price', '₹' + Math.round(f.price).toLocaleString('en-IN')],
+      ['Seats Available', f.seats_available],
+    ],
+    dateField: f => (f.departure_time || '').slice(0, 10),
+  },
+  hotel: {
+    qtyLabel: 'Rooms',
+    unitPrice: h => h.price_per_night,
+    rows: h => [
+      ['Name', h.name], ['Location', h.location],
+      ['Price / Night', '₹' + Math.round(h.price_per_night).toLocaleString('en-IN')],
+      ['Rating', '★ ' + h.rating.toFixed(1)], ['Amenities', h.amenities || '—'],
+      ['Rooms Available', h.rooms_available],
+    ],
+    dateField: () => document.getElementById('hIn')?.closest('.field-date')?.querySelector('.date-native')?.value || '',
+  },
+  cruise: {
+    qtyLabel: 'Travellers',
+    unitPrice: c => c.price,
+    rows: c => [
+      ['Name', c.name], ['Type', c.cruise_type], ['Departure Port', c.departure_port],
+      ['Duration', c.duration_days + ' Days'], ['Price', '₹' + Math.round(c.price).toLocaleString('en-IN')],
+      ['Departure Month', c.departure_month],
+    ],
+    dateField: null,
+  },
+  package: {
+    qtyLabel: 'Travellers',
+    unitPrice: p => p.price,
+    rows: p => [
+      ['Title', p.title], ['Type', p.package_type], ['Duration', p.duration_days + ' Days'],
+      ['Price', '₹' + Math.round(p.price).toLocaleString('en-IN')], ['Rating', '★ ' + p.rating.toFixed(1)],
+      ['Available Month', p.available_month || '—'],
+    ],
+    dateField: null,
+  },
+};
+
+function openDetailsModal(type, item) {
+  const cfg = detailsConfig[type];
+  currentDetailsItem = item;
+  currentDetailsType = type;
+  currentDetailsUnitPrice = cfg.unitPrice(item);
+  document.getElementById('detailsModalTitle').textContent = item.title || item.name || `${item.airline} ${item.from_airport}→${item.to_airport}`;
+  document.getElementById('detailsModalSub').textContent = type.charAt(0).toUpperCase() + type.slice(1);
+  document.getElementById('detailsBody').innerHTML = cfg.rows(item).map(([label, value]) => `
+    <div class="detail-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(value)}</span></div>
+  `).join('') + (item.description ? `<div class="detail-desc">${escapeHtml(item.description)}</div>` : '');
+  document.getElementById('detailsQtyLabel').textContent = cfg.qtyLabel;
+  document.getElementById('detailsQty').value = 1;
+  document.getElementById('detailsMsg').textContent = '';
+  const dateField = document.getElementById('detailsDateField');
+  if (cfg.dateField) {
+    dateField.style.display = 'block';
+    document.getElementById('detailsDate').value = cfg.dateField(item);
+  } else {
+    dateField.style.display = 'none';
+  }
+  detailsModalOverlay.classList.add('open');
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-details-type]');
+  if (!btn) return;
+  e.preventDefault();
+  openDetailsModal(btn.dataset.detailsType, JSON.parse(btn.dataset.detailsItem.replace(/&apos;/g, "'")));
+});
+document.getElementById('detailsModalCloseBtn').addEventListener('click', () => detailsModalOverlay.classList.remove('open'));
+detailsModalOverlay.addEventListener('click', e => { if (e.target === detailsModalOverlay) detailsModalOverlay.classList.remove('open'); });
+document.getElementById('detailsBookBtn').addEventListener('click', () => {
+  const qty = Math.max(1, Number(document.getElementById('detailsQty').value) || 1);
+  const date = document.getElementById('detailsDateField').style.display !== 'none' ? document.getElementById('detailsDate').value : null;
+  const label = document.getElementById('detailsModalTitle').textContent;
+  handleBookNow(currentDetailsType, currentDetailsItem.id, currentDetailsUnitPrice * qty, label, qty, date);
+  detailsModalOverlay.classList.remove('open');
 });
 
 /* Featured tour packages: replace hardcoded cards with live data from the API */
@@ -1304,10 +1653,12 @@ async function loadFeaturedPackages() {
             <div class="pkg-price">Starting from<b>₹${Math.round(pkg.price).toLocaleString('en-IN')}</b></div>
             <a href="#" class="btn btn-coral pkg-book" data-book-type="package" data-book-id="${pkg.id}" data-book-price="${pkg.price}" data-book-label="${pkg.title}">Book Now</a>
           </div>
+          ${cardActionsHtml('package', pkg, pkg.title)}
         </div>
       </article>
     `).join('');
     grid.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+    applyWishlistState(grid);
   } catch (err) {
     /* API unreachable — keep the existing hardcoded cards visible */
   }
@@ -1315,14 +1666,39 @@ async function loadFeaturedPackages() {
 loadFeaturedPackages();
 
 /* Search results: wire each tab's Search button to the matching content API */
+/* Parse a count out of select text like "3 Passengers" or "5+ Guests" */
+function parseCount(text) {
+  const match = (text || '').match(/\d+/);
+  return match ? Number(match[0]) : 1;
+}
+/* Each date field pairs a readonly display input with a hidden real <input type="date"> */
+function nativeDateValue(displayInputId) {
+  const display = document.getElementById(displayInputId);
+  const native = display?.closest('.field-date')?.querySelector('.date-native');
+  return native?.value || undefined;
+}
+
 const searchEndpoints = {
   flights: () => ['flights', {
     from_airport: document.getElementById('fFrom').value,
     to_airport: document.getElementById('fTo').value,
+    departure_date: nativeDateValue('fDep'),
+    cabin_class: document.getElementById('fCabin').value,
+    passengers: parseCount(document.getElementById('fPax').value),
   }],
-  hotels: () => ['hotels', { location: document.getElementById('hDest').value }],
-  cruises: () => ['cruises', { cruise_type: document.getElementById('crType').value }],
-  packages: () => ['packages', { package_type: document.getElementById('pType').value }],
+  hotels: () => ['hotels', {
+    location: document.getElementById('hDest').value,
+    rooms: parseCount(document.getElementById('hRooms').value),
+  }],
+  cruises: () => ['cruises', {
+    cruise_type: document.getElementById('crType').value,
+    departure_month: document.getElementById('crMonth').value,
+    duration_days: parseCount(document.getElementById('crDur').value),
+  }],
+  packages: () => ['packages', {
+    package_type: document.getElementById('pType').value,
+    month: document.getElementById('pMonth').value,
+  }],
 };
 
 function renderSearchResults(tab, items) {
@@ -1345,6 +1721,7 @@ function renderSearchResults(tab, items) {
         </div>
         <div class="result-price">₹${Math.round(f.price).toLocaleString('en-IN')}</div>
         <a href="#" class="btn btn-coral result-book" data-book-type="flight" data-book-id="${f.id}" data-book-price="${f.price}" data-book-label="${f.airline} ${f.from_airport}→${f.to_airport}">Book Now</a>
+        ${cardActionsHtml('flight', f, `${f.airline} ${f.from_airport}→${f.to_airport}`)}
       </div>`,
     hotels: h => `
       <div class="result-card">
@@ -1354,6 +1731,7 @@ function renderSearchResults(tab, items) {
         </div>
         <div class="result-price">₹${Math.round(h.price_per_night).toLocaleString('en-IN')}<span>/night</span></div>
         <a href="#" class="btn btn-coral result-book" data-book-type="hotel" data-book-id="${h.id}" data-book-price="${h.price_per_night}" data-book-label="${h.name}">Book Now</a>
+        ${cardActionsHtml('hotel', h, h.name)}
       </div>`,
     cruises: c => `
       <div class="result-card">
@@ -1363,6 +1741,7 @@ function renderSearchResults(tab, items) {
         </div>
         <div class="result-price">₹${Math.round(c.price).toLocaleString('en-IN')}</div>
         <a href="#" class="btn btn-coral result-book" data-book-type="cruise" data-book-id="${c.id}" data-book-price="${c.price}" data-book-label="${c.name}">Book Now</a>
+        ${cardActionsHtml('cruise', c, c.name)}
       </div>`,
     packages: p => `
       <div class="result-card">
@@ -1372,9 +1751,11 @@ function renderSearchResults(tab, items) {
         </div>
         <div class="result-price">₹${Math.round(p.price).toLocaleString('en-IN')}</div>
         <a href="#" class="btn btn-coral result-book" data-book-type="package" data-book-id="${p.id}" data-book-price="${p.price}" data-book-label="${p.title}">Book Now</a>
+        ${cardActionsHtml('package', p, p.title)}
       </div>`,
   };
   list.innerHTML = items.map(cardFor[tab]).join('');
+  applyWishlistState(list);
 }
 
 document.querySelectorAll('.search-go').forEach(btn => {
@@ -1432,19 +1813,22 @@ function getStoredAuth() {
     refresh: localStorage.getItem('jwt_refresh'),
     name: localStorage.getItem('jwt_user_name'),
     role: localStorage.getItem('jwt_user_role'),
+    userId: localStorage.getItem('jwt_user_id'),
   };
 }
-function setStoredAuth(access, refresh, name, role) {
+function setStoredAuth(access, refresh, name, role, userId) {
   localStorage.setItem('jwt_access', access);
   localStorage.setItem('jwt_refresh', refresh);
   localStorage.setItem('jwt_user_name', name);
   localStorage.setItem('jwt_user_role', role);
+  if (userId != null) localStorage.setItem('jwt_user_id', userId);
 }
 function clearStoredAuth() {
   localStorage.removeItem('jwt_access');
   localStorage.removeItem('jwt_refresh');
   localStorage.removeItem('jwt_user_name');
   localStorage.removeItem('jwt_user_role');
+  localStorage.removeItem('jwt_user_id');
 }
 
 const authNavPairs = [
@@ -1493,7 +1877,12 @@ document.querySelectorAll('[data-auth]').forEach(el => {
     e.preventDefault();
     const { access, role } = getStoredAuth();
     if (access) {
-      if (el.dataset.auth === 'signup') { clearStoredAuth(); renderAuthNav(); }
+      if (el.dataset.auth === 'signup') {
+        axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+        clearStoredAuth();
+        wishlistMap = new Map();
+        renderAuthNav();
+      }
       else if (el.dataset.auth === 'login') { window.location.href = role === 'admin' ? 'admin.html' : 'dashboard.html'; }
       return;
     }
@@ -1523,8 +1912,15 @@ document.getElementById('signupForm').addEventListener('submit', async e => {
     const { data } = await axios.post(`${API_BASE}/api/auth/signup`, {
       full_name: fullName, email, password: pass,
     });
-    setStoredAuth(data.access_token, data.refresh_token, fullName, 'user');
+    const me = await axios.get(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    });
+    setStoredAuth(data.access_token, data.refresh_token, fullName, 'user', me.data.id);
     renderAuthNav();
+    refreshWishlistState().then(() => {
+      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
+      applyWishlistState(document.getElementById('searchResultsList'));
+    });
     msg.textContent = "Account created — you're all set!";
     msg.style.color = 'var(--emerald)';
     msg.classList.add('show');
@@ -1547,8 +1943,12 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     const me = await axios.get(`${API_BASE}/api/auth/me`, {
       headers: { Authorization: `Bearer ${data.access_token}` },
     });
-    setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role);
+    setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role, me.data.id);
     renderAuthNav();
+    refreshWishlistState().then(() => {
+      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
+      applyWishlistState(document.getElementById('searchResultsList'));
+    });
     msg.textContent = 'Logged in — welcome back!';
     msg.style.color = 'var(--emerald)';
     msg.classList.add('show');

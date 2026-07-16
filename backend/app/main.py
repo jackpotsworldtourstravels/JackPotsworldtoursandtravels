@@ -2,9 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import admin, auth, bookings, content, misc, users
+from app.database.session import SessionLocal
+from app.routers import admin, auth, bookings, content, misc, notifications, reviews, users, wishlist
+from app.services import user_service
 
-app = FastAPI(title="JackPots World Tours & Travels API", version="1.0.0")
+app = FastAPI(
+    title="JackPots World Tours & Travels API",
+    description=(
+        "REST API for the JackPots World Tours & Travels booking platform, covering flights, hotels, "
+        "cruises, and tour packages. Authentication uses JWT access/refresh tokens with separate user "
+        "and admin roles. Includes a booking and mock-payment flow, plus wishlist, reviews, "
+        "notifications, and activity-log features for end users, and reporting/CSV export tools for admins."
+    ),
+    version="1.0.0",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +36,19 @@ app.include_router(misc.contact_router)
 app.include_router(misc.newsletter_router)
 app.include_router(users.router)
 app.include_router(users.admin_router)
+app.include_router(wishlist.router)
+app.include_router(reviews.router)
+app.include_router(notifications.router)
 app.include_router(admin.router)
+
+
+@app.on_event("startup")
+def ensure_default_admin_exists():
+    db = SessionLocal()
+    try:
+        user_service.ensure_default_admin(db)
+    finally:
+        db.close()
 
 
 @app.get("/api/health", tags=["health"])

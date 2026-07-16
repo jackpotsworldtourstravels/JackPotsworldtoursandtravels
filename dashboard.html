@@ -48,7 +48,7 @@ h1.page-title{font-size:28px; margin-bottom:26px;}
 .form-field input:focus{outline:none; border-color:var(--coral);}
 
 .btn{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:14px; padding:12px 24px; border-radius:100px; transition:filter .2s ease;}
-.btn:hover{filter:brightness(1.06);}
+.btn:hover{filter:brightness(1.06);} 
 .btn-coral{background:var(--coral); color:#fff;}
 .btn-navy{background:var(--navy); color:#fff;}
 .btn-ghost{background:rgba(10,37,64,0.06); color:var(--navy);}
@@ -64,6 +64,14 @@ h1.page-title{font-size:28px; margin-bottom:26px;}
 .badge.confirmed{background:rgba(18,183,106,0.12); color:var(--emerald);}
 .badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
 .badge.cancelled{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.badge.unread{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.read{background:rgba(10,37,64,0.06); color:var(--muted);}
+.badge.success{background:rgba(18,183,106,0.12); color:var(--emerald);}
+.badge.failed{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky);}
+.star-input{display:flex; gap:6px; margin-bottom:16px; font-size:24px; color:var(--line);}
+.star-input span{cursor:pointer; transition:color .15s ease;}
+.star-input span.active{color:var(--gold);}
 .booking-actions{display:flex; gap:8px; flex-wrap:wrap;}
 .empty-state{color:var(--muted); font-size:13.5px; padding:20px 0; text-align:center;}
 table{width:100%; border-collapse:collapse; font-size:13.5px;}
@@ -80,12 +88,26 @@ tr:last-child td{border-bottom:none;}
 .confirm-row span:first-child{color:var(--muted);}
 .confirm-row span:last-child{font-weight:700; color:var(--navy);}
 .confirm-actions{display:flex; gap:10px; margin-top:24px;}
+.confirm-logo{height:40px; display:block; margin:0 auto 16px;}
+.receipt-footer{display:none; margin-top:20px; font-size:11px; color:var(--muted); text-align:center;}
+
+.timeline{display:flex; align-items:flex-start; margin:6px 0 22px;}
+.tl-step{display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; width:74px;}
+.tl-dot{width:16px; height:16px; border-radius:50%; background:var(--line); border:2px solid var(--line); box-sizing:border-box;}
+.tl-step.done .tl-dot{background:var(--emerald); border-color:var(--emerald);}
+.tl-step.cancelled-step .tl-dot{background:var(--coral-dark); border-color:var(--coral-dark);}
+.tl-label{font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; text-align:center;}
+.tl-step.done .tl-label{color:var(--navy);}
+.tl-step.cancelled-step .tl-label{color:var(--coral-dark);}
+.tl-line{flex:1; height:2px; background:var(--line); margin:7px -4px 0;}
+.tl-line.done{background:var(--emerald);}
 @media print{
   header.topbar, .tabs, .booking-actions, #confirmCloseBtn, #confirmPrintBtn{display:none !important;}
   .confirm-overlay{position:static; background:none;}
   .confirm-card{box-shadow:none; margin:0 auto;}
   body *{visibility:hidden;}
   .confirm-overlay, .confirm-overlay *{visibility:visible;}
+  .receipt-footer{display:block;}
 }
 </style>
 </head>
@@ -105,6 +127,9 @@ tr:last-child td{border-bottom:none;}
   <div class="tabs">
     <button class="tab-btn active" data-tab="bookings">My Bookings</button>
     <button class="tab-btn" data-tab="payments">Payment History</button>
+    <button class="tab-btn" data-tab="wishlist">Wishlist</button>
+    <button class="tab-btn" data-tab="notifications">Notifications</button>
+    <button class="tab-btn" data-tab="reviews">My Reviews</button>
     <button class="tab-btn" data-tab="profile">Profile</button>
   </div>
 
@@ -119,6 +144,27 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <h2>Payment history</h2>
       <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="tab-section" id="tab-wishlist">
+    <div class="panel">
+      <h2>My wishlist</h2>
+      <div id="wishlistList"><div class="empty-state">Loading…</div></div>
+    </div>
+  </section>
+
+  <section class="tab-section" id="tab-notifications">
+    <div class="panel">
+      <h2>Notifications</h2>
+      <div id="notificationsList"><div class="empty-state">Loading…</div></div>
+    </div>
+  </section>
+
+  <section class="tab-section" id="tab-reviews">
+    <div class="panel">
+      <h2>My reviews</h2>
+      <div id="reviewsList"><div class="empty-state">Loading…</div></div>
     </div>
   </section>
 
@@ -146,9 +192,11 @@ tr:last-child td{border-bottom:none;}
 
 <div class="confirm-overlay" id="confirmOverlay">
   <div class="confirm-card" id="confirmCard">
+    <img class="confirm-logo" src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
     <h2>Booking Confirmation</h2>
     <p class="sub">JackPots World Tours &amp; Travels</p>
     <div id="confirmBody"></div>
+    <p class="receipt-footer">Thank you for booking with JackPots World Tours &amp; Travels. For support, contact support@jackpotsworldtours.com</p>
     <div class="confirm-actions">
       <button class="btn btn-coral" id="confirmPrintBtn">Print / Save as PDF</button>
       <button class="btn btn-ghost" id="confirmCloseBtn">Close</button>
@@ -169,11 +217,17 @@ if (!access) {
 function authHeaders() {
   return { Authorization: `Bearer ${localStorage.getItem('jwt_access')}` };
 }
+/* Escape user-supplied text before inserting into innerHTML templates */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
 function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
 
-document.getElementById('logoutBtn').addEventListener('click', e => {
+document.getElementById('logoutBtn').addEventListener('click', async e => {
   e.preventDefault();
+  try { await axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: authHeaders() }); } catch (err) { /* ignore */ }
   localStorage.removeItem('jwt_access');
   localStorage.removeItem('jwt_refresh');
   localStorage.removeItem('jwt_user_name');
@@ -196,13 +250,27 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 function loadTab(name) {
   if (name === 'payments') return loadPayments();
   if (name === 'profile') return loadProfile();
+  if (name === 'wishlist') return loadWishlist();
+  if (name === 'notifications') return loadNotifications();
+  if (name === 'reviews') return loadReviews();
 }
 
 /* ---------- Bookings ---------- */
+let paymentsByBooking = new Map();
+async function loadPaymentsMap() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    paymentsByBooking = new Map(data.map(p => [p.booking_id, p]));
+  } catch (err) { /* receipt just won't show payment rows */ }
+}
+
 async function loadBookings() {
   const container = document.getElementById('bookingsList');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() });
+    const [{ data }] = await Promise.all([
+      axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }),
+      loadPaymentsMap(),
+    ]);
     if (!data.length) {
       container.innerHTML = '<div class="empty-state">No bookings yet — go find your next trip!</div>';
       return;
@@ -211,7 +279,7 @@ async function loadBookings() {
       <div class="booking-card">
         <div class="booking-main">
           <div class="booking-title">${b.booking_type} — #${b.item_id}</div>
-          <div class="booking-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel date ' + fmtDate(b.travel_date) : ''} · ${money(b.total_price)}</div>
+          <div class="booking-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel date ' + fmtDate(b.travel_date) : ''} ${b.quantity > 1 ? '· Qty ' + b.quantity : ''} · ${money(b.total_price)}</div>
         </div>
         <span class="badge ${b.status}">${b.status}</span>
         <div class="booking-actions">
@@ -229,8 +297,10 @@ async function loadBookings() {
         if (!confirm('Cancel this booking?')) return;
         try {
           await axios.delete(`${API_BASE}/api/bookings/${btn.dataset.cancelId}`, { headers: authHeaders() });
+          await loadPaymentsMap();
+          loadPayments();
           loadBookings();
-        } catch (err) { alert('Failed to cancel booking.'); }
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
       });
     });
   } catch (err) {
@@ -238,18 +308,53 @@ async function loadBookings() {
   }
 }
 
+/* Booking status timeline: derived from status + travel_date, no schema change needed */
+function renderTimeline(booking) {
+  if (booking.status === 'cancelled') {
+    return `
+      <div class="timeline">
+        <div class="tl-step done"><span class="tl-dot"></span><span class="tl-label">Booked</span></div>
+        <div class="tl-line done"></div>
+        <div class="tl-step cancelled-step"><span class="tl-dot"></span><span class="tl-label">Cancelled</span></div>
+      </div>`;
+  }
+  const isPastTravel = booking.travel_date && new Date(booking.travel_date) < new Date();
+  const confirmedDone = booking.status === 'confirmed';
+  const completedDone = confirmedDone && isPastTravel;
+  const steps = [
+    { label: 'Booked', done: true },
+    { label: 'Confirmed', done: confirmedDone },
+    { label: 'Completed', done: completedDone },
+  ];
+  return `
+    <div class="timeline">
+      ${steps.map((s, i) => `
+        ${i > 0 ? `<div class="tl-line ${steps[i - 1].done ? 'done' : ''}"></div>` : ''}
+        <div class="tl-step ${s.done ? 'done' : ''}"><span class="tl-dot"></span><span class="tl-label">${s.label}</span></div>
+      `).join('')}
+    </div>`;
+}
+
 function showConfirmation(bookingId) {
   const bookings = JSON.parse(document.getElementById('bookingsList').dataset.bookings || '[]');
   const booking = bookings.find(b => String(b.id) === String(bookingId));
   if (!booking) return;
+  const payment = paymentsByBooking.get(booking.id);
   document.getElementById('confirmBody').innerHTML = `
+    ${renderTimeline(booking)}
     <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
     <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
     <div class="confirm-row"><span>Item</span><span>#${booking.item_id}</span></div>
+    <div class="confirm-row"><span>Quantity</span><span>${booking.quantity}</span></div>
     <div class="confirm-row"><span>Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
     <div class="confirm-row"><span>Total Paid</span><span>${money(booking.total_price)}</span></div>
     <div class="confirm-row"><span>Travel Date</span><span>${fmtDate(booking.travel_date)}</span></div>
     <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
+    ${payment ? `
+      <div class="confirm-row"><span>Payment Method</span><span style="text-transform:capitalize">${payment.method}</span></div>
+      <div class="confirm-row"><span>Transaction Ref</span><span>${payment.transaction_ref}</span></div>
+      <div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>
+    ` : ''}
   `;
   document.getElementById('confirmOverlay').classList.add('open');
 }
@@ -264,7 +369,7 @@ async function loadPayments() {
   try {
     const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
     tbody.innerHTML = data.map(p => `
-      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${p.method}</td><td style="text-transform:capitalize">${p.status}</td><td>${p.transaction_ref}</td></tr>
+      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref)}</td></tr>
     `).join('') || `<tr><td colspan="5" class="empty-state">No payments yet.</td></tr>`;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load payment history.</td></tr>`;
@@ -308,6 +413,173 @@ document.getElementById('passwordForm').addEventListener('submit', async e => {
     msg.className = 'msg error';
   }
 });
+
+/* ---------- Wishlist ---------- */
+async function loadWishlist() {
+  const container = document.getElementById('wishlistList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="empty-state">Your wishlist is empty.</div>';
+      return;
+    }
+    const endpoints = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+    const catalogs = {};
+    await Promise.all([...new Set(data.map(w => w.item_type))].map(async t => {
+      const { data: items } = await axios.get(`${API_BASE}/api/${endpoints[t]}`);
+      catalogs[t] = new Map(items.map(i => [i.id, i]));
+    }));
+    const labelFor = (type, item) => {
+      if (!item) return `${type} #? (no longer available)`;
+      if (type === 'flight') return `${item.airline} ${item.from_airport}→${item.to_airport}`;
+      if (type === 'hotel') return item.name;
+      if (type === 'cruise') return item.name;
+      return item.title;
+    };
+    const priceFor = (type, item) => item ? money(type === 'hotel' ? item.price_per_night : item.price) : '—';
+    container.innerHTML = data.map(w => {
+      const item = catalogs[w.item_type]?.get(w.item_id);
+      return `
+        <div class="booking-card">
+          <div class="booking-main">
+            <div class="booking-title">${escapeHtml(labelFor(w.item_type, item))}</div>
+            <div class="booking-sub" style="text-transform:capitalize">${w.item_type} · ${priceFor(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>
+          </div>
+          <div class="booking-actions">
+            <button class="btn btn-sm" style="background:rgba(230,57,70,0.12); color:var(--coral-dark);" data-remove-wishlist="${w.id}">Remove</button>
+          </div>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.delete(`${API_BASE}/api/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
+          loadWishlist();
+        } catch (err) { alert('Failed to remove item.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state">Failed to load wishlist.</div>';
+  }
+}
+
+/* ---------- Notifications ---------- */
+async function loadNotifications() {
+  const container = document.getElementById('notificationsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="empty-state">No notifications yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(n => `
+      <div class="booking-card">
+        <div class="booking-main">
+          <div class="booking-title" style="text-transform:none;">${escapeHtml(n.title)}</div>
+          <div class="booking-sub">${escapeHtml(n.message)}</div>
+          <div class="booking-sub">${fmtDate(n.created_at)}</div>
+        </div>
+        <span class="badge ${n.is_read ? 'read' : 'unread'}">${n.is_read ? 'Read' : 'Unread'}</span>
+        <div class="booking-actions">
+          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" data-mark-read="${n.id}">Mark Read</button>` : ''}
+          <button class="btn btn-sm" style="background:rgba(230,57,70,0.12); color:var(--coral-dark);" data-delete-notification="${n.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-mark-read]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
+          loadNotifications();
+        } catch (err) { alert('Failed to mark as read.'); }
+      });
+    });
+    container.querySelectorAll('[data-delete-notification]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.delete(`${API_BASE}/api/notifications/${btn.dataset.deleteNotification}`, { headers: authHeaders() });
+          loadNotifications();
+        } catch (err) { alert('Failed to delete notification.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state">Failed to load notifications.</div>';
+  }
+}
+
+/* ---------- My Reviews ---------- */
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
+
+async function loadReviews() {
+  const container = document.getElementById('reviewsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/reviews/mine`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="empty-state">You haven\'t written any reviews yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(r => `
+      <div class="booking-card" data-review-row="${r.id}">
+        <div class="booking-main">
+          <div class="booking-title">${escapeHtml(r.item_type)} #${r.item_id}</div>
+          <div class="booking-sub" style="color:var(--gold); letter-spacing:1px;">${starString(r.rating)}</div>
+          ${r.comment ? `<div class="booking-sub">${escapeHtml(r.comment)}</div>` : ''}
+          <div class="booking-sub">${fmtDate(r.created_at)}</div>
+        </div>
+        <div class="booking-actions">
+          <button class="btn btn-ghost btn-sm" data-edit-review="${r.id}" data-rating="${r.rating}" data-comment="${escapeHtml(r.comment || '')}">Edit</button>
+          <button class="btn btn-sm" style="background:rgba(230,57,70,0.12); color:var(--coral-dark);" data-delete-review="${r.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-edit-review]').forEach(btn => {
+      btn.addEventListener('click', () => openReviewEdit(btn.dataset.editReview, Number(btn.dataset.rating), btn.dataset.comment));
+    });
+    container.querySelectorAll('[data-delete-review]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this review?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
+          loadReviews();
+        } catch (err) { alert('Failed to delete review.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="empty-state">Failed to load reviews.</div>';
+  }
+}
+
+function openReviewEdit(reviewId, rating, comment) {
+  const row = document.querySelector(`[data-review-row="${reviewId}"]`);
+  let selected = rating;
+  row.innerHTML = `
+    <div class="booking-main" style="width:100%;">
+      <div class="star-input" id="editStars-${reviewId}">
+        ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}" class="${n <= rating ? 'active' : ''}">★</span>`).join('')}
+      </div>
+      <input type="text" id="editComment-${reviewId}" value="${escapeHtml(comment)}" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; margin-bottom:10px;">
+      <div class="booking-actions">
+        <button class="btn btn-coral btn-sm" id="saveReview-${reviewId}">Save</button>
+        <button class="btn btn-ghost btn-sm" id="cancelReview-${reviewId}">Cancel</button>
+      </div>
+    </div>
+  `;
+  row.querySelectorAll(`#editStars-${reviewId} span`).forEach(s => {
+    s.addEventListener('click', () => {
+      selected = Number(s.dataset.star);
+      row.querySelectorAll(`#editStars-${reviewId} span`).forEach(x => x.classList.toggle('active', Number(x.dataset.star) <= selected));
+    });
+  });
+  document.getElementById(`cancelReview-${reviewId}`).addEventListener('click', loadReviews);
+  document.getElementById(`saveReview-${reviewId}`).addEventListener('click', async () => {
+    try {
+      await axios.put(`${API_BASE}/api/reviews/${reviewId}`, {
+        rating: selected, comment: document.getElementById(`editComment-${reviewId}`).value,
+      }, { headers: authHeaders() });
+      loadReviews();
+    } catch (err) { alert('Failed to update review.'); }
+  });
+}
 
 loadBookings();
 </script>

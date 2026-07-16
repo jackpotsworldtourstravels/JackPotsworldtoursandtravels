@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -14,9 +14,13 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
-from app.services import auth_service
+from app.services import activity_service, auth_service, notification_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
 
 
 def _user_response(user: User) -> UserResponse:
@@ -29,32 +33,74 @@ def _user_response(user: User) -> UserResponse:
     )
 
 
-@router.post("/signup", response_model=TokenResponse)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+@router.post(
+    "/signup",
+    response_model=TokenResponse,
+    summary="Register a new user",
+    description=(
+        "Public endpoint. Creates a new user account, sends a welcome notification, and returns a fresh "
+        "access/refresh token pair so the caller is immediately logged in."
+    ),
+)
+def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)):
     user = auth_service.signup(db, payload.full_name, payload.email, payload.password)
+    activity_service.log_activity(db, user.id, "Registration", _client_ip(request))
+    notification_service.create_notification(
+        db, user.id, "Welcome to JackPots World Tours!",
+        "Thanks for joining us — start exploring flights, hotels, cruises, and tour packages.",
+    )
     access_token, refresh_token = auth_service.issue_tokens(user)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="Log in with email and password",
+    description="Public endpoint. Verifies credentials, records a login activity entry, and returns a new access/refresh token pair.",
+)
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = auth_service.authenticate(db, payload.email, payload.password)
+    activity_service.log_activity(db, user.id, "Login", _client_ip(request))
     access_token, refresh_token = auth_service.issue_tokens(user)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Exchange a refresh token for a new token pair",
+    description="Public endpoint (the refresh token itself is the credential). Validates the refresh token and issues a new access/refresh token pair.",
+)
 def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     access_token, refresh_token = auth_service.refresh_access_token(db, payload.refresh_token)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
-@router.post("/logout", response_model=MessageResponse)
-def logout(current_user: User = Depends(get_current_user)):
+@router.post(
+    "/logout",
+    response_model=MessageResponse,
+    summary="Log out the current user",
+    description=(
+        "Requires authentication. Records a logout activity entry. Tokens are stateless JWTs, so the "
+        "client is responsible for discarding them; no server-side session is invalidated."
+    ),
+)
+def logout(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    activity_service.log_activity(db, current_user.id, "Logout", _client_ip(request))
     return MessageResponse(message="Logged out — discard your tokens client-side")
 
 
-@router.post("/forgot-password", response_model=MessageResponse)
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Start a password reset",
+    description=(
+        "Public endpoint. If the email matches an account, issues a reset token. Always returns a generic "
+        "success message regardless of whether the account exists, to avoid leaking which emails are registered. "
+        "Email delivery is not yet wired up, so the reset link is returned directly in the response."
+    ),
+)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     raw_token = auth_service.start_password_reset(db, payload.email)
     if raw_token is None:
@@ -66,12 +112,22 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     )
 
 
-@router.post("/reset-password", response_model=MessageResponse)
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Complete a password reset",
+    description="Public endpoint. Validates the reset token issued by /forgot-password and sets the new password.",
+)
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     auth_service.complete_password_reset(db, payload.token, payload.new_password)
     return MessageResponse(message="Password has been reset — you can now log in")
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get the current user's profile",
+    description="Requires authentication. Returns the profile of the user identified by the access token.",
+)
 def me(current_user: User = Depends(get_current_user)):
     return _user_response(current_user)

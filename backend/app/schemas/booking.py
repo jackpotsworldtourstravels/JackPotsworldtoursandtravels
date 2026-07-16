@@ -9,7 +9,8 @@ BookingType = Literal["flight", "hotel", "cruise", "package"]
 class BookingCreate(BaseModel):
     booking_type: BookingType
     item_id: int
-    total_price: float = Field(gt=0)
+    total_price: float = Field(gt=0, description="Client-estimated total; the server recalculates this from the catalog and ignores this value.")
+    quantity: int = Field(default=1, ge=1, description="Number of seats/rooms/travellers to book.")
     travel_date: datetime.date | None = None
 
 
@@ -20,6 +21,7 @@ class BookingOut(BaseModel):
     item_id: int
     status: str
     total_price: float
+    quantity: int
     travel_date: datetime.date | None
     created_at: datetime.datetime
 

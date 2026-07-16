@@ -17,6 +17,7 @@ from app.schemas.travel import (
     TourPackageCreate,
     TourPackageOut,
 )
+from app.services import activity_service
 
 flights_router = APIRouter(prefix="/api/flights", tags=["flights"])
 hotels_router = APIRouter(prefix="/api/hotels", tags=["hotels"])
@@ -32,11 +33,18 @@ def _get_or_404(db: Session, model, item_id: int):
 
 
 # ---------- Flights ----------
-@flights_router.get("", response_model=list[FlightOut])
+@flights_router.get(
+    "",
+    response_model=list[FlightOut],
+    summary="Search/list flights",
+    description="Public endpoint. Returns flights matching the given filters (route, date, cabin class, seats needed), ordered by price ascending. Filters are optional and combine with AND.",
+)
 def list_flights(
     from_airport: str | None = None,
     to_airport: str | None = None,
     departure_date: datetime.date | None = None,
+    cabin_class: str | None = None,
+    passengers: int | None = None,
     db: Session = Depends(get_db),
 ):
     stmt = select(Flight)
@@ -49,19 +57,35 @@ def list_flights(
             Flight.departure_time >= datetime.datetime.combine(departure_date, datetime.time.min),
             Flight.departure_time <= datetime.datetime.combine(departure_date, datetime.time.max),
         )
+    if cabin_class:
+        stmt = stmt.where(Flight.cabin_class.ilike(f"%{cabin_class}%"))
+    if passengers:
+        stmt = stmt.where(Flight.seats_available >= passengers)
     return db.scalars(stmt.order_by(Flight.price)).all()
 
 
-@flights_router.post("", response_model=FlightOut, status_code=status.HTTP_201_CREATED)
+@flights_router.post(
+    "",
+    response_model=FlightOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a flight",
+    description="Requires admin role. Adds a new flight to the catalog.",
+)
 def create_flight(payload: FlightCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     flight = Flight(**payload.model_dump())
     db.add(flight)
     db.commit()
     db.refresh(flight)
+    activity_service.log_activity(db, _admin.id, f"Admin created flight #{flight.id}")
     return flight
 
 
-@flights_router.put("/{flight_id}", response_model=FlightOut)
+@flights_router.put(
+    "/{flight_id}",
+    response_model=FlightOut,
+    summary="Update a flight",
+    description="Requires admin role. Replaces all fields of an existing flight. Returns 404 if the flight doesn't exist.",
+)
 def update_flight(
     flight_id: int, payload: FlightCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)
 ):
@@ -70,35 +94,61 @@ def update_flight(
         setattr(flight, key, value)
     db.commit()
     db.refresh(flight)
+    activity_service.log_activity(db, _admin.id, f"Admin updated flight #{flight_id}")
     return flight
 
 
-@flights_router.delete("/{flight_id}", status_code=status.HTTP_204_NO_CONTENT)
+@flights_router.delete(
+    "/{flight_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a flight",
+    description="Requires admin role. Permanently removes a flight from the catalog. Returns 404 if it doesn't exist.",
+)
 def delete_flight(flight_id: int, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     flight = _get_or_404(db, Flight, flight_id)
     db.delete(flight)
     db.commit()
+    activity_service.log_activity(db, _admin.id, f"Admin deleted flight #{flight_id}")
 
 
 # ---------- Hotels ----------
-@hotels_router.get("", response_model=list[HotelOut])
-def list_hotels(location: str | None = None, db: Session = Depends(get_db)):
+@hotels_router.get(
+    "",
+    response_model=list[HotelOut],
+    summary="Search/list hotels",
+    description="Public endpoint. Returns hotels matching the given filters (location, minimum rooms needed), ordered by price per night ascending.",
+)
+def list_hotels(location: str | None = None, rooms: int | None = None, db: Session = Depends(get_db)):
     stmt = select(Hotel)
     if location:
         stmt = stmt.where(Hotel.location.ilike(f"%{location}%"))
+    if rooms:
+        stmt = stmt.where(Hotel.rooms_available >= rooms)
     return db.scalars(stmt.order_by(Hotel.price_per_night)).all()
 
 
-@hotels_router.post("", response_model=HotelOut, status_code=status.HTTP_201_CREATED)
+@hotels_router.post(
+    "",
+    response_model=HotelOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a hotel",
+    description="Requires admin role. Adds a new hotel to the catalog.",
+)
 def create_hotel(payload: HotelCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     hotel = Hotel(**payload.model_dump())
     db.add(hotel)
     db.commit()
     db.refresh(hotel)
+    activity_service.log_activity(db, _admin.id, f"Admin created hotel #{hotel.id}")
     return hotel
 
 
-@hotels_router.put("/{hotel_id}", response_model=HotelOut)
+@hotels_router.put(
+    "/{hotel_id}",
+    response_model=HotelOut,
+    summary="Update a hotel",
+    description="Requires admin role. Replaces all fields of an existing hotel. Returns 404 if the hotel doesn't exist.",
+)
 def update_hotel(
     hotel_id: int, payload: HotelCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)
 ):
@@ -107,37 +157,68 @@ def update_hotel(
         setattr(hotel, key, value)
     db.commit()
     db.refresh(hotel)
+    activity_service.log_activity(db, _admin.id, f"Admin updated hotel #{hotel_id}")
     return hotel
 
 
-@hotels_router.delete("/{hotel_id}", status_code=status.HTTP_204_NO_CONTENT)
+@hotels_router.delete(
+    "/{hotel_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a hotel",
+    description="Requires admin role. Permanently removes a hotel from the catalog. Returns 404 if it doesn't exist.",
+)
 def delete_hotel(hotel_id: int, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     hotel = _get_or_404(db, Hotel, hotel_id)
     db.delete(hotel)
     db.commit()
+    activity_service.log_activity(db, _admin.id, f"Admin deleted hotel #{hotel_id}")
 
 
 # ---------- Cruises ----------
-@cruises_router.get("", response_model=list[CruiseOut])
-def list_cruises(cruise_type: str | None = None, departure_month: str | None = None, db: Session = Depends(get_db)):
+@cruises_router.get(
+    "",
+    response_model=list[CruiseOut],
+    summary="Search/list cruises",
+    description="Public endpoint. Returns cruises matching the given filters (type, departure month, duration), ordered by price ascending.",
+)
+def list_cruises(
+    cruise_type: str | None = None,
+    departure_month: str | None = None,
+    duration_days: int | None = None,
+    db: Session = Depends(get_db),
+):
     stmt = select(Cruise)
     if cruise_type:
         stmt = stmt.where(Cruise.cruise_type.ilike(f"%{cruise_type}%"))
     if departure_month:
         stmt = stmt.where(Cruise.departure_month == departure_month)
+    if duration_days:
+        stmt = stmt.where(Cruise.duration_days == duration_days)
     return db.scalars(stmt.order_by(Cruise.price)).all()
 
 
-@cruises_router.post("", response_model=CruiseOut, status_code=status.HTTP_201_CREATED)
+@cruises_router.post(
+    "",
+    response_model=CruiseOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a cruise",
+    description="Requires admin role. Adds a new cruise to the catalog.",
+)
 def create_cruise(payload: CruiseCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     cruise = Cruise(**payload.model_dump())
     db.add(cruise)
     db.commit()
     db.refresh(cruise)
+    activity_service.log_activity(db, _admin.id, f"Admin created cruise #{cruise.id}")
     return cruise
 
 
-@cruises_router.put("/{cruise_id}", response_model=CruiseOut)
+@cruises_router.put(
+    "/{cruise_id}",
+    response_model=CruiseOut,
+    summary="Update a cruise",
+    description="Requires admin role. Replaces all fields of an existing cruise. Returns 404 if the cruise doesn't exist.",
+)
 def update_cruise(
     cruise_id: int, payload: CruiseCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)
 ):
@@ -146,42 +227,69 @@ def update_cruise(
         setattr(cruise, key, value)
     db.commit()
     db.refresh(cruise)
+    activity_service.log_activity(db, _admin.id, f"Admin updated cruise #{cruise_id}")
     return cruise
 
 
-@cruises_router.delete("/{cruise_id}", status_code=status.HTTP_204_NO_CONTENT)
+@cruises_router.delete(
+    "/{cruise_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a cruise",
+    description="Requires admin role. Permanently removes a cruise from the catalog. Returns 404 if it doesn't exist.",
+)
 def delete_cruise(cruise_id: int, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     cruise = _get_or_404(db, Cruise, cruise_id)
     db.delete(cruise)
     db.commit()
+    activity_service.log_activity(db, _admin.id, f"Admin deleted cruise #{cruise_id}")
 
 
 # ---------- Tour Packages ----------
-@packages_router.get("", response_model=list[TourPackageOut])
+@packages_router.get(
+    "",
+    response_model=list[TourPackageOut],
+    summary="Search/list tour packages",
+    description="Public endpoint. Returns tour packages matching the given filters (type, available month), ordered by id, optionally capped with a limit.",
+)
 def list_packages(
     package_type: str | None = None,
+    month: str | None = None,
     limit: int | None = Query(default=None, gt=0, le=100),
     db: Session = Depends(get_db),
 ):
     stmt = select(TourPackage)
     if package_type:
         stmt = stmt.where(TourPackage.package_type.ilike(f"%{package_type}%"))
+    if month:
+        stmt = stmt.where(TourPackage.available_month == month)
     stmt = stmt.order_by(TourPackage.id)
     if limit:
         stmt = stmt.limit(limit)
     return db.scalars(stmt).all()
 
 
-@packages_router.post("", response_model=TourPackageOut, status_code=status.HTTP_201_CREATED)
+@packages_router.post(
+    "",
+    response_model=TourPackageOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a tour package",
+    description="Requires admin role. Adds a new tour package to the catalog.",
+)
 def create_package(payload: TourPackageCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     package = TourPackage(**payload.model_dump())
     db.add(package)
     db.commit()
     db.refresh(package)
+    activity_service.log_activity(db, _admin.id, f"Admin created package #{package.id}")
     return package
 
 
-@packages_router.put("/{package_id}", response_model=TourPackageOut)
+@packages_router.put(
+    "/{package_id}",
+    response_model=TourPackageOut,
+    summary="Update a tour package",
+    description="Requires admin role. Replaces all fields of an existing tour package. Returns 404 if the package doesn't exist.",
+)
 def update_package(
     package_id: int, payload: TourPackageCreate, db: Session = Depends(get_db), _admin=Depends(get_current_admin)
 ):
@@ -190,11 +298,18 @@ def update_package(
         setattr(package, key, value)
     db.commit()
     db.refresh(package)
+    activity_service.log_activity(db, _admin.id, f"Admin updated package #{package_id}")
     return package
 
 
-@packages_router.delete("/{package_id}", status_code=status.HTTP_204_NO_CONTENT)
+@packages_router.delete(
+    "/{package_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a tour package",
+    description="Requires admin role. Permanently removes a tour package from the catalog. Returns 404 if it doesn't exist.",
+)
 def delete_package(package_id: int, db: Session = Depends(get_db), _admin=Depends(get_current_admin)):
     package = _get_or_404(db, TourPackage, package_id)
     db.delete(package)
     db.commit()
+    activity_service.log_activity(db, _admin.id, f"Admin deleted package #{package_id}")

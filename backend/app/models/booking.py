@@ -15,6 +15,7 @@ class Booking(Base):
     item_id: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="pending")  # pending | confirmed | cancelled
     total_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    quantity: Mapped[int] = mapped_column(default=1)
     travel_date: Mapped[datetime.date | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
 

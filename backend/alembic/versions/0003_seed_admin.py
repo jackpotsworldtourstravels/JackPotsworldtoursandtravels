@@ -5,6 +5,7 @@ Revises: 0002_seed_content
 Create Date: 2026-07-10
 
 """
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -17,8 +18,13 @@ down_revision: Union[str, None] = "0002_seed_content"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-ADMIN_EMAIL = "admin@jackpotsworldtours.com"
-ADMIN_PASSWORD = "AdminPass#2026"
+# Fixed, documented default so this migration is reproducible no matter how
+# many times it's applied (fresh DB, or a downgrade/upgrade cycle) — a randomly
+# generated password here is unrecoverable once its one-time console print is
+# gone, which is exactly what kept breaking admin login. Override via
+# ADMIN_SEED_EMAIL / ADMIN_SEED_PASSWORD env vars for a real deployment.
+DEFAULT_ADMIN_EMAIL = "admin@jackpotsworldtours.com"
+DEFAULT_ADMIN_PASSWORD = "AdminPass#2026"
 
 
 def upgrade() -> None:
@@ -27,9 +33,12 @@ def upgrade() -> None:
     if admin_role_id is None:
         raise RuntimeError("admin role not found — run 0001_initial migration first")
 
-    existing = conn.execute(sa.text("SELECT id FROM users WHERE email = :email"), {"email": ADMIN_EMAIL}).scalar()
+    admin_email = os.environ.get("ADMIN_SEED_EMAIL", DEFAULT_ADMIN_EMAIL)
+    existing = conn.execute(sa.text("SELECT id FROM users WHERE email = :email"), {"email": admin_email}).scalar()
     if existing:
         return
+
+    admin_password = os.environ.get("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
 
     users_table = sa.table(
         "users",
@@ -44,8 +53,8 @@ def upgrade() -> None:
         [
             {
                 "full_name": "JackPots Admin",
-                "email": ADMIN_EMAIL,
-                "hashed_password": hash_password(ADMIN_PASSWORD),
+                "email": admin_email,
+                "hashed_password": hash_password(admin_password),
                 "role_id": admin_role_id,
                 "is_active": True,
             }
@@ -55,4 +64,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    conn.execute(sa.text("DELETE FROM users WHERE email = :email"), {"email": ADMIN_EMAIL})
+    admin_email = os.environ.get("ADMIN_SEED_EMAIL", DEFAULT_ADMIN_EMAIL)
+    conn.execute(sa.text("DELETE FROM users WHERE email = :email"), {"email": admin_email})
