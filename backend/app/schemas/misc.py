@@ -79,6 +79,22 @@ class MonthlyStatOut(BaseModel):
     bookings: int
 
 
+class TopItemOut(BaseModel):
+    item_type: str
+    item_id: int
+    name: str
+    bookings: int
+    revenue: float
+
+
+class MostActiveUserOut(BaseModel):
+    user_id: int
+    full_name: str
+    email: EmailStr
+    activity_count: int
+    last_active: datetime.datetime
+
+
 class ReportsOut(BaseModel):
     total_users: int
     active_users: int
@@ -97,3 +113,15 @@ class ReportsOut(BaseModel):
     recent_users: list[RecentUserOut]
     recent_bookings: list[RecentBookingOut]
     recent_payments: list[RecentPaymentOut]
+    today_users: int = 0
+    today_logins: int = 0
+    today_bookings: int = 0
+    today_revenue: float = 0
+    today_payments: int = 0
+    users_online: int = 0
+    active_sessions: int = 0
+    top_destinations: list[TopItemOut] = []
+    top_hotels: list[TopItemOut] = []
+    top_cruises: list[TopItemOut] = []
+    top_packages: list[TopItemOut] = []
+    most_active_users: list[MostActiveUserOut] = []

@@ -142,20 +142,13 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .hero-video-layer video{
   position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center;
   opacity:0; background:var(--navy);
+  transition:opacity 650ms ease;
 }
 .hero-video-layer video.active{opacity:1;}
-/* Each clip is framed individually so only sky/aircraft, resort, ship, or coastline
-   shows — never the ground-level clutter (tarmac vehicles, buildings, people). */
-.hero-video-layer video[data-video="flights"]{object-position:30% 35%;}
-.hero-video-layer video[data-video="hotels"]{object-position:center 38%;}
-.hero-video-layer video[data-video="cruises"]{object-position:center 55%;}
+/* Packages keeps its original tuned crop (clip unchanged). Flights/hotels/cruises use a
+   neutral center crop since those clips were replaced with new footage of unknown framing. */
 .hero-video-layer video[data-video="packages"]{object-position:center 40%;}
-/* On wide/desktop heroes the source clip maps close to 1:1 vertically (object-position
-   alone can't move the subject), so nudge the main subject (plane/ship/coastline) into
-   the upper-middle area, clear of the floating search card, via a contained zoom+shift. */
 @media (min-width:901px){
-  .hero-video-layer video[data-video="flights"]{transform:translate(40%,-45%) scale(1.9); transform-origin:center;}
-  .hero-video-layer video[data-video="cruises"]{transform:translate(35%,-63%) scale(2.3); transform-origin:center;}
   .hero-video-layer video[data-video="packages"]{transform:translate(0%,-15%) scale(1.4); transform-origin:center;}
 }
 .hero-overlay{
@@ -512,6 +505,111 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .modal-msg{margin-top:14px; font-size:13px; font-weight:600; color:var(--emerald); text-align:center; opacity:0; max-height:0; overflow:hidden; transition:opacity .3s ease;}
 .modal-msg.show{opacity:1; max-height:60px;}
 
+/* ---------- PROFILE CHIP (header, logged-in state) ---------- */
+.profile-chip-wrap{position:relative;}
+.profile-chip{display:flex; align-items:center; gap:9px; padding:6px 14px 6px 6px; border-radius:100px; background:rgba(10,37,64,0.05); transition:background .2s ease;}
+.profile-chip:hover{background:rgba(10,37,64,0.1);}
+.profile-chip-avatar{width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.profile-chip-name{font-size:13.5px; font-weight:700; color:var(--navy); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.profile-chip-chevron{width:14px; height:14px; color:var(--muted); transition:transform .2s ease; flex-shrink:0;}
+.profile-chip.open .profile-chip-chevron{transform:rotate(180deg);}
+.profile-dropdown{
+  position:absolute; top:calc(100% + 10px); right:0; background:#fff; border-radius:16px; box-shadow:var(--shadow-lg);
+  min-width:230px; padding:10px; display:none; z-index:350; border:1px solid var(--line);
+}
+.profile-dropdown.open{display:block;}
+.profile-dropdown a, .profile-dropdown button{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; border-radius:10px;
+  font-size:13.5px; font-weight:600; color:var(--navy); transition:background .15s ease;
+}
+.profile-dropdown a:hover, .profile-dropdown button:hover{background:rgba(10,37,64,0.06);}
+.profile-dropdown .dd-icon{width:17px; height:17px; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; color:var(--muted);}
+.profile-dropdown hr{border:none; border-top:1px solid var(--line); margin:6px 4px;}
+.profile-dropdown .logout-item{color:var(--coral-dark);}
+.profile-dropdown .logout-item .dd-icon{color:var(--coral-dark);}
+.mobile-account-links{display:none;}
+.mobile-nav.show-account .mobile-account-links{display:block;}
+.mobile-nav.show-account .mobile-auth-links{display:none;}
+
+/* ---------- ACCOUNT CENTER MODAL ---------- */
+#accountModalOverlay .modal-card{max-width:960px; padding:0; max-height:88vh; display:flex; flex-direction:column;}
+.acct-header{display:flex; align-items:center; gap:16px; padding:24px 30px; border-bottom:1px solid var(--line); flex-shrink:0;}
+.acct-header-avatar{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.acct-header-info{min-width:0; flex:1;}
+.acct-header-name{font-size:18px; font-weight:800; color:var(--navy);}
+.acct-header-email{font-size:13px; color:var(--muted); margin-top:2px;}
+.acct-body{display:flex; flex:1; min-height:0; overflow:hidden;}
+.acct-tabs{width:220px; flex-shrink:0; border-right:1px solid var(--line); padding:16px 10px; overflow-y:auto;}
+.acct-tab{display:flex; align-items:center; gap:11px; padding:11px 14px; border-radius:12px; font-size:13.5px; font-weight:700; color:var(--muted); margin-bottom:3px; transition:background .15s ease, color .15s ease;}
+.acct-tab:hover{background:rgba(10,37,64,0.05); color:var(--navy);}
+.acct-tab.active{background:var(--navy); color:#fff;}
+.acct-tab .dd-icon{width:17px; height:17px; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.acct-panels{flex:1; min-width:0; overflow-y:auto; padding:26px 32px;}
+.acct-panel{display:none;}
+.acct-panel.active{display:block;}
+.acct-panel h2{font-size:17px; margin-bottom:18px;}
+@media (max-width:760px){
+  #accountModalOverlay .modal-card{max-width:100%; height:92vh; max-height:92vh;}
+  .acct-body{flex-direction:column;}
+  .acct-tabs{width:100%; display:flex; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line); padding:10px;}
+  .acct-tab{white-space:nowrap; margin-bottom:0;}
+  .acct-panels{padding:20px;}
+}
+
+/* ---------- Account Center shared widgets (ported from the retired user dashboard) ---------- */
+.badge{display:inline-block; padding:5px 12px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap;}
+.badge.confirmed, .badge.success, .badge.resolved, .badge.closed, .badge.completed{background:rgba(18,183,106,0.12); color:var(--emerald);}
+.badge.pending, .badge.in_progress, .badge.open{background:rgba(255,176,32,0.18); color:#a06600;}
+.badge.cancelled, .badge.failed{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky, #2F80ED);}
+.badge.unread{background:rgba(255,176,32,0.18); color:#a06600;}
+.badge.read{background:rgba(10,37,64,0.06); color:var(--muted);}
+.acct-row{display:flex; align-items:center; gap:16px; padding:16px; border-radius:16px; background:#fff; border:1px solid var(--line); margin-bottom:12px; flex-wrap:wrap;}
+.acct-row .ar-icon{width:44px; height:44px; border-radius:12px; background:rgba(255,176,32,0.14); color:var(--gold-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.acct-row .ar-main{flex:1; min-width:160px;}
+.acct-row .ar-title{font-weight:700; font-size:14px; text-transform:capitalize;}
+.acct-row .ar-sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+.acct-row .ar-amount{font-weight:800; color:var(--navy); font-size:14.5px; white-space:nowrap;}
+.acct-form-field{margin-bottom:16px; max-width:420px;}
+.acct-form-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); margin-bottom:6px;}
+.acct-form-field input, .acct-form-field select{
+  width:100%; padding:12px 15px; border-radius:12px; border:1.5px solid var(--line); font-size:14px; color:var(--navy); outline:none; transition:border-color .2s ease;
+}
+.acct-form-field input:focus, .acct-form-field select:focus{border-color:var(--coral);}
+.acct-form-grid{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; max-width:620px;}
+.acct-msg{margin-top:12px; font-size:13px; font-weight:600;}
+.acct-msg.error{color:var(--coral-dark);} .acct-msg.success{color:var(--emerald);}
+.acct-star-input{display:flex; gap:6px; margin-bottom:16px; font-size:22px; color:var(--line);}
+.acct-star-input span{cursor:pointer; transition:color .15s ease;}
+.acct-star-input span.active{color:var(--gold);}
+.acct-table{width:100%; border-collapse:collapse; font-size:13.5px;}
+.acct-table th{text-align:left; padding:10px 12px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--line);}
+.acct-table td{padding:12px; border-bottom:1px solid var(--line);}
+.acct-table tr:last-child td{border-bottom:none;}
+.acct-table-wrap{overflow-x:auto;}
+.acct-empty{color:var(--muted); font-size:13px; padding:18px 0; text-align:center;}
+.acct-notif-item{padding:12px; border-radius:12px; background:#fff; border:1px solid var(--line); margin-bottom:10px;}
+.acct-notif-item.unread{border-color:rgba(255,176,32,0.4); background:rgba(255,176,32,0.05);}
+.acct-notif-item .nt{font-size:13.5px; font-weight:700; color:var(--navy);}
+.acct-notif-item .nm{font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4;}
+.acct-notif-item .ndate{font-size:11.5px; color:var(--muted); margin-top:4px;}
+.acct-notif-actions{display:flex; gap:8px; margin-top:8px;}
+
+/* ---------- Booking confirmation (ported, unchanged behavior) ---------- */
+.confirm-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed var(--line); font-size:14px;}
+.confirm-row span:first-child{color:var(--muted);}
+.confirm-row span:last-child{font-weight:700; color:var(--navy);}
+.timeline{display:flex; align-items:flex-start; margin:6px 0 22px;}
+.tl-step{display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; width:74px;}
+.tl-dot{width:16px; height:16px; border-radius:50%; background:var(--line); border:2px solid var(--line); box-sizing:border-box;}
+.tl-step.done .tl-dot{background:var(--emerald); border-color:var(--emerald);}
+.tl-step.cancelled-step .tl-dot{background:var(--coral-dark); border-color:var(--coral-dark);}
+.tl-label{font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; text-align:center;}
+.tl-step.done .tl-label{color:var(--navy);}
+.tl-step.cancelled-step .tl-label{color:var(--coral-dark);}
+.tl-line{flex:1; height:2px; background:var(--line); margin:7px -4px 0;}
+.tl-line.done{background:var(--emerald);}
+
 /* ---------- FOOTER ---------- */
 footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px;}
 .foot-grid{display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr 1fr; gap:36px; padding-bottom:50px; border-bottom:1px solid rgba(255,255,255,0.1);}
@@ -543,12 +641,30 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
       <a href="#" data-tab-link="flights">Flights</a>
       <a href="#" data-tab-link="hotels">Hotels</a>
       <a href="#" data-tab-link="cruises">Cruises</a>
-      <a href="#newsletter">Visa</a>
       <a href="#contact">Contact</a>
     </div>
     <div class="nav-actions">
       <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
       <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
+      <div class="profile-chip-wrap" id="profileChipWrap" style="display:none;">
+        <button type="button" class="profile-chip" id="profileChipBtn">
+          <span class="profile-chip-avatar" id="profileChipAvatar">U</span>
+          <span class="profile-chip-name" id="profileChipName">Traveler</span>
+          <svg class="profile-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <a href="#" data-acct-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</a>
+          <a href="#" data-acct-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</a>
+          <a href="#" data-acct-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</a>
+          <a href="#" data-acct-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</a>
+          <a href="#" data-acct-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</a>
+          <a href="#" data-acct-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</a>
+          <a href="#" data-acct-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</a>
+          <a href="#" data-acct-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+          <hr>
+          <button type="button" class="logout-item" id="profileLogoutBtn"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Logout</button>
+        </div>
+      </div>
       <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </nav>
@@ -558,10 +674,22 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
     <a href="#" data-tab-link="flights">Flights</a>
     <a href="#" data-tab-link="hotels">Hotels</a>
     <a href="#" data-tab-link="cruises">Cruises</a>
-    <a href="#newsletter">Visa</a>
     <a href="#contact">Contact</a>
-    <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
-    <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
+    <div class="mobile-auth-links">
+      <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
+      <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
+    </div>
+    <div class="mobile-account-links">
+      <a href="#" data-acct-tab="profile">My Profile</a>
+      <a href="#" data-acct-tab="bookings">My Bookings</a>
+      <a href="#" data-acct-tab="wishlist">Wishlist</a>
+      <a href="#" data-acct-tab="payments">Payment History</a>
+      <a href="#" data-acct-tab="notifications">Notifications</a>
+      <a href="#" data-acct-tab="support">Support Tickets</a>
+      <a href="#" data-acct-tab="reviews">Reviews</a>
+      <a href="#" data-acct-tab="settings">Settings</a>
+      <a href="#" id="mobileLogoutLink">Logout</a>
+    </div>
   </div>
 </header>
 
@@ -569,9 +697,9 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
 <section class="hero" id="home">
   <div class="hero-bg" id="heroBg"></div>
   <div class="hero-video-layer" id="heroVideoLayer">
-    <video class="active" data-video="flights" src="https://assets.mixkit.co/videos/13279/13279-720.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
-    <video data-video="hotels" data-src="https://assets.mixkit.co/videos/4045/4045-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-    <video data-video="cruises" data-src="https://assets.mixkit.co/videos/16923/16923-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+    <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video data-video="cruises" data-src="assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
     <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
   </div>
   <div class="hero-overlay"></div>
@@ -1053,7 +1181,7 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
       <p class="modal-sub">Log in to manage your bookings.</p>
       <form id="loginForm" novalidate>
         <div class="modal-field"><label for="liUser">Email Address or Username</label><input id="liUser" type="text" autocomplete="username" required placeholder="you@example.com"></div>
-        <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="password" autocomplete="current-password" required placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>
+        <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="text" autocomplete="current-password" required placeholder="Enter your password"></div>
         <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
         <button type="submit" class="btn btn-coral modal-submit">Login</button>
         <div class="modal-msg" id="loginMsg">Logged in — welcome back! (demo)</div>
@@ -1101,12 +1229,139 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
   </div>
 </div>
 
+<!-- ================= ACCOUNT CENTER (replaces the old separate User Dashboard) ================= -->
+<div class="modal-overlay" id="accountModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="acctHeaderName">
+    <button class="modal-close" id="acctModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <div class="acct-header">
+      <span class="acct-header-avatar" id="acctHeaderAvatar">U</span>
+      <div class="acct-header-info">
+        <div class="acct-header-name" id="acctHeaderName">Traveler</div>
+        <div class="acct-header-email" id="acctHeaderEmail">—</div>
+      </div>
+    </div>
+    <div class="acct-body">
+      <nav class="acct-tabs" id="acctTabs">
+        <div class="acct-tab" data-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</div>
+        <div class="acct-tab" data-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</div>
+        <div class="acct-tab" data-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</div>
+        <div class="acct-tab" data-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</div>
+        <div class="acct-tab" data-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</div>
+        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</div>
+        <div class="acct-tab" data-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</div>
+        <div class="acct-tab" data-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"/></svg>Settings</div>
+      </nav>
+      <div class="acct-panels">
+        <div class="acct-panel" id="acctPanel-profile">
+          <h2>My Profile</h2>
+          <form id="acctProfileForm">
+            <div class="acct-form-grid">
+              <div class="acct-form-field"><label>Full Name</label><input id="acctProfileName" type="text" required></div>
+              <div class="acct-form-field"><label>Email</label><input id="acctProfileEmail" type="email" disabled></div>
+              <div class="acct-form-field"><label>Mobile</label><input id="acctProfileMobile" type="tel"></div>
+              <div class="acct-form-field">
+                <label>Gender</label>
+                <select id="acctProfileGender">
+                  <option value="">Select</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </div>
+              <div class="acct-form-field"><label>Date of Birth</label><input id="acctProfileDob" type="date"></div>
+              <div class="acct-form-field"><label>Country</label><input id="acctProfileCountry" type="text"></div>
+              <div class="acct-form-field"><label>State</label><input id="acctProfileState" type="text"></div>
+              <div class="acct-form-field"><label>City</label><input id="acctProfileCity" type="text"></div>
+            </div>
+            <div class="acct-form-field" style="max-width:none;"><label>Address</label><input id="acctProfileAddress" type="text"></div>
+            <button type="submit" class="btn btn-coral">Save Changes</button>
+            <div class="acct-msg" id="acctProfileMsg"></div>
+          </form>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-bookings">
+          <h2>My Bookings</h2>
+          <div id="acctBookingsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-wishlist">
+          <h2>My Wishlist</h2>
+          <div id="acctWishlistList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-payments">
+          <h2>Payment History</h2>
+          <div class="acct-table-wrap"><table class="acct-table" id="acctPaymentsTable"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-notifications">
+          <h2>Notifications</h2>
+          <div id="acctNotificationsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-support">
+          <h2>Raise a support ticket</h2>
+          <form id="acctTicketForm" style="margin-bottom:26px;">
+            <div class="acct-form-field"><label>Subject</label><input id="acctTicketSubject" type="text" required maxlength="200"></div>
+            <div class="acct-form-field" style="max-width:none;"><label>Description</label><input id="acctTicketDescription" type="text" required maxlength="4000"></div>
+            <div class="acct-form-field">
+              <label>Priority</label>
+              <select id="acctTicketPriority">
+                <option value="low">Low</option>
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-coral">Submit Ticket</button>
+            <div class="acct-msg" id="acctTicketMsg"></div>
+          </form>
+          <h2>My support tickets</h2>
+          <div id="acctTicketsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-reviews">
+          <h2>My Reviews</h2>
+          <div id="acctReviewsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-settings">
+          <h2>Change password</h2>
+          <form id="acctPasswordForm" style="margin-bottom:10px;">
+            <div class="acct-form-field"><label>Current Password</label><input id="acctCurrentPassword" type="password" required></div>
+            <div class="acct-form-field"><label>New Password</label><input id="acctNewPassword" type="password" required minlength="8"></div>
+            <button type="submit" class="btn btn-navy">Change Password</button>
+            <div class="acct-msg" id="acctPasswordMsg"></div>
+          </form>
+          <h2 style="margin-top:26px;">Notification preferences</h2>
+          <p style="color:var(--muted); font-size:13.5px; line-height:1.6; max-width:480px;">
+            You currently receive in-app notifications for bookings, payments, and support updates —
+            there's nothing to configure yet since email/SMS delivery isn't wired up. This section is
+            reserved for when those channels go live.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="acctConfirmOverlay">
+  <div class="modal-card" style="max-width:460px;">
+    <button class="modal-close" id="acctConfirmCloseBtn" type="button" aria-label="Close">&times;</button>
+    <h2>Booking Confirmation</h2>
+    <p class="modal-sub">JackPots World Tours &amp; Travels</p>
+    <div id="acctConfirmBody"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
 'use strict';
 
-/* Backend API base — update to your deployed backend URL once it's hosted */
-const API_BASE = 'http://127.0.0.1:8000';
+/* Backend API base — same-origin in production (nginx proxies /api to the backend),
+   falls back to the local uvicorn dev server when the frontend is served from localhost */
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
 /* Escape user-supplied text before inserting into innerHTML templates */
 function escapeHtml(str) {
@@ -1831,18 +2086,49 @@ function clearStoredAuth() {
   localStorage.removeItem('jwt_user_id');
 }
 
+/* Presence heartbeat — only sent while a logged-in user is browsing this page,
+   so the admin's Online Users widget can see them. */
+function sendHeartbeat() {
+  const { access } = getStoredAuth();
+  if (!access) return;
+  axios.post(`${API_BASE}/api/users/heartbeat`, { current_page: 'Home' }, {
+    headers: { Authorization: `Bearer ${access}` },
+  }).catch(() => {});
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 30000);
+
 const authNavPairs = [
   [document.getElementById('navLoginLink'), document.getElementById('navSignupLink')],
-  [document.getElementById('mobileNavLoginLink'), document.getElementById('mobileNavSignupLink')],
 ];
 
 function renderAuthNav() {
-  const { access, name } = getStoredAuth();
-  const loggedIn = Boolean(access);
+  const { access, name, role } = getStoredAuth();
+  const loggedIn = Boolean(access) && role !== 'admin';
+  const isAdmin = Boolean(access) && role === 'admin';
+
+  // Admins keep the old simple treatment (link straight to admin.html) — the
+  // Account Center below is a customer-only experience.
   authNavPairs.forEach(([loginEl, signupEl]) => {
-    if (loginEl) loginEl.textContent = loggedIn ? `Hi, ${name}` : 'Login';
-    if (signupEl) signupEl.textContent = loggedIn ? 'Logout' : 'Sign Up';
+    if (loginEl) loginEl.textContent = isAdmin ? 'Dashboard' : 'Login';
+    if (signupEl) signupEl.textContent = isAdmin ? 'Logout' : 'Sign Up';
+    if (loginEl) loginEl.style.display = loggedIn ? 'none' : '';
+    if (signupEl) signupEl.style.display = loggedIn ? 'none' : '';
   });
+
+  document.getElementById('profileChipWrap').style.display = loggedIn ? '' : 'none';
+  document.getElementById('mobileNav').classList.toggle('show-account', loggedIn);
+
+  if (loggedIn) {
+    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+    document.getElementById('profileChipName').textContent = name;
+    document.getElementById('profileChipAvatar').textContent = initials;
+  }
+
+  const mobileLoginLink = document.getElementById('mobileNavLoginLink');
+  const mobileSignupLink = document.getElementById('mobileNavSignupLink');
+  if (isAdmin) { mobileLoginLink.textContent = 'Dashboard'; mobileSignupLink.textContent = 'Logout'; }
+  else { mobileLoginLink.textContent = 'Login'; mobileSignupLink.textContent = 'Sign Up'; }
 }
 renderAuthNav();
 
@@ -1883,7 +2169,7 @@ document.querySelectorAll('[data-auth]').forEach(el => {
         wishlistMap = new Map();
         renderAuthNav();
       }
-      else if (el.dataset.auth === 'login') { window.location.href = role === 'admin' ? 'admin.html' : 'dashboard.html'; }
+      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin.html'; }
       return;
     }
     openAuth(el.dataset.auth);
@@ -1945,6 +2231,10 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     });
     setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role, me.data.id);
     renderAuthNav();
+    if (me.data.role === 'admin') {
+      window.location.href = 'admin.html';
+      return;
+    }
     refreshWishlistState().then(() => {
       applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
       applyWishlistState(document.getElementById('searchResultsList'));
@@ -1982,6 +2272,473 @@ document.getElementById('forgotPasswordLink').addEventListener('click', async e 
     msg.textContent = 'Something went wrong — please try again.';
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
+  }
+});
+
+/* ================================================================
+   ACCOUNT CENTER — replaces the old separate dashboard.html.
+   Every section below is a direct port of that page's logic, now
+   living inside one modal on the homepage instead of its own page.
+   ================================================================ */
+function authHeaders() { return { Authorization: `Bearer ${getStoredAuth().access}` }; }
+function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+
+/* ---------- Modal open/close + tab switching ---------- */
+const acctModalOverlay = document.getElementById('accountModalOverlay');
+const acctLoadedTabs = new Set();
+let acctCurrentUser = null;
+
+function openAccountCenter(tab) {
+  const { access } = getStoredAuth();
+  if (!access) { openAuth('login'); return; }
+  acctModalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  goToAcctTab(tab || 'profile');
+  if (!acctCurrentUser) loadAcctHeaderProfile();
+}
+function closeAccountCenter() {
+  acctModalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('acctModalCloseBtn').addEventListener('click', closeAccountCenter);
+acctModalOverlay.addEventListener('click', e => { if (e.target === acctModalOverlay) closeAccountCenter(); });
+
+function goToAcctTab(name) {
+  document.querySelectorAll('.acct-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.acct-panel').forEach(p => p.classList.toggle('active', p.id === `acctPanel-${name}`));
+  if (!acctLoadedTabs.has(name)) {
+    acctLoadedTabs.add(name);
+    loadAcctTab(name);
+  }
+}
+document.querySelectorAll('.acct-tab').forEach(tab => {
+  tab.addEventListener('click', () => goToAcctTab(tab.dataset.tab));
+});
+function loadAcctTab(name) {
+  if (name === 'profile') return loadAcctProfile();
+  if (name === 'bookings') return loadAcctBookings();
+  if (name === 'wishlist') return loadAcctWishlist();
+  if (name === 'payments') return loadAcctPayments();
+  if (name === 'notifications') return loadAcctNotifications();
+  if (name === 'support') return loadAcctSupportTickets();
+  if (name === 'reviews') return loadAcctReviews();
+}
+
+/* Every dropdown item (desktop + mobile) and profile-chip toggle */
+document.querySelectorAll('[data-acct-tab]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('profileDropdown').classList.remove('open');
+    document.getElementById('profileChipBtn').classList.remove('open');
+    mobileNav.classList.remove('open');
+    openAccountCenter(link.dataset.acctTab);
+  });
+});
+const profileChipBtn = document.getElementById('profileChipBtn');
+const profileDropdown = document.getElementById('profileDropdown');
+profileChipBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = profileDropdown.classList.toggle('open');
+  profileChipBtn.classList.toggle('open', open);
+});
+document.addEventListener('click', () => {
+  profileDropdown.classList.remove('open');
+  profileChipBtn.classList.remove('open');
+});
+
+function doAccountLogout() {
+  const { access } = getStoredAuth();
+  axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+  clearStoredAuth();
+  acctCurrentUser = null;
+  acctLoadedTabs.clear();
+  wishlistMap = new Map();
+  closeAccountCenter();
+  renderAuthNav();
+}
+document.getElementById('profileLogoutBtn').addEventListener('click', doAccountLogout);
+document.getElementById('mobileLogoutLink').addEventListener('click', e => { e.preventDefault(); doAccountLogout(); });
+
+/* ---------- Profile (header + editable form) ---------- */
+async function loadAcctHeaderProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    acctCurrentUser = data;
+    const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+    document.getElementById('acctHeaderAvatar').textContent = initials;
+    document.getElementById('acctHeaderName').textContent = data.full_name;
+    document.getElementById('acctHeaderEmail').textContent = data.email;
+  } catch (err) { /* header just won't populate this cycle */ }
+}
+async function loadAcctProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    acctCurrentUser = data;
+    document.getElementById('acctProfileName').value = data.full_name;
+    document.getElementById('acctProfileEmail').value = data.email;
+    document.getElementById('acctProfileMobile').value = data.mobile || '';
+    document.getElementById('acctProfileGender').value = data.gender || '';
+    document.getElementById('acctProfileDob').value = data.dob || '';
+    document.getElementById('acctProfileCountry').value = data.country || '';
+    document.getElementById('acctProfileState').value = data.state || '';
+    document.getElementById('acctProfileCity').value = data.city || '';
+    document.getElementById('acctProfileAddress').value = data.address || '';
+  } catch (err) { /* fields stay blank */ }
+}
+document.getElementById('acctProfileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctProfileMsg');
+  try {
+    const { data } = await axios.put(`${API_BASE}/api/users/me`, {
+      full_name: document.getElementById('acctProfileName').value,
+      mobile: document.getElementById('acctProfileMobile').value || null,
+      gender: document.getElementById('acctProfileGender').value || null,
+      dob: document.getElementById('acctProfileDob').value || null,
+      country: document.getElementById('acctProfileCountry').value || null,
+      state: document.getElementById('acctProfileState').value || null,
+      city: document.getElementById('acctProfileCity').value || null,
+      address: document.getElementById('acctProfileAddress').value || null,
+    }, { headers: authHeaders() });
+    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'user', data.id);
+    renderAuthNav();
+    loadAcctHeaderProfile();
+    msg.textContent = 'Profile updated.';
+    msg.className = 'acct-msg success';
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.className = 'acct-msg error';
+  }
+});
+document.getElementById('acctPasswordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctPasswordMsg');
+  try {
+    await axios.post(`${API_BASE}/api/users/change-password`, {
+      current_password: document.getElementById('acctCurrentPassword').value,
+      new_password: document.getElementById('acctNewPassword').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Password changed successfully.';
+    msg.className = 'acct-msg success';
+    e.target.reset();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
+    msg.className = 'acct-msg error';
+  }
+});
+
+/* ---------- Bookings (list, cancel, confirmation/timeline) ---------- */
+const TYPE_ICONS = {
+  flight: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/>',
+  hotel: '<path d="M3 21V7a2 2 0 0 1 2-2h6v16"/><path d="M11 9h8a2 2 0 0 1 2 2v10"/><path d="M3 21h18"/>',
+  cruise: '<path d="M2 21c1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0"/><path d="M4 18l1-9h14l1 9"/><path d="M10 9V4h4v5"/>',
+  package: '<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+};
+let allBookingsCache = [];
+let paymentsByBooking = new Map();
+async function loadPaymentsMap() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    paymentsByBooking = new Map(data.map(p => [p.booking_id, p]));
+  } catch (err) { /* receipt just won't show payment rows */ }
+}
+function renderTimeline(booking) {
+  if (booking.status === 'cancelled') {
+    return `<div class="timeline">
+      <div class="tl-step done"><span class="tl-dot"></span><span class="tl-label">Booked</span></div>
+      <div class="tl-line done"></div>
+      <div class="tl-step cancelled-step"><span class="tl-dot"></span><span class="tl-label">Cancelled</span></div>
+    </div>`;
+  }
+  const isPastTravel = booking.travel_date && new Date(booking.travel_date) < new Date();
+  const confirmedDone = booking.status === 'confirmed' || booking.status === 'completed';
+  const completedDone = booking.status === 'completed' || (confirmedDone && isPastTravel);
+  const steps = [{ label: 'Booked', done: true }, { label: 'Confirmed', done: confirmedDone }, { label: 'Completed', done: completedDone }];
+  return `<div class="timeline">${steps.map((s, i) => `
+    ${i > 0 ? `<div class="tl-line ${steps[i - 1].done ? 'done' : ''}"></div>` : ''}
+    <div class="tl-step ${s.done ? 'done' : ''}"><span class="tl-dot"></span><span class="tl-label">${s.label}</span></div>
+  `).join('')}</div>`;
+}
+function showAcctConfirmation(bookingId) {
+  const booking = allBookingsCache.find(b => String(b.id) === String(bookingId));
+  if (!booking) return;
+  const payment = paymentsByBooking.get(booking.id);
+  document.getElementById('acctConfirmBody').innerHTML = `
+    ${renderTimeline(booking)}
+    <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
+    <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
+    <div class="confirm-row"><span>Item</span><span>#${booking.item_id}</span></div>
+    <div class="confirm-row"><span>Quantity</span><span>${booking.quantity}</span></div>
+    <div class="confirm-row"><span>Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
+    <div class="confirm-row"><span>Total Paid</span><span>${money(booking.total_price)}</span></div>
+    <div class="confirm-row"><span>Travel Date</span><span>${fmtDate(booking.travel_date)}</span></div>
+    <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
+    ${payment ? `
+      <div class="confirm-row"><span>Payment Method</span><span style="text-transform:capitalize">${payment.method}</span></div>
+      <div class="confirm-row"><span>Transaction Ref</span><span>${payment.transaction_ref}</span></div>
+      <div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>
+    ` : ''}
+  `;
+  document.getElementById('acctConfirmOverlay').classList.add('open');
+}
+document.getElementById('acctConfirmCloseBtn').addEventListener('click', () => document.getElementById('acctConfirmOverlay').classList.remove('open'));
+
+function bookingRowHtml(b) {
+  return `
+    <div class="acct-row">
+      <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[b.booking_type] || TYPE_ICONS.package}</svg></div>
+      <div class="ar-main">
+        <div class="ar-title">${escapeHtml(b.booking_type)} — #${b.item_id}</div>
+        <div class="ar-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel ' + fmtDate(b.travel_date) : ''} ${b.quantity > 1 ? '· Qty ' + b.quantity : ''}</div>
+      </div>
+      <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
+      <div class="ar-amount">${money(b.total_price)}</div>
+      <button type="button" class="btn btn-ghost btn-sm" data-confirm-id="${b.id}">View</button>
+      ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.id}">Cancel</button>` : ''}
+    </div>`;
+}
+function wireBookingRowActions(container) {
+  container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
+  container.querySelectorAll('[data-cancel-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Cancel this booking?')) return;
+      try {
+        await axios.delete(`${API_BASE}/api/bookings/${btn.dataset.cancelId}`, { headers: authHeaders() });
+        await loadPaymentsMap();
+        loadAcctBookings();
+      } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
+    });
+  });
+}
+async function loadAcctBookings() {
+  const container = document.getElementById('acctBookingsList');
+  try {
+    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    allBookingsCache = data;
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">No bookings yet — go find your next trip!</div>';
+      return;
+    }
+    container.innerHTML = data.map(b => bookingRowHtml(b)).join('');
+    wireBookingRowActions(container);
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load bookings.</div>';
+  }
+}
+
+/* ---------- Payment History ---------- */
+async function loadAcctPayments() {
+  const tbody = document.querySelector('#acctPaymentsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(p => `
+      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref)}</td></tr>
+    `).join('') || `<tr><td colspan="5" class="acct-empty">No payments yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="acct-empty">Failed to load payment history.</td></tr>`;
+  }
+}
+
+/* ---------- Wishlist ---------- */
+const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+async function fetchWishlistWithCatalog() {
+  const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: authHeaders() });
+  const catalogs = {};
+  await Promise.all([...new Set(data.map(w => w.item_type))].map(async t => {
+    const { data: items } = await axios.get(`${API_BASE}/api/${ACCT_WISHLIST_ENDPOINTS[t]}`);
+    catalogs[t] = new Map(items.map(i => [i.id, i]));
+  }));
+  return { data, catalogs };
+}
+function wishlistLabel(type, item) {
+  if (!item) return `${type} #? (no longer available)`;
+  if (type === 'flight') return `${item.airline} ${item.from_airport}→${item.to_airport}`;
+  if (type === 'hotel') return item.name;
+  if (type === 'cruise') return item.name;
+  return item.title;
+}
+function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.price_per_night : item.price) : '—'; }
+async function loadAcctWishlist() {
+  const container = document.getElementById('acctWishlistList');
+  try {
+    const { data, catalogs } = await fetchWishlistWithCatalog();
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">Your wishlist is empty.</div>';
+      return;
+    }
+    container.innerHTML = data.map(w => {
+      const item = catalogs[w.item_type]?.get(w.item_id);
+      return `
+        <div class="acct-row">
+          <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[w.item_type] || TYPE_ICONS.package}</svg></div>
+          <div class="ar-main">
+            <div class="ar-title" style="text-transform:none;">${escapeHtml(wishlistLabel(w.item_type, item))}</div>
+            <div class="ar-sub" style="text-transform:capitalize;">${w.item_type} · ${wishlistPrice(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" data-remove-wishlist="${w.id}">Remove</button>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.delete(`${API_BASE}/api/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
+          loadAcctWishlist();
+        } catch (err) { alert('Failed to remove item.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load wishlist.</div>';
+  }
+}
+
+/* ---------- Notifications ---------- */
+async function loadAcctNotifications() {
+  const container = document.getElementById('acctNotificationsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">No notifications yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(n => `
+      <div class="acct-notif-item ${n.is_read ? '' : 'unread'}">
+        <div class="nt">${escapeHtml(n.title)}</div>
+        <div class="nm">${escapeHtml(n.message)}</div>
+        <div class="ndate">${fmtDate(n.created_at)}</div>
+        <div class="acct-notif-actions">
+          ${!n.is_read ? `<button type="button" class="btn btn-ghost btn-sm" data-mark-read="${n.id}">Mark Read</button>` : ''}
+          <button type="button" class="btn btn-danger btn-sm" data-delete-notification="${n.id}">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-mark-read]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
+          loadAcctNotifications();
+        } catch (err) { alert('Failed to mark as read.'); }
+      });
+    });
+    container.querySelectorAll('[data-delete-notification]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.delete(`${API_BASE}/api/notifications/${btn.dataset.deleteNotification}`, { headers: authHeaders() });
+          loadAcctNotifications();
+        } catch (err) { alert('Failed to delete notification.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load notifications.</div>';
+  }
+}
+
+/* ---------- Reviews ---------- */
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
+async function loadAcctReviews() {
+  const container = document.getElementById('acctReviewsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/reviews/mine`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = "<div class=\"acct-empty\">You haven't written any reviews yet.</div>";
+      return;
+    }
+    container.innerHTML = data.map(r => `
+      <div class="acct-row" data-review-row="${r.id}">
+        <div class="ar-main">
+          <div class="ar-title">${escapeHtml(r.item_type)} #${r.item_id}</div>
+          <div class="ar-sub" style="color:var(--gold-dark); letter-spacing:1px;">${starString(r.rating)}</div>
+          ${r.comment ? `<div class="ar-sub">${escapeHtml(r.comment)}</div>` : ''}
+          <div class="ar-sub">${fmtDate(r.created_at)}</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" data-edit-review="${r.id}" data-rating="${r.rating}" data-comment="${escapeHtml(r.comment || '')}">Edit</button>
+        <button type="button" class="btn btn-danger btn-sm" data-delete-review="${r.id}">Delete</button>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-edit-review]').forEach(btn => {
+      btn.addEventListener('click', () => openAcctReviewEdit(btn.dataset.editReview, Number(btn.dataset.rating), btn.dataset.comment));
+    });
+    container.querySelectorAll('[data-delete-review]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this review?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
+          loadAcctReviews();
+        } catch (err) { alert('Failed to delete review.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load reviews.</div>';
+  }
+}
+function openAcctReviewEdit(reviewId, rating, comment) {
+  const row = document.querySelector(`[data-review-row="${reviewId}"]`);
+  let selected = rating;
+  row.innerHTML = `
+    <div class="ar-main" style="width:100%;">
+      <div class="acct-star-input" id="acctEditStars-${reviewId}">
+        ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}" class="${n <= rating ? 'active' : ''}">★</span>`).join('')}
+      </div>
+      <input type="text" id="acctEditComment-${reviewId}" value="${escapeHtml(comment)}" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; margin-bottom:10px;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-coral btn-sm" id="acctSaveReview-${reviewId}">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="acctCancelReview-${reviewId}">Cancel</button>
+      </div>
+    </div>
+  `;
+  row.querySelectorAll(`#acctEditStars-${reviewId} span`).forEach(s => {
+    s.addEventListener('click', () => {
+      selected = Number(s.dataset.star);
+      row.querySelectorAll(`#acctEditStars-${reviewId} span`).forEach(x => x.classList.toggle('active', Number(x.dataset.star) <= selected));
+    });
+  });
+  document.getElementById(`acctCancelReview-${reviewId}`).addEventListener('click', loadAcctReviews);
+  document.getElementById(`acctSaveReview-${reviewId}`).addEventListener('click', async () => {
+    try {
+      await axios.put(`${API_BASE}/api/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: authHeaders() });
+      loadAcctReviews();
+    } catch (err) { alert('Failed to update review.'); }
+  });
+}
+
+/* ---------- Support Tickets ---------- */
+async function loadAcctSupportTickets() {
+  const container = document.getElementById('acctTicketsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/support-tickets`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">No support tickets yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(t => `
+      <div class="acct-row">
+        <div class="ar-main">
+          <div class="ar-title" style="text-transform:none;">${escapeHtml(t.subject)}</div>
+          <div class="ar-sub">${escapeHtml(t.description)}</div>
+          <div class="ar-sub">Priority: ${escapeHtml(t.priority)} · Raised ${fmtDate(t.created_at)}</div>
+        </div>
+        <span class="badge ${t.status}">${escapeHtml(t.status.replace('_', ' '))}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load support tickets.</div>';
+  }
+}
+document.getElementById('acctTicketForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctTicketMsg');
+  try {
+    await axios.post(`${API_BASE}/api/support-tickets`, {
+      subject: document.getElementById('acctTicketSubject').value,
+      description: document.getElementById('acctTicketDescription').value,
+      priority: document.getElementById('acctTicketPriority').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Ticket submitted — our support team will get back to you.';
+    msg.className = 'acct-msg success';
+    e.target.reset();
+    loadAcctSupportTickets();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to submit ticket.';
+    msg.className = 'acct-msg error';
   }
 });
 </script>

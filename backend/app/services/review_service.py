@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.misc import Review
 from app.models.user import User
+from app.services import activity_service, notification_service
 from app.services.catalog_items import ITEM_MODELS
 
 
@@ -35,6 +36,14 @@ def create_review(db: Session, user: User, item_type: str, item_id: int, rating:
             detail="You've already reviewed this item — edit your existing review instead.",
         )
     db.refresh(review)
+    activity_service.log_activity(
+        db, user.id, f"Review Submitted ({item_type} #{item_id})",
+        activity_type="Review Submitted", module="Review", reference_id=review.id,
+        description=f"{user.full_name} rated {item_type} #{item_id} {rating}/5",
+    )
+    notification_service.notify_admins(
+        db, "New review submitted", f"{user.full_name} left a {rating}/5 review on {item_type} #{item_id}.",
+    )
     return _review_out(review, user.full_name)
 
 

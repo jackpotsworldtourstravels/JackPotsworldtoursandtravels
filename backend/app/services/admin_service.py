@@ -1,4 +1,5 @@
 import csv
+import datetime
 import io
 
 from fastapi import HTTPException, status
@@ -6,10 +7,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.booking import Booking, Payment
-from app.models.misc import ContactUs, Newsletter
+from app.models.misc import ActivityLog, ContactUs, Newsletter
 from app.models.travel import Cruise, Flight, Hotel, TourPackage
 from app.models.user import User
-from app.services import booking_service
+from app.services import booking_service, session_service
 
 
 def list_all_bookings(db: Session):
@@ -55,6 +56,7 @@ def update_booking_status(db: Session, booking_id: int, new_status: str) -> tupl
     db.commit()
     db.refresh(booking)
     if new_status == "cancelled" and not was_cancelled:
+        booking_service.restore_inventory_for_booking(db, booking)
         booking_service.refund_payment_for_booking(db, booking)
         db.refresh(booking)
     email = db.scalar(select(User.email).where(User.id == booking.user_id))
@@ -87,6 +89,79 @@ def _count_status(db: Session, status_value: str) -> int:
     return db.scalar(select(func.count()).select_from(Booking).where(Booking.status == status_value)) or 0
 
 
+def _today_start() -> datetime.datetime:
+    return datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+_TOP_ITEM_NAME = {
+    "flight": lambda item: f"{item.from_airport} → {item.to_airport}",
+    "hotel": lambda item: item.name,
+    "cruise": lambda item: item.name,
+    "package": lambda item: item.title,
+}
+_TOP_ITEM_MODEL = {"flight": Flight, "hotel": Hotel, "cruise": Cruise, "package": TourPackage}
+
+
+def _top_items(db: Session, booking_type: str, limit: int = 5) -> list[dict]:
+    rows = db.execute(
+        select(
+            Booking.item_id,
+            func.count().label("bookings"),
+            func.coalesce(func.sum(Booking.total_price), 0).label("revenue"),
+        )
+        .where(Booking.booking_type == booking_type, Booking.status != "cancelled")
+        .group_by(Booking.item_id)
+        .order_by(func.count().desc())
+        .limit(limit)
+    ).all()
+    model = _TOP_ITEM_MODEL[booking_type]
+    name_fn = _TOP_ITEM_NAME[booking_type]
+    results = []
+    for item_id, bookings, revenue in rows:
+        item = db.get(model, item_id)
+        if not item:
+            continue
+        results.append(
+            {
+                "item_type": booking_type,
+                "item_id": item_id,
+                "name": name_fn(item),
+                "bookings": bookings,
+                "revenue": float(revenue),
+            }
+        )
+    return results
+
+
+def _most_active_users(db: Session, limit: int = 5) -> list[dict]:
+    rows = db.execute(
+        select(
+            ActivityLog.user_id,
+            func.count().label("activity_count"),
+            func.max(ActivityLog.created_at).label("last_active"),
+        )
+        .where(ActivityLog.user_id.is_not(None))
+        .group_by(ActivityLog.user_id)
+        .order_by(func.count().desc())
+        .limit(limit)
+    ).all()
+    results = []
+    for user_id, activity_count, last_active in rows:
+        user = db.get(User, user_id)
+        if not user:
+            continue
+        results.append(
+            {
+                "user_id": user_id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "activity_count": activity_count,
+                "last_active": last_active,
+            }
+        )
+    return results
+
+
 def build_reports(db: Session) -> dict:
     total_users = db.scalar(select(func.count()).select_from(User)) or 0
     active_users = db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(True))) or 0
@@ -113,6 +188,21 @@ def build_reports(db: Session) -> dict:
         ).all()
     ]
 
+    today_start = _today_start()
+    today_users = db.scalar(select(func.count()).select_from(User).where(User.created_at >= today_start)) or 0
+    today_bookings = db.scalar(select(func.count()).select_from(Booking).where(Booking.created_at >= today_start)) or 0
+    today_revenue = (
+        db.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.status == "success", Payment.created_at >= today_start
+            )
+        )
+        or 0
+    )
+    today_payments = (
+        db.scalar(select(func.count()).select_from(Payment).where(Payment.created_at >= today_start)) or 0
+    )
+
     return {
         "total_users": total_users,
         "active_users": active_users,
@@ -131,6 +221,18 @@ def build_reports(db: Session) -> dict:
         "recent_users": recent_users,
         "recent_bookings": recent_bookings,
         "recent_payments": recent_payments,
+        "today_users": today_users,
+        "today_logins": session_service.count_todays_logins(db),
+        "today_bookings": today_bookings,
+        "today_revenue": float(today_revenue),
+        "today_payments": today_payments,
+        "users_online": session_service.count_online_users(db),
+        "active_sessions": session_service.count_active_sessions(db),
+        "top_destinations": _top_items(db, "flight"),
+        "top_hotels": _top_items(db, "hotel"),
+        "top_cruises": _top_items(db, "cruise"),
+        "top_packages": _top_items(db, "package"),
+        "most_active_users": _most_active_users(db),
     }
 
 

@@ -11,9 +11,21 @@ from app.schemas.booking import AdminBookingOut, AdminPaymentOut, BookingStatusU
 from app.schemas.misc import ContactMessageOut, MonthlyStatOut, NewsletterSubscriberOut, ReportsOut
 from app.schemas.notification import AdminNotificationCreate, AdminNotificationOut
 from app.schemas.pagination import Page
+from app.schemas.inventory import InventoryAdjustRequest, InventoryItemOut
 from app.schemas.review import AdminReviewOut
+from app.schemas.session import OnlineUserOut, SessionOut
+from app.schemas.support_ticket import AdminSupportTicketOut, SupportTicketStatusUpdate
 from app.schemas.wishlist import AdminWishlistOut
-from app.services import activity_service, admin_service, notification_service, review_service, wishlist_service
+from app.services import (
+    activity_service,
+    admin_service,
+    inventory_service,
+    notification_service,
+    review_service,
+    session_service,
+    support_ticket_service,
+    wishlist_service,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -63,7 +75,10 @@ def update_booking_status(
 ):
     booking, email = admin_service.update_booking_status(db, booking_id, payload.status)
     result = AdminBookingOut(**booking.__dict__, user_email=email)
-    activity_service.log_activity(db, _admin.id, f"Admin updated booking #{booking_id} status to {payload.status}")
+    activity_service.log_activity(
+        db, _admin.id, f"Admin updated booking #{booking_id} status to {payload.status}",
+        module="Admin", activity_type="Admin Action", reference_id=booking_id,
+    )
     return result
 
 
@@ -108,7 +123,7 @@ def list_contact_messages(
 )
 def delete_contact_message(message_id: int, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
     admin_service.delete_contact_message(db, message_id)
-    activity_service.log_activity(db, _admin.id, f"Admin deleted contact message #{message_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted contact message #{message_id}", module="Admin", activity_type="Admin Action")
 
 
 @router.get(
@@ -187,7 +202,7 @@ def list_all_wishlist(
 )
 def delete_wishlist_entry(wishlist_id: int, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
     wishlist_service.delete_wishlist_admin(db, wishlist_id)
-    activity_service.log_activity(db, _admin.id, f"Admin deleted wishlist entry #{wishlist_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted wishlist entry #{wishlist_id}", module="Admin", activity_type="Admin Action")
 
 
 @router.get(
@@ -214,7 +229,41 @@ def list_all_reviews(
 )
 def delete_review_admin(review_id: int, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
     review_service.delete_review(db, _admin, review_id, is_admin=True)
-    activity_service.log_activity(db, _admin.id, f"Admin deleted review #{review_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted review #{review_id}", module="Admin", activity_type="Admin Action")
+
+
+@router.get(
+    "/support-tickets",
+    response_model=Page[AdminSupportTicketOut],
+    summary="List all support tickets (admin)",
+    description="Requires admin role. Returns a paginated list of every support ticket across all users, including the requester's email.",
+)
+def list_all_support_tickets(
+    page: int = PageParam,
+    page_size: int = PageSizeParam,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    items, total = support_ticket_service.list_all_tickets_paginated(db, page, page_size)
+    return Page.build(items, total, page, page_size)
+
+
+@router.patch(
+    "/support-tickets/{ticket_id}",
+    response_model=AdminSupportTicketOut,
+    summary="Update a support ticket's status (admin)",
+    description="Requires admin role. Sets the status of any user's support ticket (open/in_progress/resolved/closed).",
+)
+def update_support_ticket_status(
+    ticket_id: int,
+    payload: SupportTicketStatusUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    ticket = support_ticket_service.update_ticket_status(db, ticket_id, payload.status)
+    activity_service.log_activity(db, _admin.id, f"Admin updated support ticket #{ticket_id} to {payload.status}", module="Admin", activity_type="Admin Action")
+    user_email = db.get(User, ticket.user_id).email
+    return AdminSupportTicketOut(**ticket.__dict__, user_email=user_email)
 
 
 @router.get(
@@ -246,7 +295,7 @@ def send_notification(
     payload: AdminNotificationCreate, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
 ):
     count = notification_service.send_admin_notification(db, payload.user_id, payload.title, payload.message)
-    activity_service.log_activity(db, _admin.id, f"Admin sent notification to {count} user(s)")
+    activity_service.log_activity(db, _admin.id, f"Admin sent notification to {count} user(s)", module="Admin", activity_type="Admin Action")
     return {"message": f"Notification sent to {count} user(s)"}
 
 
@@ -259,18 +308,23 @@ def send_notification(
 def list_activity_logs(
     search: str | None = None,
     action: str | None = None,
+    module: str | None = None,
     page: int = PageParam,
     page_size: int = PageSizeParam,
     db: Session = Depends(get_db),
     _admin: User = Depends(get_current_admin),
 ):
-    rows, total = activity_service.list_activity_logs_paginated(db, page, page_size, search=search, action=action)
+    rows, total = activity_service.list_activity_logs_paginated(
+        db, page, page_size, search=search, action=action, module=module
+    )
     items = [
         ActivityLogOut(
-            id=log.id, user_id=log.user_id, user_email=email, action=log.action,
-            ip_address=log.ip_address, created_at=log.created_at,
+            id=log.id, user_id=log.user_id, user_name=full_name, user_email=email, action=log.action,
+            activity_type=log.activity_type, module=log.module, description=log.description,
+            reference_id=log.reference_id, ip_address=log.ip_address, browser=log.browser,
+            device=log.device, status=log.status, created_at=log.created_at,
         )
-        for log, email in rows
+        for log, email, full_name in rows
     ]
     return Page.build(items, total, page, page_size)
 
@@ -283,3 +337,121 @@ def list_activity_logs(
 )
 def list_activity_log_actions(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
     return activity_service.list_distinct_actions(db)
+
+
+@router.get(
+    "/activity-logs/modules",
+    response_model=list[str],
+    summary="List distinct activity log modules (admin)",
+    description="Requires admin role. Returns the distinct set of modules (Auth, Booking, Payment, etc.) recorded in the activity log, for use as filter options.",
+)
+def list_activity_log_modules(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    return activity_service.list_distinct_modules(db)
+
+
+@router.get(
+    "/inventory",
+    response_model=list[InventoryItemOut],
+    summary="List inventory across all catalog types (admin)",
+    description="Requires admin role. Returns current availability for every flight/hotel/cruise/package, optionally filtered by type, low-stock, sold-out, or name search.",
+)
+def list_inventory(
+    item_type: Literal["flight", "hotel", "cruise", "package"] | None = None,
+    low_stock_only: bool = False,
+    sold_out_only: bool = False,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    return inventory_service.list_inventory(
+        db, item_type=item_type, low_stock_only=low_stock_only, sold_out_only=sold_out_only, search=search
+    )
+
+
+@router.get(
+    "/inventory/stats",
+    summary="Inventory summary stats (admin)",
+    description="Requires admin role. Returns counts of total/sold-out/low-stock/healthy catalog items for dashboard cards.",
+)
+def inventory_stats(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    return inventory_service.get_inventory_stats(db)
+
+
+@router.patch(
+    "/inventory/{item_type}/{item_id}",
+    response_model=InventoryItemOut,
+    summary="Adjust an item's availability (admin)",
+    description="Requires admin role. Sets a catalog item's availability count and/or low-stock threshold directly (e.g. an airline adds more seats).",
+)
+def adjust_inventory(
+    item_type: Literal["flight", "hotel", "cruise", "package"],
+    item_id: int,
+    payload: InventoryAdjustRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(get_current_admin),
+):
+    result = inventory_service.adjust_inventory(db, item_type, item_id, payload.available, payload.low_stock_threshold)
+    activity_service.log_activity(
+        db, _admin.id, f"Admin adjusted inventory for {item_type} #{item_id} to {payload.available}",
+        module="Admin", activity_type="Admin Action", reference_id=item_id,
+        description=f"Admin set {item_type} #{item_id} ({result['name']}) availability to {payload.available}",
+    )
+    return result
+
+
+@router.get(
+    "/activity-logs/recent",
+    response_model=list[ActivityLogOut],
+    summary="Recent activity feed (admin)",
+    description="Requires admin role. Returns the most recent activity log entries, newest first, for a live feed widget.",
+)
+def recent_activity(limit: int = Query(default=20, ge=1, le=100), db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    rows = activity_service.list_recent_activity(db, limit=limit)
+    return [
+        ActivityLogOut(
+            id=log.id, user_id=log.user_id, user_name=full_name, user_email=email, action=log.action,
+            activity_type=log.activity_type, module=log.module, description=log.description,
+            reference_id=log.reference_id, ip_address=log.ip_address, browser=log.browser,
+            device=log.device, status=log.status, created_at=log.created_at,
+        )
+        for log, email, full_name in rows
+    ]
+
+
+@router.get(
+    "/sessions/online",
+    response_model=list[OnlineUserOut],
+    summary="List currently online users (admin)",
+    description="Requires admin role. Returns users with an active session seen within the last couple of minutes, for a live 'who's online' widget.",
+)
+def online_users(db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)):
+    rows = session_service.list_online_users(db)
+    return [
+        OnlineUserOut(
+            user_id=user.id, full_name=user.full_name, email=user.email, profile_photo=user.profile_photo,
+            current_page=session.current_page, login_at=session.login_at, last_seen_at=session.last_seen_at,
+            ip_address=session.ip_address, browser=session.browser, device=session.device,
+        )
+        for session, user in rows
+    ]
+
+
+@router.get(
+    "/sessions",
+    response_model=Page[SessionOut],
+    summary="List login sessions (admin)",
+    description="Requires admin role. Returns a paginated history of login sessions across all users, newest first.",
+)
+def list_sessions(
+    page: int = PageParam, page_size: int = PageSizeParam, db: Session = Depends(get_db), _admin: User = Depends(get_current_admin)
+):
+    rows, total = session_service.list_sessions_paginated(db, page, page_size)
+    items = [
+        SessionOut(
+            id=s.id, user_id=s.user_id, user_name=full_name, user_email=email, login_at=s.login_at,
+            logout_at=s.logout_at, last_seen_at=s.last_seen_at, ip_address=s.ip_address,
+            browser=s.browser, os=s.os, device=s.device, is_active=s.is_active,
+        )
+        for s, email, full_name in rows
+    ]
+    return Page.build(items, total, page, page_size)

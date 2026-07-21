@@ -66,4 +66,42 @@ class ActivityLog(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action: Mapped[str] = mapped_column(String(200), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Richer audit fields for the admin activity monitor — all nullable so older
+    # rows (logged before this existed) still read back fine.
+    activity_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    module: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reference_id: Mapped[int | None] = mapped_column(nullable=True)
+    browser: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    device: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="success")
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    login_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    logout_at: Mapped[datetime.datetime | None] = mapped_column(nullable=True)
+    last_seen_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    current_page: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    browser: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    os: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    device: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(String(4000), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="open")
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    resolved_at: Mapped[datetime.datetime | None] = mapped_column(nullable=True)

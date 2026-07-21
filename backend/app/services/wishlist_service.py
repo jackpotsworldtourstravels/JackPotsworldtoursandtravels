@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.misc import Wishlist
 from app.models.user import User
+from app.services import activity_service
 from app.services.catalog_items import ITEM_MODELS
 
 
@@ -27,6 +28,11 @@ def add_to_wishlist(db: Session, user: User, item_type: str, item_id: int) -> Wi
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already in your wishlist")
     db.refresh(entry)
+    activity_service.log_activity(
+        db, user.id, f"Wishlist Added ({item_type} #{item_id})",
+        activity_type="Wishlist Added", module="Wishlist", reference_id=entry.id,
+        description=f"{user.full_name} added {item_type} #{item_id} to their wishlist",
+    )
     return entry
 
 
@@ -39,8 +45,14 @@ def remove_from_wishlist(db: Session, user: User, wishlist_id: int) -> None:
     entry = db.get(Wishlist, wishlist_id)
     if not entry or entry.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist entry not found")
+    item_type, item_id = entry.item_type, entry.item_id
     db.delete(entry)
     db.commit()
+    activity_service.log_activity(
+        db, user.id, f"Wishlist Removed ({item_type} #{item_id})",
+        activity_type="Wishlist Removed", module="Wishlist",
+        description=f"{user.full_name} removed {item_type} #{item_id} from their wishlist",
+    )
 
 
 def list_all_wishlist(db: Session):

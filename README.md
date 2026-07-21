@@ -44,13 +44,16 @@ PostgreSQL, with Alembic-managed schema migrations and JWT-based authentication.
 - Contact form (persisted to the database and visible in the admin console)
 - Newsletter signup
 
-**User dashboard (`dashboard.html`)**
+**Account Center (`index.html`, logged-in customers)**
+- No separate dashboard page — logged-in customers get a profile chip in the header (MakeMyTrip-style)
+  whose dropdown opens an Account Center modal over the homepage
 - Booking history with a status timeline and a receipt/confirmation modal showing payment details
 - Cancel a booking (triggers an automatic mock refund)
 - Wishlist management
 - Notifications inbox (mark read / delete)
 - My Reviews (create / edit / delete)
-- Profile update and password change
+- Support tickets (raise / view)
+- Profile update (including mobile, gender, DOB, address) and password change
 
 **Admin console (`admin.html`)**
 - Dashboard KPIs, monthly revenue/bookings charts (Chart.js), and a full reports/CSV export tool
@@ -86,8 +89,8 @@ PostgreSQL, with Alembic-managed schema migrations and JWT-based authentication.
 
 ```
 TOURS AND TRAVEL/
-├── index.html                  Public site — search, details, auth, contact, wishlist, reviews
-├── dashboard.html              User dashboard — bookings, wishlist, notifications, reviews, profile
+├── index.html                  Public site + logged-in Account Center — search, details, auth,
+│                                contact, wishlist, reviews, bookings, payments, notifications, profile
 ├── admin.html                  Admin console — CRUD, reports, charts, moderation, pagination
 ├── README.md
 └── backend/
@@ -297,8 +300,8 @@ The three HTML files are fully static — no build step. Deploy them as-is to an
 
 1. Update `API_BASE` at the top of each HTML file's `<script>` block to your deployed backend URL.
 2. Add the deployed frontend's origin to the backend's `CORS_ORIGINS`.
-3. Upload/deploy `index.html`, `dashboard.html`, and `admin.html` (and any `assets/` referenced by
-   them) to your static host.
+3. Upload/deploy `index.html`, `login.html`, `register.html`, `forgot-password.html`,
+   `reset-password.html`, and `admin.html` (and any `assets/` referenced by them) to your static host.
 
 ## Future Enhancements
 

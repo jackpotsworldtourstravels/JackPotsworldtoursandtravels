@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -12,15 +12,36 @@ from app.schemas.auth import (
     ResetPasswordRequest,
     SignupRequest,
     TokenResponse,
+    UserLoginRequest,
     UserResponse,
 )
-from app.services import activity_service, auth_service, notification_service
+from app.services import activity_service, auth_service, notification_service, session_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+def _login_and_track(db: Session, user: User, request: Request) -> None:
+    meta = activity_service.request_context(request)
+    activity_service.log_activity(
+        db, user.id, "Login", meta["ip_address"],
+        activity_type="Login", module="Auth", description=f"{user.full_name} logged in",
+        browser=meta["browser"], device=meta["device"],
+    )
+    auth_service.record_login(db, user)
+    session_service.start_session(db, user, meta)
+
+
+def _log_failed_login(db: Session, request: Request, identifier: str) -> None:
+    meta = activity_service.request_context(request)
+    activity_service.log_activity(
+        db, None, "Failed login attempt", meta["ip_address"],
+        activity_type="Login", module="Auth", description=f"Failed login attempt for '{identifier}'",
+        browser=meta["browser"], device=meta["device"], status="failed",
+    )
 
 
 def _user_response(user: User) -> UserResponse:
@@ -30,6 +51,16 @@ def _user_response(user: User) -> UserResponse:
         email=user.email,
         role=user.role.name,
         is_active=user.is_active,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        mobile=user.mobile,
+        gender=user.gender,
+        dob=user.dob,
+        country=user.country,
+        state=user.state,
+        city=user.city,
+        address=user.address,
+        profile_photo=user.profile_photo,
     )
 
 
@@ -43,11 +74,24 @@ def _user_response(user: User) -> UserResponse:
     ),
 )
 def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)):
-    user = auth_service.signup(db, payload.full_name, payload.email, payload.password)
-    activity_service.log_activity(db, user.id, "Registration", _client_ip(request))
+    user = auth_service.signup(
+        db, payload.full_name, payload.email, payload.password,
+        first_name=payload.first_name, last_name=payload.last_name, mobile=payload.mobile,
+        gender=payload.gender, dob=payload.dob, country=payload.country, state=payload.state,
+        city=payload.city, address=payload.address,
+    )
+    meta = activity_service.request_context(request)
+    activity_service.log_activity(
+        db, user.id, "Registration", meta["ip_address"],
+        activity_type="Registration", module="Auth", description=f"{user.full_name} registered a new account",
+        browser=meta["browser"], device=meta["device"],
+    )
     notification_service.create_notification(
         db, user.id, "Welcome to JackPots World Tours!",
         "Thanks for joining us — start exploring flights, hotels, cruises, and tour packages.",
+    )
+    notification_service.notify_admins(
+        db, "New user registered", f"{user.full_name} ({user.email}) just created an account.",
     )
     access_token, refresh_token = auth_service.issue_tokens(user)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
@@ -60,8 +104,33 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
     description="Public endpoint. Verifies credentials, records a login activity entry, and returns a new access/refresh token pair.",
 )
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = auth_service.authenticate(db, payload.email, payload.password)
-    activity_service.log_activity(db, user.id, "Login", _client_ip(request))
+    try:
+        user = auth_service.authenticate(db, payload.email, payload.password)
+    except HTTPException:
+        _log_failed_login(db, request, payload.email)
+        raise
+    _login_and_track(db, user, request)
+    access_token, refresh_token = auth_service.issue_tokens(user)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post(
+    "/user/login",
+    response_model=TokenResponse,
+    summary="Customer-only login",
+    description=(
+        "Public endpoint for the dedicated customer login page. Identical to /login except it rejects "
+        "accounts with the admin role, keeping the customer and admin sign-in surfaces fully independent — "
+        "admin credentials will never succeed here."
+    ),
+)
+def user_login(payload: UserLoginRequest, request: Request, db: Session = Depends(get_db)):
+    try:
+        user = auth_service.authenticate(db, payload.identifier, payload.password, required_role="user")
+    except HTTPException:
+        _log_failed_login(db, request, payload.identifier)
+        raise
+    _login_and_track(db, user, request)
     access_token, refresh_token = auth_service.issue_tokens(user)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
@@ -87,7 +156,13 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     ),
 )
 def logout(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    activity_service.log_activity(db, current_user.id, "Logout", _client_ip(request))
+    meta = activity_service.request_context(request)
+    activity_service.log_activity(
+        db, current_user.id, "Logout", meta["ip_address"],
+        activity_type="Logout", module="Auth", description=f"{current_user.full_name} logged out",
+        browser=meta["browser"], device=meta["device"],
+    )
+    session_service.end_session(db, current_user.id)
     return MessageResponse(message="Logged out — discard your tokens client-side")
 
 

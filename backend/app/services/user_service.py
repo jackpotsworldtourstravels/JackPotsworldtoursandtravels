@@ -72,11 +72,17 @@ def delete_user(db: Session, user_id: int) -> None:
         )
 
 
-def update_profile(db: Session, user: User, full_name: str) -> User:
+def update_profile(db: Session, user: User, full_name: str, **extended_fields) -> User:
     user.full_name = full_name
+    for field in ("mobile", "gender", "dob", "country", "state", "city", "address"):
+        if field in extended_fields and extended_fields[field] is not None:
+            setattr(user, field, extended_fields[field])
     db.commit()
     db.refresh(user)
-    activity_service.log_activity(db, user.id, "Profile Updated")
+    activity_service.log_activity(
+        db, user.id, "Profile Updated",
+        activity_type="Profile Update", module="Profile", description=f"{user.full_name} updated their profile",
+    )
     notification_service.create_notification(db, user.id, "Profile updated", "Your profile details were updated.")
     return user
 
@@ -86,7 +92,10 @@ def change_password(db: Session, user: User, current_password: str, new_password
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     user.hashed_password = hash_password(new_password)
     db.commit()
-    activity_service.log_activity(db, user.id, "Password Changed")
+    activity_service.log_activity(
+        db, user.id, "Password Changed",
+        activity_type="Password Change", module="Profile", description=f"{user.full_name} changed their password",
+    )
 
 
 def list_all_users(db: Session) -> list[User]:

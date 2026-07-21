@@ -3,7 +3,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.misc import Notification
-from app.models.user import User
+from app.models.user import Role, User
+from app.services import activity_service
 
 
 def create_notification(db: Session, user_id: int, title: str, message: str) -> Notification:
@@ -12,6 +13,18 @@ def create_notification(db: Session, user_id: int, title: str, message: str) -> 
     db.commit()
     db.refresh(notification)
     return notification
+
+
+def notify_admins(db: Session, title: str, message: str) -> int:
+    """Reuses the same Notification table as end-user notifications — an admin
+    is just a User with role 'admin', so their existing GET /api/notifications
+    call already surfaces these with no new endpoint needed.
+    """
+    admin_ids = db.scalars(select(User.id).join(Role, User.role_id == Role.id).where(Role.name == "admin")).all()
+    for admin_id in admin_ids:
+        db.add(Notification(user_id=admin_id, title=title, message=message))
+    db.commit()
+    return len(admin_ids)
 
 
 def list_user_notifications(db: Session, user_id: int) -> list[Notification]:
@@ -26,6 +39,10 @@ def mark_read(db: Session, user_id: int, notification_id: int) -> Notification:
     notification.is_read = True
     db.commit()
     db.refresh(notification)
+    activity_service.log_activity(
+        db, user_id, f"Notification Read ({notification.title})",
+        activity_type="Notification Read", module="Notification", reference_id=notification.id,
+    )
     return notification
 
 

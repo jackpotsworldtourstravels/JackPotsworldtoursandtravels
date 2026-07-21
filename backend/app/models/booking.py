@@ -18,6 +18,9 @@ class Booking(Base):
     quantity: Mapped[int] = mapped_column(default=1)
     travel_date: Mapped[datetime.date | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
 
     payments: Mapped[list["Payment"]] = relationship(back_populates="booking")
 
@@ -32,6 +35,8 @@ class Payment(Base):
     method: Mapped[str] = mapped_column(String(30), default="mock")
     status: Mapped[str] = mapped_column(String(30), default="success")  # success | failed | refunded
     transaction_ref: Mapped[str] = mapped_column(String(100), nullable=False)
+    refunded_at: Mapped[datetime.datetime | None] = mapped_column(nullable=True)
+    refund_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
 
     booking: Mapped["Booking"] = relationship(back_populates="payments")

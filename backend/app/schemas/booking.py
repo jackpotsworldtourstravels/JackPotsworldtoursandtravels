@@ -10,7 +10,7 @@ class BookingCreate(BaseModel):
     booking_type: BookingType
     item_id: int
     total_price: float = Field(gt=0, description="Client-estimated total; the server recalculates this from the catalog and ignores this value.")
-    quantity: int = Field(default=1, ge=1, description="Number of seats/rooms/travellers to book.")
+    quantity: int = Field(default=1, ge=1, le=10, description="Number of seats/rooms/travellers to book (max 10 per booking).")
     travel_date: datetime.date | None = None
 
 
@@ -47,7 +47,7 @@ class BookingConfirmation(BaseModel):
 
 
 class BookingStatusUpdate(BaseModel):
-    status: Literal["pending", "confirmed", "cancelled"]
+    status: Literal["pending", "confirmed", "completed", "cancelled"]
 
 
 class AdminBookingOut(BookingOut):

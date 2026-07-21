@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A2540; --navy-2:#123157; --gold:#FFB020; --gold-dark:#C98A0E;
+  --white:#FFFFFF; --bg:#F0F4FA; --muted:#5B6B82; --line:rgba(10,37,64,0.12);
+  --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35); --radius:22px; --ff:'Montserrat', sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  font-family:var(--ff); color:var(--navy); -webkit-font-smoothing:antialiased;
+  background:linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 45%, #1B4577 100%);
+  background-attachment:fixed;
+}
+button,input{font-family:var(--ff);}
+button{cursor:pointer;}
+a{color:inherit; text-decoration:none;}
+
+.auth-card{
+  background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow-lg);
+  width:100%; max-width:420px; padding:40px 36px; position:relative; overflow:hidden;
+}
+.auth-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:5px;
+  background:linear-gradient(90deg, var(--gold), var(--navy));
+}
+.auth-logo{display:block; height:56px; width:auto; margin:0 auto 22px; object-fit:contain;}
+.auth-title{font-size:24px; font-weight:800; text-align:center; color:var(--navy);}
+.auth-sub{font-size:13.5px; color:var(--muted); text-align:center; margin-top:6px; margin-bottom:28px;}
+
+.field{margin-bottom:16px;}
+.field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); margin-bottom:6px;}
+.field-input-wrap{position:relative;}
+.field input{
+  width:100%; padding:13px 16px; border-radius:12px; border:1.5px solid var(--line);
+  font-size:14.5px; color:var(--navy); outline:none; transition:border-color .2s ease;
+}
+.field input:focus{border-color:var(--gold-dark);}
+.pass-toggle{
+  position:absolute; right:6px; top:50%; transform:translateY(-50%); width:34px; height:34px;
+  border-radius:8px; background:none; display:flex; align-items:center; justify-content:center; color:var(--muted);
+}
+.pass-toggle:hover{background:rgba(10,37,64,0.06);}
+.pass-toggle svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2;}
+
+.row-between{display:flex; align-items:center; justify-content:space-between; margin:2px 0 22px; font-size:13px;}
+.remember{display:flex; align-items:center; gap:7px; color:var(--muted); font-weight:600;}
+.remember input{width:15px; height:15px; accent-color:var(--gold-dark);}
+.forgot-link{color:var(--gold-dark); font-weight:700;}
+.forgot-link:hover{text-decoration:underline;}
+
+.btn-login{
+  width:100%; padding:14px; border-radius:100px; border:none; background:var(--navy); color:#fff;
+  font-weight:700; font-size:15px; transition:filter .2s ease, transform .2s ease;
+}
+.btn-login:hover{filter:brightness(1.15);}
+.btn-login:active{transform:scale(.98);}
+
+.divider{display:flex; align-items:center; gap:12px; margin:22px 0; color:var(--muted); font-size:12px; font-weight:600;}
+.divider::before,.divider::after{content:''; flex:1; height:1px; background:var(--line);}
+
+.btn-google{
+  width:100%; padding:12px; border-radius:100px; border:1.5px solid var(--line); background:#fff; color:var(--navy);
+  font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; gap:10px;
+  opacity:.6; cursor:not-allowed;
+}
+.btn-google svg{width:18px; height:18px;}
+
+.auth-switch{text-align:center; margin-top:26px; font-size:14px; color:var(--muted);}
+.auth-switch a{color:var(--gold-dark); font-weight:700;}
+.auth-switch a:hover{text-decoration:underline;}
+
+.msg{margin-top:14px; font-size:13px; font-weight:600; text-align:center; min-height:1px;}
+.msg.error{color:#E63946;} .msg.success{color:#12B76A;}
+
+.back-home{position:fixed; top:22px; left:24px; color:rgba(255,255,255,0.8); font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px;}
+.back-home:hover{color:#fff;}
+.back-home svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2;}
+@media (max-width:480px){ .auth-card{padding:32px 24px;} .back-home{position:static; margin-bottom:16px; color:rgba(255,255,255,0.85);} body{display:block; padding:32px 16px;} }
+</style>
+</head>
+<body>
+<a href="index.html" class="back-home"><svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> Back to site</a>
+
+<div class="auth-card">
+  <img class="auth-logo" src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+  <h1 class="auth-title">Welcome Back</h1>
+  <p class="auth-sub">Log in to manage your bookings and trips</p>
+
+  <form id="loginForm" novalidate>
+    <div class="field">
+      <label for="identifier">Email or Mobile Number</label>
+      <input id="identifier" type="text" autocomplete="username" required placeholder="you@example.com">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="field-input-wrap">
+        <input id="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+        <button type="button" class="pass-toggle" id="passToggle" aria-label="Show password">
+          <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="row-between">
+      <label class="remember"><input type="checkbox" id="rememberMe"> Remember Me</label>
+      <a href="forgot-password.html" class="forgot-link">Forgot Password?</a>
+    </div>
+    <button type="submit" class="btn-login">Login</button>
+    <div class="msg" id="loginMsg"></div>
+  </form>
+
+  <div class="divider">OR</div>
+  <button type="button" class="btn-google" disabled title="Coming soon">
+    <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/></svg>
+    Login with Google
+  </button>
+
+  <div class="auth-switch">Don't have an account? <a href="register.html">Register Now</a></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+'use strict';
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
+
+const passInput = document.getElementById('password');
+const passToggle = document.getElementById('passToggle');
+const eyeIcon = document.getElementById('eyeIcon');
+passToggle.addEventListener('click', () => {
+  const show = passInput.type === 'password';
+  passInput.type = show ? 'text' : 'password';
+  passToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  eyeIcon.innerHTML = show
+    ? '<path d="M17.9 17.9A10.9 10.9 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.1-6.1M9.9 4.2A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.7 20.7 0 0 1-3.2 4.5M14.1 14.1a3 3 0 1 1-4.2-4.2"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/>';
+});
+
+// If already logged in as a user, skip straight to the homepage.
+if (localStorage.getItem('jwt_access') && localStorage.getItem('jwt_user_role') === 'user') {
+  window.location.href = 'index.html';
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('loginMsg');
+  const identifier = document.getElementById('identifier').value.trim();
+  const password = passInput.value;
+  msg.textContent = '';
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/auth/user/login`, { identifier, password });
+    const me = await axios.get(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
+    localStorage.setItem('jwt_access', data.access_token);
+    localStorage.setItem('jwt_refresh', data.refresh_token);
+    localStorage.setItem('jwt_user_name', me.data.full_name);
+    localStorage.setItem('jwt_user_role', me.data.role);
+    localStorage.setItem('jwt_user_id', me.data.id);
+    if (document.getElementById('rememberMe').checked) {
+      localStorage.setItem('jwt_remember', '1');
+    }
+    msg.textContent = 'Logged in — redirecting…';
+    msg.className = 'msg success';
+    window.location.href = 'index.html';
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Login failed — please try again.';
+    msg.className = 'msg error';
+  }
+});
+</script>
+</body>
+</html>

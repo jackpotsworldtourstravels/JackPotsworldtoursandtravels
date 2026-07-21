@@ -12,6 +12,7 @@ class FlightBase(BaseModel):
     cabin_class: str = Field(default="Economy", max_length=30)
     price: float = Field(gt=0)
     seats_available: int = Field(default=0, ge=0)
+    low_stock_threshold: int = Field(default=5, ge=0)
 
 
 class FlightCreate(FlightBase):
@@ -20,6 +21,8 @@ class FlightCreate(FlightBase):
 
 class FlightOut(FlightBase):
     id: int
+    is_sold_out: bool = False
+    is_low_stock: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -32,6 +35,7 @@ class HotelBase(BaseModel):
     amenities: str | None = Field(default=None, max_length=500)
     image_url: str | None = Field(default=None, max_length=500)
     rooms_available: int = Field(default=0, ge=0)
+    low_stock_threshold: int = Field(default=5, ge=0)
 
 
 class HotelCreate(HotelBase):
@@ -40,6 +44,8 @@ class HotelCreate(HotelBase):
 
 class HotelOut(HotelBase):
     id: int
+    is_sold_out: bool = False
+    is_low_stock: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -51,6 +57,8 @@ class CruiseBase(BaseModel):
     duration_days: int = Field(gt=0)
     price: float = Field(gt=0)
     departure_month: str = Field(max_length=20)
+    cabins_available: int = Field(default=0, ge=0)
+    low_stock_threshold: int = Field(default=5, ge=0)
 
 
 class CruiseCreate(CruiseBase):
@@ -59,6 +67,8 @@ class CruiseCreate(CruiseBase):
 
 class CruiseOut(CruiseBase):
     id: int
+    is_sold_out: bool = False
+    is_low_stock: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -72,6 +82,8 @@ class TourPackageBase(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
     image_url: str | None = Field(default=None, max_length=500)
     available_month: str | None = Field(default=None, max_length=20)
+    capacity: int = Field(default=0, ge=0)
+    low_stock_threshold: int = Field(default=5, ge=0)
 
 
 class TourPackageCreate(TourPackageBase):
@@ -80,5 +92,7 @@ class TourPackageCreate(TourPackageBase):
 
 class TourPackageOut(TourPackageBase):
     id: int
+    is_sold_out: bool = False
+    is_low_stock: bool = False
 
     model_config = {"from_attributes": True}

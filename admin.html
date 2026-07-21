@@ -10,17 +10,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{
-  --navy:#0A2540; --navy-2:#123157; --navy-3:#1B4577;
-  --coral:#FF4D4D; --coral-dark:#E63946; --coral-hover:#FFF0F0;
-  --bg:#F5F7FA; --white:#FFFFFF; --sky:#2F80ED; --emerald:#12B76A; --gold:#FFB020;
-  --ink:#0A2540; --muted:#5B6B82; --line:rgba(10,37,64,0.10);
-  --shadow-sm:0 8px 24px -12px rgba(10,37,64,0.18); --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35);
+  /* Brand palette: primary (deep blue), secondary (bright blue), accent (orange) */
+  --navy:#0B3C6D; --navy-2:#0F4A85; --navy-3:#155A9E;
+  --coral:#FF6B35; --coral-dark:#E85A2A; --coral-hover:#FFEFE8;
+  --bg:#F5F7FA; --white:#FFFFFF; --sky:#1E88E5; --emerald:#12B76A; --gold:#FFB020;
+  --ink:#0B3C6D; --muted:#5B6B82; --line:rgba(11,60,109,0.10);
+  --shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18); --shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
   --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
 
-  --sidebar-bg:#0F172A; --sidebar-bg-2:#161F35; --sidebar-text:rgba(255,255,255,0.62); --sidebar-text-hover:#fff;
+  --sidebar-bg:#0B3C6D; --sidebar-bg-2:#0A2F55; --sidebar-text:rgba(255,255,255,0.65); --sidebar-text-hover:#fff;
   --sidebar-w:264px; --sidebar-w-collapsed:80px;
   --card-bg:#fff; --page-bg:var(--bg); --text-primary:var(--ink); --text-muted:var(--muted);
-  --border-color:var(--line); --hover-bg:rgba(10,37,64,0.04);
+  --border-color:var(--line); --hover-bg:rgba(11,60,109,0.04);
 }
 :root[data-theme="dark"]{
   --page-bg:#0B1220; --card-bg:#131B2E; --text-primary:#E7ECF5; --text-muted:#93A2BE;
@@ -53,6 +54,10 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 
 .sidebar .brand{display:flex; align-items:center; gap:10px; padding:0 22px 20px; font-size:16.5px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:10px; white-space:nowrap;}
 .sidebar .brand-mark{width:34px; height:34px; border-radius:10px; background:var(--coral); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; flex-shrink:0;}
+.brand-logo-full{height:38px; width:auto; object-fit:contain; flex-shrink:0;}
+.brand-logo-collapsed{display:none; height:32px; width:32px; object-fit:contain; border-radius:8px; flex-shrink:0;}
+.layout.collapsed .brand-logo-full{display:none;}
+.layout.collapsed .brand-logo-collapsed{display:block;}
 .sidebar .brand span.accent{color:var(--gold);}
 .nav-group-label{padding:16px 22px 6px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.32); white-space:nowrap;}
 .layout.collapsed .nav-group-label{display:none;}
@@ -156,6 +161,85 @@ tbody tr:hover{background:var(--hover-bg);}
 .pagination{display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:16px; font-size:13px; color:var(--text-muted); flex-wrap:wrap;}
 .pagination button:disabled{opacity:.4; cursor:default;}
 
+.live-feed{max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;}
+.live-feed-item{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:10px; background:var(--hover-bg); font-size:13px;}
+.live-feed-emoji{font-size:17px; line-height:1.4; flex-shrink:0;}
+.live-feed-body{min-width:0;}
+.live-feed-text{color:var(--text-primary); font-weight:600;}
+.live-feed-time{color:var(--text-muted); font-size:11.5px; margin-top:2px;}
+.online-row{display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--border-color);}
+.online-row:last-child{border-bottom:none;}
+.online-avatar{width:38px; height:38px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0; position:relative; object-fit:cover;}
+.online-avatar .pulse{position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:50%; background:var(--emerald); border:2px solid var(--card-bg);}
+.online-info{min-width:0; flex:1;}
+.online-name{font-size:13.5px; font-weight:700; color:var(--text-primary);}
+.online-meta{font-size:12px; color:var(--text-muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.top-list{display:flex; flex-direction:column; gap:8px;}
+.top-list-row{display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border-radius:10px; background:var(--hover-bg); font-size:13px;}
+.top-list-name{font-weight:700; color:var(--text-primary);}
+.top-list-meta{color:var(--text-muted); font-size:12px;}
+.notif-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:340px; max-height:420px; overflow-y:auto; background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-lg); border:1px solid var(--border-color); z-index:400; display:none; padding:8px;}
+.notif-dropdown.open{display:block;}
+.notif-dropdown-head{padding:10px 12px; font-size:13px; font-weight:800; color:var(--text-primary); border-bottom:1px solid var(--border-color); margin-bottom:6px;}
+.notif-dropdown-item{padding:10px 12px; border-radius:10px; font-size:13px; cursor:pointer;}
+.notif-dropdown-item:hover{background:var(--hover-bg);}
+.notif-dropdown-item.unread{background:rgba(255,176,32,0.08);}
+.notif-dropdown-item .n-title{font-weight:700; color:var(--text-primary);}
+.notif-dropdown-item .n-msg{color:var(--text-muted); margin-top:2px;}
+.notif-dropdown-item .n-time{color:var(--text-muted); font-size:11px; margin-top:4px;}
+.icon-btn-wrap{position:relative;}
+
+/* Inventory Management */
+.badge.healthy{background:rgba(18,183,106,0.12); color:var(--emerald);}
+.badge.low-stock{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.sold-out{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+
+/* Customer Management */
+.cust-avatar{width:36px; height:36px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.cust-name-cell{display:flex; align-items:center; gap:10px;}
+.status-dot-inline{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:var(--text-muted);}
+.status-dot-inline.online{background:var(--emerald); box-shadow:0 0 0 3px rgba(18,183,106,0.18);}
+.cust-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+.filter-bar input[type="text"]{padding:9px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px; background:var(--card-bg); color:var(--text-primary); min-width:200px;}
+
+.modal-card.modal-lg{max-width:980px; max-height:88vh; overflow-y:auto; padding:0;}
+.profile-header{display:flex; align-items:center; gap:16px; padding:26px 30px; border-bottom:1px solid var(--border-color); position:sticky; top:0; background:var(--card-bg); z-index:2;}
+.profile-header-avatar{width:64px; height:64px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.profile-header-info{min-width:0; flex:1;}
+.profile-header-name{font-size:19px; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.profile-header-meta{font-size:13px; color:var(--text-muted); margin-top:3px;}
+.profile-header-close{width:34px; height:34px; border-radius:10px; background:var(--hover-bg); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.profile-actions{display:flex; gap:8px; flex-wrap:wrap; padding:16px 30px; border-bottom:1px solid var(--border-color);}
+.profile-tabs{display:flex; gap:4px; padding:0 30px; border-bottom:1px solid var(--border-color); overflow-x:auto; background:var(--card-bg); position:sticky; top:97px; z-index:1;}
+.profile-tab{padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-muted); white-space:nowrap; border-bottom:2.5px solid transparent;}
+.profile-tab.active{color:var(--coral-dark); border-bottom-color:var(--coral);}
+.profile-tab-panel{display:none; padding:22px 30px 30px;}
+.profile-tab-panel.active{display:block;}
+.analytics-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:18px;}
+.analytics-tile{background:var(--hover-bg); border-radius:12px; padding:14px 16px;}
+.analytics-tile .num{font-size:19px; font-weight:800; color:var(--text-primary);}
+.analytics-tile .label{font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:3px;}
+.info-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 22px;}
+.info-grid .info-item label{display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:3px;}
+.info-grid .info-item div{font-size:13.5px; color:var(--text-primary); font-weight:600;}
+.timeline{display:flex; flex-direction:column; gap:2px;}
+.timeline-item{display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border-color);}
+.timeline-item:last-child{border-bottom:none;}
+.timeline-dot{width:9px; height:9px; border-radius:50%; background:var(--coral); flex-shrink:0; margin-top:5px;}
+.timeline-body{min-width:0;}
+.timeline-text{font-size:13.5px; font-weight:600; color:var(--text-primary);}
+.timeline-time{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+@media (max-width:640px){ .info-grid{grid-template-columns:1fr;} .profile-header{padding:20px;} .profile-actions{padding:14px 20px;} .profile-tabs{padding:0 20px; top:89px;} .profile-tab-panel{padding:18px 20px 24px;} }
+@media print{
+  body > *:not(.modal-overlay){display:none !important;}
+  .modal-overlay{position:static !important; background:none !important; display:block !important; padding:0 !important;}
+  .modal-overlay:not(.print-target){display:none !important;}
+  .modal-card{box-shadow:none !important; max-height:none !important; max-width:none !important;}
+  .profile-actions, .profile-header-close, .profile-tabs{display:none !important;}
+  .profile-tab-panel{display:block !important; padding:10px 0 !important;}
+}
+
 .sidebar-backdrop{display:none;}
 .mobile-topbar{
   display:none; align-items:center; justify-content:space-between; background:var(--sidebar-bg); color:#fff;
@@ -190,7 +274,7 @@ tbody tr:hover{background:var(--hover-bg);}
 </head>
 <body>
 <div class="mobile-topbar">
-  <div class="brand"><span class="brand-mark" style="width:28px;height:28px;font-size:12px;">JP</span> JackPots Admin</div>
+  <div class="brand"><img src="assets/favicon-180.png" alt="JackPots World Tours &amp; Travels" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> JackPots Admin</div>
   <button type="button" class="hamburger-btn" id="mobileMenuBtn" aria-label="Open menu">
     <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
   </button>
@@ -198,7 +282,10 @@ tbody tr:hover{background:var(--hover-bg);}
 <div class="layout" id="layoutRoot">
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <nav class="sidebar">
-    <div class="brand"><span class="brand-mark">JP</span><span class="brand-text">JackPots <span class="accent">Admin</span></span></div>
+    <div class="brand">
+      <img class="brand-logo-full" src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <img class="brand-logo-collapsed" src="assets/favicon-180.png" alt="JackPots">
+    </div>
 
     <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn">
       <svg class="icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span>Collapse</span>
@@ -212,6 +299,54 @@ tbody tr:hover{background:var(--hover-bg);}
     <a href="#" class="nav-item" data-section="users">
       <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="nav-label">Users</span>
+    </a>
+    <a href="#" class="nav-item" data-section="active-users">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
+      <span class="nav-label">Active Users</span>
+    </a>
+    <a href="#" class="nav-item" data-section="customers">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/><circle cx="17.5" cy="16.5" r="2"/></svg>
+      <span class="nav-label">Customers</span>
+    </a>
+    <a href="#" class="nav-item" data-section="contact">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
+      <span class="nav-label">Support Management</span>
+    </a>
+    <a href="#" class="nav-item" data-section="user-analytics">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      <span class="nav-label">User Analytics</span>
+    </a>
+    <a href="#" class="nav-item" data-section="reports-export">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      <span class="nav-label">Reports</span>
+    </a>
+    <a href="#" class="nav-item" data-section="bookings">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <span class="nav-label">All Transactions</span>
+    </a>
+    <a href="#" class="nav-item" data-section="booking-management">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2.5"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 15 2 2 4-4"/></svg>
+      <span class="nav-label">Booking Management</span>
+    </a>
+    <a href="#" class="nav-item" data-section="payments">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span class="nav-label">Payment Management</span>
+    </a>
+    <a href="#" class="nav-item" data-section="payment-management">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/><path d="m9 15 2 2 4-4"/></svg>
+      <span class="nav-label">Payment Management Center</span>
+    </a>
+    <a href="#" class="nav-item" data-section="reviews">
+      <svg class="icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>
+      <span class="nav-label">Complaint Management</span>
+    </a>
+    <a href="#" class="nav-item" data-section="notifications">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="nav-label">Communication</span>
+    </a>
+    <a href="#" class="nav-item" data-section="profile">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      <span class="nav-label">Profile</span>
     </a>
 
     <div class="nav-group-label">Catalog</div>
@@ -231,41 +366,23 @@ tbody tr:hover{background:var(--hover-bg);}
       <svg class="icon" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
       <span class="nav-label">Tour Packages</span>
     </a>
-
-    <div class="nav-group-label">Sales</div>
-    <a href="#" class="nav-item" data-section="bookings">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      <span class="nav-label">All Transactions</span>
-    </a>
-    <a href="#" class="nav-item" data-section="payments">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-      <span class="nav-label">Payment Management</span>
+    <a href="#" class="nav-item" data-section="inventory">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M21 8V7a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 7v10a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7v-1"/><path d="M3.3 7 12 12l8.7-5"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+      <span class="nav-label">Inventory</span>
     </a>
 
-    <div class="nav-group-label">Engagement</div>
-    <a href="#" class="nav-item" data-section="contact">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
-      <span class="nav-label">Contact Messages</span>
-    </a>
+    <div class="nav-group-label">More</div>
     <a href="#" class="nav-item" data-section="newsletter">
       <svg class="icon" viewBox="0 0 24 24"><path d="m22 2-11 11"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
       <span class="nav-label">Newsletter</span>
-    </a>
-    <a href="#" class="nav-item" data-section="reviews">
-      <svg class="icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>
-      <span class="nav-label">Reviews</span>
     </a>
     <a href="#" class="nav-item" data-section="wishlist">
       <svg class="icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>
       <span class="nav-label">Wishlist</span>
     </a>
-    <a href="#" class="nav-item" data-section="notifications">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-      <span class="nav-label">Communication Settings</span>
-    </a>
     <a href="#" class="nav-item" data-section="activity">
       <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9-6-18-3 9H2"/></svg>
-      <span class="nav-label">Activity Log</span>
+      <span class="nav-label">User Activity Monitor</span>
     </a>
 
     <div class="spacer"></div>
@@ -290,10 +407,16 @@ tbody tr:hover{background:var(--hover-bg);}
           <svg class="icon" id="themeIconSun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           <svg class="icon" id="themeIconMoon" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
         </button>
-        <button type="button" class="icon-btn" id="notifBellBtn" title="View notifications">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-          <span class="dot" id="notifDot" style="display:none;"></span>
-        </button>
+        <div class="icon-btn-wrap">
+          <button type="button" class="icon-btn" id="notifBellBtn" title="View notifications">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="dot" id="notifDot" style="display:none;"></span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-dropdown-head">Notifications</div>
+            <div id="notifDropdownList" class="empty-state">Loading…</div>
+          </div>
+        </div>
         <div class="admin-chip">
           <div class="admin-avatar" id="adminAvatar">A</div>
           <div class="admin-chip-text">
@@ -333,6 +456,46 @@ tbody tr:hover{background:var(--hover-bg);}
         <div class="panel-head"><h2>Latest payments</h2><button class="btn btn-ghost btn-sm" data-export="payments">Export CSV</button></div>
         <div id="recentPayments" class="empty-state">Loading…</div>
       </div>
+
+      <div class="stat-grid" id="liveStatGrid"></div>
+      <div class="stat-grid" id="dashboardCustomerStatGrid"></div>
+      <div class="stat-grid" id="dashboardBookingStatGrid"></div>
+      <div class="stat-grid" id="dashboardPaymentStatGrid"></div>
+
+      <div class="charts-grid">
+        <div class="panel">
+          <div class="panel-head"><h2>Recent activity feed</h2><span style="font-size:11.5px;color:var(--text-muted);font-weight:700;">Live</span></div>
+          <div id="activityFeed" class="live-feed empty-state">Loading…</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Online users now</h2><span style="font-size:11.5px;color:var(--text-muted);font-weight:700;">Live</span></div>
+          <div id="onlineUsersList" class="empty-state">Loading…</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="panel">
+          <h2>Top destinations</h2>
+          <div id="topDestinations" class="empty-state">Loading…</div>
+        </div>
+        <div class="panel">
+          <h2>Top hotels</h2>
+          <div id="topHotels" class="empty-state">Loading…</div>
+        </div>
+        <div class="panel">
+          <h2>Top cruises</h2>
+          <div id="topCruises" class="empty-state">Loading…</div>
+        </div>
+        <div class="panel">
+          <h2>Top tour packages</h2>
+          <div id="topPackages" class="empty-state">Loading…</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Most active users</h2>
+        <div id="mostActiveUsers" class="empty-state">Loading…</div>
+      </div>
     </section>
 
     <section class="section" id="section-users">
@@ -346,10 +509,128 @@ tbody tr:hover{background:var(--hover-bg);}
       </div>
     </section>
 
+    <section class="section" id="section-active-users">
+      <div class="panel">
+        <h2>Active users</h2>
+        <div class="table-wrap"><table id="activeUsersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-customers">
+      <div class="stat-grid" id="customerStatGrid"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Customers</h2>
+          <div class="filter-bar">
+            <input type="text" id="customerSearch" placeholder="Search name, email, mobile, or ID…">
+            <select id="customerStatusFilter" class="status-select">
+              <option value="">All statuses</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="blocked">Blocked</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+            </select>
+            <select id="customerSort" class="status-select">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="most_bookings">Most Bookings</option>
+              <option value="highest_spending">Highest Spending</option>
+              <option value="most_active">Most Active</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="customersTable"><thead><tr>
+          <th></th><th>Customer</th><th>Mobile</th><th>Registered</th><th>Last Login</th><th>Logins</th>
+          <th>Bookings</th><th>Payments</th><th>Points</th><th>Online</th><th>Account</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="customersPagination"></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-user-analytics">
+      <div class="stat-grid" id="userAnalyticsStatGrid"></div>
+      <div class="panel">
+        <h2>Users by role</h2>
+        <div id="userAnalyticsByRole" class="empty-state">Loading…</div>
+      </div>
+      <div class="panel">
+        <h2>Recently joined</h2>
+        <div id="userAnalyticsRecent" class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <section class="section" id="section-reports-export">
+      <div class="panel">
+        <h2>Export data as CSV</h2>
+        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:16px;">Download the current data for any of the categories below.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-navy" data-export="users">Users CSV</button>
+          <button class="btn btn-navy" data-export="bookings">Bookings CSV</button>
+          <button class="btn btn-navy" data-export="payments">Payments CSV</button>
+          <button class="btn btn-navy" data-export="contact">Support Messages CSV</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Bookings by type</h2>
+        <div id="reportsExportBookingsByType" class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <section class="section" id="section-profile">
+      <div class="panel" style="max-width:480px;">
+        <h2>My profile</h2>
+        <form id="adminProfileForm">
+          <div class="form-field" style="max-width:none;"><label>Full Name</label><input id="adminProfileName" type="text" required></div>
+          <div class="form-field" style="max-width:none;"><label>Email</label><input id="adminProfileEmail" type="email" disabled></div>
+          <button type="submit" class="btn btn-coral">Save Changes</button>
+          <div class="msg" id="adminProfileMsg"></div>
+        </form>
+      </div>
+      <div class="panel" style="max-width:480px;">
+        <h2>Change password</h2>
+        <form id="adminPasswordForm">
+          <div class="form-field" style="max-width:none;"><label>Current Password</label><input id="adminCurrentPassword" type="password" required></div>
+          <div class="form-field" style="max-width:none;"><label>New Password</label><input id="adminNewPassword" type="password" required minlength="8"></div>
+          <button type="submit" class="btn btn-navy">Change Password</button>
+          <div class="msg" id="adminPasswordMsg"></div>
+        </form>
+      </div>
+    </section>
+
     <section class="section" id="section-flights"></section>
     <section class="section" id="section-hotels"></section>
     <section class="section" id="section-cruises"></section>
     <section class="section" id="section-packages"></section>
+
+    <section class="section" id="section-inventory">
+      <div class="stat-grid" id="inventoryStatGrid"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Inventory</h2>
+          <div class="filter-bar">
+            <input type="text" id="inventorySearch" placeholder="Search by name…">
+            <select id="inventoryTypeFilter" class="status-select">
+              <option value="">All types</option>
+              <option value="flight">Flights</option>
+              <option value="hotel">Hotels</option>
+              <option value="cruise">Cruises</option>
+              <option value="package">Tour Packages</option>
+            </select>
+            <select id="inventoryStatusFilter" class="status-select">
+              <option value="">All statuses</option>
+              <option value="low_stock">Low Stock</option>
+              <option value="sold_out">Sold Out</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="inventoryTable"><thead><tr>
+          <th>Type</th><th>Name</th><th>Price</th><th>Available</th><th>Low-stock Threshold</th><th>Status</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
 
     <section class="section" id="section-bookings">
       <div class="panel">
@@ -359,11 +640,88 @@ tbody tr:hover{background:var(--hover-bg);}
       </div>
     </section>
 
+    <section class="section" id="section-booking-management">
+      <div class="stat-grid" id="bmStatGrid"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Booking Management Center</h2>
+          <div class="filter-bar">
+            <input type="text" id="bmSearch" placeholder="Search booking ID, customer, or destination…">
+            <select id="bmTypeFilter" class="status-select">
+              <option value="">All types</option>
+              <option value="flight">Flights</option>
+              <option value="hotel">Hotels</option>
+              <option value="cruise">Cruises</option>
+              <option value="package">Tour Packages</option>
+            </select>
+            <select id="bmStatusFilter" class="status-select">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select id="bmPaymentFilter" class="status-select">
+              <option value="">All payments</option>
+              <option value="success">Paid</option>
+              <option value="failed">Failed</option>
+              <option value="refunded">Refunded</option>
+            </select>
+            <input type="date" id="bmDateFrom" title="From date">
+            <input type="date" id="bmDateTo" title="To date">
+            <select id="bmSort" class="status-select">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="travel_date">Travel Date</option>
+              <option value="amount">Amount</option>
+              <option value="status">Booking Status</option>
+              <option value="customer_name">Customer Name</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="bmTable"><thead><tr>
+          <th>Booking ID</th><th>Customer</th><th>Type</th><th>Destination</th><th>Booking Date</th>
+          <th>Travel Date</th><th>Passengers</th><th>Amount</th><th>Payment</th><th>Status</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="bmPagination"></div>
+      </div>
+    </section>
+
     <section class="section" id="section-payments">
       <div class="panel">
         <h2>All payments</h2>
         <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th><th>Date</th></tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="paymentsPagination"></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-payment-management">
+      <div class="stat-grid" id="pmStatGrid"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Payment Management Center</h2>
+          <div class="filter-bar">
+            <input type="text" id="pmSearch" placeholder="Search transaction, customer, or destination…">
+            <select id="pmStatusFilter" class="status-select">
+              <option value="">All statuses</option>
+              <option value="success">Paid</option>
+              <option value="failed">Failed</option>
+              <option value="refunded">Refunded</option>
+            </select>
+            <input type="date" id="pmDateFrom" title="From date">
+            <input type="date" id="pmDateTo" title="To date">
+            <select id="pmSort" class="status-select">
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="amount">Amount</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="pmTable"><thead><tr>
+          <th>Transaction ID</th><th>Customer</th><th>Booking</th><th>Amount</th><th>Gateway</th>
+          <th>Method</th><th>Status</th><th>Refund Status</th><th>Payment Date</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="pmPagination"></div>
       </div>
     </section>
 
@@ -427,13 +785,17 @@ tbody tr:hover{background:var(--hover-bg);}
     <section class="section" id="section-activity">
       <div class="panel">
         <div class="panel-head">
-          <h2>Activity log</h2>
-          <div style="display:flex; gap:10px;">
+          <h2>User activity monitor</h2>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <input type="text" id="activitySearch" placeholder="Search user or action…" style="padding:9px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px;">
+            <select id="activityModuleFilter" class="status-select"><option value="">All modules</option></select>
             <select id="activityFilter" class="status-select"><option value="">All actions</option></select>
           </div>
         </div>
-        <div class="table-wrap"><table id="activityTable"><thead><tr><th>User</th><th>Activity</th><th>IP Address</th><th>Date</th></tr></thead><tbody></tbody></table></div>
+        <div class="table-wrap"><table id="activityTable"><thead><tr>
+          <th>Activity Time</th><th>User Name</th><th>Email</th><th>User ID</th><th>Activity Type</th>
+          <th>Module</th><th>Description</th><th>IP Address</th><th>Browser</th><th>Device</th><th>Status</th>
+        </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="activityPagination"></div>
       </div>
     </section>
@@ -462,11 +824,146 @@ tbody tr:hover{background:var(--hover-bg);}
   </div>
 </div>
 
+<div class="modal-overlay" id="customerModalOverlay">
+  <div class="modal-card modal-lg">
+    <div class="profile-header">
+      <div class="profile-header-avatar" id="custProfileAvatar">C</div>
+      <div class="profile-header-info">
+        <div class="profile-header-name">
+          <span id="custProfileName">—</span>
+          <span class="status-dot-inline" id="custProfileOnlineDot"></span>
+          <span id="custProfileBadges"></span>
+        </div>
+        <div class="profile-header-meta" id="custProfileMeta">—</div>
+      </div>
+      <button type="button" class="profile-header-close" id="customerModalCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="profile-actions" id="custProfileActions"></div>
+    <div class="profile-tabs" id="custProfileTabs">
+      <div class="profile-tab active" data-tab="overview">Overview</div>
+      <div class="profile-tab" data-tab="bookings">Bookings</div>
+      <div class="profile-tab" data-tab="payments">Payments</div>
+      <div class="profile-tab" data-tab="timeline">Activity Timeline</div>
+      <div class="profile-tab" data-tab="support">Support</div>
+      <div class="profile-tab" data-tab="reviews">Reviews</div>
+      <div class="profile-tab" data-tab="wishlist">Wishlist</div>
+    </div>
+    <div class="profile-tab-panel active" id="custTab-overview"></div>
+    <div class="profile-tab-panel" id="custTab-bookings"></div>
+    <div class="profile-tab-panel" id="custTab-payments"></div>
+    <div class="profile-tab-panel" id="custTab-timeline"></div>
+    <div class="profile-tab-panel" id="custTab-support"></div>
+    <div class="profile-tab-panel" id="custTab-reviews"></div>
+    <div class="profile-tab-panel" id="custTab-wishlist"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="customerEditModalOverlay">
+  <div class="modal-card">
+    <h2>Edit Customer</h2>
+    <form id="customerEditForm">
+      <div class="form-grid">
+        <div class="form-field"><label>Full Name</label><input name="full_name" type="text" required></div>
+        <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
+        <div class="form-field"><label>Mobile</label><input name="mobile" type="text"></div>
+        <div class="form-field"><label>Gender</label><input name="gender" type="text"></div>
+        <div class="form-field"><label>Date of Birth</label><input name="dob" type="date"></div>
+        <div class="form-field"><label>Country</label><input name="country" type="text"></div>
+        <div class="form-field"><label>State</label><input name="state" type="text"></div>
+        <div class="form-field"><label>City</label><input name="city" type="text"></div>
+      </div>
+      <div class="form-field" style="max-width:none;"><label>Address</label><input name="address" type="text"></div>
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin:8px 0 16px;">
+        <input name="is_verified" type="checkbox" style="width:16px;height:16px;"> Mark as verified
+      </label>
+      <div class="msg" id="customerEditMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Save Changes</button>
+        <button type="button" class="btn btn-ghost" id="customerEditCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="inventoryAdjustModalOverlay">
+  <div class="modal-card">
+    <h2 id="inventoryAdjustTitle">Adjust Inventory</h2>
+    <form id="inventoryAdjustForm">
+      <div class="form-field" style="max-width:none;"><label>Available</label><input name="available" type="number" min="0" required></div>
+      <div class="form-field" style="max-width:none;"><label>Low-stock Threshold</label><input name="low_stock_threshold" type="number" min="0" required></div>
+      <div class="msg" id="inventoryAdjustMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Save</button>
+        <button type="button" class="btn btn-ghost" id="inventoryAdjustCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bmModalOverlay">
+  <div class="modal-card modal-lg">
+    <div class="profile-header">
+      <div class="profile-header-avatar" id="bmProfileAvatar">B</div>
+      <div class="profile-header-info">
+        <div class="profile-header-name">
+          <span id="bmProfileName">—</span>
+          <span id="bmProfileBadges"></span>
+        </div>
+        <div class="profile-header-meta" id="bmProfileMeta">—</div>
+      </div>
+      <button type="button" class="profile-header-close" id="bmModalCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="profile-actions" id="bmProfileActions"></div>
+    <div class="profile-tabs" id="bmProfileTabs">
+      <div class="profile-tab active" data-tab="overview">Overview</div>
+      <div class="profile-tab" data-tab="payment">Payment</div>
+      <div class="profile-tab" data-tab="timeline">Booking Timeline</div>
+      <div class="profile-tab" data-tab="inventory">Inventory</div>
+    </div>
+    <div class="profile-tab-panel active" id="bmTab-overview"></div>
+    <div class="profile-tab-panel" id="bmTab-payment"></div>
+    <div class="profile-tab-panel" id="bmTab-timeline"></div>
+    <div class="profile-tab-panel" id="bmTab-inventory"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bmSmallModalOverlay">
+  <div class="modal-card">
+    <h2 id="bmSmallModalTitle">Reschedule Booking</h2>
+    <form id="bmSmallModalForm">
+      <div class="form-field" style="max-width:none;">
+        <label id="bmSmallModalLabel">New Travel Date</label>
+        <input id="bmSmallModalInput" type="date" required>
+      </div>
+      <div class="msg" id="bmSmallModalMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Save</button>
+        <button type="button" class="btn btn-ghost" id="bmSmallModalCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="customerMsgModalOverlay">
+  <div class="modal-card">
+    <h2 id="customerMsgModalTitle">Send Notification</h2>
+    <form id="customerMsgForm">
+      <div class="form-field" style="max-width:none;"><label id="customerMsgTitleLabel">Title</label><input name="title" type="text" required></div>
+      <div class="form-field" style="max-width:none;"><label>Message</label><input name="message" type="text" required></div>
+      <div class="msg" id="customerMsgFormMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Send</button>
+        <button type="button" class="btn btn-ghost" id="customerMsgCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 'use strict';
-const API_BASE = 'http://127.0.0.1:8000';
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
 /* Escape user-supplied text before inserting into innerHTML templates */
 function escapeHtml(str) {
@@ -486,6 +983,7 @@ function authHeaders() {
 }
 function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
 
 /* Render Prev/Next pagination controls into a container; onChange(newPage) reloads the table */
 function renderPagination(containerId, page, totalPages, total, onChange) {
@@ -516,9 +1014,11 @@ document.getElementById('logoutBtn').addEventListener('click', async e => {
 
 /* ---------- Section navigation ---------- */
 const sectionTitles = {
-  reports: 'Dashboard', users: 'Users', flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
-  packages: 'Tour Packages', bookings: 'Bookings', payments: 'Payments', contact: 'Contact Messages', newsletter: 'Newsletter',
-  reviews: 'Reviews', wishlist: 'Wishlist', notifications: 'Notifications', activity: 'Activity Log',
+  reports: 'Dashboard', users: 'Users', 'active-users': 'Active Users', customers: 'Customers', flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
+  packages: 'Tour Packages', bookings: 'All Transactions', 'booking-management': 'Booking Management Center', payments: 'Payment Management', 'payment-management': 'Payment Management Center', contact: 'Support Management', newsletter: 'Newsletter',
+  'user-analytics': 'User Analytics', 'reports-export': 'Reports',
+  reviews: 'Complaint Management', wishlist: 'Wishlist', notifications: 'Communication', activity: 'User Activity Monitor', inventory: 'Inventory',
+  profile: 'Profile',
 };
 const loadedSections = new Set();
 document.querySelectorAll('.nav-item[data-section]').forEach(link => {
@@ -538,6 +1038,10 @@ document.querySelectorAll('.nav-item[data-section]').forEach(link => {
 function loadSection(name) {
   if (name === 'reports') return loadReports();
   if (name === 'users') return loadUsers();
+  if (name === 'active-users') return loadActiveUsers();
+  if (name === 'customers') return loadCustomers();
+  if (name === 'user-analytics') return loadUserAnalytics();
+  if (name === 'reports-export') return loadReportsExport();
   if (name === 'bookings') return loadBookings();
   if (name === 'payments') return loadPayments();
   if (name === 'contact') return loadContact();
@@ -546,6 +1050,10 @@ function loadSection(name) {
   if (name === 'wishlist') return loadWishlistAdmin();
   if (name === 'notifications') return initNotificationForm();
   if (name === 'activity') return loadActivityLog();
+  if (name === 'inventory') return loadInventory();
+  if (name === 'booking-management') return loadBookingManagement();
+  if (name === 'payment-management') return loadPaymentManagement();
+  if (name === 'profile') return loadAdminProfile();
   if (['flights', 'hotels', 'cruises', 'packages'].includes(name)) return renderContentSection(name);
 }
 
@@ -609,11 +1117,102 @@ async function loadReports() {
         }</tbody></table></div>`
       : '<div class="empty-state" id="recentPayments">No payments yet.</div>';
 
+    document.getElementById('liveStatGrid').innerHTML = `
+      <div class="stat-card">${statIcon('emerald', ICONS.userCheck)}<div class="stat-body"><div class="num">${data.users_online}</div><div class="label">Users Online</div></div></div>
+      <div class="stat-card">${statIcon('sky', ICONS.clock)}<div class="stat-body"><div class="num">${data.active_sessions}</div><div class="label">Active Sessions</div></div></div>
+      <div class="stat-card">${statIcon('', ICONS.users)}<div class="stat-body"><div class="num">${data.today_logins}</div><div class="label">Today's Logins</div></div></div>
+      <div class="stat-card">${statIcon('', ICONS.users)}<div class="stat-body"><div class="num">${data.today_users}</div><div class="label">Today's New Users</div></div></div>
+      <div class="stat-card">${statIcon('sky', ICONS.booking)}<div class="stat-body"><div class="num">${data.today_bookings}</div><div class="label">Today's Bookings</div></div></div>
+      <div class="stat-card">${statIcon('coral', ICONS.revenue)}<div class="stat-body"><div class="num">${money(data.today_revenue)}</div><div class="label">Today's Revenue</div></div></div>
+      <div class="stat-card">${statIcon('gold', ICONS.contact)}<div class="stat-body"><div class="num">${data.today_payments}</div><div class="label">Today's Payments</div></div></div>
+    `;
+
+    renderTopList('topDestinations', data.top_destinations);
+    renderTopList('topHotels', data.top_hotels);
+    renderTopList('topCruises', data.top_cruises);
+    renderTopList('topPackages', data.top_packages);
+
+    const activeEl = document.getElementById('mostActiveUsers');
+    activeEl.innerHTML = data.most_active_users.length
+      ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Activity Count</th><th>Last Active</th></tr></thead><tbody>${
+          data.most_active_users.map(u => `<tr><td>${escapeHtml(u.full_name)}</td><td>${escapeHtml(u.email)}</td><td>${u.activity_count}</td><td>${fmtDate(u.last_active)}</td></tr>`).join('')
+        }</tbody></table></div>`
+      : `<div class="empty-state">No activity recorded yet.</div>`;
+
+    loadActivityFeed();
+    loadOnlineUsers();
+    loadCustomerStats('dashboardCustomerStatGrid');
+    loadDashboardBookingCard();
+    loadDashboardPaymentCard();
     loadMonthlyCharts();
   } catch (err) {
     document.getElementById('statGrid').innerHTML = `<div class="msg error">Failed to load reports.</div>`;
   }
 }
+
+function renderTopList(elId, items) {
+  const el = document.getElementById(elId);
+  el.innerHTML = (items && items.length)
+    ? `<div class="top-list">${items.map(i => `
+        <div class="top-list-row">
+          <span class="top-list-name">${escapeHtml(i.name)}</span>
+          <span class="top-list-meta">${i.bookings} booking${i.bookings === 1 ? '' : 's'} · ${money(i.revenue)}</span>
+        </div>`).join('')}</div>`
+    : `<div class="empty-state">No bookings yet.</div>`;
+}
+
+/* ---------- Recent activity feed (live) ---------- */
+const ACTIVITY_EMOJI = {
+  Registration: '🆕', Login: '🔐', Logout: '🚪', 'Profile Update': '✏️', 'Password Change': '🔑',
+  'Booking Created': '🧳', 'Booking Cancelled': '❌', 'Payment Completed': '💳', 'Payment Refunded': '↩️',
+  'Wishlist Added': '❤️', 'Wishlist Removed': '💔', 'Review Submitted': '⭐', 'Support Ticket Created': '🎫',
+  'Notification Read': '🔔', Search: '🔍', 'Admin Action': '🛠️',
+};
+async function loadActivityFeed() {
+  const el = document.getElementById('activityFeed');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/activity-logs/recent`, { headers: authHeaders(), params: { limit: 20 } });
+    el.innerHTML = data.length
+      ? data.map(a => `
+          <div class="live-feed-item">
+            <span class="live-feed-emoji">${ACTIVITY_EMOJI[a.activity_type] || '📌'}</span>
+            <div class="live-feed-body">
+              <div class="live-feed-text">${escapeHtml(a.description || a.action)}</div>
+              <div class="live-feed-time">${a.user_email ? escapeHtml(a.user_email) + ' · ' : ''}${new Date(a.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+            </div>
+          </div>`).join('')
+      : `<div class="empty-state">No activity yet.</div>`;
+  } catch (err) { /* feed just won't refresh this cycle */ }
+}
+
+/* ---------- Online users (live) ---------- */
+async function loadOnlineUsers() {
+  const el = document.getElementById('onlineUsersList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/sessions/online`, { headers: authHeaders() });
+    el.innerHTML = data.length
+      ? data.map(u => {
+          const initials = u.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+          return `
+            <div class="online-row">
+              <div class="online-avatar">${u.profile_photo ? `<img src="${escapeHtml(u.profile_photo)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : initials}<span class="pulse"></span></div>
+              <div class="online-info">
+                <div class="online-name">${escapeHtml(u.full_name)}</div>
+                <div class="online-meta">${escapeHtml(u.current_page || 'Browsing')} · since ${new Date(u.login_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+            </div>`;
+        }).join('')
+      : `<div class="empty-state">No one online right now.</div>`;
+  } catch (err) { /* widget just won't refresh this cycle */ }
+}
+
+/* Live widgets on the Dashboard section auto-refresh every 15s while it's the visible section */
+setInterval(() => {
+  if (document.getElementById('section-reports').classList.contains('active')) {
+    loadActivityFeed();
+    loadOnlineUsers();
+  }
+}, 15000);
 
 /* ---------- Monthly charts ---------- */
 let revenueChartInstance, bookingsChartInstance;
@@ -770,6 +1369,863 @@ userModalForm.addEventListener('submit', async e => {
     loadUsers();
   } catch (err) {
     msg.textContent = err.response?.data?.detail || 'Failed to save user.';
+    msg.className = 'msg error';
+  }
+});
+
+/* ---------- Active Users ---------- */
+async function loadActiveUsers() {
+  const tbody = document.querySelector('#activeUsersTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/users`, { headers: authHeaders(), params: { page: 1, page_size: 1000 } });
+    const active = data.items.filter(u => u.is_active);
+    tbody.innerHTML = active.map(u => `
+      <tr><td>${escapeHtml(u.full_name)}</td><td>${escapeHtml(u.email)}</td><td style="text-transform:capitalize">${escapeHtml(u.role)}</td></tr>
+    `).join('') || `<tr><td colspan="3" class="empty-state">No active users.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Failed to load active users.</td></tr>`;
+  }
+}
+
+/* ---------- Inventory Management ---------- */
+let inventorySearchTimer;
+const TYPE_LABEL = { flight: 'Flight', hotel: 'Hotel', cruise: 'Cruise', package: 'Package' };
+
+async function loadInventoryStats() {
+  const el = document.getElementById('inventoryStatGrid');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/inventory/stats`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M3.3 7 12 12l8.7-5"/><line x1="12" y1="22" x2="12" y2="12"/></svg></div><div class="stat-body"><div class="num">${data.total_items}</div><div class="label">Total Items</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg></div><div class="stat-body"><div class="num">${data.healthy}</div><div class="label">Healthy Stock</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/></svg></div><div class="stat-body"><div class="num">${data.low_stock}</div><div class="label">Low Stock</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.sold_out}</div><div class="label">Sold Out</div></div></div>
+    `;
+  } catch (err) { el.innerHTML = `<div class="msg error">Failed to load inventory stats.</div>`; }
+}
+
+async function loadInventory() {
+  const tbody = document.querySelector('#inventoryTable tbody');
+  const search = document.getElementById('inventorySearch').value;
+  const itemType = document.getElementById('inventoryTypeFilter').value;
+  const statusFilter = document.getElementById('inventoryStatusFilter').value;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/inventory`, {
+      headers: authHeaders(),
+      params: {
+        search: search || undefined,
+        item_type: itemType || undefined,
+        low_stock_only: statusFilter === 'low_stock' ? true : undefined,
+        sold_out_only: statusFilter === 'sold_out' ? true : undefined,
+      },
+    });
+    tbody.innerHTML = data.map(i => {
+      const badge = i.is_sold_out ? '<span class="badge sold-out">Sold Out</span>' : i.is_low_stock ? '<span class="badge low-stock">Low Stock</span>' : '<span class="badge healthy">Healthy</span>';
+      return `
+      <tr>
+        <td>${TYPE_LABEL[i.item_type]}</td>
+        <td>${escapeHtml(i.name)}</td>
+        <td>${money(i.price)}</td>
+        <td>${i.available}</td>
+        <td>${i.low_stock_threshold}</td>
+        <td>${badge}</td>
+        <td><button class="btn btn-ghost btn-sm" data-adjust-inventory="${i.item_type}:${i.item_id}" data-available="${i.available}" data-threshold="${i.low_stock_threshold}" data-name="${escapeHtml(i.name)}">Adjust</button></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="7" class="empty-state">No inventory items found.</td></tr>`;
+    tbody.querySelectorAll('[data-adjust-inventory]').forEach(btn => {
+      btn.addEventListener('click', () => openInventoryAdjustModal(btn));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load inventory.</td></tr>`;
+  }
+  loadInventoryStats();
+}
+document.getElementById('inventorySearch').addEventListener('input', () => {
+  clearTimeout(inventorySearchTimer);
+  inventorySearchTimer = setTimeout(loadInventory, 350);
+});
+document.getElementById('inventoryTypeFilter').addEventListener('change', loadInventory);
+document.getElementById('inventoryStatusFilter').addEventListener('change', loadInventory);
+
+const inventoryAdjustModalOverlay = document.getElementById('inventoryAdjustModalOverlay');
+const inventoryAdjustForm = document.getElementById('inventoryAdjustForm');
+let inventoryAdjustTarget = null;
+function openInventoryAdjustModal(btn) {
+  inventoryAdjustTarget = btn.dataset.adjustInventory;
+  document.getElementById('inventoryAdjustTitle').textContent = `Adjust Inventory — ${btn.dataset.name}`;
+  inventoryAdjustForm.elements.available.value = btn.dataset.available;
+  inventoryAdjustForm.elements.low_stock_threshold.value = btn.dataset.threshold;
+  document.getElementById('inventoryAdjustMsg').textContent = '';
+  inventoryAdjustModalOverlay.classList.add('open');
+}
+document.getElementById('inventoryAdjustCancelBtn').addEventListener('click', () => inventoryAdjustModalOverlay.classList.remove('open'));
+inventoryAdjustForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('inventoryAdjustMsg');
+  const [itemType, itemId] = inventoryAdjustTarget.split(':');
+  const payload = {
+    available: Number(inventoryAdjustForm.elements.available.value),
+    low_stock_threshold: Number(inventoryAdjustForm.elements.low_stock_threshold.value),
+  };
+  try {
+    await axios.patch(`${API_BASE}/api/admin/inventory/${itemType}/${itemId}`, payload, { headers: authHeaders() });
+    inventoryAdjustModalOverlay.classList.remove('open');
+    loadInventory();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to adjust inventory.';
+    msg.className = 'msg error';
+  }
+});
+
+/* ---------- Booking Management Center ---------- */
+let bmPage = 1;
+let bmSearchTimer;
+let currentBookingId = null;
+let currentBookingData = null;
+const BM_STATUS_BADGE = s => `<span class="badge ${s === 'completed' ? 'confirmed' : s}">${s}</span>`;
+
+async function loadBookingAnalytics(targetId = 'bmStatGrid') {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/booking-management/analytics`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/></svg></div><div class="stat-body"><div class="num">${data.total_bookings}</div><div class="label">Total Bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/></svg></div><div class="stat-body"><div class="num">${data.today_bookings}</div><div class="label">Today's Bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg></div><div class="stat-body"><div class="num">${data.confirmed}</div><div class="label">Confirmed</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="stat-body"><div class="num">${data.pending}</div><div class="label">Pending</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.cancelled}</div><div class="label">Cancelled</div></div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg></div><div class="stat-body"><div class="num">${data.completed}</div><div class="label">Completed</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num">${money(data.revenue)}</div><div class="label">Revenue</div></div></div>
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num">${money(data.average_booking_value)}</div><div class="label">Avg Booking Value</div></div></div>
+    `;
+  } catch (err) { el.innerHTML = `<div class="msg error">Failed to load booking analytics.</div>`; }
+}
+
+async function loadDashboardBookingCard() {
+  const el = document.getElementById('dashboardBookingStatGrid');
+  if (!el) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/booking-management/dashboard-card`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/></svg></div><div class="stat-body"><div class="num">${data.today_bookings}</div><div class="label">Today's Bookings</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="stat-body"><div class="num">${data.pending_approvals}</div><div class="label">Pending Approvals</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/></svg></div><div class="stat-body"><div class="num">${data.upcoming_trips}</div><div class="label">Upcoming Trips</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.cancelled_today}</div><div class="label">Cancelled Today</div></div></div>
+    `;
+  } catch (err) { /* card just won't refresh this cycle */ }
+}
+
+async function loadBookingManagement(page = bmPage) {
+  bmPage = page;
+  const tbody = document.querySelector('#bmTable tbody');
+  const params = {
+    search: document.getElementById('bmSearch').value || undefined,
+    booking_type: document.getElementById('bmTypeFilter').value || undefined,
+    booking_status: document.getElementById('bmStatusFilter').value || undefined,
+    payment_status: document.getElementById('bmPaymentFilter').value || undefined,
+    date_from: document.getElementById('bmDateFrom').value || undefined,
+    date_to: document.getElementById('bmDateTo').value || undefined,
+    sort: document.getElementById('bmSort').value,
+    page, page_size: PAGE_SIZE,
+  };
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/booking-management/bookings`, { headers: authHeaders(), params });
+    renderPagination('bmPagination', data.page, data.total_pages, data.total, loadBookingManagement);
+    tbody.innerHTML = data.items.map(b => `
+      <tr>
+        <td>#${b.id}</td>
+        <td>${escapeHtml(b.customer_name)}<div style="font-size:11px;color:var(--text-muted);">${escapeHtml(b.customer_email)}</div></td>
+        <td style="text-transform:capitalize">${escapeHtml(b.booking_type)}</td>
+        <td>${escapeHtml(b.destination)}</td>
+        <td>${fmtDate(b.booking_date)}</td>
+        <td>${b.travel_date ? fmtDate(b.travel_date) : '—'}</td>
+        <td>${b.passengers}</td>
+        <td>${money(b.total_amount)}</td>
+        <td>${b.payment_status ? `<span class="badge ${b.payment_status}">${b.payment_status === 'success' ? 'paid' : escapeHtml(b.payment_status)}</span>` : '—'}</td>
+        <td>${BM_STATUS_BADGE(b.booking_status)}</td>
+        <td><button class="btn btn-ghost btn-sm" data-view-booking="${b.id}">View</button></td>
+      </tr>
+    `).join('') || `<tr><td colspan="11" class="empty-state">No bookings found.</td></tr>`;
+    tbody.querySelectorAll('[data-view-booking]').forEach(btn => {
+      btn.addEventListener('click', () => openBookingDetail(btn.dataset.viewBooking));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="11" class="empty-state">Failed to load bookings.</td></tr>`;
+  }
+  loadBookingAnalytics();
+}
+['bmTypeFilter', 'bmStatusFilter', 'bmPaymentFilter', 'bmDateFrom', 'bmDateTo', 'bmSort'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => loadBookingManagement(1));
+});
+document.getElementById('bmSearch').addEventListener('input', () => {
+  clearTimeout(bmSearchTimer);
+  bmSearchTimer = setTimeout(() => loadBookingManagement(1), 350);
+});
+
+/* ---------- Booking detail modal ---------- */
+const bmModalOverlay = document.getElementById('bmModalOverlay');
+
+async function openBookingDetail(id) {
+  currentBookingId = id;
+  bmModalOverlay.classList.add('open');
+  document.getElementById('bmProfileName').textContent = 'Loading…';
+  document.getElementById('bmProfileMeta').textContent = '';
+  document.getElementById('bmProfileActions').innerHTML = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/booking-management/bookings/${id}`, { headers: authHeaders() });
+    currentBookingData = data;
+    renderBookingDetail(data);
+  } catch (err) {
+    document.getElementById('bmProfileName').textContent = 'Failed to load booking';
+  }
+}
+document.getElementById('bmModalCloseBtn').addEventListener('click', () => bmModalOverlay.classList.remove('open'));
+
+function renderBookingDetail(b) {
+  document.getElementById('bmProfileAvatar').textContent = b.booking_type[0].toUpperCase();
+  document.getElementById('bmProfileName').textContent = `Booking #${b.id} — ${b.destination}`;
+  document.getElementById('bmProfileBadges').innerHTML = BM_STATUS_BADGE(b.status);
+  document.getElementById('bmProfileMeta').textContent = `${b.customer.full_name} · ${b.customer.email} · Booked ${fmtDateTime(b.created_at)}`;
+
+  const actions = [];
+  actions.push(`<button class="btn btn-ghost btn-sm" data-bm-act="view-customer">View Customer</button>`);
+  if (b.status === 'pending') {
+    actions.push(`<button class="btn btn-navy btn-sm" data-bm-act="approve">Approve</button>`);
+    actions.push(`<button class="btn btn-danger btn-sm" data-bm-act="reject">Reject</button>`);
+  }
+  if (b.status === 'confirmed') {
+    actions.push(`<button class="btn btn-navy btn-sm" data-bm-act="complete">Mark Completed</button>`);
+  }
+  if (b.status !== 'cancelled') {
+    actions.push(`<button class="btn btn-ghost btn-sm" data-bm-act="reschedule">Reschedule</button>`);
+    actions.push(`<button class="btn btn-ghost btn-sm" data-bm-act="passengers">Update Passengers</button>`);
+    actions.push(`<button class="btn btn-danger btn-sm" data-bm-act="cancel">Cancel Booking</button>`);
+  }
+  actions.push(`<button class="btn btn-ghost btn-sm" data-bm-act="invoice">Download Invoice</button>`);
+  actions.push(`<button class="btn btn-ghost btn-sm" data-bm-act="print">Print Booking</button>`);
+  document.getElementById('bmProfileActions').innerHTML = actions.join('');
+  document.getElementById('bmProfileActions').querySelectorAll('[data-bm-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleBookingAction(btn.dataset.bmAct));
+  });
+
+  document.getElementById('bmTab-overview').innerHTML = `
+    <div class="analytics-grid">
+      <div class="analytics-tile"><div class="num" style="font-size:15px;text-transform:capitalize;">${escapeHtml(b.booking_type)}</div><div class="label">Booking Type</div></div>
+      <div class="analytics-tile"><div class="num">${b.quantity}</div><div class="label">Passengers</div></div>
+      <div class="analytics-tile"><div class="num">${money(b.total_price)}</div><div class="label">Total Amount</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:15px;">${b.travel_date ? fmtDate(b.travel_date) : '—'}</div><div class="label">Travel Date</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:15px;">${fmtDateTime(b.updated_at)}</div><div class="label">Last Updated</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:15px;">${fmtDateTime(b.created_at)}</div><div class="label">Created</div></div>
+    </div>
+    <h2 style="font-size:14px;margin-bottom:12px;">Customer &amp; traveler details</h2>
+    <div class="info-grid">
+      <div class="info-item"><label>Customer Name</label><div>${escapeHtml(b.customer.full_name)}</div></div>
+      <div class="info-item"><label>Email</label><div>${escapeHtml(b.customer.email)}</div></div>
+      <div class="info-item"><label>Mobile</label><div>${b.customer.mobile ? escapeHtml(b.customer.mobile) : '—'}</div></div>
+      <div class="info-item"><label>Travelers</label><div>${b.quantity} traveler(s), primary contact ${escapeHtml(b.customer.full_name)}</div></div>
+    </div>
+  `;
+
+  document.getElementById('bmTab-payment').innerHTML = b.payments.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Transaction ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th><th>Refund Ref</th><th>Refund Date</th></tr></thead><tbody>${
+        b.payments.map(p => `<tr><td>${escapeHtml(p.transaction_ref)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td>${fmtDateTime(p.created_at)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.refund_reference ? escapeHtml(p.refund_reference) : '—'}</td><td>${p.refunded_at ? fmtDateTime(p.refunded_at) : '—'}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No payment recorded.</div>`;
+
+  document.getElementById('bmTab-timeline').innerHTML = b.timeline.length
+    ? `<div class="timeline">${b.timeline.map(t => `
+        <div class="timeline-item">
+          <span class="timeline-dot"></span>
+          <div class="timeline-body">
+            <div class="timeline-text">${ACTIVITY_EMOJI[t.activity_type] || '📌'} ${escapeHtml(t.description || t.activity_type || 'Activity')}</div>
+            <div class="timeline-time">${fmtDateTime(t.created_at)} · ${escapeHtml(t.actor)}</div>
+          </div>
+        </div>`).join('')}</div>`
+    : `<div class="empty-state">No timeline events recorded yet.</div>`;
+
+  document.getElementById('bmTab-inventory').innerHTML = b.inventory
+    ? `<div class="analytics-grid">
+        <div class="analytics-tile"><div class="num" style="font-size:15px;">${escapeHtml(b.inventory.name)}</div><div class="label">Item</div></div>
+        <div class="analytics-tile"><div class="num">${b.inventory.available}</div><div class="label">Currently Available</div></div>
+        <div class="analytics-tile"><div class="num">${b.inventory.low_stock_threshold}</div><div class="label">Low-stock Threshold</div></div>
+        <div class="analytics-tile"><div class="num" style="font-size:15px;">${b.inventory.is_sold_out ? '<span class="badge sold-out">Sold Out</span>' : b.inventory.is_low_stock ? '<span class="badge low-stock">Low Stock</span>' : '<span class="badge healthy">Healthy</span>'}</div><div class="label">Status</div></div>
+      </div>`
+    : `<div class="empty-state">This catalog item no longer exists.</div>`;
+}
+
+document.getElementById('bmProfileTabs').querySelectorAll('.profile-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#bmProfileTabs .profile-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('#bmModalOverlay .profile-tab-panel').forEach(p => p.classList.toggle('active', p.id === `bmTab-${tab.dataset.tab}`));
+  });
+});
+
+async function handleBookingAction(action) {
+  const id = currentBookingId;
+  const base = `${API_BASE}/api/admin/booking-management/bookings/${id}`;
+  try {
+    if (action === 'view-customer') { bmModalOverlay.classList.remove('open'); return openCustomerProfile(currentBookingData.customer.id); }
+    if (action === 'reschedule') return openBmSmallModal('reschedule');
+    if (action === 'passengers') return openBmSmallModal('passengers');
+    if (action === 'invoice') {
+      const { data } = await axios.get(`${base}/invoice`, { headers: authHeaders(), responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url; a.download = `invoice-booking-${id}.csv`; a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (action === 'print') {
+      bmModalOverlay.classList.add('print-target');
+      window.print();
+      setTimeout(() => bmModalOverlay.classList.remove('print-target'), 500);
+      return;
+    }
+    if (action === 'approve') await axios.post(`${base}/approve`, {}, { headers: authHeaders() });
+    else if (action === 'reject') { if (!confirm('Reject this pending booking?')) return; await axios.post(`${base}/reject`, {}, { headers: authHeaders() }); }
+    else if (action === 'complete') await axios.post(`${base}/complete`, {}, { headers: authHeaders() });
+    else if (action === 'cancel') { if (!confirm('Cancel this booking? This restores inventory and refunds the payment.')) return; await axios.post(`${base}/cancel`, {}, { headers: authHeaders() }); }
+    openBookingDetail(id);
+    loadBookingManagement(bmPage);
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Action failed.');
+  }
+}
+
+/* ---------- Reschedule / passenger-count small modal (shared) ---------- */
+const bmSmallModalOverlay = document.getElementById('bmSmallModalOverlay');
+const bmSmallModalForm = document.getElementById('bmSmallModalForm');
+let bmSmallModalMode = 'reschedule';
+function openBmSmallModal(mode) {
+  bmSmallModalMode = mode;
+  document.getElementById('bmSmallModalMsg').textContent = '';
+  const input = document.getElementById('bmSmallModalInput');
+  if (mode === 'reschedule') {
+    document.getElementById('bmSmallModalTitle').textContent = 'Reschedule Booking';
+    document.getElementById('bmSmallModalLabel').textContent = 'New Travel Date';
+    input.type = 'date';
+    input.value = currentBookingData.travel_date || '';
+  } else {
+    document.getElementById('bmSmallModalTitle').textContent = 'Update Passenger Count';
+    document.getElementById('bmSmallModalLabel').textContent = 'Passengers (max 10)';
+    input.type = 'number';
+    input.min = 1; input.max = 10;
+    input.value = currentBookingData.quantity;
+  }
+  bmSmallModalOverlay.classList.add('open');
+}
+document.getElementById('bmSmallModalCancelBtn').addEventListener('click', () => bmSmallModalOverlay.classList.remove('open'));
+bmSmallModalForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('bmSmallModalMsg');
+  const value = document.getElementById('bmSmallModalInput').value;
+  const base = `${API_BASE}/api/admin/booking-management/bookings/${currentBookingId}`;
+  try {
+    if (bmSmallModalMode === 'reschedule') {
+      await axios.patch(`${base}/reschedule`, { travel_date: value }, { headers: authHeaders() });
+    } else {
+      await axios.patch(`${base}/passengers`, { quantity: Number(value) }, { headers: authHeaders() });
+    }
+    bmSmallModalOverlay.classList.remove('open');
+    openBookingDetail(currentBookingId);
+    loadBookingManagement(bmPage);
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to save.';
+    msg.className = 'msg error';
+  }
+});
+
+/* ---------- Payment Management Center ---------- */
+let pmPage = 1;
+let pmSearchTimer;
+
+async function loadPaymentAnalytics(targetId = 'pmStatGrid') {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/payment-management/analytics`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="stat-body"><div class="num">${data.total_transactions}</div><div class="label">Total Transactions</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num">${money(data.total_revenue)}</div><div class="label">Total Revenue</div></div></div>
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num">${money(data.today_revenue)}</div><div class="label">Today's Revenue</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></div><div class="stat-body"><div class="num">${money(data.total_refunded)}</div><div class="label">Total Refunded</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg></div><div class="stat-body"><div class="num">${data.success_count}</div><div class="label">Successful</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.failed_count}</div><div class="label">Failed</div></div></div>
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></div><div class="stat-body"><div class="num">${data.refunded_count}</div><div class="label">Refunded</div></div></div>
+    `;
+  } catch (err) { el.innerHTML = `<div class="msg error">Failed to load payment analytics.</div>`; }
+}
+
+async function loadDashboardPaymentCard() {
+  const el = document.getElementById('dashboardPaymentStatGrid');
+  if (!el) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/payment-management/dashboard-card`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num">${money(data.today_revenue)}</div><div class="label">Today's Revenue</div></div></div>
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div><div class="stat-body"><div class="num">${data.total_transactions_today}</div><div class="label">Today's Transactions</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.failed_payments}</div><div class="label">Failed Payments</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><div class="stat-body"><div class="num">${data.pending_refunds}</div><div class="label">Pending Refunds</div></div></div>
+    `;
+  } catch (err) { /* card just won't refresh this cycle */ }
+}
+
+async function loadPaymentManagement(page = pmPage) {
+  pmPage = page;
+  const tbody = document.querySelector('#pmTable tbody');
+  const params = {
+    search: document.getElementById('pmSearch').value || undefined,
+    payment_status: document.getElementById('pmStatusFilter').value || undefined,
+    date_from: document.getElementById('pmDateFrom').value || undefined,
+    date_to: document.getElementById('pmDateTo').value || undefined,
+    sort: document.getElementById('pmSort').value,
+    page, page_size: PAGE_SIZE,
+  };
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/payment-management/payments`, { headers: authHeaders(), params });
+    renderPagination('pmPagination', data.page, data.total_pages, data.total, loadPaymentManagement);
+    tbody.innerHTML = data.items.map(p => `
+      <tr>
+        <td>${escapeHtml(p.transaction_ref)}</td>
+        <td>${escapeHtml(p.customer_name)}<div style="font-size:11px;color:var(--text-muted);">${escapeHtml(p.customer_email)}</div></td>
+        <td>#${p.booking_id} <span style="color:var(--text-muted);font-size:12px;">${escapeHtml(p.destination)}</span></td>
+        <td>${money(p.amount)}</td>
+        <td>${escapeHtml(p.gateway)}</td>
+        <td style="text-transform:capitalize">${escapeHtml(p.method)}</td>
+        <td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td>
+        <td>${escapeHtml(p.refund_status)}</td>
+        <td>${fmtDateTime(p.created_at)}</td>
+        <td class="cust-actions">
+          ${p.status === 'success' ? `<button class="btn btn-danger btn-sm" data-pm-act="refund" data-id="${p.id}">Refund</button>` : ''}
+          <button class="btn btn-ghost btn-sm" data-pm-act="invoice" data-booking="${p.booking_id}">Invoice</button>
+          <button class="btn btn-ghost btn-sm" data-pm-act="view-booking" data-booking="${p.booking_id}">View Booking</button>
+          <button class="btn btn-ghost btn-sm" data-pm-act="view-customer" data-customer="${p.customer_id}">View Customer</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="10" class="empty-state">No payments found.</td></tr>`;
+    tbody.querySelectorAll('[data-pm-act]').forEach(btn => {
+      btn.addEventListener('click', () => handlePaymentAction(btn.dataset.pmAct, btn.dataset));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-state">Failed to load payments.</td></tr>`;
+  }
+  loadPaymentAnalytics();
+}
+['pmStatusFilter', 'pmDateFrom', 'pmDateTo', 'pmSort'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => loadPaymentManagement(1));
+});
+document.getElementById('pmSearch').addEventListener('input', () => {
+  clearTimeout(pmSearchTimer);
+  pmSearchTimer = setTimeout(() => loadPaymentManagement(1), 350);
+});
+
+async function handlePaymentAction(action, dataset) {
+  try {
+    if (action === 'view-booking') return openBookingDetail(dataset.booking);
+    if (action === 'view-customer') return openCustomerProfile(dataset.customer);
+    if (action === 'invoice') {
+      const { data } = await axios.get(`${API_BASE}/api/admin/booking-management/bookings/${dataset.booking}/invoice`, { headers: authHeaders(), responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url; a.download = `invoice-booking-${dataset.booking}.csv`; a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (action === 'refund') {
+      if (!confirm('Refund this payment? This cancels the booking and restores inventory.')) return;
+      await axios.post(`${API_BASE}/api/admin/payment-management/payments/${dataset.id}/refund`, {}, { headers: authHeaders() });
+      loadPaymentManagement(pmPage);
+    }
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Action failed.');
+  }
+}
+
+/* ---------- Customer Management ---------- */
+let customersPage = 1;
+let customerSearchTimer;
+const ACCOUNT_BADGE = (c) => {
+  if (c.is_deleted) return '<span class="badge cancelled">Deleted</span>';
+  if (c.is_blocked) return '<span class="badge cancelled">Blocked</span>';
+  if (!c.is_active) return '<span class="badge inactive">Inactive</span>';
+  return '<span class="badge active">Active</span>';
+};
+
+async function loadCustomerStats(targetId = 'customerStatGrid') {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/customers/stats`, { headers: authHeaders() });
+    el.innerHTML = `
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><line x1="7" y1="9" x2="17" y2="9"/></svg></div><div class="stat-body"><div class="num">${data.total_customers}</div><div class="label">Total Customers</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></div><div class="stat-body"><div class="num">${data.online_customers}</div><div class="label">Online Customers</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${data.blocked_customers}</div><div class="label">Blocked Customers</div></div></div>
+      <div class="stat-card"><div class="stat-icon sky"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="stat-body"><div class="num">${data.new_customers_today}</div><div class="label">New Today</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold"><svg class="icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg></div><div class="stat-body"><div class="num" style="font-size:15px;">${data.most_active_customer ? escapeHtml(data.most_active_customer) : '—'}</div><div class="label">Most Active</div></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:rgba(18,183,106,0.12); color:var(--emerald);"><svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><div class="num" style="font-size:15px;">${data.highest_spending_customer ? escapeHtml(data.highest_spending_customer) : '—'}</div><div class="label">Highest Spending</div></div></div>
+    `;
+  } catch (err) { el.innerHTML = `<div class="msg error">Failed to load customer stats.</div>`; }
+}
+
+async function loadCustomers(page = customersPage) {
+  customersPage = page;
+  const tbody = document.querySelector('#customersTable tbody');
+  const search = document.getElementById('customerSearch').value;
+  const status = document.getElementById('customerStatusFilter').value;
+  const sort = document.getElementById('customerSort').value;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/customers`, {
+      headers: authHeaders(),
+      params: { search: search || undefined, status: status || undefined, sort, page, page_size: PAGE_SIZE },
+    });
+    renderPagination('customersPagination', data.page, data.total_pages, data.total, loadCustomers);
+    tbody.innerHTML = data.items.map(c => {
+      const initials = c.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'C';
+      return `
+      <tr>
+        <td>${c.profile_photo ? `<img class="cust-avatar" src="${escapeHtml(c.profile_photo)}">` : `<div class="cust-avatar">${initials}</div>`}</td>
+        <td>
+          <div style="font-weight:700;">${escapeHtml(c.full_name)}</div>
+          <div style="font-size:12px;color:var(--text-muted);">#${c.id} · ${escapeHtml(c.email)}</div>
+        </td>
+        <td>${c.mobile ? escapeHtml(c.mobile) : '—'}</td>
+        <td>${fmtDate(c.created_at)}</td>
+        <td>${c.last_login_at ? fmtDateTime(c.last_login_at) : '—'} <div style="font-size:11px;color:var(--text-muted);">${c.login_count} login${c.login_count === 1 ? '' : 's'}</div></td>
+        <td>${c.login_count}</td>
+        <td>${c.total_bookings}</td>
+        <td>${c.total_payments}</td>
+        <td>${c.reward_points}</td>
+        <td><span class="status-dot-inline ${c.is_online ? 'online' : ''}"></span>${c.is_online ? 'Online' : 'Offline'}</td>
+        <td>${ACCOUNT_BADGE(c)}</td>
+        <td><button class="btn btn-ghost btn-sm" data-view-customer="${c.id}">View</button></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="12" class="empty-state">No customers found.</td></tr>`;
+    tbody.querySelectorAll('[data-view-customer]').forEach(btn => {
+      btn.addEventListener('click', () => openCustomerProfile(btn.dataset.viewCustomer));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="12" class="empty-state">Failed to load customers.</td></tr>`;
+  }
+  loadCustomerStats();
+}
+document.getElementById('customerSearch').addEventListener('input', () => {
+  clearTimeout(customerSearchTimer);
+  customerSearchTimer = setTimeout(() => loadCustomers(1), 350);
+});
+document.getElementById('customerStatusFilter').addEventListener('change', () => loadCustomers(1));
+document.getElementById('customerSort').addEventListener('change', () => loadCustomers(1));
+
+/* ---------- Customer profile modal ---------- */
+const customerModalOverlay = document.getElementById('customerModalOverlay');
+let currentCustomerId = null;
+let currentCustomerData = null;
+
+async function openCustomerProfile(id) {
+  currentCustomerId = id;
+  customerModalOverlay.classList.add('open');
+  document.getElementById('custProfileName').textContent = 'Loading…';
+  document.getElementById('custProfileMeta').textContent = '';
+  document.getElementById('custProfileActions').innerHTML = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/customers/${id}`, { headers: authHeaders() });
+    currentCustomerData = data;
+    renderCustomerProfile(data);
+  } catch (err) {
+    document.getElementById('custProfileName').textContent = 'Failed to load customer';
+  }
+}
+document.getElementById('customerModalCloseBtn').addEventListener('click', () => customerModalOverlay.classList.remove('open'));
+
+function renderCustomerProfile(c) {
+  const initials = c.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'C';
+  document.getElementById('custProfileAvatar').innerHTML = c.profile_photo ? `<img src="${escapeHtml(c.profile_photo)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : initials;
+  document.getElementById('custProfileName').textContent = c.full_name;
+  document.getElementById('custProfileOnlineDot').className = `status-dot-inline ${c.session.is_online ? 'online' : ''}`;
+  document.getElementById('custProfileBadges').innerHTML = `${ACCOUNT_BADGE(c)} ${c.is_verified ? '<span class="badge active">Verified</span>' : '<span class="badge pending">Unverified</span>'}`;
+  document.getElementById('custProfileMeta').textContent = `#${c.id} · ${c.email} · ${c.mobile || 'No mobile on file'} · Joined ${fmtDate(c.created_at)}`;
+
+  document.getElementById('custProfileActions').innerHTML = `
+    <button class="btn btn-navy btn-sm" data-act="edit">Edit Customer</button>
+    ${c.is_active
+      ? '<button class="btn btn-danger btn-sm" data-act="deactivate">Deactivate</button>'
+      : '<button class="btn btn-navy btn-sm" data-act="activate">Activate</button>'}
+    ${c.is_blocked
+      ? '<button class="btn btn-navy btn-sm" data-act="unblock">Unblock</button>'
+      : '<button class="btn btn-danger btn-sm" data-act="block">Block</button>'}
+    <button class="btn btn-ghost btn-sm" data-act="reset-password">Reset Password</button>
+    <button class="btn btn-ghost btn-sm" data-act="force-logout">Force Logout</button>
+    <button class="btn btn-ghost btn-sm" data-act="notify">Send Notification</button>
+    <button class="btn btn-ghost btn-sm" data-act="email">Send Email</button>
+    ${c.is_deleted
+      ? '<button class="btn btn-navy btn-sm" data-act="restore">Restore</button>'
+      : '<button class="btn btn-danger btn-sm" data-act="delete">Delete (Soft)</button>'}
+  `;
+  document.getElementById('custProfileActions').querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleCustomerAction(btn.dataset.act));
+  });
+
+  document.getElementById('custTab-overview').innerHTML = `
+    <div class="analytics-grid">
+      <div class="analytics-tile"><div class="num">${c.analytics.total_bookings}</div><div class="label">Total Bookings</div></div>
+      <div class="analytics-tile"><div class="num">${c.analytics.completed_trips}</div><div class="label">Completed Trips</div></div>
+      <div class="analytics-tile"><div class="num">${c.analytics.cancelled_trips}</div><div class="label">Cancelled Trips</div></div>
+      <div class="analytics-tile"><div class="num">${money(c.analytics.total_spending)}</div><div class="label">Total Spending</div></div>
+      <div class="analytics-tile"><div class="num">${money(c.analytics.average_booking_value)}</div><div class="label">Avg Booking Value</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:14px;">${c.analytics.last_activity ? fmtDateTime(c.analytics.last_activity) : '—'}</div><div class="label">Last Activity</div></div>
+    </div>
+    <div class="analytics-grid">
+      <div class="analytics-tile"><div class="num" style="font-size:14px;">${c.analytics.favorite_destination ? escapeHtml(c.analytics.favorite_destination) : '—'}</div><div class="label">Favorite Destination</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:14px;">${c.analytics.favorite_hotel ? escapeHtml(c.analytics.favorite_hotel) : '—'}</div><div class="label">Favorite Hotel</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:14px;">${c.analytics.favorite_cruise ? escapeHtml(c.analytics.favorite_cruise) : '—'}</div><div class="label">Favorite Cruise</div></div>
+      <div class="analytics-tile"><div class="num" style="font-size:14px;">${c.analytics.favorite_package ? escapeHtml(c.analytics.favorite_package) : '—'}</div><div class="label">Favorite Package</div></div>
+    </div>
+    <h2 style="font-size:14px;margin-bottom:12px;">Personal &amp; contact information</h2>
+    <div class="info-grid">
+      <div class="info-item"><label>Gender</label><div>${c.gender ? escapeHtml(c.gender) : '—'}</div></div>
+      <div class="info-item"><label>Date of Birth</label><div>${c.dob ? fmtDate(c.dob) : '—'}</div></div>
+      <div class="info-item"><label>Address</label><div>${c.address ? escapeHtml(c.address) : '—'}</div></div>
+      <div class="info-item"><label>City / State / Country</label><div>${[c.city, c.state, c.country].filter(Boolean).map(escapeHtml).join(', ') || '—'}</div></div>
+      <div class="info-item"><label>Browser</label><div>${c.session.browser ? escapeHtml(c.session.browser) : '—'}</div></div>
+      <div class="info-item"><label>Device</label><div>${c.session.device ? escapeHtml(c.session.device) : '—'}</div></div>
+      <div class="info-item"><label>Operating System</label><div>${c.session.os ? escapeHtml(c.session.os) : '—'}</div></div>
+      <div class="info-item"><label>Current / Last Page</label><div>${c.session.current_page ? escapeHtml(c.session.current_page) : '—'}</div></div>
+    </div>
+  `;
+
+  document.getElementById('custTab-bookings').innerHTML = c.bookings.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Booking ID</th><th>Type</th><th>Destination</th><th>Travel Date</th><th>Amount</th><th>Status</th><th>Payment</th></tr></thead><tbody>${
+        c.bookings.map(b => `<tr><td>#${b.id}</td><td style="text-transform:capitalize">${escapeHtml(b.booking_type)}</td><td>${escapeHtml(b.destination)}</td><td>${fmtDate(b.travel_date)}</td><td>${money(b.total_price)}</td><td><span class="badge ${b.status}">${escapeHtml(b.status)}</span></td><td>${b.payment_status ? `<span class="badge ${b.payment_status}">${escapeHtml(b.payment_status)}</span>` : '—'}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No bookings yet.</div>`;
+
+  document.getElementById('custTab-payments').innerHTML = c.payments.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Transaction ID</th><th>Amount</th><th>Method</th><th>Date</th><th>Status</th><th>Invoice</th></tr></thead><tbody>${
+        c.payments.map(p => `<tr><td>${escapeHtml(p.transaction_ref)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td>${fmtDateTime(p.created_at)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref)}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No payments yet.</div>`;
+
+  document.getElementById('custTab-timeline').innerHTML = c.timeline.length
+    ? `<div class="timeline">${c.timeline.map(t => `
+        <div class="timeline-item">
+          <span class="timeline-dot"></span>
+          <div class="timeline-body">
+            <div class="timeline-text">${ACTIVITY_EMOJI[t.activity_type] || '📌'} ${escapeHtml(t.description || t.activity_type || 'Activity')}</div>
+            <div class="timeline-time">${fmtDateTime(t.created_at)}${t.module ? ' · ' + escapeHtml(t.module) : ''}</div>
+          </div>
+        </div>`).join('')}</div>`
+    : `<div class="empty-state">No activity recorded yet.</div>`;
+
+  document.getElementById('custTab-support').innerHTML = c.support_tickets.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Ticket #</th><th>Priority</th><th>Status</th><th>Created</th><th>Resolved</th></tr></thead><tbody>${
+        c.support_tickets.map(t => `<tr><td>#${t.id}</td><td style="text-transform:capitalize">${escapeHtml(t.priority)}</td><td><span class="badge ${t.status === 'resolved' || t.status === 'closed' ? 'confirmed' : 'pending'}">${escapeHtml(t.status)}</span></td><td>${fmtDate(t.created_at)}</td><td>${t.resolved_at ? fmtDate(t.resolved_at) : '—'}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No support tickets yet.</div>`;
+
+  document.getElementById('custTab-reviews').innerHTML = c.reviews.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Destination</th><th>Rating</th><th>Review</th><th>Date</th></tr></thead><tbody>${
+        c.reviews.map(r => `<tr><td>${escapeHtml(r.destination)}</td><td>${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</td><td>${r.comment ? escapeHtml(r.comment) : '—'}</td><td>${fmtDate(r.created_at)}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No reviews yet.</div>`;
+
+  document.getElementById('custTab-wishlist').innerHTML = c.wishlist.length
+    ? `<div class="table-wrap"><table><thead><tr><th>Type</th><th>Destination / Package</th><th>Date Added</th></tr></thead><tbody>${
+        c.wishlist.map(w => `<tr><td style="text-transform:capitalize">${escapeHtml(w.item_type)}</td><td>${escapeHtml(w.destination)}</td><td>${fmtDate(w.created_at)}</td></tr>`).join('')
+      }</tbody></table></div>`
+    : `<div class="empty-state">No wishlist items yet.</div>`;
+}
+
+document.getElementById('custProfileTabs').querySelectorAll('.profile-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#custProfileTabs .profile-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.profile-tab-panel').forEach(p => p.classList.toggle('active', p.id === `custTab-${tab.dataset.tab}`));
+  });
+});
+
+async function handleCustomerAction(action) {
+  const id = currentCustomerId;
+  const base = `${API_BASE}/api/admin/customers/${id}`;
+  try {
+    if (action === 'edit') return openCustomerEditModal();
+    if (action === 'notify') return openCustomerMsgModal('notify');
+    if (action === 'email') return openCustomerMsgModal('email');
+    if (action === 'activate') await axios.patch(`${base}/activate`, {}, { headers: authHeaders() });
+    else if (action === 'deactivate') await axios.patch(`${base}/deactivate`, {}, { headers: authHeaders() });
+    else if (action === 'block') { if (!confirm('Block this customer? They will be unable to log in.')) return; await axios.patch(`${base}/block`, {}, { headers: authHeaders() }); }
+    else if (action === 'unblock') await axios.patch(`${base}/unblock`, {}, { headers: authHeaders() });
+    else if (action === 'reset-password') {
+      const { data } = await axios.post(`${base}/reset-password`, {}, { headers: authHeaders() });
+      alert(data.reset_link ? `Reset link generated:\n${location.origin}/reset-password.html?token=${new URLSearchParams(data.reset_link.split('?')[1]).get('token')}` : data.message);
+    }
+    else if (action === 'force-logout') { if (!confirm('Force-logout this customer from all sessions?')) return; await axios.post(`${base}/force-logout`, {}, { headers: authHeaders() }); }
+    else if (action === 'delete') { if (!confirm('Soft-delete this customer? Their bookings/payments/history are preserved and this can be undone via Restore.')) return; await axios.delete(base, { headers: authHeaders() }); }
+    else if (action === 'restore') await axios.post(`${base}/restore`, {}, { headers: authHeaders() });
+    openCustomerProfile(id);
+    loadCustomers(customersPage);
+  } catch (err) {
+    alert(err.response?.data?.detail || 'Action failed.');
+  }
+}
+
+/* ---------- Customer edit modal ---------- */
+const customerEditModalOverlay = document.getElementById('customerEditModalOverlay');
+const customerEditForm = document.getElementById('customerEditForm');
+function openCustomerEditModal() {
+  const c = currentCustomerData;
+  customerEditForm.reset();
+  customerEditForm.elements.full_name.value = c.full_name;
+  customerEditForm.elements.email.value = c.email;
+  customerEditForm.elements.mobile.value = c.mobile || '';
+  customerEditForm.elements.gender.value = c.gender || '';
+  customerEditForm.elements.dob.value = c.dob || '';
+  customerEditForm.elements.country.value = c.country || '';
+  customerEditForm.elements.state.value = c.state || '';
+  customerEditForm.elements.city.value = c.city || '';
+  customerEditForm.elements.address.value = c.address || '';
+  customerEditForm.elements.is_verified.checked = c.is_verified;
+  document.getElementById('customerEditMsg').textContent = '';
+  customerEditModalOverlay.classList.add('open');
+}
+document.getElementById('customerEditCancelBtn').addEventListener('click', () => customerEditModalOverlay.classList.remove('open'));
+customerEditForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('customerEditMsg');
+  const f = customerEditForm.elements;
+  const payload = {
+    full_name: f.full_name.value, email: f.email.value, mobile: f.mobile.value || null,
+    gender: f.gender.value || null, dob: f.dob.value || null, country: f.country.value || null,
+    state: f.state.value || null, city: f.city.value || null, address: f.address.value || null,
+    is_verified: f.is_verified.checked,
+  };
+  try {
+    const { data } = await axios.put(`${API_BASE}/api/admin/customers/${currentCustomerId}`, payload, { headers: authHeaders() });
+    customerEditModalOverlay.classList.remove('open');
+    currentCustomerData = data;
+    renderCustomerProfile(data);
+    loadCustomers(customersPage);
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to save changes.';
+    msg.className = 'msg error';
+  }
+});
+
+/* ---------- Customer notify / email modal (shared) ---------- */
+const customerMsgModalOverlay = document.getElementById('customerMsgModalOverlay');
+const customerMsgForm = document.getElementById('customerMsgForm');
+let customerMsgMode = 'notify';
+function openCustomerMsgModal(mode) {
+  customerMsgMode = mode;
+  customerMsgForm.reset();
+  document.getElementById('customerMsgFormMsg').textContent = '';
+  document.getElementById('customerMsgModalTitle').textContent = mode === 'email' ? 'Send Email' : 'Send Notification';
+  document.getElementById('customerMsgTitleLabel').textContent = mode === 'email' ? 'Subject' : 'Title';
+  customerMsgModalOverlay.classList.add('open');
+}
+document.getElementById('customerMsgCancelBtn').addEventListener('click', () => customerMsgModalOverlay.classList.remove('open'));
+customerMsgForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('customerMsgFormMsg');
+  const f = customerMsgForm.elements;
+  const endpoint = customerMsgMode === 'email' ? 'send-email' : 'notify';
+  const payload = customerMsgMode === 'email'
+    ? { subject: f.title.value, message: f.message.value }
+    : { title: f.title.value, message: f.message.value };
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/admin/customers/${currentCustomerId}/${endpoint}`, payload, { headers: authHeaders() });
+    msg.textContent = data.message;
+    msg.className = 'msg success';
+    setTimeout(() => customerMsgModalOverlay.classList.remove('open'), 900);
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to send.';
+    msg.className = 'msg error';
+  }
+});
+
+/* ---------- User Analytics ---------- */
+async function loadUserAnalytics() {
+  const statGrid = document.getElementById('userAnalyticsStatGrid');
+  const byRoleEl = document.getElementById('userAnalyticsByRole');
+  const recentEl = document.getElementById('userAnalyticsRecent');
+  try {
+    const [{ data: reports }, { data: usersPage }] = await Promise.all([
+      axios.get(`${API_BASE}/api/admin/reports`, { headers: authHeaders() }),
+      axios.get(`${API_BASE}/api/admin/users`, { headers: authHeaders(), params: { page: 1, page_size: 1000 } }),
+    ]);
+    const inactive = reports.total_users - reports.active_users;
+    statGrid.innerHTML = `
+      <div class="stat-card"><div class="stat-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><div class="stat-body"><div class="num">${reports.total_users}</div><div class="label">Total Users</div></div></div>
+      <div class="stat-card"><div class="stat-icon emerald"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg></div><div class="stat-body"><div class="num">${reports.active_users}</div><div class="label">Active</div></div></div>
+      <div class="stat-card"><div class="stat-icon coral"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></div><div class="stat-body"><div class="num">${inactive}</div><div class="label">Inactive</div></div></div>
+    `;
+    const roleCounts = {};
+    usersPage.items.forEach(u => { roleCounts[u.role] = (roleCounts[u.role] || 0) + 1; });
+    const roleRows = Object.entries(roleCounts);
+    byRoleEl.outerHTML = roleRows.length
+      ? `<div class="table-wrap"><table id="userAnalyticsByRole"><thead><tr><th>Role</th><th>Count</th></tr></thead><tbody>${
+          roleRows.map(([role, count]) => `<tr><td style="text-transform:capitalize">${role}</td><td>${count}</td></tr>`).join('')
+        }</tbody></table></div>`
+      : '<div class="empty-state" id="userAnalyticsByRole">No users yet.</div>';
+    recentEl.outerHTML = reports.recent_users.length
+      ? `<div class="table-wrap"><table id="userAnalyticsRecent"><thead><tr><th>Name</th><th>Email</th><th>Joined</th></tr></thead><tbody>${
+          reports.recent_users.map(u => `<tr><td>${escapeHtml(u.full_name)}</td><td>${escapeHtml(u.email)}</td><td>${fmtDate(u.created_at)}</td></tr>`).join('')
+        }</tbody></table></div>`
+      : '<div class="empty-state" id="userAnalyticsRecent">No users yet.</div>';
+  } catch (err) {
+    statGrid.innerHTML = `<div class="msg error">Failed to load user analytics.</div>`;
+  }
+}
+
+/* ---------- Reports (CSV export hub) ---------- */
+async function loadReportsExport() {
+  const el = document.getElementById('reportsExportBookingsByType');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/reports`, { headers: authHeaders() });
+    const types = Object.entries(data.bookings_by_type);
+    el.outerHTML = types.length
+      ? `<div class="table-wrap"><table id="reportsExportBookingsByType"><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>${
+          types.map(([type, count]) => `<tr><td style="text-transform:capitalize">${type}</td><td>${count}</td></tr>`).join('')
+        }</tbody></table></div>`
+      : '<div class="empty-state" id="reportsExportBookingsByType">No bookings yet.</div>';
+  } catch (err) {
+    el.textContent = 'Failed to load report summary.';
+  }
+}
+
+/* ---------- Profile (admin's own account) ---------- */
+async function loadAdminProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    document.getElementById('adminProfileName').value = data.full_name;
+    document.getElementById('adminProfileEmail').value = data.email;
+  } catch (err) { /* fields stay blank */ }
+}
+document.getElementById('adminProfileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('adminProfileMsg');
+  try {
+    const { data } = await axios.put(`${API_BASE}/api/users/me`, { full_name: document.getElementById('adminProfileName').value }, { headers: authHeaders() });
+    localStorage.setItem('jwt_user_name', data.full_name);
+    document.getElementById('adminChipName').textContent = data.full_name;
+    msg.textContent = 'Profile updated.';
+    msg.className = 'msg success';
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.className = 'msg error';
+  }
+});
+document.getElementById('adminPasswordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('adminPasswordMsg');
+  try {
+    await axios.post(`${API_BASE}/api/users/change-password`, {
+      current_password: document.getElementById('adminCurrentPassword').value,
+      new_password: document.getElementById('adminNewPassword').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Password changed successfully.';
+    msg.className = 'msg success';
+    e.target.reset();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
     msg.className = 'msg error';
   }
 });
@@ -1187,36 +2643,50 @@ async function loadNotificationsAdmin(page = notificationsPage) {
   }
 }
 
-/* ---------- Activity Log (admin) ---------- */
+/* ---------- User Activity Monitor (admin) ---------- */
 let activityFilterPopulated = false;
 async function loadActivityLog(page = activityPage) {
   activityPage = page;
   const tbody = document.querySelector('#activityTable tbody');
   const search = document.getElementById('activitySearch').value;
   const action = document.getElementById('activityFilter').value;
+  const module = document.getElementById('activityModuleFilter').value;
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/activity-logs`, {
-      params: { search: search || undefined, action: action || undefined, page, page_size: PAGE_SIZE },
+      params: { search: search || undefined, action: action || undefined, module: module || undefined, page, page_size: PAGE_SIZE },
       headers: authHeaders(),
     });
     renderPagination('activityPagination', data.page, data.total_pages, data.total, loadActivityLog);
     tbody.innerHTML = data.items.map(a => `
       <tr>
+        <td>${fmtDateTime(a.created_at)}</td>
+        <td>${a.user_name ? escapeHtml(a.user_name) : '—'}</td>
         <td>${a.user_email ? escapeHtml(a.user_email) : '—'}</td>
-        <td>${escapeHtml(a.action)}</td>
+        <td>${a.user_id ?? '—'}</td>
+        <td>${a.activity_type ? escapeHtml(a.activity_type) : '—'}</td>
+        <td>${a.module ? escapeHtml(a.module) : '—'}</td>
+        <td>${escapeHtml(a.description || a.action)}</td>
         <td>${a.ip_address ? escapeHtml(a.ip_address) : '—'}</td>
-        <td>${fmtDate(a.created_at)}</td>
+        <td>${a.browser ? escapeHtml(a.browser) : '—'}</td>
+        <td>${a.device ? escapeHtml(a.device) : '—'}</td>
+        <td><span class="badge ${a.status === 'failed' ? 'failed' : 'success'}">${escapeHtml(a.status)}</span></td>
       </tr>
-    `).join('') || `<tr><td colspan="4" class="empty-state">No activity recorded yet.</td></tr>`;
+    `).join('') || `<tr><td colspan="11" class="empty-state">No activity recorded yet.</td></tr>`;
     if (!activityFilterPopulated) {
       activityFilterPopulated = true;
-      const { data: actions } = await axios.get(`${API_BASE}/api/admin/activity-logs/actions`, { headers: authHeaders() });
+      const [{ data: actions }, { data: modules }] = await Promise.all([
+        axios.get(`${API_BASE}/api/admin/activity-logs/actions`, { headers: authHeaders() }),
+        axios.get(`${API_BASE}/api/admin/activity-logs/modules`, { headers: authHeaders() }),
+      ]);
       document.getElementById('activityFilter').insertAdjacentHTML(
         'beforeend', actions.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')
       );
+      document.getElementById('activityModuleFilter').insertAdjacentHTML(
+        'beforeend', modules.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('')
+      );
     }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Failed to load activity log.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" class="empty-state">Failed to load activity log.</td></tr>`;
   }
 }
 let activitySearchTimer;
@@ -1225,6 +2695,12 @@ document.getElementById('activitySearch').addEventListener('input', () => {
   activitySearchTimer = setTimeout(() => loadActivityLog(1), 350);
 });
 document.getElementById('activityFilter').addEventListener('change', () => loadActivityLog(1));
+document.getElementById('activityModuleFilter').addEventListener('change', () => loadActivityLog(1));
+
+/* Live-refresh the activity monitor table every 15s while it's the visible section */
+setInterval(() => {
+  if (document.getElementById('section-activity').classList.contains('active')) loadActivityLog(activityPage);
+}, 15000);
 
 /* ---------- UI-only additions: theme, sidebar collapse, mobile nav, header chip, clock ---------- */
 /* Purely presentational — no API calls, no changes to any function above this point. */
@@ -1282,9 +2758,49 @@ document.getElementById('activityFilter').addEventListener('change', () => loadA
   document.querySelectorAll('.nav-item[data-section]').forEach(link => link.addEventListener('click', close));
 })();
 
-document.getElementById('notifBellBtn').addEventListener('click', () => {
-  document.querySelector('.nav-item[data-section="notifications"]').click();
+/* ---------- Notification bell (admin's own notifications) ---------- */
+async function loadNotifBell() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
+    const unread = data.filter(n => !n.is_read).length;
+    document.getElementById('notifDot').style.display = unread ? '' : 'none';
+    const list = document.getElementById('notifDropdownList');
+    list.innerHTML = data.length
+      ? data.slice(0, 15).map(n => `
+          <div class="notif-dropdown-item ${n.is_read ? '' : 'unread'}" data-notif-id="${n.id}">
+            <div class="n-title">${escapeHtml(n.title)}</div>
+            <div class="n-msg">${escapeHtml(n.message)}</div>
+            <div class="n-time">${fmtDateTime(n.created_at)}</div>
+          </div>`).join('')
+      : `<div class="empty-state">No notifications yet.</div>`;
+    list.querySelectorAll('[data-notif-id]').forEach(item => {
+      item.addEventListener('click', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/notifications/${item.dataset.notifId}/read`, {}, { headers: authHeaders() });
+          loadNotifBell();
+        } catch (err) { /* ignore */ }
+      });
+    });
+  } catch (err) { /* bell just won't refresh this cycle */ }
+}
+document.getElementById('notifBellBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('notifDropdown').classList.toggle('open');
 });
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('notifDropdown');
+  if (dropdown.classList.contains('open') && !e.target.closest('.icon-btn-wrap')) dropdown.classList.remove('open');
+});
+loadNotifBell();
+setInterval(loadNotifBell, 15000);
+
+/* ---------- Presence heartbeat: reports this admin as "online" for the online-users widget ---------- */
+function sendHeartbeat() {
+  const label = sectionTitles[document.querySelector('.nav-item[data-section].active')?.dataset.section] || 'Admin Dashboard';
+  axios.post(`${API_BASE}/api/users/heartbeat`, { current_page: `Admin: ${label}` }, { headers: authHeaders() }).catch(() => {});
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 30000);
 
 loadReports();
 </script>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0A2540; --navy-2:#123157; --gold:#FFB020; --gold-dark:#C98A0E;
+  --white:#FFFFFF; --bg:#F0F4FA; --muted:#5B6B82; --line:rgba(10,37,64,0.12);
+  --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35); --radius:22px; --ff:'Montserrat', sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 24px;
+  font-family:var(--ff); color:var(--navy); -webkit-font-smoothing:antialiased;
+  background:linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 45%, #1B4577 100%);
+  background-attachment:fixed;
+}
+button,input,select{font-family:var(--ff);}
+button{cursor:pointer;}
+a{color:inherit; text-decoration:none;}
+
+.auth-card{
+  background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow-lg);
+  width:100%; max-width:640px; padding:40px 40px 34px; position:relative; overflow:hidden;
+}
+.auth-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:5px;
+  background:linear-gradient(90deg, var(--gold), var(--navy));
+}
+.auth-logo{display:block; height:52px; width:auto; margin:0 auto 18px; object-fit:contain;}
+.auth-title{font-size:23px; font-weight:800; text-align:center; color:var(--navy);}
+.auth-sub{font-size:13.5px; color:var(--muted); text-align:center; margin-top:6px; margin-bottom:26px;}
+
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 16px;}
+.field{margin-bottom:14px;}
+.field.full{grid-column:1 / -1;}
+.field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); margin-bottom:6px;}
+.field input, .field select{
+  width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line);
+  font-size:14px; color:var(--navy); outline:none; transition:border-color .2s ease; background:#fff;
+}
+.field input:focus, .field select:focus{border-color:var(--gold-dark);}
+
+.terms-row{display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--muted); margin:6px 0 20px;}
+.terms-row input{width:16px; height:16px; margin-top:2px; accent-color:var(--gold-dark); flex-shrink:0;}
+.terms-row a{color:var(--gold-dark); font-weight:700;}
+
+.btn-register{
+  width:100%; padding:14px; border-radius:100px; border:none; background:var(--navy); color:#fff;
+  font-weight:700; font-size:15px; transition:filter .2s ease, transform .2s ease;
+}
+.btn-register:hover{filter:brightness(1.15);}
+.btn-register:active{transform:scale(.98);}
+
+.auth-switch{text-align:center; margin-top:22px; font-size:14px; color:var(--muted);}
+.auth-switch a{color:var(--gold-dark); font-weight:700;}
+.auth-switch a:hover{text-decoration:underline;}
+
+.msg{margin-top:14px; font-size:13px; font-weight:600; text-align:center; min-height:1px;}
+.msg.error{color:#E63946;} .msg.success{color:#12B76A;}
+
+.back-home{position:fixed; top:22px; left:24px; color:rgba(255,255,255,0.8); font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px;}
+.back-home:hover{color:#fff;}
+.back-home svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2;}
+@media (max-width:640px){
+  .form-grid{grid-template-columns:1fr;}
+  .auth-card{padding:30px 22px;}
+  .back-home{position:static; margin-bottom:16px; color:rgba(255,255,255,0.85);}
+  body{display:block; padding:24px 16px;}
+}
+</style>
+</head>
+<body>
+<a href="index.html" class="back-home"><svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg> Back to site</a>
+
+<div class="auth-card">
+  <img class="auth-logo" src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+  <h1 class="auth-title">Create Your Account</h1>
+  <p class="auth-sub">Join JackPots World Tours &amp; Travels — plan, book, and track every trip in one place</p>
+
+  <form id="registerForm" novalidate>
+    <div class="form-grid">
+      <div class="field"><label for="firstName">First Name</label><input id="firstName" type="text" required></div>
+      <div class="field"><label for="lastName">Last Name</label><input id="lastName" type="text" required></div>
+      <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="mobile">Mobile Number</label><input id="mobile" type="tel" pattern="[0-9+ ]{7,20}" required placeholder="+91 98765 43210"></div>
+      <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="confirmPassword">Confirm Password</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field">
+        <label for="gender">Gender</label>
+        <select id="gender" required>
+          <option value="">Select</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="other">Other</option>
+          <option value="prefer_not_to_say">Prefer not to say</option>
+        </select>
+      </div>
+      <div class="field"><label for="dob">Date of Birth</label><input id="dob" type="date" required></div>
+      <div class="field"><label for="country">Country</label><input id="country" type="text" required placeholder="India"></div>
+      <div class="field"><label for="state">State</label><input id="state" type="text" required></div>
+      <div class="field full"><label for="city">City</label><input id="city" type="text" required></div>
+    </div>
+
+    <label class="terms-row">
+      <input type="checkbox" id="acceptTerms" required>
+      <span>I agree to the <a href="#">Terms &amp; Conditions</a> and <a href="#">Privacy Policy</a></span>
+    </label>
+
+    <button type="submit" class="btn-register">Register</button>
+    <div class="msg" id="registerMsg"></div>
+  </form>
+
+  <div class="auth-switch">Already have an account? <a href="login.html">Login</a></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+'use strict';
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
+
+document.getElementById('registerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('registerMsg');
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+
+  if (password !== confirmPassword) {
+    msg.textContent = "Passwords don't match — please try again.";
+    msg.className = 'msg error';
+    return;
+  }
+  if (!document.getElementById('acceptTerms').checked) {
+    msg.textContent = 'Please accept the Terms & Conditions to continue.';
+    msg.className = 'msg error';
+    return;
+  }
+
+  const firstName = document.getElementById('firstName').value.trim();
+  const lastName = document.getElementById('lastName').value.trim();
+  const payload = {
+    full_name: `${firstName} ${lastName}`.trim(),
+    email: document.getElementById('email').value.trim(),
+    password,
+    first_name: firstName,
+    last_name: lastName,
+    mobile: document.getElementById('mobile').value.trim(),
+    gender: document.getElementById('gender').value,
+    dob: document.getElementById('dob').value,
+    country: document.getElementById('country').value.trim(),
+    state: document.getElementById('state').value.trim(),
+    city: document.getElementById('city').value.trim(),
+  };
+
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/auth/signup`, payload);
+    const me = await axios.get(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } });
+    localStorage.setItem('jwt_access', data.access_token);
+    localStorage.setItem('jwt_refresh', data.refresh_token);
+    localStorage.setItem('jwt_user_name', me.data.full_name);
+    localStorage.setItem('jwt_user_role', me.data.role);
+    localStorage.setItem('jwt_user_id', me.data.id);
+    msg.textContent = 'Account created — redirecting you now…';
+    msg.className = 'msg success';
+    window.location.href = 'index.html';
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Registration failed — please try again.';
+    msg.className = 'msg error';
+  }
+});
+</script>
+</body>
+</html>

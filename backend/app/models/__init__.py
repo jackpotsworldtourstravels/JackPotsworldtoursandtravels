@@ -7,6 +7,7 @@ from app.models.misc import (
     Newsletter,
     Notification,
     Review,
+    SupportTicket,
     Wishlist,
 )
 
@@ -25,4 +26,5 @@ __all__ = [
     "Wishlist",
     "Notification",
     "ActivityLog",
+    "SupportTicket",
 ]

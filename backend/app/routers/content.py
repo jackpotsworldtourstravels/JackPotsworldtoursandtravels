@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.deps import get_current_admin
+from app.auth.deps import get_current_admin, get_current_user_optional
 from app.database.session import get_db
 from app.models.travel import Cruise, Flight, Hotel, TourPackage
+from app.models.user import User
 from app.schemas.travel import (
     CruiseCreate,
     CruiseOut,
@@ -32,6 +33,14 @@ def _get_or_404(db: Session, model, item_id: int):
     return obj
 
 
+def _log_search(db: Session, current_user: User | None, category: str, detail: str) -> None:
+    who = current_user.full_name if current_user else "A visitor"
+    activity_service.log_activity(
+        db, current_user.id if current_user else None, f"Search ({category}: {detail})",
+        activity_type="Search", module="Search", description=f"{who} searched {category}s ({detail})",
+    )
+
+
 # ---------- Flights ----------
 @flights_router.get(
     "",
@@ -46,6 +55,7 @@ def list_flights(
     cabin_class: str | None = None,
     passengers: int | None = None,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     stmt = select(Flight)
     if from_airport:
@@ -61,6 +71,8 @@ def list_flights(
         stmt = stmt.where(Flight.cabin_class.ilike(f"%{cabin_class}%"))
     if passengers:
         stmt = stmt.where(Flight.seats_available >= passengers)
+    if from_airport or to_airport or departure_date or cabin_class or passengers:
+        _log_search(db, current_user, "flight", f"{from_airport or '*'} to {to_airport or '*'}")
     return db.scalars(stmt.order_by(Flight.price)).all()
 
 
@@ -76,7 +88,7 @@ def create_flight(payload: FlightCreate, db: Session = Depends(get_db), _admin=D
     db.add(flight)
     db.commit()
     db.refresh(flight)
-    activity_service.log_activity(db, _admin.id, f"Admin created flight #{flight.id}")
+    activity_service.log_activity(db, _admin.id, f"Admin created flight #{flight.id}", module="Admin", activity_type="Admin Action")
     return flight
 
 
@@ -94,7 +106,7 @@ def update_flight(
         setattr(flight, key, value)
     db.commit()
     db.refresh(flight)
-    activity_service.log_activity(db, _admin.id, f"Admin updated flight #{flight_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin updated flight #{flight_id}", module="Admin", activity_type="Admin Action")
     return flight
 
 
@@ -108,7 +120,7 @@ def delete_flight(flight_id: int, db: Session = Depends(get_db), _admin=Depends(
     flight = _get_or_404(db, Flight, flight_id)
     db.delete(flight)
     db.commit()
-    activity_service.log_activity(db, _admin.id, f"Admin deleted flight #{flight_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted flight #{flight_id}", module="Admin", activity_type="Admin Action")
 
 
 # ---------- Hotels ----------
@@ -118,12 +130,19 @@ def delete_flight(flight_id: int, db: Session = Depends(get_db), _admin=Depends(
     summary="Search/list hotels",
     description="Public endpoint. Returns hotels matching the given filters (location, minimum rooms needed), ordered by price per night ascending.",
 )
-def list_hotels(location: str | None = None, rooms: int | None = None, db: Session = Depends(get_db)):
+def list_hotels(
+    location: str | None = None,
+    rooms: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     stmt = select(Hotel)
     if location:
         stmt = stmt.where(Hotel.location.ilike(f"%{location}%"))
     if rooms:
         stmt = stmt.where(Hotel.rooms_available >= rooms)
+    if location or rooms:
+        _log_search(db, current_user, "hotel", location or "any location")
     return db.scalars(stmt.order_by(Hotel.price_per_night)).all()
 
 
@@ -139,7 +158,7 @@ def create_hotel(payload: HotelCreate, db: Session = Depends(get_db), _admin=Dep
     db.add(hotel)
     db.commit()
     db.refresh(hotel)
-    activity_service.log_activity(db, _admin.id, f"Admin created hotel #{hotel.id}")
+    activity_service.log_activity(db, _admin.id, f"Admin created hotel #{hotel.id}", module="Admin", activity_type="Admin Action")
     return hotel
 
 
@@ -157,7 +176,7 @@ def update_hotel(
         setattr(hotel, key, value)
     db.commit()
     db.refresh(hotel)
-    activity_service.log_activity(db, _admin.id, f"Admin updated hotel #{hotel_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin updated hotel #{hotel_id}", module="Admin", activity_type="Admin Action")
     return hotel
 
 
@@ -171,7 +190,7 @@ def delete_hotel(hotel_id: int, db: Session = Depends(get_db), _admin=Depends(ge
     hotel = _get_or_404(db, Hotel, hotel_id)
     db.delete(hotel)
     db.commit()
-    activity_service.log_activity(db, _admin.id, f"Admin deleted hotel #{hotel_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted hotel #{hotel_id}", module="Admin", activity_type="Admin Action")
 
 
 # ---------- Cruises ----------
@@ -186,6 +205,7 @@ def list_cruises(
     departure_month: str | None = None,
     duration_days: int | None = None,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     stmt = select(Cruise)
     if cruise_type:
@@ -194,6 +214,8 @@ def list_cruises(
         stmt = stmt.where(Cruise.departure_month == departure_month)
     if duration_days:
         stmt = stmt.where(Cruise.duration_days == duration_days)
+    if cruise_type or departure_month or duration_days:
+        _log_search(db, current_user, "cruise", cruise_type or "any type")
     return db.scalars(stmt.order_by(Cruise.price)).all()
 
 
@@ -209,7 +231,7 @@ def create_cruise(payload: CruiseCreate, db: Session = Depends(get_db), _admin=D
     db.add(cruise)
     db.commit()
     db.refresh(cruise)
-    activity_service.log_activity(db, _admin.id, f"Admin created cruise #{cruise.id}")
+    activity_service.log_activity(db, _admin.id, f"Admin created cruise #{cruise.id}", module="Admin", activity_type="Admin Action")
     return cruise
 
 
@@ -227,7 +249,7 @@ def update_cruise(
         setattr(cruise, key, value)
     db.commit()
     db.refresh(cruise)
-    activity_service.log_activity(db, _admin.id, f"Admin updated cruise #{cruise_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin updated cruise #{cruise_id}", module="Admin", activity_type="Admin Action")
     return cruise
 
 
@@ -241,7 +263,7 @@ def delete_cruise(cruise_id: int, db: Session = Depends(get_db), _admin=Depends(
     cruise = _get_or_404(db, Cruise, cruise_id)
     db.delete(cruise)
     db.commit()
-    activity_service.log_activity(db, _admin.id, f"Admin deleted cruise #{cruise_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted cruise #{cruise_id}", module="Admin", activity_type="Admin Action")
 
 
 # ---------- Tour Packages ----------
@@ -256,6 +278,7 @@ def list_packages(
     month: str | None = None,
     limit: int | None = Query(default=None, gt=0, le=100),
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     stmt = select(TourPackage)
     if package_type:
@@ -265,6 +288,8 @@ def list_packages(
     stmt = stmt.order_by(TourPackage.id)
     if limit:
         stmt = stmt.limit(limit)
+    if package_type or month:
+        _log_search(db, current_user, "package", package_type or "any type")
     return db.scalars(stmt).all()
 
 
@@ -280,7 +305,7 @@ def create_package(payload: TourPackageCreate, db: Session = Depends(get_db), _a
     db.add(package)
     db.commit()
     db.refresh(package)
-    activity_service.log_activity(db, _admin.id, f"Admin created package #{package.id}")
+    activity_service.log_activity(db, _admin.id, f"Admin created package #{package.id}", module="Admin", activity_type="Admin Action")
     return package
 
 
@@ -298,7 +323,7 @@ def update_package(
         setattr(package, key, value)
     db.commit()
     db.refresh(package)
-    activity_service.log_activity(db, _admin.id, f"Admin updated package #{package_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin updated package #{package_id}", module="Admin", activity_type="Admin Action")
     return package
 
 
@@ -312,4 +337,4 @@ def delete_package(package_id: int, db: Session = Depends(get_db), _admin=Depend
     package = _get_or_404(db, TourPackage, package_id)
     db.delete(package)
     db.commit()
-    activity_service.log_activity(db, _admin.id, f"Admin deleted package #{package_id}")
+    activity_service.log_activity(db, _admin.id, f"Admin deleted package #{package_id}", module="Admin", activity_type="Admin Action")

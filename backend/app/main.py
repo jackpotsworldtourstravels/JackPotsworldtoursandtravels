@@ -3,7 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database.session import SessionLocal
-from app.routers import admin, auth, bookings, content, misc, notifications, reviews, users, wishlist
+from app.routers import (
+    admin,
+    auth,
+    booking_management,
+    bookings,
+    content,
+    customers,
+    misc,
+    notifications,
+    payment_management,
+    reviews,
+    support_tickets,
+    users,
+    wishlist,
+)
 from app.services import user_service
 
 app = FastAPI(
@@ -39,7 +53,11 @@ app.include_router(users.admin_router)
 app.include_router(wishlist.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
+app.include_router(support_tickets.router)
 app.include_router(admin.router)
+app.include_router(customers.router)
+app.include_router(booking_management.router)
+app.include_router(payment_management.router)
 
 
 @app.on_event("startup")
