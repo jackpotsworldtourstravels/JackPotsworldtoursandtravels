@@ -8,8 +8,10 @@ from app.models.misc import (
     Notification,
     Review,
     SupportTicket,
+    UserSession,
     Wishlist,
 )
+from app.models.pricing import Coupon, DiscountCampaign, SeasonalPrice
 
 __all__ = [
     "Role",
@@ -27,4 +29,8 @@ __all__ = [
     "Notification",
     "ActivityLog",
     "SupportTicket",
+    "UserSession",
+    "SeasonalPrice",
+    "DiscountCampaign",
+    "Coupon",
 ]

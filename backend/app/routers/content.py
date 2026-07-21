@@ -76,6 +76,16 @@ def list_flights(
     return db.scalars(stmt.order_by(Flight.price)).all()
 
 
+@flights_router.get(
+    "/{flight_id}",
+    response_model=FlightOut,
+    summary="Get a single flight",
+    description="Public endpoint. Returns one flight by id. Returns 404 if it doesn't exist.",
+)
+def get_flight(flight_id: int, db: Session = Depends(get_db)):
+    return _get_or_404(db, Flight, flight_id)
+
+
 @flights_router.post(
     "",
     response_model=FlightOut,
@@ -144,6 +154,16 @@ def list_hotels(
     if location or rooms:
         _log_search(db, current_user, "hotel", location or "any location")
     return db.scalars(stmt.order_by(Hotel.price_per_night)).all()
+
+
+@hotels_router.get(
+    "/{hotel_id}",
+    response_model=HotelOut,
+    summary="Get a single hotel",
+    description="Public endpoint. Returns one hotel by id. Returns 404 if it doesn't exist.",
+)
+def get_hotel(hotel_id: int, db: Session = Depends(get_db)):
+    return _get_or_404(db, Hotel, hotel_id)
 
 
 @hotels_router.post(
@@ -219,6 +239,16 @@ def list_cruises(
     return db.scalars(stmt.order_by(Cruise.price)).all()
 
 
+@cruises_router.get(
+    "/{cruise_id}",
+    response_model=CruiseOut,
+    summary="Get a single cruise",
+    description="Public endpoint. Returns one cruise by id. Returns 404 if it doesn't exist.",
+)
+def get_cruise(cruise_id: int, db: Session = Depends(get_db)):
+    return _get_or_404(db, Cruise, cruise_id)
+
+
 @cruises_router.post(
     "",
     response_model=CruiseOut,
@@ -291,6 +321,16 @@ def list_packages(
     if package_type or month:
         _log_search(db, current_user, "package", package_type or "any type")
     return db.scalars(stmt).all()
+
+
+@packages_router.get(
+    "/{package_id}",
+    response_model=TourPackageOut,
+    summary="Get a single tour package",
+    description="Public endpoint. Returns one tour package by id. Returns 404 if it doesn't exist.",
+)
+def get_package(package_id: int, db: Session = Depends(get_db)):
+    return _get_or_404(db, TourPackage, package_id)
 
 
 @packages_router.post(

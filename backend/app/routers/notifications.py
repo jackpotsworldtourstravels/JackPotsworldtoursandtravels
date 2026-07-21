@@ -21,6 +21,16 @@ def my_notifications(db: Session = Depends(get_db), current_user: User = Depends
 
 
 @router.patch(
+    "/read-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Mark all notifications as read",
+    description="Requires authentication. Marks every unread notification owned by the current user as read.",
+)
+def mark_all_notifications_read(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notification_service.mark_all_read(db, current_user.id)
+
+
+@router.patch(
     "/{notification_id}/read",
     response_model=NotificationOut,
     summary="Mark a notification as read",
@@ -30,6 +40,16 @@ def mark_notification_read(
     notification_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     return notification_service.mark_read(db, current_user.id, notification_id)
+
+
+@router.delete(
+    "/read",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Clear all read notifications",
+    description="Requires authentication. Deletes every read notification owned by the current user; unread notifications are left untouched.",
+)
+def delete_read_notifications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notification_service.delete_read_notifications(db, current_user.id)
 
 
 @router.delete(

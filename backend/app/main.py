@@ -13,6 +13,7 @@ from app.routers import (
     misc,
     notifications,
     payment_management,
+    pricing,
     reviews,
     support_tickets,
     users,
@@ -58,6 +59,8 @@ app.include_router(admin.router)
 app.include_router(customers.router)
 app.include_router(booking_management.router)
 app.include_router(payment_management.router)
+app.include_router(pricing.router)
+app.include_router(pricing.admin_router)
 
 
 @app.on_event("startup")

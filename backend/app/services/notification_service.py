@@ -46,12 +46,30 @@ def mark_read(db: Session, user_id: int, notification_id: int) -> Notification:
     return notification
 
 
+def mark_all_read(db: Session, user_id: int) -> int:
+    stmt = select(Notification).where(Notification.user_id == user_id, Notification.is_read.is_(False))
+    notifications = db.scalars(stmt).all()
+    for notification in notifications:
+        notification.is_read = True
+    db.commit()
+    return len(notifications)
+
+
 def delete_notification(db: Session, user_id: int, notification_id: int) -> None:
     notification = db.get(Notification, notification_id)
     if not notification or notification.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     db.delete(notification)
     db.commit()
+
+
+def delete_read_notifications(db: Session, user_id: int) -> int:
+    stmt = select(Notification).where(Notification.user_id == user_id, Notification.is_read.is_(True))
+    notifications = db.scalars(stmt).all()
+    for notification in notifications:
+        db.delete(notification)
+    db.commit()
+    return len(notifications)
 
 
 def list_all_notifications_paginated(db: Session, page: int, page_size: int):

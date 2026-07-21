@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.booking import Booking, Payment
 from app.models.user import User
 from app.schemas.booking import BookingCreate
-from app.services import activity_service, catalog_items, notification_service
+from app.services import activity_service, catalog_items, notification_service, pricing_service
 from app.services.catalog_items import AVAILABILITY_FIELD, ITEM_MODELS
 
 _AVAILABILITY_LABEL = {"flight": "seat(s)", "hotel": "room(s)", "cruise": "cabin(s)", "package": "slot(s)"}
@@ -23,7 +23,7 @@ def get_item(db: Session, booking_type: str, item_id: int):
 
 
 def unit_price(booking_type: str, item) -> float:
-    return float(item.price_per_night) if booking_type == "hotel" else float(item.price)
+    return catalog_items.base_unit_price(booking_type, item)
 
 
 def check_availability(booking_type: str, item, quantity: int) -> None:
@@ -77,8 +77,25 @@ def restore_inventory_for_booking(db: Session, booking: "Booking") -> None:
 def create_booking_with_payment(db: Session, user: User, payload: BookingCreate) -> tuple[Booking, Payment]:
     item = get_item(db, payload.booking_type, payload.item_id)
     check_availability(payload.booking_type, item, payload.quantity)
+
     # Server recomputes the price from the catalog — the client-supplied total_price is ignored.
-    total_price = round(unit_price(payload.booking_type, item) * payload.quantity, 2)
+    # Order: base/seasonal unit price -> auto campaign discount -> optional coupon on top.
+    # With no seasonal price, no active campaign, and no coupon (true for all bookings today),
+    # this is exactly unit_price * quantity, unchanged from before pricing existed.
+    effective_unit_price = pricing_service.get_effective_unit_price(db, payload.booking_type, item, payload.travel_date)
+    subtotal = round(effective_unit_price * payload.quantity, 2)
+    campaign_discount, _campaign = pricing_service.get_active_campaign_discount(db, payload.booking_type, subtotal)
+    amount_after_campaign = subtotal - campaign_discount
+
+    coupon = None
+    coupon_discount = 0.0
+    if payload.coupon_code:
+        coupon = pricing_service.validate_coupon(db, payload.coupon_code, payload.booking_type, amount_after_campaign)
+        coupon_discount = pricing_service.apply_coupon_discount(coupon, amount_after_campaign)
+
+    total_discount = round(campaign_discount + coupon_discount, 2)
+    total_price = max(round(subtotal - total_discount, 2), 0.01)
+
     availability_before = getattr(item, AVAILABILITY_FIELD[payload.booking_type])
     new_available = decrement_inventory(db, payload.booking_type, payload.item_id, payload.quantity)
 
@@ -90,6 +107,8 @@ def create_booking_with_payment(db: Session, user: User, payload: BookingCreate)
         total_price=total_price,
         quantity=payload.quantity,
         travel_date=payload.travel_date,
+        coupon_code=coupon.code if coupon else None,
+        discount_amount=total_discount or None,
     )
     db.add(booking)
     db.flush()
@@ -103,6 +122,8 @@ def create_booking_with_payment(db: Session, user: User, payload: BookingCreate)
         transaction_ref=f"TXN-{secrets.token_hex(6).upper()}",
     )
     db.add(payment)
+    if coupon:
+        coupon.times_used += 1
     db.commit()
     db.refresh(booking)
     db.refresh(payment)

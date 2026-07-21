@@ -12,6 +12,7 @@ class BookingCreate(BaseModel):
     total_price: float = Field(gt=0, description="Client-estimated total; the server recalculates this from the catalog and ignores this value.")
     quantity: int = Field(default=1, ge=1, le=10, description="Number of seats/rooms/travellers to book (max 10 per booking).")
     travel_date: datetime.date | None = None
+    coupon_code: str | None = Field(default=None, max_length=40)
 
 
 class BookingOut(BaseModel):
@@ -23,6 +24,8 @@ class BookingOut(BaseModel):
     total_price: float
     quantity: int
     travel_date: datetime.date | None
+    coupon_code: str | None = None
+    discount_amount: float | None = None
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}

@@ -72,6 +72,7 @@ h1,h2,h3,h4{font-family:var(--ff-head); line-height:1.12; letter-spacing:-0.01em
 .btn-coral:hover{filter:brightness(1.06); box-shadow:0 18px 36px -8px rgba(255,77,77,0.6);}
 .btn-navy{background:var(--navy); color:#fff;}
 .btn-navy:hover{background:var(--navy-3);}
+.btn-sm{padding:10px 16px; font-size:13px;}
 .btn-ghost{background:rgba(255,255,255,0.1); color:#fff; border:1.5px solid rgba(255,255,255,0.4); backdrop-filter:blur(6px);}
 .btn-ghost:hover{background:rgba(255,255,255,0.2);}
 .ripple{position:absolute; border-radius:50%; background:rgba(255,255,255,0.55); transform:scale(0); animation:rippleAnim .6s ease-out; pointer-events:none;}
@@ -594,6 +595,13 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .acct-notif-item .nm{font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4;}
 .acct-notif-item .ndate{font-size:11.5px; color:var(--muted); margin-top:4px;}
 .acct-notif-actions{display:flex; gap:8px; margin-top:8px;}
+.acct-section-head{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
+.acct-section-head h2{margin-bottom:0;}
+.acct-notif-clearbar{position:sticky; bottom:0; display:flex; justify-content:flex-end; padding:14px 0 2px; margin-top:4px; background:linear-gradient(rgba(255,255,255,0), #fff 45%);}
+.acct-empty-notif{padding:44px 10px;}
+.acct-empty-notif .aei{font-size:38px; line-height:1; margin-bottom:12px;}
+.acct-empty-notif .aet{font-weight:700; color:var(--navy); font-size:15px; margin-bottom:4px;}
+.acct-empty-notif .aes{font-size:12.5px; color:var(--muted);}
 
 /* ---------- Booking confirmation (ported, unchanged behavior) ---------- */
 .confirm-row{display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed var(--line); font-size:14px;}
@@ -609,6 +617,24 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .tl-step.cancelled-step .tl-label{color:var(--coral-dark);}
 .tl-line{flex:1; height:2px; background:var(--line); margin:7px -4px 0;}
 .tl-line.done{background:var(--emerald);}
+#acctConfirmOverlay .modal-card{max-width:520px;}
+.ticket-head{display:flex; align-items:center; gap:12px; margin-bottom:18px;}
+.ticket-head img{height:40px; width:auto;}
+.ticket-head .th-name{font-weight:800; color:var(--navy); font-size:15px;}
+.ticket-section-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:20px 0 6px;}
+.ticket-note{font-size:11.5px; color:var(--muted); font-style:italic;}
+.ticket-qr{display:flex; flex-direction:column; align-items:center; gap:8px; padding:18px 0 6px; text-align:center;}
+.ticket-qr img{border:1px solid var(--line); border-radius:12px; padding:8px; background:#fff;}
+.ticket-qr .tq-ref{font-weight:800; color:var(--navy); letter-spacing:.04em; font-size:14px;}
+.ticket-support{font-size:12.5px; color:var(--muted); text-align:center; margin-top:18px; padding-top:14px; border-top:1px solid var(--line);}
+.ticket-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px;}
+.ticket-actions .btn{flex:1; min-width:120px; justify-content:center;}
+@media print{
+  body *{visibility:hidden;}
+  #acctConfirmOverlay, #acctConfirmOverlay *{visibility:visible;}
+  #acctConfirmOverlay{position:absolute; inset:0; background:#fff; display:block;}
+  #acctConfirmOverlay .modal-close, #acctConfirmOverlay .ticket-actions{display:none;}
+}
 
 /* ---------- FOOTER ---------- */
 footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px;}
@@ -1224,6 +1250,14 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
       <label id="detailsQtyLabel" for="detailsQty">Quantity</label>
       <input id="detailsQty" type="number" min="1" value="1">
     </div>
+    <div class="modal-field">
+      <label for="detailsCoupon">Coupon Code (optional)</label>
+      <div style="display:flex; gap:8px;">
+        <input id="detailsCoupon" type="text" style="text-transform:uppercase;" placeholder="e.g. SAVE500">
+        <button type="button" class="btn btn-navy btn-sm" id="detailsCouponApplyBtn" style="flex-shrink:0;">Apply</button>
+      </div>
+      <div class="modal-msg" id="detailsCouponMsg" style="margin-top:8px;"></div>
+    </div>
     <button type="button" class="btn btn-coral modal-submit" id="detailsBookBtn">Book Now</button>
     <div class="modal-msg" id="detailsMsg"></div>
   </div>
@@ -1296,8 +1330,14 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
         </div>
 
         <div class="acct-panel" id="acctPanel-notifications">
-          <h2>Notifications</h2>
+          <div class="acct-section-head">
+            <h2>Notifications</h2>
+            <button type="button" class="btn btn-navy btn-sm" id="acctMarkAllReadBtn">Mark All as Read</button>
+          </div>
           <div id="acctNotificationsList"><div class="acct-empty">Loading…</div></div>
+          <div class="acct-notif-clearbar" id="acctNotifClearBar" style="display:none;">
+            <button type="button" class="btn btn-danger btn-sm" id="acctClearAllBtn">Clear All</button>
+          </div>
         </div>
 
         <div class="acct-panel" id="acctPanel-support">
@@ -1347,10 +1387,8 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
 </div>
 
 <div class="modal-overlay" id="acctConfirmOverlay">
-  <div class="modal-card" style="max-width:460px;">
+  <div class="modal-card">
     <button class="modal-close" id="acctConfirmCloseBtn" type="button" aria-label="Close">&times;</button>
-    <h2>Booking Confirmation</h2>
-    <p class="modal-sub">JackPots World Tours &amp; Travels</p>
     <div id="acctConfirmBody"></div>
   </div>
 </div>
@@ -1614,7 +1652,7 @@ function showToast(text, isError) {
 }
 
 /* Booking: shared handler for every "Book Now" button (package cards + search results) */
-async function handleBookNow(type, id, price, label, quantity = 1, travelDate = null) {
+async function handleBookNow(type, id, price, label, quantity = 1, travelDate = null, couponCode = null) {
   const { access } = getStoredAuth();
   if (!access) {
     showToast('Please log in to book — opening login.', true);
@@ -1627,10 +1665,11 @@ async function handleBookNow(type, id, price, label, quantity = 1, travelDate = 
       {
         booking_type: type, item_id: Number(id), total_price: Number(price),
         quantity: Number(quantity) || 1, travel_date: travelDate || undefined,
+        coupon_code: couponCode || undefined,
       },
       { headers: { Authorization: `Bearer ${access}` } }
     );
-    showToast(`Booked "${label}" — confirmation sent instantly!`);
+    showToast(couponCode ? `Booked "${label}" with coupon ${couponCode} — confirmation sent instantly!` : `Booked "${label}" — confirmation sent instantly!`);
   } catch (err) {
     showToast(err.response?.data?.detail || 'Booking failed — please try again.', true);
   }
@@ -1806,6 +1845,7 @@ const detailsModalOverlay = document.getElementById('detailsModalOverlay');
 let currentDetailsItem = null;
 let currentDetailsType = null;
 let currentDetailsUnitPrice = 0;
+let currentAppliedCoupon = null;
 
 const detailsConfig = {
   flight: {
@@ -1866,6 +1906,9 @@ function openDetailsModal(type, item) {
   document.getElementById('detailsQtyLabel').textContent = cfg.qtyLabel;
   document.getElementById('detailsQty').value = 1;
   document.getElementById('detailsMsg').textContent = '';
+  document.getElementById('detailsCoupon').value = '';
+  document.getElementById('detailsCouponMsg').textContent = '';
+  currentAppliedCoupon = null;
   const dateField = document.getElementById('detailsDateField');
   if (cfg.dateField) {
     dateField.style.display = 'block';
@@ -1883,11 +1926,41 @@ document.addEventListener('click', e => {
 });
 document.getElementById('detailsModalCloseBtn').addEventListener('click', () => detailsModalOverlay.classList.remove('open'));
 detailsModalOverlay.addEventListener('click', e => { if (e.target === detailsModalOverlay) detailsModalOverlay.classList.remove('open'); });
+
+document.getElementById('detailsCouponApplyBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('detailsCouponMsg');
+  const code = document.getElementById('detailsCoupon').value.trim();
+  const { access } = getStoredAuth();
+  if (!code) { msg.textContent = ''; currentAppliedCoupon = null; return; }
+  if (!access) { msg.textContent = 'Please log in first to apply a coupon.'; msg.className = 'modal-msg show'; msg.style.color = 'var(--coral-dark)'; return; }
+  const qty = Math.max(1, Number(document.getElementById('detailsQty').value) || 1);
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/coupons/validate`,
+      { code, booking_type: currentDetailsType, item_id: currentDetailsItem.id, quantity: qty },
+      { headers: { Authorization: `Bearer ${access}` } });
+    if (data.valid) {
+      currentAppliedCoupon = code;
+      msg.textContent = `Coupon applied — you save ₹${Math.round(data.campaign_discount + data.coupon_discount).toLocaleString('en-IN')}. New total: ₹${Math.round(data.final_amount).toLocaleString('en-IN')}`;
+      msg.style.color = 'var(--emerald)';
+    } else {
+      currentAppliedCoupon = null;
+      msg.textContent = data.message;
+      msg.style.color = 'var(--coral-dark)';
+    }
+    msg.classList.add('show');
+  } catch (err) {
+    currentAppliedCoupon = null;
+    msg.textContent = err.response?.data?.detail || 'Could not validate this coupon right now.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  }
+});
+
 document.getElementById('detailsBookBtn').addEventListener('click', () => {
   const qty = Math.max(1, Number(document.getElementById('detailsQty').value) || 1);
   const date = document.getElementById('detailsDateField').style.display !== 'none' ? document.getElementById('detailsDate').value : null;
   const label = document.getElementById('detailsModalTitle').textContent;
-  handleBookNow(currentDetailsType, currentDetailsItem.id, currentDetailsUnitPrice * qty, label, qty, date);
+  handleBookNow(currentDetailsType, currentDetailsItem.id, currentDetailsUnitPrice * qty, label, qty, date, currentAppliedCoupon);
   detailsModalOverlay.classList.remove('open');
 });
 
@@ -2283,6 +2356,7 @@ document.getElementById('forgotPasswordLink').addEventListener('click', async e 
 function authHeaders() { return { Authorization: `Bearer ${getStoredAuth().access}` }; }
 function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }
 
 /* ---------- Modal open/close + tab switching ---------- */
 const acctModalOverlay = document.getElementById('accountModalOverlay');
@@ -2459,29 +2533,125 @@ function renderTimeline(booking) {
     <div class="tl-step ${s.done ? 'done' : ''}"><span class="tl-dot"></span><span class="tl-label">${s.label}</span></div>
   `).join('')}</div>`;
 }
-function showAcctConfirmation(bookingId) {
+const CATALOG_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+const catalogItemCache = new Map();
+async function fetchCatalogItem(type, id) {
+  const cacheKey = `${type}-${id}`;
+  if (catalogItemCache.has(cacheKey)) return catalogItemCache.get(cacheKey);
+  const endpoint = CATALOG_ENDPOINTS[type];
+  if (!endpoint) return null;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/${endpoint}/${id}`);
+    catalogItemCache.set(cacheKey, data);
+    return data;
+  } catch (err) {
+    return null;
+  }
+}
+function bookingReference(bookingId) { return 'JWT-' + String(bookingId).padStart(6, '0'); }
+
+function closeAcctTicket() { document.getElementById('acctConfirmOverlay').classList.remove('open'); }
+document.getElementById('acctConfirmCloseBtn').addEventListener('click', closeAcctTicket);
+
+async function showAcctConfirmation(bookingId) {
   const booking = allBookingsCache.find(b => String(b.id) === String(bookingId));
   if (!booking) return;
   const payment = paymentsByBooking.get(booking.id);
+  const item = await fetchCatalogItem(booking.booking_type, booking.item_id);
+  const reference = bookingReference(booking.id);
+  const isFlight = booking.booking_type === 'flight';
+
+  let itemTitle = `${booking.booking_type} — #${booking.item_id}`;
+  let itemSub = '';
+  let dateValue = fmtDate(booking.travel_date);
+  let sourceDestRow = '';
+  let timeRow = '';
+  let seatRow = '';
+
+  if (item) {
+    if (isFlight) {
+      itemTitle = `${item.airline} · ${item.cabin_class}`;
+      dateValue = fmtDate(item.departure_time);
+      sourceDestRow = `
+        <div class="confirm-row"><span>From</span><span>${escapeHtml(item.from_airport)}</span></div>
+        <div class="confirm-row"><span>To</span><span>${escapeHtml(item.to_airport)}</span></div>`;
+      timeRow = `<div class="confirm-row"><span>Time</span><span>${fmtTime(item.departure_time)} – ${fmtTime(item.arrival_time)}</span></div>`;
+      seatRow = `<div class="confirm-row"><span>Seat Number</span><span>Assigned at check-in</span></div>`;
+    } else if (booking.booking_type === 'hotel') {
+      itemTitle = item.name;
+      itemSub = item.location;
+    } else if (booking.booking_type === 'cruise') {
+      itemTitle = item.name;
+      itemSub = `Departs ${item.departure_port}`;
+    } else if (booking.booking_type === 'package') {
+      itemTitle = item.title;
+      itemSub = item.package_type;
+    }
+  }
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(reference)}`;
+
   document.getElementById('acctConfirmBody').innerHTML = `
+    <div class="ticket-head">
+      <img src="assets/jackpots-logo-full.png" alt="JackPots World Tours & Travels">
+      <div>
+        <div class="th-name">${escapeHtml(itemTitle)}</div>
+        ${itemSub ? `<div class="modal-sub" style="margin:2px 0 0;">${escapeHtml(itemSub)}</div>` : ''}
+      </div>
+    </div>
     ${renderTimeline(booking)}
     <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
+    <div class="confirm-row"><span>PNR / Booking Reference</span><span>${reference}</span></div>
+    <div class="confirm-row"><span>Passenger Name</span><span>${escapeHtml(acctCurrentUser?.full_name || '—')}</span></div>
     <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
-    <div class="confirm-row"><span>Item</span><span>#${booking.item_id}</span></div>
+    ${sourceDestRow}
+    <div class="confirm-row"><span>Date</span><span>${dateValue}</span></div>
+    ${timeRow}
+    ${seatRow}
     <div class="confirm-row"><span>Quantity</span><span>${booking.quantity}</span></div>
-    <div class="confirm-row"><span>Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
-    <div class="confirm-row"><span>Total Paid</span><span>${money(booking.total_price)}</span></div>
-    <div class="confirm-row"><span>Travel Date</span><span>${fmtDate(booking.travel_date)}</span></div>
+    <div class="confirm-row"><span>Booking Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
+    ${payment ? `<div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>` : ''}
+    <div class="confirm-row"><span>Total Amount</span><span>${money(booking.total_price)}</span></div>
     <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
     ${payment ? `
       <div class="confirm-row"><span>Payment Method</span><span style="text-transform:capitalize">${payment.method}</span></div>
       <div class="confirm-row"><span>Transaction Ref</span><span>${payment.transaction_ref}</span></div>
-      <div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>
     ` : ''}
+    <div class="ticket-qr">
+      <img src="${qrUrl}" alt="Booking QR code" width="140" height="140">
+      <div class="tq-ref">${reference}</div>
+    </div>
+    <div class="ticket-support">Need help with this booking? Call +91 12345 67890 or email info@jackpotsworldtours.com</div>
+    <div class="ticket-actions">
+      <button type="button" class="btn btn-coral btn-sm" id="ticketDownloadBtn">Download PDF</button>
+      <button type="button" class="btn btn-navy btn-sm" id="ticketPrintBtn">Print Ticket</button>
+      <button type="button" class="btn btn-navy btn-sm" id="ticketShareBtn">Share Ticket</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="ticketCloseBtn">Close</button>
+    </div>
   `;
   document.getElementById('acctConfirmOverlay').classList.add('open');
+
+  document.getElementById('ticketDownloadBtn').addEventListener('click', () => window.print());
+  document.getElementById('ticketPrintBtn').addEventListener('click', () => window.print());
+  document.getElementById('ticketCloseBtn').addEventListener('click', closeAcctTicket);
+  document.getElementById('ticketShareBtn').addEventListener('click', async () => {
+    const shareText = `My ${booking.booking_type} booking with JackPots World Tours & Travels — Ref ${reference}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'JackPots World Tours & Travels — Booking Ticket', text: shareText }); }
+      catch (err) { /* user cancelled the native share sheet */ }
+      return;
+    }
+    const withTimeout = (promise, ms) => Promise.race([
+      promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    ]);
+    try {
+      await withTimeout(navigator.clipboard.writeText(shareText), 2000);
+      alert('Ticket details copied to clipboard.');
+    } catch (err) {
+      prompt('Copy your ticket details:', shareText);
+    }
+  });
 }
-document.getElementById('acctConfirmCloseBtn').addEventListener('click', () => document.getElementById('acctConfirmOverlay').classList.remove('open'));
 
 function bookingRowHtml(b) {
   return `
@@ -2493,7 +2663,7 @@ function bookingRowHtml(b) {
       </div>
       <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
       <div class="ar-amount">${money(b.total_price)}</div>
-      <button type="button" class="btn btn-ghost btn-sm" data-confirm-id="${b.id}">View</button>
+      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.id}">View Ticket</button>
       ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.id}">Cancel</button>` : ''}
     </div>`;
 }
@@ -2594,10 +2764,17 @@ async function loadAcctWishlist() {
 /* ---------- Notifications ---------- */
 async function loadAcctNotifications() {
   const container = document.getElementById('acctNotificationsList');
+  const clearBar = document.getElementById('acctNotifClearBar');
   try {
     const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
     if (!data.length) {
-      container.innerHTML = '<div class="acct-empty">No notifications yet.</div>';
+      container.innerHTML = `
+        <div class="acct-empty acct-empty-notif">
+          <div class="aei">🔔</div>
+          <div class="aet">No notifications yet</div>
+          <div class="aes">We'll notify you when something important happens.</div>
+        </div>`;
+      clearBar.style.display = 'none';
       return;
     }
     container.innerHTML = data.map(n => `
@@ -2605,12 +2782,10 @@ async function loadAcctNotifications() {
         <div class="nt">${escapeHtml(n.title)}</div>
         <div class="nm">${escapeHtml(n.message)}</div>
         <div class="ndate">${fmtDate(n.created_at)}</div>
-        <div class="acct-notif-actions">
-          ${!n.is_read ? `<button type="button" class="btn btn-ghost btn-sm" data-mark-read="${n.id}">Mark Read</button>` : ''}
-          <button type="button" class="btn btn-danger btn-sm" data-delete-notification="${n.id}">Delete</button>
-        </div>
+        ${!n.is_read ? `<div class="acct-notif-actions"><button type="button" class="btn btn-ghost btn-sm" data-mark-read="${n.id}">Mark as Read</button></div>` : ''}
       </div>
     `).join('');
+    clearBar.style.display = data.some(n => n.is_read) ? 'flex' : 'none';
     container.querySelectorAll('[data-mark-read]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
@@ -2619,18 +2794,26 @@ async function loadAcctNotifications() {
         } catch (err) { alert('Failed to mark as read.'); }
       });
     });
-    container.querySelectorAll('[data-delete-notification]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        try {
-          await axios.delete(`${API_BASE}/api/notifications/${btn.dataset.deleteNotification}`, { headers: authHeaders() });
-          loadAcctNotifications();
-        } catch (err) { alert('Failed to delete notification.'); }
-      });
-    });
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load notifications.</div>';
+    clearBar.style.display = 'none';
   }
 }
+
+document.getElementById('acctMarkAllReadBtn').addEventListener('click', async () => {
+  try {
+    await axios.patch(`${API_BASE}/api/notifications/read-all`, {}, { headers: authHeaders() });
+    loadAcctNotifications();
+  } catch (err) { alert('Failed to mark all as read.'); }
+});
+
+document.getElementById('acctClearAllBtn').addEventListener('click', async () => {
+  if (!confirm('Are you sure you want to clear all notifications?')) return;
+  try {
+    await axios.delete(`${API_BASE}/api/notifications/read`, { headers: authHeaders() });
+    loadAcctNotifications();
+  } catch (err) { alert('Failed to clear notifications.'); }
+});
 
 /* ---------- Reviews ---------- */
 function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }

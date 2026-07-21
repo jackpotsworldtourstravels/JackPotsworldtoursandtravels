@@ -370,6 +370,10 @@ tbody tr:hover{background:var(--hover-bg);}
       <svg class="icon" viewBox="0 0 24 24"><path d="M21 8V7a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 7v10a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7v-1"/><path d="M3.3 7 12 12l8.7-5"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
       <span class="nav-label">Inventory</span>
     </a>
+    <a href="#" class="nav-item" data-section="pricing">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M20.6 12.4 12.4 20.6a2 2 0 0 1-2.8 0l-8-8A2 2 0 0 1 1 11.2V4a3 3 0 0 1 3-3h7.2a2 2 0 0 1 1.4.6l8 8a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+      <span class="nav-label">Coupons &amp; Discounts</span>
+    </a>
 
     <div class="nav-group-label">More</div>
     <a href="#" class="nav-item" data-section="newsletter">
@@ -629,6 +633,98 @@ tbody tr:hover{background:var(--hover-bg);}
         <div class="table-wrap"><table id="inventoryTable"><thead><tr>
           <th>Type</th><th>Name</th><th>Price</th><th>Available</th><th>Low-stock Threshold</th><th>Status</th><th></th>
         </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-pricing">
+      <div class="panel" style="padding:0;">
+        <div class="profile-tabs" id="pricingTabs" style="position:static; padding:16px 20px 0;">
+          <div class="profile-tab active" data-ptab="seasonal">Seasonal Pricing</div>
+          <div class="profile-tab" data-ptab="campaigns">Discount Campaigns</div>
+          <div class="profile-tab" data-ptab="coupons">Coupons</div>
+        </div>
+
+        <div class="profile-tab-panel active" id="pricingTab-seasonal" style="padding:20px;">
+          <h2 style="font-size:15px;margin-bottom:14px;">Add seasonal price override</h2>
+          <form id="seasonalForm">
+            <div class="form-grid">
+              <div class="form-field"><label>Item Type</label>
+                <select name="item_type" required>
+                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
+                  <option value="cruise">Cruise</option><option value="package">Package</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Item ID</label><input name="item_id" type="number" min="1" required></div>
+              <div class="form-field"><label>Start Date</label><input name="start_date" type="date" required></div>
+              <div class="form-field"><label>End Date</label><input name="end_date" type="date" required></div>
+              <div class="form-field"><label>Override Price (₹)</label><input name="override_price" type="number" min="1" step="0.01" required></div>
+              <div class="form-field"><label>Label</label><input name="label" type="text" placeholder="e.g. Christmas Week"></div>
+            </div>
+            <button type="submit" class="btn btn-coral">Add Seasonal Price</button>
+            <div class="msg" id="seasonalMsg"></div>
+          </form>
+          <div class="table-wrap" style="margin-top:18px;"><table id="seasonalTable"><thead><tr>
+            <th>Item</th><th>Type</th><th>Dates</th><th>Override Price</th><th>Label</th><th>Active</th><th></th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="profile-tab-panel" id="pricingTab-campaigns" style="padding:20px;">
+          <h2 style="font-size:15px;margin-bottom:14px;">Create discount campaign</h2>
+          <form id="campaignForm">
+            <div class="form-grid">
+              <div class="form-field"><label>Name</label><input name="name" type="text" required></div>
+              <div class="form-field"><label>Applies To</label>
+                <select name="applicable_type">
+                  <option value="">All Types</option>
+                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
+                  <option value="cruise">Cruise</option><option value="package">Package</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Discount Type</label>
+                <select name="discount_type"><option value="percent">Percent</option><option value="flat">Flat (₹)</option></select>
+              </div>
+              <div class="form-field"><label>Discount Value</label><input name="discount_value" type="number" min="0.01" step="0.01" required></div>
+              <div class="form-field"><label>Start Date</label><input name="start_date" type="date" required></div>
+              <div class="form-field"><label>End Date</label><input name="end_date" type="date" required></div>
+            </div>
+            <div class="form-field" style="max-width:none;"><label>Description</label><input name="description" type="text"></div>
+            <button type="submit" class="btn btn-coral">Create Campaign</button>
+            <div class="msg" id="campaignMsg"></div>
+          </form>
+          <div class="table-wrap" style="margin-top:18px;"><table id="campaignsTable"><thead><tr>
+            <th>Name</th><th>Applies To</th><th>Discount</th><th>Dates</th><th>Active</th><th></th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="profile-tab-panel" id="pricingTab-coupons" style="padding:20px;">
+          <h2 style="font-size:15px;margin-bottom:14px;">Create coupon</h2>
+          <form id="couponForm">
+            <div class="form-grid">
+              <div class="form-field"><label>Code</label><input name="code" type="text" required placeholder="e.g. SAVE500" style="text-transform:uppercase;"></div>
+              <div class="form-field"><label>Applies To</label>
+                <select name="applicable_type">
+                  <option value="">All Types</option>
+                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
+                  <option value="cruise">Cruise</option><option value="package">Package</option>
+                </select>
+              </div>
+              <div class="form-field"><label>Discount Type</label>
+                <select name="discount_type"><option value="percent">Percent</option><option value="flat">Flat (₹)</option></select>
+              </div>
+              <div class="form-field"><label>Discount Value</label><input name="discount_value" type="number" min="0.01" step="0.01" required></div>
+              <div class="form-field"><label>Min Booking Amount (₹)</label><input name="min_booking_amount" type="number" min="0" step="0.01"></div>
+              <div class="form-field"><label>Usage Limit</label><input name="usage_limit" type="number" min="1" placeholder="Unlimited"></div>
+              <div class="form-field"><label>Valid From</label><input name="valid_from" type="date" required></div>
+              <div class="form-field"><label>Valid Until</label><input name="valid_until" type="date" required></div>
+            </div>
+            <div class="form-field" style="max-width:none;"><label>Description</label><input name="description" type="text"></div>
+            <button type="submit" class="btn btn-coral">Create Coupon</button>
+            <div class="msg" id="couponMsg"></div>
+          </form>
+          <div class="table-wrap" style="margin-top:18px;"><table id="couponsTable"><thead><tr>
+            <th>Code</th><th>Applies To</th><th>Discount</th><th>Min Amount</th><th>Usage</th><th>Valid Until</th><th>Active</th><th></th>
+          </tr></thead><tbody></tbody></table></div>
+        </div>
       </div>
     </section>
 
@@ -1017,7 +1113,7 @@ const sectionTitles = {
   reports: 'Dashboard', users: 'Users', 'active-users': 'Active Users', customers: 'Customers', flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
   packages: 'Tour Packages', bookings: 'All Transactions', 'booking-management': 'Booking Management Center', payments: 'Payment Management', 'payment-management': 'Payment Management Center', contact: 'Support Management', newsletter: 'Newsletter',
   'user-analytics': 'User Analytics', 'reports-export': 'Reports',
-  reviews: 'Complaint Management', wishlist: 'Wishlist', notifications: 'Communication', activity: 'User Activity Monitor', inventory: 'Inventory',
+  reviews: 'Complaint Management', wishlist: 'Wishlist', notifications: 'Communication', activity: 'User Activity Monitor', inventory: 'Inventory', pricing: 'Coupons & Discounts',
   profile: 'Profile',
 };
 const loadedSections = new Set();
@@ -1051,6 +1147,7 @@ function loadSection(name) {
   if (name === 'notifications') return initNotificationForm();
   if (name === 'activity') return loadActivityLog();
   if (name === 'inventory') return loadInventory();
+  if (name === 'pricing') return loadPricingSection();
   if (name === 'booking-management') return loadBookingManagement();
   if (name === 'payment-management') return loadPaymentManagement();
   if (name === 'profile') return loadAdminProfile();
@@ -1841,6 +1938,229 @@ async function handlePaymentAction(action, dataset) {
     alert(err.response?.data?.detail || 'Action failed.');
   }
 }
+
+/* ---------- Coupons & Discounts (Seasonal Pricing / Campaigns / Coupons) ---------- */
+let pricingTabsWired = false;
+let pricingLoaded = false;
+let editingSeasonalId = null, editingCampaignId = null, editingCouponId = null;
+
+function loadPricingSection() {
+  if (!pricingTabsWired) {
+    pricingTabsWired = true;
+    document.querySelectorAll('#pricingTabs .profile-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#pricingTabs .profile-tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.querySelectorAll('[id^="pricingTab-"]').forEach(p => p.classList.toggle('active', p.id === `pricingTab-${tab.dataset.ptab}`));
+      });
+    });
+  }
+  if (pricingLoaded) return;
+  pricingLoaded = true;
+  loadSeasonalPrices();
+  loadCampaigns();
+  loadCoupons();
+}
+
+/* ---- Seasonal Pricing ---- */
+async function loadSeasonalPrices() {
+  const tbody = document.querySelector('#seasonalTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/pricing/seasonal`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(s => `
+      <tr>
+        <td>${escapeHtml(s.item_name || `${s.item_type} #${s.item_id}`)}</td>
+        <td style="text-transform:capitalize">${escapeHtml(s.item_type)}</td>
+        <td>${fmtDate(s.start_date)} – ${fmtDate(s.end_date)}</td>
+        <td>${money(s.override_price)}</td>
+        <td>${s.label ? escapeHtml(s.label) : '—'}</td>
+        <td><span class="badge ${s.is_active ? 'active' : 'inactive'}">${s.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" data-edit-seasonal='${escapeHtml(JSON.stringify(s))}'>Edit</button>
+          <button class="btn btn-danger btn-sm" data-delete-seasonal="${s.id}">Delete</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="7" class="empty-state">No seasonal prices yet.</td></tr>`;
+    tbody.querySelectorAll('[data-edit-seasonal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = JSON.parse(btn.dataset.editSeasonal);
+        editingSeasonalId = s.id;
+        const f = document.getElementById('seasonalForm');
+        f.elements.item_type.value = s.item_type; f.elements.item_id.value = s.item_id;
+        f.elements.start_date.value = s.start_date; f.elements.end_date.value = s.end_date;
+        f.elements.override_price.value = s.override_price; f.elements.label.value = s.label || '';
+        f.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+    tbody.querySelectorAll('[data-delete-seasonal]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this seasonal price?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/admin/pricing/seasonal/${btn.dataset.deleteSeasonal}`, { headers: authHeaders() });
+          loadSeasonalPrices();
+        } catch (err) { alert('Failed to delete.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load seasonal prices.</td></tr>`;
+  }
+}
+document.getElementById('seasonalForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const msg = document.getElementById('seasonalMsg');
+  const payload = {
+    item_type: f.elements.item_type.value, item_id: Number(f.elements.item_id.value),
+    start_date: f.elements.start_date.value, end_date: f.elements.end_date.value,
+    override_price: Number(f.elements.override_price.value), label: f.elements.label.value || null,
+    is_active: true,
+  };
+  try {
+    if (editingSeasonalId) await axios.put(`${API_BASE}/api/admin/pricing/seasonal/${editingSeasonalId}`, payload, { headers: authHeaders() });
+    else await axios.post(`${API_BASE}/api/admin/pricing/seasonal`, payload, { headers: authHeaders() });
+    editingSeasonalId = null;
+    f.reset();
+    msg.textContent = 'Saved.'; msg.className = 'msg success';
+    loadSeasonalPrices();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to save.'; msg.className = 'msg error';
+  }
+});
+
+/* ---- Discount Campaigns ---- */
+async function loadCampaigns() {
+  const tbody = document.querySelector('#campaignsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/pricing/campaigns`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td style="text-transform:capitalize">${c.applicable_type ? escapeHtml(c.applicable_type) : 'All'}</td>
+        <td>${c.discount_type === 'percent' ? c.discount_value + '%' : money(c.discount_value)}</td>
+        <td>${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}</td>
+        <td><span class="badge ${c.is_active ? 'active' : 'inactive'}">${c.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" data-edit-campaign='${escapeHtml(JSON.stringify(c))}'>Edit</button>
+          <button class="btn btn-danger btn-sm" data-delete-campaign="${c.id}">Delete</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="6" class="empty-state">No campaigns yet.</td></tr>`;
+    tbody.querySelectorAll('[data-edit-campaign]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = JSON.parse(btn.dataset.editCampaign);
+        editingCampaignId = c.id;
+        const f = document.getElementById('campaignForm');
+        f.elements.name.value = c.name; f.elements.applicable_type.value = c.applicable_type || '';
+        f.elements.discount_type.value = c.discount_type; f.elements.discount_value.value = c.discount_value;
+        f.elements.start_date.value = c.start_date; f.elements.end_date.value = c.end_date;
+        f.elements.description.value = c.description || '';
+        f.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+    tbody.querySelectorAll('[data-delete-campaign]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this campaign?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/admin/pricing/campaigns/${btn.dataset.deleteCampaign}`, { headers: authHeaders() });
+          loadCampaigns();
+        } catch (err) { alert('Failed to delete.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load campaigns.</td></tr>`;
+  }
+}
+document.getElementById('campaignForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const msg = document.getElementById('campaignMsg');
+  const payload = {
+    name: f.elements.name.value, description: f.elements.description.value || null,
+    discount_type: f.elements.discount_type.value, discount_value: Number(f.elements.discount_value.value),
+    applicable_type: f.elements.applicable_type.value || null,
+    start_date: f.elements.start_date.value, end_date: f.elements.end_date.value, is_active: true,
+  };
+  try {
+    if (editingCampaignId) await axios.put(`${API_BASE}/api/admin/pricing/campaigns/${editingCampaignId}`, payload, { headers: authHeaders() });
+    else await axios.post(`${API_BASE}/api/admin/pricing/campaigns`, payload, { headers: authHeaders() });
+    editingCampaignId = null;
+    f.reset();
+    msg.textContent = 'Saved.'; msg.className = 'msg success';
+    loadCampaigns();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to save.'; msg.className = 'msg error';
+  }
+});
+
+/* ---- Coupons ---- */
+async function loadCoupons() {
+  const tbody = document.querySelector('#couponsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/pricing/coupons`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td><strong>${escapeHtml(c.code)}</strong></td>
+        <td style="text-transform:capitalize">${c.applicable_type ? escapeHtml(c.applicable_type) : 'All'}</td>
+        <td>${c.discount_type === 'percent' ? c.discount_value + '%' : money(c.discount_value)}</td>
+        <td>${c.min_booking_amount ? money(c.min_booking_amount) : '—'}</td>
+        <td>${c.times_used}${c.usage_limit ? ' / ' + c.usage_limit : ''}</td>
+        <td>${fmtDate(c.valid_until)}</td>
+        <td><span class="badge ${c.is_active ? 'active' : 'inactive'}">${c.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" data-edit-coupon='${escapeHtml(JSON.stringify(c))}'>Edit</button>
+          <button class="btn btn-danger btn-sm" data-delete-coupon="${c.id}">Delete</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="8" class="empty-state">No coupons yet.</td></tr>`;
+    tbody.querySelectorAll('[data-edit-coupon]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = JSON.parse(btn.dataset.editCoupon);
+        editingCouponId = c.id;
+        const f = document.getElementById('couponForm');
+        f.elements.code.value = c.code; f.elements.applicable_type.value = c.applicable_type || '';
+        f.elements.discount_type.value = c.discount_type; f.elements.discount_value.value = c.discount_value;
+        f.elements.min_booking_amount.value = c.min_booking_amount || '';
+        f.elements.usage_limit.value = c.usage_limit || '';
+        f.elements.valid_from.value = c.valid_from; f.elements.valid_until.value = c.valid_until;
+        f.elements.description.value = c.description || '';
+        f.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+    tbody.querySelectorAll('[data-delete-coupon]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this coupon?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/admin/pricing/coupons/${btn.dataset.deleteCoupon}`, { headers: authHeaders() });
+          loadCoupons();
+        } catch (err) { alert('Failed to delete.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load coupons.</td></tr>`;
+  }
+}
+document.getElementById('couponForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target;
+  const msg = document.getElementById('couponMsg');
+  const payload = {
+    code: f.elements.code.value, description: f.elements.description.value || null,
+    discount_type: f.elements.discount_type.value, discount_value: Number(f.elements.discount_value.value),
+    applicable_type: f.elements.applicable_type.value || null,
+    min_booking_amount: f.elements.min_booking_amount.value ? Number(f.elements.min_booking_amount.value) : null,
+    usage_limit: f.elements.usage_limit.value ? Number(f.elements.usage_limit.value) : null,
+    valid_from: f.elements.valid_from.value, valid_until: f.elements.valid_until.value, is_active: true,
+  };
+  try {
+    if (editingCouponId) await axios.put(`${API_BASE}/api/admin/pricing/coupons/${editingCouponId}`, payload, { headers: authHeaders() });
+    else await axios.post(`${API_BASE}/api/admin/pricing/coupons`, payload, { headers: authHeaders() });
+    editingCouponId = null;
+    f.reset();
+    msg.textContent = 'Saved.'; msg.className = 'msg success';
+    loadCoupons();
+  } catch (err) {
+    msg.textContent = err.response?.data?.detail || 'Failed to save.'; msg.className = 'msg error';
+  }
+});
 
 /* ---------- Customer Management ---------- */
 let customersPage = 1;

@@ -17,6 +17,8 @@ class Booking(Base):
     total_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     quantity: Mapped[int] = mapped_column(default=1)
     travel_date: Mapped[datetime.date | None] = mapped_column(nullable=True)
+    coupon_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    discount_amount: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(default=datetime.datetime.utcnow)
     updated_at: Mapped[datetime.datetime] = mapped_column(
         default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow

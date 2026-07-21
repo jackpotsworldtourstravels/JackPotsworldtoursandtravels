@@ -33,6 +33,10 @@ def item_display_name(db, item_type: str, item_id: int) -> str:
     return ITEM_NAME_FN[item_type](item)
 
 
+def base_unit_price(booking_type: str, item) -> float:
+    return float(item.price_per_night) if booking_type == "hotel" else float(item.price)
+
+
 def get_availability(item) -> int:
     field = AVAILABILITY_FIELD[_item_type_of(item)]
     return getattr(item, field)
