@@ -17,7 +17,7 @@ from app.schemas.auth import (
     UserLoginRequest,
     UserResponse,
 )
-from app.services import activity_service, auth_service, notification_service, session_service
+from app.services import activity_service, auth_service, email_service, notification_service, session_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -177,21 +177,26 @@ def logout(request: Request, db: Session = Depends(get_db), current_user: User =
     response_model=MessageResponse,
     summary="Start a password reset",
     description=(
-        "Public endpoint. If the email matches an account, issues a reset token. Always returns a generic "
-        "success message regardless of whether the account exists, to avoid leaking which emails are registered. "
-        "Email delivery is not yet wired up: with settings.debug enabled, the reset link is returned directly in "
-        "the response for local testing; in production (debug off) the token is never exposed over the API — "
-        "wire up real email delivery before launching the reset flow publicly."
+        "Public endpoint. If the email matches an account, issues a reset token and emails the reset link "
+        "(if SMTP is configured). Always returns a generic success message regardless of whether the account "
+        "exists, to avoid leaking which emails are registered. With settings.debug enabled, the reset link is "
+        "also returned directly in the response — handy for local testing without SMTP configured."
     ),
 )
 @limiter.limit("5/minute")
 def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     raw_token = auth_service.start_password_reset(db, payload.email)
     generic_message = MessageResponse(message="If an account exists for that email, a reset link has been issued")
-    if raw_token is None or not settings.debug:
+    if raw_token is None:
+        return generic_message
+
+    reset_link = f"{settings.frontend_base_url}/reset-password?token={raw_token}"
+    email_service.send_password_reset_email(payload.email, reset_link, settings.reset_token_expire_minutes)
+
+    if not settings.debug:
         return generic_message
     return MessageResponse(
-        message="Reset link generated (email delivery not yet configured — debug mode only)",
+        message="Reset link generated and emailed (debug mode also returns it directly)",
         reset_link=f"/reset-password?token={raw_token}",
     )
 

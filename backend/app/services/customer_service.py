@@ -4,10 +4,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.booking import Booking, Payment
 from app.models.misc import ActivityLog, Review, SupportTicket, UserSession, Wishlist
 from app.models.user import Role, User
-from app.services import auth_service, catalog_items, session_service
+from app.services import auth_service, catalog_items, email_service, session_service
 from app.services.session_service import ONLINE_THRESHOLD_MINUTES
 
 _SORT_MAP = {
@@ -402,6 +403,8 @@ def reset_customer_password(db: Session, customer_id: int) -> str | None:
     raw_token = auth_service.start_password_reset(db, user.email)
     if raw_token is None:
         return None
+    reset_link = f"{settings.frontend_base_url}/reset-password?token={raw_token}"
+    email_service.send_password_reset_email(user.email, reset_link, settings.reset_token_expire_minutes)
     return f"/reset-password?token={raw_token}"
 
 

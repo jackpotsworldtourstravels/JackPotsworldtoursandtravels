@@ -13,6 +13,7 @@ from app.auth.security import (
     hash_reset_token,
     verify_password,
 )
+from app.config import settings
 from app.models.user import Role, User
 
 _EXTENDED_PROFILE_FIELDS = (
@@ -107,7 +108,7 @@ def start_password_reset(db: Session, email: str) -> str | None:
         return None
     raw_token, hashed = generate_reset_token()
     user.reset_token_hash = hashed
-    user.reset_token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+    user.reset_token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=settings.reset_token_expire_minutes)
     db.commit()
     return raw_token
 

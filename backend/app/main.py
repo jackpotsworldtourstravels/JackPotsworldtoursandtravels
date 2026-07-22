@@ -1,11 +1,15 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import func, select
 
 from app.auth.rate_limit import limiter
 from app.config import settings
-from app.database.session import SessionLocal
+from app.database.session import SessionLocal, engine
+from app.models.user import User
 from app.routers import (
     admin,
     auth,
@@ -23,6 +27,9 @@ from app.routers import (
     wishlist,
 )
 from app.services import user_service
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+logger = logging.getLogger("jackpots.startup")
 
 app = FastAPI(
     title="JackPots World Tours & Travels API",
@@ -74,6 +81,17 @@ def ensure_default_admin_exists():
     db = SessionLocal()
     try:
         user_service.ensure_default_admin(db)
+        user_count = db.scalar(select(func.count()).select_from(User)) or 0
+        logger.info(
+            "Connected to database %s - %d existing user account(s) found.",
+            engine.url.render_as_string(hide_password=True), user_count,
+        )
+        if user_count == 0:
+            logger.warning(
+                "Zero users found at startup. If this database previously had accounts, "
+                "double-check DATABASE_URL in .env — you may be pointed at the wrong database "
+                "instead of a genuinely fresh one."
+            )
     finally:
         db.close()
 
