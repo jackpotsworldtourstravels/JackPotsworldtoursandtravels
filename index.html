@@ -230,17 +230,21 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   .search-go{min-height:52px; padding:16px;}
 }
 
-/* ---------- SEARCH RESULTS PANEL ---------- */
-.search-results-panel{
-  display:none; margin-top:18px; background:rgba(255,255,255,0.94); backdrop-filter:blur(20px) saturate(160%);
-  border:1px solid rgba(255,255,255,0.6); border-radius:var(--radius); box-shadow:var(--shadow-lg); padding:22px 26px;
+/* ---------- SEARCH RESULTS SECTION (normal page flow, no overlay/blur) ---------- */
+.search-results-section{
+  display:none; position:relative; width:100%; margin-top:30px; z-index:1;
+  background:var(--bg); padding:36px 0;
 }
-.search-results-panel.open{display:block;}
+.search-results-section.open{display:block;}
+.search-results-card{
+  position:relative; display:block; width:100%;
+  background:var(--white); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:22px 26px;
+}
 .search-results-head{display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:16px;}
 .search-results-close{width:30px; height:30px; border-radius:50%; background:rgba(10,37,64,0.06); color:var(--navy); font-size:18px; line-height:1; display:flex; align-items:center; justify-content:center; transition:background .2s ease;}
 .search-results-close:hover{background:rgba(10,37,64,0.12);}
-.search-results-list{display:flex; flex-direction:column; gap:10px; max-height:340px; overflow-y:auto;}
-.result-card{display:flex; align-items:center; gap:18px; padding:16px 18px; border-radius:var(--radius-sm); background:var(--bg); border:1px solid var(--line);}
+.search-results-list{display:flex; flex-direction:column; gap:10px;}
+.result-card{display:flex; align-items:center; gap:18px; padding:16px 18px; border-radius:var(--radius-sm); background:var(--bg); border:1px solid var(--line); position:relative; pointer-events:auto;}
 .result-main{flex:1; min-width:0;}
 .result-title{font-weight:700; font-size:15px; color:var(--navy);}
 .result-sub{font-size:13px; color:var(--muted); margin-top:4px;}
@@ -252,6 +256,31 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   .result-card{flex-wrap:wrap;}
   .result-price{order:2;}
   .result-book{order:3; width:100%; justify-content:center;}
+}
+
+/* ---------- YOUR UPCOMING JOURNEY (homepage widget, normal page flow) ---------- */
+.upcoming-section{display:none; position:relative; width:100%; background:var(--bg); padding:56px 0; z-index:1;}
+.upcoming-section.open{display:block;}
+.upcoming-list{display:flex; flex-direction:column; gap:16px;}
+.upcoming-card{
+  position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:20px;
+  background:var(--white); border:1px solid var(--line); border-radius:var(--radius); padding:22px 26px; box-shadow:var(--shadow-sm);
+}
+.upcoming-main{flex:1; min-width:240px;}
+.upcoming-title{font-weight:700; font-size:16px; color:var(--navy);}
+.upcoming-sub{font-size:12.5px; color:var(--muted); margin-top:5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.upcoming-meta{display:flex; flex-wrap:wrap; gap:14px 20px; margin-top:12px; font-size:12.5px; color:var(--muted);}
+.upcoming-meta b{color:var(--navy); font-weight:700;}
+.upcoming-countdown{display:flex; gap:8px; text-align:center; flex-shrink:0;}
+.upcoming-countdown .cd-box{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:8px 10px; min-width:54px;}
+.upcoming-countdown .cd-num{font-family:var(--ff-head); font-weight:800; font-size:17px; color:var(--navy);}
+.upcoming-countdown .cd-label{font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-top:2px;}
+.upcoming-actions{display:flex; flex-wrap:wrap; gap:8px; flex-shrink:0;}
+@media (max-width:760px){
+  .upcoming-card{flex-direction:column; align-items:stretch;}
+  .upcoming-countdown{justify-content:center;}
+  .upcoming-actions{justify-content:stretch;}
+  .upcoming-actions .btn{flex:1; min-width:120px; justify-content:center;}
 }
 
 /* ---------- WISHLIST + REVIEWS controls (shared by result cards and package cards) ---------- */
@@ -888,8 +917,12 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
     </div>
   </div>
 
+  <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+</section>
+
+<section class="search-results-section" id="searchResultsSection">
   <div class="wrap">
-    <div class="search-results-panel" id="searchResultsPanel">
+    <div class="search-results-card">
       <div class="search-results-head">
         <span>Search results</span>
         <button type="button" class="search-results-close" id="searchResultsClose" aria-label="Close results">&times;</button>
@@ -898,8 +931,18 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
       <p class="search-results-empty" id="searchResultsEmpty" style="display:none;">No results match that search — try different filters.</p>
     </div>
   </div>
+</section>
 
-  <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+<section class="upcoming-section" id="upcomingJourneySection">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">Track your trip</div>
+        <h2>Your Upcoming Journey</h2>
+      </div>
+    </div>
+    <div class="upcoming-list" id="upcomingJourneyList"></div>
+  </div>
 </section>
 
 <section class="offers-section" aria-labelledby="offersHead">
@@ -1670,6 +1713,7 @@ async function handleBookNow(type, id, price, label, quantity = 1, travelDate = 
       { headers: { Authorization: `Bearer ${access}` } }
     );
     showToast(couponCode ? `Booked "${label}" with coupon ${couponCode} — confirmation sent instantly!` : `Booked "${label}" — confirmation sent instantly!`);
+    loadUpcomingJourney();
   } catch (err) {
     showToast(err.response?.data?.detail || 'Booking failed — please try again.', true);
   }
@@ -2030,13 +2074,14 @@ const searchEndpoints = {
 };
 
 function renderSearchResults(tab, items) {
-  const panel = document.getElementById('searchResultsPanel');
+  const section = document.getElementById('searchResultsSection');
   const list = document.getElementById('searchResultsList');
   const empty = document.getElementById('searchResultsEmpty');
-  panel.classList.add('open');
+  section.classList.add('open');
   if (!items.length) {
     list.innerHTML = '';
     empty.style.display = 'block';
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
   empty.style.display = 'none';
@@ -2084,6 +2129,7 @@ function renderSearchResults(tab, items) {
   };
   list.innerHTML = items.map(cardFor[tab]).join('');
   applyWishlistState(list);
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 document.querySelectorAll('.search-go').forEach(btn => {
@@ -2102,7 +2148,7 @@ document.querySelectorAll('.search-go').forEach(btn => {
   });
 });
 document.getElementById('searchResultsClose')?.addEventListener('click', () => {
-  document.getElementById('searchResultsPanel').classList.remove('open');
+  document.getElementById('searchResultsSection').classList.remove('open');
 });
 
 /* AI chatbot */
@@ -2571,7 +2617,7 @@ async function showAcctConfirmation(bookingId) {
   if (item) {
     if (isFlight) {
       itemTitle = `${item.airline} · ${item.cabin_class}`;
-      dateValue = fmtDate(item.departure_time);
+      dateValue = fmtDate(booking.travel_date || item.departure_time);
       sourceDestRow = `
         <div class="confirm-row"><span>From</span><span>${escapeHtml(item.from_airport)}</span></div>
         <div class="confirm-row"><span>To</span><span>${escapeHtml(item.to_airport)}</span></div>`;
@@ -2667,17 +2713,21 @@ function bookingRowHtml(b) {
       ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.id}">Cancel</button>` : ''}
     </div>`;
 }
+async function cancelBookingById(bookingId, onSuccess) {
+  if (!confirm('Cancel this booking?')) return;
+  try {
+    await axios.delete(`${API_BASE}/api/bookings/${bookingId}`, { headers: authHeaders() });
+    await loadPaymentsMap();
+    if (typeof onSuccess === 'function') await onSuccess();
+  } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
+}
 function wireBookingRowActions(container) {
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
   container.querySelectorAll('[data-cancel-id]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('Cancel this booking?')) return;
-      try {
-        await axios.delete(`${API_BASE}/api/bookings/${btn.dataset.cancelId}`, { headers: authHeaders() });
-        await loadPaymentsMap();
-        loadAcctBookings();
-      } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
-    });
+    btn.addEventListener('click', () => cancelBookingById(btn.dataset.cancelId, async () => {
+      await loadAcctBookings();
+      loadUpcomingJourney();
+    }));
   });
 }
 async function loadAcctBookings() {
@@ -2693,6 +2743,128 @@ async function loadAcctBookings() {
     wireBookingRowActions(container);
   } catch (err) {
     container.innerHTML = '<div class="acct-empty">Failed to load bookings.</div>';
+  }
+}
+
+/* ---------- Homepage: Your Upcoming Journey ---------- */
+let upcomingCountdownTimer = null;
+
+function upcomingCardHtml(entry) {
+  const { booking, item, when } = entry;
+  const ref = bookingReference(booking.id);
+  let title = `${booking.booking_type} — #${booking.item_id}`;
+  let fromTo = '';
+  let timeSpan = '';
+  let seatSpan = '';
+  if (item) {
+    if (booking.booking_type === 'flight') {
+      title = item.airline;
+      fromTo = `<span>${escapeHtml(item.from_airport)} &rarr; ${escapeHtml(item.to_airport)}</span>`;
+      timeSpan = `<span>Time: <b>${fmtTime(item.departure_time)}</b></span>`;
+      seatSpan = `<span>Seat: <b>Assigned at check-in</b></span>`;
+    } else if (booking.booking_type === 'hotel') title = item.name;
+    else if (booking.booking_type === 'cruise') title = item.name;
+    else if (booking.booking_type === 'package') title = item.title;
+  }
+  return `
+    <div class="upcoming-card" data-upcoming-id="${booking.id}" data-upcoming-when="${when.toISOString()}">
+      <div class="upcoming-main">
+        <div class="upcoming-title">${escapeHtml(title)}</div>
+        <div class="upcoming-sub">Booking #${booking.id} · PNR ${ref} · <span class="badge ${booking.status}">${escapeHtml(booking.status)}</span></div>
+        <div class="upcoming-meta">
+          ${fromTo}
+          <span>Date: <b>${fmtDate(booking.travel_date)}</b></span>
+          ${timeSpan}
+          <span>Passengers: <b>${booking.quantity}</b></span>
+          ${seatSpan}
+        </div>
+      </div>
+      <div class="upcoming-countdown" data-countdown></div>
+      <div class="upcoming-actions">
+        <button type="button" class="btn btn-coral btn-sm" data-upcoming-view="${booking.id}">View Ticket</button>
+        <button type="button" class="btn btn-navy btn-sm" data-upcoming-download="${booking.id}">Download Ticket</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-upcoming-account>View Booking</button>
+        <button type="button" class="btn btn-danger btn-sm" data-upcoming-cancel="${booking.id}">Cancel Booking</button>
+      </div>
+    </div>`;
+}
+
+function tickUpcomingCountdowns() {
+  const now = Date.now();
+  const cards = document.querySelectorAll('#upcomingJourneyList .upcoming-card');
+  cards.forEach(card => {
+    const when = new Date(card.dataset.upcomingWhen).getTime();
+    const diff = when - now;
+    if (diff <= 0) {
+      card.remove();
+      return;
+    }
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const box = card.querySelector('[data-countdown]');
+    box.innerHTML = `
+      <div class="cd-box"><div class="cd-num">${days}</div><div class="cd-label">Days</div></div>
+      <div class="cd-box"><div class="cd-num">${String(hours).padStart(2, '0')}</div><div class="cd-label">Hours</div></div>
+      <div class="cd-box"><div class="cd-num">${String(minutes).padStart(2, '0')}</div><div class="cd-label">Minutes</div></div>`;
+  });
+  if (!document.querySelectorAll('#upcomingJourneyList .upcoming-card').length) {
+    document.getElementById('upcomingJourneySection').classList.remove('open');
+    clearInterval(upcomingCountdownTimer);
+  }
+}
+
+function wireUpcomingJourneyActions() {
+  document.querySelectorAll('[data-upcoming-view]').forEach(btn => {
+    btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.upcomingView));
+  });
+  document.querySelectorAll('[data-upcoming-download]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await showAcctConfirmation(btn.dataset.upcomingDownload);
+      window.print();
+    });
+  });
+  document.querySelectorAll('[data-upcoming-account]').forEach(btn => {
+    btn.addEventListener('click', () => openAccountCenter('bookings'));
+  });
+  document.querySelectorAll('[data-upcoming-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => cancelBookingById(btn.dataset.upcomingCancel, loadUpcomingJourney));
+  });
+}
+
+async function loadUpcomingJourney() {
+  const section = document.getElementById('upcomingJourneySection');
+  const list = document.getElementById('upcomingJourneyList');
+  const { access } = getStoredAuth();
+  if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
+  try {
+    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    allBookingsCache = data;
+    const now = new Date();
+    const candidates = data.filter(b => b.status !== 'cancelled' && b.status !== 'completed' && b.travel_date);
+    const resolved = await Promise.all(candidates.map(async b => {
+      const item = await fetchCatalogItem(b.booking_type, b.item_id);
+      let when = new Date(`${b.travel_date}T00:00:00`);
+      if (b.booking_type === 'flight' && item?.departure_time) {
+        const clock = new Date(item.departure_time);
+        when.setHours(clock.getHours(), clock.getMinutes(), clock.getSeconds(), 0);
+      }
+      return { booking: b, item, when };
+    }));
+    const upcoming = resolved.filter(r => r.when.getTime() > now.getTime()).sort((a, b) => a.when - b.when);
+    clearInterval(upcomingCountdownTimer);
+    if (!upcoming.length) {
+      list.innerHTML = '';
+      section.classList.remove('open');
+      return;
+    }
+    list.innerHTML = upcoming.map(upcomingCardHtml).join('');
+    wireUpcomingJourneyActions();
+    tickUpcomingCountdowns();
+    upcomingCountdownTimer = setInterval(tickUpcomingCountdowns, 1000);
+    section.classList.add('open');
+  } catch (err) {
+    section.classList.remove('open');
   }
 }
 
@@ -2924,6 +3096,8 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
     msg.className = 'acct-msg error';
   }
 });
+
+loadUpcomingJourney();
 </script>
 </body>
 </html>
