@@ -78,6 +78,15 @@ def issue_tokens(user: User) -> tuple[str, str]:
     return create_access_token(user.id), create_refresh_token(user.id)
 
 
+def logout(db: Session, user: User) -> None:
+    """Revokes the user's outstanding access/refresh tokens immediately, rather than
+    leaving them valid until natural expiry (JWTs are stateless, so this works by
+    moving force_logout_at forward — the same mechanism the admin "force logout"
+    action uses)."""
+    user.force_logout_at = datetime.datetime.utcnow()
+    db.commit()
+
+
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":

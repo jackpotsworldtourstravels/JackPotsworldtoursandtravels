@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.auth.rate_limit import limiter
+from app.config import settings
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -103,7 +105,8 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
     summary="Log in with email and password",
     description="Public endpoint. Verifies credentials, records a login activity entry, and returns a new access/refresh token pair.",
 )
-def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)):
     try:
         user = auth_service.authenticate(db, payload.email, payload.password)
     except HTTPException:
@@ -124,7 +127,8 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         "admin credentials will never succeed here."
     ),
 )
-def user_login(payload: UserLoginRequest, request: Request, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def user_login(request: Request, payload: UserLoginRequest, db: Session = Depends(get_db)):
     try:
         user = auth_service.authenticate(db, payload.identifier, payload.password, required_role="user")
     except HTTPException:
@@ -151,8 +155,9 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     response_model=MessageResponse,
     summary="Log out the current user",
     description=(
-        "Requires authentication. Records a logout activity entry. Tokens are stateless JWTs, so the "
-        "client is responsible for discarding them; no server-side session is invalidated."
+        "Requires authentication. Records a logout activity entry and immediately revokes the "
+        "current access/refresh token pair (and any others issued before this call), so a copied "
+        "token can't keep being used after logout."
     ),
 )
 def logout(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -163,7 +168,8 @@ def logout(request: Request, db: Session = Depends(get_db), current_user: User =
         browser=meta["browser"], device=meta["device"],
     )
     session_service.end_session(db, current_user.id)
-    return MessageResponse(message="Logged out — discard your tokens client-side")
+    auth_service.logout(db, current_user)
+    return MessageResponse(message="Logged out — your tokens have been revoked")
 
 
 @router.post(
@@ -173,17 +179,20 @@ def logout(request: Request, db: Session = Depends(get_db), current_user: User =
     description=(
         "Public endpoint. If the email matches an account, issues a reset token. Always returns a generic "
         "success message regardless of whether the account exists, to avoid leaking which emails are registered. "
-        "Email delivery is not yet wired up, so the reset link is returned directly in the response."
+        "Email delivery is not yet wired up: with settings.debug enabled, the reset link is returned directly in "
+        "the response for local testing; in production (debug off) the token is never exposed over the API — "
+        "wire up real email delivery before launching the reset flow publicly."
     ),
 )
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     raw_token = auth_service.start_password_reset(db, payload.email)
-    if raw_token is None:
-        return MessageResponse(message="If an account exists for that email, a reset link has been issued")
-    reset_link = f"/reset-password?token={raw_token}"
+    generic_message = MessageResponse(message="If an account exists for that email, a reset link has been issued")
+    if raw_token is None or not settings.debug:
+        return generic_message
     return MessageResponse(
-        message="Reset link generated (email delivery not yet configured)",
-        reset_link=reset_link,
+        message="Reset link generated (email delivery not yet configured — debug mode only)",
+        reset_link=f"/reset-password?token={raw_token}",
     )
 
 

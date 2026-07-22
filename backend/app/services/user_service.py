@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import HTTPException, status
@@ -12,6 +13,8 @@ from app.services import activity_service, notification_service
 
 DEFAULT_ADMIN_EMAIL = "admin@jackpotsworldtours.com"
 DEFAULT_ADMIN_PASSWORD = "AdminPass#2026"
+
+logger = logging.getLogger(__name__)
 
 
 def _get_role(db: Session, role_name: str) -> Role:
@@ -136,6 +139,12 @@ def ensure_default_admin(db: Session) -> None:
         return  # roles not seeded yet — migrations haven't run
 
     admin_password = os.environ.get("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+    if admin_password == DEFAULT_ADMIN_PASSWORD:
+        logger.warning(
+            "ensure_default_admin: seeding admin account with the hardcoded default "
+            "password because ADMIN_SEED_PASSWORD is not set. Set ADMIN_SEED_PASSWORD "
+            "in the environment before deploying anywhere reachable by the public."
+        )
     db.add(
         User(
             full_name="JackPots Admin",
