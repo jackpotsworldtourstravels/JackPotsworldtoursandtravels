@@ -87,6 +87,15 @@ class TopItemOut(BaseModel):
     revenue: float
 
 
+class TopDestinationOut(BaseModel):
+    """Real geographic destinations (grouped by hotel location) — no single catalog item backs
+    a destination, so unlike TopItemOut this has no item_type/item_id."""
+
+    name: str
+    bookings: int
+    revenue: float
+
+
 class MostActiveUserOut(BaseModel):
     user_id: int
     full_name: str
@@ -109,7 +118,9 @@ class ReportsOut(BaseModel):
     total_packages: int
     pending_bookings: int
     confirmed_bookings: int
+    completed_bookings: int = 0
     cancelled_bookings: int
+    payments_by_status: dict[str, int] = {}
     recent_users: list[RecentUserOut]
     recent_bookings: list[RecentBookingOut]
     recent_payments: list[RecentPaymentOut]
@@ -120,8 +131,10 @@ class ReportsOut(BaseModel):
     today_payments: int = 0
     users_online: int = 0
     active_sessions: int = 0
-    top_destinations: list[TopItemOut] = []
+    top_destinations: list[TopDestinationOut] = []
+    top_flights: list[TopItemOut] = []
     top_hotels: list[TopItemOut] = []
     top_cruises: list[TopItemOut] = []
     top_packages: list[TopItemOut] = []
     most_active_users: list[MostActiveUserOut] = []
+    open_support_tickets: int = 0

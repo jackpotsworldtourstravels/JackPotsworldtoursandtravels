@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.booking import Booking, Payment
-from app.models.misc import ActivityLog, ContactUs, Newsletter
+from app.models.misc import ActivityLog, ContactUs, Newsletter, SupportTicket
 from app.models.travel import Cruise, Flight, Hotel, TourPackage
 from app.models.user import User
 from app.services import booking_service, session_service
@@ -133,6 +133,24 @@ def _top_items(db: Session, booking_type: str, limit: int = 5) -> list[dict]:
     return results
 
 
+def _top_destinations_by_location(db: Session, limit: int = 5) -> list[dict]:
+    """Real geographic destinations (hotel bookings grouped by hotel location) — distinct from
+    _top_items('flight'), which ranks flight routes, not destinations."""
+    rows = db.execute(
+        select(
+            Hotel.location,
+            func.count().label("bookings"),
+            func.coalesce(func.sum(Booking.total_price), 0).label("revenue"),
+        )
+        .join(Hotel, Booking.item_id == Hotel.id)
+        .where(Booking.booking_type == "hotel", Booking.status != "cancelled")
+        .group_by(Hotel.location)
+        .order_by(func.count().desc())
+        .limit(limit)
+    ).all()
+    return [{"name": location, "bookings": bookings, "revenue": float(revenue)} for location, bookings, revenue in rows]
+
+
 def _most_active_users(db: Session, limit: int = 5) -> list[dict]:
     rows = db.execute(
         select(
@@ -171,6 +189,9 @@ def build_reports(db: Session) -> dict:
     )
     rows = db.execute(select(Booking.booking_type, func.count()).group_by(Booking.booking_type)).all()
     bookings_by_type = {row[0]: row[1] for row in rows}
+    payments_by_status = {
+        row[0]: row[1] for row in db.execute(select(Payment.status, func.count()).group_by(Payment.status)).all()
+    }
     newsletter_subscribers = db.scalar(select(func.count()).select_from(Newsletter)) or 0
     contact_messages = db.scalar(select(func.count()).select_from(ContactUs)) or 0
 
@@ -217,7 +238,9 @@ def build_reports(db: Session) -> dict:
         "total_packages": db.scalar(select(func.count()).select_from(TourPackage)) or 0,
         "pending_bookings": _count_status(db, "pending"),
         "confirmed_bookings": _count_status(db, "confirmed"),
+        "completed_bookings": _count_status(db, "completed"),
         "cancelled_bookings": _count_status(db, "cancelled"),
+        "payments_by_status": payments_by_status,
         "recent_users": recent_users,
         "recent_bookings": recent_bookings,
         "recent_payments": recent_payments,
@@ -228,11 +251,15 @@ def build_reports(db: Session) -> dict:
         "today_payments": today_payments,
         "users_online": session_service.count_online_users(db),
         "active_sessions": session_service.count_active_sessions(db),
-        "top_destinations": _top_items(db, "flight"),
+        "top_destinations": _top_destinations_by_location(db),
+        "top_flights": _top_items(db, "flight"),
         "top_hotels": _top_items(db, "hotel"),
         "top_cruises": _top_items(db, "cruise"),
         "top_packages": _top_items(db, "package"),
         "most_active_users": _most_active_users(db),
+        "open_support_tickets": db.scalar(
+            select(func.count()).select_from(SupportTicket).where(SupportTicket.status.in_(["open", "in_progress"]))
+        ) or 0,
     }
 
 
