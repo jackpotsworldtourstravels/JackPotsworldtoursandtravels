@@ -12,6 +12,7 @@ from app.database.session import SessionLocal, engine
 from app.models.user import User
 from app.routers import (
     admin,
+    admin_partner_requests,
     auth,
     booking_management,
     bookings,
@@ -19,6 +20,14 @@ from app.routers import (
     customers,
     misc,
     notifications,
+    partner_auth,
+    partner_bookings,
+    partner_dashboard,
+    partner_profile,
+    partner_reference,
+    partner_reports,
+    partner_service_requests,
+    partner_ticket_enquiry,
     payment_management,
     pricing,
     reviews,
@@ -74,6 +83,15 @@ app.include_router(booking_management.router)
 app.include_router(payment_management.router)
 app.include_router(pricing.router)
 app.include_router(pricing.admin_router)
+app.include_router(partner_auth.router)
+app.include_router(partner_reference.router)
+app.include_router(partner_dashboard.router)
+app.include_router(partner_ticket_enquiry.router)
+app.include_router(partner_bookings.router)
+app.include_router(partner_service_requests.router)
+app.include_router(partner_reports.router)
+app.include_router(partner_profile.router)
+app.include_router(admin_partner_requests.router)
 
 
 @app.on_event("startup")

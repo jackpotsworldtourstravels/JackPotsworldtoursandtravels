@@ -544,6 +544,10 @@ tbody tr:hover{background:var(--hover-bg);}
       <svg class="icon" viewBox="0 0 24 24"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
       <span class="nav-label">Refunds</span>
     </a>
+    <a href="#" class="nav-item" data-section="partner-requests">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="nav-label">Partner Requests</span>
+    </a>
     <a href="#" class="nav-item" data-section="reviews">
       <svg class="icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>
       <span class="nav-label">Complaint Management</span>
@@ -1066,6 +1070,19 @@ tbody tr:hover{background:var(--hover-bg);}
       </div>
     </section>
 
+    <section class="section" id="section-partner-requests">
+      <div class="panel" style="padding:0;">
+        <div class="profile-tabs" id="prTabs" style="position:static; padding:16px 20px 0;">
+          <div class="profile-tab active" data-pr-tab="bookings">Booking Approvals</div>
+          <div class="profile-tab" data-pr-tab="service-requests">Service Requests</div>
+        </div>
+        <div style="padding:20px;">
+          <div class="filter-bar" id="prFilterBar"></div>
+          <div class="table-wrap"><table id="prTable"><thead><tr id="prTableHead"></tr></thead><tbody id="prTableBody"></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="section-contact">
       <div class="panel">
         <div class="panel-head">
@@ -1303,6 +1320,14 @@ tbody tr:hover{background:var(--hover-bg);}
   </div>
 </div>
 
+<div class="modal-overlay" id="prBookingModalOverlay">
+  <div class="modal-card modal-lg" id="prBookingModalBody"></div>
+</div>
+
+<div class="modal-overlay" id="prServiceRequestModalOverlay">
+  <div class="modal-card" id="prServiceRequestModalBody"></div>
+</div>
+
 <div class="modal-overlay" id="customerMsgModalOverlay">
   <div class="modal-card">
     <h2 id="customerMsgModalTitle">Send Notification</h2>
@@ -1375,7 +1400,7 @@ document.getElementById('logoutBtn').addEventListener('click', async e => {
 /* ---------- Section navigation ---------- */
 const sectionTitles = {
   reports: 'Dashboard', users: 'Users', 'active-users': 'Active Users', customers: 'Customers', flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
-  packages: 'Tour Packages', bookings: 'All Transactions', 'booking-management': 'Booking Management Center', payments: 'Payment Management', 'payment-management': 'Payment Management Center', refunds: 'Refunds', contact: 'Support Management', newsletter: 'Newsletter',
+  packages: 'Tour Packages', bookings: 'All Transactions', 'booking-management': 'Booking Management Center', payments: 'Payment Management', 'payment-management': 'Payment Management Center', refunds: 'Refunds', 'partner-requests': 'Partner Requests', contact: 'Support Management', newsletter: 'Newsletter',
   'user-analytics': 'User Analytics', 'reports-export': 'Reports',
   reviews: 'Complaint Management', wishlist: 'Wishlist', notifications: 'Communication', activity: 'User Activity Monitor', inventory: 'Inventory', pricing: 'Coupons & Discounts',
   profile: 'Profile',
@@ -1423,6 +1448,7 @@ function loadSection(name) {
   if (name === 'booking-management') return loadBookingManagement();
   if (name === 'payment-management') return loadPaymentManagement();
   if (name === 'refunds') return loadRefunds();
+  if (name === 'partner-requests') return initPartnerRequests();
   if (name === 'profile') return loadAdminProfile();
   if (['flights', 'hotels', 'cruises', 'packages'].includes(name)) return renderContentSection(name);
 }
@@ -2652,6 +2678,278 @@ document.getElementById('rfSearch').addEventListener('input', () => {
   clearTimeout(rfSearchTimer);
   rfSearchTimer = setTimeout(() => loadRefunds(1), 350);
 });
+
+/* ---------- Partner Requests (Back Office approval queue) ----------
+   Closes the gap flagged throughout the Partner Portal build: the database
+   and API (sp_approve_request/sp_reject_request from Phase 2, plus the new
+   sp_admin_list_partner_bookings/sp_resolve_service_request) already
+   supported this — there was just no screen to drive them. */
+let prActiveTab = 'bookings';
+let prTabsWired = false;
+let prSearchTimer;
+let prSrListCache = [];
+
+function prStatusBadgeClass(s) {
+  if (s === 'approved' || s === 'completed') return 'confirmed';
+  if (s === 'rejected' || s === 'cancelled') return 'cancelled';
+  return 'pending'; // pending_approval, submitted, in_review, draft
+}
+
+function initPartnerRequests() {
+  if (!prTabsWired) {
+    prTabsWired = true;
+    document.querySelectorAll('#prTabs .profile-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('#prTabs .profile-tab').forEach(t => t.classList.toggle('active', t === tab));
+        prActiveTab = tab.dataset.prTab;
+        renderPrFilterBar();
+        loadPartnerRequestsTab();
+      });
+    });
+  }
+  renderPrFilterBar();
+  loadPartnerRequestsTab();
+}
+
+function renderPrFilterBar() {
+  const bar = document.getElementById('prFilterBar');
+  if (prActiveTab === 'bookings') {
+    bar.innerHTML = `
+      <select id="prStatusFilter" class="status-select">
+        <option value="pending_approval">Pending Approval</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <input type="text" id="prSearch" placeholder="Search reference or company…">
+    `;
+    document.getElementById('prStatusFilter').addEventListener('change', () => loadPartnerRequestsTab());
+    document.getElementById('prSearch').addEventListener('input', () => {
+      clearTimeout(prSearchTimer);
+      prSearchTimer = setTimeout(() => loadPartnerRequestsTab(), 350);
+    });
+  } else {
+    bar.innerHTML = `
+      <select id="prSrStatusFilter" class="status-select">
+        <option value="submitted">Submitted</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="completed">Completed</option>
+      </select>
+      <select id="prSrTypeFilter" class="status-select">
+        <option value="">All types</option>
+        <option value="cancellation">Cancellation</option>
+        <option value="date_change">Date Change</option>
+        <option value="refund">Refund</option>
+        <option value="passenger_modification">Passenger Modification</option>
+      </select>
+    `;
+    document.getElementById('prSrStatusFilter').addEventListener('change', () => loadPartnerRequestsTab());
+    document.getElementById('prSrTypeFilter').addEventListener('change', () => loadPartnerRequestsTab());
+  }
+}
+
+function loadPartnerRequestsTab() {
+  return prActiveTab === 'bookings' ? loadPrBookings() : loadPrServiceRequests();
+}
+
+async function loadPrBookings() {
+  const thead = document.getElementById('prTableHead');
+  const tbody = document.getElementById('prTableBody');
+  thead.innerHTML = `<th>Reference</th><th>Company</th><th>Requester</th><th>Travel</th><th>Route</th><th>Travel Date</th><th>Passengers</th><th>Amount</th><th>Status</th><th>Actions</th>`;
+  tbody.innerHTML = `<tr><td colspan="10">${rowsSkeleton(4)}</td></tr>`;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/partner-requests/bookings`, {
+      headers: authHeaders(),
+      params: {
+        status: document.getElementById('prStatusFilter').value,
+        search: document.getElementById('prSearch').value || undefined,
+      },
+    });
+    tbody.innerHTML = data.length ? data.map(b => `
+      <tr>
+        <td>${escapeHtml(b.reference_number)}</td>
+        <td>${escapeHtml(b.company_name)}</td>
+        <td>${escapeHtml(b.requester_name)}</td>
+        <td style="text-transform:capitalize">${escapeHtml(b.travel_type)}</td>
+        <td>${escapeHtml(b.departure)} → ${escapeHtml(b.arrival)}</td>
+        <td>${fmtDate(b.departure_date)}</td>
+        <td>${b.passenger_count}</td>
+        <td>${b.total_amount != null ? money(b.total_amount) : '—'}</td>
+        <td><span class="badge ${prStatusBadgeClass(b.status)}">${b.status.replace(/_/g, ' ')}</span></td>
+        <td><button class="btn btn-ghost btn-sm" data-pr-view-booking="${b.booking_id}">Review</button></td>
+      </tr>
+    `).join('') : `<tr><td colspan="10" class="empty-state">No bookings match this filter.</td></tr>`;
+    tbody.querySelectorAll('[data-pr-view-booking]').forEach(btn => {
+      btn.addEventListener('click', () => openPrBookingModal(btn.dataset.prViewBooking));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-state">Failed to load partner bookings.</td></tr>`;
+  }
+}
+
+async function openPrBookingModal(bookingId) {
+  const overlay = document.getElementById('prBookingModalOverlay');
+  const body = document.getElementById('prBookingModalBody');
+  overlay.classList.add('open');
+  body.innerHTML = `<div class="empty-state">Loading…</div>`;
+  try {
+    const { data: b } = await axios.get(`${API_BASE}/api/admin/partner-requests/bookings/${bookingId}`, { headers: authHeaders() });
+    const canAct = b.status === 'pending_approval';
+    body.innerHTML = `
+      <h2>Booking ${escapeHtml(b.reference_number)}</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:18px;">${escapeHtml(b.company_name)} · ${escapeHtml(b.requester_name)} (${escapeHtml(b.requester_email)})</p>
+      <div class="info-grid">
+        <div class="info-item"><label>Status</label><div><span class="badge ${prStatusBadgeClass(b.status)}">${b.status.replace(/_/g, ' ')}</span></div></div>
+        <div class="info-item"><label>Travel Type</label><div style="text-transform:capitalize;">${escapeHtml(b.travel_type)}</div></div>
+        <div class="info-item"><label>Departure</label><div>${escapeHtml(b.departure)}</div></div>
+        <div class="info-item"><label>Arrival</label><div>${escapeHtml(b.arrival)}</div></div>
+        <div class="info-item"><label>Travel Date</label><div>${fmtDate(b.departure_date)}</div></div>
+        <div class="info-item"><label>Return Date</label><div>${b.return_date ? fmtDate(b.return_date) : '—'}</div></div>
+        ${b.airline_name ? `<div class="info-item"><label>Airline</label><div>${escapeHtml(b.airline_name)}${b.flight_number ? ' · ' + escapeHtml(b.flight_number) : ''}</div></div>` : ''}
+        ${b.cabin_class ? `<div class="info-item"><label>Cabin</label><div style="text-transform:capitalize;">${escapeHtml(b.cabin_class.replace(/_/g, ' '))}</div></div>` : ''}
+        <div class="info-item"><label>Total Amount</label><div>${b.total_amount != null ? money(b.total_amount) : '—'}</div></div>
+      </div>
+      ${b.rejection_reason ? `<div class="msg error" style="margin-bottom:14px;">Rejected: ${escapeHtml(b.rejection_reason)}</div>` : ''}
+      <h2 style="font-size:14px;margin-bottom:10px;">Passengers</h2>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Passport #</th><th>DOB</th></tr></thead><tbody>
+        ${b.passengers.map(p => `<tr><td>${escapeHtml(p.full_name)}</td><td style="text-transform:capitalize">${escapeHtml(p.passenger_type)}</td><td>${escapeHtml(p.passport_number)}</td><td>${fmtDate(p.date_of_birth)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty-state">No passengers.</td></tr>'}
+      </tbody></table></div>
+      ${canAct ? `
+      <div class="form-grid" style="margin-top:20px;">
+        <div class="form-field"><label>Approved Amount (₹, optional)</label><input type="number" id="prApproveAmount" min="1" step="0.01"></div>
+      </div>
+      <div class="modal-actions" style="margin-top:8px;">
+        <button type="button" class="btn btn-coral" id="prApproveBtn">Approve</button>
+        <button type="button" class="btn btn-danger" id="prRejectBtn">Reject</button>
+        <button type="button" class="btn btn-ghost" id="prBookingCloseBtn">Close</button>
+      </div>
+      <div class="form-field" id="prRejectReasonField" style="display:none;max-width:none;margin-top:12px;">
+        <label>Rejection Reason</label>
+        <textarea id="prRejectReason" rows="2" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-color);font-family:var(--ff);font-size:14px;"></textarea>
+        <button type="button" class="btn btn-danger btn-sm" id="prConfirmRejectBtn" style="margin-top:10px;">Confirm Reject</button>
+      </div>
+      <div class="msg" id="prBookingMsg"></div>
+      ` : `<div class="modal-actions" style="margin-top:20px;"><button type="button" class="btn btn-ghost" id="prBookingCloseBtn">Close</button></div>`}
+    `;
+    document.getElementById('prBookingCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
+    if (canAct) {
+      document.getElementById('prApproveBtn').addEventListener('click', async () => {
+        const msg = document.getElementById('prBookingMsg');
+        const amountInput = document.getElementById('prApproveAmount').value;
+        try {
+          await axios.post(`${API_BASE}/api/admin/partner-requests/bookings/${bookingId}/approve`, {
+            total_amount: amountInput ? Number(amountInput) : null,
+          }, { headers: authHeaders() });
+          overlay.classList.remove('open');
+          loadPrBookings();
+        } catch (err) {
+          msg.textContent = err.response?.data?.detail || 'Failed to approve.';
+          msg.className = 'msg error';
+        }
+      });
+      document.getElementById('prRejectBtn').addEventListener('click', () => {
+        document.getElementById('prRejectReasonField').style.display = 'block';
+      });
+      document.getElementById('prConfirmRejectBtn').addEventListener('click', async () => {
+        const reason = document.getElementById('prRejectReason').value.trim();
+        const msg = document.getElementById('prBookingMsg');
+        if (!reason) { msg.textContent = 'Enter a rejection reason.'; msg.className = 'msg error'; return; }
+        try {
+          await axios.post(`${API_BASE}/api/admin/partner-requests/bookings/${bookingId}/reject`, { reason }, { headers: authHeaders() });
+          overlay.classList.remove('open');
+          loadPrBookings();
+        } catch (err) {
+          msg.textContent = err.response?.data?.detail || 'Failed to reject.';
+          msg.className = 'msg error';
+        }
+      });
+    }
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state">Failed to load booking.</div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="prBookingCloseBtn">Close</button></div>`;
+    document.getElementById('prBookingCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  }
+}
+
+async function loadPrServiceRequests() {
+  const thead = document.getElementById('prTableHead');
+  const tbody = document.getElementById('prTableBody');
+  thead.innerHTML = `<th>SR Number</th><th>Type</th><th>Reference</th><th>Company</th><th>Requested By</th><th>Reason</th><th>Status</th><th>Created</th><th>Actions</th>`;
+  tbody.innerHTML = `<tr><td colspan="9">${rowsSkeleton(4)}</td></tr>`;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/partner-requests/service-requests`, {
+      headers: authHeaders(),
+      params: {
+        status: document.getElementById('prSrStatusFilter').value,
+        request_type: document.getElementById('prSrTypeFilter').value || undefined,
+      },
+    });
+    prSrListCache = data;
+    tbody.innerHTML = data.length ? data.map(sr => `
+      <tr>
+        <td>${escapeHtml(sr.service_request_number)}</td>
+        <td style="text-transform:capitalize">${escapeHtml(sr.request_type.replace(/_/g, ' '))}</td>
+        <td>${escapeHtml(sr.reference_number)}</td>
+        <td>${escapeHtml(sr.company_name)}</td>
+        <td>${escapeHtml(sr.requested_by)}</td>
+        <td style="max-width:220px;">${escapeHtml(sr.reason || '—')}</td>
+        <td><span class="badge ${prStatusBadgeClass(sr.status)}">${sr.status}</span></td>
+        <td>${fmtDate(sr.created_at)}</td>
+        <td>${['submitted', 'in_review'].includes(sr.status) ? `<button class="btn btn-ghost btn-sm" data-pr-resolve-sr="${sr.service_request_id}">Resolve</button>` : '—'}</td>
+      </tr>
+    `).join('') : `<tr><td colspan="9" class="empty-state">No service requests match this filter.</td></tr>`;
+    tbody.querySelectorAll('[data-pr-resolve-sr]').forEach(btn => {
+      btn.addEventListener('click', () => openPrServiceRequestModal(btn.dataset.prResolveSr));
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load service requests.</td></tr>`;
+  }
+}
+
+function openPrServiceRequestModal(srId) {
+  const sr = prSrListCache.find(x => String(x.service_request_id) === String(srId));
+  if (!sr) return;
+  const overlay = document.getElementById('prServiceRequestModalOverlay');
+  const body = document.getElementById('prServiceRequestModalBody');
+  overlay.classList.add('open');
+  body.innerHTML = `
+    <h2>${escapeHtml(sr.service_request_number)}</h2>
+    <div class="info-grid">
+      <div class="info-item"><label>Type</label><div style="text-transform:capitalize;">${escapeHtml(sr.request_type.replace(/_/g, ' '))}</div></div>
+      <div class="info-item"><label>Booking</label><div>${escapeHtml(sr.reference_number)}</div></div>
+      <div class="info-item"><label>Company</label><div>${escapeHtml(sr.company_name)}</div></div>
+      <div class="info-item"><label>Requested By</label><div>${escapeHtml(sr.requested_by)}</div></div>
+    </div>
+    <div class="form-field" style="max-width:none;"><label>Reason</label><div style="font-size:13.5px;color:var(--text-primary);">${escapeHtml(sr.reason || '—')}</div></div>
+    <div class="form-field" style="max-width:none;margin-top:14px;">
+      <label>Resolution</label>
+      <select id="prResolveStatus" class="status-select" style="width:100%;">
+        <option value="approved">Approve</option>
+        <option value="rejected">Reject</option>
+        <option value="completed">Mark Completed</option>
+      </select>
+    </div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button type="button" class="btn btn-coral" id="prConfirmResolveBtn">Confirm</button>
+      <button type="button" class="btn btn-ghost" id="prSrCloseBtn">Cancel</button>
+    </div>
+    <div class="msg" id="prSrMsg"></div>
+  `;
+  document.getElementById('prSrCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  document.getElementById('prConfirmResolveBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('prSrMsg');
+    const resolveStatus = document.getElementById('prResolveStatus').value;
+    try {
+      await axios.post(`${API_BASE}/api/admin/partner-requests/service-requests/${srId}/resolve`, { status: resolveStatus }, { headers: authHeaders() });
+      overlay.classList.remove('open');
+      loadPrServiceRequests();
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to resolve.';
+      msg.className = 'msg error';
+    }
+  });
+}
 
 /* ---------- Coupons & Discounts (Seasonal Pricing / Campaigns / Coupons) ---------- */
 let pricingTabsWired = false;

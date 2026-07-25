@@ -17,7 +17,7 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     payload = decode_token(credentials.credentials)
-    if not payload or payload.get("type") != "access":
+    if not payload or payload.get("type") != "access" or payload.get("scope") == "partner":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     user = db.get(User, int(payload["sub"]))
     if not user or not user.is_active:

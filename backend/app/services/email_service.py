@@ -59,3 +59,26 @@ def send_password_reset_email(to_email: str, reset_link: str, expire_minutes: in
     </div>
     """
     return _send(to_email, subject, text_body, html_body)
+
+
+def send_otp_email(to_email: str, otp_code: str, expire_minutes: int) -> bool:
+    subject = "Your JackPots Partner Portal verification code"
+    text_body = (
+        f"Your verification code is: {otp_code}\n\n"
+        f"This code expires in {expire_minutes} minutes. "
+        f"If you didn't request this, you can safely ignore this email."
+    )
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif; max-width:480px; margin:0 auto; color:#0A2540;">
+      <h2 style="color:#0A2540;">Your verification code</h2>
+      <p>Use this code to continue signing in to the JackPots Partner Portal.</p>
+      <p style="margin:28px 0; font-size:32px; font-weight:800; letter-spacing:.15em; color:#0A2540;">
+        {otp_code}
+      </p>
+      <p style="font-size:13px; color:#666;">
+        This code expires in {expire_minutes} minutes.
+        If you didn't request this, you can safely ignore this email.
+      </p>
+    </div>
+    """
+    return _send(to_email, subject, text_body, html_body)

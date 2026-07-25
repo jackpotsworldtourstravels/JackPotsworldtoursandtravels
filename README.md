@@ -1,131 +1,126 @@
 # JackPots World Tours & Travels
 
-A full-stack tours & travel booking platform: static HTML/CSS/JS frontends (public site, admin
-console) backed by a FastAPI + PostgreSQL REST API.
+A full-stack tours & travel booking platform.
 
-Visitors can search and book flights, hotels, cruises, and tour packages; maintain a wishlist;
-leave reviews; and track bookings/payments/notifications from an in-page Account Center. Admins
-get a separate console (`admin.html`) for managing catalog content, users, bookings, payments,
-pricing/coupons, support tickets, and revenue reports.
+- **Frontend** — plain HTML/CSS/JS (no build step, no npm), talking to the API via Axios
+- **Backend** — FastAPI + SQLAlchemy 2.0 + PostgreSQL, JWT auth, Alembic migrations
 
-The frontend has **no build step** — plain HTML files with inline CSS/JS, talking to the API via
-Axios. The backend is FastAPI + SQLAlchemy 2.0 + PostgreSQL, with Alembic-managed migrations and
-JWT authentication.
+Visitors can search and book flights, hotels, cruises, and tour packages; keep a wishlist; leave
+reviews; and manage bookings/payments from an Account Center. Admins get a separate console
+(`admin.html`) for catalog, users, bookings, payments, pricing/coupons, support tickets, and
+reports. Registered B2B partner companies (gaming companies, corporate travel desks, agencies) get
+their own portal (`partner-portal.html`) to raise and track ticket requests and service requests
+against their own bookings only.
 
 ## Contents
 
-- [Quick Start](#quick-start)
+- [How to Run](#how-to-run)
 - [Project Structure](#project-structure)
-- [Detailed Setup](#detailed-setup)
 - [Environment Variables](#environment-variables)
 - [Database Migrations](#database-migrations)
 - [Default Admin Login](#default-admin-login)
 - [API Reference](#api-reference)
 - [Features](#features)
 - [Deployment](#deployment)
-- [Future Enhancements](#future-enhancements)
 
-## Quick Start
+## How to Run
 
-You need **two terminals** running at the same time: one for the backend API, one for the static
-frontend.
+**Prerequisites:** Python 3.11+, PostgreSQL 14+ (local, or a hosted instance like Neon/Railway), a
+modern browser.
+
+You need **two terminals** running at the same time — one for the API, one for the static site.
+
+### Terminal 1 — Backend API
 
 ```bash
-# 1. Clone and enter the project
-git clone <repository-url>
-cd "TOURS AND TRAVEL"
-
-# 2. Set up the backend
 cd backend
+
+# 1. Create and activate a virtual environment
 python -m venv venv
-venv\Scripts\activate            # Windows — use `source venv/bin/activate` on macOS/Linux
+venv\Scripts\activate            # Windows
+# source venv/bin/activate       # macOS/Linux
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Configure environment
-copy .env.example .env           # Windows — use `cp .env.example .env` on macOS/Linux
-#    -> edit backend/.env: set DATABASE_URL and JWT_SECRET_KEY at minimum (see below)
+copy .env.example .env           # Windows — `cp .env.example .env` on macOS/Linux
+# Edit backend/.env — set DATABASE_URL and JWT_SECRET_KEY at minimum (see Environment Variables)
 
-# 4. Create the database (adjust credentials/name to match your DATABASE_URL)
+# 4. Create the database (name must match DATABASE_URL)
 createdb -U postgres jackpotsworldtours
 
-# 5. Run migrations (creates tables + seeds sample data + one admin account)
+# 5. Run migrations — creates all tables and seeds sample data + one admin account
 python -m alembic upgrade head
 
-# 6. Start the backend  (Terminal 1 — stays in backend/)
+# 6. Start the API
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
+Leave this running. The API is now live at http://127.0.0.1:8000 (interactive docs at
+[/docs](http://127.0.0.1:8000/docs)).
+
+### Terminal 2 — Frontend
+
 ```bash
-# 7. Start the frontend (Terminal 2 — from the project root, NOT backend/)
-cd "TOURS AND TRAVEL"
+# From the project root (NOT backend/)
 python -m http.server 5500
 ```
 
-Then open **http://127.0.0.1:5500/index.html** in your browser. Sign up, log in, search, and
-book — or log in with the [seeded admin account](#default-admin-login) and open
-`admin.html` to manage the platform.
+Open **http://127.0.0.1:5500/index.html** in your browser. Sign up, log in, search, and book — or
+log in with the [seeded admin account](#default-admin-login) and open `admin.html` to manage the
+platform.
 
-> The frontend must be served over HTTP (step 7), never opened as a `file://` path, or the
-> browser will block API calls. The backend's default `CORS_ORIGINS` already allows
-> `http://127.0.0.1:5500` / `http://localhost:5500`.
+> ⚠️ The frontend must be served over HTTP (`python -m http.server`), never opened directly as a
+> `file://` path, or the browser will block API calls. The backend's default `CORS_ORIGINS`
+> already allows `http://127.0.0.1:5500` / `http://localhost:5500`.
 
-## Project Structure
+<details>
+<summary>Windows: <code>createdb</code> not found?</summary>
 
-```
-TOURS AND TRAVEL/
-├── index.html              Public site + logged-in Account Center (search, booking, wishlist,
-│                            reviews, notifications, profile) — the main customer-facing app
-├── admin.html               Admin console — CRUD, reports, pricing/coupons, support tickets
-├── login.html / register.html / forgot-password.html / reset-password.html
-│                            Standalone auth pages (reset-password.html is the live link sent
-│                            in password-reset emails)
-├── assets/                  Logo, favicon, hero videos
-├── deploy/                  AWS EC2 deployment scripts + guide (see Deployment section)
-└── backend/
-    ├── requirements.txt
-    ├── .env.example
-    ├── alembic/versions/    Migration history (see Database Migrations)
-    └── app/
-        ├── main.py          FastAPI app instance, CORS, router registration, startup checks
-        ├── config.py        Environment configuration (pydantic-settings)
-        ├── auth/            Password hashing, JWT encode/decode, rate limiting
-        ├── database/        SQLAlchemy engine/session setup
-        ├── models/          SQLAlchemy ORM models
-        ├── schemas/         Pydantic request/response schemas
-        ├── routers/         FastAPI routers, one per resource group
-        └── services/        Business logic called by routers
-```
-
-## Detailed Setup
-
-**Prerequisites**
-- Python 3.11+
-- PostgreSQL 14+ (local install, or a hosted instance such as Neon or Railway)
-- A modern browser
-
-**Install backend dependencies**
-
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
-pip install -r requirements.txt
-```
-
-**Create the database**
-
-On Windows, `createdb`/`psql` live inside the PostgreSQL install folder and usually aren't on
-`PATH`, so use the full path (adjust the version number):
+`createdb`/`psql` live inside the PostgreSQL install folder and usually aren't on `PATH`. Use the
+full path (adjust the version number to match your install):
 
 ```powershell
 & "C:\Program Files\PostgreSQL\17\bin\createdb.exe" -U postgres jackpotsworldtours
 ```
 
-On macOS/Linux, `createdb` is normally already on `PATH`:
+</details>
 
-```bash
-createdb -U postgres jackpotsworldtours
+## Project Structure
+
+```
+TOURS AND TRAVEL/
+├── index.html              Public site + logged-in Account Center — the main customer-facing app
+├── admin.html               Admin console — CRUD, reports, pricing/coupons, support tickets
+├── partner-portal.html      B2B Partner Portal shell — auth flow + sidebar/section markup
+├── login.html / register.html / forgot-password.html / reset-password.html
+│                            Standalone auth pages
+├── assets/
+│   ├── (logo, favicon, hero videos)
+│   ├── css/partner-portal.css
+│   └── js/partner-*.js      One file per Partner Portal concern (auth, dashboard, ticket
+│                            enquiry, request ticket, request history, service request,
+│                            reports, profile) — no build step, plain <script> tags
+├── deploy/                  AWS EC2 deployment scripts + guide (see Deployment)
+└── backend/
+    ├── requirements.txt
+    ├── .env.example
+    ├── alembic/versions/    Migration history (see Database Migrations)
+    ├── db/partner_portal/   Reviewed, applied-as-migrations SQL: schema, stored procedures,
+    │                        triggers, views, seed data (see Partner Portal Database below)
+    └── app/
+        ├── main.py          FastAPI app instance, CORS, router registration, startup checks
+        ├── config.py        Environment configuration (pydantic-settings)
+        ├── auth/            Password hashing, JWT encode/decode, rate limiting
+        │                    (partner_deps.py: separate JWT scope for Partner Portal sessions)
+        ├── database/        SQLAlchemy engine/session setup
+        ├── models/          SQLAlchemy ORM models (partner*.py, reference.py for the Partner Portal)
+        ├── schemas/         Pydantic request/response schemas (partner_*.py)
+        ├── routers/         FastAPI routers, one per resource group (partner_*.py)
+        └── services/        Business logic called by routers — Partner Portal services are
+                             thin wrappers that call PostgreSQL stored procedures rather than
+                             implementing logic in Python (see Partner Portal Database below)
 ```
 
 ## Environment Variables
@@ -134,15 +129,15 @@ Copy `backend/.env.example` to `backend/.env` and fill in your own values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string, e.g. `postgresql+psycopg2://postgres:PASSWORD@127.0.0.1:5432/jackpotsworldtours`. URL-encode special characters in the password (`@` → `%40`). |
-| `JWT_SECRET_KEY` | Yes | Long random secret used to sign JWTs. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"`. Never reuse the example value. |
-| `JWT_ALGORITHM` | No (default `HS256`) | JWT signing algorithm. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No (default `30`) | Access token lifetime. |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | No (default `7`) | Refresh token lifetime. |
-| `RESET_TOKEN_EXPIRE_MINUTES` | No (default `60`) | Password-reset token lifetime. |
-| `CORS_ORIGINS` | No (has a dev default) | Comma-separated list of frontend origins allowed to call the API. Must include whatever origin you serve the frontend from. |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string, e.g. `postgresql+psycopg2://postgres:PASSWORD@127.0.0.1:5432/jackpotsworldtours`. URL-encode special characters in the password (`@` → `%40`). |
+| `JWT_SECRET_KEY` | **Yes** | Long random secret used to sign JWTs. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. Never reuse the example value. |
+| `JWT_ALGORITHM` | No — default `HS256` | JWT signing algorithm. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No — default `30` | Access token lifetime. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No — default `7` | Refresh token lifetime. |
+| `RESET_TOKEN_EXPIRE_MINUTES` | No — default `60` | Password-reset token lifetime. |
+| `CORS_ORIGINS` | No — has a dev default | Comma-separated frontend origins allowed to call the API. Must include whatever origin you serve the frontend from. |
 | `FRONTEND_BASE_URL` | No | Base URL used to build the absolute link inside password-reset emails, e.g. `https://yourdomain.com`. |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_USE_TLS` / `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | No | SMTP settings for sending real password-reset emails. Leave `SMTP_HOST` unset to skip sending (a warning is logged instead) — fine for local dev. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_USE_TLS` / `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | No | SMTP settings for real password-reset emails. Leave `SMTP_HOST` unset to skip sending (a warning is logged instead) — fine for local dev. |
 | `ADMIN_SEED_EMAIL` | No | Email for the admin account created by the seed migration. Defaults to `admin@jackpotsworldtours.com`. |
 | `ADMIN_SEED_PASSWORD` | No | Password for the seeded admin account. If unset, a random password is generated and printed once to the migration's console output — capture it there. |
 
@@ -183,19 +178,70 @@ python -m alembic upgrade head
 | `0012_inventory_management` | Inventory tracking tables |
 | `0013_booking_management` | Admin booking-management fields |
 | `0014_pricing_coupons` | Pricing rules and coupon tables |
+| `0015_partner_portal` | Partner Portal: 19 tables, 3 views, 9 triggers, 19 stored procedures — applies `backend/db/partner_portal/*.sql` |
+| `0016_partner_portal_gap_completion` | Partner Portal follow-up: status-history tables, 4 more stored procedures, 2 more views, sample partner seed data — applies `backend/db/partner_portal/gap_completion/*.sql` |
+| `0017_partner_portal_back_office` | Partner Portal Back Office: 2 stored procedures backing the new admin.html Partner Requests screen — applies `backend/db/partner_portal/back_office/*.sql` |
 
 </details>
+
+### Partner Portal database
+
+Unlike the rest of the schema, the Partner Portal's business logic lives mostly in
+**PostgreSQL stored procedures**, not in the FastAPI service layer — the Python services in
+`app/services/partner_*.py` are thin wrappers that call `SELECT sp_xxx(...)`. The actual DDL/PLpgSQL
+is hand-written and reviewed in `backend/db/partner_portal/` (numbered `01_types.sql` ...
+`14_seed_reference_data.sql`) and `backend/db/partner_portal/gap_completion/` (`01_schema.sql` ...
+`08_seed_data.sql`) — each folder has its own `README.md` explaining every table/procedure/trigger/view
+and a `00_run_all.sql` you can run directly against a scratch database to review the DDL outside of
+Alembic. Migrations `0015`/`0016` apply this same SQL through the normal `alembic upgrade head` path;
+don't hand-edit the schema.
+
+**Onboarding a new partner company.** The portal is invitation-only — there's no public sign-up.
+Back Office creates a partner and its first login with:
+
+```sql
+SELECT sp_register_partner(
+    'Company Name', 'COMPANYCODE01', 'CC',        -- company_name, company_code, reference_prefix
+    'contact@company.example', '+91-90000-00000',  -- partner email, phone
+    'Admin Full Name', 'admin@company.example',    -- first partner_user's name + email
+    '<bcrypt hash — see below>',
+    'partner_admin'                                 -- or 'partner_staff'
+);
+```
+
+Generate the bcrypt hash the same way the app does (never hand-write or paste a plaintext password
+into SQL):
+
+```bash
+cd backend && python -c "from app.auth.security import hash_password; print(hash_password('their-temp-password'))"
+```
+
+Two sample partners are already seeded this way — see `backend/db/partner_portal/gap_completion/08_seed_data.sql`.
 
 ## Default Admin Login
 
 The `0003_seed_admin` migration creates one admin account:
 
-- **Email**: `admin@jackpotsworldtours.com`, or whatever you set via `ADMIN_SEED_EMAIL`
-- **Password**: whatever you set via `ADMIN_SEED_PASSWORD`, or — if left unset — a cryptographically
-  random password generated and printed **once** to the migration's console output
+- **Email** — `admin@jackpotsworldtours.com`, or whatever you set via `ADMIN_SEED_EMAIL`
+- **Password** — whatever you set via `ADMIN_SEED_PASSWORD`, or, if left unset, a random password
+  printed **once** to the migration's console output
 
 **Change the seeded admin's password after your first login.** No password is ever hardcoded in
 source control.
+
+### Partner Portal demo logins
+
+Two sample partner accounts are seeded by `0016_partner_portal_gap_completion`
+(`backend/db/partner_portal/gap_completion/08_seed_data.sql`):
+
+| Company | Email | Password |
+|---|---|---|
+| Aurora Gaming Studios | `meera.iyer@auroragaming.example` | `Aurora@2026` |
+| Blueline Corporate Travel | `arjun.nair@bluelinecorp.example` | `Blueline@2026` |
+
+Sign in at `partner-portal.html` — you'll still need to complete the OTP step. With `SMTP_HOST`
+unset, the OTP is logged as a warning server-side rather than emailed; configure SMTP (see
+Environment Variables) to receive it for real.
 
 ## API Reference
 
@@ -214,6 +260,8 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
 | `/api/users`, `/api/users/me` | Self-service profile management |
 | `/api/contact`, `/api/newsletter` | Public contact form and newsletter signup |
 | `/api/admin/*` | Admin-only: users, customers, bookings, payments, pricing/coupons, activity logs, reports/CSV export |
+| `/api/partner-auth` | Partner Portal auth: OTP request/verify, login, refresh, logout, forgot/reset password |
+| `/api/partner/*` | Partner Portal (own-data-only via JWT, enforced in the service layer): dashboard, ticket enquiry, bookings, request history, service requests, reports, profile, countries |
 
 ## Features
 
@@ -228,14 +276,35 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
 **Admin console (`admin.html`)**
 - Dashboard KPIs, revenue/booking charts, CSV report export
 - CRUD for flights, hotels, cruises, tour packages, and pricing/coupons
-- Paginated management of users, bookings, payments, contact messages, reviews, wishlist,
-  support tickets, and activity logs
+- Paginated management of users, bookings, payments, contact messages, reviews, wishlist, support
+  tickets, and activity logs
 - Send notifications to one user or broadcast to all users
 
+**Partner Portal (`partner-portal.html`)** — separate B2B surface, own JWT scope, own login
+- 3-step OTP + password sign-in (email → OTP → password), plus forgot-password
+- Dashboard KPIs, Ticket Enquiry (searches the same live flight catalog as the public site)
+- Request Ticket: flights/hotels/cruises, multi-passenger, draft-then-submit-for-approval workflow
+- Request History; Service Requests (cancellation, date change, refund, passenger modification)
+- Reports with filters + CSV/print export; profile + password management
+- Partners can only ever see and act on their own bookings — enforced server-side, not just hidden
+  in the UI (verified: a second partner's token gets `404`, not someone else's data)
+
+**Partner Requests (`admin.html`)** — the Back Office side of the workflow above
+- Booking Approvals tab: queue of pending partner bookings across every company, with a review
+  drawer (full trip + passenger detail) and Approve (with an optional final amount) / Reject
+  (with a required reason)
+- Service Requests tab: queue of submitted cancellation/date-change/refund/passenger-modification
+  requests, with Approve / Reject / Mark Completed
+- Uses the same `sp_approve_request`/`sp_reject_request` (Phase 2) that already existed but had no
+  caller, plus two new procedures (`sp_admin_list_partner_bookings`, `sp_resolve_service_request`)
+
 **Cross-cutting**
-- JWT access/refresh authentication with role-based access control (user vs. admin)
+- JWT access/refresh authentication with role-based access control (user vs. admin vs. partner —
+  three separate, mutually-exclusive token scopes; a partner token is rejected on `/api/admin/*`
+  and an admin token is rejected on `/api/partner/*`)
 - Rate limiting on authentication endpoints
-- Real password-reset emails via SMTP (falls back to a logged link if unconfigured)
+- Real password-reset/OTP emails via SMTP (falls back to a logged warning if unconfigured — true
+  for both the customer password-reset flow and Partner Portal OTP delivery)
 - Server-side price recalculation and inventory validation on every booking
 - XSS-safe rendering of all user-generated content
 
@@ -252,12 +321,8 @@ Minimum steps for any host:
    your deployed frontend's origin) on your hosting platform.
 2. `pip install -r requirements.txt` then `alembic upgrade head` as part of your deploy step.
 3. Run with a production ASGI server, e.g. `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-4. Update `API_BASE` at the top of each HTML file's `<script>` block to your deployed backend URL.
+4. Update `API_BASE` to your deployed backend URL — inline at the top of each HTML file's
+   `<script>` block (`index.html`, `admin.html`) or, for the Partner Portal, in
+   `assets/js/partner-shared.js`.
 5. Confirm `/api/health` returns `{"status": "ok"}`.
-
-## Future Enhancements
-
-- A real payment gateway integration in place of the current mock payment flow
-- Round-trip flight modeling and per-date hotel/cruise inventory (current availability checks are
-  per-listing, not per-date)
-- Automated test suite (unit + integration) and CI pipeline
+</content>
