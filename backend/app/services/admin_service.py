@@ -3,11 +3,11 @@ import datetime
 import io
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.models.booking import Booking, Payment
-from app.models.misc import ActivityLog, ContactUs, Newsletter, SupportTicket
+from app.models.misc import ActivityLog, ContactUs, Newsletter
 from app.models.travel import Cruise, Flight, Hotel, TourPackage
 from app.models.user import User
 from app.services import booking_service, session_service
@@ -257,9 +257,34 @@ def build_reports(db: Session) -> dict:
         "top_cruises": _top_items(db, "cruise"),
         "top_packages": _top_items(db, "package"),
         "most_active_users": _most_active_users(db),
-        "open_support_tickets": db.scalar(
-            select(func.count()).select_from(SupportTicket).where(SupportTicket.status.in_(["open", "in_progress"]))
-        ) or 0,
+        **_merchant_dashboard_stats(db),
+    }
+
+
+def _merchant_dashboard_stats(db: Session) -> dict:
+    """Merchant Management KPIs for the Admin Dashboard. Reuses the existing
+    partners/partner_bookings/service_requests tables — no new tables."""
+    total_merchants = db.scalar(text("SELECT count(*) FROM partners")) or 0
+    merchants_by_type = {
+        (row[0] or "unspecified"): row[1]
+        for row in db.execute(text("SELECT company_type, count(*) FROM partners GROUP BY company_type")).all()
+    }
+    total_merchant_users = db.scalar(text("SELECT count(*) FROM partner_users")) or 0
+    pending_partner_requests = db.scalar(
+        text("SELECT count(*) FROM partner_bookings WHERE status = 'pending_approval'")
+    ) or 0
+    active_cancellation_requests = db.scalar(
+        text("""
+            SELECT count(*) FROM service_requests
+            WHERE request_type = 'cancellation' AND status IN ('submitted', 'in_review')
+        """)
+    ) or 0
+    return {
+        "total_merchants": total_merchants,
+        "merchants_by_type": merchants_by_type,
+        "total_merchant_users": total_merchant_users,
+        "pending_partner_requests": pending_partner_requests,
+        "active_cancellation_requests": active_cancellation_requests,
     }
 
 

@@ -1,10 +1,7 @@
-import logging
-
 from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.auth.security import (
     create_partner_access_token,
     create_partner_refresh_token,
@@ -16,9 +13,7 @@ from app.auth.security import (
 )
 from app.services import email_service
 
-logger = logging.getLogger("jackpots.partner_auth")
-
-OTP_TTL_MINUTES = 10
+OTP_TTL_MINUTES = 5
 
 
 def _login_lookup(db: Session, email: str) -> dict | None:
@@ -168,11 +163,24 @@ def update_profile(db: Session, partner_user_id: int, full_name: str | None, pho
 
 def _issue_otp(db: Session, partner_user_id: int, email: str, purpose: str) -> None:
     otp_code = generate_otp_code()
-    db.execute(
-        text("SELECT sp_request_otp(:id, :hash, :purpose, :ttl)"),
-        {"id": partner_user_id, "hash": hash_reset_token(otp_code), "purpose": purpose, "ttl": OTP_TTL_MINUTES},
-    )
-    db.commit()
+    try:
+        db.execute(
+            text("SELECT sp_request_otp(:id, :hash, :purpose, :ttl)"),
+            {"id": partner_user_id, "hash": hash_reset_token(otp_code), "purpose": purpose, "ttl": OTP_TTL_MINUTES},
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        if "RATE_LIMIT_EXCEEDED" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many OTP requests for this account. Please try again in an hour.",
+            ) from exc
+        raise
+
     sent = email_service.send_otp_email(email, otp_code, OTP_TTL_MINUTES)
-    if not sent and not (settings.smtp_host and settings.smtp_from_email):
-        logger.warning("SMTP not configured — %s OTP for %s is: %s", purpose, email, otp_code)
+    if not sent:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to send the OTP email right now. Please try again shortly.",
+        )

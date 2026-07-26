@@ -56,7 +56,8 @@ def add_passenger(db: Session, partner_id: int, booking_id: int, payload: Passen
             SELECT sp_add_passenger(
                 :booking_id, :full_name, :gender, :passenger_type, :passport_issuing_country_id,
                 :passport_number, :passport_issue_date, :passport_expiry_date, :date_of_birth,
-                :nationality_country_id, :meal_preference, :special_assistance
+                :nationality_country_id, :meal_preference, :special_assistance,
+                :baggage_catalog_id, :meal_catalog_id, :seat_preference
             )
         """),
         {
@@ -67,8 +68,15 @@ def add_passenger(db: Session, partner_id: int, booking_id: int, payload: Passen
             "passport_expiry_date": payload.passport_expiry_date, "date_of_birth": payload.date_of_birth,
             "nationality_country_id": payload.nationality_country_id,
             "meal_preference": payload.meal_preference, "special_assistance": payload.special_assistance,
+            "baggage_catalog_id": payload.baggage_catalog_id, "meal_catalog_id": payload.meal_catalog_id,
+            "seat_preference": payload.seat_preference,
         },
     ).scalar()
+    if payload.special_service_catalog_ids:
+        db.execute(
+            text("SELECT sp_set_passenger_special_services(:pid, :catalog_ids)"),
+            {"pid": passenger_id, "catalog_ids": payload.special_service_catalog_ids},
+        )
     db.commit()
     return passenger_id
 
@@ -90,8 +98,41 @@ def get_booking_detail(db: Session, partner_id: int, booking_id: int) -> dict:
         {"bid": booking_id},
     ).mappings().all()
     booking = dict(booking)
-    booking["passengers"] = [dict(p) for p in passengers]
+    booking["passengers"] = _attach_ancillary_selections(db, [dict(p) for p in passengers])
     return booking
+
+
+def _attach_ancillary_selections(db: Session, passengers: list[dict]) -> list[dict]:
+    """Resolves baggage_catalog_id/meal_catalog_id/seat_preference and the
+    passenger_special_services join rows into the nested shape PassengerOut
+    expects (label + price, not raw catalog IDs)."""
+    if not passengers:
+        return passengers
+
+    catalog_rows = db.execute(text("SELECT catalog_id, label, additional_charge FROM ancillary_service_catalog")).mappings().all()
+    catalog = {r["catalog_id"]: {"catalog_id": r["catalog_id"], "label": r["label"], "additional_charge": float(r["additional_charge"])} for r in catalog_rows}
+
+    passenger_ids = [p["passenger_id"] for p in passengers]
+    special_rows = db.execute(
+        text("""
+            SELECT pss.passenger_id, c.catalog_id, c.label, c.additional_charge
+            FROM passenger_special_services pss
+            JOIN ancillary_service_catalog c ON c.catalog_id = pss.catalog_id
+            WHERE pss.passenger_id = ANY(:pids)
+        """),
+        {"pids": passenger_ids},
+    ).mappings().all()
+    special_by_passenger: dict[int, list[dict]] = {}
+    for r in special_rows:
+        special_by_passenger.setdefault(r["passenger_id"], []).append(
+            {"catalog_id": r["catalog_id"], "label": r["label"], "additional_charge": float(r["additional_charge"])}
+        )
+
+    for p in passengers:
+        p["baggage_selection"] = catalog.get(p.get("baggage_catalog_id"))
+        p["meal_selection"] = catalog.get(p.get("meal_catalog_id"))
+        p["special_services"] = special_by_passenger.get(p["passenger_id"], [])
+    return passengers
 
 
 def get_request_history(

@@ -12,19 +12,27 @@
 -- Passwords below are real bcrypt hashes (via the same passlib/bcrypt the
 -- app already uses — generated with backend/app/auth/security.hash_password,
 -- not fabricated inline) for the demo passwords noted in each comment.
+--
+-- Emails use real, deliverable addresses (not the reserved .example TLD)
+-- so OTP/password-reset emails actually arrive during a demo. Both demo
+-- accounts route to the same real inbox via Gmail "+" sub-addressing
+-- (RFC 5233 — mail to local+tag@gmail.com delivers to local@gmail.com,
+-- while remaining a distinct, unique string for the email UNIQUE
+-- constraints on partners/partner_users). Swap in different real
+-- addresses per company if you want separate inboxes.
 
 -- Demo password: Aurora@2026
 SELECT sp_register_partner(
-    'Aurora Gaming Studios', 'AURORA01', 'AU', 'partnerships@auroragaming.example', '+91-9800011122',
-    'Meera Iyer', 'meera.iyer@auroragaming.example',
+    'Aurora Gaming Studios', 'AURORA01', 'AU', 'jackpotsworldtours.travels+aurora@gmail.com', '+91-9800011122',
+    'Meera Iyer', 'jackpotsworldtours.travels@gmail.com',
     '$2b$12$KwIT.AUFzf0r.GsXinVSTu1kzUeiArBLUul9rRnwvEtCLd97hDpaC',
     'partner_admin'
 );
 
 -- Demo password: Blueline@2026
 SELECT sp_register_partner(
-    'Blueline Corporate Travel', 'BLUELINE01', 'BL', 'accounts@bluelinecorp.example', '+91-9800033344',
-    'Arjun Nair', 'arjun.nair@bluelinecorp.example',
+    'Blueline Corporate Travel', 'BLUELINE01', 'BL', 'jackpotsworldtours.travels+blueline@gmail.com', '+91-9800033344',
+    'Arjun Nair', 'jackpotsworldtours.travels+arjun@gmail.com',
     '$2b$12$ZxKoJzs.DL/NtS8LjLY8yOMcVAnB1/c7MgB.o3KAu9kiWkXSA9jM2',
     'partner_admin'
 );

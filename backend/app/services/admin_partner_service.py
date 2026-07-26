@@ -2,6 +2,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.services.partner_booking_service import _attach_ancillary_selections
+
 
 def list_pending_bookings(db: Session, status_filter: str | None, search: str | None) -> list[dict]:
     rows = db.execute(
@@ -31,7 +33,7 @@ def get_booking_detail(db: Session, booking_id: int) -> dict:
     ).mappings().all()
 
     result = dict(booking)
-    result["passengers"] = [dict(p) for p in passengers]
+    result["passengers"] = _attach_ancillary_selections(db, [dict(p) for p in passengers])
     return result
 
 

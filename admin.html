@@ -134,6 +134,7 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 :root[data-theme="dark"] .stat-card .num.gold{color:var(--gold);}
 .stat-card .num.coral{color:var(--coral-dark);}
 .stat-card .label{font-size:11.5px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.stat-card .stat-sub{font-size:10.5px; color:var(--text-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
 .panel{background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:24px; margin-bottom:22px; border:1px solid var(--border-color);}
 .panel h2{font-size:16px; margin-bottom:16px; color:var(--text-primary);}
@@ -514,7 +515,7 @@ tbody tr:hover{background:var(--hover-bg);}
     </a>
     <a href="#" class="nav-item" data-section="users">
       <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="nav-label">Users</span>
+      <span class="nav-label">Merchant Management</span>
     </a>
     <a href="#" class="nav-item" data-section="active-users">
       <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
@@ -716,14 +717,16 @@ tbody tr:hover{background:var(--hover-bg);}
     </section>
 
     <section class="section" id="section-users">
-      <div class="panel">
+      <div class="panel" id="merchantListPanel">
         <div class="panel-head">
-          <h2>All users</h2>
-          <button class="btn btn-coral btn-sm" id="addUserBtn">+ Add User</button>
+          <h2>Merchant Management</h2>
+          <button class="btn btn-coral btn-sm" id="onboardMerchantBtn">+ Onboard Merchant</button>
         </div>
-        <div class="table-wrap"><table id="usersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="usersPagination"></div>
+        <div class="table-wrap"><table id="merchantsTable"><thead><tr>
+          <th>Merchant ID</th><th>Merchant Name</th><th>Company Type</th><th>Contact Person</th><th>Email</th><th>Phone Number</th><th>Status</th><th>Created Date</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
       </div>
+      <div id="merchantDetailPanel" style="display:none;"></div>
     </section>
 
     <section class="section" id="section-active-users">
@@ -1160,27 +1163,6 @@ tbody tr:hover{background:var(--hover-bg);}
   </main>
 </div>
 
-<div class="modal-overlay" id="userModalOverlay">
-  <div class="modal-card">
-    <h2 id="userModalTitle">Add User</h2>
-    <form id="userModalForm">
-      <div class="form-field"><label>Full Name</label><input name="full_name" type="text" required></div>
-      <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
-      <div class="form-field" id="userModalPasswordField"><label>Password</label><input name="password" type="password" minlength="8"></div>
-      <div class="form-field"><label>Role</label>
-        <select name="role" required>
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-      <div class="msg" id="userModalMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Save</button>
-        <button type="button" class="btn btn-ghost" id="userModalCancelBtn">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <div class="modal-overlay" id="customerModalOverlay">
   <div class="modal-card modal-lg">
@@ -1328,6 +1310,14 @@ tbody tr:hover{background:var(--hover-bg);}
   <div class="modal-card" id="prServiceRequestModalBody"></div>
 </div>
 
+<div class="modal-overlay" id="onboardMerchantModalOverlay">
+  <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
+</div>
+
+<div class="modal-overlay" id="createMerchantUserModalOverlay">
+  <div class="modal-card modal-lg" id="createMerchantUserModalBody"></div>
+</div>
+
 <div class="modal-overlay" id="customerMsgModalOverlay">
   <div class="modal-card">
     <h2 id="customerMsgModalTitle">Send Notification</h2>
@@ -1430,7 +1420,7 @@ document.querySelectorAll('.nav-item[data-section]').forEach(link => {
 
 function loadSection(name) {
   if (name === 'reports') return loadReports();
-  if (name === 'users') return loadUsers();
+  if (name === 'users') return loadMerchants();
   if (name === 'active-users') return loadActiveUsers();
   if (name === 'customers') return loadCustomers();
   if (name === 'user-analytics') return loadUserAnalytics();
@@ -1559,21 +1549,20 @@ async function loadReports() {
       cancel: '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
       mail: '<path d="m22 2-11 11"/><path d="M22 2 15 22l-4-9-9-4Z"/>',
       contact: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/>',
-      ticket: '<path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6Z"/><path d="M13 5v14" stroke-dasharray="2 2"/>',
+      merchant: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="3" y1="13" x2="21" y2="13"/>',
     };
+    const typeLabels = { gaming_company: 'Gaming', corporate_company: 'Corporate', travel_agency: 'Travel Agency', business_partner: 'Business Partner', unspecified: 'Unspecified' };
+    const merchantBreakdown = Object.entries(data.merchants_by_type || {}).map(([k, v]) => `${typeLabels[k] || k}: ${v}`).join(' · ');
     document.getElementById('statGridRow1').innerHTML = `
-      <div class="stat-card">${statIcon('coral', ICONS.revenue)}<div class="stat-body"><div class="num emerald">${money(data.total_revenue)}</div><div class="label">Total Revenue</div></div></div>
+      <div class="stat-card">${statIcon('coral', ICONS.merchant)}<div class="stat-body"><div class="num">${data.total_merchants}</div><div class="label">Total Merchants</div>${merchantBreakdown ? `<div class="stat-sub">${merchantBreakdown}</div>` : ''}</div></div>
+      <div class="stat-card">${statIcon('', ICONS.users)}<div class="stat-body"><div class="num">${data.total_merchant_users}</div><div class="label">Total Users</div></div></div>
+      <div class="stat-card">${statIcon('', ICONS.userCheck)}<div class="stat-body"><div class="num">${customerStats.total_customers ?? 0}</div><div class="label">Total Customers</div></div></div>
       <div class="stat-card">${statIcon('sky', ICONS.booking)}<div class="stat-body"><div class="num">${data.total_bookings}</div><div class="label">Total Bookings</div></div></div>
-      <div class="stat-card">${statIcon('', ICONS.users)}<div class="stat-body"><div class="num">${customerStats.total_customers ?? 0}</div><div class="label">Total Customers</div></div></div>
     `;
     document.getElementById('statGridRow2').innerHTML = `
-      <div class="stat-card">${statIcon('', ICONS.users)}<div class="stat-body"><div class="num">${data.total_users}</div><div class="label">Total Users</div></div></div>
-      <div class="stat-card">${statIcon('sky', ICONS.booking)}<div class="stat-body"><div class="num">${data.today_bookings}</div><div class="label">Today's Bookings</div></div></div>
-      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${data.pending_bookings}</div><div class="label">Pending Bookings</div></div></div>
-      <div class="stat-card">${statIcon('emerald', ICONS.check)}<div class="stat-body"><div class="num emerald">${data.confirmed_bookings}</div><div class="label">Confirmed Bookings</div></div></div>
-      <div class="stat-card">${statIcon('coral', ICONS.cancel)}<div class="stat-body"><div class="num coral">${data.cancelled_bookings}</div><div class="label">Cancelled Bookings</div></div></div>
+      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${data.pending_partner_requests}</div><div class="label">Pending Requests</div></div></div>
+      <div class="stat-card">${statIcon('coral', ICONS.cancel)}<div class="stat-body"><div class="num coral">${data.active_cancellation_requests}</div><div class="label">Cancellation Requests</div></div></div>
       <div class="stat-card">${statIcon('emerald', ICONS.flight)}<div class="stat-body"><div class="num">${bookingCard.upcoming_trips ?? 0}</div><div class="label">Upcoming Departures</div></div></div>
-      <div class="stat-card">${statIcon('gold', ICONS.ticket)}<div class="stat-body"><div class="num">${data.open_support_tickets}</div><div class="label">Support Tickets</div></div></div>
     `;
     const types = Object.entries(data.bookings_by_type);
     renderBookingSourcesChart(types);
@@ -1997,96 +1986,274 @@ document.addEventListener('click', async e => {
   } catch (err) { alert('Failed to export CSV.'); }
 });
 
-/* ---------- Users ---------- */
-async function loadUsers(page = usersPage) {
-  usersPage = page;
-  const tbody = document.querySelector('#usersTable tbody');
+/* ---------- Merchant Management ---------- */
+const COMPANY_TYPE_LABELS = { gaming_company: 'Gaming Company', corporate_company: 'Corporate Company', travel_agency: 'Travel Agency', business_partner: 'Business Partner' };
+const ROLE_TYPE_LABELS = { admin: 'Admin', user: 'User', maker: 'Maker', checker: 'Checker' };
+const MEMBER_ROLE_LABELS = { admin: 'Admin', user: 'User', data_operator: 'Data Operator', request_ticket: 'Request Ticket', cancellation_ticket: 'Cancellation Ticket', supervisor: 'Supervisor', manager: 'Manager' };
+const ROLE_TYPE_MEMBER_ROLES = { admin: ['admin'], user: ['user'], maker: ['data_operator', 'request_ticket', 'cancellation_ticket'], checker: ['supervisor', 'manager'] };
+
+async function loadMerchants() {
+  document.getElementById('merchantListPanel').style.display = '';
+  document.getElementById('merchantDetailPanel').style.display = 'none';
+  document.getElementById('merchantDetailPanel').innerHTML = '';
+  const tbody = document.querySelector('#merchantsTable tbody');
+  tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Loading…</td></tr>`;
   try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/users`, { headers: authHeaders(), params: { page, page_size: PAGE_SIZE } });
-    renderPagination('usersPagination', data.page, data.total_pages, data.total, loadUsers);
-    tbody.innerHTML = data.items.map(u => `
+    const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(m => `
       <tr>
-        <td>${escapeHtml(u.full_name)}</td>
-        <td>${escapeHtml(u.email)}</td>
-        <td style="text-transform:capitalize">${escapeHtml(u.role)}</td>
-        <td><span class="badge ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>MRC-${m.partner_id}</td>
+        <td>${escapeHtml(m.company_name)}</td>
+        <td>${escapeHtml(COMPANY_TYPE_LABELS[m.company_type] || '—')}</td>
+        <td>${escapeHtml(m.contact_person || '—')}</td>
+        <td>${escapeHtml(m.email)}</td>
+        <td>${escapeHtml(m.phone_number || '—')}</td>
+        <td><span class="badge ${m.status === 'active' ? 'active' : 'inactive'}">${m.status === 'active' ? 'Active' : 'Inactive'}</span></td>
+        <td>${fmtDate(m.created_at)}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-ghost btn-sm" data-edit-user='${escapeHtml(JSON.stringify(u))}'>Edit</button>
-          ${u.role === 'admin' ? '' : `<button class="btn btn-sm ${u.is_active ? 'btn-danger' : 'btn-navy'}" data-toggle-user="${u.id}" data-next="${!u.is_active}">${u.is_active ? 'Deactivate' : 'Activate'}</button>`}
-          <button class="btn btn-danger btn-sm" data-delete-user="${u.id}">Delete</button>
+          <button class="btn btn-ghost btn-sm" data-view-merchant="${m.partner_id}">View</button>
+          <button class="btn btn-ghost btn-sm" data-edit-merchant="${m.partner_id}">Edit</button>
+          <button class="btn btn-sm ${m.status === 'active' ? 'btn-danger' : 'btn-navy'}" data-toggle-merchant="${m.partner_id}" data-next="${m.status === 'active' ? 'inactive' : 'active'}">${m.status === 'active' ? 'Deactivate' : 'Activate'}</button>
         </td>
       </tr>
-    `).join('') || `<tr><td colspan="5" class="empty-state">No users yet.</td></tr>`;
-    tbody.querySelectorAll('[data-toggle-user]').forEach(btn => {
+    `).join('') || `<tr><td colspan="9" class="empty-state">No merchants onboarded yet.</td></tr>`;
+    tbody.querySelectorAll('[data-view-merchant]').forEach(btn => btn.addEventListener('click', () => openMerchantDetail(btn.dataset.viewMerchant)));
+    tbody.querySelectorAll('[data-edit-merchant]').forEach(btn => btn.addEventListener('click', () => openOnboardMerchantModal(btn.dataset.editMerchant)));
+    tbody.querySelectorAll('[data-toggle-merchant]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
-          await axios.patch(`${API_BASE}/api/admin/users/${btn.dataset.toggleUser}`, { is_active: btn.dataset.next === 'true' }, { headers: authHeaders() });
-          loadUsers();
+          await axios.post(`${API_BASE}/api/admin/merchants/${btn.dataset.toggleMerchant}/${btn.dataset.next === 'active' ? 'activate' : 'deactivate'}`, {}, { headers: authHeaders() });
+          loadMerchants();
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to update merchant.'); }
+      });
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load merchants.</td></tr>`;
+  }
+}
+document.getElementById('onboardMerchantBtn').addEventListener('click', () => openOnboardMerchantModal(null));
+
+/* ---------- Onboard / Edit Merchant modal ---------- */
+async function openOnboardMerchantModal(partnerId) {
+  const overlay = document.getElementById('onboardMerchantModalOverlay');
+  const body = document.getElementById('onboardMerchantModalBody');
+  let m = null;
+  if (partnerId) {
+    try { m = (await axios.get(`${API_BASE}/api/admin/merchants/${partnerId}`, { headers: authHeaders() })).data; }
+    catch (err) { alert('Failed to load merchant.'); return; }
+  }
+  const v = (field, fallback = '') => m ? (m[field] ?? fallback) : fallback;
+  body.innerHTML = `
+    <h2>${m ? 'Edit Merchant' : 'Onboard Merchant'}</h2>
+    <form id="onboardMerchantForm">
+      <div class="form-grid">
+        <div class="form-field"><label>Merchant Name</label><input name="company_name" required value="${escapeHtml(v('company_name'))}"></div>
+        <div class="form-field"><label>Company Type</label>
+          <select name="company_type" required>
+            ${Object.entries(COMPANY_TYPE_LABELS).map(([val, label]) => `<option value="${val}" ${v('company_type') === val ? 'selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Contact Person</label><input name="contact_person" required value="${escapeHtml(v('contact_person'))}"></div>
+        <div class="form-field"><label>Email</label><input name="email" type="email" required value="${escapeHtml(v('email'))}"></div>
+        <div class="form-field"><label>Phone Number</label><input name="phone_number" required value="${escapeHtml(v('phone_number'))}"></div>
+        <div class="form-field"><label>Address</label><input name="address" value="${escapeHtml(v('address'))}"></div>
+        <div class="form-field"><label>City</label><input name="city" value="${escapeHtml(v('city'))}"></div>
+        <div class="form-field"><label>State</label><input name="state" value="${escapeHtml(v('state'))}"></div>
+        <div class="form-field"><label>Country</label><input name="country" value="${escapeHtml(v('country'))}"></div>
+        <div class="form-field"><label>GST Number (optional)</label><input name="gst_number" value="${escapeHtml(v('gst_number'))}"></div>
+        <div class="form-field"><label>PAN Number (optional)</label><input name="pan_number" value="${escapeHtml(v('pan_number'))}"></div>
+        ${m ? '' : `<div class="form-field"><label>Status</label><select name="status"><option value="active">Active</option><option value="inactive">Inactive</option></select></div>`}
+      </div>
+      <div class="msg" id="onboardMerchantMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">${m ? 'Save Changes' : 'Save Merchant'}</button>
+        <button type="button" class="btn btn-ghost" id="onboardMerchantCancelBtn">Cancel</button>
+      </div>
+    </form>
+  `;
+  overlay.classList.add('open');
+  document.getElementById('onboardMerchantCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  document.getElementById('onboardMerchantForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const msg = document.getElementById('onboardMerchantMsg');
+    const payload = {
+      company_name: f.company_name.value, company_type: f.company_type.value, contact_person: f.contact_person.value,
+      email: f.email.value, phone_number: f.phone_number.value, address: f.address.value || null,
+      city: f.city.value || null, state: f.state.value || null, country: f.country.value || null,
+      gst_number: f.gst_number.value || null, pan_number: f.pan_number.value || null,
+    };
+    if (!m) payload.status = f.status.value;
+    try {
+      if (m) await axios.patch(`${API_BASE}/api/admin/merchants/${partnerId}`, payload, { headers: authHeaders() });
+      else await axios.post(`${API_BASE}/api/admin/merchants`, payload, { headers: authHeaders() });
+      overlay.classList.remove('open');
+      loadMerchants();
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to save merchant.';
+      msg.className = 'msg error';
+    }
+  });
+}
+
+/* ---------- Merchant Details ---------- */
+async function openMerchantDetail(partnerId) {
+  const listPanel = document.getElementById('merchantListPanel');
+  const detailPanel = document.getElementById('merchantDetailPanel');
+  listPanel.style.display = 'none';
+  detailPanel.style.display = '';
+  detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Loading…</div></div>`;
+  try {
+    const { data: m } = await axios.get(`${API_BASE}/api/admin/merchants/${partnerId}`, { headers: authHeaders() });
+    detailPanel.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <h2>${escapeHtml(m.company_name)}</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-coral btn-sm" id="createMerchantUserBtn">+ Create User</button>
+            <button class="btn btn-ghost btn-sm" id="backToMerchantsBtn">← Back to Merchants</button>
+          </div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><label>Merchant ID</label><div>MRC-${m.partner_id}</div></div>
+          <div class="info-item"><label>Merchant Name</label><div>${escapeHtml(m.company_name)}</div></div>
+          <div class="info-item"><label>Company Type</label><div>${escapeHtml(COMPANY_TYPE_LABELS[m.company_type] || '—')}</div></div>
+          <div class="info-item"><label>Contact Person</label><div>${escapeHtml(m.contact_person || '—')}</div></div>
+          <div class="info-item"><label>Email</label><div>${escapeHtml(m.email)}</div></div>
+          <div class="info-item"><label>Phone</label><div>${escapeHtml(m.phone_number || '—')}</div></div>
+          <div class="info-item"><label>Status</label><div><span class="badge ${m.status === 'active' ? 'active' : 'inactive'}">${m.status === 'active' ? 'Active' : 'Inactive'}</span></div></div>
+          <div class="info-item"><label>Created Date</label><div>${fmtDate(m.created_at)}</div></div>
+          <div class="info-item"><label>Number of Users</label><div>${m.user_count}</div></div>
+          <div class="info-item"><label>Number of Bookings</label><div>${m.booking_count}</div></div>
+          <div class="info-item"><label>Number of Requests</label><div>${m.request_count}</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:14px;margin-bottom:10px;">Users</h2>
+        <div class="table-wrap"><table id="merchantUsersTable"><thead><tr>
+          <th>User ID</th><th>Full Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Role Type</th><th>Member Role</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    `;
+    document.getElementById('backToMerchantsBtn').addEventListener('click', loadMerchants);
+    document.getElementById('createMerchantUserBtn').addEventListener('click', () => openCreateMerchantUserModal(partnerId, m.company_name));
+    loadMerchantUsersTable(partnerId);
+  } catch (err) {
+    detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
+  }
+}
+
+async function loadMerchantUsersTable(partnerId) {
+  const tbody = document.querySelector('#merchantUsersTable tbody');
+  tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Loading…</td></tr>`;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/admin/merchants/${partnerId}/users`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td>USR-${u.partner_user_id}</td>
+        <td>${escapeHtml(u.full_name)}</td>
+        <td>${escapeHtml(u.username || '—')}</td>
+        <td>${escapeHtml(u.email)}</td>
+        <td>${escapeHtml(u.phone_number || '—')}</td>
+        <td>${escapeHtml(ROLE_TYPE_LABELS[u.role_type] || '—')}</td>
+        <td>${escapeHtml(MEMBER_ROLE_LABELS[u.member_role] || '—')}</td>
+        <td><span class="badge ${u.status === 'active' ? 'active' : 'inactive'}">${u.status === 'active' ? 'Active' : 'Inactive'}</span></td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-ghost btn-sm" data-view-mu="${u.partner_user_id}">View</button>
+          <button class="btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-navy'}" data-toggle-mu="${u.partner_user_id}" data-next="${u.status === 'active' ? 'inactive' : 'active'}">${u.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+          <button class="btn btn-ghost btn-sm" data-reset-mu="${u.partner_user_id}">Reset Password</button>
+        </td>
+      </tr>
+    `).join('') || `<tr><td colspan="9" class="empty-state">No users yet for this merchant.</td></tr>`;
+    tbody.querySelectorAll('[data-view-mu]').forEach(btn => btn.addEventListener('click', () => {
+      const u = data.find(x => String(x.partner_user_id) === btn.dataset.viewMu);
+      alert(`${u.full_name}\nUsername: ${u.username || '—'}\nEmail: ${u.email}\nPhone: ${u.phone_number || '—'}\nRole Type: ${ROLE_TYPE_LABELS[u.role_type] || '—'}\nMember Role: ${MEMBER_ROLE_LABELS[u.member_role] || '—'}\nStatus: ${u.status}`);
+    }));
+    tbody.querySelectorAll('[data-toggle-mu]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.post(`${API_BASE}/api/admin/merchants/users/${btn.dataset.toggleMu}/${btn.dataset.next === 'active' ? 'activate' : 'deactivate'}`, {}, { headers: authHeaders() });
+          loadMerchantUsersTable(partnerId);
         } catch (err) { alert('Failed to update user.'); }
       });
     });
-    tbody.querySelectorAll('[data-edit-user]').forEach(btn => {
-      btn.addEventListener('click', () => openUserModal(JSON.parse(btn.dataset.editUser)));
-    });
-    tbody.querySelectorAll('[data-delete-user]').forEach(btn => {
+    tbody.querySelectorAll('[data-reset-mu]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this user?')) return;
+        if (!confirm('Reset this user\'s password?')) return;
         try {
-          await axios.delete(`${API_BASE}/api/admin/users/${btn.dataset.deleteUser}`, { headers: authHeaders() });
-          loadUsers();
-        } catch (err) { alert(err.response?.data?.detail || 'Failed to delete user.'); }
+          const { data: r } = await axios.post(`${API_BASE}/api/admin/merchants/users/${btn.dataset.resetMu}/reset-password`, {}, { headers: authHeaders() });
+          alert(`New password: ${r.new_password}\n\nShare this with the merchant user securely.`);
+        } catch (err) { alert('Failed to reset password.'); }
       });
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load users.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load users.</td></tr>`;
   }
 }
 
-/* ---------- User Add/Edit modal ---------- */
-const userModalOverlay = document.getElementById('userModalOverlay');
-const userModalForm = document.getElementById('userModalForm');
-const userModalPasswordField = document.getElementById('userModalPasswordField');
-let editingUserId = null;
-
-function openUserModal(user) {
-  editingUserId = user ? user.id : null;
-  document.getElementById('userModalTitle').textContent = user ? 'Edit User' : 'Add User';
-  document.getElementById('userModalMsg').textContent = '';
-  userModalForm.reset();
-  userModalPasswordField.style.display = user ? 'none' : '';
-  userModalForm.elements.password.required = !user;
-  if (user) {
-    userModalForm.elements.full_name.value = user.full_name;
-    userModalForm.elements.email.value = user.email;
-    userModalForm.elements.role.value = user.role;
-  }
-  userModalOverlay.classList.add('open');
-}
-document.getElementById('addUserBtn').addEventListener('click', () => openUserModal(null));
-document.getElementById('userModalCancelBtn').addEventListener('click', () => userModalOverlay.classList.remove('open'));
-
-userModalForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  const msg = document.getElementById('userModalMsg');
-  const payload = {
-    full_name: userModalForm.elements.full_name.value,
-    email: userModalForm.elements.email.value,
-    role: userModalForm.elements.role.value,
+/* ---------- Create User modal ---------- */
+function openCreateMerchantUserModal(partnerId, merchantName) {
+  const overlay = document.getElementById('createMerchantUserModalOverlay');
+  const body = document.getElementById('createMerchantUserModalBody');
+  body.innerHTML = `
+    <h2>Create User</h2>
+    <form id="createMerchantUserForm">
+      <div class="form-grid">
+        <div class="form-field"><label>Merchant Name</label><input value="${escapeHtml(merchantName)}" disabled></div>
+        <div class="form-field"><label>User ID</label><input value="Auto-generated on save" disabled></div>
+        <div class="form-field"><label>User Full Name</label><input name="full_name" required></div>
+        <div class="form-field"><label>Username</label><input name="username" required minlength="3"></div>
+        <div class="form-field"><label>Email ID</label><input name="email" type="email" required></div>
+        <div class="form-field"><label>Phone Number</label><input name="phone_number" required></div>
+        <div class="form-field"><label>Password</label><input name="password" type="password" required minlength="8"></div>
+        <div class="form-field"><label>Confirm Password</label><input name="confirm_password" type="password" required minlength="8"></div>
+        <div class="form-field"><label>Role Type</label>
+          <select name="role_type" id="cmuRoleType" required>
+            ${Object.entries(ROLE_TYPE_LABELS).map(([val, label]) => `<option value="${val}">${label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Member Role</label><select name="member_role" id="cmuMemberRole" required></select></div>
+      </div>
+      <div class="msg" id="createMerchantUserMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Create User</button>
+        <button type="button" class="btn btn-ghost" id="createMerchantUserCancelBtn">Cancel</button>
+      </div>
+    </form>
+  `;
+  const refreshMemberRoles = () => {
+    const roleType = document.getElementById('cmuRoleType').value;
+    document.getElementById('cmuMemberRole').innerHTML = ROLE_TYPE_MEMBER_ROLES[roleType]
+      .map(val => `<option value="${val}">${MEMBER_ROLE_LABELS[val]}</option>`).join('');
   };
-  try {
-    if (editingUserId) {
-      await axios.put(`${API_BASE}/api/admin/users/${editingUserId}`, payload, { headers: authHeaders() });
-    } else {
-      payload.password = userModalForm.elements.password.value;
-      await axios.post(`${API_BASE}/api/admin/users`, payload, { headers: authHeaders() });
+  document.getElementById('cmuRoleType').addEventListener('change', refreshMemberRoles);
+  refreshMemberRoles();
+  overlay.classList.add('open');
+  document.getElementById('createMerchantUserCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  document.getElementById('createMerchantUserForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const msg = document.getElementById('createMerchantUserMsg');
+    if (f.password.value !== f.confirm_password.value) {
+      msg.textContent = 'Password and Confirm Password do not match.';
+      msg.className = 'msg error';
+      return;
     }
-    userModalOverlay.classList.remove('open');
-    loadUsers();
-  } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to save user.';
-    msg.className = 'msg error';
-  }
-});
+    try {
+      await axios.post(`${API_BASE}/api/admin/merchants/${partnerId}/users`, {
+        full_name: f.full_name.value, username: f.username.value, email: f.email.value, phone_number: f.phone_number.value,
+        password: f.password.value, confirm_password: f.confirm_password.value,
+        role_type: f.role_type.value, member_role: f.member_role.value,
+      }, { headers: authHeaders() });
+      overlay.classList.remove('open');
+      loadMerchantUsersTable(partnerId);
+      openMerchantDetail(partnerId);
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to create user.';
+      msg.className = 'msg error';
+    }
+  });
+}
 
 /* ---------- Active Users ---------- */
 async function loadActiveUsers() {
@@ -2789,6 +2956,32 @@ async function loadPrBookings() {
   }
 }
 
+const PR_SEAT_LABELS = { window: 'Window', aisle: 'Aisle', middle: 'Middle', front_row: 'Front Row', exit_row: 'Exit Row' };
+function prAncillaryValue(label, charge) {
+  return charge > 0 ? `${escapeHtml(label)} <span style="color:var(--coral-dark);font-weight:700;">(+${money(charge)})</span>` : escapeHtml(label);
+}
+/* Booking staff need to see each passenger's ancillary selections before
+   issuing the ticket — same data Request Ticket collected, no separate
+   review step exists elsewhere for this. */
+function prPassengerAncillaryBlock(p) {
+  const hasAny = p.baggage_selection || p.meal_selection || p.meal_preference || p.seat_preference || p.special_services?.length || p.special_assistance;
+  if (!hasAny) return '';
+  const services = p.special_services?.length
+    ? p.special_services.map(s => `<span class="badge" style="background:rgba(11,60,109,0.08);color:var(--navy);margin:0 4px 4px 0;">${prAncillaryValue(s.label, s.additional_charge)}</span>`).join('')
+    : '—';
+  return `
+    <div style="border:1px solid var(--border-color);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <div style="font-size:12.5px;font-weight:700;color:var(--text-muted);margin-bottom:8px;">${escapeHtml(p.full_name)} — Travel Preferences &amp; Additional Services</div>
+      <div class="info-grid">
+        <div class="info-item"><label>Baggage</label><div>${p.baggage_selection ? prAncillaryValue(p.baggage_selection.label, p.baggage_selection.additional_charge) : 'Not selected'}</div></div>
+        <div class="info-item"><label>Meal</label><div>${p.meal_selection ? prAncillaryValue(p.meal_selection.label, p.meal_selection.additional_charge) : (p.meal_preference ? escapeHtml(p.meal_preference) : 'Not specified')}</div></div>
+        <div class="info-item"><label>Seat Preference</label><div>${p.seat_preference ? escapeHtml(PR_SEAT_LABELS[p.seat_preference] || p.seat_preference) : 'Not selected'}</div></div>
+        <div class="info-item"><label>Special Services</label><div>${services}</div></div>
+      </div>
+      ${p.special_assistance ? `<div style="margin-top:10px;"><label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px;">Special Request</label><div style="font-size:13.5px;">${escapeHtml(p.special_assistance)}</div></div>` : ''}
+    </div>`;
+}
+
 async function openPrBookingModal(bookingId) {
   const overlay = document.getElementById('prBookingModalOverlay');
   const body = document.getElementById('prBookingModalBody');
@@ -2816,6 +3009,7 @@ async function openPrBookingModal(bookingId) {
       <div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Passport #</th><th>DOB</th></tr></thead><tbody>
         ${b.passengers.map(p => `<tr><td>${escapeHtml(p.full_name)}</td><td style="text-transform:capitalize">${escapeHtml(p.passenger_type)}</td><td>${escapeHtml(p.passport_number)}</td><td>${fmtDate(p.date_of_birth)}</td></tr>`).join('') || '<tr><td colspan="4" class="empty-state">No passengers.</td></tr>'}
       </tbody></table></div>
+      ${b.passengers.map(p => prPassengerAncillaryBlock(p)).join('')}
       ${canAct ? `
       <div class="form-grid" style="margin-top:20px;">
         <div class="form-field"><label>Approved Amount (₹, optional)</label><input type="number" id="prApproveAmount" min="1" step="0.01"></div>

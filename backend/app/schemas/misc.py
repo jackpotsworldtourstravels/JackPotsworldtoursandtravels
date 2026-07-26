@@ -137,4 +137,8 @@ class ReportsOut(BaseModel):
     top_cruises: list[TopItemOut] = []
     top_packages: list[TopItemOut] = []
     most_active_users: list[MostActiveUserOut] = []
-    open_support_tickets: int = 0
+    total_merchants: int = 0
+    merchants_by_type: dict[str, int] = {}
+    total_merchant_users: int = 0
+    pending_partner_requests: int = 0
+    active_cancellation_requests: int = 0

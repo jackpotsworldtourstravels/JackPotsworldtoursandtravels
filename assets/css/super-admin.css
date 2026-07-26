@@ -1,0 +1,21 @@
+/* Super Admin Portal — small additions on top of partner-portal.css's
+   design system. Everything else (sidebar, topbar, cards, tables, modals,
+   badges, forms) is reused as-is for visual consistency across portals. */
+
+.sa-demo-creds{margin-top:20px; padding:14px 16px; background:var(--gold-soft); border:1px dashed var(--gold-line); border-radius:12px;}
+.sa-demo-creds-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gold-dark); margin-bottom:8px;}
+.sa-demo-creds-row{display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:3px 0;}
+.sa-demo-creds-row span{color:var(--text-muted);}
+.sa-demo-creds-row code{font-weight:700; color:var(--text-primary);}
+.sa-demo-creds p{font-size:11.5px; color:var(--text-muted); margin-top:8px; line-height:1.5;}
+
+.callout-mock{display:flex; align-items:center; gap:8px; background:var(--hover-bg); border:1px dashed var(--border-color); border-radius:10px; padding:10px 14px; font-size:12.5px; color:var(--text-muted); margin-bottom:16px;}
+
+.sa-profile-photo-row{display:flex; justify-content:center;}
+.sa-profile-photo{width:76px; height:76px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:800;}
+
+.sa-pw-hint{font-size:11.5px; color:var(--text-muted); margin:-8px 0 4px;}
+
+/* partner-portal.css has no .btn-danger — admin.html defines its own, so
+   this mirrors that same color for visual consistency across portals. */
+.btn-danger{background:rgba(214,41,61,0.12); color:var(--coral-dark);}

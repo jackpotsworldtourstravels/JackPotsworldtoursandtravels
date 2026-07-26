@@ -1,0 +1,27 @@
+-- =========================================================================
+-- 12_seed.sql
+-- =========================================================================
+-- Intentionally empty.
+--
+-- Per explicit instruction: this redesigned schema must not contain any
+-- sample data, dummy data, demo records, or mock data of any kind.
+--
+-- All production data (admins, merchants, merchant staff, customers,
+-- bookings, catalog content, etc.) is created exclusively through normal
+-- frontend/backend operations:
+--   - Admin accounts      -> Super Admin Portal "Add Admin" (once that
+--                            module's own database is wired up), or the
+--                            existing ADMIN_SEED_EMAIL/ADMIN_SEED_PASSWORD
+--                            startup bootstrap already used by this project.
+--   - admin_roles          -> a one-time bootstrap insert of the single
+--                            'admin' role, done by the application at
+--                            first startup -- not sample data, an
+--                            operational prerequisite (admins.role_id is
+--                            NOT NULL). See DATABASE_STRUCTURE.md.
+--   - Merchants (partners) -> Admin Portal > Merchant Management > Onboard Merchant
+--   - Merchant staff        -> Merchant Details > Create User
+--   - Customers (users)     -> the public Sign Up form on index.html
+--   - Bookings/passengers   -> the respective portal's own booking flow
+--
+-- If you need working data to test against after applying this schema,
+-- create it by using the application itself -- do not insert it here.

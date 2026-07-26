@@ -113,6 +113,11 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .navlinks a:hover::after{width:100%;}
 .nav-actions{display:flex; align-items:center; gap:14px;}
 .nav-login{font-size:14.5px; font-weight:700; color:#fff;}
+.nav-partner-mark{display:inline-flex; align-items:center; gap:8px; padding:7px 16px 7px 9px; border-radius:100px; border:1.5px solid rgba(255,255,255,0.32); color:#fff; font-weight:700; font-size:13.5px; transition:border-color .25s ease, background-color .25s ease, transform .2s ease;}
+.nav-partner-mark:hover{border-color:var(--coral); background:rgba(255,77,77,0.14); transform:translateY(-1px);}
+.npm-mark{width:21px; height:21px; flex-shrink:0;}
+.mobile-partner-mark{display:flex; align-items:center; gap:10px;}
+.mobile-partner-mark .npm-mark{width:20px; height:20px; color:var(--navy);}
 .nav-signup{padding:11px 22px; font-size:14px;}
 .hamburger{display:none; flex-direction:column; gap:5px; width:26px;}
 .hamburger span{height:2px; background:#fff; border-radius:2px;}
@@ -740,7 +745,10 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
       <a href="#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <a href="partner-portal.html" class="nav-login" id="navPartnerLink">My Partner</a>
+      <a href="partner-portal.html" class="nav-partner-mark" id="navPartnerLink">
+        <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
+        <span>My Partner</span>
+      </a>
       <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
       <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
       <div class="profile-chip-wrap" id="profileChipWrap" style="display:none;">
@@ -773,7 +781,10 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
     <a href="#" data-tab-link="cruises">Cruises</a>
     <a href="#contact">Contact</a>
     <div class="mobile-auth-links">
-      <a href="partner-portal.html">My Partner</a>
+      <a href="partner-portal.html" class="mobile-partner-mark">
+        <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
+        My Partner
+      </a>
       <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
       <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
     </div>

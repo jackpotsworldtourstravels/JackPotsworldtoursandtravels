@@ -7,3 +7,13 @@ class CountryOut(BaseModel):
     iso2: str
 
     model_config = {"from_attributes": True}
+
+
+class AncillaryCatalogItemOut(BaseModel):
+    catalog_id: int
+    category: str
+    code: str
+    label: str
+    additional_charge: float
+
+    model_config = {"from_attributes": True}

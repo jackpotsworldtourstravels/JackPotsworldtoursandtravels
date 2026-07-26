@@ -137,7 +137,7 @@ Copy `backend/.env.example` to `backend/.env` and fill in your own values.
 | `RESET_TOKEN_EXPIRE_MINUTES` | No — default `60` | Password-reset token lifetime. |
 | `CORS_ORIGINS` | No — has a dev default | Comma-separated frontend origins allowed to call the API. Must include whatever origin you serve the frontend from. |
 | `FRONTEND_BASE_URL` | No | Base URL used to build the absolute link inside password-reset emails, e.g. `https://yourdomain.com`. |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_USE_TLS` / `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | No | SMTP settings for real password-reset emails. Leave `SMTP_HOST` unset to skip sending (a warning is logged instead) — fine for local dev. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_USE_TLS` / `SMTP_FROM_EMAIL` / `SMTP_FROM_NAME` | Partner Portal: **Yes** · main-site reset: No | Generic SMTP settings — works with Gmail (`smtp.gmail.com:587` + a 16-char App Password), Outlook (`smtp.office365.com:587`), SendGrid (`smtp.sendgrid.net:587`, username `apikey`), or Amazon SES (`email-smtp.<region>.amazonaws.com:587`, SES SMTP credentials). The main site's password-reset email silently skips sending (logs a warning) if `SMTP_HOST` is unset — fine for local dev. The **Partner Portal's OTP emails do not** have a log/skip fallback: an OTP request fails with `503` if SMTP isn't configured, since the code is never printed anywhere. |
 | `ADMIN_SEED_EMAIL` | No | Email for the admin account created by the seed migration. Defaults to `admin@jackpotsworldtours.com`. |
 | `ADMIN_SEED_PASSWORD` | No | Password for the seeded admin account. If unset, a random password is generated and printed once to the migration's console output — capture it there. |
 
@@ -201,13 +201,17 @@ Back Office creates a partner and its first login with:
 
 ```sql
 SELECT sp_register_partner(
-    'Company Name', 'COMPANYCODE01', 'CC',        -- company_name, company_code, reference_prefix
-    'contact@company.example', '+91-90000-00000',  -- partner email, phone
-    'Admin Full Name', 'admin@company.example',    -- first partner_user's name + email
+    'Company Name', 'COMPANYCODE01', 'CC',              -- company_name, company_code, reference_prefix
+    'contact@realcompanydomain.com', '+91-90000-00000',  -- partner email (must be a real, deliverable address — OTP/reset emails go here), phone
+    'Admin Full Name', 'admin@realcompanydomain.com',    -- first partner_user's name + a real, deliverable email
     '<bcrypt hash — see below>',
-    'partner_admin'                                 -- or 'partner_staff'
+    'partner_admin'                                       -- or 'partner_staff'
 );
 ```
+
+Use real, deliverable email addresses — the Partner Portal's OTP and password-reset flows send actual
+emails via SMTP, so a fake or reserved-TLD address (`.example`, `.test`, etc.) means that partner can
+never receive their OTP and can never log in.
 
 Generate the bcrypt hash the same way the app does (never hand-write or paste a plaintext password
 into SQL):
@@ -236,12 +240,16 @@ Two sample partner accounts are seeded by `0016_partner_portal_gap_completion`
 
 | Company | Email | Password |
 |---|---|---|
-| Aurora Gaming Studios | `meera.iyer@auroragaming.example` | `Aurora@2026` |
-| Blueline Corporate Travel | `arjun.nair@bluelinecorp.example` | `Blueline@2026` |
+| Aurora Gaming Studios | `jackpotsworldtours.travels@gmail.com` | `Aurora@2026` |
+| Blueline Corporate Travel | `jackpotsworldtours.travels+arjun@gmail.com` | `Blueline@2026` |
 
-Sign in at `partner-portal.html` — you'll still need to complete the OTP step. With `SMTP_HOST`
-unset, the OTP is logged as a warning server-side rather than emailed; configure SMTP (see
-Environment Variables) to receive it for real.
+Both route to the same real inbox via Gmail "+" sub-addressing (mail to `local+tag@gmail.com`
+delivers to `local@gmail.com`, while staying a distinct string for the `email` UNIQUE constraint) —
+swap in different real addresses per company if you want separate inboxes.
+
+Sign in at `partner-portal.html`; the OTP step requires `SMTP_HOST`/`SMTP_FROM_EMAIL` (and the rest
+of the SMTP variables) to be set in `backend/.env` — there is no server-side log fallback. If SMTP
+isn't configured, OTP requests fail with a `503` rather than ever printing the code anywhere.
 
 ## API Reference
 

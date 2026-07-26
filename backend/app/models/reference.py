@@ -1,7 +1,19 @@
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.session import Base
+
+
+class AncillaryServiceCatalog(Base):
+    __tablename__ = "ancillary_service_catalog"
+
+    catalog_id: Mapped[int] = mapped_column(primary_key=True)
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    additional_charge: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    display_order: Mapped[int] = mapped_column(nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
 
 
 class Country(Base):

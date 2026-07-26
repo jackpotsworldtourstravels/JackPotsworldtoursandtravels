@@ -8,6 +8,7 @@ TripType = Literal["one_way", "round_trip"]
 CabinClass = Literal["economy", "premium_economy", "business", "first_class"]
 Gender = Literal["male", "female"]
 PassengerType = Literal["adult", "child", "infant"]
+SeatPreference = Literal["window", "aisle", "middle", "front_row", "exit_row"]
 
 
 class PassengerCreate(BaseModel):
@@ -22,6 +23,16 @@ class PassengerCreate(BaseModel):
     nationality_country_id: int
     meal_preference: str | None = Field(default=None, max_length=80)
     special_assistance: str | None = None
+    baggage_catalog_id: int | None = None
+    meal_catalog_id: int | None = None
+    seat_preference: SeatPreference | None = None
+    special_service_catalog_ids: list[int] = Field(default_factory=list)
+
+
+class AncillarySelectionOut(BaseModel):
+    catalog_id: int
+    label: str
+    additional_charge: float
 
 
 class PassengerOut(BaseModel):
@@ -33,6 +44,10 @@ class PassengerOut(BaseModel):
     date_of_birth: datetime.date
     meal_preference: str | None = None
     special_assistance: str | None = None
+    baggage_selection: AncillarySelectionOut | None = None
+    meal_selection: AncillarySelectionOut | None = None
+    seat_preference: str | None = None
+    special_services: list[AncillarySelectionOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

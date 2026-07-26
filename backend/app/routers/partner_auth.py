@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/partner-auth", tags=["partner-auth"])
 @router.post("/otp/request", response_model=MessageResponse, summary="Step 1 — send a login OTP")
 def request_login_otp(payload: OTPRequestRequest, db: Session = Depends(get_db)):
     partner_auth_service.request_login_otp(db, payload.email)
-    return MessageResponse(message="OTP sent to your email.")
+    return MessageResponse(message="OTP sent successfully.")
 
 
 @router.post("/otp/verify", response_model=OTPVerifyResponse, summary="Step 2 — verify the login OTP")
@@ -41,7 +41,7 @@ def login(payload: PartnerLoginRequest, request: Request, db: Session = Depends(
 @router.post("/forgot-password/request", response_model=MessageResponse, summary="Forgot password — send OTP")
 def forgot_password_request(payload: OTPRequestRequest, db: Session = Depends(get_db)):
     partner_auth_service.request_password_reset_otp(db, payload.email)
-    return MessageResponse(message="If an account exists for this email, an OTP has been sent.")
+    return MessageResponse(message="OTP sent successfully.")
 
 
 @router.post("/forgot-password/reset", response_model=MessageResponse, summary="Forgot password — set new password")

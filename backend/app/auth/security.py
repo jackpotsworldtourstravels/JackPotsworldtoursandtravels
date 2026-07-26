@@ -50,6 +50,30 @@ def create_partner_refresh_token(partner_user_id: int) -> str:
     return _create_token(str(partner_user_id), delta, "refresh", extra_claims={"scope": "partner"})
 
 
+SUPER_ADMIN_SENTINEL_SUB = "-1"  # never a real users.id / partner_user_id — see super_admin_deps.py
+
+
+def create_super_admin_access_token(username: str, full_name: str) -> str:
+    # `sub` is a fixed numeric sentinel, not the username — every OTHER auth
+    # dependency in this app does `int(payload["sub"])` and looks the row up
+    # by numeric ID (see app/auth/deps.py, app/auth/partner_deps.py). If a
+    # super-admin token were ever presented to one of those by mistake, a
+    # non-numeric `sub` would raise an unhandled ValueError instead of a
+    # clean 401. "-1" casts fine and can never match a real row.
+    delta = datetime.timedelta(minutes=settings.access_token_expire_minutes)
+    return _create_token(
+        SUPER_ADMIN_SENTINEL_SUB, delta, "access",
+        extra_claims={"scope": "super_admin", "username": username, "full_name": full_name},
+    )
+
+
+def create_super_admin_refresh_token(username: str) -> str:
+    delta = datetime.timedelta(days=settings.refresh_token_expire_days)
+    return _create_token(
+        SUPER_ADMIN_SENTINEL_SUB, delta, "refresh", extra_claims={"scope": "super_admin", "username": username}
+    )
+
+
 def generate_otp_code() -> str:
     """Cryptographically random 6-digit numeric OTP."""
     return f"{secrets.randbelow(1_000_000):06d}"

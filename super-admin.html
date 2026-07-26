@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super Admin Portal — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Reuses the Partner Portal's design system (navy/gold, cards, tables,
+     modals) so the Super Admin Portal matches the project's established
+     premium-enterprise language rather than inventing a new one. -->
+<link rel="stylesheet" href="assets/css/partner-portal.css?v=20260725f">
+<link rel="stylesheet" href="assets/css/super-admin.css?v=1">
+</head>
+<body>
+
+<!-- ============== AUTH VIEW ============== -->
+<div class="partner-auth-shell" id="saAuthShell">
+  <div class="partner-auth-card">
+    <div class="partner-auth-brand">
+      <img src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <div class="pab-sub">Super Admin Portal</div>
+    </div>
+
+    <h1 style="font-size:20px; text-align:center; margin-bottom:6px;">Super Admin Sign In</h1>
+    <p class="auth-step-sub">Platform-level access for onboarding and managing Admins.</p>
+
+    <form id="saLoginForm">
+      <div class="form-field"><label>Username / Email</label><input id="saUsername" autocomplete="username" placeholder="superadmin"></div>
+      <div class="form-field"><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div>
+      <button type="submit" class="btn btn-coral btn-block">Login</button>
+      <div class="msg" id="saLoginMsg"></div>
+    </form>
+
+    <div class="sa-demo-creds">
+      <div class="sa-demo-creds-title">Demo credentials — UI testing only</div>
+      <div class="sa-demo-creds-row"><span>Username</span><code>superadmin</code></div>
+      <div class="sa-demo-creds-row"><span>Password</span><code>SuperAdmin@2026</code></div>
+      <p>These are placeholders until the real database is connected — nothing here is persisted.</p>
+    </div>
+
+    <div class="partner-auth-footer"><a href="index.html">← Back to main site</a></div>
+  </div>
+</div>
+
+<!-- ============== PORTAL VIEW ============== -->
+<div class="mobile-topbar">
+  <div class="brand"><img src="assets/favicon-180.png" alt="JackPots" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> Super Admin</div>
+  <button type="button" class="hamburger-btn" id="saMobileMenuBtn" aria-label="Open menu">
+    <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+  </button>
+</div>
+<div class="layout" id="saLayout" style="display:none;">
+  <div class="sidebar-backdrop" id="saSidebarBackdrop"></div>
+  <nav class="sidebar">
+    <div class="brand"><img src="assets/jackpots-logo-full.png" alt="JackPots"><span class="brand-badge">Super Admin</span></div>
+    <div class="nav-group-label">Menu</div>
+    <a href="#" class="nav-item active" data-section="dashboard">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <a href="#" class="nav-item" data-section="admin">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-label">Admin</span>
+    </a>
+    <a href="#" class="nav-item" data-section="profile">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      <span class="nav-label">Profile</span>
+    </a>
+    <div class="spacer"></div>
+    <a href="index.html" class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="nav-label">Back to site</span></a>
+    <a href="#" class="nav-item logout" id="saSignOutBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="nav-label">Sign Out</span></a>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="saPageTitle">Dashboard</h1>
+      <div class="topbar-right">
+        <div class="partner-chip">
+          <span class="partner-chip-avatar" id="saChipAvatar">S</span>
+          <span class="partner-chip-text"><span id="saChipName">—</span><small>Super Administrator</small></span>
+        </div>
+      </div>
+    </div>
+
+    <section class="section active" id="section-dashboard">
+      <div class="callout-mock">Dashboard figures below are temporary static values — not yet connected to PostgreSQL.</div>
+      <div class="stat-grid" id="saDashboardStatGrid"></div>
+    </section>
+
+    <section class="section" id="section-admin">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Admin Management</h2>
+          <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Admin</button>
+        </div>
+        <div class="callout-mock">This list lives in server memory only right now — it resets whenever the backend restarts.</div>
+        <div class="table-wrap"><table id="saAdminsTable"><thead><tr>
+          <th>Admin ID</th><th>Full Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Status</th><th>Created</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-profile">
+      <div class="panel" style="max-width:520px;">
+        <h2 style="margin-bottom:16px;">Super Admin Profile</h2>
+        <div class="sa-profile-photo-row">
+          <span class="sa-profile-photo" id="saProfilePhoto">S</span>
+        </div>
+        <div class="info-grid" style="margin-top:16px;">
+          <div class="info-item"><label>Full Name</label><div id="saProfileName">—</div></div>
+          <div class="info-item"><label>Email</label><div id="saProfileEmail">—</div></div>
+          <div class="info-item"><label>Phone</label><div id="saProfilePhone">—</div></div>
+          <div class="info-item"><label>Role</label><div>Super Administrator</div></div>
+          <div class="info-item"><label>Created Date</label><div id="saProfileCreated">—</div></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-navy" id="saEditProfileBtn">Edit Profile</button>
+          <button type="button" class="btn btn-ghost" id="saChangePasswordBtn">Change Password</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============== Add Admin modal ============== -->
+<div class="modal-overlay" id="saAddAdminModalOverlay">
+  <div class="modal-card modal-lg">
+    <h2>Add Admin</h2>
+    <form id="saAddAdminForm">
+      <div class="form-grid">
+        <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
+        <div class="form-field" style="max-width:none;"><label>Username</label><input name="username" required minlength="3"></div>
+        <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
+        <div class="form-field" style="max-width:none;"><label>Country Code</label>
+          <select name="country_code" id="saCountryCode">
+            <option value="+91">+91 (India)</option>
+            <option value="+1">+1 (US/Canada)</option>
+            <option value="+44">+44 (UK)</option>
+            <option value="+971">+971 (UAE)</option>
+            <option value="+65">+65 (Singapore)</option>
+            <option value="+61">+61 (Australia)</option>
+            <option value="+49">+49 (Germany)</option>
+            <option value="+81">+81 (Japan)</option>
+          </select>
+        </div>
+        <div class="form-field" style="max-width:none;"><label>Phone Number</label><input name="phone_number" required placeholder="Digits only"></div>
+        <div></div>
+        <div class="form-field" style="max-width:none;"><label>Password</label><input name="password" type="password" required minlength="8"></div>
+        <div class="form-field" style="max-width:none;"><label>Confirm Password</label><input name="confirm_password" type="password" required minlength="8"></div>
+      </div>
+      <div class="sa-pw-hint">Minimum 8 characters, at least one uppercase letter and one number.</div>
+      <div class="msg" id="saAddAdminMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Create Admin</button>
+        <button type="button" class="btn btn-ghost" id="saAddAdminCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Edit Profile modal ============== -->
+<div class="modal-overlay" id="saEditProfileModalOverlay">
+  <div class="modal-card">
+    <h2>Edit Profile</h2>
+    <form id="saEditProfileForm">
+      <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
+      <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone_number" required></div>
+      <div class="msg" id="saEditProfileMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Save Changes</button>
+        <button type="button" class="btn btn-ghost" id="saEditProfileCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Change Password modal ============== -->
+<div class="modal-overlay" id="saChangePasswordModalOverlay">
+  <div class="modal-card">
+    <h2>Change Password</h2>
+    <form id="saChangePasswordForm">
+      <div class="form-field" style="max-width:none;"><label>Current Password</label><input name="current_password" type="password" required></div>
+      <div class="form-field" style="max-width:none;"><label>New Password</label><input name="new_password" type="password" required minlength="8"></div>
+      <div class="form-field" style="max-width:none;"><label>Confirm New Password</label><input name="confirm_new_password" type="password" required minlength="8"></div>
+      <div class="msg" id="saChangePasswordMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Change Password</button>
+        <button type="button" class="btn btn-ghost" id="saChangePasswordCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Sign Out confirmation ============== -->
+<div class="modal-overlay" id="saSignOutModalOverlay">
+  <div class="modal-card">
+    <h2>Sign out?</h2>
+    <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:20px;">You'll need to sign in again next time.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-coral" id="saConfirmSignOutBtn">Logout</button>
+      <button type="button" class="btn btn-ghost" id="saCancelSignOutBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/super-admin-shared.js?v=1"></script>
+<script src="assets/js/super-admin-auth.js?v=1"></script>
+<script src="assets/js/super-admin-dashboard.js?v=1"></script>
+<script src="assets/js/super-admin-admin-management.js?v=1"></script>
+<script src="assets/js/super-admin-profile.js?v=1"></script>
+<script>
+  'use strict';
+  if (isSuperAdminLoggedIn()) { showSuperAdminPortal(); } else { showSuperAdminAuthShell(); }
+</script>
+</body>
+</html>

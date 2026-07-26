@@ -26,6 +26,12 @@ class AdminPartnerBookingListItemOut(BaseModel):
     created_at: datetime.datetime
 
 
+class AncillarySelectionOut(BaseModel):
+    catalog_id: int
+    label: str
+    additional_charge: float
+
+
 class AdminPassengerOut(BaseModel):
     passenger_id: int
     full_name: str
@@ -33,6 +39,12 @@ class AdminPassengerOut(BaseModel):
     passenger_type: str
     passport_number: str
     date_of_birth: datetime.date
+    meal_preference: str | None = None
+    special_assistance: str | None = None
+    baggage_selection: AncillarySelectionOut | None = None
+    meal_selection: AncillarySelectionOut | None = None
+    seat_preference: str | None = None
+    special_services: list[AncillarySelectionOut] = Field(default_factory=list)
 
 
 class AdminPartnerBookingDetailOut(BaseModel):

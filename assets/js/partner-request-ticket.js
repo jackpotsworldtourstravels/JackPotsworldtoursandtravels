@@ -12,6 +12,16 @@ let rtCountries = [];
 let rtCountryOptionsHtml = '';
 let rtDraftBookingId = null;
 let rtPassengerSeq = 0;
+let rtCatalog = { baggage: [], meal: [], special_service: [] };
+
+const RT_SEAT_PREFS = [
+  { value: 'window', label: 'Window' }, { value: 'aisle', label: 'Aisle' }, { value: 'middle', label: 'Middle' },
+  { value: 'front_row', label: 'Front Row' }, { value: 'exit_row', label: 'Exit Row' },
+];
+
+function rtPriceSuffix(charge) {
+  return charge > 0 ? ` (+${money(charge)})` : '';
+}
 
 async function initRequestTicket() {
   document.querySelectorAll('[data-rt-tab]').forEach(tab => {
@@ -26,6 +36,11 @@ async function initRequestTicket() {
     rtCountries = data;
     rtCountryOptionsHtml = '<option value="">Select…</option>' + data.map(c => `<option value="${c.country_id}">${escapeHtml(c.name)}</option>`).join('');
   } catch (err) { /* country dropdowns just show empty if this fails */ }
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/partner/ancillary-catalog`, { headers: partnerAuthHeaders() });
+    rtCatalog = { baggage: [], meal: [], special_service: [] };
+    data.forEach(item => rtCatalog[item.category]?.push(item));
+  } catch (err) { /* ancillary section just shows empty selects if this fails */ }
   resetRequestTicketForm();
 }
 
@@ -114,15 +129,75 @@ function addPassengerCard() {
       <div class="form-field"><label>Passport Expiry Date</label><input type="date" data-field="passport_expiry_date"></div>
       <div class="form-field"><label>Date of Birth</label><input type="date" data-field="date_of_birth"></div>
       <div class="form-field"><label>Nationality</label><select data-field="nationality_country_id">${rtCountryOptionsHtml}</select></div>
-      <div class="form-field"><label>Meal Preference</label><input data-field="meal_preference" placeholder="e.g. Vegetarian"></div>
-      <div class="form-field"><label>Special Assistance</label><input data-field="special_assistance" placeholder="Optional"></div>
     </div>
+    ${rtAncillarySectionHtml(n)}
   `;
   div.querySelector('[data-remove-passenger]').addEventListener('click', () => {
     if (document.querySelectorAll('.passenger-card').length <= 1) return;
     div.remove();
   });
   document.getElementById('rtPassengerList').appendChild(div);
+  wireAncillarySection(div);
+}
+
+/* ---------- Travel Preferences & Additional Services (ancillary) ---------- */
+function rtAncillarySectionHtml(n) {
+  const baggageOptions = rtCatalog.baggage.map(o =>
+    `<option value="${o.catalog_id}">${escapeHtml(o.label)}${rtPriceSuffix(o.additional_charge)}</option>`).join('');
+  const mealOptions = rtCatalog.meal.map(o =>
+    `<option value="${o.catalog_id}">${escapeHtml(o.label)}${rtPriceSuffix(o.additional_charge)}</option>`).join('');
+  const specialServiceChecks = rtCatalog.special_service.map(o => `
+    <label class="rt-check-item">
+      <input type="checkbox" data-special-service value="${o.catalog_id}">
+      <span>${escapeHtml(o.label)}${rtPriceSuffix(o.additional_charge)}</span>
+    </label>`).join('');
+  const seatButtons = RT_SEAT_PREFS.map(s =>
+    `<button type="button" class="rt-seat-option" data-seat-value="${s.value}">${s.label}</button>`).join('');
+
+  return `
+    <div class="rt-ancillary" data-ancillary-for="${n}">
+      <button type="button" class="rt-ancillary-toggle">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6Z"/></svg>
+        <span>Travel Preferences &amp; Additional Services</span>
+        <svg class="icon rt-ancillary-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="rt-ancillary-body">
+        <div class="form-grid">
+          <div class="form-field"><label>Baggage</label><select data-field="baggage_catalog_id"><option value="">No Extra Baggage</option>${baggageOptions}</select></div>
+          <div class="form-field"><label>Meal Preference</label><select data-field="meal_catalog_id"><option value="">No Meal</option>${mealOptions}</select></div>
+        </div>
+
+        <div class="rt-seat-block">
+          <label class="rt-seat-label">Seat Preference</label>
+          <div class="rt-seat-options">${seatButtons}</div>
+          <input type="hidden" data-field="seat_preference">
+        </div>
+
+        <div class="rt-special-block">
+          <label class="rt-seat-label">Special Services</label>
+          <div class="rt-check-grid">${specialServiceChecks}</div>
+        </div>
+
+        <div class="form-field" style="max-width:none;">
+          <label>Special Request</label>
+          <textarea data-field="special_assistance" rows="3" placeholder="e.g. Passenger requires wheelchair assistance during boarding."></textarea>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wireAncillarySection(cardEl) {
+  const toggle = cardEl.querySelector('.rt-ancillary-toggle');
+  toggle.addEventListener('click', () => cardEl.querySelector('.rt-ancillary').classList.toggle('open'));
+
+  cardEl.querySelectorAll('.rt-seat-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const already = btn.classList.contains('active');
+      cardEl.querySelectorAll('.rt-seat-option').forEach(b => b.classList.remove('active'));
+      cardEl.querySelector('[data-field="seat_preference"]').value = already ? '' : btn.dataset.seatValue;
+      if (!already) btn.classList.add('active');
+    });
+  });
 }
 
 function collectTripPayload() {
@@ -157,13 +232,21 @@ function collectTripPayload() {
 function collectPassengerPayloads() {
   return Array.from(document.querySelectorAll('.passenger-card')).map(card => {
     const get = f => card.querySelector(`[data-field="${f}"]`).value;
+    const baggageCatalogId = get('baggage_catalog_id') ? Number(get('baggage_catalog_id')) : null;
+    const mealCatalogId = get('meal_catalog_id') ? Number(get('meal_catalog_id')) : null;
+    const mealOption = rtCatalog.meal.find(o => o.catalog_id === mealCatalogId);
+    const specialServiceIds = Array.from(card.querySelectorAll('[data-special-service]:checked')).map(cb => Number(cb.value));
     return {
       full_name: get('full_name'), gender: get('gender'), passenger_type: get('passenger_type'),
       passport_issuing_country_id: Number(get('passport_issuing_country_id')),
       passport_number: get('passport_number'), passport_issue_date: get('passport_issue_date'),
       passport_expiry_date: get('passport_expiry_date'), date_of_birth: get('date_of_birth'),
       nationality_country_id: Number(get('nationality_country_id')),
-      meal_preference: get('meal_preference') || null, special_assistance: get('special_assistance') || null,
+      meal_preference: mealOption ? mealOption.label : null,
+      special_assistance: get('special_assistance') || null,
+      baggage_catalog_id: baggageCatalogId, meal_catalog_id: mealCatalogId,
+      seat_preference: get('seat_preference') || null,
+      special_service_catalog_ids: specialServiceIds,
     };
   });
 }
