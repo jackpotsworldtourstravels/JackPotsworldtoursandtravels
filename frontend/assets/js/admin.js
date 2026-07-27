@@ -860,7 +860,7 @@ async function openMerchantDetail(partnerId) {
         </tr></thead><tbody></tbody></table></div>
       </div>
     `;
-    document.getElementById('backToMerchantsBtn').addEventListener('click', loadMerchants);
+    document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
     document.getElementById('createMerchantUserBtn').addEventListener('click', () => openCreateMerchantUserPage(partnerId, m.company_name));
     loadMerchantUsersTable(partnerId);
   } catch (err) {
