@@ -1,6 +1,6 @@
 # Database Structure — v2: Fully Domain-Separated Design
 
-This is a revision of the earlier four-domain proposal in [`database/`](database/README.md),
+This is a revision of the earlier four-domain proposal in [`database/`](../database/README.md),
 built to one hard rule: **no authentication, profile, session, or activity-log
 table is shared across Admin, Merchant, and User.** Each portal now owns its
 identity end to end. Nothing here has been applied to the live

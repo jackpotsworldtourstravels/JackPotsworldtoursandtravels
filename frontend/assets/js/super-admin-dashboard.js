@@ -13,7 +13,7 @@ async function loadSaDashboard() {
   const grid = document.getElementById('saDashboardStatGrid');
   grid.innerHTML = '<div class="empty-state">Loading…</div>';
   try {
-    const { data } = await axios.get(`${SA_API_BASE}/api/super-admin/dashboard/stats`, { headers: saAuthHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/super-admin/dashboard/stats`, { headers: saAuthHeaders() });
     const card = (icon, variant, value, label) => `
       <div class="stat-card">
         <div class="stat-icon ${variant}"><svg class="icon" viewBox="0 0 24 24">${icon}</svg></div>

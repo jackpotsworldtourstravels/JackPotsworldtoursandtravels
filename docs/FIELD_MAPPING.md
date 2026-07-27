@@ -3,7 +3,7 @@
 Every row below was verified directly against the live frontend source
 (`index.html`, `admin.html`, `partner-portal.html`, plus their JS files) —
 not reconstructed from memory. Database Table/Column names reflect the v2
-domain-separated schema in [`database/`](database/README.md); see
+domain-separated schema in [`database/`](../database/README.md); see
 [`DATABASE_STRUCTURE.md`](DATABASE_STRUCTURE.md) for the full rationale.
 
 A separate **§6 Provisioned** section lists tables/columns in the new

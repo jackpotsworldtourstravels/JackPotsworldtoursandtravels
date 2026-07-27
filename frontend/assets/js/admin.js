@@ -1,1364 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard — JackPots World Tours &amp; Travels</title>
-<link rel="icon" type="image/png" href="assets/favicon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-:root{
-  /* Brand palette: primary (deep blue), secondary (bright blue), accent (orange) */
-  --navy:#0B3C6D; --navy-2:#0F4A85; --navy-3:#155A9E;
-  --coral:#FF6B35; --coral-dark:#E85A2A; --coral-hover:#FFEFE8;
-  --bg:#F5F7FA; --white:#FFFFFF; --sky:#1E88E5; --emerald:#12B76A; --gold:#FFB020;
-  --ink:#0B3C6D; --muted:#5B6B82; --line:rgba(11,60,109,0.10);
-  --shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18); --shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
-  --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
-
-  --sidebar-bg:#0B3C6D; --sidebar-bg-2:#0A2F55; --sidebar-text:rgba(255,255,255,0.65); --sidebar-text-hover:#fff;
-  --sidebar-w:264px; --sidebar-w-collapsed:80px;
-  --card-bg:#fff; --page-bg:var(--bg); --text-primary:var(--ink); --text-muted:var(--muted);
-  --border-color:var(--line); --hover-bg:rgba(11,60,109,0.04);
-}
-:root[data-theme="dark"]{
-  --page-bg:#0B1220; --card-bg:#131B2E; --text-primary:#E7ECF5; --text-muted:#93A2BE;
-  --border-color:rgba(255,255,255,0.08); --hover-bg:rgba(255,255,255,0.05);
-  --shadow-sm:0 8px 24px -12px rgba(0,0,0,0.5); --shadow-lg:0 30px 70px -20px rgba(0,0,0,0.65);
-}
-*{box-sizing:border-box; margin:0; padding:0;}
-html{scroll-behavior:smooth;}
-body{background:var(--page-bg); color:var(--text-primary); font-family:var(--ff); -webkit-font-smoothing:antialiased; transition:background .25s ease, color .25s ease;}
-button,input,select,textarea{font-family:var(--ff);}
-button{cursor:pointer; border:none; background:none;}
-a{color:inherit; text-decoration:none;}
-h1,h2,h3{font-weight:800; color:var(--text-primary);}
-.icon{width:18px; height:18px; flex-shrink:0; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
-
-.layout{display:flex; min-height:100vh;}
-.sidebar{
-  width:var(--sidebar-w); flex-shrink:0; background:linear-gradient(180deg,var(--sidebar-bg),var(--sidebar-bg-2));
-  color:#fff; display:flex; flex-direction:column; padding:22px 0;
-  position:fixed; top:0; left:0; height:100vh; overflow-y:auto; z-index:200;
-  transition:width .25s ease, transform .25s ease;
-}
-.sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
-.main{flex:1; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
-.layout.collapsed .sidebar{width:var(--sidebar-w-collapsed) !important;}
-.layout.collapsed .main{margin-left:var(--sidebar-w-collapsed) !important;}
-.layout.collapsed .nav-item span.nav-label, .layout.collapsed .brand-text, .layout.collapsed .sidebar-collapse-btn span{display:none;}
-.layout.collapsed .nav-item{justify-content:center; padding:13px 0;}
-.layout.collapsed .sidebar .brand{justify-content:center; padding:0 0 20px;}
-
-.sidebar .brand{display:flex; align-items:center; gap:10px; padding:0 22px 20px; font-size:16.5px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:10px; white-space:nowrap;}
-.sidebar .brand-mark{width:34px; height:34px; border-radius:10px; background:var(--coral); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; flex-shrink:0;}
-.brand-logo-full{height:38px; width:auto; object-fit:contain; flex-shrink:0;}
-.brand-logo-collapsed{display:none; height:32px; width:32px; object-fit:contain; border-radius:8px; flex-shrink:0;}
-.layout.collapsed .brand-logo-full{display:none;}
-.layout.collapsed .brand-logo-collapsed{display:block;}
-.sidebar .brand span.accent{color:var(--gold);}
-.nav-group-label{padding:16px 22px 6px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.32); white-space:nowrap;}
-.layout.collapsed .nav-group-label{display:none;}
-.nav-item{display:flex; align-items:center; gap:12px; padding:11px 22px; margin:2px 12px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--sidebar-text); transition:background .18s ease, color .18s ease; white-space:nowrap; position:relative;}
-.nav-item:hover{background:rgba(255,255,255,0.07); color:var(--sidebar-text-hover);}
-.nav-item.active{background:rgba(255,77,77,0.16); color:#fff;}
-.nav-item.active::before{content:''; position:absolute; left:-12px; top:8px; bottom:8px; width:3px; border-radius:3px; background:var(--coral);}
-.nav-item .icon{opacity:.85;}
-.nav-item.active .icon{opacity:1; color:var(--coral);}
-.sidebar .spacer{flex:1;}
-.sidebar .nav-item.logout{color:#ffb4b4; margin-top:4px;}
-.sidebar .nav-item.logout:hover{background:rgba(255,77,77,0.14); color:#fff;}
-.sidebar-collapse-btn{display:flex; align-items:center; gap:10px; margin:10px 20px 4px; padding:9px 10px; border-radius:10px; color:var(--sidebar-text); font-size:12px; font-weight:700; background:rgba(255,255,255,0.05);}
-.sidebar-collapse-btn:hover{background:rgba(255,255,255,0.1); color:#fff;}
-.sidebar-collapse-btn .icon{transition:transform .25s ease;}
-.layout.collapsed .sidebar-collapse-btn .icon{transform:rotate(180deg);}
-.mobile-topbar{display:none;}
-
-.env-banner{
-  display:flex; align-items:center; gap:10px; background:rgba(255,176,32,0.14); color:#a06600;
-  border:1px solid rgba(255,176,32,0.35); border-radius:12px; padding:10px 16px; font-size:12.5px; font-weight:700;
-  margin-bottom:18px;
-}
-.env-banner .icon{width:17px; height:17px; flex-shrink:0;}
-:root[data-theme="dark"] .env-banner{color:var(--gold);}
-.topbar{
-  display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:26px;
-  background:var(--card-bg); border-radius:var(--radius); padding:16px 22px; box-shadow:var(--shadow-sm);
-  position:sticky; top:16px; z-index:150;
-}
-.topbar-left{display:flex; flex-direction:column; gap:2px; min-width:0;}
-.topbar h1{font-size:21px;}
-.topbar .current-date{font-size:12.5px; color:var(--text-muted); font-weight:600;}
-.topbar .back-link{font-size:13px; font-weight:700; color:var(--sky);}
-.topbar-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
-.icon-btn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--hover-bg); color:var(--text-primary); position:relative; transition:background .18s ease;}
-.icon-btn:hover{background:var(--border-color);}
-.theme-selector{display:flex; align-items:center; gap:2px; background:var(--hover-bg); border-radius:12px; padding:3px;}
-.theme-selector-btn{
-  display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:9px;
-  color:var(--text-muted); transition:background .18s ease, color .18s ease;
-}
-.theme-selector-btn:hover{color:var(--text-primary);}
-.theme-selector-btn.active{background:var(--card-bg); color:var(--text-primary); box-shadow:var(--shadow-sm);}
-.theme-selector-btn .icon{width:16px; height:16px;}
-.icon-btn .dot{
-  position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 3px; border-radius:8px;
-  background:var(--coral); border:1.5px solid var(--card-bg); color:#fff; font-size:10px; font-weight:800;
-  display:flex; align-items:center; justify-content:center; line-height:1;
-}
-.admin-chip{display:flex; align-items:center; gap:10px; padding:6px 12px 6px 6px; border-radius:100px; background:var(--hover-bg); margin-left:4px;}
-.admin-avatar{width:34px; height:34px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0;}
-.admin-chip-text{display:flex; flex-direction:column; line-height:1.25;}
-.admin-chip-name{font-size:12.5px; font-weight:700; color:var(--text-primary);}
-.admin-chip-role{font-size:11px; font-weight:600; color:var(--text-muted); text-transform:capitalize;}
-
-.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:18px; margin-bottom:24px;}
-.stat-card{
-  background:var(--card-bg); border-radius:var(--radius); padding:20px 22px; box-shadow:var(--shadow-sm);
-  display:flex; align-items:center; gap:14px; transition:transform .2s ease, box-shadow .2s ease;
-  border:1px solid var(--border-color);
-}
-.stat-card:hover{transform:translateY(-3px); box-shadow:var(--shadow-lg);}
-.stat-card .stat-icon{width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:rgba(10,37,64,0.08); color:var(--navy);}
-.stat-card .stat-icon.coral{background:rgba(255,77,77,0.12); color:var(--coral-dark);}
-.stat-card .stat-icon.sky{background:rgba(47,128,237,0.12); color:var(--sky);}
-.stat-card .stat-icon.emerald{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.stat-card .stat-icon.gold{background:rgba(255,176,32,0.15); color:#a06600;}
-.stat-card .stat-body{min-width:0;}
-.stat-card .num{font-size:24px; font-weight:800; color:var(--text-primary); line-height:1.1;}
-.stat-card .num.emerald{color:var(--emerald);}
-.text-emerald{color:var(--emerald);}
-.stat-card .num.gold{color:#a06600;}
-:root[data-theme="dark"] .stat-card .num.gold{color:var(--gold);}
-.stat-card .num.coral{color:var(--coral-dark);}
-.stat-card .label{font-size:11.5px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.stat-card .stat-sub{font-size:10.5px; color:var(--text-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-
-.panel{background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:24px; margin-bottom:22px; border:1px solid var(--border-color);}
-.panel h2{font-size:16px; margin-bottom:16px; color:var(--text-primary);}
-.chart-wrap{position:relative; height:260px;}
-.charts-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:20px;}
-
-.btn{display:inline-flex; align-items:center; gap:6px; font-weight:700; font-size:13.5px; padding:10px 18px; border-radius:100px; transition:filter .2s ease;}
-.btn:hover{filter:brightness(1.06);}
-.btn-coral{background:var(--coral); color:#fff;}
-.btn-navy{background:var(--navy); color:#fff;}
-.btn-ghost{background:rgba(10,37,64,0.06); color:var(--navy);}
-.btn-danger{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
-.btn-sm{padding:7px 14px; font-size:12.5px;}
-
-table{width:100%; border-collapse:collapse; font-size:13.5px;}
-th{text-align:left; padding:10px 12px; color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--border-color);}
-td{padding:12px; border-bottom:1px solid var(--border-color); vertical-align:middle; color:var(--text-primary);}
-tr:last-child td{border-bottom:none;}
-tbody tr{transition:background .15s ease;}
-tbody tr:hover{background:var(--hover-bg);}
-.table-wrap{overflow-x:auto; border-radius:12px;}
-.badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700;}
-.badge.confirmed, .badge.success, .badge.active{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
-.badge.cancelled, .badge.failed, .badge.inactive{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
-.badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky);}
-.badge.unread{background:rgba(255,176,32,0.15); color:#a06600;}
-.badge.read{background:rgba(10,37,64,0.06); color:var(--text-muted);}
-
-.form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px;}
-.form-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:5px;}
-.form-field input, .form-field select, .form-field textarea{
-  width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border-color); font-size:13.5px; color:var(--text-primary); background:var(--card-bg);
-}
-.form-field input:focus, .form-field select:focus, .form-field textarea:focus{outline:none; border-color:var(--coral);}
-
-.status-select{padding:6px 8px; border-radius:8px; border:1.5px solid var(--border-color); font-size:12.5px; background:var(--card-bg); color:var(--text-primary);}
-.msg{margin-top:12px; font-size:13px; font-weight:600;}
-.msg.error{color:var(--coral-dark);} .msg.success{color:var(--emerald);}
-.section{display:none;} .section.active{display:block;}
-.empty-state{color:var(--text-muted); font-size:13.5px; padding:20px 0; text-align:center;}
-.panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;}
-.panel-head h2{margin-bottom:0;}
-.modal-overlay{position:fixed; inset:0; background:rgba(10,37,64,0.6); display:none; align-items:center; justify-content:center; z-index:300; padding:20px;}
-.modal-overlay.open{display:flex;}
-.modal-card{background:var(--card-bg); border-radius:var(--radius); padding:32px; max-width:420px; width:100%; box-shadow:var(--shadow-lg);}
-.modal-card h2{font-size:19px; margin-bottom:18px; color:var(--text-primary);}
-.modal-actions{display:flex; gap:10px; margin-top:20px;}
-.pagination{display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:16px; font-size:13px; color:var(--text-muted); flex-wrap:wrap;}
-.pagination button:disabled{opacity:.4; cursor:default;}
-
-.live-feed{max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;}
-.live-feed-item{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:10px; background:var(--hover-bg); font-size:13px;}
-.live-feed-emoji{font-size:17px; line-height:1.4; flex-shrink:0;}
-.live-feed-body{min-width:0;}
-.live-feed-text{color:var(--text-primary); font-weight:600;}
-.live-feed-time{color:var(--text-muted); font-size:11.5px; margin-top:2px;}
-.online-row{display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--border-color);}
-.online-row:last-child{border-bottom:none;}
-.online-avatar{width:38px; height:38px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0; position:relative; object-fit:cover;}
-.online-avatar .pulse{position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:50%; background:var(--emerald); border:2px solid var(--card-bg);}
-.online-info{min-width:0; flex:1;}
-.online-name{font-size:13.5px; font-weight:700; color:var(--text-primary);}
-.online-meta{font-size:12px; color:var(--text-muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.top-list{display:flex; flex-direction:column; gap:8px;}
-.top-list-row{display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border-radius:10px; background:var(--hover-bg); font-size:13px;}
-.top-list-name{font-weight:700; color:var(--text-primary);}
-.top-list-meta{color:var(--text-muted); font-size:12px;}
-.notif-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:340px; max-height:420px; overflow-y:auto; background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-lg); border:1px solid var(--border-color); z-index:400; display:none; padding:8px;}
-.notif-dropdown.open{display:block;}
-.notif-dropdown-head{padding:10px 12px; font-size:13px; font-weight:800; color:var(--text-primary); border-bottom:1px solid var(--border-color); margin-bottom:6px;}
-.notif-dropdown-item{padding:10px 12px; border-radius:10px; font-size:13px; cursor:pointer;}
-.notif-dropdown-item:hover{background:var(--hover-bg);}
-.notif-dropdown-item.unread{background:rgba(255,176,32,0.08);}
-.notif-dropdown-item .n-title{font-weight:700; color:var(--text-primary);}
-.notif-dropdown-item .n-msg{color:var(--text-muted); margin-top:2px;}
-.notif-dropdown-item .n-time{color:var(--text-muted); font-size:11px; margin-top:4px;}
-.icon-btn-wrap{position:relative;}
-
-/* ---------- Luxury accent: gold hover glow on stat cards ---------- */
-.stat-card{position:relative; overflow:hidden;}
-.stat-card::before{content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; opacity:0; transition:opacity .25s ease; pointer-events:none;
-  background:linear-gradient(135deg, rgba(255,176,32,0.55), rgba(255,176,32,0) 55%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;}
-.stat-card:hover::before{opacity:1;}
-.stat-card:hover{box-shadow:var(--shadow-lg), 0 0 0 1px rgba(255,176,32,0.18);}
-.panel{border-top:2px solid transparent; transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;}
-.panel:hover{border-top-color:rgba(255,176,32,0.5);}
-
-/* ---------- Loading skeletons ---------- */
-@keyframes skeletonShimmer{0%{background-position:-200px 0;} 100%{background-position:calc(200px + 100%) 0;}}
-.skeleton{
-  border-radius:8px; background:linear-gradient(90deg, var(--hover-bg) 0px, var(--border-color) 40px, var(--hover-bg) 80px);
-  background-size:200px 100%; animation:skeletonShimmer 1.3s ease-in-out infinite; display:block;
-}
-.skeleton-stat-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px;}
-.skeleton-stat-card{background:var(--card-bg); border-radius:var(--radius); padding:20px 22px; border:1px solid var(--border-color); display:flex; align-items:center; gap:14px;}
-.skeleton-stat-card .skeleton{flex-shrink:0;}
-.skeleton-stat-card .skeleton.icon{width:44px; height:44px; border-radius:12px;}
-.skeleton-stat-card .skeleton-lines{flex:1; display:flex; flex-direction:column; gap:8px;}
-.skeleton-stat-card .skeleton.line-lg{height:20px; width:70%;}
-.skeleton-stat-card .skeleton.line-sm{height:11px; width:45%;}
-.skeleton-rows{display:flex; flex-direction:column; gap:10px;}
-.skeleton-rows .skeleton{height:16px; width:100%;}
-.skeleton-rows .skeleton:nth-child(3n+1){width:92%;} .skeleton-rows .skeleton:nth-child(3n+2){width:78%;} .skeleton-rows .skeleton:nth-child(3n){width:65%;}
-
-/* ---------- Global search ---------- */
-.global-search{position:relative; flex:1; max-width:340px;}
-.global-search input{
-  width:100%; padding:9px 14px 9px 38px; border-radius:12px; border:1px solid var(--border-color); background:var(--hover-bg);
-  color:var(--text-primary); font-family:var(--ff); font-size:13.5px; outline:none; transition:border-color .18s ease, background .18s ease;
-}
-.global-search input:focus{border-color:var(--gold); background:var(--card-bg);}
-.global-search .gs-icon{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--text-muted); pointer-events:none;}
-.global-search-dropdown{
-  position:absolute; top:calc(100% + 10px); left:0; width:100%; min-width:320px; max-height:420px; overflow-y:auto;
-  background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-lg); border:1px solid var(--border-color); z-index:400; display:none; padding:8px;
-}
-.global-search-dropdown.open{display:block;}
-.gs-group-label{padding:8px 12px 4px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted);}
-.gs-result-item{display:flex; flex-direction:column; padding:9px 12px; border-radius:10px; font-size:13px; cursor:pointer;}
-.gs-result-item:hover{background:var(--hover-bg);}
-.gs-result-item .gs-title{font-weight:700; color:var(--text-primary);}
-.gs-result-item .gs-meta{color:var(--text-muted); font-size:11.5px; margin-top:2px;}
-@media (max-width:900px){.global-search{display:none;}}
-
-/* ---------- Quick Actions ---------- */
-.quick-actions-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px;}
-.quick-action-btn{
-  display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:16px; border-radius:14px;
-  background:var(--hover-bg); border:1px solid var(--border-color); color:var(--text-primary); text-align:left;
-  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-}
-.quick-action-btn:hover{transform:translateY(-2px); box-shadow:var(--shadow-sm); border-color:rgba(255,176,32,0.5);}
-.quick-action-btn .qa-icon{width:36px; height:36px; border-radius:10px; background:rgba(255,176,32,0.15); color:#a06600; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
-:root[data-theme="dark"] .quick-action-btn .qa-icon{color:var(--gold);}
-.quick-action-btn .qa-label{font-size:13px; font-weight:700;}
-
-/* Inventory Management */
-.badge.healthy{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.badge.low-stock{background:rgba(255,176,32,0.15); color:#a06600;}
-.badge.sold-out{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
-
-/* Customer Management */
-.cust-avatar{width:36px; height:36px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0; object-fit:cover;}
-.cust-name-cell{display:flex; align-items:center; gap:10px;}
-.status-dot-inline{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:var(--text-muted);}
-.status-dot-inline.online{background:var(--emerald); box-shadow:0 0 0 3px rgba(18,183,106,0.18);}
-.cust-actions{display:flex; gap:6px; flex-wrap:wrap;}
-.filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-.filter-bar input[type="text"]{padding:9px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px; background:var(--card-bg); color:var(--text-primary); min-width:200px;}
-
-.modal-card.modal-lg{max-width:980px; max-height:88vh; overflow-y:auto; padding:0;}
-.profile-header{display:flex; align-items:center; gap:16px; padding:26px 30px; border-bottom:1px solid var(--border-color); position:sticky; top:0; background:var(--card-bg); z-index:2;}
-.profile-header-avatar{width:64px; height:64px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; flex-shrink:0; object-fit:cover;}
-.profile-header-info{min-width:0; flex:1;}
-.profile-header-name{font-size:19px; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-.profile-header-meta{font-size:13px; color:var(--text-muted); margin-top:3px;}
-.profile-header-close{width:34px; height:34px; border-radius:10px; background:var(--hover-bg); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
-.profile-actions{display:flex; gap:8px; flex-wrap:wrap; padding:16px 30px; border-bottom:1px solid var(--border-color);}
-.profile-tabs{display:flex; gap:4px; padding:0 30px; border-bottom:1px solid var(--border-color); overflow-x:auto; background:var(--card-bg); position:sticky; top:97px; z-index:1;}
-.profile-tab{padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-muted); white-space:nowrap; border-bottom:2.5px solid transparent;}
-.profile-tab.active{color:var(--coral-dark); border-bottom-color:var(--coral);}
-.profile-tab-panel{display:none; padding:22px 30px 30px;}
-.profile-tab-panel.active{display:block;}
-.analytics-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:18px;}
-.analytics-tile{background:var(--hover-bg); border-radius:12px; padding:14px 16px;}
-.analytics-tile .num{font-size:19px; font-weight:800; color:var(--text-primary);}
-.analytics-tile .label{font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:3px;}
-.info-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px 22px;}
-.info-grid .info-item label{display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:3px;}
-.info-grid .info-item div{font-size:13.5px; color:var(--text-primary); font-weight:600;}
-.timeline{display:flex; flex-direction:column; gap:2px;}
-.timeline-item{display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--border-color);}
-.timeline-item:last-child{border-bottom:none;}
-.timeline-dot{width:9px; height:9px; border-radius:50%; background:var(--coral); flex-shrink:0; margin-top:5px;}
-.timeline-body{min-width:0;}
-.timeline-text{font-size:13.5px; font-weight:600; color:var(--text-primary);}
-.timeline-time{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
-@media (max-width:640px){ .info-grid{grid-template-columns:1fr;} .profile-header{padding:20px;} .profile-actions{padding:14px 20px;} .profile-tabs{padding:0 20px; top:89px;} .profile-tab-panel{padding:18px 20px 24px;} }
-/* ---------- Admin ticket view (mirrors the customer-facing ticket, admin theme) ---------- */
-.ticket-modal-card{max-width:480px; padding:32px;}
-.ticket-head{display:flex; align-items:center; gap:12px; margin-bottom:18px;}
-.ticket-head img{height:36px; width:auto;}
-.ticket-head .th-name{font-weight:800; color:var(--text-primary); font-size:15px;}
-.ticket-head .th-sub{color:var(--text-muted); font-size:12.5px; margin-top:2px;}
-.ticket-row{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border-color); font-size:13.5px;}
-.ticket-row span:first-child{color:var(--text-muted);}
-.ticket-row span:last-child{font-weight:700; color:var(--text-primary); text-align:right;}
-.ticket-qr{display:flex; flex-direction:column; align-items:center; gap:8px; padding:18px 0 6px; text-align:center;}
-.ticket-qr img{border:1px solid var(--border-color); border-radius:12px; padding:8px; background:#fff;}
-.ticket-qr .tq-ref{font-weight:800; color:var(--text-primary); letter-spacing:.04em; font-size:14px;}
-.ticket-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px;}
-.ticket-actions .btn{flex:1; min-width:110px; justify-content:center;}
-
-/* ================= Premium Booking Preview (Dashboard "Recent Bookings") ================= */
-.bm2-panel{padding:0; overflow:visible;}
-.bm2-head{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:24px 26px 18px;}
-.bm2-head h2{font-size:16.5px; margin-bottom:4px;}
-.bm2-head-sub{font-size:12.5px; color:var(--text-muted);}
-.bm2-head-actions{display:flex; gap:8px; flex-wrap:wrap;}
-.bm2-head-actions .btn .icon{width:14px; height:14px;}
-
-.bm2-table{overflow-x:auto;}
-.bm2-row{display:grid; grid-template-columns:var(--bm2-cols); align-items:center; gap:14px; padding:0 26px; min-width:760px;}
-.bm2-head-row{background:var(--hover-bg); position:sticky; top:0; z-index:2; padding-top:12px; padding-bottom:12px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); border-top:1px solid var(--border-color); border-bottom:1px solid var(--border-color);}
-.bm2-body{max-height:640px; overflow-y:auto;}
-.bm2-body-row{padding-top:15px; padding-bottom:15px; border-bottom:1px solid var(--border-color); cursor:pointer; transition:background .15s ease; position:relative;}
-.bm2-body-row:last-child{border-bottom:none;}
-.bm2-body-row:hover{background:var(--hover-bg);}
-.bm2-body-row.bm2-selected{background:rgba(255,176,32,0.07);}
-.bm2-check{display:flex; align-items:center;}
-.bm2-check input{width:16px; height:16px; accent-color:var(--coral); cursor:pointer;}
-
-.bm2-id{font-weight:800; color:var(--text-primary); font-size:13.5px;}
-.bm2-id-sub{font-size:10.5px; color:var(--text-muted); margin-top:2px; font-family:monospace; letter-spacing:.02em;}
-
-.bm2-cust{display:flex; align-items:center; gap:11px; min-width:0;}
-.bm2-avatar{width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--navy),var(--navy-3)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0;}
-.bm2-cust-info{min-width:0;}
-.bm2-cust-name{font-weight:700; font-size:13.5px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.bm2-cust-meta{font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-
-.bm2-travel{display:flex; align-items:center; gap:10px; min-width:0;}
-.bm2-travel-icon{width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
-.bm2-travel-icon .icon{width:17px; height:17px;}
-.bm2-travel-icon.flight{background:rgba(30,136,229,0.12); color:var(--sky);}
-.bm2-travel-icon.hotel{background:rgba(255,176,32,0.15); color:#a06600;}
-:root[data-theme="dark"] .bm2-travel-icon.hotel{color:var(--gold);}
-.bm2-travel-icon.package{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.bm2-travel-icon.cruise{background:rgba(138,92,246,0.14); color:#7c4de0;}
-.bm2-travel-info{min-width:0;}
-.bm2-travel-type{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);}
-.bm2-travel-route{font-size:12.5px; font-weight:600; color:var(--text-primary); display:flex; align-items:center; gap:6px; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.bm2-travel-route .arrow{color:var(--text-muted); flex-shrink:0; width:12px; height:12px;}
-
-.bm2-amount{font-weight:800; font-size:13.5px; color:var(--text-primary);}
-
-.bm2-badge{display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:100px; font-size:11px; font-weight:700; text-transform:capitalize; white-space:nowrap;}
-.bm2-badge::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0;}
-.bm2-badge.paid, .bm2-badge.confirmed, .bm2-badge.completed{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.bm2-badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
-:root[data-theme="dark"] .bm2-badge.pending{color:var(--gold);}
-.bm2-badge.cancelled, .bm2-badge.failed{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
-.bm2-badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky);}
-.bm2-badge.upcoming{background:rgba(138,92,246,0.14); color:#7c4de0;}
-
-.bm2-date{font-size:12.5px; color:var(--text-primary); font-weight:600;}
-
-.bm2-actions{display:flex; align-items:center; gap:6px; justify-content:flex-end;}
-.bm2-icon-btn{width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); transition:background .15s ease, color .15s ease; flex-shrink:0;}
-.bm2-icon-btn:hover{background:var(--card-bg); color:var(--text-primary); box-shadow:var(--shadow-sm);}
-.bm2-icon-btn .icon{width:16px; height:16px;}
-
-.bm2-more-wrap{position:relative;}
-.bm2-more-menu{position:absolute; top:calc(100% + 6px); right:0; min-width:196px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:var(--shadow-lg); padding:6px; z-index:50; display:none; opacity:0; transform:translateY(-6px) scale(.98); transition:opacity .15s ease, transform .15s ease;}
-.bm2-more-menu.open{display:block; opacity:1; transform:translateY(0) scale(1);}
-.bm2-more-item{display:flex; align-items:center; gap:9px; width:100%; padding:9px 10px; border-radius:8px; font-size:13px; font-weight:600; color:var(--text-primary); text-align:left;}
-.bm2-more-item:hover{background:var(--hover-bg);}
-.bm2-more-item .icon{width:15px; height:15px; color:var(--text-muted); flex-shrink:0;}
-.bm2-more-item.danger{color:var(--coral-dark);}
-.bm2-more-item.danger .icon{color:var(--coral-dark);}
-.bm2-more-divider{height:1px; background:var(--border-color); margin:5px 2px;}
-
-.bm2-empty{padding:64px 26px; text-align:center;}
-.bm2-empty .icon{width:56px; height:56px; color:var(--border-color); margin-bottom:16px; stroke-width:1.4;}
-.bm2-empty-title{font-size:14.5px; font-weight:700; color:var(--text-primary); margin-bottom:16px;}
-
-.bm2-skel-row{display:grid; grid-template-columns:var(--bm2-cols); gap:14px; align-items:center; padding:16px 26px; border-bottom:1px solid var(--border-color); min-width:760px;}
-
-@media (max-width:900px){
-  .bm2-table{overflow-x:visible;}
-  .bm2-row, .bm2-skel-row{grid-template-columns:28px 1fr auto; min-width:0;}
-  .bm2-head-row > div:nth-child(4), .bm2-head-row > div:nth-child(5), .bm2-head-row > div:nth-child(6), .bm2-head-row > div:nth-child(7), .bm2-head-row > div:nth-child(8){display:none;}
-  .bm2-body-row{display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px 14px; padding:16px 18px;}
-  .bm2-check{order:1;}
-  .bm2-id{order:2; flex-basis:60px;}
-  .bm2-cust{order:3; flex:1 1 200px;}
-  .bm2-travel{order:5; flex:1 1 100%;}
-  .bm2-amount{order:6;}
-  .bm2-badge{order:7;}
-  .bm2-date{order:8; color:var(--text-muted); font-weight:500;}
-  .bm2-actions{order:4; margin-left:auto;}
-}
-
-/* Side drawer */
-.drawer-overlay{position:fixed; inset:0; background:rgba(10,37,64,0.5); z-index:310; display:none; opacity:0; transition:opacity .25s ease;}
-.drawer-overlay.open{display:block; opacity:1;}
-.drawer-panel{position:absolute; top:0; right:0; height:100%; width:min(500px,100%); background:var(--page-bg); box-shadow:var(--shadow-lg); transform:translateX(100%); transition:transform .32s cubic-bezier(.32,.72,0,1); display:flex; flex-direction:column;}
-.drawer-overlay.open .drawer-panel{transform:translateX(0);}
-.drawer-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:24px 26px; border-bottom:1px solid var(--border-color); background:var(--card-bg); flex-shrink:0;}
-.drawer-title{font-size:17px; font-weight:800; color:var(--text-primary);}
-.drawer-body{flex:1; overflow-y:auto; padding:22px 26px 30px;}
-.drawer-footer{padding:16px 26px; border-top:1px solid var(--border-color); display:flex; flex-wrap:wrap; gap:10px; background:var(--card-bg); flex-shrink:0;}
-.drawer-section-title{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin:22px 0 10px;}
-.drawer-section-title:first-child{margin-top:0;}
-@media (max-width:640px){ .drawer-panel{width:100%;} }
-
-@media print{
-  body:not(.printing-section) > *:not(.modal-overlay):not(.drawer-overlay){display:none !important;}
-  .modal-overlay{position:static !important; background:none !important; display:block !important; padding:0 !important;}
-  .modal-overlay:not(.print-target){display:none !important;}
-  .modal-card{box-shadow:none !important; max-height:none !important; max-width:none !important;}
-  .profile-actions, .profile-header-close, .profile-tabs{display:none !important;}
-  .profile-tab-panel{display:block !important; padding:10px 0 !important;}
-  .ticket-actions{display:none !important;}
-
-  .drawer-overlay{position:static !important; background:none !important; display:block !important;}
-  .drawer-overlay:not(.print-target){display:none !important;}
-  .drawer-panel{position:static !important; width:100% !important; height:auto !important; box-shadow:none !important; transform:none !important;}
-  .drawer-head .profile-header-close, .drawer-footer{display:none !important;}
-
-  /* Printing a normal (non-modal) section, e.g. Reports — hide the sidebar/topbar/other
-     sections but keep the page's normal layout flow, unlike the modal-only rules above. */
-  body.printing-section .sidebar, body.printing-section .topbar, body.printing-section .env-banner,
-  body.printing-section .mobile-topbar, body.printing-section .sidebar-backdrop{display:none !important;}
-  body.printing-section .main{margin-left:0 !important; padding:0 !important;}
-  body.printing-section .section{display:none !important;}
-  body.printing-section .section.print-target-section{display:block !important;}
-  body.printing-section #reportsPrintBtn{display:none !important;}
-}
-
-.sidebar-backdrop{display:none;}
-.mobile-topbar{
-  display:none; align-items:center; justify-content:space-between; background:var(--sidebar-bg); color:#fff;
-  padding:14px 18px; position:sticky; top:0; z-index:250;
-}
-.mobile-topbar .brand{display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px;}
-.hamburger-btn{display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,0.08); color:#fff;}
-
-@media (max-width:1100px){
-  .stat-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
-  .charts-grid{grid-template-columns:1fr;}
-}
-@media (max-width:900px){
-  .mobile-topbar{display:flex;}
-  .sidebar{transform:translateX(-100%); width:var(--sidebar-w) !important; box-shadow:var(--shadow-lg);}
-  .layout.mobile-open .sidebar{transform:translateX(0);}
-  .layout.mobile-open .sidebar-backdrop{display:block; position:fixed; inset:0; background:rgba(10,37,64,0.45); z-index:190;}
-  .layout.collapsed .nav-item span.nav-label{display:inline;}
-  .layout.collapsed .sidebar{width:var(--sidebar-w) !important;}
-  .sidebar-collapse-btn{display:none;}
-  .main{margin-left:0; padding:20px 16px;}
-  .topbar{position:static; flex-wrap:wrap;}
-  .admin-chip-text{display:none;}
-  .topbar .current-date{display:none;}
-}
-@media (max-width:520px){
-  .stat-grid{grid-template-columns:1fr 1fr;}
-  .panel{padding:18px;}
-  .topbar h1{font-size:18px;}
-}
-</style>
-</head>
-<body>
-<div class="mobile-topbar">
-  <div class="brand"><img src="assets/favicon-180.png" alt="JackPots World Tours &amp; Travels" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> JackPots Admin</div>
-  <button type="button" class="hamburger-btn" id="mobileMenuBtn" aria-label="Open menu">
-    <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-  </button>
-</div>
-<div class="layout" id="layoutRoot">
-  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-  <nav class="sidebar">
-    <div class="brand">
-      <img class="brand-logo-full" src="assets/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-      <img class="brand-logo-collapsed" src="assets/favicon-180.png" alt="JackPots">
-    </div>
-
-    <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span>Collapse</span>
-    </button>
-
-    <div class="nav-group-label">Overview</div>
-    <a href="#" class="nav-item active" data-section="reports">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-      <span class="nav-label">Dashboard</span>
-    </a>
-    <a href="#" class="nav-item" data-section="users">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="nav-label">Merchant Management</span>
-    </a>
-    <a href="#" class="nav-item" data-section="active-users">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
-      <span class="nav-label">Active Users</span>
-    </a>
-    <a href="#" class="nav-item" data-section="contact">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
-      <span class="nav-label">Support Management</span>
-    </a>
-    <a href="#" class="nav-item" data-section="user-analytics">
-      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
-      <span class="nav-label">User Analytics</span>
-    </a>
-    <a href="#" class="nav-item" data-section="reports-export">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-      <span class="nav-label">Reports</span>
-    </a>
-    <a href="#" class="nav-item" data-section="bookings">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      <span class="nav-label">All Transactions</span>
-    </a>
-    <a href="#" class="nav-item" data-section="payments">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-      <span class="nav-label">Payment Management</span>
-    </a>
-    <a href="#" class="nav-item" data-section="refunds">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 10h18M7 15h4"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
-      <span class="nav-label">Refunds</span>
-    </a>
-    <a href="#" class="nav-item" data-section="partner-requests">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="nav-label">Partner Requests</span>
-    </a>
-    <a href="#" class="nav-item" data-section="reviews">
-      <svg class="icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>
-      <span class="nav-label">Complaint Management</span>
-    </a>
-    <a href="#" class="nav-item" data-section="notifications">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-      <span class="nav-label">Communication</span>
-    </a>
-    <a href="#" class="nav-item" data-section="profile">
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
-      <span class="nav-label">Profile</span>
-    </a>
-
-    <div class="nav-group-label">Catalog</div>
-    <a href="#" class="nav-item" data-section="flights">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/></svg>
-      <span class="nav-label">Flights</span>
-    </a>
-    <a href="#" class="nav-item" data-section="hotels">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 21V7a2 2 0 0 1 2-2h6v16"/><path d="M11 9h8a2 2 0 0 1 2 2v10"/><path d="M3 21h18"/><path d="M7 9v.01M7 13v.01M7 17v.01"/></svg>
-      <span class="nav-label">Hotels</span>
-    </a>
-    <a href="#" class="nav-item" data-section="cruises">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M2 21c1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0"/><path d="M4 18l1-9h14l1 9"/><path d="M10 9V4h4v5"/></svg>
-      <span class="nav-label">Cruises</span>
-    </a>
-    <a href="#" class="nav-item" data-section="packages">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
-      <span class="nav-label">Tour Packages</span>
-    </a>
-    <a href="#" class="nav-item" data-section="pricing">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M20.6 12.4 12.4 20.6a2 2 0 0 1-2.8 0l-8-8A2 2 0 0 1 1 11.2V4a3 3 0 0 1 3-3h7.2a2 2 0 0 1 1.4.6l8 8a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
-      <span class="nav-label">Coupons &amp; Discounts</span>
-    </a>
-
-    <div class="nav-group-label">More</div>
-    <a href="#" class="nav-item" data-section="newsletter">
-      <svg class="icon" viewBox="0 0 24 24"><path d="m22 2-11 11"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
-      <span class="nav-label">Newsletter</span>
-    </a>
-    <div class="spacer"></div>
-    <a href="index.html" class="nav-item">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-      <span class="nav-label">Back to site</span>
-    </a>
-    <a href="#" class="nav-item logout" id="logoutBtn">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-      <span class="nav-label">Sign Out</span>
-    </a>
-  </nav>
-
-  <main class="main">
-    <div class="env-banner">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/></svg>
-      <span>Mock payment gateway — all payments here are simulated, no real transactions are processed.</span>
-    </div>
-    <div class="topbar">
-      <div class="topbar-left">
-        <h1 id="pageTitle">Dashboard</h1>
-        <span class="current-date" id="currentDate"></span>
-      </div>
-      <div class="topbar-right">
-        <div class="global-search" id="globalSearchWrap">
-          <svg class="gs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="globalSearchInput" placeholder="Search customers, bookings, payments…" autocomplete="off">
-          <div class="global-search-dropdown" id="globalSearchDropdown"></div>
-        </div>
-        <div class="theme-selector" id="themeSelector" role="group" aria-label="Theme">
-          <button type="button" class="theme-selector-btn" data-theme-choice="light" title="Light theme">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-          </button>
-          <button type="button" class="theme-selector-btn" data-theme-choice="dark" title="Dark theme">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
-          </button>
-          <button type="button" class="theme-selector-btn" data-theme-choice="system" title="Match system theme">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          </button>
-        </div>
-        <div class="icon-btn-wrap">
-          <button type="button" class="icon-btn" id="notifBellBtn" title="View notifications">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-            <span class="dot" id="notifDot" style="display:none;"></span>
-          </button>
-          <div class="notif-dropdown" id="notifDropdown">
-            <div class="notif-dropdown-head">Notifications</div>
-            <div id="notifDropdownList" class="empty-state">Loading…</div>
-          </div>
-        </div>
-        <div class="admin-chip">
-          <div class="admin-avatar" id="adminAvatar">A</div>
-          <div class="admin-chip-text">
-            <span class="admin-chip-name" id="adminChipName"></span>
-            <span class="admin-chip-role" id="adminChipRole"></span>
-          </div>
-        </div>
-        <span id="adminName" class="back-link" style="display:none;"></span>
-      </div>
-    </div>
-
-    <section class="section active" id="section-reports">
-      <div class="stat-grid" id="statGridRow1"><div class="skeleton-stat-grid">
-        <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
-        <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
-        <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
-      </div></div>
-      <div class="stat-grid" id="statGridRow2"></div>
-
-      <div class="charts-grid">
-        <div class="panel">
-          <h2>Booking Trend</h2>
-          <div class="chart-wrap"><canvas id="bookingsChart"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2>Revenue Analytics</h2>
-          <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2>Booking Distribution</h2>
-          <div class="chart-wrap"><canvas id="bookingSourcesChart"></canvas></div>
-        </div>
-      </div>
-
-      <div class="panel bm2-panel">
-        <div class="bm2-head">
-          <div>
-            <h2>Recent Bookings</h2>
-            <div class="bm2-head-sub">A quick look at your latest travel bookings.</div>
-          </div>
-          <div class="bm2-head-actions">
-            <button type="button" class="btn btn-ghost btn-sm" id="dashBookingsRefreshBtn">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg> Refresh
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" data-export="bookings">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 3v13"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg> Export CSV
-            </button>
-            <button type="button" class="btn btn-navy btn-sm" id="dashBookingsViewAllBtn">
-              View all bookings
-              <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="bm2-table" id="dashBookingsTable" style="--bm2-cols:36px 84px minmax(190px,1.7fr) minmax(190px,1.5fr) minmax(110px,1fr) 108px 122px 96px 84px;">
-          <div class="bm2-row bm2-head-row">
-            <div class="bm2-check"><input type="checkbox" id="dashBookingsSelectAll" aria-label="Select all bookings"></div>
-            <div>Booking ID</div>
-            <div>Customer</div>
-            <div>Travel</div>
-            <div>Amount</div>
-            <div>Payment</div>
-            <div>Status</div>
-            <div>Date</div>
-            <div style="text-align:right;">Actions</div>
-          </div>
-          <div class="bm2-body" id="dashBookingsBody">
-            <div class="bm2-skel-row"><div class="skeleton" style="width:16px;height:16px;border-radius:4px;"></div><div class="skeleton" style="width:40px;height:14px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:70%;height:14px;"></div><div class="skeleton" style="width:70px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:80px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:60px;height:14px;"></div><div class="skeleton" style="width:60px;height:14px;"></div></div>
-            <div class="bm2-skel-row"><div class="skeleton" style="width:16px;height:16px;border-radius:4px;"></div><div class="skeleton" style="width:40px;height:14px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:70%;height:14px;"></div><div class="skeleton" style="width:70px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:80px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:60px;height:14px;"></div><div class="skeleton" style="width:60px;height:14px;"></div></div>
-            <div class="bm2-skel-row"><div class="skeleton" style="width:16px;height:16px;border-radius:4px;"></div><div class="skeleton" style="width:40px;height:14px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:80%;height:32px;border-radius:10px;"></div><div class="skeleton" style="width:70%;height:14px;"></div><div class="skeleton" style="width:70px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:80px;height:22px;border-radius:100px;"></div><div class="skeleton" style="width:60px;height:14px;"></div><div class="skeleton" style="width:60px;height:14px;"></div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-head"><h2>Recent activity feed</h2><span style="font-size:11.5px;color:var(--text-muted);font-weight:700;">Live</span></div>
-        <div id="activityFeed" class="live-feed empty-state">Loading…</div>
-      </div>
-    </section>
-
-    <section class="section" id="section-users">
-      <div class="panel" id="merchantListPanel">
-        <div class="panel-head">
-          <h2>Merchant Management</h2>
-          <button class="btn btn-coral btn-sm" id="onboardMerchantBtn">+ Onboard Merchant</button>
-        </div>
-        <div class="table-wrap"><table id="merchantsTable"><thead><tr>
-          <th>Merchant ID</th><th>Merchant Name</th><th>Company Type</th><th>Contact Person</th><th>Email</th><th>Phone Number</th><th>Status</th><th>Created Date</th><th>Actions</th>
-        </tr></thead><tbody></tbody></table></div>
-      </div>
-      <div id="merchantDetailPanel" style="display:none;"></div>
-    </section>
-
-    <section class="section" id="section-active-users">
-      <div class="panel">
-        <h2>Active users</h2>
-        <div class="table-wrap"><table id="activeUsersTable"><thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead><tbody></tbody></table></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-customers">
-      <div class="stat-grid" id="customerStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Customers</h2>
-          <div class="filter-bar">
-            <input type="text" id="customerSearch" placeholder="Search name, email, mobile, or ID…">
-            <select id="customerStatusFilter" class="status-select">
-              <option value="">All statuses</option>
-              <option value="online">Online</option>
-              <option value="offline">Offline</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="blocked">Blocked</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Unverified</option>
-            </select>
-            <select id="customerSort" class="status-select">
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="most_bookings">Most Bookings</option>
-              <option value="highest_spending">Highest Spending</option>
-              <option value="most_active">Most Active</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap"><table id="customersTable"><thead><tr>
-          <th></th><th>Customer</th><th>Mobile</th><th>Registered</th><th>Last Login</th><th>Logins</th>
-          <th>Bookings</th><th>Lifetime Spending</th><th>Payments</th><th>Points</th><th>Online</th><th>Account</th><th>Actions</th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="customersPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-user-analytics">
-      <div class="stat-grid" id="userAnalyticsStatGrid"></div>
-      <div class="panel">
-        <h2>Users by role</h2>
-        <div id="userAnalyticsByRole" class="empty-state">Loading…</div>
-      </div>
-      <div class="panel">
-        <h2>Recently joined</h2>
-        <div id="userAnalyticsRecent" class="empty-state">Loading…</div>
-      </div>
-    </section>
-
-    <section class="section" id="section-reports-export">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Reports</h2>
-          <button type="button" class="btn btn-ghost btn-sm" id="reportsPrintBtn">Print / Export PDF</button>
-        </div>
-        <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:16px;">
-          Each report below is a CSV export (opens directly in Excel or Google Sheets). Use "Print / Export PDF" for a printable summary of this page instead.
-        </p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-navy" data-export="payments">Revenue Report (CSV)</button>
-          <button class="btn btn-navy" data-export="bookings">Booking Report (CSV)</button>
-          <button class="btn btn-navy" data-export="users">Customer Report (CSV)</button>
-          <button class="btn btn-navy" data-export="contact">Support Messages (CSV)</button>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Bookings by type</h2>
-        <div id="reportsExportBookingsByType" class="empty-state">Loading…</div>
-      </div>
-      <div class="charts-grid">
-        <div class="panel">
-          <h2>Destination report</h2>
-          <div id="reportsTopDestinations" class="empty-state">Loading…</div>
-        </div>
-        <div class="panel">
-          <h2>Package performance</h2>
-          <div id="reportsTopPackages" class="empty-state">Loading…</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="section-profile">
-      <div class="panel" style="max-width:480px;">
-        <h2>My profile</h2>
-        <form id="adminProfileForm">
-          <div class="form-field" style="max-width:none;"><label>Full Name</label><input id="adminProfileName" type="text" required></div>
-          <div class="form-field" style="max-width:none;"><label>Email</label><input id="adminProfileEmail" type="email" disabled></div>
-          <button type="submit" class="btn btn-coral">Save Changes</button>
-          <div class="msg" id="adminProfileMsg"></div>
-        </form>
-      </div>
-      <div class="panel" style="max-width:480px;">
-        <h2>Change password</h2>
-        <form id="adminPasswordForm">
-          <div class="form-field" style="max-width:none;"><label>Current Password</label><input id="adminCurrentPassword" type="password" required></div>
-          <div class="form-field" style="max-width:none;"><label>New Password</label><input id="adminNewPassword" type="password" required minlength="8"></div>
-          <button type="submit" class="btn btn-navy">Change Password</button>
-          <div class="msg" id="adminPasswordMsg"></div>
-        </form>
-      </div>
-    </section>
-
-    <section class="section" id="section-flights"></section>
-    <section class="section" id="section-hotels"></section>
-    <section class="section" id="section-cruises"></section>
-    <section class="section" id="section-packages"></section>
-
-    <section class="section" id="section-inventory">
-      <div class="stat-grid" id="inventoryStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Inventory</h2>
-          <div class="filter-bar">
-            <input type="text" id="inventorySearch" placeholder="Search by name…">
-            <select id="inventoryTypeFilter" class="status-select">
-              <option value="">All types</option>
-              <option value="flight">Flights</option>
-              <option value="hotel">Hotels</option>
-              <option value="cruise">Cruises</option>
-              <option value="package">Tour Packages</option>
-            </select>
-            <select id="inventoryStatusFilter" class="status-select">
-              <option value="">All statuses</option>
-              <option value="low_stock">Low Stock</option>
-              <option value="sold_out">Sold Out</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap"><table id="inventoryTable"><thead><tr>
-          <th>Type</th><th>Name</th><th>Price</th><th>Available</th><th>Low-stock Threshold</th><th>Status</th><th></th>
-        </tr></thead><tbody></tbody></table></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-pricing">
-      <div class="panel" style="padding:0;">
-        <div class="profile-tabs" id="pricingTabs" style="position:static; padding:16px 20px 0;">
-          <div class="profile-tab active" data-ptab="seasonal">Seasonal Pricing</div>
-          <div class="profile-tab" data-ptab="campaigns">Discount Campaigns</div>
-          <div class="profile-tab" data-ptab="coupons">Coupons</div>
-        </div>
-
-        <div class="profile-tab-panel active" id="pricingTab-seasonal" style="padding:20px;">
-          <h2 style="font-size:15px;margin-bottom:14px;">Add seasonal price override</h2>
-          <form id="seasonalForm">
-            <div class="form-grid">
-              <div class="form-field"><label>Item Type</label>
-                <select name="item_type" required>
-                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
-                  <option value="cruise">Cruise</option><option value="package">Package</option>
-                </select>
-              </div>
-              <div class="form-field"><label>Item ID</label><input name="item_id" type="number" min="1" required></div>
-              <div class="form-field"><label>Start Date</label><input name="start_date" type="date" required></div>
-              <div class="form-field"><label>End Date</label><input name="end_date" type="date" required></div>
-              <div class="form-field"><label>Override Price (₹)</label><input name="override_price" type="number" min="1" step="0.01" required></div>
-              <div class="form-field"><label>Label</label><input name="label" type="text" placeholder="e.g. Christmas Week"></div>
-            </div>
-            <button type="submit" class="btn btn-coral">Add Seasonal Price</button>
-            <div class="msg" id="seasonalMsg"></div>
-          </form>
-          <div class="table-wrap" style="margin-top:18px;"><table id="seasonalTable"><thead><tr>
-            <th>Item</th><th>Type</th><th>Dates</th><th>Override Price</th><th>Label</th><th>Active</th><th></th>
-          </tr></thead><tbody></tbody></table></div>
-        </div>
-
-        <div class="profile-tab-panel" id="pricingTab-campaigns" style="padding:20px;">
-          <h2 style="font-size:15px;margin-bottom:14px;">Create discount campaign</h2>
-          <form id="campaignForm">
-            <div class="form-grid">
-              <div class="form-field"><label>Name</label><input name="name" type="text" required></div>
-              <div class="form-field"><label>Applies To</label>
-                <select name="applicable_type">
-                  <option value="">All Types</option>
-                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
-                  <option value="cruise">Cruise</option><option value="package">Package</option>
-                </select>
-              </div>
-              <div class="form-field"><label>Discount Type</label>
-                <select name="discount_type"><option value="percent">Percent</option><option value="flat">Flat (₹)</option></select>
-              </div>
-              <div class="form-field"><label>Discount Value</label><input name="discount_value" type="number" min="0.01" step="0.01" required></div>
-              <div class="form-field"><label>Start Date</label><input name="start_date" type="date" required></div>
-              <div class="form-field"><label>End Date</label><input name="end_date" type="date" required></div>
-            </div>
-            <div class="form-field" style="max-width:none;"><label>Description</label><input name="description" type="text"></div>
-            <button type="submit" class="btn btn-coral">Create Campaign</button>
-            <div class="msg" id="campaignMsg"></div>
-          </form>
-          <div class="table-wrap" style="margin-top:18px;"><table id="campaignsTable"><thead><tr>
-            <th>Name</th><th>Applies To</th><th>Discount</th><th>Dates</th><th>Active</th><th></th>
-          </tr></thead><tbody></tbody></table></div>
-        </div>
-
-        <div class="profile-tab-panel" id="pricingTab-coupons" style="padding:20px;">
-          <h2 style="font-size:15px;margin-bottom:14px;">Create coupon</h2>
-          <form id="couponForm">
-            <div class="form-grid">
-              <div class="form-field"><label>Code</label><input name="code" type="text" required placeholder="e.g. SAVE500" style="text-transform:uppercase;"></div>
-              <div class="form-field"><label>Applies To</label>
-                <select name="applicable_type">
-                  <option value="">All Types</option>
-                  <option value="flight">Flight</option><option value="hotel">Hotel</option>
-                  <option value="cruise">Cruise</option><option value="package">Package</option>
-                </select>
-              </div>
-              <div class="form-field"><label>Discount Type</label>
-                <select name="discount_type"><option value="percent">Percent</option><option value="flat">Flat (₹)</option></select>
-              </div>
-              <div class="form-field"><label>Discount Value</label><input name="discount_value" type="number" min="0.01" step="0.01" required></div>
-              <div class="form-field"><label>Min Booking Amount (₹)</label><input name="min_booking_amount" type="number" min="0" step="0.01"></div>
-              <div class="form-field"><label>Usage Limit</label><input name="usage_limit" type="number" min="1" placeholder="Unlimited"></div>
-              <div class="form-field"><label>Valid From</label><input name="valid_from" type="date" required></div>
-              <div class="form-field"><label>Valid Until</label><input name="valid_until" type="date" required></div>
-            </div>
-            <div class="form-field" style="max-width:none;"><label>Description</label><input name="description" type="text"></div>
-            <button type="submit" class="btn btn-coral">Create Coupon</button>
-            <div class="msg" id="couponMsg"></div>
-          </form>
-          <div class="table-wrap" style="margin-top:18px;"><table id="couponsTable"><thead><tr>
-            <th>Code</th><th>Applies To</th><th>Discount</th><th>Min Amount</th><th>Usage</th><th>Valid Until</th><th>Active</th><th></th>
-          </tr></thead><tbody></tbody></table></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="section-bookings">
-      <div class="panel">
-        <h2>All bookings</h2>
-        <div class="table-wrap"><table id="bookingsTable"><thead><tr><th>Customer</th><th>Type</th><th>Item</th><th>Price</th><th>Travel date</th><th>Status</th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="bookingsPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-booking-management">
-      <div class="stat-grid" id="bmStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Booking Management Center</h2>
-          <div class="filter-bar">
-            <input type="text" id="bmSearch" placeholder="Search booking ID, customer, or destination…">
-            <select id="bmTypeFilter" class="status-select">
-              <option value="">All types</option>
-              <option value="flight">Flights</option>
-              <option value="hotel">Hotels</option>
-              <option value="cruise">Cruises</option>
-              <option value="package">Tour Packages</option>
-            </select>
-            <select id="bmStatusFilter" class="status-select">
-              <option value="">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <select id="bmPaymentFilter" class="status-select">
-              <option value="">All payments</option>
-              <option value="success">Paid</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </select>
-            <input type="date" id="bmDateFrom" title="From date">
-            <input type="date" id="bmDateTo" title="To date">
-            <select id="bmSort" class="status-select">
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="travel_date">Travel Date</option>
-              <option value="amount">Amount</option>
-              <option value="status">Booking Status</option>
-              <option value="customer_name">Customer Name</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap"><table id="bmTable"><thead><tr>
-          <th>Booking ID</th><th>Customer</th><th>Type</th><th>Destination</th><th>Booking Date</th>
-          <th>Travel Date</th><th>Passengers</th><th>Amount</th><th>Payment</th><th>Status</th><th></th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="bmPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-payments">
-      <div class="panel">
-        <h2>All payments</h2>
-        <div class="table-wrap"><table id="paymentsTable"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th><th>Date</th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="paymentsPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-payment-management">
-      <div class="stat-grid" id="pmStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Payment Management Center</h2>
-          <div class="filter-bar">
-            <input type="text" id="pmSearch" placeholder="Search transaction, customer, or destination…">
-            <select id="pmStatusFilter" class="status-select">
-              <option value="">All statuses</option>
-              <option value="success">Paid</option>
-              <option value="failed">Failed</option>
-              <option value="refunded">Refunded</option>
-            </select>
-            <input type="date" id="pmDateFrom" title="From date">
-            <input type="date" id="pmDateTo" title="To date">
-            <select id="pmSort" class="status-select">
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="amount">Amount</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap"><table id="pmTable"><thead><tr>
-          <th>Transaction ID</th><th>Customer</th><th>Booking</th><th>Amount</th><th>Gateway</th>
-          <th>Method</th><th>Status</th><th>Refund Status</th><th>Payment Date</th><th>Actions</th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="pmPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-refunds">
-      <div class="stat-grid" id="rfStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Refunds</h2>
-          <div class="filter-bar">
-            <select id="rfViewFilter" class="status-select">
-              <option value="success">Refundable (not yet refunded)</option>
-              <option value="refunded">Refund history</option>
-            </select>
-            <input type="text" id="rfSearch" placeholder="Search transaction, customer, or destination…">
-          </div>
-        </div>
-        <div class="table-wrap"><table id="rfTable"><thead><tr>
-          <th>Transaction ID</th><th>Customer</th><th>Booking</th><th>Amount</th><th>Method</th>
-          <th>Status</th><th>Refund Ref</th><th>Refunded At</th><th>Actions</th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="rfPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-partner-requests">
-      <div class="panel" style="padding:0;">
-        <div class="profile-tabs" id="prTabs" style="position:static; padding:16px 20px 0;">
-          <div class="profile-tab active" data-pr-tab="bookings">Booking Approvals</div>
-          <div class="profile-tab" data-pr-tab="service-requests">Service Requests</div>
-        </div>
-        <div style="padding:20px;">
-          <div class="filter-bar" id="prFilterBar"></div>
-          <div class="table-wrap"><table id="prTable"><thead><tr id="prTableHead"></tr></thead><tbody id="prTableBody"></tbody></table></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="section-contact">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Contact messages</h2>
-          <button class="btn btn-ghost btn-sm" data-export="contact">Export CSV</button>
-        </div>
-        <div class="table-wrap"><table id="contactTable"><thead><tr><th>Name</th><th>Email</th><th>Subject</th><th>Message</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="contactPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-newsletter">
-      <div class="panel">
-        <h2>Newsletter subscribers</h2>
-        <div class="table-wrap"><table id="newsletterTable"><thead><tr><th>Email</th><th>Subscribed</th></tr></thead><tbody></tbody></table></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-reviews">
-      <div class="panel">
-        <h2>All reviews</h2>
-        <div class="table-wrap"><table id="reviewsTable"><thead><tr><th>Customer</th><th>Item</th><th>Rating</th><th>Comment</th><th>Date</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="reviewsPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-wishlist">
-      <div class="panel">
-        <h2>All wishlist entries</h2>
-        <div class="table-wrap"><table id="wishlistTable"><thead><tr><th>Customer</th><th>Item</th><th>Saved</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="wishlistPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-notifications">
-      <div class="panel">
-        <h2>Send notification</h2>
-        <form id="notificationForm">
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Recipient</label>
-              <select name="user_id" id="notificationRecipient"><option value="">All Users</option></select>
-            </div>
-            <div class="form-field"><label>Title</label><input name="title" type="text" required></div>
-          </div>
-          <div class="form-field" style="max-width:none;"><label>Message</label><input name="message" type="text" required></div>
-          <button type="submit" class="btn btn-coral">Send Notification</button>
-          <div class="msg" id="notificationMsg"></div>
-        </form>
-      </div>
-      <div class="panel">
-        <h2>All notifications</h2>
-        <div class="table-wrap"><table id="notificationsTable"><thead><tr><th>Recipient</th><th>Title</th><th>Message</th><th>Status</th><th>Date</th></tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="notificationsPagination"></div>
-      </div>
-    </section>
-
-    <section class="section" id="section-activity">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>User activity monitor</h2>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <input type="text" id="activitySearch" placeholder="Search user or action…" style="padding:9px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px;">
-            <select id="activityModuleFilter" class="status-select"><option value="">All modules</option></select>
-            <select id="activityFilter" class="status-select"><option value="">All actions</option></select>
-          </div>
-        </div>
-        <div class="table-wrap"><table id="activityTable"><thead><tr>
-          <th>Activity Time</th><th>User Name</th><th>Email</th><th>User ID</th><th>Activity Type</th>
-          <th>Module</th><th>Description</th><th>IP Address</th><th>Browser</th><th>Device</th><th>Status</th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="activityPagination"></div>
-      </div>
-    </section>
-  </main>
-</div>
-
-
-<div class="modal-overlay" id="customerModalOverlay">
-  <div class="modal-card modal-lg">
-    <div class="profile-header">
-      <div class="profile-header-avatar" id="custProfileAvatar">C</div>
-      <div class="profile-header-info">
-        <div class="profile-header-name">
-          <span id="custProfileName">—</span>
-          <span class="status-dot-inline" id="custProfileOnlineDot"></span>
-          <span id="custProfileBadges"></span>
-        </div>
-        <div class="profile-header-meta" id="custProfileMeta">—</div>
-      </div>
-      <button type="button" class="profile-header-close" id="customerModalCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="profile-actions" id="custProfileActions"></div>
-    <div class="profile-tabs" id="custProfileTabs">
-      <div class="profile-tab active" data-tab="overview">Overview</div>
-      <div class="profile-tab" data-tab="bookings">Bookings</div>
-      <div class="profile-tab" data-tab="payments">Payments</div>
-      <div class="profile-tab" data-tab="timeline">Activity Timeline</div>
-      <div class="profile-tab" data-tab="support">Support</div>
-      <div class="profile-tab" data-tab="reviews">Reviews</div>
-      <div class="profile-tab" data-tab="wishlist">Wishlist</div>
-    </div>
-    <div class="profile-tab-panel active" id="custTab-overview"></div>
-    <div class="profile-tab-panel" id="custTab-bookings"></div>
-    <div class="profile-tab-panel" id="custTab-payments"></div>
-    <div class="profile-tab-panel" id="custTab-timeline"></div>
-    <div class="profile-tab-panel" id="custTab-support"></div>
-    <div class="profile-tab-panel" id="custTab-reviews"></div>
-    <div class="profile-tab-panel" id="custTab-wishlist"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="customerEditModalOverlay">
-  <div class="modal-card">
-    <h2>Edit Customer</h2>
-    <form id="customerEditForm">
-      <div class="form-grid">
-        <div class="form-field"><label>Full Name</label><input name="full_name" type="text" required></div>
-        <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
-        <div class="form-field"><label>Mobile</label><input name="mobile" type="text"></div>
-        <div class="form-field"><label>Gender</label><input name="gender" type="text"></div>
-        <div class="form-field"><label>Date of Birth</label><input name="dob" type="date"></div>
-        <div class="form-field"><label>Country</label><input name="country" type="text"></div>
-        <div class="form-field"><label>State</label><input name="state" type="text"></div>
-        <div class="form-field"><label>City</label><input name="city" type="text"></div>
-      </div>
-      <div class="form-field" style="max-width:none;"><label>Address</label><input name="address" type="text"></div>
-      <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin:8px 0 16px;">
-        <input name="is_verified" type="checkbox" style="width:16px;height:16px;"> Mark as verified
-      </label>
-      <div class="msg" id="customerEditMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Save Changes</button>
-        <button type="button" class="btn btn-ghost" id="customerEditCancelBtn">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal-overlay" id="inventoryAdjustModalOverlay">
-  <div class="modal-card">
-    <h2 id="inventoryAdjustTitle">Adjust Inventory</h2>
-    <form id="inventoryAdjustForm">
-      <div class="form-field" style="max-width:none;"><label>Available</label><input name="available" type="number" min="0" required></div>
-      <div class="form-field" style="max-width:none;"><label>Low-stock Threshold</label><input name="low_stock_threshold" type="number" min="0" required></div>
-      <div class="msg" id="inventoryAdjustMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Save</button>
-        <button type="button" class="btn btn-ghost" id="inventoryAdjustCancelBtn">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal-overlay" id="bmModalOverlay">
-  <div class="modal-card modal-lg">
-    <div class="profile-header">
-      <div class="profile-header-avatar" id="bmProfileAvatar">B</div>
-      <div class="profile-header-info">
-        <div class="profile-header-name">
-          <span id="bmProfileName">—</span>
-          <span id="bmProfileBadges"></span>
-        </div>
-        <div class="profile-header-meta" id="bmProfileMeta">—</div>
-      </div>
-      <button type="button" class="profile-header-close" id="bmModalCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="profile-actions" id="bmProfileActions"></div>
-    <div class="profile-tabs" id="bmProfileTabs">
-      <div class="profile-tab active" data-tab="overview">Overview</div>
-      <div class="profile-tab" data-tab="payment">Payment</div>
-      <div class="profile-tab" data-tab="timeline">Booking Timeline</div>
-      <div class="profile-tab" data-tab="inventory">Inventory</div>
-    </div>
-    <div class="profile-tab-panel active" id="bmTab-overview"></div>
-    <div class="profile-tab-panel" id="bmTab-payment"></div>
-    <div class="profile-tab-panel" id="bmTab-timeline"></div>
-    <div class="profile-tab-panel" id="bmTab-inventory"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="adminTicketOverlay">
-  <div class="modal-card ticket-modal-card" id="adminTicketBody"></div>
-</div>
-
-<div class="drawer-overlay" id="bookingDrawerOverlay">
-  <div class="drawer-panel">
-    <div class="drawer-head">
-      <div>
-        <div class="drawer-title" id="drawerTitle">Booking</div>
-        <div class="bm2-head-sub" id="drawerSubtitle"></div>
-      </div>
-      <button type="button" class="profile-header-close" id="drawerCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="drawer-body" id="drawerBody"></div>
-    <div class="drawer-footer" id="drawerFooter"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="bmSmallModalOverlay">
-  <div class="modal-card">
-    <h2 id="bmSmallModalTitle">Reschedule Booking</h2>
-    <form id="bmSmallModalForm">
-      <div class="form-field" style="max-width:none;">
-        <label id="bmSmallModalLabel">New Travel Date</label>
-        <input id="bmSmallModalInput" type="date" required>
-      </div>
-      <div class="msg" id="bmSmallModalMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Save</button>
-        <button type="button" class="btn btn-ghost" id="bmSmallModalCancelBtn">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal-overlay" id="prBookingModalOverlay">
-  <div class="modal-card modal-lg" id="prBookingModalBody"></div>
-</div>
-
-<div class="modal-overlay" id="prServiceRequestModalOverlay">
-  <div class="modal-card" id="prServiceRequestModalBody"></div>
-</div>
-
-<div class="modal-overlay" id="onboardMerchantModalOverlay">
-  <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
-</div>
-
-<div class="modal-overlay" id="createMerchantUserModalOverlay">
-  <div class="modal-card modal-lg" id="createMerchantUserModalBody"></div>
-</div>
-
-<div class="modal-overlay" id="customerMsgModalOverlay">
-  <div class="modal-card">
-    <h2 id="customerMsgModalTitle">Send Notification</h2>
-    <form id="customerMsgForm">
-      <div class="form-field" style="max-width:none;"><label id="customerMsgTitleLabel">Title</label><input name="title" type="text" required></div>
-      <div class="form-field" style="max-width:none;"><label>Message</label><input name="message" type="text" required></div>
-      <div class="msg" id="customerMsgFormMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Send</button>
-        <button type="button" class="btn btn-ghost" id="customerMsgCancelBtn">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script>
 'use strict';
 const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
 /* Escape user-supplied text before inserting into innerHTML templates */
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
+/* escapeHtml/money/fmtDate/fmtDateTime/fmtTime now live in shared/formatters.js. */
 
 const access = localStorage.getItem('jwt_access');
 const role = localStorage.getItem('jwt_user_role');
 if (!access || role !== 'admin') {
-  window.location.href = 'index.html';
+  window.location.href = '../index.html';
 }
 document.getElementById('adminName').textContent = localStorage.getItem('jwt_user_name') || '';
 
-function authHeaders() {
-  return { Authorization: `Bearer ${localStorage.getItem('jwt_access')}` };
-}
-function money(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
-function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
-function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
-function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }
+/* authHeaders() now lives in assets/js/auth.js, loaded before this file. */
 
 /* Render Prev/Next pagination controls into a container; onChange(newPage) reloads the table */
 function renderPagination(containerId, page, totalPages, total, onChange) {
@@ -1384,7 +37,7 @@ document.getElementById('logoutBtn').addEventListener('click', async e => {
   localStorage.removeItem('jwt_refresh');
   localStorage.removeItem('jwt_user_name');
   localStorage.removeItem('jwt_user_role');
-  window.location.href = 'index.html';
+  window.location.href = '../index.html';
 });
 
 /* ---------- Section navigation ---------- */
@@ -1992,16 +645,44 @@ const ROLE_TYPE_LABELS = { admin: 'Admin', user: 'User', maker: 'Maker', checker
 const MEMBER_ROLE_LABELS = { admin: 'Admin', user: 'User', data_operator: 'Data Operator', request_ticket: 'Request Ticket', cancellation_ticket: 'Cancellation Ticket', supervisor: 'Supervisor', manager: 'Manager' };
 const ROLE_TYPE_MEMBER_ROLES = { admin: ['admin'], user: ['user'], maker: ['data_operator', 'request_ticket', 'cancellation_ticket'], checker: ['supervisor', 'manager'] };
 
-async function loadMerchants() {
-  document.getElementById('merchantListPanel').style.display = '';
-  document.getElementById('merchantDetailPanel').style.display = 'none';
+let merchantsPage = 1;
+let merchantSearchTimer = null;
+const merchantSelectedIds = new Set();
+
+function updateMerchantBulkBar() {
+  const bar = document.getElementById('merchantBulkBar');
+  const count = merchantSelectedIds.size;
+  document.getElementById('merchantBulkCount').textContent = `${count} selected`;
+  bar.classList.toggle('open', count > 0);
+}
+
+async function loadMerchants(page = merchantsPage) {
+  merchantsPage = page;
+  merchantSelectedIds.clear();
+  updateMerchantBulkBar();
+  showMerchantView('list');
   document.getElementById('merchantDetailPanel').innerHTML = '';
   const tbody = document.querySelector('#merchantsTable tbody');
-  tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="10" class="empty-state">Loading…</td></tr>`;
+  const search = document.getElementById('merchantSearch').value;
+  const status = document.getElementById('merchantStatusFilter').value;
+  const dateFrom = document.getElementById('merchantDateFrom').value;
+  const dateTo = document.getElementById('merchantDateTo').value;
+  const sort = document.getElementById('merchantSort').value;
   try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders() });
-    tbody.innerHTML = data.map(m => `
+    const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, {
+      headers: authHeaders(),
+      params: {
+        search: search || undefined, status: status || undefined,
+        date_from: dateFrom || undefined, date_to: dateTo || undefined,
+        sort, page, page_size: PAGE_SIZE,
+      },
+    });
+    renderPagination('merchantsPagination', data.page, data.total_pages, data.total, loadMerchants);
+    document.getElementById('merchantSelectAll').checked = false;
+    tbody.innerHTML = data.items.map(m => `
       <tr>
+        <td class="mm-checkbox-col"><input type="checkbox" class="mm-row-check" data-select-merchant="${m.partner_id}" ${merchantSelectedIds.has(m.partner_id) ? 'checked' : ''}></td>
         <td>MRC-${m.partner_id}</td>
         <td>${escapeHtml(m.company_name)}</td>
         <td>${escapeHtml(COMPANY_TYPE_LABELS[m.company_type] || '—')}</td>
@@ -2014,9 +695,17 @@ async function loadMerchants() {
           <button class="btn btn-ghost btn-sm" data-view-merchant="${m.partner_id}">View</button>
           <button class="btn btn-ghost btn-sm" data-edit-merchant="${m.partner_id}">Edit</button>
           <button class="btn btn-sm ${m.status === 'active' ? 'btn-danger' : 'btn-navy'}" data-toggle-merchant="${m.partner_id}" data-next="${m.status === 'active' ? 'inactive' : 'active'}">${m.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+          <button class="btn btn-danger btn-sm" data-delete-merchant="${m.partner_id}">Delete</button>
         </td>
       </tr>
-    `).join('') || `<tr><td colspan="9" class="empty-state">No merchants onboarded yet.</td></tr>`;
+    `).join('') || `<tr><td colspan="10" class="empty-state">No merchants found.</td></tr>`;
+    tbody.querySelectorAll('[data-select-merchant]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = Number(cb.dataset.selectMerchant);
+        if (cb.checked) merchantSelectedIds.add(id); else merchantSelectedIds.delete(id);
+        updateMerchantBulkBar();
+      });
+    });
     tbody.querySelectorAll('[data-view-merchant]').forEach(btn => btn.addEventListener('click', () => openMerchantDetail(btn.dataset.viewMerchant)));
     tbody.querySelectorAll('[data-edit-merchant]').forEach(btn => btn.addEventListener('click', () => openOnboardMerchantModal(btn.dataset.editMerchant)));
     tbody.querySelectorAll('[data-toggle-merchant]').forEach(btn => {
@@ -2027,11 +716,49 @@ async function loadMerchants() {
         } catch (err) { alert(err.response?.data?.detail || 'Failed to update merchant.'); }
       });
     });
+    tbody.querySelectorAll('[data-delete-merchant]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this merchant? This cannot be undone.')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/admin/merchants/${btn.dataset.deleteMerchant}`, { headers: authHeaders() });
+          loadMerchants(1);
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to delete merchant.'); }
+      });
+    });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load merchants.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-state">Failed to load merchants.</td></tr>`;
   }
 }
 document.getElementById('onboardMerchantBtn').addEventListener('click', () => openOnboardMerchantModal(null));
+document.getElementById('topCreateMerchantUserBtn').addEventListener('click', () => openCreateMerchantUserPage(null, null));
+document.getElementById('merchantsRefreshBtn').addEventListener('click', () => loadMerchants(merchantsPage));
+document.getElementById('merchantSearch').addEventListener('input', () => {
+  clearTimeout(merchantSearchTimer);
+  merchantSearchTimer = setTimeout(() => loadMerchants(1), 350);
+});
+document.getElementById('merchantStatusFilter').addEventListener('change', () => loadMerchants(1));
+document.getElementById('merchantDateFrom').addEventListener('change', () => loadMerchants(1));
+document.getElementById('merchantDateTo').addEventListener('change', () => loadMerchants(1));
+document.getElementById('merchantSort').addEventListener('change', () => loadMerchants(1));
+document.getElementById('merchantSelectAll').addEventListener('change', e => {
+  document.querySelectorAll('#merchantsTable [data-select-merchant]').forEach(cb => {
+    cb.checked = e.target.checked;
+    const id = Number(cb.dataset.selectMerchant);
+    if (e.target.checked) merchantSelectedIds.add(id); else merchantSelectedIds.delete(id);
+  });
+  updateMerchantBulkBar();
+});
+document.getElementById('merchantBulkClearBtn').addEventListener('click', () => loadMerchants(merchantsPage));
+async function merchantBulkSetStatus(action) {
+  const ids = [...merchantSelectedIds];
+  if (!ids.length) return;
+  try {
+    await Promise.all(ids.map(id => axios.post(`${API_BASE}/api/admin/merchants/${id}/${action}`, {}, { headers: authHeaders() })));
+  } catch (err) { alert('Some merchants could not be updated.'); }
+  loadMerchants(merchantsPage);
+}
+document.getElementById('merchantBulkActivateBtn').addEventListener('click', () => merchantBulkSetStatus('activate'));
+document.getElementById('merchantBulkDeactivateBtn').addEventListener('click', () => merchantBulkSetStatus('deactivate'));
 
 /* ---------- Onboard / Edit Merchant modal ---------- */
 async function openOnboardMerchantModal(partnerId) {
@@ -2098,10 +825,8 @@ async function openOnboardMerchantModal(partnerId) {
 
 /* ---------- Merchant Details ---------- */
 async function openMerchantDetail(partnerId) {
-  const listPanel = document.getElementById('merchantListPanel');
   const detailPanel = document.getElementById('merchantDetailPanel');
-  listPanel.style.display = 'none';
-  detailPanel.style.display = '';
+  showMerchantView('detail');
   detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Loading…</div></div>`;
   try {
     const { data: m } = await axios.get(`${API_BASE}/api/admin/merchants/${partnerId}`, { headers: authHeaders() });
@@ -2136,7 +861,7 @@ async function openMerchantDetail(partnerId) {
       </div>
     `;
     document.getElementById('backToMerchantsBtn').addEventListener('click', loadMerchants);
-    document.getElementById('createMerchantUserBtn').addEventListener('click', () => openCreateMerchantUserModal(partnerId, m.company_name));
+    document.getElementById('createMerchantUserBtn').addEventListener('click', () => openCreateMerchantUserPage(partnerId, m.company_name));
     loadMerchantUsersTable(partnerId);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
@@ -2191,36 +916,134 @@ async function loadMerchantUsersTable(partnerId) {
   }
 }
 
-/* ---------- Create User modal ---------- */
-function openCreateMerchantUserModal(partnerId, merchantName) {
-  const overlay = document.getElementById('createMerchantUserModalOverlay');
-  const body = document.getElementById('createMerchantUserModalBody');
-  body.innerHTML = `
-    <h2>Create User</h2>
-    <form id="createMerchantUserForm">
-      <div class="form-grid">
-        <div class="form-field"><label>Merchant Name</label><input value="${escapeHtml(merchantName)}" disabled></div>
-        <div class="form-field"><label>User ID</label><input value="Auto-generated on save" disabled></div>
-        <div class="form-field"><label>User Full Name</label><input name="full_name" required></div>
-        <div class="form-field"><label>Username</label><input name="username" required minlength="3"></div>
-        <div class="form-field"><label>Email ID</label><input name="email" type="email" required></div>
-        <div class="form-field"><label>Phone Number</label><input name="phone_number" required></div>
-        <div class="form-field"><label>Password</label><input name="password" type="password" required minlength="8"></div>
-        <div class="form-field"><label>Confirm Password</label><input name="confirm_password" type="password" required minlength="8"></div>
-        <div class="form-field"><label>Role Type</label>
-          <select name="role_type" id="cmuRoleType" required>
-            ${Object.entries(ROLE_TYPE_LABELS).map(([val, label]) => `<option value="${val}">${label}</option>`).join('')}
-          </select>
+/* ---------- Create Merchant User -- dedicated full page ----------
+   This is NOT a modal/dialog/popup. It is a third view inside
+   #section-users (alongside the merchant list and merchant detail views),
+   shown by hiding the other two and rendering full-page content into
+   #merchantCreateUserPanel -- the same "swap the visible panel" mechanism
+   openMerchantDetail() already uses to move from the list to a merchant's
+   detail view. showMerchantView() below is the single place that decides
+   which of the three is visible.
+
+   Called two ways:
+   - From Merchant Detail's own "+ Create User" button: partnerId + merchantName
+     are already known, so the Merchant field is shown as read-only text
+     (unchanged behavior) and "Back"/"Cancel" return to that merchant's detail view.
+   - From Merchant Management's top-level "+ Create User" button: partnerId is
+     null, so a Merchant dropdown is shown instead, populated from the same
+     /api/admin/merchants endpoint the list page uses. "Back"/"Cancel" return
+     to the merchant list. */
+function showMerchantView(view) {
+  document.getElementById('merchantBreadcrumb').innerHTML = view === 'create-user'
+    ? 'Admin Portal / <a href="#" id="mmBreadcrumbBackLink">Merchant Management</a> / <span>Create User</span>'
+    : 'Admin Portal / <span>Merchant Management</span>';
+  document.getElementById('merchantListPanel').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('merchantDetailPanel').style.display = view === 'detail' ? '' : 'none';
+  document.getElementById('merchantCreateUserPanel').style.display = view === 'create-user' ? '' : 'none';
+  document.getElementById('mmBreadcrumbBackLink')?.addEventListener('click', e => { e.preventDefault(); loadMerchants(merchantsPage); });
+}
+
+async function openCreateMerchantUserPage(partnerId, merchantName) {
+  const panel = document.getElementById('merchantCreateUserPanel');
+  const goBack = () => partnerId ? openMerchantDetail(partnerId) : loadMerchants(merchantsPage);
+
+  let merchantOptions = [];
+  if (!partnerId) {
+    panel.innerHTML = `<div class="panel"><div class="empty-state">Loading merchants…</div></div>`;
+    showMerchantView('create-user');
+    try {
+      const { data } = await axios.get(`${API_BASE}/api/admin/merchants`, {
+        headers: authHeaders(), params: { status: 'active', sort: 'name_asc', page: 1, page_size: 100 },
+      });
+      merchantOptions = data.items;
+    } catch (err) {
+      panel.innerHTML = `<div class="panel"><div class="msg error">Failed to load merchants.</div></div>`;
+      return;
+    }
+    if (!merchantOptions.length) {
+      panel.innerHTML = `<div class="panel"><div class="empty-state">No active merchants to assign a user to. Onboard a merchant first.</div></div>`;
+      return;
+    }
+  } else {
+    showMerchantView('create-user');
+  }
+
+  const merchantFieldHtml = partnerId
+    ? `<div class="form-field"><label>Merchant Name</label><input value="${escapeHtml(merchantName)}" disabled></div>`
+    : `<div class="form-field"><label>Merchant<span class="mm-required">*</span></label>
+        <select name="partner_id" id="cmuPartnerId" required>
+          ${merchantOptions.map(m => `<option value="${m.partner_id}">${escapeHtml(m.company_name)} (MRC-${m.partner_id})</option>`).join('')}
+        </select>
+        <div class="field-error"></div>
+      </div>`;
+
+  panel.innerHTML = `
+    <div class="mm-page-head">
+      <div class="mm-page-head-left">
+        <button type="button" class="mm-back-btn" id="cmuBackBtn" aria-label="Back to Merchant Management">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <div class="mm-page-title">Create Merchant User</div>
+          <div class="mm-page-sub">${partnerId ? `Adding a user under ${escapeHtml(merchantName)}` : 'Add a new login for one of your onboarded merchants'}</div>
         </div>
-        <div class="form-field"><label>Member Role</label><select name="member_role" id="cmuMemberRole" required></select></div>
       </div>
-      <div class="msg" id="createMerchantUserMsg"></div>
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Create User</button>
-        <button type="button" class="btn btn-ghost" id="createMerchantUserCancelBtn">Cancel</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="cmuCancelTopBtn">Cancel</button>
+    </div>
+
+    <form id="createMerchantUserForm" novalidate>
+      <div class="panel mm-form-section">
+        <h3>Merchant Information</h3>
+        <div class="mm-section-sub">Which merchant this login belongs to.</div>
+        <div class="form-grid">
+          ${merchantFieldHtml}
+          <div class="form-field"><label>User ID</label><input value="Auto-generated on save" disabled></div>
+        </div>
+      </div>
+
+      <div class="panel mm-form-section">
+        <h3>Account Information</h3>
+        <div class="mm-section-sub">Identity and contact details for this user.</div>
+        <div class="form-grid">
+          <div class="form-field"><label>User Full Name<span class="mm-required">*</span></label><input name="full_name" required><div class="field-error"></div></div>
+          <div class="form-field"><label>Username<span class="mm-required">*</span></label><input name="username" required minlength="3"><div class="field-error"></div></div>
+          <div class="form-field"><label>Email ID<span class="mm-required">*</span></label><input name="email" type="email" required><div class="field-error"></div></div>
+          <div class="form-field"><label>Phone Number<span class="mm-required">*</span></label><input name="phone_number" required><div class="field-error"></div></div>
+        </div>
+      </div>
+
+      <div class="panel mm-form-section">
+        <h3>Authentication</h3>
+        <div class="mm-section-sub">Login credentials for this user.</div>
+        <div class="form-grid">
+          <div class="form-field"><label>Password<span class="mm-required">*</span></label><input name="password" type="password" required minlength="8"><div class="field-error"></div></div>
+          <div class="form-field"><label>Confirm Password<span class="mm-required">*</span></label><input name="confirm_password" type="password" required minlength="8"><div class="field-error"></div></div>
+        </div>
+      </div>
+
+      <div class="panel mm-form-section">
+        <h3>Permissions</h3>
+        <div class="mm-section-sub">Access level within the Merchant Portal.</div>
+        <div class="form-grid">
+          <div class="form-field"><label>Role Type<span class="mm-required">*</span></label>
+            <select name="role_type" id="cmuRoleType" required>
+              ${Object.entries(ROLE_TYPE_LABELS).map(([val, label]) => `<option value="${val}">${label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-field"><label>Member Role<span class="mm-required">*</span></label><select name="member_role" id="cmuMemberRole" required></select></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="msg" id="createMerchantUserMsg"></div>
+        <div class="mm-form-actions">
+          <button type="button" class="btn btn-ghost" id="createMerchantUserCancelBtn">Cancel</button>
+          <button type="submit" class="btn btn-coral" id="createMerchantUserSubmitBtn">Create User</button>
+        </div>
       </div>
     </form>
   `;
+
   const refreshMemberRoles = () => {
     const roleType = document.getElementById('cmuRoleType').value;
     document.getElementById('cmuMemberRole').innerHTML = ROLE_TYPE_MEMBER_ROLES[roleType]
@@ -2228,29 +1051,57 @@ function openCreateMerchantUserModal(partnerId, merchantName) {
   };
   document.getElementById('cmuRoleType').addEventListener('change', refreshMemberRoles);
   refreshMemberRoles();
-  overlay.classList.add('open');
-  document.getElementById('createMerchantUserCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
-  document.getElementById('createMerchantUserForm').addEventListener('submit', async e => {
+  document.getElementById('cmuBackBtn').addEventListener('click', goBack);
+  document.getElementById('cmuCancelTopBtn').addEventListener('click', goBack);
+  document.getElementById('createMerchantUserCancelBtn').addEventListener('click', goBack);
+
+  const form = document.getElementById('createMerchantUserForm');
+  const fieldError = name => form.querySelector(`[name="${name}"]`)?.closest('.form-field')?.querySelector('.field-error');
+  const setFieldError = (name, text) => { const el = fieldError(name); if (el) el.textContent = text || ''; };
+  const validateField = name => {
+    const f = form.elements[name];
+    if (!f) return true;
+    if (f.hasAttribute('required') && !f.value.trim()) { setFieldError(name, 'This field is required.'); return false; }
+    if (name === 'email' && f.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.value)) { setFieldError(name, 'Enter a valid email address.'); return false; }
+    if ((name === 'password' || name === 'confirm_password') && f.value && f.value.length < 8) { setFieldError(name, 'Must be at least 8 characters.'); return false; }
+    if (name === 'confirm_password' && f.value && form.elements.password.value !== f.value) { setFieldError(name, 'Passwords do not match.'); return false; }
+    if (name === 'username' && f.value && f.value.trim().length < 3) { setFieldError(name, 'Must be at least 3 characters.'); return false; }
+    setFieldError(name, '');
+    return true;
+  };
+  const validatedFields = ['full_name', 'username', 'email', 'phone_number', 'password', 'confirm_password'].concat(partnerId ? [] : ['partner_id']);
+  validatedFields.forEach(name => form.elements[name]?.addEventListener('blur', () => validateField(name)));
+  form.elements.password?.addEventListener('input', () => { if (form.elements.confirm_password.value) validateField('confirm_password'); });
+
+  form.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target.elements;
     const msg = document.getElementById('createMerchantUserMsg');
-    if (f.password.value !== f.confirm_password.value) {
-      msg.textContent = 'Password and Confirm Password do not match.';
-      msg.className = 'msg error';
-      return;
-    }
+    msg.textContent = ''; msg.className = 'msg';
+    const allValid = validatedFields.map(validateField).every(Boolean);
+    if (!allValid) return;
+
+    const targetPartnerId = partnerId || f.partner_id.value;
+    const submitBtn = document.getElementById('createMerchantUserSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating…';
     try {
-      await axios.post(`${API_BASE}/api/admin/merchants/${partnerId}/users`, {
+      await axios.post(`${API_BASE}/api/admin/merchants/${targetPartnerId}/users`, {
         full_name: f.full_name.value, username: f.username.value, email: f.email.value, phone_number: f.phone_number.value,
         password: f.password.value, confirm_password: f.confirm_password.value,
         role_type: f.role_type.value, member_role: f.member_role.value,
       }, { headers: authHeaders() });
-      overlay.classList.remove('open');
-      loadMerchantUsersTable(partnerId);
-      openMerchantDetail(partnerId);
+      msg.textContent = 'User created successfully.';
+      msg.className = 'msg success';
+      setTimeout(() => {
+        if (partnerId) openMerchantDetail(partnerId);
+        else loadMerchants(merchantsPage);
+      }, 700);
     } catch (err) {
       msg.textContent = err.response?.data?.detail || 'Failed to create user.';
       msg.className = 'msg error';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create User';
     }
   });
 }
@@ -2623,7 +1474,7 @@ async function showAdminTicket(b) {
 
   document.getElementById('adminTicketBody').innerHTML = `
     <div class="ticket-head">
-      <img src="assets/jackpots-logo-full.png" alt="JackPots World Tours & Travels">
+      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours & Travels">
       <div>
         <div class="th-name">${escapeHtml(itemTitle)}</div>
         ${itemSub ? `<div class="th-sub">${escapeHtml(itemSub)}</div>` : ''}
@@ -4354,6 +3205,3 @@ sendHeartbeat();
 setInterval(sendHeartbeat, 30000);
 
 loadReports();
-</script>
-</body>
-</html>

@@ -19,7 +19,7 @@ document.getElementById('saLoginForm').addEventListener('submit', async e => {
     // TODO (backend): once app/services/super_admin_service.py is wired to
     // PostgreSQL, this same call authenticates against the real table —
     // nothing here on the frontend needs to change.
-    const { data } = await axios.post(`${SA_API_BASE}/api/super-admin/auth/login`, {
+    const { data } = await axios.post(`${API_BASE}/api/super-admin/auth/login`, {
       username_or_email: username, password,
     });
     storeSuperAdminSession(data);

@@ -4,24 +4,16 @@
    customer/admin session or a partner session open in the same browser —
    same reasoning as partner-shared.js's PARTNER_KEYS. */
 
-const SA_API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
-const SA_KEYS = { access: 'super_admin_jwt_access', refresh: 'super_admin_jwt_refresh', fullName: 'super_admin_full_name' };
+/* SA_KEYS, saAuthHeaders(), isSuperAdminLoggedIn(), storeSuperAdminSession(),
+   clearSuperAdminSession() now live in assets/js/auth.js, loaded before this file. */
 
-function saAuthHeaders() { return { Authorization: `Bearer ${localStorage.getItem(SA_KEYS.access)}` }; }
-function isSuperAdminLoggedIn() { return !!localStorage.getItem(SA_KEYS.access); }
-function storeSuperAdminSession(data) {
-  localStorage.setItem(SA_KEYS.access, data.access_token);
-  localStorage.setItem(SA_KEYS.refresh, data.refresh_token);
-  if (data.full_name) localStorage.setItem(SA_KEYS.fullName, data.full_name);
-}
-function clearSuperAdminSession() { Object.values(SA_KEYS).forEach(k => localStorage.removeItem(k)); }
-
-function saEscapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
-function saFmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+/* Thin aliases onto shared/formatters.js's canonical escapeHtml/fmtDate,
+   kept under their sa-prefixed names since every super-admin-*.js file
+   already calls them that way. */
+function saEscapeHtml(str) { return escapeHtml(str); }
+function saFmtDate(s) { return fmtDate(s); }
 
 axios.interceptors.response.use(
   res => res,
@@ -84,7 +76,7 @@ document.getElementById('saSignOutBtn').addEventListener('click', e => {
 });
 document.getElementById('saCancelSignOutBtn').addEventListener('click', () => saSignOutModalOverlay.classList.remove('open'));
 document.getElementById('saConfirmSignOutBtn').addEventListener('click', async () => {
-  try { await axios.post(`${SA_API_BASE}/api/super-admin/auth/logout`, {}, { headers: saAuthHeaders() }); } catch (err) { /* ignore */ }
+  try { await axios.post(`${API_BASE}/api/super-admin/auth/logout`, {}, { headers: saAuthHeaders() }); } catch (err) { /* ignore */ }
   clearSuperAdminSession();
   saLoadedSections.clear();
   saSignOutModalOverlay.classList.remove('open');

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels, cruises and holiday packages in one premium search. Trusted by 2 million+ travellers.">
+<title>JackPots World Tours &amp; Travels — Your Next Adventure Starts Here</title>
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="icon" href="assets/images/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+
+<header id="siteHeader">
+  <nav class="wrap">
+    <a href="#home" class="logo">
+      <img class="logo-mark-img" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+    </a>
+    <div class="navlinks">
+      <a href="#home">Home</a>
+      <a href="#packages">Packages</a>
+      <a href="#" data-tab-link="flights">Flights</a>
+      <a href="#" data-tab-link="hotels">Hotels</a>
+      <a href="#" data-tab-link="cruises">Cruises</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <a href="partner/partner-portal.html" class="nav-partner-mark" id="navPartnerLink">
+        <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
+        <span>My Partner</span>
+      </a>
+      <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
+      <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
+      <div class="profile-chip-wrap" id="profileChipWrap" style="display:none;">
+        <button type="button" class="profile-chip" id="profileChipBtn">
+          <span class="profile-chip-avatar" id="profileChipAvatar">U</span>
+          <span class="profile-chip-name" id="profileChipName">Traveler</span>
+          <svg class="profile-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <a href="#" data-acct-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</a>
+          <a href="#" data-acct-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</a>
+          <a href="#" data-acct-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</a>
+          <a href="#" data-acct-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</a>
+          <a href="#" data-acct-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</a>
+          <a href="#" data-acct-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</a>
+          <a href="#" data-acct-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</a>
+          <a href="#" data-acct-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+          <hr>
+          <button type="button" class="logout-item" id="profileLogoutBtn"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Logout</button>
+        </div>
+      </div>
+      <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+  <div class="mobile-nav" id="mobileNav">
+    <a href="#home">Home</a>
+    <a href="#packages">Packages</a>
+    <a href="#" data-tab-link="flights">Flights</a>
+    <a href="#" data-tab-link="hotels">Hotels</a>
+    <a href="#" data-tab-link="cruises">Cruises</a>
+    <a href="#contact">Contact</a>
+    <div class="mobile-auth-links">
+      <a href="partner/partner-portal.html" class="mobile-partner-mark">
+        <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
+        My Partner
+      </a>
+      <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
+      <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
+    </div>
+    <div class="mobile-account-links">
+      <a href="#" data-acct-tab="profile">My Profile</a>
+      <a href="#" data-acct-tab="bookings">My Bookings</a>
+      <a href="#" data-acct-tab="wishlist">Wishlist</a>
+      <a href="#" data-acct-tab="payments">Payment History</a>
+      <a href="#" data-acct-tab="notifications">Notifications</a>
+      <a href="#" data-acct-tab="support">Support Tickets</a>
+      <a href="#" data-acct-tab="reviews">Reviews</a>
+      <a href="#" data-acct-tab="settings">Settings</a>
+      <a href="#" id="mobileLogoutLink">Logout</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" id="home">
+  <div class="hero-bg" id="heroBg"></div>
+  <div class="hero-video-layer" id="heroVideoLayer">
+    <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+    <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video data-video="cruises" data-src="assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+  </div>
+  <div class="hero-overlay"></div>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search</div>
+    <h1>Your next adventure<span class="accent"> starts here.</span></h1>
+    <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
+  </div>
+
+  <div class="wrap search-dock">
+    <div class="search-card" role="region" aria-label="Booking search">
+      <div class="tabs" role="tablist" aria-label="Booking type">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="flights">&#9992;&#65039; Flights</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="hotels">&#127976; Hotels</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="cruises">&#128674; Cruises</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="packages">&#127958;&#65039; Tour Packages</button>
+      </div>
+
+      <div class="search-body">
+      <div class="search-panel active" data-panel="flights">
+        <div class="search-fields">
+          <div class="field"><label for="fFrom">From Airport</label><input id="fFrom" value="Hyderabad (HYD)"></div>
+          <button class="swap-btn" type="button" aria-label="Swap origin and destination">&#8646;</button>
+          <div class="field"><label for="fTo">To Airport</label><input id="fTo" value="Delhi (DEL)"></div>
+          <div class="field field-date">
+            <label for="fDep">Departure</label>
+            <input id="fDep" class="date-display" value="Sat, 4 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field field-date">
+            <label for="fRet">Return</label>
+            <input id="fRet" class="date-display" value="Add date" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field">
+            <label for="fPax">Passengers</label>
+            <select id="fPax">
+              <option>1 Passenger</option>
+              <option>2 Passengers</option>
+              <option>3 Passengers</option>
+              <option>4 Passengers</option>
+              <option>5+ Passengers</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fCabin">Cabin</label>
+            <select id="fCabin">
+              <option>Economy</option>
+              <option>Premium Economy</option>
+              <option>Business</option>
+              <option>First</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="hotels">
+        <div class="search-fields cols-6">
+          <div class="field"><label for="hDest">Destination</label><input id="hDest" value="Goa, India"></div>
+          <div class="field field-date">
+            <label for="hIn">Check-in</label>
+            <input id="hIn" class="date-display" value="Fri, 10 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field field-date">
+            <label for="hOut">Check-out</label>
+            <input id="hOut" class="date-display" value="Sun, 12 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field">
+            <label for="hGuests">Guests</label>
+            <select id="hGuests">
+              <option>1 Guest</option>
+              <option>2 Guests</option>
+              <option>3 Guests</option>
+              <option>4 Guests</option>
+              <option>5+ Guests</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="hRooms">Rooms</label>
+            <select id="hRooms">
+              <option>1 Room</option>
+              <option>2 Rooms</option>
+              <option>3 Rooms</option>
+              <option>4 Rooms</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="cruises">
+        <div class="search-fields cols-5">
+          <div class="field">
+            <label for="crType">Cruise Type</label>
+            <select id="crType">
+              <option>Goa Cruise</option>
+              <option>Kerala Backwater Cruise</option>
+              <option>Singapore Cruise</option>
+              <option>Dubai Cruise</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="crMonth">Month</label>
+            <select id="crMonth">
+              <option>January</option><option>February</option><option>March</option><option>April</option>
+              <option>May</option><option>June</option><option selected>July</option><option>August</option>
+              <option>September</option><option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="crDur">Duration</label>
+            <select id="crDur">
+              <option>2 Days</option>
+              <option>3 Days</option>
+              <option>5 Days</option>
+              <option>7 Days</option>
+            </select>
+          </div>
+          <div class="field"><label for="crTrav">Travellers</label><input id="crTrav" value="2 Adults"></div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="packages">
+        <div class="search-fields cols-3">
+          <div class="field">
+            <label for="pType">Tour Package Type</label>
+            <select id="pType">
+              <option>Casino Tour Package</option>
+              <option>Domestic Tour Package</option>
+              <option>Pilgrimage Tour Package</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pMonth">Month</label>
+            <select id="pMonth">
+              <option>January</option><option>February</option><option>March</option><option>April</option>
+              <option>May</option><option>June</option><option selected>July</option><option>August</option>
+              <option>September</option><option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+      </div>
+
+      <div class="trust-row">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Trusted by 2 Million+ Travellers</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>24/7 Support</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Secure Payments</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Instant Confirmation</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+</section>
+
+<section class="search-results-section" id="searchResultsSection">
+  <div class="wrap">
+    <div class="search-results-card">
+      <div class="search-results-head">
+        <span>Search results</span>
+        <button type="button" class="search-results-close" id="searchResultsClose" aria-label="Close results">&times;</button>
+      </div>
+      <div class="search-results-list" id="searchResultsList"></div>
+      <p class="search-results-empty" id="searchResultsEmpty" style="display:none;">No results match that search — try different filters.</p>
+    </div>
+  </div>
+</section>
+
+<section class="upcoming-section" id="upcomingJourneySection">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">Track your trip</div>
+        <h2>Your Upcoming Journey</h2>
+      </div>
+    </div>
+    <div class="upcoming-list" id="upcomingJourneyList"></div>
+  </div>
+</section>
+
+<section class="offers-section" aria-labelledby="offersHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">Deals refreshed daily</div>
+        <h2 id="offersHead">Exclusive offers</h2>
+      </div>
+      <p>Hand-picked discounts across every mode of travel — stacked automatically at checkout.</p>
+    </div>
+  </div>
+  <div class="offers-track-wrap wrap">
+    <div class="offers-track" id="offersTrack">
+      <div class="offer-card o1"><div><div class="tag">Flights</div><h3>Flat 30% off on domestic flights</h3><p>Valid on all major airlines, booked before midnight.</p></div><div class="code">CODE: FLYHIGH30</div></div>
+      <div class="offer-card o2"><div><div class="tag">Cruises</div><h3>₹2,000 instant cashback on cruise bookings</h3><p>On your first three bookings this month.</p></div><div class="code">CODE: CRUISE2000</div></div>
+      <div class="offer-card o3"><div><div class="tag">Hotels</div><h3>Up to 40% off premium hotel stays</h3><p>Free breakfast included at 2,000+ properties.</p></div><div class="code">CODE: STAYMORE</div></div>
+      <div class="offer-card o4"><div><div class="tag">Family Packages</div><h3>Kids stay & fly free this summer</h3><p>On select holiday packages for families of 4+.</p></div><div class="code">CODE: FAMILYFUN</div></div>
+      <div class="offer-card o5"><div><div class="tag">Honeymoon</div><h3>Romantic getaways from ₹24,999</h3><p>Candlelight dinners & couple spa included.</p></div><div class="code">CODE: TOGETHER25</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="destinations-section" id="destinations" aria-labelledby="destHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">Where India is booking right now</div><h2 id="destHead">Popular destinations</h2></div>
+      <a href="#" class="view-all">View all destinations &rarr;</a>
+    </div>
+    <div class="dest-grid">
+      <div class="dest-card reveal-zoom">
+        <img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=600&q=80" alt="Goa beach with palm trees" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
+        <div class="dest-label"><div class="city">Goa</div><div class="price">Starting from <b>₹5,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-1">
+        <img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=600&q=80" alt="Kashmir valley mountains" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.9</div>
+        <div class="dest-label"><div class="city">Kashmir</div><div class="price">Starting from <b>₹14,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-2">
+        <img src="https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=600&q=80" alt="Kerala backwaters houseboat" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.7</div>
+        <div class="dest-label"><div class="city">Kerala</div><div class="price">Starting from <b>₹9,299</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-3">
+        <img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=600&q=80" alt="Manali snow mountains" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
+        <div class="dest-label"><div class="city">Manali</div><div class="price">Starting from <b>₹7,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom">
+        <img src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=600&q=80" alt="Bali temple and rice terrace" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.9</div>
+        <div class="dest-label"><div class="city">Bali</div><div class="price">Starting from <b>₹28,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-1">
+        <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80" alt="Dubai skyline at dusk" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
+        <div class="dest-label"><div class="city">Dubai</div><div class="price">Starting from <b>₹32,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-2">
+        <img src="https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=600&q=80" alt="Thailand island beach" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.7</div>
+        <div class="dest-label"><div class="city">Thailand</div><div class="price">Starting from <b>₹22,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+      <div class="dest-card reveal-zoom delay-3">
+        <img src="https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=600&q=80" alt="Maldives overwater villas" loading="lazy">
+        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>5.0</div>
+        <div class="dest-label"><div class="city">Maldives</div><div class="price">Starting from <b>₹49,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="packages-section" id="packages" aria-labelledby="pkgHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">Ready-made itineraries</div><h2 id="pkgHead">Featured tour packages</h2></div>
+      <a href="#" class="view-all">Browse all packages &rarr;</a>
+    </div>
+    <div class="pkg-grid">
+      <article class="pkg-card reveal">
+        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=500&q=80" alt="Goa Escape package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
+        <div class="pkg-body">
+          <h3>Goa Escape</h3>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.8 (2,140 reviews)</div>
+          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹5,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="1" data-book-price="5999" data-book-label="Goa Escape">Book Now</a></div>
+        </div>
+      </article>
+      <article class="pkg-card reveal delay-1">
+        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=500&q=80" alt="Kashmir Valley Retreat package" loading="lazy"><span class="pkg-duration">6 Days</span></div>
+        <div class="pkg-body">
+          <h3>Kashmir Valley Retreat</h3>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.9 (1,865 reviews)</div>
+          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹16,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="2" data-book-price="16999" data-book-label="Kashmir Valley Retreat">Book Now</a></div>
+        </div>
+      </article>
+      <article class="pkg-card reveal delay-2">
+        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=500&q=80" alt="Bali Honeymoon Special package" loading="lazy"><span class="pkg-duration">5 Days</span></div>
+        <div class="pkg-body">
+          <h3>Bali Honeymoon Special</h3>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.9 (3,210 reviews)</div>
+          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹31,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="3" data-book-price="31999" data-book-label="Bali Honeymoon Special">Book Now</a></div>
+        </div>
+      </article>
+      <article class="pkg-card reveal delay-3">
+        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=500&q=80" alt="Maldives Overwater Villa package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
+        <div class="pkg-body">
+          <h3>Maldives Overwater Villa</h3>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 5.0 (980 reviews)</div>
+          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹52,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="4" data-book-price="52999" data-book-label="Maldives Overwater Villa">Book Now</a></div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="why-section" aria-labelledby="whyHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">The JackPots World promise</div><h2 id="whyHead">Why choose us</h2></div>
+      <p>Eight reasons two million travellers stopped comparing tabs and just booked here.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card reveal"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div><h4>Instant Booking</h4><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div>
+      <div class="why-card reveal delay-1"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Best Price Guarantee</h4><p>Find it cheaper elsewhere and we refund the difference.</p></div>
+      <div class="why-card reveal delay-2"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div><h4>Secure Payments</h4><p>Bank-grade encryption on every transaction, every time.</p></div>
+      <div class="why-card reveal delay-3"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h4>Verified Hotels</h4><p>Every property physically inspected before it's listed.</p></div>
+      <div class="why-card reveal"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h4>24×7 Customer Support</h4><p>Real humans on chat and call, any hour, any day.</p></div>
+      <div class="why-card reveal delay-1"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg></div><h4>Free Cancellation</h4><p>Plans change — cancel most bookings at zero cost.</p></div>
+      <div class="why-card reveal delay-2"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1015-6.7M3 5v6h6"/></svg></div><h4>Easy Refunds</h4><p>Refunds processed to source within 24 hours.</p></div>
+      <div class="why-card reveal delay-3"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M11 3a4 4 0 110 8 4 4 0 010-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div><h4>Trusted by Millions</h4><p>2 million+ travellers and counting, every single month.</p></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="routes-section" aria-labelledby="routesHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">Updated every 90 seconds</div><h2 id="routesHead">Trending routes</h2></div>
+      <p>The routes everyone's booking right now, live from our reservation engine.</p>
+    </div>
+    <div class="routes-grid">
+      <div class="route-card reveal">
+        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16l20-6-7 12-2-6-6-2z"/><path d="M22 10L2 16"/></svg>Flight</span><span class="live-dot"><i></i>Live</span></div>
+        <div class="route-cities">Hyderabad <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Delhi</div>
+        <div class="route-price"><span class="amt" data-price="2499">₹2,499</span><span class="unit">onwards</span></div>
+      </div>
+      <div class="route-card reveal delay-1">
+        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M5 20l1.5-8h11L19 20"/><path d="M9 12V6h4l3 6"/></svg>Cruise</span><span class="live-dot"><i></i>Live</span></div>
+        <div class="route-cities">Mumbai <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Goa</div>
+        <div class="route-price"><span class="amt" data-price="4999">₹4,999</span><span class="unit">onwards</span></div>
+      </div>
+      <div class="route-card reveal delay-2">
+        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/><path d="M9 9h1M14 9h1M9 13h1M14 13h1"/></svg>Tour Package</span><span class="live-dot"><i></i>Live</span></div>
+        <div class="route-cities">Rajasthan <span style="font-size:13px; font-weight:500; color:var(--muted);">— pilgrimage circuit</span></div>
+        <div class="route-price"><span class="amt" data-price="14999">₹14,999</span><span class="unit">onwards</span></div>
+      </div>
+      <div class="route-card reveal delay-3">
+        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Hotel</span><span class="live-dot"><i></i>Live</span></div>
+        <div class="route-cities">Goa <span style="font-size:13px; font-weight:500; color:var(--muted);">— beachfront stays</span></div>
+        <div class="route-price"><span class="amt" data-price="1999">₹1,999</span><span class="unit">/ night</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="stats-section" aria-label="JackPots World Tours &amp; Travels in numbers">
+  <div class="wrap">
+    <div class="stats-grid">
+      <div class="reveal"><div class="stat-num" data-count="2000000" data-suffix="+">0</div><div class="stat-label">Happy Travellers</div></div>
+      <div class="reveal delay-1"><div class="stat-num" data-count="500" data-suffix="+">0</div><div class="stat-label">Destinations</div></div>
+      <div class="reveal delay-2"><div class="stat-num" data-count="10000" data-suffix="+">0</div><div class="stat-label">Hotels</div></div>
+      <div class="reveal delay-3"><div class="stat-num" data-count="5000" data-suffix="+">0</div><div class="stat-label">Daily Bookings</div></div>
+    </div>
+  </div>
+</section>
+
+
+
+<section class="partners-section" aria-label="Our airline and hotel partners">
+  <div class="wrap"><div class="eyebrow reveal" style="justify-content:center;">Trusted travel partners</div></div>
+  <div class="partners-track-wrap">
+    <div class="partners-track" id="partnersTrack">
+      <span class="partner-logo">Air India</span><span class="partner-logo">IndiGo</span><span class="partner-logo">Vistara</span>
+      <span class="partner-logo">IRCTC</span><span class="partner-logo">OYO</span><span class="partner-logo">Taj Hotels</span>
+      <span class="partner-logo">Uber</span><span class="partner-logo">SpiceJet</span><span class="partner-logo">Marriott</span>
+    </div>
+  </div>
+</section>
+
+<section class="newsletter-section" id="newsletter" aria-labelledby="newsHead">
+  <div class="wrap reveal">
+    <h2 id="newsHead">Never miss amazing travel deals</h2>
+    <p>One email a week. Fares, flash sales, and visa updates — nothing else.</p>
+    <form class="newsletter-form" id="newsletterForm">
+      <label for="newsEmail" class="sr-only">Email address</label>
+      <input type="email" id="newsEmail" placeholder="you@example.com" required>
+      <button type="submit" class="btn btn-navy">Subscribe</button>
+    </form>
+    <div class="newsletter-msg" id="newsletterMsg">You're subscribed! Watch your inbox for deals.</div>
+  </div>
+</section>
+
+<section class="contact-section" id="contact" aria-labelledby="contactHead">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div><div class="eyebrow">We usually reply within a few hours</div><h2 id="contactHead">Get in touch</h2></div>
+      <p>Questions about a booking, a refund, or just want to plan something big? Send us a message.</p>
+    </div>
+    <div class="contact-form-card reveal">
+      <form id="contactForm" novalidate>
+        <div class="form-row">
+          <div class="modal-field"><label for="cName">Full Name</label><input id="cName" type="text" autocomplete="name" required placeholder="Your name"></div>
+          <div class="modal-field"><label for="cEmail">Email Address</label><input id="cEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+        </div>
+        <div class="modal-field"><label for="cSubject">Subject</label><input id="cSubject" type="text" placeholder="What's this about?"></div>
+        <div class="modal-field"><label for="cMessage">Message</label><textarea id="cMessage" required placeholder="Tell us more..."></textarea></div>
+        <button type="submit" class="btn btn-coral">Send Message</button>
+        <div class="modal-msg" id="contactMsg"></div>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="foot-logo">
+          <img class="foot-logo-img" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+        </div>
+        <p>Flights, hotels, cruises and holiday packages — booked in one clean sweep, backed by support that actually picks up.</p>
+      </div>
+      <div class="foot-col">
+        <h5>Company</h5>
+        <a href="#">About</a><a href="#">Careers</a><a href="#">Press</a>
+      </div>
+      <div class="foot-col">
+        <h5>Travel</h5>
+        <a href="#" data-tab-link="flights">Flights</a><a href="#" data-tab-link="hotels">Hotels</a><a href="#" data-tab-link="cruises">Cruises</a><a href="#packages">Holiday Packages</a>
+      </div>
+      <div class="foot-col">
+        <h5>Support</h5>
+        <a href="#">Help Center</a><a href="#">Cancellation</a><a href="#">Refund</a><a href="#">FAQs</a>
+      </div>
+      <div class="foot-col">
+        <h5>Contact</h5>
+        <ul class="foot-contact">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.81.35 1.6.68 2.34a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.74-1.25a2 2 0 012.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0122 16.92z"/></svg><a href="tel:+911234567890">+91 12345 67890</a></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg><a href="mailto:info@jackpotsworldtours.com">info@jackpotsworldtours.com</a></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>3rd Floor, Prestige Towers, Banjara Hills, Hyderabad, India 500034</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>Mon–Sat, 9:00 AM – 8:00 PM IST</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; 2026 JackPots World Tours &amp; Travels Pvt. Ltd.</span>
+      <span>Made for every route, every ticket type, every traveller.</span>
+    </div>
+  </div>
+</footer>
+
+<div class="fab-menu" id="fabMenu">
+  <div class="fab-items" id="fabItems" role="menu" aria-label="Quick actions">
+    <button type="button" class="fab-item" id="fabTopBtn" data-tooltip="Back to Top" aria-label="Scroll back to top" role="menuitem">
+      <span class="fab-icon" aria-hidden="true">&#11014;</span>
+    </button>
+    <button type="button" class="fab-item" id="fabSupportBtn" data-tooltip="Customer Support" aria-label="Open customer support" role="menuitem">
+      <span class="fab-icon" aria-hidden="true">&#128172;</span>
+    </button>
+    <button type="button" class="fab-item" id="fabVoiceBtn" data-tooltip="Voice Search" aria-label="Start voice search" role="menuitem">
+      <span class="fab-icon" aria-hidden="true">&#127908;</span>
+    </button>
+    <button type="button" class="fab-item" id="fabAiBtn" data-tooltip="AI Travel Assistant" aria-label="Open AI travel assistant" aria-expanded="false" role="menuitem">
+      <span class="fab-icon" aria-hidden="true">&#10024;</span>
+    </button>
+  </div>
+  <button type="button" class="fab-main" id="fabMainBtn" aria-label="Open quick actions menu" aria-haspopup="true" aria-expanded="false" aria-controls="fabItems">
+    <span class="fab-main-icon" aria-hidden="true">+</span>
+  </button>
+</div>
+<div class="chatbot-panel" id="chatPanel" role="dialog" aria-label="JackPots World travel assistant">
+  <div class="chatbot-head">
+    <h4>JackPots World Assistant</h4>
+    <p>Need help planning your next adventure?</p>
+  </div>
+  <div class="chatbot-body" id="chatBody">
+    <div class="chat-msg bot">Hi! I can help with fares, packages and bookings. Try one of these:</div>
+  </div>
+  <div class="chat-suggestions" id="chatSuggestions">
+    <button class="chat-chip" data-q="Best Goa package">Best Goa package</button>
+    <button class="chat-chip" data-q="Cheapest flights today">Cheapest flights today</button>
+    <button class="chat-chip" data-q="Hotels near beaches">Hotels near beaches</button>
+    <button class="chat-chip" data-q="Weekend trips under ₹10,000">Weekend trips under ₹10,000</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="authOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="modal-close" id="authCloseBtn" type="button" aria-label="Close">&times;</button>
+
+    <div class="auth-view" id="signupView">
+      <h2 id="authTitle">Create your account</h2>
+      <p class="modal-sub">Join 2 million+ travellers booking smarter.</p>
+      <form id="signupForm" novalidate>
+        <div class="modal-field"><label for="suName">Full Name</label><input id="suName" type="text" autocomplete="name" required placeholder="Your name"></div>
+        <div class="modal-field"><label for="suEmail">Email Address</label><input id="suEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+        <div class="modal-field"><label for="suPass">Password</label><input id="suPass" type="password" autocomplete="new-password" required placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>
+        <div class="modal-field"><label for="suPass2">Confirm Password</label><input id="suPass2" type="password" autocomplete="new-password" required placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>
+        <button type="submit" class="btn btn-coral modal-submit">Sign Up</button>
+        <div class="modal-msg" id="signupMsg">Account created — you're all set! (demo)</div>
+      </form>
+      <div class="modal-switch">Already have an account? <a href="#" data-auth="login">Login</a></div>
+    </div>
+
+    <div class="auth-view" id="loginView" style="display:none;">
+      <h2>Welcome back</h2>
+      <p class="modal-sub">Log in to manage your bookings.</p>
+      <form id="loginForm" novalidate>
+        <div class="modal-field"><label for="liUser">Email Address or Username</label><input id="liUser" type="text" autocomplete="username" required placeholder="you@example.com"></div>
+        <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="text" autocomplete="current-password" required placeholder="Enter your password"></div>
+        <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
+        <button type="submit" class="btn btn-coral modal-submit">Login</button>
+        <div class="modal-msg" id="loginMsg">Logged in — welcome back! (demo)</div>
+      </form>
+      <div class="modal-switch">Don't have an account? <a href="#" data-auth="signup">Sign Up</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reviewsModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reviewsModalTitle">
+    <button class="modal-close" id="reviewsModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <h2 id="reviewsModalTitle">Reviews</h2>
+    <p class="modal-sub" id="reviewsModalSub"></p>
+    <div id="reviewFormWrap">
+      <div class="star-input" id="reviewStarInput">
+        <span data-star="1">&#9733;</span><span data-star="2">&#9733;</span><span data-star="3">&#9733;</span><span data-star="4">&#9733;</span><span data-star="5">&#9733;</span>
+      </div>
+      <form id="reviewForm">
+        <div class="modal-field"><label for="reviewComment">Your review (optional)</label><input id="reviewComment" type="text" placeholder="Share your experience..."></div>
+        <button type="submit" class="btn btn-coral modal-submit" id="reviewSubmitBtn">Submit Review</button>
+        <div class="modal-msg" id="reviewFormMsg"></div>
+      </form>
+    </div>
+    <div id="reviewsList" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailsModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="detailsModalTitle">
+    <button class="modal-close" id="detailsModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <h2 id="detailsModalTitle">Details</h2>
+    <p class="modal-sub" id="detailsModalSub"></p>
+    <div id="detailsBody"></div>
+    <div class="modal-field" id="detailsDateField" style="display:none;">
+      <label for="detailsDate">Travel Date</label>
+      <input id="detailsDate" type="date">
+    </div>
+    <div class="modal-field">
+      <label id="detailsQtyLabel" for="detailsQty">Quantity</label>
+      <input id="detailsQty" type="number" min="1" value="1">
+    </div>
+    <div class="modal-field">
+      <label for="detailsCoupon">Coupon Code (optional)</label>
+      <div style="display:flex; gap:8px;">
+        <input id="detailsCoupon" type="text" style="text-transform:uppercase;" placeholder="e.g. SAVE500">
+        <button type="button" class="btn btn-navy btn-sm" id="detailsCouponApplyBtn" style="flex-shrink:0;">Apply</button>
+      </div>
+      <div class="modal-msg" id="detailsCouponMsg" style="margin-top:8px;"></div>
+    </div>
+    <button type="button" class="btn btn-coral modal-submit" id="detailsBookBtn">Book Now</button>
+    <div class="modal-msg" id="detailsMsg"></div>
+  </div>
+</div>
+
+<!-- ================= ACCOUNT CENTER (replaces the old separate User Dashboard) ================= -->
+<div class="modal-overlay" id="accountModalOverlay">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="acctHeaderName">
+    <button class="modal-close" id="acctModalCloseBtn" type="button" aria-label="Close">&times;</button>
+    <div class="acct-header">
+      <span class="acct-header-avatar" id="acctHeaderAvatar">U</span>
+      <div class="acct-header-info">
+        <div class="acct-header-name" id="acctHeaderName">Traveler</div>
+        <div class="acct-header-email" id="acctHeaderEmail">—</div>
+      </div>
+    </div>
+    <div class="acct-body">
+      <nav class="acct-tabs" id="acctTabs">
+        <div class="acct-tab" data-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</div>
+        <div class="acct-tab" data-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</div>
+        <div class="acct-tab" data-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</div>
+        <div class="acct-tab" data-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</div>
+        <div class="acct-tab" data-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</div>
+        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</div>
+        <div class="acct-tab" data-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</div>
+        <div class="acct-tab" data-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"/></svg>Settings</div>
+      </nav>
+      <div class="acct-panels">
+        <div class="acct-panel" id="acctPanel-profile">
+          <h2>My Profile</h2>
+          <form id="acctProfileForm">
+            <div class="acct-form-grid">
+              <div class="acct-form-field"><label>Full Name</label><input id="acctProfileName" type="text" required></div>
+              <div class="acct-form-field"><label>Email</label><input id="acctProfileEmail" type="email" disabled></div>
+              <div class="acct-form-field"><label>Mobile</label><input id="acctProfileMobile" type="tel"></div>
+              <div class="acct-form-field">
+                <label>Gender</label>
+                <select id="acctProfileGender">
+                  <option value="">Select</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </div>
+              <div class="acct-form-field"><label>Date of Birth</label><input id="acctProfileDob" type="date"></div>
+              <div class="acct-form-field"><label>Country</label><input id="acctProfileCountry" type="text"></div>
+              <div class="acct-form-field"><label>State</label><input id="acctProfileState" type="text"></div>
+              <div class="acct-form-field"><label>City</label><input id="acctProfileCity" type="text"></div>
+            </div>
+            <div class="acct-form-field" style="max-width:none;"><label>Address</label><input id="acctProfileAddress" type="text"></div>
+            <button type="submit" class="btn btn-coral">Save Changes</button>
+            <div class="acct-msg" id="acctProfileMsg"></div>
+          </form>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-bookings">
+          <h2>My Bookings</h2>
+          <div id="acctBookingsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-wishlist">
+          <h2>My Wishlist</h2>
+          <div id="acctWishlistList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-payments">
+          <h2>Payment History</h2>
+          <div class="acct-table-wrap"><table class="acct-table" id="acctPaymentsTable"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Transaction Ref</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-notifications">
+          <div class="acct-section-head">
+            <h2>Notifications</h2>
+            <button type="button" class="btn btn-navy btn-sm" id="acctMarkAllReadBtn">Mark All as Read</button>
+          </div>
+          <div id="acctNotificationsList"><div class="acct-empty">Loading…</div></div>
+          <div class="acct-notif-clearbar" id="acctNotifClearBar" style="display:none;">
+            <button type="button" class="btn btn-danger btn-sm" id="acctClearAllBtn">Clear All</button>
+          </div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-support">
+          <h2>Raise a support ticket</h2>
+          <form id="acctTicketForm" style="margin-bottom:26px;">
+            <div class="acct-form-field"><label>Subject</label><input id="acctTicketSubject" type="text" required maxlength="200"></div>
+            <div class="acct-form-field" style="max-width:none;"><label>Description</label><input id="acctTicketDescription" type="text" required maxlength="4000"></div>
+            <div class="acct-form-field">
+              <label>Priority</label>
+              <select id="acctTicketPriority">
+                <option value="low">Low</option>
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-coral">Submit Ticket</button>
+            <div class="acct-msg" id="acctTicketMsg"></div>
+          </form>
+          <h2>My support tickets</h2>
+          <div id="acctTicketsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-reviews">
+          <h2>My Reviews</h2>
+          <div id="acctReviewsList"><div class="acct-empty">Loading…</div></div>
+        </div>
+
+        <div class="acct-panel" id="acctPanel-settings">
+          <h2>Change password</h2>
+          <form id="acctPasswordForm" style="margin-bottom:10px;">
+            <div class="acct-form-field"><label>Current Password</label><input id="acctCurrentPassword" type="password" required></div>
+            <div class="acct-form-field"><label>New Password</label><input id="acctNewPassword" type="password" required minlength="8"></div>
+            <button type="submit" class="btn btn-navy">Change Password</button>
+            <div class="acct-msg" id="acctPasswordMsg"></div>
+          </form>
+          <h2 style="margin-top:26px;">Notification preferences</h2>
+          <p style="color:var(--muted); font-size:13.5px; line-height:1.6; max-width:480px;">
+            You currently receive in-app notifications for bookings, payments, and support updates —
+            there's nothing to configure yet since email/SMS delivery isn't wired up. This section is
+            reserved for when those channels go live.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="acctConfirmOverlay">
+  <div class="modal-card">
+    <button class="modal-close" id="acctConfirmCloseBtn" type="button" aria-label="Close">&times;</button>
+    <div id="acctConfirmBody"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="shared/formatters.js"></script>
+<script src="components/toast.js"></script>
+<script src="components/spinner.js"></script>
+<script src="components/confirm-dialog.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

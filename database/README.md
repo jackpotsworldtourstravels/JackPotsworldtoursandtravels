@@ -6,9 +6,9 @@ has been applied to the live `jackpotsworldtours` database.
 v2 goes beyond v1's Admin/Merchant/User/Shared split: **no table for
 authentication, profile, session, or activity data is shared across
 portals.** Each domain owns its identity end to end — see
-[`DATABASE_STRUCTURE.md`](../DATABASE_STRUCTURE.md) in the project root for
+[`DATABASE_STRUCTURE.md`](../docs/DATABASE_STRUCTURE.md) in `docs/` for
 the full ER diagram, rationale, and the complete rename/retirement list.
-See [`FIELD_MAPPING.md`](../FIELD_MAPPING.md) for the exhaustive
+See [`FIELD_MAPPING.md`](../docs/FIELD_MAPPING.md) for the exhaustive
 frontend-field-to-database-column mapping.
 
 ## File order (also see `migrate.sql`)

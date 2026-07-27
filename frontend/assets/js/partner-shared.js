@@ -7,35 +7,10 @@
 
 const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
-const PARTNER_KEYS = {
-  access: 'partner_jwt_access', refresh: 'partner_jwt_refresh',
-  fullName: 'partner_user_name', companyName: 'partner_company_name',
-};
+/* PARTNER_KEYS, partnerAuthHeaders(), isPartnerLoggedIn(), storePartnerSession(),
+   clearPartnerSession() now live in assets/js/auth.js, loaded before this file. */
 
-function partnerAuthHeaders() {
-  return { Authorization: `Bearer ${localStorage.getItem(PARTNER_KEYS.access)}` };
-}
-function isPartnerLoggedIn() {
-  return !!localStorage.getItem(PARTNER_KEYS.access);
-}
-function storePartnerSession(data) {
-  localStorage.setItem(PARTNER_KEYS.access, data.access_token);
-  localStorage.setItem(PARTNER_KEYS.refresh, data.refresh_token);
-  if (data.full_name) localStorage.setItem(PARTNER_KEYS.fullName, data.full_name);
-  if (data.company_name) localStorage.setItem(PARTNER_KEYS.companyName, data.company_name);
-}
-function clearPartnerSession() {
-  Object.values(PARTNER_KEYS).forEach(k => localStorage.removeItem(k));
-}
-
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
-function money(n) { return n == null ? '—' : '₹' + Math.round(n).toLocaleString('en-IN'); }
-function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
-function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
-function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }
+/* escapeHtml/money/fmtDate/fmtDateTime/fmtTime now live in shared/formatters.js. */
 function rowsSkeleton() { return '<tr><td colspan="12" class="empty-state">Loading…</td></tr>'; }
 function statusLabel(s) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 

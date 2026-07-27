@@ -37,14 +37,62 @@ def _generate_reference_prefix(db: Session, company_name: str) -> str:
     return candidate
 
 
-def list_merchants(db: Session) -> list[dict]:
+_MERCHANT_SORT_MAP = {
+    "newest": "created_at DESC",
+    "oldest": "created_at ASC",
+    "name_asc": "company_name ASC",
+    "name_desc": "company_name DESC",
+}
+
+
+def list_merchants_paginated(
+    db: Session,
+    page: int,
+    page_size: int,
+    search: str | None = None,
+    status_filter: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "newest",
+) -> tuple[list[dict], int]:
+    where: list[str] = []
+    params: dict = {}
+
+    if search:
+        where.append(
+            "(company_name ILIKE :search OR email ILIKE :search "
+            "OR contact_person ILIKE :search OR phone_number ILIKE :search)"
+        )
+        params["search"] = f"%{search}%"
+
+    if status_filter in ("active", "inactive"):
+        where.append("status = :status")
+        params["status"] = status_filter
+
+    if date_from:
+        where.append("created_at >= :date_from")
+        params["date_from"] = date_from
+
+    if date_to:
+        where.append("created_at < (:date_to::date + interval '1 day')")
+        params["date_to"] = date_to
+
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    order_clause = _MERCHANT_SORT_MAP.get(sort, _MERCHANT_SORT_MAP["newest"])
+
+    total = db.scalar(text(f"SELECT count(*) FROM partners {where_clause}"), params) or 0
+
     rows = db.execute(
-        text("""
+        text(f"""
             SELECT partner_id, company_name, company_type, contact_person, email, phone_number, status, created_at
-            FROM partners ORDER BY created_at DESC
-        """)
+            FROM partners
+            {where_clause}
+            ORDER BY {order_clause}
+            LIMIT :limit OFFSET :offset
+        """),
+        {**params, "limit": page_size, "offset": (page - 1) * page_size},
     ).mappings().all()
-    return [dict(r) for r in rows]
+    return [dict(r) for r in rows], total
 
 
 def create_merchant(db: Session, payload: MerchantCreateRequest) -> dict:
@@ -127,6 +175,20 @@ def set_merchant_status(db: Session, partner_id: int, new_status: str) -> dict:
     )
     db.commit()
     return get_merchant_detail(db, partner_id)
+
+
+def delete_merchant(db: Session, partner_id: int) -> None:
+    detail = get_merchant_detail(db, partner_id)
+    if detail["user_count"] or detail["booking_count"] or detail["request_count"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This merchant has users, bookings, or service requests on record and cannot be deleted. "
+                "Deactivate it instead."
+            ),
+        )
+    db.execute(text("DELETE FROM partners WHERE partner_id = :id"), {"id": partner_id})
+    db.commit()
 
 
 def _require_merchant(db: Session, partner_id: int) -> None:

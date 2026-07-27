@@ -51,10 +51,7 @@ systemctl enable --now jackpots-backend
 
 echo "==> Deploying static frontend"
 mkdir -p /var/www/jackpots
-cp "${REPO_DIR}"/index.html "${REPO_DIR}"/login.html "${REPO_DIR}"/register.html "${REPO_DIR}"/forgot-password.html "${REPO_DIR}"/reset-password.html "${REPO_DIR}"/admin.html /var/www/jackpots/
-if [ -d "${REPO_DIR}/assets" ]; then
-  cp -r "${REPO_DIR}/assets" /var/www/jackpots/
-fi
+cp -r "${REPO_DIR}/frontend/." /var/www/jackpots/
 
 echo "==> Configuring nginx"
 cp "${REPO_DIR}/deploy/nginx.conf" /etc/nginx/sites-available/jackpots

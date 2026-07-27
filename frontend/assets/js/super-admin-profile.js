@@ -3,7 +3,7 @@
 
 async function loadSaProfile() {
   try {
-    const { data } = await axios.get(`${SA_API_BASE}/api/super-admin/profile`, { headers: saAuthHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/super-admin/profile`, { headers: saAuthHeaders() });
     document.getElementById('saProfileName').textContent = data.full_name;
     document.getElementById('saProfileEmail').textContent = data.email;
     document.getElementById('saProfilePhone').textContent = data.phone_number;
@@ -30,7 +30,7 @@ document.getElementById('saEditProfileForm').addEventListener('submit', async e 
   try {
     // TODO (backend): app/services/super_admin_service.py::update_profile
     // has the matching TODO for the real PostgreSQL UPDATE.
-    await axios.patch(`${SA_API_BASE}/api/super-admin/profile`, {
+    await axios.patch(`${API_BASE}/api/super-admin/profile`, {
       full_name: f.full_name.value.trim(), phone_number: f.phone_number.value.trim(),
     }, { headers: saAuthHeaders() });
     saEditProfileModalOverlay.classList.remove('open');
@@ -68,7 +68,7 @@ document.getElementById('saChangePasswordForm').addEventListener('submit', async
     // TODO (backend): app/services/super_admin_service.py::change_password
     // has the matching TODO for validating against + updating the real
     // password hash in PostgreSQL.
-    await axios.post(`${SA_API_BASE}/api/super-admin/change-password`, {
+    await axios.post(`${API_BASE}/api/super-admin/change-password`, {
       current_password: f.current_password.value, new_password: pw, confirm_new_password: f.confirm_new_password.value,
     }, { headers: saAuthHeaders() });
     saChangePasswordModalOverlay.classList.remove('open');

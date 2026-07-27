@@ -72,7 +72,7 @@ auto-renewal. Visit `https://YOUR_DOMAIN` to confirm.
 
 - `https://YOUR_DOMAIN/api/health` → `{"status":"ok"}`
 - `https://YOUR_DOMAIN/` → the public site loads and can sign up/search/book
-- `https://YOUR_DOMAIN/admin.html` → log in with the seeded admin account
+- `https://YOUR_DOMAIN/admin/admin.html` → log in with the seeded admin account
   (check `sudo journalctl -u jackpots-backend | grep -i admin` right after
   the first migration ran, for the auto-generated password if you didn't set
   `ADMIN_SEED_PASSWORD`)

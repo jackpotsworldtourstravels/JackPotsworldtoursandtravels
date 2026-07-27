@@ -12,10 +12,7 @@ cd "${REPO_DIR}/backend"
 venv/bin/pip install -r requirements.txt
 venv/bin/python -m alembic upgrade head
 
-cp "${REPO_DIR}"/index.html "${REPO_DIR}"/login.html "${REPO_DIR}"/register.html "${REPO_DIR}"/forgot-password.html "${REPO_DIR}"/reset-password.html "${REPO_DIR}"/admin.html /var/www/jackpots/
-if [ -d "${REPO_DIR}/assets" ]; then
-  cp -r "${REPO_DIR}/assets" /var/www/jackpots/
-fi
+cp -r "${REPO_DIR}/frontend/." /var/www/jackpots/
 
 sudo systemctl restart jackpots-backend
 sudo systemctl reload nginx
