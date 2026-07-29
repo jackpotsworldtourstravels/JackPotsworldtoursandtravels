@@ -932,6 +932,14 @@ function openAuth(view) {
   signupView.style.display = view === 'login' ? 'none' : 'block';
   loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
+  /* Always reopen on the credentials step — a half-finished OTP attempt from
+     a previous open would otherwise still be showing. */
+  if (view === 'login') {
+    loginChallengeToken = null;
+    showLoginStep('creds');
+    setModalMsg(document.getElementById('loginMsg'), '', 'muted');
+    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
+  }
   const firstInput = (view === 'login' ? loginView : signupView).querySelector('input');
   if (firstInput) firstInput.focus();
 }
@@ -942,6 +950,13 @@ function closeAuth() {
 document.querySelectorAll('[data-auth]').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
+    /* A merchant who already has a live session shouldn't be asked to sign in
+       again — send them straight through. Merchant tokens live in their own
+       namespace (PARTNER_KEYS), which getStoredAuth() below doesn't see. */
+    if (el.dataset.auth === 'login' && isPartnerLoggedIn()) {
+      window.location.href = MERCHANT_PORTAL_URL;
+      return;
+    }
     const { access, role } = getStoredAuth();
     if (access) {
       if (el.dataset.auth === 'signup') {
@@ -962,68 +977,147 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
-document.getElementById('signupForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const fullName = document.getElementById('suName').value;
-  const email = document.getElementById('suEmail').value;
-  const pass = document.getElementById('suPass').value;
-  const pass2 = document.getElementById('suPass2').value;
+/** Where merchant onboarding requests go — the address the site already
+    publishes in its Contact section. */
+const MERCHANT_ONBOARDING_EMAIL = 'info@jackpotsworldtours.com';
+
+/* ---------------------------------------------------------------------------
+   Merchant access request.
+
+   Merchants don't self-register: an Admin creates the company
+   (POST /api/admin/merchants) and it stays pending_approval until approved, so
+   there is no /api/auth/signup in the v2 API to post to. This collects the
+   details the team needs and routes them through the existing contact channel
+   rather than pretending an account was created.
+   --------------------------------------------------------------------------- */
+document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
+  const company = document.getElementById('suCompany').value.trim();
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const phone = document.getElementById('suPhone').value.trim();
   const msg = document.getElementById('signupMsg');
-  if (pass !== pass2) {
-    msg.textContent = "Passwords don't match — please try again.";
+  const fail = text => {
+    msg.textContent = text;
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
-    return;
-  }
-  try {
-    const data = await Api.register({ full_name: fullName, email, password: pass });
-    const me = await Api.me({ Authorization: `Bearer ${data.access_token}` });
-    setStoredAuth(data.access_token, data.refresh_token, fullName, 'user', me.id);
-    renderAuthNav();
-    refreshWishlistState().then(() => {
-      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
-      applyWishlistState(document.getElementById('searchResultsList'));
-    });
-    msg.textContent = "Account created — you're all set!";
-    msg.style.color = 'var(--emerald)';
-    msg.classList.add('show');
-    e.target.reset();
-    setTimeout(closeAuth, 1200);
-  } catch (err) {
-    msg.textContent = apiErrorText(err, 'Something went wrong — please try again.');
-    msg.style.color = 'var(--coral-dark)';
-    msg.classList.add('show');
-  }
+  };
+
+  if (!company) return fail('Please tell us your company name.');
+  if (!name) return fail('Please tell us your name.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid work email.');
+
+  /* Opens the visitor's mail client rather than posting anywhere: the legacy
+     /api/contact route isn't mounted under the v2 schema, and a form that
+     silently swallowed the request would be worse than one that plainly
+     hands it over. Swap this for a real endpoint when one exists. */
+  const body = [
+    `Company: ${company}`,
+    `Contact: ${name}`,
+    `Email: ${email}`,
+    `Phone: ${phone || '—'}`,
+    '',
+    'We would like a merchant account on JackPots World Tours & Travels.',
+  ].join('\n');
+  window.location.href = `mailto:${MERCHANT_ONBOARDING_EMAIL}`
+    + `?subject=${encodeURIComponent(`Merchant access request — ${company}`)}`
+    + `&body=${encodeURIComponent(body)}`;
+
+  msg.textContent = `Opening your email app — or write to ${MERCHANT_ONBOARDING_EMAIL}.`;
+  msg.style.color = 'var(--emerald)';
+  msg.classList.add('show');
 });
+
+/* ---------------------------------------------------------------------------
+   Merchant sign-in — the site's "Login" is the merchant login.
+
+   Runs the same two-step flow as the Merchant Portal's own shell
+   (Login -> Password -> OTP -> Portal, API_CONTRACT.md §1) using the shared
+   helpers in auth.js, then hands off to /merchant/. Tokens are written under
+   the merchant namespace by storePortalTokens, so arriving at the portal the
+   session is already live and no second sign-in is needed.
+   --------------------------------------------------------------------------- */
+const MERCHANT_PORTAL_URL = 'merchant/';
+let loginChallengeToken = null;
+
+function showLoginStep(step) {
+  document.getElementById('loginStepCreds').style.display = step === 'creds' ? '' : 'none';
+  document.getElementById('loginStepOtp').style.display = step === 'otp' ? '' : 'none';
+}
+
+function setModalMsg(el, text, tone) {
+  el.textContent = text;
+  el.style.color = tone === 'error' ? 'var(--coral-dark)'
+    : tone === 'ok' ? 'var(--emerald)' : 'var(--text-muted)';
+  el.classList.toggle('show', !!text);
+}
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const email = document.getElementById('liUser').value;
+  const email = document.getElementById('liUser').value.trim();
   const pass = document.getElementById('liPass').value;
   const msg = document.getElementById('loginMsg');
-  try {
-    const data = await Api.login(email, pass);
-    const me = await Api.me({ Authorization: `Bearer ${data.access_token}` });
-    setStoredAuth(data.access_token, data.refresh_token, me.full_name, me.role, me.id);
-    renderAuthNav();
-    if (me.role === 'admin') {
-      window.location.href = 'admin/';
-      return;
-    }
-    refreshWishlistState().then(() => {
-      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
-      applyWishlistState(document.getElementById('searchResultsList'));
-    });
-    msg.textContent = 'Logged in — welcome back!';
-    msg.style.color = 'var(--emerald)';
-    msg.classList.add('show');
-    e.target.reset();
-    setTimeout(closeAuth, 1200);
-  } catch (err) {
-    msg.textContent = apiErrorText(err, 'Invalid email or password.');
-    msg.style.color = 'var(--coral-dark)';
-    msg.classList.add('show');
+  if (!email || !pass) {
+    setModalMsg(msg, 'Enter your email and password.', 'error');
+    return;
   }
+  setModalMsg(msg, 'Checking…', 'muted');
+  try {
+    const data = await startPortalLogin('merchant', email, pass);
+    loginChallengeToken = data.challenge_token;
+    setModalMsg(msg, '', 'muted');
+    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
+    document.getElementById('liOtp').value = '';
+    /* With SMTP unconfigured the API returns the code inline so local demos
+       work without a mailbox; show it rather than leaving the user stuck. */
+    document.getElementById('loginOtpSub').textContent = data.dev_otp
+      ? `Dev mode — your code is ${data.dev_otp}`
+      : `Enter the 6-digit code sent to ${email}.`;
+    showLoginStep('otp');
+    document.getElementById('liOtp').focus();
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
+  }
+});
+
+document.getElementById('liVerifyBtn')?.addEventListener('click', async () => {
+  const code = document.getElementById('liOtp').value.trim();
+  const msg = document.getElementById('loginOtpMsg');
+  if (!/^\d{6}$/.test(code)) {
+    setModalMsg(msg, 'Enter the 6-digit code.', 'error');
+    return;
+  }
+  setModalMsg(msg, 'Verifying…', 'muted');
+  try {
+    const data = await verifyPortalOtp(loginChallengeToken, code);
+    storePortalTokens('merchant', data);
+    setModalMsg(msg, 'Signed in — taking you to your portal…', 'ok');
+    window.location.href = MERCHANT_PORTAL_URL;
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'That code was not accepted.'), 'error');
+  }
+});
+
+document.getElementById('liResendBtn')?.addEventListener('click', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('loginOtpMsg');
+  setModalMsg(msg, 'Sending a new code…', 'muted');
+  try {
+    const data = await resendPortalOtp(loginChallengeToken);
+    /* resend issues a fresh challenge; keep using the newest one. */
+    if (data.challenge_token) loginChallengeToken = data.challenge_token;
+    setModalMsg(msg, data.dev_otp ? `Dev mode — your new code is ${data.dev_otp}` : 'A new code is on its way.', 'ok');
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'Could not resend the code just now.'), 'error');
+  }
+});
+
+document.getElementById('liBackBtn')?.addEventListener('click', e => {
+  e.preventDefault();
+  loginChallengeToken = null;
+  document.getElementById('liPass').value = '';
+  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
+  showLoginStep('creds');
+  document.getElementById('liUser').focus();
 });
 
 document.getElementById('forgotPasswordLink').addEventListener('click', async e => {
