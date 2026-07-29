@@ -936,7 +936,7 @@ document.querySelectorAll('[data-auth]').forEach(el => {
         wishlistMap = new Map();
         renderAuthNav();
       }
-      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/admin.html'; }
+      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/'; }
       return;
     }
     openAuth(el.dataset.auth);
@@ -993,7 +993,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     setStoredAuth(data.access_token, data.refresh_token, me.full_name, me.role, me.id);
     renderAuthNav();
     if (me.role === 'admin') {
-      window.location.href = 'admin/admin.html';
+      window.location.href = 'admin/';
       return;
     }
     refreshWishlistState().then(() => {
