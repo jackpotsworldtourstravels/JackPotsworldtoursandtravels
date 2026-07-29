@@ -56,6 +56,8 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 .nav-item.active::before{content:''; position:absolute; left:-12px; top:8px; bottom:8px; width:3px; border-radius:3px; background:var(--coral);}
 .nav-item .icon{opacity:.85;}
 .nav-item.active .icon{opacity:1; color:var(--coral);}
+.nav-badge{margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--coral); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center;}
+.layout.collapsed .nav-badge{display:none;}
 .sidebar .spacer{flex:1;}
 .sidebar .nav-item.logout{color:#ffb4b4; margin-top:4px;}
 .sidebar .nav-item.logout:hover{background:rgba(255,77,77,0.14); color:#fff;}
@@ -159,6 +161,33 @@ tbody tr:hover{background:var(--hover-bg);}
   width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border-color); font-size:13.5px; color:var(--text-primary); background:var(--card-bg);
 }
 .form-field input:focus, .form-field select:focus, .form-field textarea:focus{outline:none; border-color:var(--coral);}
+
+/* ---------- Auth shell (2026-07-29) ----------
+   Same pattern as the Merchant/Super Admin portals (partner-portal.css), adapted to Admin's
+   own --navy/--gold/--card-bg tokens so the three portals share one visual language without
+   sharing a stylesheet. Used by the new embedded Login -> Password -> OTP shell in admin.html. */
+.partner-auth-shell{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:radial-gradient(1200px 700px at 15% -10%, var(--navy-2) 0%, transparent 60%), linear-gradient(165deg, #071B33 0%, var(--navy) 60%, var(--navy-2) 100%);}
+.partner-auth-card{width:100%; max-width:420px; background:var(--card-bg); border-radius:20px; box-shadow:var(--shadow-lg); padding:38px 36px; border-top:3px solid var(--gold);}
+.partner-auth-brand{text-align:center; margin-bottom:22px;}
+.partner-auth-brand img{height:42px; width:auto; margin-bottom:8px;}
+.pab-sub{font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--gold);}
+.auth-stepper{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:28px;}
+.auth-step-dot{width:26px; height:26px; border-radius:50%; background:var(--hover-bg); color:var(--text-muted); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; transition:background .2s ease, color .2s ease;}
+.auth-step-dot.active, .auth-step-dot.done{background:var(--navy); color:#fff;}
+.auth-step-line{width:28px; height:2px; background:var(--border-color);}
+.auth-step{display:none;}
+.auth-step.active{display:block; animation:fadeUp .28s ease;}
+.auth-step h1{font-size:20px; margin-bottom:6px; text-align:center;}
+.auth-step-sub{font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:22px;}
+.otp-input{letter-spacing:.5em; text-align:center; font-size:20px; font-weight:800;}
+.auth-forgot-row{text-align:right; margin:-10px 0 18px;}
+.auth-forgot-row a{font-size:12.5px; font-weight:700; color:var(--coral);}
+.partner-auth-footer{text-align:center; margin-top:22px;}
+.partner-auth-footer a{font-size:12.5px; color:var(--text-muted); font-weight:600;}
+.partner-auth-card .btn{margin-bottom:10px; width:100%;}
+.partner-auth-card .msg{text-align:center;}
+@keyframes fadeUp{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
 
 .status-select{padding:6px 8px; border-radius:8px; border:1.5px solid var(--border-color); font-size:12.5px; background:var(--card-bg); color:var(--text-primary);}
 .msg{margin-top:12px; font-size:13px; font-weight:600;}
@@ -447,6 +476,13 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .drawer-section-title{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin:22px 0 10px;}
 .drawer-section-title:first-child{margin-top:0;}
 @media (max-width:640px){ .drawer-panel{width:100%;} }
+
+/* Support Management / Live Chat conversation */
+.chat-msg{max-width:82%; margin-bottom:14px; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.45;}
+.chat-msg-in{background:var(--card-bg); border:1px solid var(--border-color); margin-right:auto; border-bottom-left-radius:3px;}
+.chat-msg-out{background:var(--coral); color:#fff; margin-left:auto; border-bottom-right-radius:3px;}
+.chat-msg-meta{font-size:11px; opacity:.7; margin-bottom:3px;}
+.chat-msg-body{white-space:pre-wrap; word-break:break-word;}
 
 @media print{
   body:not(.printing-section) > *:not(.modal-overlay):not(.drawer-overlay){display:none !important;}

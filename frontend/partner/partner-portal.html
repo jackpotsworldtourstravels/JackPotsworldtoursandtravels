@@ -12,72 +12,45 @@
 </head>
 <body>
 
-<!-- ============== AUTH VIEW (shown when there's no valid partner session) ============== -->
+<!-- ============== AUTH VIEW (shown when there's no valid merchant session) ==============
+     Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live
+     /api/auth/login|verify-otp|resend-otp endpoints with portal="merchant". -->
 <div class="partner-auth-shell" id="partnerAuthShell">
   <div class="partner-auth-card">
     <div class="partner-auth-brand">
       <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-      <div class="pab-sub">Partner Portal</div>
+      <div class="pab-sub">Merchant Portal</div>
     </div>
 
     <div class="auth-stepper" id="authStepper">
       <div class="auth-step-dot active" data-step-dot="1">1</div>
       <div class="auth-step-line"></div>
       <div class="auth-step-dot" data-step-dot="2">2</div>
-      <div class="auth-step-line"></div>
-      <div class="auth-step-dot" data-step-dot="3">3</div>
     </div>
 
-    <!-- Step 1 -->
+    <!-- Step 1: credentials -->
     <div class="auth-step active" id="authStep1">
-      <h1>Partner Sign In</h1>
-      <p class="auth-step-sub">Enter your registered email address to receive a one-time code.</p>
-      <div class="form-field"><label>Username / Email Address</label><input id="authEmail" type="email" autocomplete="username" placeholder="you@company.com"></div>
-      <button type="button" class="btn btn-coral btn-block" id="sendOtpBtn">Send OTP</button>
+      <h1>Merchant Sign In</h1>
+      <p class="auth-step-sub">Sign in with your registered email and password.</p>
+      <div class="form-field"><label>Email Address</label><input id="authEmail" type="email" autocomplete="username" placeholder="you@company.com"></div>
+      <div class="form-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password"></div>
+      <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
+      <button type="button" class="btn btn-coral btn-block" id="partnerLoginBtn">Sign In</button>
       <div class="msg" id="authStep1Msg"></div>
     </div>
 
-    <!-- Step 2 -->
+    <!-- Step 2: OTP -->
     <div class="auth-step" id="authStep2">
       <h1>Verify OTP</h1>
-      <p class="auth-step-sub">Enter the 6-digit code sent to <strong id="authStep2Email"></strong></p>
+      <p class="auth-step-sub" id="authStep2Sub">Enter the 6-digit code sent to your email.</p>
       <div class="form-field"><label>OTP</label><input id="authOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
       <button type="button" class="btn btn-coral btn-block" id="verifyOtpBtn">Verify OTP</button>
       <button type="button" class="btn btn-ghost btn-block" id="resendOtpBtn">Resend OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="backToCredsBtn">← Back</button>
       <div class="msg" id="authStep2Msg"></div>
     </div>
 
-    <!-- Step 3 -->
-    <div class="auth-step" id="authStep3">
-      <h1>Enter Password</h1>
-      <div class="email-verified-badge"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Email Verified</div>
-      <div class="form-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password"></div>
-      <div class="auth-forgot-row"><a href="#" id="forgotPasswordLink">Forgot Password?</a></div>
-      <button type="button" class="btn btn-coral btn-block" id="partnerLoginBtn">Partner Login</button>
-      <div class="msg" id="authStep3Msg"></div>
-    </div>
-
-    <!-- Forgot password: OTP -->
-    <div class="auth-step" id="authForgotStep1">
-      <h1>Reset Password</h1>
-      <p class="auth-step-sub">Enter your email and we'll send a reset code, if an account exists.</p>
-      <div class="form-field"><label>Email Address</label><input id="forgotEmail" type="email"></div>
-      <button type="button" class="btn btn-coral btn-block" id="forgotSendOtpBtn">Send Reset Code</button>
-      <button type="button" class="btn btn-ghost btn-block" id="backToLoginBtn1">Back to Login</button>
-      <div class="msg" id="authForgotStep1Msg"></div>
-    </div>
-
-    <!-- Forgot password: OTP + new password -->
-    <div class="auth-step" id="authForgotStep2">
-      <h1>Set New Password</h1>
-      <div class="form-field"><label>OTP</label><input id="forgotOtp" inputmode="numeric" maxlength="6" class="otp-input"></div>
-      <div class="form-field"><label>New Password</label><input id="forgotNewPassword" type="password"></div>
-      <button type="button" class="btn btn-coral btn-block" id="forgotResetBtn">Reset Password</button>
-      <button type="button" class="btn btn-ghost btn-block" id="backToLoginBtn2">Back to Login</button>
-      <div class="msg" id="authForgotStep2Msg"></div>
-    </div>
-
-    <div class="partner-auth-footer"><a href="../index.html">← Back to main site</a></div>
+    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
   </div>
 </div>
 
@@ -166,31 +139,23 @@
 
     <section class="section active" id="section-dashboard">
       <div class="stat-grid" id="dashboardStatGrid"></div>
+      <div id="dashboardRecentWrap" style="margin-top:22px;"></div>
     </section>
 
     <section class="section" id="section-ticket-enquiry">
       <div class="panel">
         <div class="panel-head"><h2>Ticket Enquiry</h2></div>
 
-        <div class="te-trip-type" id="teTripType">
-          <button type="button" class="te-trip-btn active" data-trip="one_way">One Way</button>
-          <button type="button" class="te-trip-btn" data-trip="round_trip">Round Trip</button>
-          <button type="button" class="te-trip-btn" data-trip="multi_city">Multi City</button>
-        </div>
-
-        <div id="teLegsContainer">
-          <div class="te-leg-row" data-leg="0">
-            <input type="text" class="te-leg-departure" placeholder="Departure">
-            <input type="text" class="te-leg-arrival" placeholder="Arrival">
-            <input type="date" class="te-leg-date" title="Departure date">
-            <input type="date" class="te-leg-return-date" title="Return date" style="display:none;">
-          </div>
-        </div>
-        <div id="teAddLegRow" style="display:none; margin:-4px 0 14px;">
-          <button type="button" class="btn btn-ghost btn-sm" id="teAddLegBtn">+ Add another city</button>
+        <div class="te-trip-type" id="teTravelType">
+          <button type="button" class="te-trip-btn active" data-travel-type="flight">Flights</button>
+          <button type="button" class="te-trip-btn" data-travel-type="hotel">Hotels</button>
+          <button type="button" class="te-trip-btn" data-travel-type="cruise">Cruises</button>
         </div>
 
         <div class="filter-bar">
+          <input type="text" id="teOrigin" placeholder="From (city / code)" style="min-width:160px;">
+          <input type="text" id="teDestination" placeholder="To (city / code)" style="min-width:160px;">
+          <input type="date" id="teDate" title="Travel date">
           <select id="tePassengers" class="status-select">
             <option value="1">1 Passenger</option><option value="2">2 Passengers</option>
             <option value="3">3 Passengers</option><option value="4">4 Passengers</option><option value="5">5+ Passengers</option>
@@ -200,24 +165,16 @@
             <option value="premium_economy">Premium Economy</option><option value="business">Business</option><option value="first_class">First Class</option>
           </select>
           <input type="text" id="teAirline" placeholder="Preferred Airline (optional)" style="min-width:180px;">
+          <input type="number" id="teMaxPrice" placeholder="Max price (optional)" style="min-width:150px;">
           <button type="button" class="btn btn-navy btn-sm" id="teSearchBtn">Search</button>
         </div>
 
         <div id="teResultsContainer"></div>
-
-        <div class="te-request-row"><button type="button" class="btn btn-coral" id="teRequestTicketBtn">Request Ticket →</button></div>
       </div>
     </section>
 
     <section class="section" id="section-request-ticket">
-      <div class="panel" style="padding:0;">
-        <div class="profile-tabs" id="rtTabs" style="position:static; padding:16px 20px 0;">
-          <div class="profile-tab active" data-rt-tab="flight">Flights</div>
-          <div class="profile-tab" data-rt-tab="hotel">Hotels</div>
-          <div class="profile-tab" data-rt-tab="cruise">Cruises</div>
-        </div>
-        <div class="profile-tab-panel active" id="rtPanel" style="padding:22px;"></div>
-      </div>
+      <div class="panel" id="rtPanelWrap" style="padding:22px;"></div>
     </section>
 
     <section class="section" id="section-request-history">
@@ -256,23 +213,27 @@
       <div class="panel">
         <div class="panel-head"><h2>Reports</h2></div>
         <div class="form-grid">
-          <div class="form-field"><label>Request Date From</label><input type="date" id="repRequestFrom"></div>
-          <div class="form-field"><label>Request Date To</label><input type="date" id="repRequestTo"></div>
           <div class="form-field"><label>Travel Date From</label><input type="date" id="repTravelFrom"></div>
           <div class="form-field"><label>Travel Date To</label><input type="date" id="repTravelTo"></div>
-          <div class="form-field"><label>Passenger Name</label><input type="text" id="repPassenger"></div>
-          <div class="form-field"><label>Request Number</label><input type="text" id="repSrNumber" placeholder="SR000001"></div>
-          <div class="form-field"><label>Sector — Departure</label><input type="text" id="repDeparture"></div>
-          <div class="form-field"><label>Sector — Arrival</label><input type="text" id="repArrival"></div>
+          <div class="form-field"><label>Search (passenger, request #, PNR)</label><input type="text" id="repSearch" placeholder="e.g. Smith or REQ-2026-000123"></div>
+          <div class="form-field"><label>Status</label>
+            <select id="repStatus"><option value="">All statuses</option>
+              <option value="draft">Draft</option><option value="pending_approval">Pending Approval</option>
+              <option value="approved">Approved</option><option value="payment_pending">Payment Pending</option>
+              <option value="paid">Paid</option><option value="ticket_issued">Ticket Issued</option>
+              <option value="completed">Completed</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
           <button type="button" class="btn btn-coral" id="repGenerateBtn">Generate Report</button>
           <button type="button" class="btn btn-navy" id="repExportPdfBtn">Export PDF</button>
           <button type="button" class="btn btn-navy" id="repExportExcelBtn">Export Excel</button>
+          <button type="button" class="btn btn-navy" id="repExportCsvBtn">Export CSV</button>
         </div>
         <div class="table-wrap"><table id="repTable"><thead><tr>
-          <th>Reference</th><th>Passenger</th><th>Request #</th><th>Sector</th>
-          <th>Request Date</th><th>Travel Date</th><th>Amount</th><th>Reimbursement</th><th>Status</th>
+          <th>Reference</th><th>Request #</th><th>Passenger(s)</th><th>Sector</th>
+          <th>Travel Date</th><th>Amount</th><th>Status</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -286,11 +247,17 @@
         <h2>Partner Information</h2>
         <form id="profileForm">
           <div class="form-field" style="max-width:none;"><label>Company Name</label><input id="profCompanyName" type="text" disabled></div>
-          <div class="form-field" style="max-width:none;"><label>Company Code</label><input id="profCompanyCode" type="text" disabled></div>
-          <div class="form-field" style="max-width:none;"><label>Partner ID</label><input id="profPartnerId" type="text" disabled></div>
           <div class="form-field" style="max-width:none;"><label>Full Name</label><input id="profFullName" type="text" required></div>
           <div class="form-field" style="max-width:none;"><label>Email</label><input id="profEmail" type="email" disabled></div>
           <div class="form-field" style="max-width:none;"><label>Phone</label><input id="profPhone" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>Gender</label>
+            <select id="profGender"><option value="">Select…</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+          </div>
+          <div class="form-field" style="max-width:none;"><label>Date of Birth</label><input id="profDob" type="date"></div>
+          <div class="form-field" style="max-width:none;"><label>Country</label><input id="profCountry" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>State</label><input id="profState" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>City</label><input id="profCity" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>Address</label><input id="profAddress" type="text"></div>
           <button type="submit" class="btn btn-coral">Update Profile</button>
           <div class="msg" id="profileMsg"></div>
         </form>
@@ -328,7 +295,7 @@
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
-<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/partner-shared.js?v=20260725f"></script>
 <script src="../assets/js/partner-auth.js?v=20260725f"></script>

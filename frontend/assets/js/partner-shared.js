@@ -14,14 +14,17 @@ const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http:
 function rowsSkeleton() { return '<tr><td colspan="12" class="empty-state">Loading…</td></tr>'; }
 function statusLabel(s) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
-/* Any 401 from a partner-scoped call means the session is gone (expired,
-   revoked, or never valid) — bounce back to the auth flow rather than
-   showing a broken portal. */
+/* A 401 from any API call means the session is gone (expired, revoked, or never valid).
+   Try one silent refresh first (see auth.js::handlePortalUnauthorized) — only bounce back to
+   the auth shell once that's failed too. Checking the URL for "/api/partner" here would miss
+   almost every v2 call (catalog/requests/service-requests/merchant-team all live under plain
+   /api/*, not /api/partner/*), so this checks status alone. */
 axios.interceptors.response.use(
   res => res,
-  err => {
-    const url = err.config?.url || '';
-    if (err.response?.status === 401 && url.includes('/api/partner')) {
+  async err => {
+    if (err.response?.status === 401) {
+      const retried = await handlePortalUnauthorized('merchant', err);
+      if (retried) return retried;
       clearPartnerSession();
       showPartnerAuthShell();
     }
@@ -97,8 +100,7 @@ document.getElementById('partnerSignOutBtn').addEventListener('click', e => {
 });
 document.getElementById('cancelSignOutBtn').addEventListener('click', () => signOutModalOverlay.classList.remove('open'));
 document.getElementById('confirmSignOutBtn').addEventListener('click', async () => {
-  try { await axios.post(`${API_BASE}/api/partner-auth/logout`, {}, { headers: partnerAuthHeaders() }); } catch (err) { /* ignore */ }
-  clearPartnerSession();
+  await logoutPortalSession('merchant');
   loadedSections.clear();
   if (typeof notifPollTimer !== 'undefined' && notifPollTimer) { clearInterval(notifPollTimer); notifPollTimer = null; }
   signOutModalOverlay.classList.remove('open');

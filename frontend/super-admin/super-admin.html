@@ -12,11 +12,13 @@
      modals) so the Super Admin Portal matches the project's established
      premium-enterprise language rather than inventing a new one. -->
 <link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260725f">
-<link rel="stylesheet" href="../assets/css/super-admin.css?v=1">
+<link rel="stylesheet" href="../assets/css/super-admin.css?v=2">
 </head>
 <body>
 
-<!-- ============== AUTH VIEW ============== -->
+<!-- ============== AUTH VIEW ==============
+     Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live
+     /api/auth/login|verify-otp|resend-otp endpoints with portal="super_admin". -->
 <div class="partner-auth-shell" id="saAuthShell">
   <div class="partner-auth-card">
     <div class="partner-auth-brand">
@@ -24,24 +26,37 @@
       <div class="pab-sub">Super Admin Portal</div>
     </div>
 
-    <h1 style="font-size:20px; text-align:center; margin-bottom:6px;">Super Admin Sign In</h1>
-    <p class="auth-step-sub">Platform-level access for onboarding and managing Admins.</p>
-
-    <form id="saLoginForm">
-      <div class="form-field"><label>Username / Email</label><input id="saUsername" autocomplete="username" placeholder="superadmin"></div>
-      <div class="form-field"><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div>
-      <button type="submit" class="btn btn-coral btn-block">Login</button>
-      <div class="msg" id="saLoginMsg"></div>
-    </form>
-
-    <div class="sa-demo-creds">
-      <div class="sa-demo-creds-title">Demo credentials — UI testing only</div>
-      <div class="sa-demo-creds-row"><span>Username</span><code>superadmin</code></div>
-      <div class="sa-demo-creds-row"><span>Password</span><code>SuperAdmin@2026</code></div>
-      <p>These are placeholders until the real database is connected — nothing here is persisted.</p>
+    <div class="auth-stepper" id="saAuthStepper">
+      <div class="auth-step-dot active" data-step-dot="1">1</div>
+      <div class="auth-step-line"></div>
+      <div class="auth-step-dot" data-step-dot="2">2</div>
     </div>
 
-    <div class="partner-auth-footer"><a href="../index.html">← Back to main site</a></div>
+    <!-- Step 1: credentials -->
+    <div class="auth-step active" id="saAuthStep1">
+      <h1>Super Admin Sign In</h1>
+      <p class="auth-step-sub">Platform-level access for onboarding and managing Admins.</p>
+      <form id="saLoginForm">
+        <div class="form-field"><label>Email</label><input id="saUsername" type="email" autocomplete="username" placeholder="superadmin@jackpotsworld.com"></div>
+        <div class="form-field"><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div>
+        <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
+        <button type="submit" class="btn btn-coral btn-block">Continue</button>
+        <div class="msg" id="saLoginMsg"></div>
+      </form>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="auth-step" id="saAuthStep2">
+      <h1>Verify OTP</h1>
+      <p class="auth-step-sub" id="saAuthStep2Sub">Enter the 6-digit code sent to your email.</p>
+      <div class="form-field"><label>OTP</label><input id="saOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
+      <button type="button" class="btn btn-coral btn-block" id="saVerifyOtpBtn">Verify OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="saResendOtpBtn">Resend OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="saBackToCredsBtn">← Back</button>
+      <div class="msg" id="saAuthStep2Msg"></div>
+    </div>
+
+    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
   </div>
 </div>
 
@@ -63,11 +78,27 @@
     </a>
     <a href="#" class="nav-item" data-section="admin">
       <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="nav-label">Admin</span>
+      <span class="nav-label">Admin Management</span>
+    </a>
+    <a href="#" class="nav-item" data-section="roles">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 4 8.5 9 10 5-1.5 9-5 9-10V6l-9-4Z"/><path d="m9 12 2 2 4-4"/></svg>
+      <span class="nav-label">Role &amp; Permissions</span>
+    </a>
+    <a href="#" class="nav-item" data-section="reports">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+      <span class="nav-label">Global Reports</span>
+    </a>
+    <a href="#" class="nav-item" data-section="audit">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+      <span class="nav-label">Audit Logs</span>
+    </a>
+    <a href="#" class="nav-item" data-section="settings">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      <span class="nav-label">System Configuration</span>
     </a>
     <a href="#" class="nav-item" data-section="profile">
       <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
-      <span class="nav-label">Profile</span>
+      <span class="nav-label">Profile &amp; Security</span>
     </a>
     <div class="spacer"></div>
     <a href="../index.html" class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="nav-label">Back to site</span></a>
@@ -85,27 +116,127 @@
       </div>
     </div>
 
+    <!-- ============== Dashboard ============== -->
     <section class="section active" id="section-dashboard">
-      <div class="callout-mock">Dashboard figures below are temporary static values — not yet connected to PostgreSQL.</div>
       <div class="stat-grid" id="saDashboardStatGrid"></div>
+      <div class="panel">
+        <div class="panel-head"><h2>Recent System Activity</h2></div>
+        <div id="saDashboardActivity" class="empty-state">Loading…</div>
+      </div>
     </section>
 
+    <!-- ============== Admin Management ============== -->
     <section class="section" id="section-admin">
       <div class="panel">
         <div class="panel-head">
           <h2>Admin Management</h2>
           <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Admin</button>
         </div>
-        <div class="callout-mock">This list lives in server memory only right now — it resets whenever the backend restarts.</div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <input type="text" id="saAdminSearch" placeholder="Search name or email…">
+        </div>
         <div class="table-wrap"><table id="saAdminsTable"><thead><tr>
-          <th>Admin ID</th><th>Full Name</th><th>Username</th><th>Email</th><th>Phone</th><th>Status</th><th>Created</th><th>Actions</th>
+          <th>Full Name</th><th>Email</th><th>Status</th><th>Last Login</th><th>Created</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="saAdminsPagination"></div>
       </div>
     </section>
 
+    <!-- ============== Role & Permission Management ============== -->
+    <section class="section" id="section-roles">
+      <div class="panel">
+        <div class="panel-head"><h2>Role Permission Matrix</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Fixed by design — role responsibilities (e.g. Super Admin cannot hold ticket permissions) are not
+          reassignable here. This is visibility into the matrix, not an editor for it.
+        </p>
+        <div class="table-wrap"><table id="saMatrixTable"><thead><tr><th>Permission</th><th>Super Admin</th><th>Admin</th><th>Merchant Admin</th><th>Merchant User</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Per-Admin Extra Grants</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Give one specific Admin an extra capability beyond their role default. Additive only — this cannot
+          revoke a role-default permission.
+        </p>
+        <div class="filter-bar" style="margin-bottom:14px;">
+          <select id="saPermAdminPicker" class="status-select"><option value="">Select an admin…</option></select>
+        </div>
+        <div id="saPermEditorBody"></div>
+      </div>
+    </section>
+
+    <!-- ============== Global Reports & Analytics ============== -->
+    <section class="section" id="section-reports">
+      <div class="panel">
+        <div class="panel-head"><h2>Global Reports &amp; Analytics</h2></div>
+        <div class="stat-grid" id="saReportsStatGrid" style="margin-bottom:18px;"></div>
+        <div class="table-wrap"><table id="saReportsTable"><thead><tr>
+          <th>Merchant</th><th>Code</th><th>Status</th><th>Total Requests</th><th>Completed</th><th>Revenue</th><th>Users</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Export Row-Level Data</h2></div>
+        <div class="form-grid">
+          <div class="form-field"><label>Report Type</label>
+            <select id="saExportType" class="status-select">
+              <option value="bookings">Bookings</option>
+              <option value="service_requests">Service Requests</option>
+              <option value="payments">Payments</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-navy btn-sm" id="saExportPdfBtn">Export PDF</button>
+          <button class="btn btn-navy btn-sm" id="saExportExcelBtn">Export Excel</button>
+          <button class="btn btn-navy btn-sm" id="saExportCsvBtn">Export CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== Audit Logs ============== -->
+    <section class="section" id="section-audit">
+      <div class="panel">
+        <div class="panel-head"><h2>Audit Logs</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Row-level change history, written directly by a database trigger on users, merchants,
+          service requests and payments — the API only reads it. The trigger records <em>what</em>
+          changed, not <em>who</em> changed it, so &ldquo;Changed By&rdquo; reads
+          &ldquo;Not recorded&rdquo;; for the acting user, see Recent System Activity on the Dashboard.
+        </p>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <select id="saAuditTableFilter" class="status-select"><option value="">All tables</option></select>
+          <select id="saAuditOpFilter" class="status-select">
+            <option value="">All operations</option>
+            <option value="INSERT">Insert</option>
+            <option value="UPDATE">Update</option>
+            <option value="DELETE">Delete</option>
+          </select>
+          <input type="date" id="saAuditDateFrom" title="From date">
+          <input type="date" id="saAuditDateTo" title="To date">
+        </div>
+        <div class="table-wrap"><table id="saAuditTable"><thead><tr>
+          <th>When</th><th>Table</th><th>Record</th><th>Operation</th><th>Changed By</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="saAuditPagination"></div>
+      </div>
+    </section>
+
+    <!-- ============== System Configuration ============== -->
+    <section class="section" id="section-settings">
+      <div class="panel">
+        <div class="panel-head"><h2>System Configuration</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Read-only. Configuration lives in the backend's environment file, not a database table — no
+          secrets (SMTP credentials, signing keys, database URL) are ever returned here.
+        </p>
+        <div id="saSettingsBody" class="empty-state">Loading…</div>
+      </div>
+    </section>
+
+    <!-- ============== Profile & Security ============== -->
     <section class="section" id="section-profile">
       <div class="panel" style="max-width:520px;">
-        <h2 style="margin-bottom:16px;">Super Admin Profile</h2>
+        <h2 style="margin-bottom:16px;">My Profile</h2>
         <div class="sa-profile-photo-row">
           <span class="sa-profile-photo" id="saProfilePhoto">S</span>
         </div>
@@ -114,12 +245,16 @@
           <div class="info-item"><label>Email</label><div id="saProfileEmail">—</div></div>
           <div class="info-item"><label>Phone</label><div id="saProfilePhone">—</div></div>
           <div class="info-item"><label>Role</label><div>Super Administrator</div></div>
-          <div class="info-item"><label>Created Date</label><div id="saProfileCreated">—</div></div>
+          <div class="info-item"><label>Last Login</label><div id="saProfileLastLogin">—</div></div>
         </div>
         <div style="display:flex; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-navy" id="saEditProfileBtn">Edit Profile</button>
           <button type="button" class="btn btn-ghost" id="saChangePasswordBtn">Change Password</button>
         </div>
+      </div>
+      <div class="panel" style="max-width:520px;">
+        <h2 style="margin-bottom:16px;">Security — Recent Sign-Ins</h2>
+        <div class="table-wrap"><table id="saSecurityTable"><thead><tr><th>When</th><th>Action</th><th>IP</th><th>Browser</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
   </main>
@@ -127,31 +262,14 @@
 
 <!-- ============== Add Admin modal ============== -->
 <div class="modal-overlay" id="saAddAdminModalOverlay">
-  <div class="modal-card modal-lg">
+  <div class="modal-card">
     <h2>Add Admin</h2>
     <form id="saAddAdminForm">
-      <div class="form-grid">
-        <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
-        <div class="form-field" style="max-width:none;"><label>Username</label><input name="username" required minlength="3"></div>
-        <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
-        <div class="form-field" style="max-width:none;"><label>Country Code</label>
-          <select name="country_code" id="saCountryCode">
-            <option value="+91">+91 (India)</option>
-            <option value="+1">+1 (US/Canada)</option>
-            <option value="+44">+44 (UK)</option>
-            <option value="+971">+971 (UAE)</option>
-            <option value="+65">+65 (Singapore)</option>
-            <option value="+61">+61 (Australia)</option>
-            <option value="+49">+49 (Germany)</option>
-            <option value="+81">+81 (Japan)</option>
-          </select>
-        </div>
-        <div class="form-field" style="max-width:none;"><label>Phone Number</label><input name="phone_number" required placeholder="Digits only"></div>
-        <div></div>
-        <div class="form-field" style="max-width:none;"><label>Password</label><input name="password" type="password" required minlength="8"></div>
-        <div class="form-field" style="max-width:none;"><label>Confirm Password</label><input name="confirm_password" type="password" required minlength="8"></div>
-      </div>
-      <div class="sa-pw-hint">Minimum 8 characters, at least one uppercase letter and one number.</div>
+      <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
+      <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
+      <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone" placeholder="Optional"></div>
+      <div class="form-field" style="max-width:none;"><label>Password</label><input name="password" type="password" minlength="8" placeholder="Leave blank to auto-generate"></div>
+      <div class="sa-pw-hint">Leave the password blank to have a strong one generated and shown once on creation.</div>
       <div class="msg" id="saAddAdminMsg"></div>
       <div class="modal-actions">
         <button type="submit" class="btn btn-coral">Create Admin</button>
@@ -161,13 +279,48 @@
   </div>
 </div>
 
+<!-- ============== Edit Admin modal ============== -->
+<div class="modal-overlay" id="saEditAdminModalOverlay">
+  <div class="modal-card">
+    <h2>Edit Admin</h2>
+    <form id="saEditAdminForm">
+      <input type="hidden" name="admin_id">
+      <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
+      <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
+      <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone"></div>
+      <div class="msg" id="saEditAdminMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Save Changes</button>
+        <button type="button" class="btn btn-ghost" id="saEditAdminCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============== Credentials-once modal (create / reset password) ============== -->
+<div class="modal-overlay" id="saCredentialsModalOverlay">
+  <div class="modal-card">
+    <h2 id="saCredentialsTitle">Credentials</h2>
+    <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+      This password cannot be retrieved again — share it securely now.
+    </p>
+    <div class="info-grid">
+      <div class="info-item"><label>Email</label><div id="saCredentialsEmail">—</div></div>
+      <div class="info-item"><label>Temporary Password</label><div id="saCredentialsPassword" style="font-weight:800;">—</div></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-coral" id="saCredentialsCloseBtn">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============== Edit Profile modal ============== -->
 <div class="modal-overlay" id="saEditProfileModalOverlay">
   <div class="modal-card">
     <h2>Edit Profile</h2>
     <form id="saEditProfileForm">
       <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
-      <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone_number" required></div>
+      <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone"></div>
       <div class="msg" id="saEditProfileMsg"></div>
       <div class="modal-actions">
         <button type="submit" class="btn btn-coral">Save Changes</button>
@@ -184,13 +337,23 @@
     <form id="saChangePasswordForm">
       <div class="form-field" style="max-width:none;"><label>Current Password</label><input name="current_password" type="password" required></div>
       <div class="form-field" style="max-width:none;"><label>New Password</label><input name="new_password" type="password" required minlength="8"></div>
-      <div class="form-field" style="max-width:none;"><label>Confirm New Password</label><input name="confirm_new_password" type="password" required minlength="8"></div>
       <div class="msg" id="saChangePasswordMsg"></div>
       <div class="modal-actions">
         <button type="submit" class="btn btn-coral">Change Password</button>
         <button type="button" class="btn btn-ghost" id="saChangePasswordCancelBtn">Cancel</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ============== Audit entry detail modal ============== -->
+<div class="modal-overlay" id="saAuditDetailModalOverlay">
+  <div class="modal-card modal-lg">
+    <h2 id="saAuditDetailTitle">Audit Entry</h2>
+    <div id="saAuditDetailBody"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="saAuditDetailCloseBtn">Close</button>
+    </div>
   </div>
 </div>
 
@@ -211,13 +374,17 @@
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
-<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
-<script src="../assets/js/super-admin-shared.js?v=1"></script>
+<script src="../assets/js/super-admin-shared.js?v=2"></script>
 <script src="../assets/js/super-admin-auth.js?v=1"></script>
-<script src="../assets/js/super-admin-dashboard.js?v=1"></script>
-<script src="../assets/js/super-admin-admin-management.js?v=1"></script>
-<script src="../assets/js/super-admin-profile.js?v=1"></script>
+<script src="../assets/js/super-admin-dashboard.js?v=2"></script>
+<script src="../assets/js/super-admin-admin-management.js?v=2"></script>
+<script src="../assets/js/super-admin-permissions.js?v=1"></script>
+<script src="../assets/js/super-admin-reports.js?v=1"></script>
+<script src="../assets/js/super-admin-audit.js?v=1"></script>
+<script src="../assets/js/super-admin-settings.js?v=1"></script>
+<script src="../assets/js/super-admin-profile.js?v=2"></script>
 <script>
   'use strict';
   if (isSuperAdminLoggedIn()) { showSuperAdminPortal(); } else { showSuperAdminAuthShell(); }

@@ -1,5 +1,10 @@
 'use strict';
-/* Partner Portal — Request History */
+/* Merchant Portal — Request History. GET /api/requests + GET /api/requests/{id}
+   (API_CONTRACT.md — existing, live). The detail view drives its action buttons entirely from
+   the server's `actions` list (docs/API_CONTRACT.md's ActionOption) rather than hardcoding a
+   status -> button map here, so it never drifts from app/services/lifecycle.py's state
+   machine. "Pay" is the one exception: paying isn't a status transition, it's a separate
+   endpoint the merchant calls while status is Payment Pending. */
 
 function initRequestHistoryFilters() {
   ['rhStatusFilter', 'rhFromDate', 'rhToDate'].forEach(id => {
@@ -8,146 +13,174 @@ function initRequestHistoryFilters() {
 }
 let rhFiltersWired = false;
 
+function rhRow(r) {
+  const d = r.details || {};
+  return `
+    <tr>
+      <td>${escapeHtml(r.booking_reference || '—')}</td>
+      <td>${escapeHtml(r.request_number)}</td>
+      <td>${r.passengers?.length ? escapeHtml(r.passengers.map(p => `${p.first_name} ${p.last_name}`).join(', ')) : '—'}</td>
+      <td style="text-transform:capitalize">${escapeHtml(r.travel_type || '—')}</td>
+      <td>${escapeHtml(d.destination_city || d.destination || '—')}</td>
+      <td>${r.travel_date ? fmtDate(r.travel_date) : '—'}</td>
+      <td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td>
+      <td>${fmtDate(r.created_at)}</td>
+      <td><button type="button" class="btn btn-ghost btn-sm" data-rh-view="${r.id}">View</button></td>
+    </tr>`;
+}
+
 async function loadRequestHistory() {
   if (!rhFiltersWired) { initRequestHistoryFilters(); rhFiltersWired = true; }
   const tbody = document.querySelector('#rhTable tbody');
   tbody.innerHTML = rowsSkeleton();
   const params = {
+    request_type: 'booking',
     status: document.getElementById('rhStatusFilter').value || undefined,
-    from_date: document.getElementById('rhFromDate').value || undefined,
-    to_date: document.getElementById('rhToDate').value || undefined,
+    date_from: document.getElementById('rhFromDate').value || undefined,
+    date_to: document.getElementById('rhToDate').value || undefined,
+    page_size: 50,
   };
   try {
-    const { data } = await axios.get(`${API_BASE}/api/partner/request-history`, { headers: partnerAuthHeaders(), params });
-    window.__rhLastData = data;
-    tbody.innerHTML = data.length ? data.map(r => `
-      <tr>
-        <td>${escapeHtml(r.reference_number)}</td>
-        <td>${r.service_request_number ? escapeHtml(r.service_request_number) : '—'}</td>
-        <td>${escapeHtml(r.passenger_name)}</td>
-        <td style="text-transform:capitalize">${escapeHtml(r.travel_type)}</td>
-        <td>${escapeHtml(r.destination)}</td>
-        <td>${r.travel_date ? fmtDate(r.travel_date) : '—'}</td>
-        <td><span class="badge ${r.status}">${statusLabel(r.status)}</span></td>
-        <td>${fmtDate(r.created_at)}</td>
-        <td>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-ghost btn-sm" data-rh-view="${r.booking_id}">View</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-rh-pdf="${r.booking_id}">Download PDF</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-rh-print="${r.booking_id}">Print</button>
-          </div>
-        </td>
-      </tr>
-    `).join('') : '<tr><td colspan="9" class="empty-state">No requests found.</td></tr>';
+    const { data } = await axios.get(`${API_BASE}/api/requests`, { headers: partnerAuthHeaders(), params });
+    tbody.innerHTML = data.items.length ? data.items.map(rhRow).join('') : '<tr><td colspan="9" class="empty-state">No requests found.</td></tr>';
     tbody.querySelectorAll('[data-rh-view]').forEach(b => b.addEventListener('click', () => openBookingDetailModal(b.dataset.rhView)));
-    tbody.querySelectorAll('[data-rh-pdf]').forEach(b => b.addEventListener('click', () => openBookingDetailModal(b.dataset.rhPdf, true)));
-    tbody.querySelectorAll('[data-rh-print]').forEach(b => b.addEventListener('click', () => openBookingDetailModal(b.dataset.rhPrint, true)));
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="9" class="empty-state">Failed to load request history.</td></tr>';
   }
 }
 
-const PAX_SEAT_LABELS = { window: 'Window', aisle: 'Aisle', middle: 'Middle', front_row: 'Front Row', exit_row: 'Exit Row' };
-
-function paxAncillaryValue(label, charge) {
-  return charge > 0 ? `${escapeHtml(label)} <span class="pax-charge">(+${money(charge)})</span>` : escapeHtml(label);
-}
-
-/* Meal Preference / Special Request (special_assistance) are real columns.
-   Baggage/Meal selections, Seat Preference, and Special Services come from
-   the passenger_ancillary_catalog-backed fields added for Request Ticket's
-   "Travel Preferences & Additional Services" section — passengers created
-   before that feature simply have no selection, shown as "Not selected". */
-function passengerAccordionCard(p, index) {
-  const specialServicesHtml = p.special_services?.length
-    ? `<div class="pax-service-badges">${p.special_services.map(s => `<span class="pax-service-badge">${paxAncillaryValue(s.label, s.additional_charge)}</span>`).join('')}</div>`
-    : 'None selected';
-  return `
-    <div class="pax-card" data-pax-index="${index}">
-      <button type="button" class="pax-card-header">
-        <span class="pax-avatar">${escapeHtml((p.full_name || '?')[0])}</span>
-        <span class="pax-header-body">
-          <strong>${escapeHtml(p.full_name)}</strong>
-          <small style="text-transform:capitalize;">${escapeHtml(p.passenger_type)} · Passport ${escapeHtml(p.passport_number)} · DOB ${fmtDate(p.date_of_birth)}</small>
-        </span>
-        <svg class="icon pax-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="pax-card-body">
-        <div class="pax-option-grid">
-          <div class="pax-option">
-            <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
-            <div><label>Baggage</label><div>${p.baggage_selection ? paxAncillaryValue(p.baggage_selection.label, p.baggage_selection.additional_charge) : 'Not selected'}</div></div>
-          </div>
-          <div class="pax-option">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M3 2v20M3 7h4M3 12h18M3 2h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H3"/></svg>
-            <div><label>Meal</label><div>${p.meal_selection ? paxAncillaryValue(p.meal_selection.label, p.meal_selection.additional_charge) : (p.meal_preference ? escapeHtml(p.meal_preference) : 'Not specified')}</div></div>
-          </div>
-          <div class="pax-option">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M4 4v14a2 2 0 0 0 2 2h12M8 12h12M8 8h8"/></svg>
-            <div><label>Seat Preference</label><div>${p.seat_preference ? escapeHtml(PAX_SEAT_LABELS[p.seat_preference] || p.seat_preference) : 'Not selected'}</div></div>
-          </div>
-          <div class="pax-option">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2 3.5 7v6c0 5 4 8.5 8.5 9 4.5-.5 8.5-4 8.5-9V7Z"/></svg>
-            <div><label>Special Services</label><div>${specialServicesHtml}</div></div>
-          </div>
-          <div class="pax-option" style="grid-column:1/-1;">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4v2H8V6a4 4 0 0 1 4-4Z"/><path d="M4 10h16l-1.5 10a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2Z"/></svg>
-            <div><label>Special Request</label><div>${p.special_assistance ? escapeHtml(p.special_assistance) : 'None requested'}</div></div>
-          </div>
-        </div>
+function rhTimelineHtml(timeline) {
+  return `<div class="rh-timeline">${timeline.map(s => `
+    <div class="rh-timeline-step ${s.state}">
+      <div class="rh-timeline-dot"></div>
+      <div>
+        <strong>${escapeHtml(s.label || '')}</strong>
+        ${s.at ? `<div style="font-size:11.5px; color:var(--text-muted);">${fmtDateTime(s.at)}${s.by ? ' · ' + escapeHtml(s.by) : ''}</div>` : ''}
+        ${s.reason ? `<div style="font-size:12px; color:var(--coral-dark); margin-top:2px;">Reason: ${escapeHtml(s.reason)}</div>` : ''}
       </div>
-    </div>`;
-}
-function wirePassengerAccordion(container) {
-  container.querySelectorAll('.pax-card-header').forEach(btn => {
-    btn.addEventListener('click', () => btn.closest('.pax-card').classList.toggle('open'));
-  });
+    </div>`).join('')}</div>`;
 }
 
-/* Reused by Request History's View/Download PDF/Print. "Download PDF" and
-   "Print" both use the browser's print dialog (Save as PDF is a print
-   destination in every modern browser) — there's no server-side PDF
-   generator for the Partner Portal, so this doesn't pretend to have one. */
-async function openBookingDetailModal(bookingId, autoPrint) {
+function rhPassengerRow(p) {
+  return `<tr>
+    <td>${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}</td>
+    <td style="text-transform:capitalize">${escapeHtml(p.passenger_type)}</td>
+    <td>${escapeHtml(p.passport_number || '—')}</td>
+    <td>${p.seat_preference ? escapeHtml(p.seat_preference.replace(/_/g, ' ')) : '—'}</td>
+    <td>${escapeHtml(p.meal_preference || '—')}</td>
+  </tr>`;
+}
+
+const RH_ACTION_ENDPOINTS = {
+  pending_approval: (id) => axios.post(`${API_BASE}/api/requests/${id}/submit`, {}, { headers: partnerAuthHeaders() }),
+  cancelled: (id, reason) => axios.post(`${API_BASE}/api/requests/${id}/cancel`, { reason }, { headers: partnerAuthHeaders() }),
+};
+
+async function openBookingDetailModal(requestId) {
   const overlay = document.getElementById('bookingDetailModalOverlay');
   const body = document.getElementById('bookingDetailBody');
   overlay.classList.add('open');
   body.innerHTML = '<div class="empty-state">Loading…</div>';
   try {
-    const { data: b } = await axios.get(`${API_BASE}/api/partner/bookings/${bookingId}`, { headers: partnerAuthHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/requests/${requestId}`, { headers: partnerAuthHeaders() });
+    const r = data.request;
+    const d = r.details || {};
+
+    const actionButtons = data.actions.map(a => `
+      <button type="button" class="btn ${a.to === 'cancelled' ? 'btn-ghost' : 'btn-coral'} btn-sm" data-rh-action="${a.to}">${escapeHtml(a.label)}</button>
+    `).join('');
+    const payButton = r.status === 'payment_pending'
+      ? `<button type="button" class="btn btn-coral btn-sm" id="rhPayBtn">Pay ${money(r.total_amount)}</button>` : '';
+
     body.innerHTML = `
-      <h2>Booking ${escapeHtml(b.reference_number)}</h2>
+      <h2>${escapeHtml(r.request_number)}${r.pnr ? ' · PNR ' + escapeHtml(r.pnr) : ''}</h2>
       <div class="info-grid">
-        <div class="info-item"><label>Status</label><div><span class="badge ${b.status}">${statusLabel(b.status)}</span></div></div>
-        <div class="info-item"><label>Travel Type</label><div style="text-transform:capitalize;">${escapeHtml(b.travel_type)}</div></div>
-        <div class="info-item"><label>Departure</label><div>${escapeHtml(b.departure)}</div></div>
-        <div class="info-item"><label>Arrival</label><div>${escapeHtml(b.arrival)}</div></div>
-        <div class="info-item"><label>Travel Date</label><div>${fmtDate(b.departure_date)}</div></div>
-        <div class="info-item"><label>Return Date</label><div>${b.return_date ? fmtDate(b.return_date) : '—'}</div></div>
-        <div class="info-item"><label>Total Amount</label><div>${money(b.total_amount)}</div></div>
-        <div class="info-item"><label>Booked On</label><div>${fmtDateTime(b.created_at)}</div></div>
+        <div class="info-item"><label>Status</label><div><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></div></div>
+        <div class="info-item"><label>Travel Type</label><div style="text-transform:capitalize;">${escapeHtml(r.travel_type || '—')}</div></div>
+        <div class="info-item"><label>Route</label><div>${escapeHtml(d.origin_city || d.origin || '—')} → ${escapeHtml(d.destination_city || d.destination || '—')}</div></div>
+        <div class="info-item"><label>Travel Date</label><div>${r.travel_date ? fmtDate(r.travel_date) : '—'}</div></div>
+        <div class="info-item"><label>Total Amount</label><div>${money(r.total_amount)}</div></div>
+        <div class="info-item"><label>Ticket / Invoice #</label><div>${escapeHtml(r.ticket_number || '—')} / ${escapeHtml(r.invoice_number || '—')}</div></div>
+        <div class="info-item"><label>Booked On</label><div>${fmtDateTime(r.created_at)}</div></div>
+        <div class="info-item"><label>Remarks</label><div>${escapeHtml(r.remarks || '—')}</div></div>
       </div>
-      <h2 style="font-size:14px;margin-bottom:10px;">Passengers</h2>
-      <div class="pax-accordion">
-        ${b.passengers.map((p, i) => passengerAccordionCard(p, i)).join('') || '<div class="empty-state">No passengers.</div>'}
-      </div>
-      <div class="modal-actions" style="margin-top:20px;">
-        <button type="button" class="btn btn-navy" id="bookingDetailPrintBtn">Print / Save as PDF</button>
+
+      <h2 style="font-size:14px;margin:18px 0 10px;">Passengers</h2>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Passport</th><th>Seat</th><th>Meal</th></tr></thead>
+        <tbody>${r.passengers.map(rhPassengerRow).join('') || '<tr><td colspan="5" class="empty-state">No passengers.</td></tr>'}</tbody></table></div>
+
+      ${data.payments.length ? `
+        <h2 style="font-size:14px;margin:18px 0 10px;">Payments</h2>
+        <div class="table-wrap"><table><thead><tr><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody>${data.payments.map(p => `<tr><td>${money(p.amount)}</td><td>${escapeHtml(p.method || '—')}</td><td>${escapeHtml(p.transaction_id || '—')}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.paid_date ? fmtDateTime(p.paid_date) : '—'}</td></tr>`).join('')}</tbody></table></div>
+      ` : ''}
+
+      <h2 style="font-size:14px;margin:18px 0 10px;">Activity Timeline</h2>
+      ${rhTimelineHtml(data.timeline)}
+
+      <div class="modal-actions" style="margin-top:20px; flex-wrap:wrap;">
+        ${payButton}
+        ${actionButtons}
         <button type="button" class="btn btn-ghost" id="bookingDetailCloseBtn">Close</button>
       </div>
+      <div class="msg" id="rhDetailMsg"></div>
     `;
     document.getElementById('bookingDetailCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
-    document.getElementById('bookingDetailPrintBtn').addEventListener('click', () => printBookingDetail());
-    wirePassengerAccordion(body);
-    if (autoPrint) printBookingDetail();
+    document.getElementById('rhPayBtn')?.addEventListener('click', () => openPayModal(r));
+    body.querySelectorAll('[data-rh-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const to = btn.dataset.rhAction;
+        let reason;
+        if (to === 'cancelled' && !confirm('Cancel this request? This cannot be undone.')) return;
+        try {
+          await RH_ACTION_ENDPOINTS[to](requestId, reason);
+          overlay.classList.remove('open');
+          loadedSections.delete('dashboard');
+          showToast('Request updated.');
+          loadRequestHistory();
+        } catch (err) {
+          document.getElementById('rhDetailMsg').textContent = err.response?.data?.detail || 'Action failed.';
+          document.getElementById('rhDetailMsg').className = 'msg error';
+        }
+      });
+    });
   } catch (err) {
-    body.innerHTML = `<div class="empty-state">Failed to load booking.</div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="bookingDetailCloseBtn">Close</button></div>`;
+    body.innerHTML = `<div class="empty-state">Failed to load request.</div><div class="modal-actions"><button type="button" class="btn btn-ghost" id="bookingDetailCloseBtn">Close</button></div>`;
     document.getElementById('bookingDetailCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
   }
 }
-function printBookingDetail() {
+
+function openPayModal(request) {
   const overlay = document.getElementById('bookingDetailModalOverlay');
-  overlay.classList.add('print-target');
-  window.print();
-  setTimeout(() => overlay.classList.remove('print-target'), 500);
+  const body = document.getElementById('bookingDetailBody');
+  body.innerHTML = `
+    <h2>Pay for ${escapeHtml(request.request_number)}</h2>
+    <div class="form-field" style="max-width:none;"><label>Amount</label><input id="payAmount" type="number" value="${request.total_amount}" step="0.01"></div>
+    <div class="form-field" style="max-width:none;"><label>Payment Method</label>
+      <select id="payMethod"><option value="bank_transfer">Bank Transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="wallet">Wallet</option></select>
+    </div>
+    <div class="form-field" style="max-width:none;"><label>Transaction ID (optional)</label><input id="payTxnId"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-coral" id="payConfirmBtn">Submit Payment</button>
+      <button type="button" class="btn btn-ghost" id="payCancelBtn">Cancel</button>
+    </div>
+    <div class="msg" id="payMsg"></div>
+  `;
+  document.getElementById('payCancelBtn').addEventListener('click', () => openBookingDetailModal(request.id));
+  document.getElementById('payConfirmBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('payMsg');
+    try {
+      await axios.post(`${API_BASE}/api/requests/${request.id}/pay`, {
+        amount: Number(document.getElementById('payAmount').value),
+        method: document.getElementById('payMethod').value,
+        transaction_id: document.getElementById('payTxnId').value || undefined,
+      }, { headers: partnerAuthHeaders() });
+      overlay.classList.remove('open');
+      loadedSections.delete('dashboard');
+      showToast('Payment submitted — awaiting verification.');
+      loadRequestHistory();
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Payment failed.'; msg.className = 'msg error';
+    }
+  });
 }

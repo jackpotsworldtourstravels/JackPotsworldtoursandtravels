@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff &amp; Merchant Sign In — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="Sign in to the Super Admin, Admin, or Merchant portal.">
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Reuses the enterprise portal design system (navy/gold, cards) established in
+     assets/css/partner-portal.css, so this hub matches the same premium language as the
+     three portals it links to, rather than inventing a fourth look. -->
+<link rel="stylesheet" href="assets/css/partner-portal.css?v=20260729a">
+<style>
+body{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 20px;
+  background:radial-gradient(1200px 700px at 15% -10%, var(--navy-3) 0%, transparent 60%), linear-gradient(165deg, var(--navy-deep) 0%, var(--navy) 60%, #0A2647 100%);}
+.pl-wrap{width:100%; max-width:920px;}
+.pl-brand{text-align:center; margin-bottom:36px;}
+.pl-brand img{height:52px; width:auto; margin-bottom:16px;}
+.pl-title{font-size:26px; font-weight:800; color:#fff;}
+.pl-sub{font-size:14.5px; color:rgba(255,255,255,0.72); margin-top:8px;}
+.pl-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:20px;}
+@media (max-width:800px){ .pl-grid{grid-template-columns:1fr; max-width:420px; margin:0 auto;} }
+.pl-card{background:var(--card-bg); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:32px 26px; text-align:center; border-top:3px solid var(--gold); transition:transform .2s var(--ease), box-shadow .2s var(--ease);}
+.pl-card:hover{transform:translateY(-4px);}
+.pl-card-icon{width:56px; height:56px; border-radius:16px; background:var(--gold-soft); color:var(--gold-dark); display:flex; align-items:center; justify-content:center; margin:0 auto 18px;}
+.pl-card-icon svg{width:28px; height:28px; stroke:currentColor; fill:none; stroke-width:1.8;}
+.pl-card h2{font-size:18px; margin-bottom:8px;}
+.pl-card p{font-size:13px; color:var(--text-muted); line-height:1.55; margin-bottom:22px; min-height:60px;}
+.pl-footer{text-align:center; margin-top:34px;}
+.pl-footer a{font-size:13px; color:rgba(255,255,255,0.75); font-weight:600;}
+.pl-footer a:hover{color:#fff;}
+</style>
+</head>
+<body>
+<div class="pl-wrap">
+  <div class="pl-brand">
+    <img src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+    <h1 class="pl-title">Sign in to your portal</h1>
+    <p class="pl-sub">Choose your portal to continue — you'll verify with a one-time code after your password.</p>
+  </div>
+
+  <div class="pl-grid">
+    <div class="pl-card">
+      <div class="pl-card-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <h2>Super Admin</h2>
+      <p>Platform-level access for onboarding and managing Admin accounts.</p>
+      <a href="super-admin/super-admin.html" class="btn btn-coral btn-block">Continue as Super Admin</a>
+    </div>
+
+    <div class="pl-card">
+      <div class="pl-card-icon"><svg viewBox="0 0 24 24"><path d="M20.2 7.8l-7.7 7.7-4-4"/><circle cx="12" cy="12" r="10"/></svg></div>
+      <h2>Admin</h2>
+      <p>Manage merchants, approve ticket requests, and handle payments.</p>
+      <a href="admin/admin.html" class="btn btn-coral btn-block">Continue as Admin</a>
+    </div>
+
+    <div class="pl-card">
+      <div class="pl-card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="3" y1="13" x2="21" y2="13"/></svg></div>
+      <h2>Merchant</h2>
+      <p>Raise ticket requests, track bookings, and manage your company's team.</p>
+      <a href="partner/partner-portal.html" class="btn btn-coral btn-block">Continue as Merchant</a>
+    </div>
+  </div>
+
+  <div class="pl-footer"><a href="index.html">← Back to main site</a></div>
+</div>
+</body>
+</html>

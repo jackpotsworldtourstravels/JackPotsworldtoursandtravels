@@ -1,0 +1,1060 @@
+"""SQLAlchemy 2.0 models for the nine-table schema (migration 0023).
+
+Standalone module, deliberately not merged into ``app/models/``: that
+package still holds the legacy models for the 39-table design, which the
+routers and services import. Both exist during the rewrite; delete
+``app/models/`` once every router has been ported over to this module.
+
+Mirrors backend/db/schema_v2/02_nine_table_schema.sql exactly. If you change
+one, change the other — the SQL file is the source of truth for the DDL, and
+these classes are the source of truth for the ORM layer.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import enum
+from decimal import Decimal
+from typing import Any, Optional
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import INET, JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    """Declarative base for the v2 schema."""
+
+
+# ---------------------------------------------------------------------
+# Enums — names match the PostgreSQL types created by the migration, so
+# ``create_type=False`` keeps SQLAlchemy from trying to re-create them.
+# ---------------------------------------------------------------------
+class UserRole(str, enum.Enum):
+    SUPER_ADMIN = "super_admin"
+    ADMIN = "admin"
+    MERCHANT_ADMIN = "merchant_admin"
+    MERCHANT_USER = "merchant_user"
+    CUSTOMER = "customer"
+
+
+class UserStatus(str, enum.Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    BLOCKED = "blocked"
+    SUSPENDED = "suspended"
+
+
+class MerchantStatus(str, enum.Enum):
+    #: A merchant created by an Admin starts here and cannot trade until approved.
+    PENDING_APPROVAL = "pending_approval"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
+
+
+class MerchantRole(str, enum.Enum):
+    """A merchant's internal staff role.
+
+    Orthogonal to :class:`UserRole`, which stays the portal-level role.
+    NULL for platform staff (super admin / admin).
+    """
+
+    MANAGER = "manager"
+    SUPERVISOR = "supervisor"
+    OPERATOR = "operator"
+    FINANCE = "finance"
+    DATA_OPERATOR = "data_operator"
+
+
+class CompanyType(str, enum.Enum):
+    GAMING_COMPANY = "gaming_company"
+    CORPORATE_COMPANY = "corporate_company"
+    TRAVEL_AGENCY = "travel_agency"
+    BUSINESS_PARTNER = "business_partner"
+    DIRECT_CUSTOMER = "direct_customer"
+
+
+class RequestType(str, enum.Enum):
+    CATALOG_ITEM = "catalog_item"
+    BOOKING = "booking"
+    TICKET_ENQUIRY = "ticket_enquiry"
+    CANCELLATION = "cancellation"
+    REFUND = "refund"
+    DATE_CHANGE = "date_change"
+    PASSENGER_MODIFICATION = "passenger_modification"
+    SUPPORT_TICKET = "support_ticket"
+    REVIEW = "review"
+    WISHLIST = "wishlist"
+    # --- added by migration 0025 for the 3-role B2B spec ---
+    DOCUMENT = "document"          # passport / visa / ID / company document
+    ATTACHMENT = "attachment"      # file on a support ticket or request
+    LIVE_CHAT = "live_chat"        # a chat conversation thread
+    EXTRA_BAGGAGE = "extra_baggage"
+    MEAL = "meal"
+    SEAT = "seat"
+
+
+class RequestStatus(str, enum.Enum):
+    """Request lifecycle.
+
+    The spec's stages map onto these values as::
+
+        Created         -> DRAFT
+        Pending         -> PENDING_APPROVAL
+        Under Review    -> IN_REVIEW
+        Approved        -> APPROVED
+        Payment Pending -> PAYMENT_PENDING
+        Paid            -> PAID
+        Ticket Issued   -> TICKET_ISSUED
+        Completed       -> COMPLETED
+        Rejected        -> REJECTED
+    """
+
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    PENDING_APPROVAL = "pending_approval"
+    IN_REVIEW = "in_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    # --- added by migration 0025 ---
+    PAYMENT_PENDING = "payment_pending"
+    PAID = "paid"
+    TICKET_ISSUED = "ticket_issued"
+    VERIFIED = "verified"          # terminal state for a document review
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class Priority(str, enum.Enum):
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class TravelType(str, enum.Enum):
+    FLIGHT = "flight"
+    HOTEL = "hotel"
+    CRUISE = "cruise"
+    PACKAGE = "package"
+
+
+class PaymentType(str, enum.Enum):
+    BOOKING_PAYMENT = "booking_payment"
+    REFUND = "refund"
+    WALLET_TOPUP = "wallet_topup"
+    ADJUSTMENT = "adjustment"
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SUCCESS = "success"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+    PARTIALLY_REFUNDED = "partially_refunded"
+
+
+class Gender(str, enum.Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
+class PassengerType(str, enum.Enum):
+    ADULT = "adult"
+    CHILD = "child"
+    INFANT = "infant"
+
+
+class SeatPreference(str, enum.Enum):
+    WINDOW = "window"
+    AISLE = "aisle"
+    MIDDLE = "middle"
+    FRONT_ROW = "front_row"
+    EXIT_ROW = "exit_row"
+
+
+class OtpPurpose(str, enum.Enum):
+    LOGIN = "login"
+    PASSWORD_RESET = "password_reset"
+    VERIFICATION = "verification"
+
+
+class MessageType(str, enum.Enum):
+    OTP = "otp"
+    EMAIL = "email"
+    SMS = "sms"
+    WHATSAPP = "whatsapp"
+    LIVE_CHAT = "live_chat"
+    PUSH = "push"
+    NEWSLETTER = "newsletter"
+    CONTACT_US = "contact_us"
+    NOTIFICATION = "notification"
+
+
+class MessageStatus(str, enum.Enum):
+    QUEUED = "queued"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+    READ = "read"
+    BOUNCED = "bounced"
+
+
+class AuditOperation(str, enum.Enum):
+    INSERT = "INSERT"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+
+
+def _pg_enum(python_enum: type[enum.Enum], name: str) -> SAEnum:
+    """Bind to an existing PostgreSQL ENUM by value, without re-creating it."""
+    return SAEnum(
+        python_enum,
+        name=name,
+        create_type=False,
+        native_enum=True,
+        values_callable=lambda e: [m.value for m in e],
+    )
+
+
+_TS = DateTime(timezone=True)
+
+
+# =====================================================================
+# 2. merchants
+# =====================================================================
+class Merchant(Base):
+    """A B2B partner company: gaming studio, corporate travel desk, agency.
+
+    Absorbs the legacy ``partners`` table, its wallet columns, and
+    ``booking_reference_counters`` (each merchant carries its own reference
+    prefix and sequence, so no counter table is needed).
+    """
+
+    __tablename__ = "merchants"
+
+    merchant_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    merchant_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    company_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    company_type: Mapped[CompanyType] = mapped_column(
+        _pg_enum(CompanyType, "company_type_enum"),
+        nullable=False,
+        server_default=text("'business_partner'"),
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(30))
+
+    reference_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
+    booking_sequence: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+
+    wallet_balance: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    credit_limit: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+
+    country: Mapped[Optional[str]] = mapped_column(String(100))
+    country_code: Mapped[Optional[str]] = mapped_column(String(2))
+    city: Mapped[Optional[str]] = mapped_column(String(100))
+    address: Mapped[Optional[str]] = mapped_column(Text)
+
+    status: Mapped[MerchantStatus] = mapped_column(
+        _pg_enum(MerchantStatus, "merchant_status_enum"),
+        nullable=False,
+        server_default=text("'active'"),
+    )
+    # use_alter: merchants.created_by -> users and users.merchant_id ->
+    # merchants form a cycle. Marking this side as ALTER-added lets
+    # SQLAlchemy sort the tables (and matches the migration, which adds this
+    # constraint by ALTER TABLE after both tables exist).
+    created_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "users.user_id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_merchants_created_by",
+        ),
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    users: Mapped[list["User"]] = relationship(
+        back_populates="merchant",
+        cascade="all, delete-orphan",
+        foreign_keys="User.merchant_id",
+    )
+    communication_settings: Mapped[Optional["CommunicationSettings"]] = relationship(
+        back_populates="merchant", cascade="all, delete-orphan", uselist=False
+    )
+    requests: Mapped[list["ServiceRequest"]] = relationship(back_populates="merchant")
+
+    __table_args__ = (
+        UniqueConstraint("merchant_code", name="uq_merchants_code"),
+        UniqueConstraint("email", name="uq_merchants_email"),
+        UniqueConstraint("reference_prefix", name="uq_merchants_prefix"),
+        CheckConstraint("wallet_balance >= 0", name="ck_merchants_wallet_non_negative"),
+        CheckConstraint("credit_limit >= 0", name="ck_merchants_credit_non_negative"),
+        CheckConstraint("booking_sequence >= 0", name="ck_merchants_sequence_non_negative"),
+        Index("ix_merchants_status", "status"),
+        Index("ix_merchants_company_type", "company_type"),
+        Index("ix_merchants_status_name", "status", "company_name"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Merchant {self.merchant_code} {self.company_name!r}>"
+
+
+# =====================================================================
+# 1. users
+# =====================================================================
+class User(Base):
+    """Every human identity: super admin, admin, merchant staff, customer.
+
+    Absorbs ``users``, ``roles``, ``permissions``, ``role_permissions``,
+    ``partner_users``, and the in-flight row of ``partner_otp_requests``.
+    """
+
+    __tablename__ = "users"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+
+    role: Mapped[UserRole] = mapped_column(
+        _pg_enum(UserRole, "user_role_enum"),
+        nullable=False,
+        server_default=text("'customer'"),
+    )
+    #: Internal staff role within a merchant. NULL for platform staff.
+    merchant_role: Mapped[Optional[MerchantRole]] = mapped_column(
+        _pg_enum(MerchantRole, "merchant_role_enum")
+    )
+    #: Permission codes, e.g. ``["booking.approve", "reports.export"]``.
+    permissions: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+    full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(30))
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    #: Sparse profile fields (address, dob, passport, preferences, ...).
+    profile: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    otp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    otp_code_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    otp_purpose: Mapped[Optional[OtpPurpose]] = mapped_column(
+        _pg_enum(OtpPurpose, "otp_purpose_enum")
+    )
+    otp_expires_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    otp_attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default=text("0")
+    )
+    otp_requested_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    status: Mapped[UserStatus] = mapped_column(
+        _pg_enum(UserStatus, "user_status_enum"),
+        nullable=False,
+        server_default=text("'active'"),
+    )
+    last_login: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    failed_login_attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default=text("0")
+    )
+    login_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+
+    # Password-reset state (migration 0024).
+    reset_token_hash: Mapped[Optional[str]] = mapped_column(String(64))
+    reset_token_expires_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    # Logout for stateless JWTs: any token issued before this instant is
+    # rejected. Set by /api/auth/logout and by the admin force-logout action.
+    force_logout_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped[Optional["Merchant"]] = relationship(
+        back_populates="users", foreign_keys=[merchant_id]
+    )
+    requests: Mapped[list["ServiceRequest"]] = relationship(
+        back_populates="user", foreign_keys="ServiceRequest.user_id"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_users_email"),
+        CheckConstraint(
+            "jsonb_typeof(permissions) = 'array'", name="ck_users_permissions_is_array"
+        ),
+        CheckConstraint("jsonb_typeof(profile) = 'object'", name="ck_users_profile_is_object"),
+        CheckConstraint("otp_attempts >= 0", name="ck_users_otp_attempts_sane"),
+        CheckConstraint(
+            "merchant_role IS NULL OR role IN ('merchant_admin', 'merchant_user')",
+            name="ck_users_merchant_role_scope",
+        ),
+        CheckConstraint(
+            "(role IN ('merchant_admin', 'merchant_user') AND merchant_id IS NOT NULL) "
+            "OR (role IN ('super_admin', 'admin', 'customer') AND merchant_id IS NULL)",
+            name="ck_users_merchant_scope",
+        ),
+        Index("ix_users_merchant_id", "merchant_id"),
+        Index("ix_users_role", "role"),
+        Index("ix_users_status", "status"),
+        Index("ix_users_permissions", "permissions", postgresql_using="gin"),
+        Index(
+            "ix_users_reset_token",
+            "reset_token_hash",
+            postgresql_where=text("reset_token_hash IS NOT NULL"),
+        ),
+    )
+
+    @property
+    def is_platform_staff(self) -> bool:
+        return self.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN)
+
+    @property
+    def is_merchant_user(self) -> bool:
+        return self.role in (UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+
+    @property
+    def is_active(self) -> bool:
+        """Legacy-compatible view of ``status``."""
+        return self.status is UserStatus.ACTIVE
+
+    @property
+    def is_blocked(self) -> bool:
+        return self.status is UserStatus.BLOCKED
+
+    def has_permission(self, code: str) -> bool:
+        return self.role is UserRole.SUPER_ADMIN or code in (self.permissions or [])
+
+    def __repr__(self) -> str:
+        return f"<User {self.email} role={self.role.value}>"
+
+
+# =====================================================================
+# 3. service_requests
+# =====================================================================
+class ServiceRequest(Base):
+    """Catalog inventory, bookings, and every request raised against them.
+
+    ``request_type`` discriminates the row. ``parent_request_id`` carries the
+    relationships that used to live in separate tables:
+
+    * ``booking``       -> parent is the ``catalog_item`` being purchased
+    * ``cancellation``  -> parent is the ``booking`` being cancelled
+    * ``refund``        -> parent is the ``booking`` being refunded
+    * ``date_change``   -> parent is the ``booking`` being moved
+    * ``review``        -> parent is the ``catalog_item`` being reviewed
+    * ``wishlist``      -> parent is the ``catalog_item`` saved
+    """
+
+    __tablename__ = "service_requests"
+
+    request_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    request_number: Mapped[str] = mapped_column(String(40), nullable=False)
+    parent_request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="CASCADE")
+    )
+
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+
+    request_type: Mapped[RequestType] = mapped_column(
+        _pg_enum(RequestType, "request_type_enum"), nullable=False
+    )
+    booking_reference: Mapped[Optional[str]] = mapped_column(String(40))
+    travel_type: Mapped[Optional[TravelType]] = mapped_column(
+        _pg_enum(TravelType, "travel_type_enum")
+    )
+
+    # Identifiers issued as the request moves through the lifecycle
+    # (migration 0025). ``pnr`` is a primary search key in the spec.
+    pnr: Mapped[Optional[str]] = mapped_column(String(20))
+    ticket_number: Mapped[Optional[str]] = mapped_column(String(40))
+    invoice_number: Mapped[Optional[str]] = mapped_column(String(40))
+
+    status: Mapped[RequestStatus] = mapped_column(
+        _pg_enum(RequestStatus, "request_status_enum"),
+        nullable=False,
+        server_default=text("'draft'"),
+    )
+    priority: Mapped[Priority] = mapped_column(
+        _pg_enum(Priority, "priority_enum"), nullable=False, server_default=text("'normal'")
+    )
+
+    title: Mapped[Optional[str]] = mapped_column(String(255))
+    remarks: Mapped[Optional[str]] = mapped_column(Text)
+
+    #: Type-specific payload — see docs/SCHEMA_V2.md for the shape per type.
+    travel_details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    #: Base fare plus any seasonal/campaign overrides, as a snapshot.
+    pricing: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+
+    available_units: Mapped[Optional[int]] = mapped_column(Integer)
+    low_stock_threshold: Mapped[Optional[int]] = mapped_column(Integer)
+
+    rating: Mapped[Optional[int]] = mapped_column(SmallInteger)
+
+    requested_date: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    travel_date: Mapped[Optional[dt.date]] = mapped_column(Date)
+    return_date: Mapped[Optional[dt.date]] = mapped_column(Date)
+
+    assigned_admin: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    approved_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    approved_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
+    completed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    resolved_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    #: Append-only ``[{"from":..., "to":..., "by":..., "at":...}]``.
+    status_history: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    parent: Mapped[Optional["ServiceRequest"]] = relationship(
+        back_populates="children", remote_side=[request_id]
+    )
+    children: Mapped[list["ServiceRequest"]] = relationship(
+        back_populates="parent", cascade="all, delete-orphan"
+    )
+    merchant: Mapped[Optional["Merchant"]] = relationship(back_populates="requests")
+    user: Mapped[Optional["User"]] = relationship(
+        back_populates="requests", foreign_keys=[user_id]
+    )
+    passengers: Mapped[list["PassengerData"]] = relationship(
+        back_populates="request", cascade="all, delete-orphan"
+    )
+    payments: Mapped[list["Payment"]] = relationship(back_populates="request")
+
+    __table_args__ = (
+        UniqueConstraint("request_number", name="uq_service_requests_number"),
+        UniqueConstraint("ticket_number", name="uq_sr_ticket_number"),
+        UniqueConstraint("invoice_number", name="uq_sr_invoice_number"),
+        CheckConstraint("quantity > 0", name="ck_sr_quantity_positive"),
+        CheckConstraint("total_amount >= 0", name="ck_sr_amount_non_negative"),
+        CheckConstraint("rating IS NULL OR rating BETWEEN 1 AND 5", name="ck_sr_rating_range"),
+        CheckConstraint("jsonb_typeof(travel_details) = 'object'", name="ck_sr_details_is_object"),
+        CheckConstraint("jsonb_typeof(pricing) = 'object'", name="ck_sr_pricing_is_object"),
+        CheckConstraint("jsonb_typeof(status_history) = 'array'", name="ck_sr_history_is_array"),
+        CheckConstraint(
+            "return_date IS NULL OR travel_date IS NULL OR return_date >= travel_date",
+            name="ck_sr_date_order",
+        ),
+        CheckConstraint(
+            "parent_request_id IS NULL OR parent_request_id <> request_id",
+            name="ck_sr_no_self_parent",
+        ),
+        CheckConstraint(
+            "request_type <> 'catalog_item' OR (merchant_id IS NULL AND user_id IS NULL)",
+            name="ck_sr_catalog_has_no_owner",
+        ),
+        CheckConstraint(
+            "request_type NOT IN ('cancellation', 'refund', 'date_change', "
+            "'passenger_modification') OR parent_request_id IS NOT NULL",
+            name="ck_sr_modifications_have_parent",
+        ),
+        Index("ix_sr_merchant_id", "merchant_id"),
+        Index("ix_sr_user_id", "user_id"),
+        Index("ix_sr_parent", "parent_request_id"),
+        Index("ix_sr_type_status", "request_type", "status"),
+        Index("ix_sr_booking_ref", "booking_reference"),
+        Index("ix_sr_travel_type", "travel_type"),
+        Index("ix_sr_travel_date", "travel_date"),
+        Index("ix_sr_pnr", "pnr", postgresql_where=text("pnr IS NOT NULL")),
+        Index("ix_sr_created_at", text("created_at DESC")),
+        Index("ix_sr_details_gin", "travel_details", postgresql_using="gin"),
+        Index(
+            "ix_sr_catalog_live",
+            "travel_type",
+            "status",
+            postgresql_where=text("request_type = 'catalog_item'"),
+        ),
+        Index(
+            "uq_sr_wishlist_once",
+            "user_id",
+            "parent_request_id",
+            unique=True,
+            postgresql_where=text("request_type = 'wishlist'"),
+        ),
+        Index(
+            "uq_sr_review_once",
+            "user_id",
+            "parent_request_id",
+            unique=True,
+            postgresql_where=text("request_type = 'review'"),
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ServiceRequest {self.request_number} {self.request_type.value}>"
+
+
+# =====================================================================
+# 4. payments
+# =====================================================================
+class Payment(Base):
+    """Money movement. Absorbs ``payments``, ``partner_payments``,
+    ``coupons``, and ``discount_campaigns``."""
+
+    __tablename__ = "payments"
+
+    payment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="SET NULL")
+    )
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, server_default=text("'INR'")
+    )
+    payment_type: Mapped[PaymentType] = mapped_column(
+        _pg_enum(PaymentType, "payment_type_enum"), nullable=False
+    )
+    payment_method: Mapped[Optional[str]] = mapped_column(String(50))
+    transaction_id: Mapped[Optional[str]] = mapped_column(String(100))
+    payment_status: Mapped[PaymentStatus] = mapped_column(
+        _pg_enum(PaymentStatus, "payment_status_enum"),
+        nullable=False,
+        server_default=text("'pending'"),
+    )
+
+    coupon_code: Mapped[Optional[str]] = mapped_column(String(50))
+    discount_amount: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    discount_meta: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
+    refund_amount: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    refund_reason: Mapped[Optional[str]] = mapped_column(Text)
+    refunded_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    paid_date: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    request: Mapped[Optional["ServiceRequest"]] = relationship(back_populates="payments")
+
+    __table_args__ = (
+        UniqueConstraint("transaction_id", name="uq_payments_transaction_id"),
+        CheckConstraint("amount >= 0", name="ck_payments_amount_non_negative"),
+        CheckConstraint("discount_amount >= 0", name="ck_payments_discount_non_negative"),
+        CheckConstraint("refund_amount >= 0", name="ck_payments_refund_non_negative"),
+        CheckConstraint("refund_amount <= amount", name="ck_payments_refund_within_amount"),
+        CheckConstraint("jsonb_typeof(discount_meta) = 'object'", name="ck_payments_meta_is_object"),
+        Index("ix_payments_merchant_id", "merchant_id"),
+        Index("ix_payments_request_id", "request_id"),
+        Index("ix_payments_status", "payment_status"),
+        Index("ix_payments_paid_date", text("paid_date DESC")),
+        Index("ix_payments_coupon", "coupon_code", postgresql_where=text("coupon_code IS NOT NULL")),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Payment {self.payment_id} {self.amount} {self.payment_status.value}>"
+
+
+# =====================================================================
+# 5. passenger_data
+# =====================================================================
+class PassengerData(Base):
+    """A traveller on a request. Absorbs ``partner_booking_passengers``,
+    ``cancellation_request_passengers``, ``passenger_special_services``,
+    and ``ancillary_service_catalog`` selections."""
+
+    __tablename__ = "passenger_data"
+
+    passenger_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    request_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("service_requests.request_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+
+    title: Mapped[Optional[str]] = mapped_column(String(10))
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    gender: Mapped[Optional[Gender]] = mapped_column(_pg_enum(Gender, "gender_enum"))
+    dob: Mapped[Optional[dt.date]] = mapped_column(Date)
+    passenger_type: Mapped[PassengerType] = mapped_column(
+        _pg_enum(PassengerType, "passenger_type_enum"),
+        nullable=False,
+        server_default=text("'adult'"),
+    )
+
+    passport_number: Mapped[Optional[str]] = mapped_column(String(40))
+    passport_issue_country: Mapped[Optional[str]] = mapped_column(String(100))
+    passport_issue_date: Mapped[Optional[dt.date]] = mapped_column(Date)
+    passport_expiry: Mapped[Optional[dt.date]] = mapped_column(Date)
+    nationality: Mapped[Optional[str]] = mapped_column(String(100))
+
+    seat_preference: Mapped[Optional[SeatPreference]] = mapped_column(
+        _pg_enum(SeatPreference, "seat_preference_enum")
+    )
+    meal_preference: Mapped[Optional[str]] = mapped_column(String(100))
+    #: ``[{"category":"baggage","code":"XBAG20","label":"Extra 20kg","price":1500}]``
+    special_services: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+    is_cancelled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    request: Mapped["ServiceRequest"] = relationship(back_populates="passengers")
+
+    __table_args__ = (
+        CheckConstraint(
+            "jsonb_typeof(special_services) = 'array'", name="ck_passenger_services_is_array"
+        ),
+        CheckConstraint(
+            "passport_expiry IS NULL OR passport_issue_date IS NULL "
+            "OR passport_expiry > passport_issue_date",
+            name="ck_passenger_passport_dates",
+        ),
+        Index("ix_passenger_request_id", "request_id"),
+        Index("ix_passenger_merchant_id", "merchant_id"),
+        Index("ix_passenger_names", "last_name", "first_name"),
+        Index(
+            "ix_passenger_passport",
+            "passport_number",
+            postgresql_where=text("passport_number IS NOT NULL"),
+        ),
+    )
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def __repr__(self) -> str:
+        return f"<PassengerData {self.full_name} req={self.request_id}>"
+
+
+# =====================================================================
+# 6. communication_settings
+# =====================================================================
+class CommunicationSettings(Base):
+    """Per-merchant channel preferences. One row per merchant."""
+
+    __tablename__ = "communication_settings"
+
+    communication_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("merchants.merchant_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    email_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    sms_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    whatsapp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    otp_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    notification_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    preferred_language: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default=text("'en'")
+    )
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped["Merchant"] = relationship(back_populates="communication_settings")
+
+    __table_args__ = (
+        UniqueConstraint("merchant_id", name="uq_comm_settings_merchant"),
+    )
+
+
+# =====================================================================
+# 7. msg_logs
+# =====================================================================
+class MsgLog(Base):
+    """Every message in or out. Absorbs ``notifications``,
+    ``partner_notifications``, ``newsletter``, ``contact_us``, OTP delivery
+    history, and email/SMS/WhatsApp/live-chat logs."""
+
+    __tablename__ = "msg_logs"
+
+    message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+
+    message_type: Mapped[MessageType] = mapped_column(
+        _pg_enum(MessageType, "message_type_enum"), nullable=False
+    )
+    direction: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default=text("'outbound'")
+    )
+
+    sender_name: Mapped[Optional[str]] = mapped_column(String(150))
+    sender_email: Mapped[Optional[str]] = mapped_column(String(255))
+
+    recipient: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[Optional[str]] = mapped_column(String(255))
+    message: Mapped[Optional[str]] = mapped_column(Text)
+
+    status: Mapped[MessageStatus] = mapped_column(
+        _pg_enum(MessageStatus, "message_status_enum"),
+        nullable=False,
+        server_default=text("'queued'"),
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    sent_time: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    delivered_time: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("direction IN ('inbound', 'outbound')", name="ck_msg_direction"),
+        CheckConstraint(
+            "delivered_time IS NULL OR sent_time IS NULL OR delivered_time >= sent_time",
+            name="ck_msg_delivery_order",
+        ),
+        Index("ix_msg_merchant_id", "merchant_id"),
+        Index("ix_msg_user_unread", "user_id", "is_read"),
+        Index("ix_msg_type_status", "message_type", "status"),
+        Index("ix_msg_created_at", text("created_at DESC")),
+    )
+
+
+# =====================================================================
+# 8. system_logs
+# =====================================================================
+class SystemLog(Base):
+    """Sessions, activity, report generation. Absorbs ``activity_logs``,
+    ``user_sessions``, ``report_generation_log``, and login history."""
+
+    __tablename__ = "system_logs"
+
+    log_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+
+    module: Mapped[str] = mapped_column(String(80), nullable=False)
+    action: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+
+    ip_address: Mapped[Optional[str]] = mapped_column(INET)
+    browser: Mapped[Optional[str]] = mapped_column(String(200))
+    device: Mapped[Optional[str]] = mapped_column(String(120))
+
+    session_token: Mapped[Optional[str]] = mapped_column(String(255))
+    session_expires_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default=text("'success'")
+    )
+    #: Named ``extra_data``: ``metadata`` is reserved on declarative classes.
+    extra_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "jsonb_typeof(extra_data) = 'object'", name="ck_system_logs_extra_is_object"
+        ),
+        Index("ix_syslog_user_id", "user_id"),
+        Index("ix_syslog_merchant", "merchant_id"),
+        Index("ix_syslog_module", "module", "action"),
+        Index("ix_syslog_created_at", text("created_at DESC")),
+        Index(
+            "ix_syslog_session",
+            "session_token",
+            postgresql_where=text("session_token IS NOT NULL"),
+        ),
+    )
+
+
+# =====================================================================
+# 9. audit_logs
+# =====================================================================
+class AuditLog(Base):
+    """Row-level change history, written by the ``fn_write_audit_log``
+    trigger on users/merchants/service_requests/payments. Absorbs
+    ``partner_audit_logs``.
+
+    Rows arrive from a database trigger, not the ORM — treat as read-only
+    from application code.
+    """
+
+    __tablename__ = "audit_logs"
+
+    audit_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    table_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    record_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    operation: Mapped[AuditOperation] = mapped_column(
+        _pg_enum(AuditOperation, "audit_operation_enum"), nullable=False
+    )
+    old_value: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    new_value: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    changed_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    changed_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "NOT (old_value IS NULL AND new_value IS NULL)", name="ck_audit_has_payload"
+        ),
+        Index("ix_audit_table_record", "table_name", "record_id"),
+        Index("ix_audit_changed_by", "changed_by"),
+        Index("ix_audit_changed_at", text("changed_at DESC")),
+    )
+
+
+__all__ = [
+    "Base",
+    "User",
+    "Merchant",
+    "ServiceRequest",
+    "Payment",
+    "PassengerData",
+    "CommunicationSettings",
+    "MsgLog",
+    "SystemLog",
+    "AuditLog",
+    "UserRole",
+    "UserStatus",
+    "MerchantStatus",
+    "MerchantRole",
+    "CompanyType",
+    "RequestType",
+    "RequestStatus",
+    "Priority",
+    "TravelType",
+    "PaymentType",
+    "PaymentStatus",
+    "Gender",
+    "PassengerType",
+    "SeatPreference",
+    "OtpPurpose",
+    "MessageType",
+    "MessageStatus",
+    "AuditOperation",
+]

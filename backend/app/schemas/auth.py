@@ -1,35 +1,44 @@
+"""Auth request/response schemas for the three-portal B2B login."""
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-
-class SignupRequest(BaseModel):
-    full_name: str = Field(min_length=1, max_length=150)
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
-    # Extended profile fields — all optional so the existing signup modal (which only
-    # sends full_name/email/password) keeps working unchanged.
-    first_name: str | None = Field(default=None, max_length=100)
-    last_name: str | None = Field(default=None, max_length=100)
-    mobile: str | None = Field(default=None, max_length=20)
-    gender: str | None = Field(default=None, max_length=20)
-    dob: datetime.date | None = None
-    country: str | None = Field(default=None, max_length=100)
-    state: str | None = Field(default=None, max_length=100)
-    city: str | None = Field(default=None, max_length=100)
-    address: str | None = Field(default=None, max_length=300)
+#: Which portal a login is being attempted against. The login endpoint
+#: rejects an account whose role doesn't belong to the named portal, so
+#: an Admin's credentials can never open the Super Admin portal.
+Portal = Literal["super_admin", "admin", "merchant"]
 
 
 class LoginRequest(BaseModel):
+    """Step 1 of the spec's Login -> Password -> OTP -> Dashboard flow."""
+
     email: EmailStr
     password: str
+    portal: Portal
 
 
-class UserLoginRequest(BaseModel):
-    """Customer login accepts either an email address or a mobile number."""
+class LoginChallengeResponse(BaseModel):
+    """Step 1 result: password accepted, OTP outstanding."""
 
-    identifier: str = Field(min_length=3, max_length=255)
-    password: str
+    otp_required: bool = True
+    challenge_token: str
+    delivery: str = Field(description="'email' when SMTP is configured, else 'dev'")
+    message: str
+    #: Only populated in dev delivery mode (SMTP unconfigured), so local
+    #: development and demos work without an SMTP account.
+    dev_otp: str | None = None
+
+
+class VerifyOtpRequest(BaseModel):
+    """Step 2: exchange the challenge token plus the code for a session."""
+
+    challenge_token: str
+    code: str = Field(min_length=4, max_length=10)
+
+
+class ResendOtpRequest(BaseModel):
+    challenge_token: str
 
 
 class RefreshRequest(BaseModel):
@@ -45,10 +54,16 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=72)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=72)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: "UserResponse | None" = None
 
 
 class UserResponse(BaseModel):
@@ -56,10 +71,15 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: str
+    portal: str
+    merchant_role: str | None = None
+    merchant_id: int | None = None
+    merchant_name: str | None = None
+    permissions: list[str] = []
     is_active: bool
+    mobile: str | None = None
     first_name: str | None = None
     last_name: str | None = None
-    mobile: str | None = None
     gender: str | None = None
     dob: datetime.date | None = None
     country: str | None = None
@@ -67,6 +87,7 @@ class UserResponse(BaseModel):
     city: str | None = None
     address: str | None = None
     profile_photo: str | None = None
+    last_login: datetime.datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -74,3 +95,6 @@ class UserResponse(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     reset_link: str | None = None
+
+
+TokenResponse.model_rebuild()

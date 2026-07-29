@@ -1,80 +1,134 @@
 'use strict';
-/* Super Admin Portal — Profile, Edit Profile, Change Password. */
+/* Super Admin Portal — Profile & Security.
+   GET|PUT /api/profile          — the shared profile endpoint every portal uses
+   POST /api/auth/change-password
+   GET /api/super-admin/activity — this account's own Auth-module history
+
+   "Security" here is the sign-in trail: the activity endpoint already records
+   Login / Logout / OTP requested with IP, browser and device
+   (app/services/activity_service.py), so the recent-sign-ins table is a
+   filtered read of it rather than a new endpoint. Email is deliberately not
+   editable — changing the sign-in identity is a separate, higher-friction
+   flow, out of scope for this milestone (see app/routers/profile.py). */
+
+let saProfileEmail = '';
 
 async function loadSaProfile() {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/super-admin/profile`, { headers: saAuthHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/profile`, { headers: saAuthHeaders() });
+    saProfileEmail = data.email;
     document.getElementById('saProfileName').textContent = data.full_name;
     document.getElementById('saProfileEmail').textContent = data.email;
-    document.getElementById('saProfilePhone').textContent = data.phone_number;
-    document.getElementById('saProfileCreated').textContent = saFmtDate(data.created_date);
-    document.getElementById('saProfilePhoto').textContent = (data.full_name.trim()[0] || 'S').toUpperCase();
-  } catch (err) { /* section just shows placeholders if this fails */ }
+    /* Read `mobile`, write `phone` — UserResponse exposes the column as
+       `mobile` while UpdateProfileRequest takes `phone`. Same asymmetry the
+       Merchant Portal's partner-profile.js already handles. */
+    document.getElementById('saProfilePhone').textContent = data.mobile || '—';
+    document.getElementById('saProfileLastLogin').textContent =
+      data.last_login ? fmtDateTime(data.last_login) : 'Never';
+    document.getElementById('saProfilePhoto').textContent =
+      (data.full_name?.trim()[0] || 'S').toUpperCase();
+
+    /* Keep the topbar chip and the stored name in step with an edit. */
+    document.getElementById('saChipName').textContent = data.full_name;
+    document.getElementById('saChipAvatar').textContent = (data.full_name?.trim()[0] || 'S').toUpperCase();
+    localStorage.setItem(SA_KEYS.fullName, data.full_name);
+  } catch (err) {
+    showToast(saErrorText(err, 'Failed to load your profile.'), true);
+  }
+  loadSaSignIns();
+}
+
+async function loadSaSignIns() {
+  const tbody = document.querySelector('#saSecurityTable tbody');
+  saTableError(tbody, 4, 'Loading…');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/super-admin/activity`, {
+      params: { module: 'Auth', search: saProfileEmail, page_size: 10 },
+      headers: saAuthHeaders(),
+    });
+    tbody.innerHTML = data.items.length ? data.items.map(e => `
+      <tr>
+        <td>${fmtDateTime(e.created_at)}</td>
+        <td>${saEscapeHtml(e.action)}</td>
+        <td>${saEscapeHtml(e.ip_address || '—')}</td>
+        <td>${saEscapeHtml(e.browser || '—')}${e.device ? ` · ${saEscapeHtml(e.device)}` : ''}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4" class="empty-state">No sign-in activity recorded yet.</td></tr>';
+  } catch (err) {
+    saTableError(tbody, 4, saErrorText(err, 'Failed to load sign-in history.'));
+  }
 }
 
 /* ---------- Edit Profile ---------- */
 const saEditProfileModalOverlay = document.getElementById('saEditProfileModalOverlay');
-document.getElementById('saEditProfileBtn').addEventListener('click', () => {
+document.getElementById('saEditProfileBtn')?.addEventListener('click', () => {
   const f = document.getElementById('saEditProfileForm').elements;
   f.full_name.value = document.getElementById('saProfileName').textContent;
-  f.phone_number.value = document.getElementById('saProfilePhone').textContent;
-  document.getElementById('saEditProfileMsg').textContent = '';
+  const phone = document.getElementById('saProfilePhone').textContent;
+  f.phone.value = phone === '—' ? '' : phone;
+  const msg = document.getElementById('saEditProfileMsg');
+  msg.textContent = '';
+  msg.className = 'msg';
   saEditProfileModalOverlay.classList.add('open');
 });
-document.getElementById('saEditProfileCancelBtn').addEventListener('click', () => saEditProfileModalOverlay.classList.remove('open'));
-document.getElementById('saEditProfileForm').addEventListener('submit', async e => {
+document.getElementById('saEditProfileCancelBtn')?.addEventListener('click',
+  () => saEditProfileModalOverlay.classList.remove('open'));
+
+document.getElementById('saEditProfileForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target.elements;
   const msg = document.getElementById('saEditProfileMsg');
-  if (!f.full_name.value.trim()) { msg.className = 'msg error'; msg.textContent = 'Full Name is required.'; return; }
+  if (!f.full_name.value.trim()) {
+    msg.className = 'msg error';
+    msg.textContent = 'Full Name is required.';
+    return;
+  }
   try {
-    // TODO (backend): app/services/super_admin_service.py::update_profile
-    // has the matching TODO for the real PostgreSQL UPDATE.
-    await axios.patch(`${API_BASE}/api/super-admin/profile`, {
-      full_name: f.full_name.value.trim(), phone_number: f.phone_number.value.trim(),
+    await axios.put(`${API_BASE}/api/profile`, {
+      full_name: f.full_name.value.trim(),
+      phone: f.phone.value.trim() || null,
     }, { headers: saAuthHeaders() });
     saEditProfileModalOverlay.classList.remove('open');
+    showToast('Profile updated.');
     loadSaProfile();
   } catch (err) {
     msg.className = 'msg error';
-    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.textContent = saErrorText(err, 'Failed to update your profile.');
   }
 });
 
 /* ---------- Change Password ---------- */
 const saChangePasswordModalOverlay = document.getElementById('saChangePasswordModalOverlay');
-document.getElementById('saChangePasswordBtn').addEventListener('click', () => {
+document.getElementById('saChangePasswordBtn')?.addEventListener('click', () => {
   document.getElementById('saChangePasswordForm').reset();
-  document.getElementById('saChangePasswordMsg').textContent = '';
+  const msg = document.getElementById('saChangePasswordMsg');
+  msg.textContent = '';
+  msg.className = 'msg';
   saChangePasswordModalOverlay.classList.add('open');
 });
-document.getElementById('saChangePasswordCancelBtn').addEventListener('click', () => saChangePasswordModalOverlay.classList.remove('open'));
-document.getElementById('saChangePasswordForm').addEventListener('submit', async e => {
+document.getElementById('saChangePasswordCancelBtn')?.addEventListener('click',
+  () => saChangePasswordModalOverlay.classList.remove('open'));
+
+document.getElementById('saChangePasswordForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.target.elements;
   const msg = document.getElementById('saChangePasswordMsg');
-  const pw = f.new_password.value;
-  if (pw.length < 8 || !/[A-Z]/.test(pw) || !/\d/.test(pw)) {
+  if (f.new_password.value.length < 8) {
     msg.className = 'msg error';
-    msg.textContent = 'New password must be at least 8 characters and include an uppercase letter and a number.';
-    return;
-  }
-  if (pw !== f.confirm_new_password.value) {
-    msg.className = 'msg error';
-    msg.textContent = 'New Password and Confirm New Password do not match.';
+    msg.textContent = 'The new password must be at least 8 characters.';
     return;
   }
   try {
-    // TODO (backend): app/services/super_admin_service.py::change_password
-    // has the matching TODO for validating against + updating the real
-    // password hash in PostgreSQL.
-    await axios.post(`${API_BASE}/api/super-admin/change-password`, {
-      current_password: f.current_password.value, new_password: pw, confirm_new_password: f.confirm_new_password.value,
+    await axios.post(`${API_BASE}/api/auth/change-password`, {
+      current_password: f.current_password.value,
+      new_password: f.new_password.value,
     }, { headers: saAuthHeaders() });
     saChangePasswordModalOverlay.classList.remove('open');
-    msg.className = 'msg success';
+    showToast('Password changed.');
+    /* The sign-in trail is the natural place this shows up. */
+    loadSaSignIns();
   } catch (err) {
     msg.className = 'msg error';
-    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
+    msg.textContent = saErrorText(err, 'Failed to change your password.');
   }
 });

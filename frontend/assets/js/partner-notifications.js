@@ -1,5 +1,5 @@
 'use strict';
-/* Notification bell — polls GET /api/partner/notifications (no WebSocket
+/* Notification bell — polls GET /api/notifications (API_CONTRACT.md §6.4; no WebSocket
    backend exists yet, so this is the explicit polling fallback). */
 
 const NOTIF_POLL_MS = 20000;
@@ -29,14 +29,17 @@ async function fetchAndRenderNotifications() {
   const badge = document.getElementById('notifBadge');
   if (!dropdown) return;
   try {
-    const { data } = await axios.get(`${API_BASE}/api/partner/notifications`, { headers: partnerAuthHeaders() });
-    if (data.unread_count > 0) {
-      badge.textContent = data.unread_count > 9 ? '9+' : String(data.unread_count);
+    const [{ data: page }, { data: unread }] = await Promise.all([
+      axios.get(`${API_BASE}/api/notifications`, { headers: partnerAuthHeaders(), params: { page_size: 20 } }),
+      axios.get(`${API_BASE}/api/notifications/unread-count`, { headers: partnerAuthHeaders() }),
+    ]);
+    if (unread.count > 0) {
+      badge.textContent = unread.count > 9 ? '9+' : String(unread.count);
       badge.style.display = 'flex';
     } else {
       badge.style.display = 'none';
     }
-    if (!data.notifications.length) {
+    if (!page.items.length) {
       dropdown.innerHTML = `<div class="notif-head"><span>Notifications</span></div>
         <div class="empty-state" style="padding:28px 16px;">
           <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -47,11 +50,11 @@ async function fetchAndRenderNotifications() {
     dropdown.innerHTML = `
       <div class="notif-head">
         <span>Notifications</span>
-        <button type="button" id="notifMarkAllBtn" ${data.unread_count === 0 ? 'disabled' : ''}>Mark all as read</button>
+        <button type="button" id="notifMarkAllBtn" ${unread.count === 0 ? 'disabled' : ''}>Mark all as read</button>
       </div>
       <div class="notif-list">
-        ${data.notifications.map(n => `
-          <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.notification_id}">
+        ${page.items.map(n => `
+          <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
             <span class="notif-item-icon">${notifIconFor(n.title)}</span>
             <div class="notif-item-body">
               <div class="notif-item-title">${escapeHtml(n.title)}</div>
@@ -62,12 +65,12 @@ async function fetchAndRenderNotifications() {
           </div>`).join('')}
       </div>`;
     document.getElementById('notifMarkAllBtn')?.addEventListener('click', async () => {
-      await axios.post(`${API_BASE}/api/partner/notifications/mark-all-read`, {}, { headers: partnerAuthHeaders() });
+      await axios.post(`${API_BASE}/api/notifications/read-all`, {}, { headers: partnerAuthHeaders() });
       fetchAndRenderNotifications();
     });
     dropdown.querySelectorAll('.notif-item.unread').forEach(el => {
       el.addEventListener('click', async () => {
-        await axios.post(`${API_BASE}/api/partner/notifications/${el.dataset.id}/read`, {}, { headers: partnerAuthHeaders() });
+        await axios.patch(`${API_BASE}/api/notifications/${el.dataset.id}/read`, {}, { headers: partnerAuthHeaders() });
         fetchAndRenderNotifications();
       });
     });

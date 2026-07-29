@@ -301,6 +301,13 @@ tr:last-child td{border-bottom:none;}
 .info-grid .info-item label{display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:3px;}
 .info-grid .info-item div{font-size:13.5px; color:var(--text-primary); font-weight:600;}
 
+/* ---------- Activity Timeline (Request History detail) ---------- */
+.rh-timeline{display:flex; flex-direction:column; gap:14px; margin-bottom:8px;}
+.rh-timeline-step{display:flex; gap:12px; align-items:flex-start; font-size:13px;}
+.rh-timeline-dot{width:10px; height:10px; border-radius:50%; margin-top:4px; flex-shrink:0; background:var(--border-color);}
+.rh-timeline-step.done .rh-timeline-dot{background:var(--navy);}
+.rh-timeline-step.pending{opacity:.5;}
+
 /* ---------- Live Chat Support ---------- */
 .chat-shell{display:flex; height:min(680px, 74vh); border-radius:var(--radius); overflow:hidden;}
 .chat-list-pane{width:300px; flex-shrink:0; border-right:1px solid var(--border-color); display:flex; flex-direction:column;}
