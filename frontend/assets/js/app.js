@@ -6,6 +6,21 @@ const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http:
 
 /* escapeHtml() now lives in shared/formatters.js, loaded before this file. */
 
+/* Turn an axios failure into a sentence a person can act on.
+   FastAPI returns `detail` as a plain string for a raised HTTPException but as
+   an ARRAY of {loc,msg,type} objects for a 422 validation error. Assigning that
+   array straight to textContent renders "[object Object]", which is what the
+   login and signup forms used to show. */
+function apiErrorText(err, fallback) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    const text = detail.map(d => d?.msg).filter(Boolean).join(' ');
+    return text || fallback;
+  }
+  if (typeof detail === 'string' && detail) return detail;
+  return fallback;
+}
+
 /* Nav: header fades from transparent to solid black gradually over a long scroll range */
 const header = document.getElementById('siteHeader');
 const HEADER_FADE_RANGE = 600;
@@ -224,8 +239,7 @@ document.getElementById('contactForm').addEventListener('submit', async e => {
     msg.classList.add('show');
     e.target.reset();
   } catch (err) {
-    const detail = err.response?.data?.detail;
-    msg.textContent = Array.isArray(detail) ? detail.map(d => d.msg).join(' ') : (detail || 'Something went wrong — please try again.');
+    msg.textContent = apiErrorText(err, 'Something went wrong — please try again.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -254,7 +268,7 @@ async function handleBookNow(type, id, price, label, quantity = 1, travelDate = 
     showToast(couponCode ? `Booked "${label}" with coupon ${couponCode} — confirmation sent instantly!` : `Booked "${label}" — confirmation sent instantly!`);
     loadUpcomingJourney();
   } catch (err) {
-    showToast(err.response?.data?.detail || 'Booking failed — please try again.', true);
+    showToast(apiErrorText(err, 'Booking failed — please try again.'), true);
   }
 }
 document.addEventListener('click', e => {
@@ -315,7 +329,7 @@ document.addEventListener('click', async e => {
       showToast('Saved to wishlist!');
     }
     applyWishlistState(wlBtn.closest('.pkg-grid, .search-results-list'));
-  } catch (err) { showToast(err.response?.data?.detail || 'Wishlist update failed.', true); }
+  } catch (err) { showToast(apiErrorText(err, 'Wishlist update failed.'), true); }
 });
 refreshWishlistState();
 
@@ -417,7 +431,7 @@ reviewForm.addEventListener('submit', async e => {
     msg.classList.add('show');
     openReviewsModal(currentReviewItem.type, currentReviewItem.id, document.getElementById('reviewsModalSub').textContent);
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to submit review.';
+    msg.textContent = apiErrorText(err, 'Failed to submit review.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -533,7 +547,7 @@ document.getElementById('detailsCouponApplyBtn').addEventListener('click', async
     msg.classList.add('show');
   } catch (err) {
     currentAppliedCoupon = null;
-    msg.textContent = err.response?.data?.detail || 'Could not validate this coupon right now.';
+    msg.textContent = apiErrorText(err, 'Could not validate this coupon right now.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -976,7 +990,7 @@ document.getElementById('signupForm').addEventListener('submit', async e => {
     e.target.reset();
     setTimeout(closeAuth, 1200);
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Something went wrong — please try again.';
+    msg.textContent = apiErrorText(err, 'Something went wrong — please try again.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -1006,7 +1020,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     e.target.reset();
     setTimeout(closeAuth, 1200);
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Invalid email or password.';
+    msg.textContent = apiErrorText(err, 'Invalid email or password.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -1167,7 +1181,7 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
     msg.textContent = 'Profile updated.';
     msg.className = 'acct-msg success';
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.textContent = apiErrorText(err, 'Failed to update profile.');
     msg.className = 'acct-msg error';
   }
 });
@@ -1183,7 +1197,7 @@ document.getElementById('acctPasswordForm').addEventListener('submit', async e =
     msg.className = 'acct-msg success';
     e.target.reset();
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
+    msg.textContent = apiErrorText(err, 'Failed to change password.');
     msg.className = 'acct-msg error';
   }
 });
@@ -1360,7 +1374,7 @@ async function cancelBookingById(bookingId, onSuccess) {
     await axios.delete(`${API_BASE}/api/bookings/${bookingId}`, { headers: authHeaders() });
     await loadPaymentsMap();
     if (typeof onSuccess === 'function') await onSuccess();
-  } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
+  } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
 function wireBookingRowActions(container) {
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
@@ -1733,7 +1747,7 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
     e.target.reset();
     loadAcctSupportTickets();
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to submit ticket.';
+    msg.textContent = apiErrorText(err, 'Failed to submit ticket.');
     msg.className = 'acct-msg error';
   }
 });
