@@ -24,6 +24,9 @@ SUITE = [
     # endpoints is broken, every document failure downstream is a symptom.
     ("verify_storage.py", "Storage: local and S3 backends, key validation"),
     ("verify_storage_s3.py", "Storage: the S3 backend against real boto3 (needs moto)"),
+    # Also serverless, and before the HTTP scripts: it tests the startup hook
+    # that every one of those scripts needs to have already succeeded.
+    ("verify_seed_race.py", "Startup: concurrent admin seeding across gunicorn workers"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),

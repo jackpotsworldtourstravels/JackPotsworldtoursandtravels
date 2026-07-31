@@ -200,18 +200,22 @@ def ensure_default_admin(db: Session) -> None:
     overwritten. This exists because the admin account has been wiped and
     recreated with an unrecoverable random password more than once (e.g. by a
     migration downgrade/upgrade cycle).
+
+    **Safe to run concurrently.** Gunicorn boots ``WEB_CONCURRENCY`` workers and
+    every one of them runs this startup hook against the same database, so on a
+    fresh deploy they all pass the check below before any of them commits, and
+    all of them insert. Only one can win ``uq_users_email``; the losers used to
+    raise out of the startup event and take the worker down with them —
+    *"Worker failed to boot"*, followed by a gunicorn restart that succeeded
+    only because by then the row existed. The check is therefore a fast path,
+    not the guarantee: the INSERT itself is what decides, and losing it means
+    the account exists, which is all this function ever promised.
     """
     admin_email = os.environ.get("ADMIN_SEED_EMAIL", DEFAULT_ADMIN_EMAIL)
     if db.scalar(select(User).where(User.email == admin_email)):
         return
 
     admin_password = os.environ.get("ADMIN_SEED_PASSWORD", DEFAULT_ADMIN_PASSWORD)
-    if admin_password == DEFAULT_ADMIN_PASSWORD:
-        logger.warning(
-            "ensure_default_admin: seeding admin account with the hardcoded default "
-            "password because ADMIN_SEED_PASSWORD is not set. Set ADMIN_SEED_PASSWORD "
-            "in the environment before deploying anywhere reachable by the public."
-        )
     db.add(
         User(
             full_name="JackPots Admin",
@@ -224,4 +228,26 @@ def ensure_default_admin(db: Session) -> None:
             email_verified=True,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Another worker got there between the check and this commit. Roll back
+        # so the session is usable again — an IntegrityError leaves the
+        # transaction aborted, and every later query on it fails too, which is
+        # how one lost race would otherwise poison the rest of startup.
+        db.rollback()
+        logger.info(
+            "ensure_default_admin: %s was created by another worker first; nothing to do",
+            admin_email,
+        )
+        return
+
+    # Warned only on the path that actually seeds, so the message names a
+    # password that was really used — and appears once per deploy rather than
+    # once per worker.
+    if admin_password == DEFAULT_ADMIN_PASSWORD:
+        logger.warning(
+            "ensure_default_admin: seeded the admin account with the hardcoded default "
+            "password because ADMIN_SEED_PASSWORD is not set. Set ADMIN_SEED_PASSWORD "
+            "in the environment before deploying anywhere reachable by the public."
+        )
