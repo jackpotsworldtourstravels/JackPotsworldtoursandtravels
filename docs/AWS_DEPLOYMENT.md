@@ -232,14 +232,34 @@ S3 → **Create bucket**.
 
 | Setting | Value |
 |---|---|
+| Bucket namespace | **Global namespace** — not *Account Regional namespace* |
 | Bucket name | `jackpotsworld-documents` — globally unique, so add a suffix if taken |
 | Region | Same as everything else |
 | **Block all public access** | **On.** Every checkbox |
 | Bucket Versioning | Enable |
 | Default encryption | SSE-S3 (`AES256`) |
 
+> **Bucket namespace renames the bucket behind your back.** Newer consoles
+> default to *Account Regional namespace (recommended)*, which appends
+> `-<account-id>-<region>-an` to whatever you type: `jackpotsworld-documents`
+> becomes `jackpotsworld-documents-754549530476-ap-south-1-an`. Read the **Full
+> bucket name** line before creating; it is the only place the real name
+> appears. Pick **Global namespace** and the name is what you typed.
+>
+> Either would work, but the suffix has to be carried into the IAM policy ARN
+> in Step 4 and `S3_BUCKET` in Step 7, and a mismatch there shows up as
+> AccessDenied on upload rather than as anything mentioning the name. The
+> global namespace is also what `tests/verify_storage_s3.py` exercises.
+
 Versioning is worth the pennies: a document deleted by mistake, or by a bug,
 is recoverable rather than gone.
+
+**Check both on the Properties tab afterwards.** Versioning defaults to
+*Disable* and is easy to leave that way — the created bucket showed
+`Bucket Versioning: Disabled` despite the radio looking set. Both versioning
+and encryption are editable after creation, unlike the name and the region, so
+the Properties tab is the verification that counts. Block Public Access is on
+the **Permissions** tab, where it should read `On` with an empty bucket policy.
 
 The bucket must never be public. The application streams every download
 through its own authenticated endpoint and issues no presigned URLs, so
