@@ -21,8 +21,8 @@ the portal script that references it — real behavior risk for a job
 scoped to "reorganize, don't rewrite."
 
 Each portal's sidebar/topbar markup stays where it is, in
-`index.html` / `admin/admin.html` / `partner/partner-portal.html` /
-`super-admin/super-admin.html`. If a future task wants to unify them,
+`index.html` / `admin/index.html` / `merchant/index.html` /
+`super-admin/index.html`. If a future task wants to unify them,
 that's a genuine UI rewrite (matching markup + behavior across all four
 first) — a separate, deliberate piece of work, not a byproduct of a folder
 reorganization.

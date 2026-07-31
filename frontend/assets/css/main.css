@@ -565,7 +565,10 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .modal-switch{text-align:center; margin-top:22px; font-size:14px; color:var(--muted);}
 .modal-switch a{color:var(--coral); font-weight:700;}
 .modal-msg{margin-top:14px; font-size:13px; font-weight:600; color:var(--emerald); text-align:center; opacity:0; max-height:0; overflow:hidden; transition:opacity .3s ease;}
-.modal-msg.show{opacity:1; max-height:60px;}
+/* max-height is a clamp for the reveal, not an animated property (the
+   transition is opacity-only), so it needs headroom for multi-line notices —
+   the partner-registration holding message wraps to 3-4 lines at 340px. */
+.modal-msg.show{opacity:1; max-height:200px;}
 
 /* ---------- PROFILE CHIP (header, logged-in state) ---------- */
 .profile-chip-wrap{position:relative;}

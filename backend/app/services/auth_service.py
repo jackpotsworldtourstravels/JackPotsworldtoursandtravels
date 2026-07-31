@@ -1,3 +1,20 @@
+"""Authentication against the v2 ``users`` table.
+
+Column renames from the legacy schema:
+
+===========================  ===================================
+Legacy                       v2
+===========================  ===================================
+``users.id``                 ``users.user_id``
+``users.hashed_password``    ``users.password_hash``
+``users.mobile``             ``users.phone``
+``users.role_id`` -> roles   ``users.role`` (enum)
+``users.is_active``          ``users.status == 'active'``
+``users.is_blocked``         ``users.status == 'blocked'``
+``users.last_login_at``      ``users.last_login``
+extended profile columns     ``users.profile`` (JSONB)
+===========================  ===================================
+"""
 import datetime
 
 from fastapi import HTTPException, status
@@ -14,11 +31,24 @@ from app.auth.security import (
     verify_password,
 )
 from app.config import settings
-from app.models.user import Role, User
+from app.models_v2 import User, UserRole, UserStatus
 
-_EXTENDED_PROFILE_FIELDS = (
-    "first_name", "last_name", "mobile", "gender", "dob", "country", "state", "city", "address",
+#: Keys accepted into ``users.profile``. Previously real columns on ``users``.
+PROFILE_FIELDS = (
+    "first_name",
+    "last_name",
+    "gender",
+    "dob",
+    "country",
+    "state",
+    "city",
+    "address",
+    "profile_photo",
 )
+
+
+def _now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -26,26 +56,31 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 
 def get_user_by_identifier(db: Session, identifier: str) -> User | None:
-    """Look up a user by email or mobile number, for login forms that accept either."""
-    return db.scalar(select(User).where(or_(User.email == identifier, User.mobile == identifier)))
+    """Look up by email or phone, for login forms that accept either."""
+    return db.scalar(select(User).where(or_(User.email == identifier, User.phone == identifier)))
 
 
 def signup(db: Session, full_name: str, email: str, password: str, **extended_fields) -> User:
     if get_user_by_email(db, email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
+        )
 
-    user_role = db.scalar(select(Role).where(Role.name == "user"))
-    if user_role is None:
-        raise HTTPException(status_code=500, detail="Default role not seeded — run migrations")
-
-    profile_values = {k: v for k, v in extended_fields.items() if k in _EXTENDED_PROFILE_FIELDS and v is not None}
+    profile = {
+        k: (v.isoformat() if isinstance(v, (datetime.date, datetime.datetime)) else v)
+        for k, v in extended_fields.items()
+        if k in PROFILE_FIELDS and v is not None
+    }
 
     user = User(
         full_name=full_name,
         email=email,
-        hashed_password=hash_password(password),
-        role_id=user_role.id,
-        **profile_values,
+        phone=extended_fields.get("mobile"),
+        password_hash=hash_password(password),
+        role=UserRole.CUSTOMER,
+        permissions=[],
+        profile=profile,
+        status=UserStatus.ACTIVE,
     )
     db.add(user)
     db.commit()
@@ -53,52 +88,99 @@ def signup(db: Session, full_name: str, email: str, password: str, **extended_fi
     return user
 
 
-def authenticate(db: Session, identifier: str, password: str, required_role: str | None = None) -> User:
-    """Authenticate by email or (for user-role logins) mobile number."""
+def authenticate(
+    db: Session, identifier: str, password: str, required_role: str | None = None
+) -> User:
+    """Authenticate by email or phone.
+
+    ``required_role`` keeps the customer and admin sign-in surfaces separate.
+    It accepts the legacy value ``"user"`` as an alias for the v2
+    ``customer`` role so the existing /api/auth/user/login contract holds.
+    """
     user = get_user_by_identifier(db, identifier)
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    if required_role is not None and user.role.name != required_role:
-        # Deliberately the same generic message as a wrong password — don't reveal
-        # that the account exists but belongs to the other login surface.
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    if not user.is_active:
+    if not user or not verify_password(password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+        )
+
+    if required_role is not None:
+        wanted = UserRole.CUSTOMER if required_role in ("user", "customer") else UserRole(required_role)
+        if user.role is not wanted:
+            # Deliberately the same generic message as a wrong password — don't
+            # reveal that the account exists but belongs to the other surface.
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            )
+
+    if user.status is UserStatus.BLOCKED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is blocked. Please contact support.",
+        )
+    if user.status is not UserStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
-    if user.is_blocked:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is blocked. Please contact support.")
     return user
 
 
 def record_login(db: Session, user: User) -> None:
-    user.last_login_at = datetime.datetime.utcnow()
+    user.last_login = _now()
     user.login_count = (user.login_count or 0) + 1
+    user.failed_login_attempts = 0
+    db.commit()
+
+
+def record_failed_login(db: Session, user: User | None) -> None:
+    if user is None:
+        return
+    user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
     db.commit()
 
 
 def issue_tokens(user: User) -> tuple[str, str]:
-    return create_access_token(user.id), create_refresh_token(user.id)
+    return create_access_token(user.user_id), create_refresh_token(user.user_id)
 
 
 def logout(db: Session, user: User) -> None:
-    """Revokes the user's outstanding access/refresh tokens immediately, rather than
-    leaving them valid until natural expiry (JWTs are stateless, so this works by
-    moving force_logout_at forward — the same mechanism the admin "force logout"
-    action uses)."""
-    user.force_logout_at = datetime.datetime.utcnow()
+    """Revoke outstanding tokens immediately.
+
+    JWTs are stateless, so this moves ``force_logout_at`` forward and every
+    dependency rejects tokens issued before it — the same mechanism behind
+    the admin "force logout" action.
+    """
+    user.force_logout_at = _now()
     db.commit()
+
+
+def is_token_revoked(user: User, payload: dict) -> bool:
+    """True when ``force_logout_at`` postdates the token's ``iat``."""
+    if user.force_logout_at is None:
+        return False
+    issued_at = payload.get("iat")
+    if issued_at is None:
+        return True
+    issued = datetime.datetime.fromtimestamp(issued_at, tz=datetime.timezone.utc)
+    forced = user.force_logout_at
+    if forced.tzinfo is None:
+        forced = forced.replace(tzinfo=datetime.timezone.utc)
+    return issued < forced
 
 
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
     user = db.get(User, int(payload["sub"]))
-    if not user or not user.is_active or user.is_blocked:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    if user.force_logout_at is not None:
-        issued_at = payload.get("iat")
-        if issued_at is None or datetime.datetime.utcfromtimestamp(issued_at) < user.force_logout_at:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session ended — please log in again")
+    if not user or user.status is not UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
+    if is_token_revoked(user, payload):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session ended — please log in again",
+        )
     return issue_tokens(user)
 
 
@@ -108,7 +190,9 @@ def start_password_reset(db: Session, email: str) -> str | None:
         return None
     raw_token, hashed = generate_reset_token()
     user.reset_token_hash = hashed
-    user.reset_token_expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=settings.reset_token_expire_minutes)
+    user.reset_token_expires_at = _now() + datetime.timedelta(
+        minutes=settings.reset_token_expire_minutes
+    )
     db.commit()
     return raw_token
 
@@ -116,9 +200,14 @@ def start_password_reset(db: Session, email: str) -> str | None:
 def complete_password_reset(db: Session, raw_token: str, new_password: str) -> None:
     hashed = hash_reset_token(raw_token)
     user = db.scalar(select(User).where(User.reset_token_hash == hashed))
-    if not user or not user.reset_token_expires_at or user.reset_token_expires_at < datetime.datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token is invalid or expired")
-    user.hashed_password = hash_password(new_password)
+    expires = user.reset_token_expires_at if user else None
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=datetime.timezone.utc)
+    if not user or expires is None or expires < _now():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token is invalid or expired"
+        )
+    user.password_hash = hash_password(new_password)
     user.reset_token_hash = None
     user.reset_token_expires_at = None
     db.commit()

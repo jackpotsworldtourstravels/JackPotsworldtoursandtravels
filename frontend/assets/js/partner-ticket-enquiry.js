@@ -1,96 +1,72 @@
 'use strict';
-/* Partner Portal — Ticket Enquiry.
-   "Passengers" and "Preferred Airline" are filtered client-side — the
-   underlying stored procedure (sp_get_ticket_enquiry, already approved and
-   applied) only filters by departure/arrival/date/cabin, so filtering here
-   keeps the same UX without touching that already-approved SQL.
-   Trip Type (Round Trip / Multi City) is a pure search-UX layer: it calls
-   the same single-leg search endpoint once per leg and renders one result
-   table per leg — no new API, no change to booking creation. */
+/* Merchant Portal — Ticket Enquiry. GET /api/catalog/search (API_CONTRACT.md — existing, live).
+   Inventory is real catalog items (flights/hotels/cruises), each with a fixed fare and seat
+   count — there is no free-form "type in any flight" search, and no multi-city/round-trip
+   itinerary concept server-side (a request books exactly one catalog item), so this is a
+   single search against one travel type at a time, not the old per-leg flight search UI. */
 
-let teTripType = 'one_way';
+let teTravelType = 'flight';
 
-function flightDuration(dep, arr) {
-  const mins = Math.round((new Date(arr) - new Date(dep)) / 60000);
-  if (mins <= 0) return '—';
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-}
-
-function teLegRowHtml(index) {
-  return `
-    <div class="te-leg-row" data-leg="${index}">
-      <input type="text" class="te-leg-departure" placeholder="Departure">
-      <input type="text" class="te-leg-arrival" placeholder="Arrival">
-      <input type="date" class="te-leg-date" title="Departure date">
-      <input type="date" class="te-leg-return-date" title="Return date" style="display:none;">
-      ${index > 0 ? '<button type="button" class="te-leg-remove" title="Remove city">✕</button>' : ''}
-    </div>`;
-}
-
-function setTripType(type) {
-  teTripType = type;
-  document.querySelectorAll('.te-trip-btn').forEach(b => b.classList.toggle('active', b.dataset.trip === type));
-  const container = document.getElementById('teLegsContainer');
-  const addRow = document.getElementById('teAddLegBtn').closest('#teAddLegRow');
-
-  if (type === 'multi_city') {
-    addRow.style.display = 'block';
-    container.querySelectorAll('.te-leg-return-date').forEach(el => el.style.display = 'none');
-    if (container.children.length < 2) container.insertAdjacentHTML('beforeend', teLegRowHtml(1));
-  } else {
-    addRow.style.display = 'none';
-    [...container.children].slice(1).forEach(el => el.remove());
-    container.querySelector('.te-leg-return-date').style.display = type === 'round_trip' ? 'block' : 'none';
-  }
-  wireLegRemoveButtons();
-}
-
-function wireLegRemoveButtons() {
-  document.querySelectorAll('.te-leg-remove').forEach(btn => {
-    btn.onclick = () => btn.closest('.te-leg-row').remove();
-  });
+function setTeTravelType(type) {
+  teTravelType = type;
+  document.querySelectorAll('#teTravelType .te-trip-btn').forEach(b => b.classList.toggle('active', b.dataset.travelType === type));
+  const flightOnly = type === 'flight';
+  document.getElementById('teCabin').style.display = flightOnly ? '' : 'none';
+  document.getElementById('teAirline').style.display = flightOnly ? '' : 'none';
+  document.getElementById('teResultsContainer').innerHTML = '';
 }
 
 function initTicketEnquiry() {
-  document.querySelectorAll('.te-trip-btn').forEach(btn => {
-    btn.addEventListener('click', () => setTripType(btn.dataset.trip));
-  });
-  document.getElementById('teAddLegBtn').addEventListener('click', () => {
-    const container = document.getElementById('teLegsContainer');
-    if (container.children.length >= 4) return;
-    container.insertAdjacentHTML('beforeend', teLegRowHtml(container.children.length));
-    wireLegRemoveButtons();
+  document.querySelectorAll('#teTravelType .te-trip-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTeTravelType(btn.dataset.travelType));
   });
   document.getElementById('teSearchBtn').addEventListener('click', searchTicketEnquiry);
-  document.getElementById('teRequestTicketBtn').addEventListener('click', () => navigateToSection('request-ticket'));
+  setTeTravelType('flight');
   searchTicketEnquiry();
 }
 
-async function fetchLeg(departure, arrival, date, cabinClass) {
-  const params = { departure: departure || undefined, arrival: arrival || undefined, date: date || undefined, cabin_class: cabinClass || undefined };
-  const { data } = await axios.get(`${API_BASE}/api/partner/ticket-enquiry`, { headers: partnerAuthHeaders(), params });
-  return data;
+function teDetailLine(item) {
+  const d = item.details || {};
+  if (item.travel_type === 'flight') {
+    return `${escapeHtml(d.airline || '')} ${escapeHtml(d.flight_number || '')} · ${escapeHtml(d.origin_city || d.origin || '')} → ${escapeHtml(d.destination_city || d.destination || '')}`;
+  }
+  if (item.travel_type === 'hotel') {
+    return `${escapeHtml(d.hotel_name || item.title || '')} · ${escapeHtml(d.room_type || '')} · ${escapeHtml(d.destination_city || d.destination || '')}`;
+  }
+  return `${escapeHtml(d.cruise_line || '')} ${escapeHtml(d.cruise_name || '')} · ${escapeHtml(d.origin_city || d.origin || '')} → ${escapeHtml(d.destination_city || d.destination || '')}`;
 }
 
-function renderLegTable(title, flights) {
-  const rows = flights.length ? flights.map(f => `
-      <tr>
-        <td>${escapeHtml(f.airline)}</td>
-        <td>${escapeHtml(f.from_airport)}</td>
-        <td>${escapeHtml(f.to_airport)}</td>
-        <td>${fmtTime(f.departure_time)}</td>
-        <td>${fmtTime(f.arrival_time)}</td>
-        <td>${flightDuration(f.departure_time, f.arrival_time)}</td>
-        <td>${f.seats_available}</td>
-        <td>${money(f.price)}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="8" class="empty-state">No flights match this search.</td></tr>';
+function teMetaChips(item) {
+  const d = item.details || {};
+  const chips = [];
+  if (item.travel_type === 'flight') {
+    if (d.departure_time) chips.push(fmtTime(d.departure_time));
+    if (d.arrival_time) chips.push('→ ' + fmtTime(d.arrival_time));
+    if (d.cabin_class) chips.push(escapeHtml(d.cabin_class.replace(/_/g, ' ')));
+    if (d.stops != null) chips.push(d.stops === 0 ? 'Non-stop' : `${d.stops} stop(s)`);
+  } else if (item.travel_type === 'hotel') {
+    if (d.nights) chips.push(`${d.nights} night(s)`);
+    if (d.star_rating) chips.push('★'.repeat(d.star_rating));
+  } else {
+    if (d.nights) chips.push(`${d.nights} night(s)`);
+    if (d.cabin_class) chips.push(escapeHtml(d.cabin_class));
+  }
+  if (item.available_units != null) chips.push(`${item.available_units} seats left`);
+  return chips.join(' &middot; ');
+}
+
+function teResultCard(item, passengers) {
   return `
-    <div class="te-leg-result">
-      <h3 class="te-leg-result-title">${escapeHtml(title)}</h3>
-      <div class="table-wrap"><table><thead><tr>
-        <th>Airline</th><th>Departure</th><th>Arrival</th><th>Dep. Time</th><th>Arr. Time</th><th>Duration</th><th>Seats</th><th>Price</th>
-      </tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="panel" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
+      <div>
+        <div style="font-weight:700; font-size:14.5px;">${teDetailLine(item)}</div>
+        <div style="font-size:12.5px; color:var(--text-muted); margin-top:4px;">${teMetaChips(item)}</div>
+        ${item.travel_date ? `<div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Travel date: ${fmtDate(item.travel_date)}</div>` : ''}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:18px; font-weight:800;">${money(item.total_amount)}<span style="font-size:11px; font-weight:600; color:var(--text-muted);"> /seat</span></div>
+        <button type="button" class="btn btn-coral btn-sm" data-request-item="${item.id}" style="margin-top:8px;">Request This</button>
+      </div>
     </div>`;
 }
 
@@ -98,33 +74,45 @@ async function searchTicketEnquiry() {
   const container = document.getElementById('teResultsContainer');
   container.innerHTML = '<div class="skeleton-row"><div class="skeleton-block"></div></div>';
 
-  const minPassengers = Number(document.getElementById('tePassengers').value || 1);
-  const cabinClass = document.getElementById('teCabin').value;
-  const airlineFilter = document.getElementById('teAirline').value.trim().toLowerCase();
-  const applyFilters = flights => flights.filter(f =>
-    f.seats_available >= minPassengers && (!airlineFilter || f.airline.toLowerCase().includes(airlineFilter)));
+  const passengers = Number(document.getElementById('tePassengers').value || 1);
+  const params = {
+    travel_type: teTravelType,
+    origin: document.getElementById('teOrigin').value.trim() || undefined,
+    destination: document.getElementById('teDestination').value.trim() || undefined,
+    travel_date: document.getElementById('teDate').value || undefined,
+    passengers,
+    max_price: document.getElementById('teMaxPrice').value || undefined,
+    page_size: 20,
+  };
+  if (teTravelType === 'flight') {
+    params.cabin_class = document.getElementById('teCabin').value || undefined;
+    params.airline = document.getElementById('teAirline').value.trim() || undefined;
+  }
 
   try {
-    const legRows = [...document.querySelectorAll('.te-leg-row')];
-    const sections = [];
-
-    for (let i = 0; i < legRows.length; i++) {
-      const row = legRows[i];
-      const dep = row.querySelector('.te-leg-departure').value;
-      const arr = row.querySelector('.te-leg-arrival').value;
-      const date = row.querySelector('.te-leg-date').value;
-      const label = legRows.length > 1 ? `City ${i + 1}: ${dep || 'Anywhere'} → ${arr || 'Anywhere'}` : 'Outbound Flights';
-      const flights = applyFilters(await fetchLeg(dep, arr, date, cabinClass));
-      sections.push(renderLegTable(teTripType === 'one_way' ? 'Available Flights' : label, flights));
-
-      if (teTripType === 'round_trip' && i === 0) {
-        const returnDate = row.querySelector('.te-leg-return-date').value;
-        const returnFlights = applyFilters(await fetchLeg(arr, dep, returnDate, cabinClass));
-        sections.push(renderLegTable('Return Flights', returnFlights));
-      }
-    }
-    container.innerHTML = sections.join('');
+    const { data } = await axios.get(`${API_BASE}/api/catalog/search`, { headers: partnerAuthHeaders(), params });
+    container.innerHTML = data.items.length
+      ? data.items.map(item => teResultCard(item, passengers)).join('')
+      : '<div class="empty-state">No results match this search.</div>';
+    container.querySelectorAll('[data-request-item]').forEach(btn => {
+      btn.addEventListener('click', () => requestCatalogItem(Number(btn.dataset.requestItem), passengers));
+    });
   } catch (err) {
-    container.innerHTML = '<div class="empty-state">Failed to load flights.</div>';
+    container.innerHTML = '<div class="empty-state">Failed to load results.</div>';
+  }
+}
+
+/* Hands off to Request Ticket (partner-request-ticket.js): fetch the quote for this party
+   size, then switch sections so the passenger-details step opens against a priced, real
+   catalog item rather than free-form input. */
+async function requestCatalogItem(itemId, passengers) {
+  try {
+    const { data: quote } = await axios.get(`${API_BASE}/api/catalog/${itemId}/quote`, {
+      headers: partnerAuthHeaders(), params: { passengers },
+    });
+    startRequestTicket(quote, passengers);
+    navigateToSection('request-ticket');
+  } catch (err) {
+    showToast(err.response?.data?.detail || 'Could not price this option.', true);
   }
 }

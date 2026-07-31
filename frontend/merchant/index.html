@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Partner Portal — JackPots World Tours &amp; Travels</title>
+
+<!-- =========================================================================
+     PREMIUM MERCHANT PORTAL (V1) — OUT OF SERVICE.
+     =========================================================================
+     The merchant UI is the Classic portal at ../merchant-classic/. This page
+     redirects there before anything else on it loads.
+
+     NOTHING WAS DELETED. Every file of this portal is still on disk, exactly
+     as it was — the markup below, ../assets/css/partner-portal.css,
+     merchant-home.css, merchant-booking.css and all of assets/js/partner-*.js.
+     To put Premium back: delete this one <script> block, and point
+     MERCHANT_PORTAL_URL in ../assets/js/app.js back at 'merchant/'.
+
+     WHY IT IS FIRST IN <head>: placed above the stylesheet and font links so
+     the browser never fetches this portal's CSS or JS and the user never sees
+     a frame of it. location.replace, not .href, so Back does not bounce
+     between the two portals.
+
+     The hash is carried across because the section names largely coincide
+     (payments, reports, profile, notifications, support). Anything Classic
+     does not recognise is safe: clGo() falls back to the dashboard for an
+     unknown section rather than rendering a blank screen.
+     ========================================================================= -->
+<script>
+  location.replace('../merchant-classic/' + (location.hash || ''));
+</script>
+
+<link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260730g">
+<!-- Loaded AFTER partner-portal.css. Everything in it is `mh-` prefixed and scoped,
+     so it adds the public travel site's look to the Merchant Home without
+     restyling any existing portal screen. See the header comment in that file for
+     why main.css itself is deliberately not loaded here. -->
+<link rel="stylesheet" href="../assets/css/merchant-home.css?v=20260730j">
+<!-- Booking surfaces (Request Ticket, smart-search dropdown, travel calendar).
+     Must load after merchant-home.css — it reuses that file's --mh-* tokens. -->
+<link rel="stylesheet" href="../assets/css/merchant-booking.css?v=20260730h">
+</head>
+<body>
+
+<!-- ============== AUTH VIEW (shown when there's no valid merchant session) ==============
+     Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live
+     /api/auth/login|verify-otp|resend-otp endpoints with portal="merchant". -->
+<div class="partner-auth-shell" id="partnerAuthShell">
+  <div class="partner-auth-card">
+    <div class="partner-auth-brand">
+      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <div class="pab-sub">Merchant Portal</div>
+    </div>
+
+    <div class="auth-stepper" id="authStepper">
+      <div class="auth-step-dot active" data-step-dot="1">1</div>
+      <div class="auth-step-line"></div>
+      <div class="auth-step-dot" data-step-dot="2">2</div>
+    </div>
+
+    <!-- Step 1: credentials -->
+    <div class="auth-step active" id="authStep1">
+      <h1>Merchant Sign In</h1>
+      <p class="auth-step-sub">Sign in with your registered email and password.</p>
+      <div class="form-field"><label>Email Address</label><input id="authEmail" type="email" autocomplete="username" placeholder="you@company.com"></div>
+      <div class="form-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password"></div>
+      <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
+      <button type="button" class="btn btn-coral btn-block" id="partnerLoginBtn">Sign In</button>
+      <div class="msg" id="authStep1Msg"></div>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="auth-step" id="authStep2">
+      <h1>Verify OTP</h1>
+      <p class="auth-step-sub" id="authStep2Sub">Enter the 6-digit code sent to your email.</p>
+      <div class="form-field"><label>OTP</label><input id="authOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
+      <button type="button" class="btn btn-coral btn-block" id="verifyOtpBtn">Verify OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="resendOtpBtn">Resend OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="backToCredsBtn">← Back</button>
+      <div class="msg" id="authStep2Msg"></div>
+    </div>
+
+    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
+  </div>
+</div>
+
+<!-- ============== PORTAL VIEW (shown once authenticated) ==============
+
+     The travel header below replaces the old .mobile-topbar and is the merchant's
+     primary navigation on every screen, so signing in doesn't feel like switching
+     into a separate ERP. The ERP sidebar is kept in the DOM (hidden by
+     .layout.mh-headed) because partner-shared.js binds #partnerSignOutBtn and the
+     collapse/backdrop controls directly; the account menu drives navigation now.
+
+     The notification bell lives here rather than in .main .topbar so a single
+     #notifBellBtn / #notifDropdown pair stays visible on all sections —
+     initNotifications() in partner-notifications.js binds those exact ids and is
+     unchanged. -->
+<header class="mh-header mh-scope" id="mhHeader" style="display:none;">
+  <nav class="mh-nav mh-wrap">
+    <a href="#" class="mh-logo" id="mhHomeLink">
+      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <span class="mh-logo-badge">Partner</span>
+    </a>
+
+    <div class="mh-navlinks">
+      <button type="button" data-mh-navlink="flight" class="active">Flights</button>
+      <button type="button" data-mh-navlink="hotel">Hotels</button>
+      <button type="button" data-mh-navlink="cruise">Cruises</button>
+      <button type="button" data-mh-navlink="package">Packages</button>
+    </div>
+
+    <div class="mh-nav-actions">
+      <div class="mh-gsearch">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="mhGlobalSearch" placeholder="Search requests, PNR…" autocomplete="off" aria-label="Search your requests">
+        <div class="mh-gsearch-results" id="mhGlobalResults"></div>
+      </div>
+
+      <!-- The panel itself is NOT here: .mh-header sets backdrop-filter, which per
+           spec makes it a containing block for position:fixed descendants, so a
+           drawer nested inside it would be positioned against the header instead
+           of the viewport. It lives at the end of <body>; ids are unchanged, and
+           partner-notifications.js finds them by id either way. -->
+      <button type="button" class="mh-iconbtn" id="notifBellBtn" aria-label="Notifications"
+              title="Notifications" aria-expanded="false" aria-controls="notifDropdown">
+        <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="mh-badge" id="notifBadge"></span>
+      </button>
+
+      <div class="mh-acct-wrap">
+        <button type="button" class="mh-acct" id="mhAcctBtn" aria-haspopup="true" aria-label="Account menu">
+          <span class="mh-acct-avatar" id="partnerChipAvatar">P</span>
+          <span class="mh-acct-text">
+            <span class="mh-acct-name" id="partnerChipName">—</span>
+            <span class="mh-acct-co" id="partnerChipCompany">—</span>
+          </span>
+        </button>
+        <div class="mh-acct-menu" id="mhAcctMenu">
+          <div class="mh-acct-menu-head">
+            <b id="mhMenuName">—</b><small id="mhMenuCompany">—</small>
+          </div>
+          <a href="#" data-section="dashboard"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
+          <a href="#" data-section="request-history"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>My Requests</a>
+          <a href="#" data-section="payments"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Payments</a>
+          <a href="#" data-section="service-request"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Service Requests</a>
+          <a href="#" data-section="reports"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Reports</a>
+          <a href="#" data-section="live-chat"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>Live Chat Support</a>
+          <a href="#" data-section="profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Profile</a>
+          <div class="mh-acct-sep"></div>
+          <a href="../index.html"><svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back to public site</a>
+          <a href="#" class="mh-danger" id="mhSignOutLink"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Sign Out</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<div class="layout mh-headed" id="partnerLayout" style="display:none;">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <nav class="sidebar" id="partnerSidebar">
+    <div class="brand"><img src="../assets/images/jackpots-logo-full.png" alt="JackPots"><span class="brand-badge">Partner</span></div>
+    <div class="nav-group-label">Overview</div>
+    <a href="#" class="nav-item active" data-section="dashboard">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <div class="nav-group-label">Bookings</div>
+    <a href="#" class="nav-item" data-section="ticket-enquiry">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="nav-label">Ticket Enquiry</span>
+    </a>
+    <a href="#" class="nav-item" data-section="request-ticket">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6Z"/></svg>
+      <span class="nav-label">Request Ticket</span>
+    </a>
+    <a href="#" class="nav-item" data-section="request-history">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      <span class="nav-label">Request History</span>
+    </a>
+    <a href="#" class="nav-item" data-section="service-request">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+      <span class="nav-label">Service Request</span>
+    </a>
+    <div class="nav-group-label">Insights</div>
+    <a href="#" class="nav-item" data-section="reports">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      <span class="nav-label">Reports</span>
+    </a>
+    <div class="nav-group-label">Support</div>
+    <a href="#" class="nav-item" data-section="live-chat">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      <span class="nav-label">Live Chat Support</span>
+    </a>
+    <div class="nav-group-label">Account</div>
+    <a href="#" class="nav-item" data-section="profile">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      <span class="nav-label">Profile</span>
+    </a>
+    <div class="spacer"></div>
+    <a href="../index.html" class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="nav-label">Back to site</span></a>
+    <a href="#" class="nav-item logout" id="partnerSignOutBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg><span class="nav-label">Sign Out</span></a>
+    <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" aria-label="Collapse sidebar">
+      <svg class="icon" viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M11 19l-7-7 7-7"/><path d="M19 19l-7-7 7-7"/></svg>
+      <span>Collapse</span>
+    </button>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <div class="breadcrumb"><span>Partner Portal</span><span class="bc-sep">/</span><span class="bc-current" id="breadcrumbCurrent">Dashboard</span></div>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbarDate"></span>
+        <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="Toggle theme" title="Toggle theme">
+          <svg class="icon" id="themeIconSun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon" id="themeIconMoon" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+        </button>
+        <!-- The notification bell and partner chip moved into the travel header
+             above (single #notifBellBtn / #partnerChipName in the document — they
+             must not be duplicated here, getElementById would only ever find the
+             first and the two copies would drift out of sync). -->
+      </div>
+    </div>
+
+    <!-- ============== MERCHANT HOME (default after login) ==============
+         The booking surface. Markup is intentionally thin — partner-home.js builds
+         the tab/panel/field grid from MH_TYPES so the four travel types stay in one
+         place, and searches the same GET /api/catalog/search that Ticket Enquiry
+         uses. "Request" hands off to the existing Request Ticket flow untouched. -->
+    <section class="section active mh-scope mh-home" id="section-home">
+      <!-- Same video hero as the public landing page: one clip per booking tab,
+           lazy-loaded on first use. Keys match MH_TYPES (flight/hotel/cruise/
+           package), so partner-home.js's mhSetType can drive the swap. Paths are
+           ../ because this page sits one level down. -->
+      <div class="mh-hero">
+        <div class="mh-hero-bg" id="mhHeroBg"></div>
+        <div class="mh-hero-video-layer" id="mhHeroVideoLayer">
+          <video class="active" data-mh-video="flight" src="../assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+          <video data-mh-video="hotel" data-src="../assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+          <video data-mh-video="cruise" data-src="../assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+          <video data-mh-video="package" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+        </div>
+        <div class="mh-hero-overlay"></div>
+        <div class="mh-wrap mh-hero-inner">
+          <div class="mh-eyebrow">Flights · Hotels · Cruises · Packages — one search</div>
+          <h1>Book for your travellers<span class="mh-accent"> in one place.</span></h1>
+          <p class="mh-sub">
+            Live B2B inventory with your negotiated fares. Search, raise a request,
+            and track it through approval, payment and ticketing.
+          </p>
+        </div>
+        <div class="mh-wrap mh-dock">
+          <div class="mh-card" id="mhSearchCard" role="region" aria-label="Booking search"></div>
+        </div>
+      </div>
+
+      <!-- Recent searches + popular destinations, built by partner-home.js. Both
+           are local/static by necessity: there is no search-history or trending
+           endpoint to read (see the comments on those functions). -->
+      <div class="mh-wrap mh-discover" id="mhDiscover"></div>
+
+      <div class="mh-wrap mh-results" id="mhResults" style="display:none;">
+        <div class="mh-results-head">
+          <div class="mh-results-titles">
+            <h2 id="mhResultsTitle">Results</h2>
+            <!-- Also the live region for the rotating "Searching flights…" states,
+                 so a screen reader hears progress and then the final total. -->
+            <span class="mh-results-count" id="mhResultsCount" role="status" aria-live="polite"></span>
+          </div>
+          <div class="mh-results-tools">
+            <button type="button" class="mh-chipbtn mh-ftoggle" id="mhFilterToggle"
+                    aria-expanded="false" aria-controls="mhFilterRail" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+              Filters <span class="mh-fbadge" data-mh-fbadge hidden></span>
+            </button>
+            <div id="mhSortWrap"></div>
+          </div>
+        </div>
+        <div class="mh-results-body">
+          <div class="mh-frail-backdrop" id="mhFilterBackdrop"></div>
+          <aside class="mh-frail" id="mhFilterRail" aria-label="Filter results" hidden></aside>
+          <div class="mh-results-list" id="mhResultsList"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="section-dashboard">
+      <div class="stat-grid" id="dashboardStatGrid"></div>
+      <div id="dashboardRecentWrap" style="margin-top:22px;"></div>
+    </section>
+
+    <!-- Payments — new in this pass, and deliberately built in the existing portal
+         style rather than the travel style, because it belongs to the account-menu
+         group that this pass is not redesigning. No backend was added: there is no
+         merchant-facing payments list endpoint (GET /api/admin/payments is admin
+         only), so this composes the existing GET /api/requests filtered to the
+         payment-bearing statuses and reuses openPayModal/openBookingDetailModal
+         from partner-request-history.js. -->
+    <section class="section" id="section-payments">
+      <div class="panel">
+        <div class="panel-head"><h2>Payments</h2></div>
+        <div class="filter-bar">
+          <select id="payStatusFilter" class="status-select">
+            <option value="payment_pending">Awaiting payment</option>
+            <option value="paid">Paid</option>
+            <option value="ticket_issued">Ticket issued</option>
+            <option value="">All payment stages</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="payTable"><thead><tr>
+          <th>Request #</th><th>Reference</th><th>Travel Type</th><th>Travel Date</th>
+          <th>Amount</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-ticket-enquiry">
+      <div class="panel">
+        <div class="panel-head"><h2>Ticket Enquiry</h2></div>
+
+        <div class="te-trip-type" id="teTravelType">
+          <button type="button" class="te-trip-btn active" data-travel-type="flight">Flights</button>
+          <button type="button" class="te-trip-btn" data-travel-type="hotel">Hotels</button>
+          <button type="button" class="te-trip-btn" data-travel-type="cruise">Cruises</button>
+        </div>
+
+        <div class="filter-bar">
+          <input type="text" id="teOrigin" placeholder="From (city / code)" style="min-width:160px;">
+          <input type="text" id="teDestination" placeholder="To (city / code)" style="min-width:160px;">
+          <input type="date" id="teDate" title="Travel date">
+          <select id="tePassengers" class="status-select">
+            <option value="1">1 Passenger</option><option value="2">2 Passengers</option>
+            <option value="3">3 Passengers</option><option value="4">4 Passengers</option><option value="5">5+ Passengers</option>
+          </select>
+          <select id="teCabin" class="status-select">
+            <option value="">Any Cabin</option><option value="economy">Economy</option>
+            <option value="premium_economy">Premium Economy</option><option value="business">Business</option><option value="first_class">First Class</option>
+          </select>
+          <input type="text" id="teAirline" placeholder="Preferred Airline (optional)" style="min-width:180px;">
+          <input type="number" id="teMaxPrice" placeholder="Max price (optional)" style="min-width:150px;">
+          <button type="button" class="btn btn-navy btn-sm" id="teSearchBtn">Search</button>
+        </div>
+
+        <div id="teResultsContainer"></div>
+      </div>
+    </section>
+
+    <!-- Request Ticket is `mh-scope` so the booking redesign inherits Home's
+         tokens; it is NOT wrapped in `.panel` any more because the screen is now
+         a set of floating cards rather than one ERP box. -->
+    <section class="section mh-scope mh-rt" id="section-request-ticket">
+      <div id="rtPanelWrap"></div>
+    </section>
+
+    <section class="section" id="section-request-history">
+      <div class="panel">
+        <!-- Heading follows the account menu's "My Requests" label so the page and
+             the link that reaches it don't read as two different screens. -->
+        <div class="panel-head"><h2>My Requests</h2></div>
+        <div class="filter-bar">
+          <select id="rhStatusFilter" class="status-select">
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option><option value="pending_approval">Pending Approval</option>
+            <option value="approved">Approved</option><option value="rejected">Rejected</option>
+            <option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+          </select>
+          <input type="date" id="rhFromDate" title="From date">
+          <input type="date" id="rhToDate" title="To date">
+        </div>
+        <div class="table-wrap"><table id="rhTable"><thead><tr>
+          <th>Reference Number</th><th>Request Number</th><th>Passenger Name</th><th>Travel Type</th>
+          <th>Destination</th><th>Travel Date</th><th>Status</th><th>Created Date</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-service-request">
+      <div class="panel" style="padding:0;">
+        <div class="profile-tabs" id="srTabs" style="position:static; padding:16px 20px 0;">
+          <div class="profile-tab active" data-sr-tab="cancellation">Cancellation of Ticket</div>
+          <div class="profile-tab" data-sr-tab="date_change">Date Change</div>
+          <div class="profile-tab" data-sr-tab="refund">Refund Request</div>
+          <div class="profile-tab" data-sr-tab="passenger_modification">Passenger Modification</div>
+        </div>
+        <div class="profile-tab-panel active" id="srPanel" style="padding:22px;"></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-reports">
+      <div class="panel">
+        <div class="panel-head"><h2>Reports</h2></div>
+        <div class="form-grid">
+          <div class="form-field"><label>Travel Date From</label><input type="date" id="repTravelFrom"></div>
+          <div class="form-field"><label>Travel Date To</label><input type="date" id="repTravelTo"></div>
+          <div class="form-field"><label>Search (passenger, request #, PNR)</label><input type="text" id="repSearch" placeholder="e.g. Smith or REQ-2026-000123"></div>
+          <div class="form-field"><label>Status</label>
+            <select id="repStatus"><option value="">All statuses</option>
+              <option value="draft">Draft</option><option value="pending_approval">Pending Approval</option>
+              <option value="approved">Approved</option><option value="payment_pending">Payment Pending</option>
+              <option value="paid">Paid</option><option value="ticket_issued">Ticket Issued</option>
+              <option value="completed">Completed</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+          <button type="button" class="btn btn-coral" id="repGenerateBtn">Generate Report</button>
+          <button type="button" class="btn btn-navy" id="repExportPdfBtn">Export PDF</button>
+          <button type="button" class="btn btn-navy" id="repExportExcelBtn">Export Excel</button>
+          <button type="button" class="btn btn-navy" id="repExportCsvBtn">Export CSV</button>
+        </div>
+        <div class="table-wrap"><table id="repTable"><thead><tr>
+          <th>Reference</th><th>Request #</th><th>Passenger(s)</th><th>Sector</th>
+          <th>Travel Date</th><th>Amount</th><th>Status</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-live-chat">
+      <div class="panel" id="liveChatPanel" style="padding:0;"></div>
+    </section>
+
+    <section class="section" id="section-profile">
+      <!-- Account standing, filled by partner-profile.js from GET /api/merchant/dashboard
+           (the same endpoint the Home strip and Dashboard use — merchants can read it).
+
+           The brief also asks for GST number, Documents and API Keys here. None of
+           the three is reachable by a merchant: gst_number exists only on
+           schemas/admin_merchant.py behind admin permissions, and there is no
+           document-vault or API-key endpoint at all. They are left out rather than
+           mocked up, because a panel of blank or invented values is worse than an
+           honest omission — see the note in the handover. -->
+      <div class="acct-summary" id="profAccountSummary"></div>
+
+      <div class="panel" style="max-width:520px;">
+        <h2>Partner Information</h2>
+        <form id="profileForm">
+          <div class="form-field" style="max-width:none;"><label>Company Name</label><input id="profCompanyName" type="text" disabled></div>
+          <div class="form-field" style="max-width:none;"><label>Full Name</label><input id="profFullName" type="text" required></div>
+          <div class="form-field" style="max-width:none;"><label>Email</label><input id="profEmail" type="email" disabled></div>
+          <div class="form-field" style="max-width:none;"><label>Phone</label><input id="profPhone" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>Gender</label>
+            <select id="profGender"><option value="">Select…</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select>
+          </div>
+          <div class="form-field" style="max-width:none;"><label>Date of Birth</label><input id="profDob" type="date"></div>
+          <div class="form-field" style="max-width:none;"><label>Country</label><input id="profCountry" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>State</label><input id="profState" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>City</label><input id="profCity" type="text"></div>
+          <div class="form-field" style="max-width:none;"><label>Address</label><input id="profAddress" type="text"></div>
+          <button type="submit" class="btn btn-coral">Update Profile</button>
+          <div class="msg" id="profileMsg"></div>
+        </form>
+      </div>
+      <div class="panel" style="max-width:520px;">
+        <h2>Change Password</h2>
+        <form id="passwordForm">
+          <div class="form-field" style="max-width:none;"><label>Current Password</label><input id="pwdCurrent" type="password" required></div>
+          <div class="form-field" style="max-width:none;"><label>New Password</label><input id="pwdNew" type="password" required minlength="8"></div>
+          <button type="submit" class="btn btn-navy">Change Password</button>
+          <div class="msg" id="passwordMsg"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============== NOTIFICATION DRAWER ==============
+     Body-level, for the containing-block reason noted on the bell above. Ids are
+     the ones initNotifications() has always bound. -->
+<div class="mh-notif-backdrop mh-scope" id="notifBackdrop"></div>
+<aside id="notifDropdown" class="mh-notif-drawer mh-scope" role="dialog" aria-modal="false"
+       aria-label="Notifications" aria-hidden="true"></aside>
+
+<!-- ============== MOBILE BOTTOM NAV ==============
+     Phone-only (hidden at >=901px). Every entry drives the same
+     navigateToSection() the account menu does — this adds no new destinations,
+     it just puts the five a merchant needs mid-booking within thumb reach. -->
+<nav class="mh-bottomnav mh-scope" id="mhBottomNav" aria-label="Primary">
+  <button type="button" data-mh-bnav="home" class="active">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+    <span>Home</span>
+  </button>
+  <button type="button" data-mh-bnav="request-history">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
+    <span>Requests</span>
+  </button>
+  <button type="button" data-mh-bnav="payments">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+    <span>Payments</span>
+  </button>
+  <button type="button" data-mh-bnav="live-chat">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+    <span>Support</span>
+  </button>
+  <button type="button" data-mh-bnav="profile">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+    <span>Account</span>
+  </button>
+</nav>
+
+<div class="modal-overlay" id="bookingDetailModalOverlay">
+  <div class="modal-card modal-lg" id="bookingDetailBody"></div>
+</div>
+
+<div class="modal-overlay" id="signOutModalOverlay">
+  <div class="modal-card">
+    <h2>Sign out?</h2>
+    <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:20px;">You'll need to verify your email again next time you sign in.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-coral" id="confirmSignOutBtn">Sign Out</button>
+      <button type="button" class="btn btn-ghost" id="cancelSignOutBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../shared/formatters.js"></script>
+<script src="../components/toast.js"></script>
+<script src="../components/spinner.js"></script>
+<script src="../components/confirm-dialog.js"></script>
+<script src="../assets/js/auth.js?v=20260730a"></script>
+<script src="../assets/js/api.js"></script>
+<script src="../assets/js/partner-shared.js?v=20260730e"></script>
+<!-- Booking UI primitives. travel-locations.js is the static airport/city
+     reference data (no backend lookup exists); the other two are the smart
+     search dropdown and the travel calendar. All three must precede the
+     partner-* screens that call mhAttachAutocomplete / mhAttachDatePicker. -->
+<script src="../assets/js/travel-locations.js?v=20260730b"></script>
+<!-- Generated by scripts/fetch_airline_logos.mjs — the IATA -> logo-file map for
+     the carrier marks vendored under assets/images/airlines/. Must precede
+     mh-visuals.js, which reads AIRLINE_LOGO_FILES / AIRLINE_NAME_TO_IATA. -->
+<script src="../assets/js/airline-logos.js?v=20260730h"></script>
+<!-- Generated by scripts/fetch_hotel_images.py — the slug -> photograph manifest
+     for the real hotel pictures vendored under assets/hotels/. Must precede
+     hotel-image-map.js, which reads HOTEL_IMAGE_FILES / _ALIASES / _BRANDS. -->
+<script src="../assets/js/hotel-images.js?v=20260730j"></script>
+<script src="../assets/js/hotel-image-map.js?v=20260730j"></script>
+<script src="../assets/js/mh-visuals.js?v=20260730i"></script>
+<script src="../assets/js/mh-filters.js?v=20260730f"></script>
+<script src="../assets/js/mh-autocomplete.js?v=20260730e"></script>
+<script src="../assets/js/mh-datepicker.js?v=20260730d"></script>
+<script src="../assets/js/partner-auth.js?v=20260725f"></script>
+<script src="../assets/js/partner-dashboard.js?v=20260730g"></script>
+<script src="../assets/js/partner-home.js?v=20260730j"></script>
+<script src="../assets/js/partner-payments.js?v=20260730g"></script>
+<script src="../assets/js/partner-ticket-enquiry.js?v=20260725f"></script>
+<script src="../assets/js/partner-request-ticket.js?v=20260730j"></script>
+<script src="../assets/js/partner-request-history.js?v=20260730a"></script>
+<script src="../assets/js/partner-service-request.js?v=20260725f"></script>
+<script src="../assets/js/partner-reports.js?v=20260725f"></script>
+<script src="../assets/js/partner-notifications.js?v=20260730e"></script>
+<script src="../assets/js/partner-live-chat.js?v=20260725f"></script>
+<script src="../assets/js/partner-profile.js?v=20260730g"></script>
+<script>
+  'use strict';
+  if (isPartnerLoggedIn()) { showPartnerPortal(); } else { showPartnerAuthShell(); }
+</script>
+</body>
+</html>

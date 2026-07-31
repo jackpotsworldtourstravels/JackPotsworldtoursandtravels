@@ -1,0 +1,802 @@
+/* ==========================================================================
+   OPERATIONS PORTAL (Version 2) — enterprise workspace stylesheet.
+   ==========================================================================
+   For staff who live in this screen for eight to ten hours: ticketing,
+   finance, approvals, support, administration. Every pixel is spent on
+   density and scannability.
+
+   HARD RULES THIS FILE KEEPS (from the V2 brief):
+     - no gradients, no glassmorphism, no backdrop-filter
+     - no hero banners, no photography, no decorative graphics
+     - no animation beyond a 1-frame hover and one spinner
+     - white content surfaces, light-grey chrome, ONE blue for primary action
+     - colour otherwise only ever carries status
+     - system fonts only: nothing to download, so first paint is immediate
+
+   IT IS ALSO DELIBERATELY NOT THE OTHER TWO LOOKS. The Premium portal
+   (assets/css/merchant-home.css et al) is a travel storefront. The Classic
+   merchant portal (merchant-classic/css/classic.css) is a dark-rail SAP-Fiori
+   register. This is a light-rail Odoo/Zoho-style back office: white sidebar,
+   grey shell, 26px table rows, a heavier information density than either.
+
+   Namespaced `ops-` throughout, and the Operations Portal loads no other
+   stylesheet — neither of the other two frontends can restyle it and it
+   cannot restyle them.
+   ========================================================================== */
+
+:root{
+  /* ---- surfaces ---- */
+  --ops-shell:#eef1f5;          /* app background behind the panels */
+  --ops-surface:#ffffff;        /* panels, table body, inputs */
+  --ops-band:#f7f8fa;           /* table head, section strips, toolbars */
+  --ops-band-2:#eceff3;         /* hover / pressed / zebra */
+  --ops-rail:#ffffff;           /* left sidebar — light, unlike Classic */
+  --ops-topbar:#152238;         /* one dark band at the very top */
+
+  /* ---- lines ---- */
+  --ops-line:#dbe0e7;
+  --ops-line-soft:#e8ebef;
+  --ops-line-strong:#b9c1cc;
+
+  /* ---- ink ---- */
+  --ops-ink:#101a28;
+  --ops-ink-soft:#54606f;
+  --ops-ink-faint:#8b94a1;
+  --ops-ink-invert:#eef2f8;
+
+  /* ---- the single accent ---- */
+  --ops-blue:#1a56db;
+  --ops-blue-dark:#123fa8;
+  --ops-blue-soft:#e8effc;
+  --ops-blue-line:#b9cdf6;
+
+  /* ---- status ---- */
+  --ops-ok:#116b3c;      --ops-ok-bg:#e6f4ec;      --ops-ok-line:#b6ddc6;
+  --ops-warn:#8a5300;    --ops-warn-bg:#fdf2e2;    --ops-warn-line:#efd6a8;
+  --ops-err:#a81f16;     --ops-err-bg:#fdebe9;     --ops-err-line:#f0c3bf;
+  --ops-info:#1a56db;    --ops-info-bg:#e8effc;    --ops-info-line:#b9cdf6;
+  --ops-mute-bg:#eceff3; --ops-mute-line:#d8dde4;
+
+  /* ---- metrics ---- */
+  --ops-radius:3px;             /* business software, not cards */
+  --ops-rail-w:212px;
+  --ops-rail-w-collapsed:48px;
+  --ops-top-h:44px;
+  --ops-row-h:28px;             /* compact table row */
+  --ops-ctl-h:28px;             /* compact input/button */
+  --ops-font:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ops-mono:ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+}
+
+/* A density switch, because "compact" for a finance clerk on a 24" monitor and
+   "compact" for an operator on a laptop are not the same number. Set on <html>
+   by the Settings screen; the default is the tighter of the two. */
+html[data-ops-density="relaxed"]{
+  --ops-row-h:34px;
+  --ops-ctl-h:32px;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:var(--ops-font);
+  font-size:12.5px;
+  line-height:1.45;
+  color:var(--ops-ink);
+  background:var(--ops-shell);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--ops-blue);text-decoration:none;}
+a:hover{text-decoration:underline;}
+h1,h2,h3,h4{margin:0;font-weight:600;}
+table{border-collapse:collapse;}
+input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit;}
+
+/* Keyboard-first operation is the entire point of this portal, so focus is
+   never invisible and never removed. */
+:focus-visible{outline:2px solid var(--ops-blue);outline-offset:1px;}
+
+.ops-hidden{display:none !important;}
+.ops-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+.ops-mono{font-family:var(--ops-mono);font-size:11.5px;}
+.ops-num{text-align:right;font-variant-numeric:tabular-nums;}
+.ops-nowrap{white-space:nowrap;}
+.ops-muted{color:var(--ops-ink-faint);}
+.ops-ref{font-family:var(--ops-mono);font-size:11.5px;font-weight:600;letter-spacing:.2px;}
+
+/* ==========================================================================
+   NO AUTH STYLES
+   ==========================================================================
+   The `.ops-auth*` rules that used to live here were deleted with the sign-in
+   screen they styled. This workspace has no login of its own — authentication
+   is the public site's login modal, styled by assets/css/main.css. Nothing
+   here should ever style a login form again; if one is needed, the answer is
+   to send the visitor to the existing one (opsRequireSignIn in
+   js/ops-core.js), not to draw a second.
+   ========================================================================== */
+
+/* ==========================================================================
+   APP FRAME
+   ========================================================================== */
+.ops-app{display:none;min-height:100vh;flex-direction:column;}
+.ops-app.active{display:flex;}
+
+/* ---- top toolbar ---- */
+.ops-top{
+  height:var(--ops-top-h);flex:0 0 auto;
+  background:var(--ops-topbar);color:var(--ops-ink-invert);
+  display:flex;align-items:center;gap:8px;padding:0 8px;
+  position:sticky;top:0;z-index:40;
+}
+.ops-top-brand{
+  font-size:12.5px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
+  padding-right:6px;
+}
+.ops-top-brand b{color:#fff;}
+.ops-top-brand span{color:#8fa2c0;font-weight:400;}
+.ops-icon-btn{
+  height:26px;min-width:26px;padding:0 6px;
+  background:transparent;border:1px solid transparent;border-radius:var(--ops-radius);
+  color:#c8d3e4;cursor:pointer;font-size:13px;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+}
+.ops-icon-btn:hover{background:#243550;color:#fff;}
+.ops-icon-btn.on{background:#243550;color:#fff;border-color:#38507a;}
+
+/* global search — the widest thing in the bar, because it is used constantly */
+.ops-top-search{position:relative;flex:1 1 auto;max-width:640px;}
+.ops-top-search input{
+  width:100%;height:26px;padding:0 8px 0 26px;
+  background:#0d1727;border:1px solid #2c3e5c;border-radius:var(--ops-radius);
+  color:#eef2f8;font-size:12px;
+}
+.ops-top-search input::placeholder{color:#7488a8;}
+.ops-top-search input:focus{border-color:#4f79c4;outline:none;background:#0a131f;}
+.ops-top-search::before{
+  content:"⌕";position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  color:#7488a8;font-size:13px;pointer-events:none;
+}
+.ops-gs{
+  display:none;position:absolute;top:30px;left:0;right:0;z-index:50;
+  background:var(--ops-surface);color:var(--ops-ink);
+  border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);
+  box-shadow:0 6px 16px rgba(16,26,40,.16);
+  max-height:70vh;overflow:auto;
+}
+.ops-gs.open{display:block;}
+.ops-gs-group{
+  padding:4px 9px;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--ops-ink-faint);
+  background:var(--ops-band);border-bottom:1px solid var(--ops-line-soft);
+  position:sticky;top:0;
+}
+.ops-gs a{
+  display:flex;gap:8px;align-items:baseline;padding:5px 9px;
+  border-bottom:1px solid var(--ops-line-soft);color:var(--ops-ink);
+  font-size:12px;text-decoration:none;
+}
+.ops-gs a:last-child{border-bottom:none;}
+.ops-gs a:hover,.ops-gs a.cursor{background:var(--ops-blue-soft);text-decoration:none;}
+.ops-gs a b{font-family:var(--ops-mono);font-size:11.5px;white-space:nowrap;}
+.ops-gs a small{color:var(--ops-ink-faint);font-size:11px;}
+.ops-gs-note{padding:6px 9px;font-size:11px;color:var(--ops-ink-faint);}
+
+.ops-top-right{display:flex;align-items:center;gap:4px;margin-left:auto;}
+.ops-top-user{
+  font-size:11.5px;color:#c8d3e4;padding:0 6px;white-space:nowrap;
+  max-width:210px;overflow:hidden;text-overflow:ellipsis;
+}
+.ops-top-user b{color:#fff;}
+.ops-badge-dot{
+  position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;padding:0 3px;
+  background:#d93a2b;color:#fff;border-radius:8px;font-size:9.5px;font-weight:700;
+  line-height:14px;text-align:center;
+}
+.ops-bell{position:relative;}
+
+/* a dark-on-dark dropdown for the toolbar menus */
+.ops-menu{
+  display:none;position:absolute;right:0;top:32px;z-index:60;min-width:200px;
+  background:var(--ops-surface);color:var(--ops-ink);
+  border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);
+  box-shadow:0 6px 16px rgba(16,26,40,.16);padding:3px;
+}
+.ops-menu.open{display:block;}
+.ops-menu-head{
+  padding:5px 8px;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--ops-ink-faint);
+}
+.ops-menu button,.ops-menu a{
+  display:flex;width:100%;align-items:center;gap:7px;padding:5px 8px;
+  background:none;border:0;border-radius:2px;text-align:left;font-size:12px;
+  color:var(--ops-ink);cursor:pointer;text-decoration:none;
+}
+.ops-menu button:hover,.ops-menu a:hover{background:var(--ops-band-2);text-decoration:none;}
+.ops-menu button.on{background:var(--ops-blue-soft);font-weight:600;}
+.ops-menu-sep{height:1px;background:var(--ops-line-soft);margin:3px 0;}
+.ops-menu-wrap{position:relative;}
+
+/* ---- body: rail + work area ---- */
+.ops-body{display:flex;flex:1 1 auto;min-height:0;}
+
+.ops-rail{
+  flex:0 0 var(--ops-rail-w);width:var(--ops-rail-w);
+  background:var(--ops-rail);border-right:1px solid var(--ops-line);
+  overflow-y:auto;padding:4px 0 20px;
+  position:sticky;top:var(--ops-top-h);align-self:flex-start;
+  max-height:calc(100vh - var(--ops-top-h));
+}
+.ops-rail-group{
+  padding:9px 12px 3px;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--ops-ink-faint);
+}
+.ops-rail a{
+  display:flex;align-items:center;gap:8px;padding:0 12px;
+  height:26px;font-size:12.5px;color:var(--ops-ink-soft);
+  border-left:2px solid transparent;text-decoration:none;white-space:nowrap;
+}
+.ops-rail a:hover{background:var(--ops-band-2);color:var(--ops-ink);text-decoration:none;}
+.ops-rail a.active{
+  background:var(--ops-blue-soft);color:var(--ops-blue-dark);
+  border-left-color:var(--ops-blue);font-weight:600;
+}
+.ops-rail-ico{
+  width:15px;text-align:center;font-size:12px;flex:0 0 15px;
+  color:var(--ops-ink-faint);
+}
+.ops-rail a.active .ops-rail-ico{color:var(--ops-blue);}
+.ops-rail-count{
+  margin-left:auto;background:var(--ops-mute-bg);color:var(--ops-ink-soft);
+  border-radius:8px;padding:0 5px;font-size:10px;font-weight:700;line-height:15px;
+}
+.ops-rail a.active .ops-rail-count{background:#fff;color:var(--ops-blue-dark);}
+
+/* Collapsed rail: icons only. Labels are hidden rather than removed so the
+   accessible name survives. */
+.ops-app.rail-collapsed .ops-rail{flex-basis:var(--ops-rail-w-collapsed);width:var(--ops-rail-w-collapsed);}
+.ops-app.rail-collapsed .ops-rail-group{
+  height:1px;padding:0;margin:6px 8px;overflow:hidden;color:transparent;
+  background:var(--ops-line-soft);
+}
+.ops-app.rail-collapsed .ops-rail a{padding:0 0 0 14px;}
+.ops-app.rail-collapsed .ops-rail-label,
+.ops-app.rail-collapsed .ops-rail-count{display:none;}
+
+.ops-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+
+/* ---- breadcrumb strip ---- */
+.ops-crumb{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;
+  padding:0 12px;height:28px;font-size:11.5px;color:var(--ops-ink-faint);
+  background:var(--ops-band);border-bottom:1px solid var(--ops-line);
+  position:sticky;top:var(--ops-top-h);z-index:20;
+}
+.ops-crumb b{color:var(--ops-ink);font-weight:600;}
+.ops-crumb-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+
+.ops-content{padding:10px 12px 40px;flex:1 1 auto;min-width:0;}
+.ops-section{display:none;}
+.ops-section.active{display:block;}
+
+/* ==========================================================================
+   PAGE FURNITURE
+   ========================================================================== */
+.ops-page-head{
+  display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;
+}
+.ops-page-head h1{font-size:16px;line-height:1.2;}
+.ops-page-head p{margin:3px 0 0;font-size:11.5px;color:var(--ops-ink-soft);max-width:76ch;}
+.ops-page-actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+
+.ops-panel{
+  background:var(--ops-surface);border:1px solid var(--ops-line);
+  border-radius:var(--ops-radius);margin-bottom:10px;
+}
+.ops-panel-head{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:6px 10px;background:var(--ops-band);
+  border-bottom:1px solid var(--ops-line);border-radius:var(--ops-radius) var(--ops-radius) 0 0;
+}
+.ops-panel-head h2{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--ops-ink-soft);}
+.ops-panel-tools{margin-left:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.ops-panel-body{padding:10px;}
+.ops-panel-body.ops-flush{padding:0;}
+.ops-panel-note{
+  padding:6px 10px;background:var(--ops-band);border-top:1px solid var(--ops-line-soft);
+  font-size:11px;color:var(--ops-ink-soft);border-radius:0 0 var(--ops-radius) var(--ops-radius);
+}
+.ops-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px;align-items:start;}
+.ops-cols-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start;}
+
+/* ---- controls waiting on an endpoint -------------------------------------
+   Deliberately quiet: a disabled control with a reason should read as "not
+   yet", not as an error the operator caused. No warning colour, no icon —
+   the muted note carries the whole message. See opsPendingAction in
+   js/ops-core.js for the honesty rules these express. */
+.ops-pending{display:flex;flex-direction:column;gap:3px;align-items:flex-start;}
+.ops-pending-full{grid-column:1/-1;}
+.ops-pending-note{
+  margin:0;font-size:10.5px;line-height:1.45;color:var(--ops-ink-faint);
+  max-width:52ch;
+}
+.ops-pending-block{
+  border:1px dashed var(--ops-line-strong);border-radius:var(--ops-radius);
+  padding:12px;background:var(--ops-band);
+}
+.ops-pending-block p{margin:0 0 3px;font-size:11.5px;color:var(--ops-ink-soft);}
+.ops-pending-block p:last-child{margin-bottom:0;}
+
+/* ---- the merchant dashboard's worklist ----
+   A count, the thing to do, and the way to it. Rows are the same 26px rhythm
+   as a table so the dashboard reads as one grid. */
+.ops-todo{list-style:none;margin:0;padding:0;}
+.ops-todo li{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 10px;border-bottom:1px solid var(--ops-line-soft);
+}
+.ops-todo li:last-child{border-bottom:0;}
+.ops-todo li:hover{background:var(--ops-band);}
+.ops-todo-n{
+  flex:0 0 auto;min-width:22px;padding:1px 5px;text-align:center;
+  background:var(--ops-blue-soft);border:1px solid var(--ops-blue-line);
+  border-radius:3px;color:var(--ops-blue-dark);
+  font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;
+}
+.ops-todo-txt{flex:1 1 auto;min-width:0;font-size:11.5px;color:var(--ops-ink);}
+.ops-todo li .ops-btn{flex:0 0 auto;margin-left:auto;}
+
+/* ---- tabs ---- */
+.ops-tabs{
+  display:flex;gap:1px;border-bottom:1px solid var(--ops-line);
+  margin-bottom:10px;flex-wrap:wrap;
+}
+.ops-tab{
+  padding:5px 11px;background:var(--ops-band);border:1px solid var(--ops-line);
+  border-bottom:none;border-radius:var(--ops-radius) var(--ops-radius) 0 0;
+  font-size:12px;color:var(--ops-ink-soft);cursor:pointer;margin-bottom:-1px;
+}
+.ops-tab:hover{background:var(--ops-band-2);color:var(--ops-ink);}
+.ops-tab.active{
+  background:var(--ops-surface);color:var(--ops-blue-dark);font-weight:600;
+  border-bottom:1px solid var(--ops-surface);
+}
+.ops-tab-count{color:var(--ops-ink-faint);font-weight:400;}
+
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+.ops-btn{
+  height:var(--ops-ctl-h);padding:0 10px;
+  background:var(--ops-surface);border:1px solid var(--ops-line-strong);
+  border-radius:var(--ops-radius);font-size:12px;color:var(--ops-ink);
+  cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;
+}
+.ops-btn:hover:not(:disabled){background:var(--ops-band-2);}
+.ops-btn:disabled{opacity:.5;cursor:not-allowed;}
+.ops-btn-primary{background:var(--ops-blue);border-color:var(--ops-blue);color:#fff;font-weight:600;}
+.ops-btn-primary:hover:not(:disabled){background:var(--ops-blue-dark);border-color:var(--ops-blue-dark);}
+.ops-btn-danger{background:var(--ops-surface);border-color:var(--ops-err-line);color:var(--ops-err);}
+.ops-btn-danger:hover:not(:disabled){background:var(--ops-err-bg);}
+.ops-btn-sm{height:22px;padding:0 7px;font-size:11px;}
+.ops-btn-link{
+  background:none;border:none;color:var(--ops-blue);padding:0 3px;height:auto;
+  text-decoration:underline;
+}
+.ops-btn-link:hover{background:none;color:var(--ops-blue-dark);}
+.ops-btn-group{display:inline-flex;}
+.ops-btn-group .ops-btn{border-radius:0;margin-left:-1px;}
+.ops-btn-group .ops-btn:first-child{border-radius:var(--ops-radius) 0 0 var(--ops-radius);margin-left:0;}
+.ops-btn-group .ops-btn:last-child{border-radius:0 var(--ops-radius) var(--ops-radius) 0;}
+.ops-kbd{
+  font-family:var(--ops-mono);font-size:10px;padding:1px 4px;
+  border:1px solid var(--ops-line-strong);border-bottom-width:2px;
+  border-radius:3px;background:var(--ops-band);color:var(--ops-ink-soft);
+  white-space:nowrap;
+}
+
+/* ==========================================================================
+   FORMS — compact, label-above, tab-ordered
+   ========================================================================== */
+.ops-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px 10px;}
+.ops-form-2{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+.ops-form-wide{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));}
+.ops-field{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.ops-field-full{grid-column:1/-1;}
+.ops-field-2{grid-column:span 2;}
+.ops-field label{
+  font-size:11px;font-weight:600;color:var(--ops-ink-soft);
+  display:flex;align-items:center;gap:3px;
+}
+.ops-req{color:var(--ops-err);}
+.ops-field input,.ops-field select,.ops-field textarea{
+  height:var(--ops-ctl-h);padding:0 6px;
+  background:var(--ops-surface);border:1px solid var(--ops-line-strong);
+  border-radius:var(--ops-radius);font-size:12px;width:100%;min-width:0;
+}
+.ops-field textarea{height:auto;min-height:52px;padding:4px 6px;resize:vertical;line-height:1.4;}
+.ops-field input:focus,.ops-field select:focus,.ops-field textarea:focus{
+  border-color:var(--ops-blue);outline:none;box-shadow:0 0 0 2px var(--ops-blue-soft);
+}
+.ops-field input:disabled,.ops-field select:disabled{background:var(--ops-band);color:var(--ops-ink-faint);}
+.ops-field input[aria-invalid="true"],.ops-field select[aria-invalid="true"]{border-color:var(--ops-err);}
+.ops-field-hint{font-size:10.5px;color:var(--ops-ink-faint);}
+.ops-check{display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;}
+.ops-check input{width:14px;height:14px;margin:0;}
+.ops-form-actions{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  margin-top:10px;padding-top:9px;border-top:1px solid var(--ops-line-soft);
+}
+.ops-form-actions .ops-spacer{margin-left:auto;}
+
+.ops-fieldset{border:1px solid var(--ops-line);border-radius:var(--ops-radius);margin:0 0 10px;padding:0;}
+.ops-fieldset > legend{
+  margin-left:8px;padding:0 5px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.4px;color:var(--ops-ink-soft);
+}
+.ops-fieldset-body{padding:8px 10px 10px;}
+
+/* inline messages */
+.ops-msg{margin:8px 0 0;font-size:11.5px;padding:0;}
+.ops-msg:empty{display:none;}
+.ops-msg-ok,.ops-msg-err,.ops-msg-warn,.ops-msg-info{
+  padding:5px 8px;border-radius:var(--ops-radius);border:1px solid;
+}
+.ops-msg-ok{background:var(--ops-ok-bg);border-color:var(--ops-ok-line);color:var(--ops-ok);}
+.ops-msg-err{background:var(--ops-err-bg);border-color:var(--ops-err-line);color:var(--ops-err);}
+.ops-msg-warn{background:var(--ops-warn-bg);border-color:var(--ops-warn-line);color:var(--ops-warn);}
+.ops-msg-info{background:var(--ops-info-bg);border-color:var(--ops-info-line);color:var(--ops-info);}
+.ops-msg-muted{color:var(--ops-ink-faint);}
+
+/* ==========================================================================
+   KPI TILES — compact, one line of numbers, no chrome
+   ========================================================================== */
+.ops-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:8px;}
+.ops-kpi{
+  background:var(--ops-surface);border:1px solid var(--ops-line);
+  border-radius:var(--ops-radius);padding:7px 9px;min-width:0;
+}
+.ops-kpi.click{cursor:pointer;}
+.ops-kpi.click:hover{border-color:var(--ops-blue-line);background:var(--ops-blue-soft);}
+.ops-kpi-label{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--ops-ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ops-kpi-value{font-size:19px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;}
+.ops-kpi-sub{font-size:10.5px;color:var(--ops-ink-faint);}
+.ops-kpi.warn .ops-kpi-value{color:var(--ops-warn);}
+.ops-kpi.err .ops-kpi-value{color:var(--ops-err);}
+.ops-kpi.ok .ops-kpi-value{color:var(--ops-ok);}
+
+/* ==========================================================================
+   TABLES / GRID
+   ========================================================================== */
+.ops-grid-bar{
+  display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+  padding:5px 8px;background:var(--ops-band);border-bottom:1px solid var(--ops-line);
+}
+.ops-grid-bar .ops-grid-search{position:relative;flex:0 0 auto;}
+.ops-grid-bar .ops-grid-search input{
+  height:var(--ops-ctl-h);width:200px;padding:0 6px;
+  border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);
+  background:var(--ops-surface);font-size:12px;
+}
+.ops-grid-bar select,.ops-grid-bar input[type="date"],.ops-grid-bar input[type="text"],
+.ops-grid-bar input[type="number"]{
+  height:var(--ops-ctl-h);padding:0 5px;border:1px solid var(--ops-line-strong);
+  border-radius:var(--ops-radius);background:var(--ops-surface);font-size:11.5px;max-width:160px;
+}
+.ops-grid-flabel{font-size:11px;color:var(--ops-ink-faint);margin-left:4px;}
+.ops-grid-bar-right{margin-left:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.ops-grid-count{font-size:11px;color:var(--ops-ink-soft);white-space:nowrap;}
+
+.ops-table-wrap{overflow:auto;max-height:none;}
+.ops-table-wrap.tall{max-height:62vh;}
+table.ops-table{width:100%;font-size:12px;}
+.ops-table th,.ops-table td{
+  padding:0 7px;height:var(--ops-row-h);text-align:left;
+  border-bottom:1px solid var(--ops-line-soft);vertical-align:middle;
+}
+.ops-table thead th{
+  position:sticky;top:0;z-index:2;
+  background:var(--ops-band);border-bottom:1px solid var(--ops-line);
+  font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--ops-ink-soft);white-space:nowrap;
+}
+.ops-table thead th.sortable{cursor:pointer;user-select:none;}
+.ops-table thead th.sortable:hover{background:var(--ops-band-2);color:var(--ops-ink);}
+.ops-table thead th .ops-sort{color:var(--ops-blue);font-size:9px;margin-left:2px;}
+.ops-table tbody tr:hover{background:var(--ops-band);}
+.ops-table tbody tr.sel{background:var(--ops-blue-soft);}
+.ops-table tbody tr.click{cursor:pointer;}
+.ops-table td.ops-actions{white-space:nowrap;text-align:right;}
+.ops-table td.ops-actions .ops-btn{margin-left:3px;}
+.ops-table .ops-check-cell{width:26px;padding:0 0 0 7px;}
+.ops-table .ops-check-cell input{width:13px;height:13px;margin:0;vertical-align:middle;}
+.ops-empty{
+  padding:18px 10px;text-align:center;color:var(--ops-ink-faint);
+  font-size:11.5px;height:auto;
+}
+.ops-table td.ops-empty{height:auto;}
+
+.ops-grid-foot{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:5px 8px;background:var(--ops-band);border-top:1px solid var(--ops-line);
+  font-size:11.5px;color:var(--ops-ink-soft);
+}
+.ops-grid-foot .ops-spacer{margin-left:auto;}
+.ops-page-btns{display:inline-flex;gap:3px;align-items:center;}
+
+/* bulk-action bar, only visible with a selection */
+.ops-bulk{
+  display:none;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:5px 8px;background:var(--ops-blue-soft);
+  border-bottom:1px solid var(--ops-blue-line);font-size:11.5px;
+}
+.ops-bulk.on{display:flex;}
+.ops-bulk b{font-variant-numeric:tabular-nums;}
+
+/* column chooser */
+.ops-colmenu{
+  display:none;position:absolute;right:0;top:calc(var(--ops-ctl-h) + 3px);z-index:30;
+  background:var(--ops-surface);border:1px solid var(--ops-line-strong);
+  border-radius:var(--ops-radius);box-shadow:0 6px 16px rgba(16,26,40,.16);
+  padding:5px;min-width:186px;max-height:320px;overflow:auto;
+}
+.ops-colmenu.open{display:block;}
+.ops-colmenu label{
+  display:flex;align-items:center;gap:6px;padding:3px 5px;
+  font-size:11.5px;border-radius:2px;cursor:pointer;
+}
+.ops-colmenu label:hover{background:var(--ops-band-2);}
+.ops-colmenu input{width:13px;height:13px;margin:0;}
+.ops-colmenu-foot{
+  border-top:1px solid var(--ops-line-soft);margin-top:4px;padding-top:4px;
+  display:flex;gap:4px;flex-wrap:wrap;
+}
+/* A column row is its checkbox plus the two order nudges. */
+.ops-colrow{display:flex;align-items:center;gap:4px;}
+.ops-colrow label{flex:1 1 auto;min-width:0;}
+.ops-colmove{flex:0 0 auto;display:flex;gap:1px;}
+.ops-colmove button{
+  width:16px;height:16px;line-height:1;padding:0;font-size:7px;
+  border:1px solid var(--ops-line);background:var(--ops-band);
+  color:var(--ops-ink-soft);border-radius:2px;cursor:pointer;
+}
+.ops-colmove button:hover:not(:disabled){
+  background:var(--ops-blue-soft);border-color:var(--ops-blue-line);color:var(--ops-blue-dark);
+}
+.ops-colmove button:disabled{opacity:.32;cursor:default;}
+
+/* ---- column resize ----
+   The grip sits on the right edge of every header cell, absolutely positioned
+   against the already-sticky th (which is its containing block). Visible only
+   on hover of that cell, so a resting header stays clean. */
+.ops-colgrip{
+  position:absolute;top:0;right:0;width:7px;height:100%;
+  cursor:col-resize;user-select:none;
+  border-right:2px solid transparent;
+}
+.ops-table thead th:hover .ops-colgrip{border-right-color:var(--ops-line-strong);}
+.ops-colgrip:hover{border-right-color:var(--ops-blue) !important;}
+/* While dragging, kill text selection and keep the resize cursor everywhere. */
+body.ops-col-resizing{cursor:col-resize !important;user-select:none !important;}
+/* Applied only once this operator has resized a column in this grid — see
+   the widthKey note in js/ops-grid.js. */
+table.ops-table.ops-table-fixed{table-layout:fixed;}
+table.ops-table.ops-table-fixed td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ==========================================================================
+   TAGS / STATUS
+   ========================================================================== */
+.ops-tag{
+  display:inline-block;padding:0 6px;border-radius:9px;
+  font-size:10.5px;font-weight:600;line-height:16px;white-space:nowrap;
+  background:var(--ops-mute-bg);border:1px solid var(--ops-mute-line);color:var(--ops-ink-soft);
+}
+.ops-tag-ok{background:var(--ops-ok-bg);border-color:var(--ops-ok-line);color:var(--ops-ok);}
+.ops-tag-warn{background:var(--ops-warn-bg);border-color:var(--ops-warn-line);color:var(--ops-warn);}
+.ops-tag-err{background:var(--ops-err-bg);border-color:var(--ops-err-line);color:var(--ops-err);}
+.ops-tag-info{background:var(--ops-info-bg);border-color:var(--ops-info-line);color:var(--ops-info);}
+.ops-tag-sq{border-radius:2px;}
+
+/* ==========================================================================
+   DEFINITION LISTS / DETAIL PANES
+   ========================================================================== */
+dl.ops-dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 12px;margin:0;}
+.ops-dl > div{min-width:0;}
+.ops-dl dt{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--ops-ink-faint);margin:0;
+}
+.ops-dl dd{margin:0;font-size:12px;word-break:break-word;}
+dl.ops-dl-rows{grid-template-columns:1fr;gap:0;}
+.ops-dl-rows > div{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid var(--ops-line-soft);}
+.ops-dl-rows dt{flex:0 0 148px;padding-top:1px;}
+.ops-dl-rows dd{flex:1 1 auto;}
+
+/* status rail in the request drawer */
+.ops-rail-steps{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--ops-line);border-radius:var(--ops-radius);overflow:hidden;}
+.ops-step{
+  flex:1 1 92px;min-width:92px;padding:5px 8px;font-size:10.5px;
+  background:var(--ops-band);border-right:1px solid var(--ops-line);color:var(--ops-ink-faint);
+}
+.ops-step:last-child{border-right:none;}
+.ops-step b{display:block;font-size:11px;color:var(--ops-ink-soft);}
+.ops-step.done{background:var(--ops-ok-bg);color:var(--ops-ok);}
+.ops-step.done b{color:var(--ops-ok);}
+.ops-step.current{background:var(--ops-blue-soft);color:var(--ops-blue-dark);}
+.ops-step.current b{color:var(--ops-blue-dark);}
+.ops-step.bad{background:var(--ops-err-bg);color:var(--ops-err);}
+.ops-step.bad b{color:var(--ops-err);}
+
+.ops-timeline{margin:0;padding:0;list-style:none;}
+.ops-timeline li{
+  padding:4px 0 4px 14px;position:relative;font-size:11.5px;
+  border-bottom:1px solid var(--ops-line-soft);
+}
+.ops-timeline li:last-child{border-bottom:none;}
+.ops-timeline li::before{
+  content:"";position:absolute;left:2px;top:9px;width:6px;height:6px;
+  border-radius:50%;background:var(--ops-line-strong);
+}
+.ops-timeline li.done::before{background:var(--ops-ok);}
+.ops-timeline li.current::before{background:var(--ops-blue);}
+.ops-timeline li b{font-weight:600;}
+.ops-timeline li small{display:block;color:var(--ops-ink-faint);font-size:10.5px;}
+
+/* ==========================================================================
+   MODAL / DRAWER
+   ========================================================================== */
+.ops-modal-back{
+  display:none;position:fixed;inset:0;z-index:80;
+  background:rgba(16,26,40,.42);padding:24px 12px;overflow:auto;
+}
+.ops-modal-back.open{display:block;}
+.ops-modal{
+  background:var(--ops-surface);border-radius:var(--ops-radius);
+  border:1px solid var(--ops-line-strong);box-shadow:0 12px 32px rgba(16,26,40,.28);
+  max-width:660px;margin:0 auto;
+}
+.ops-modal.wide{max-width:940px;}
+.ops-modal-head{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--ops-line);background:var(--ops-band);
+  border-radius:var(--ops-radius) var(--ops-radius) 0 0;
+}
+.ops-modal-head h2{font-size:13px;}
+.ops-modal-close{
+  margin-left:auto;background:none;border:none;font-size:18px;line-height:1;
+  color:var(--ops-ink-faint);cursor:pointer;padding:0 3px;
+}
+.ops-modal-close:hover{color:var(--ops-ink);}
+.ops-modal-body{padding:12px;max-height:72vh;overflow:auto;}
+.ops-modal-foot{
+  display:flex;gap:6px;align-items:center;padding:8px 12px;
+  border-top:1px solid var(--ops-line);background:var(--ops-band);
+  border-radius:0 0 var(--ops-radius) var(--ops-radius);
+}
+.ops-modal-foot .ops-spacer{margin-left:auto;}
+
+.ops-drawer-back{display:none;position:fixed;inset:0;z-index:70;background:rgba(16,26,40,.3);}
+.ops-drawer-back.open{display:block;}
+.ops-drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(400px,94vw);z-index:75;
+  background:var(--ops-surface);border-left:1px solid var(--ops-line-strong);
+  box-shadow:-6px 0 20px rgba(16,26,40,.18);
+  transform:translateX(100%);transition:transform .12s ease-out;
+  display:flex;flex-direction:column;
+}
+.ops-drawer.open{transform:translateX(0);}
+.ops-drawer-head{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--ops-line);background:var(--ops-band);
+}
+.ops-drawer-head h2{font-size:13px;}
+.ops-drawer-list{flex:1 1 auto;overflow:auto;}
+.ops-note{
+  display:block;padding:7px 12px;border-bottom:1px solid var(--ops-line-soft);
+  font-size:11.5px;cursor:pointer;
+}
+.ops-note:hover{background:var(--ops-band);}
+.ops-note.unread{background:var(--ops-blue-soft);}
+.ops-note b{display:block;font-size:12px;}
+.ops-note time{display:block;color:var(--ops-ink-faint);font-size:10.5px;margin-top:1px;}
+
+/* toast — the only transient surface in the portal */
+.ops-toasts{position:fixed;right:12px;bottom:12px;z-index:90;display:flex;flex-direction:column;gap:6px;}
+.ops-toast{
+  min-width:230px;max-width:380px;padding:7px 10px;font-size:12px;
+  background:var(--ops-topbar);color:#eef2f8;border-radius:var(--ops-radius);
+  box-shadow:0 4px 14px rgba(16,26,40,.24);
+}
+.ops-toast.ok{background:#0f5f36;}
+.ops-toast.err{background:#8f1c14;}
+
+/* ==========================================================================
+   CHAT
+   ========================================================================== */
+.ops-chat{display:flex;flex-direction:column;height:min(56vh,460px);}
+.ops-chat-log{flex:1 1 auto;overflow:auto;padding:10px;background:var(--ops-band);}
+.ops-bubble{
+  max-width:74%;margin-bottom:7px;padding:5px 8px;font-size:12px;
+  border:1px solid var(--ops-line);border-radius:var(--ops-radius);background:var(--ops-surface);
+}
+.ops-bubble.out{margin-left:auto;background:var(--ops-blue-soft);border-color:var(--ops-blue-line);}
+.ops-bubble small{display:block;color:var(--ops-ink-faint);font-size:10px;margin-top:2px;}
+.ops-chat-in{display:flex;gap:6px;padding:8px;border-top:1px solid var(--ops-line);}
+.ops-chat-in textarea{
+  flex:1 1 auto;min-height:30px;max-height:96px;padding:5px 6px;font-size:12px;
+  border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);resize:vertical;
+}
+
+/* ==========================================================================
+   SPINNER — the one piece of motion
+   ========================================================================== */
+.ops-spin{
+  display:inline-block;width:11px;height:11px;vertical-align:-1px;
+  border:2px solid var(--ops-line-strong);border-top-color:var(--ops-blue);
+  border-radius:50%;animation:ops-spin .6s linear infinite;
+}
+@keyframes ops-spin{to{transform:rotate(360deg);}}
+
+/* JSON diff in the audit viewer */
+pre.ops-json{
+  margin:0;padding:7px 8px;background:var(--ops-band);border:1px solid var(--ops-line);
+  border-radius:var(--ops-radius);font-family:var(--ops-mono);font-size:11px;
+  max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+}
+
+/* ==========================================================================
+   RESPONSIVE — the rail becomes an overlay; tables keep their own scroller
+   ========================================================================== */
+@media (max-width:900px){
+  .ops-rail{
+    position:fixed;top:var(--ops-top-h);left:0;bottom:0;z-index:45;
+    width:var(--ops-rail-w);flex-basis:auto;max-height:none;
+    transform:translateX(-100%);transition:transform .12s ease-out;
+    box-shadow:2px 0 12px rgba(16,26,40,.18);
+  }
+  .ops-rail.open{transform:translateX(0);}
+  .ops-app.rail-collapsed .ops-rail{width:var(--ops-rail-w);flex-basis:auto;}
+  .ops-app.rail-collapsed .ops-rail-label,
+  .ops-app.rail-collapsed .ops-rail-count{display:revert;}
+  .ops-app.rail-collapsed .ops-rail-group{
+    height:auto;padding:9px 12px 3px;margin:0;color:var(--ops-ink-faint);background:none;
+  }
+  .ops-app.rail-collapsed .ops-rail a{padding:0 12px;}
+  .ops-cols-2{grid-template-columns:minmax(0,1fr);}
+  .ops-top-user{display:none;}
+}
+@media (max-width:620px){
+  .ops-content{padding:8px 8px 40px;}
+  .ops-top-search{max-width:none;}
+  .ops-top-brand span{display:none;}
+  .ops-dl-rows dt{flex-basis:110px;}
+}
+
+/* ==========================================================================
+   PRINT — one grid, nothing else. The section being printed is tagged
+   `ops-printing` by the grid's Print button just before window.print().
+   ========================================================================== */
+@media print{
+  body{background:#fff;font-size:10pt;}
+  .ops-top,.ops-rail,.ops-crumb,.ops-grid-bar,.ops-grid-foot,.ops-bulk,
+  .ops-toasts,.ops-drawer,.ops-drawer-back,.ops-page-actions,.ops-panel-tools,
+  .ops-tabs,.ops-modal-back{display:none !important;}
+  .ops-panel{border:none;margin:0;}
+  .ops-table-wrap{overflow:visible !important;max-height:none !important;}
+  .ops-table thead th{position:static;background:#fff;border-bottom:1px solid #000;}
+  .ops-table td,.ops-table th{padding:2px 4px;height:auto;}
+  .ops-table td.ops-actions,.ops-table th.ops-actions,
+  .ops-table .ops-check-cell,.ops-colgrip{display:none !important;}
+  /* Let paper re-flow the columns: a width dragged to fit a monitor is
+     meaningless at A4, and fixed layout would clip cells instead of wrapping. */
+  table.ops-table.ops-table-fixed{table-layout:auto;}
+  table.ops-table.ops-table-fixed td{overflow:visible;white-space:normal;}
+  /* When a grid asked for print, hide every sibling panel so the page is the
+     table and its caption, not the whole workspace. */
+  .ops-printing .ops-panel:not(.ops-print-target){display:none !important;}
+  .ops-section:not(.active){display:none !important;}
+  .ops-print-head{display:block !important;margin-bottom:8px;font-size:12pt;font-weight:600;}
+}
+.ops-print-head{display:none;}

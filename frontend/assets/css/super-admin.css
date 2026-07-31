@@ -2,14 +2,18 @@
    design system. Everything else (sidebar, topbar, cards, tables, modals,
    badges, forms) is reused as-is for visual consistency across portals. */
 
-.sa-demo-creds{margin-top:20px; padding:14px 16px; background:var(--gold-soft); border:1px dashed var(--gold-line); border-radius:12px;}
-.sa-demo-creds-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gold-dark); margin-bottom:8px;}
-.sa-demo-creds-row{display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:3px 0;}
-.sa-demo-creds-row span{color:var(--text-muted);}
-.sa-demo-creds-row code{font-weight:700; color:var(--text-primary);}
-.sa-demo-creds p{font-size:11.5px; color:var(--text-muted); margin-top:8px; line-height:1.5;}
+/* .main is a flex child of .layout, so it inherits min-width:auto and refuses
+   to shrink below its widest content. The Super Admin tables (the 6-column
+   admin list, the 5-column permission matrix, the 7-column merchant rollup)
+   are all wider than a phone, so that intrinsic width propagated up and
+   scrolled the whole page sideways instead of scrolling the table inside its
+   own .table-wrap. min-width:0 restores the intended behaviour.
 
-.callout-mock{display:flex; align-items:center; gap:8px; background:var(--hover-bg); border:1px dashed var(--border-color); border-radius:10px; padding:10px 14px; font-size:12.5px; color:var(--text-muted); margin-bottom:16px;}
+   Deliberately scoped to this stylesheet rather than fixed in
+   partner-portal.css: that file is shared with the Merchant and Admin
+   portals, which have the same latent issue, and changing it would silently
+   alter two already-signed-off phases. Flagged for a portal-wide fix. */
+.main{min-width:0;}
 
 .sa-profile-photo-row{display:flex; justify-content:center;}
 .sa-profile-photo{width:76px; height:76px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:800;}
@@ -19,3 +23,78 @@
 /* partner-portal.css has no .btn-danger — admin.html defines its own, so
    this mirrors that same color for visual consistency across portals. */
 .btn-danger{background:rgba(214,41,61,0.12); color:var(--coral-dark);}
+
+/* partner-portal.css has no .pagination either (the Merchant Portal's tables
+   are unpaged); this matches admin.css's rule so both staff portals page
+   identically. */
+.pagination{display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:16px; font-size:13px; color:var(--text-muted); flex-wrap:wrap;}
+.pagination button:disabled{opacity:.4; cursor:default;}
+
+/* A stat card whose value is a string, not a count. partner-portal.css's
+   .num is 23px and never wraps, which is right for "4" and wrong for
+   "0029_fix_sequences" — that overflowed its 200px track and pushed the
+   whole page into a horizontal scroll. */
+.stat-body .num.sa-num-text{font-size:14px; line-height:1.35; word-break:break-word;}
+
+/* UserStatus badge modifiers. partner-portal.css only styles the request
+   lifecycle statuses (approved/pending_approval/rejected/...), which don't
+   overlap with an account's active|inactive|blocked|suspended. */
+.badge.active{background:rgba(18,138,94,0.12); color:var(--emerald);}
+.badge.inactive{background:var(--hover-bg); color:var(--text-muted);}
+.badge.suspended, .badge.blocked{background:rgba(214,41,61,0.10); color:var(--coral-dark);}
+
+/* Audit-log operation badges — INSERT/UPDATE/DELETE. */
+.badge.INSERT{background:rgba(18,138,94,0.12); color:var(--emerald);}
+.badge.UPDATE{background:rgba(30,111,168,0.12); color:var(--sky);}
+.badge.DELETE{background:rgba(214,41,61,0.10); color:var(--coral-dark);}
+
+/* ---------- Role & Permission matrix ----------
+   38 permission codes x 4 roles: a wide, dense grid where the useful signal
+   is the tick column, so the permission name is pinned while the roles
+   scroll under it. */
+#saMatrixTable td:first-child, #saMatrixTable th:first-child{position:sticky; left:0; background:var(--card-bg); z-index:1;}
+#saMatrixTable th:not(:first-child), #saMatrixTable td:not(:first-child){text-align:center; width:120px;}
+.sa-perm-code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--text-primary);}
+.sa-tick{color:var(--emerald); font-weight:800;}
+.sa-cross{color:var(--border-color);}
+.sa-matrix-group td{background:var(--hover-bg); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);}
+
+/* ---------- Per-admin extra grants ---------- */
+.sa-perm-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px 16px; margin-bottom:18px;}
+.sa-perm-check{display:flex; align-items:center; gap:8px; font-size:12.5px; padding:5px 0;}
+.sa-perm-check input{width:15px; height:15px; accent-color:var(--navy); flex-shrink:0;}
+.sa-perm-check.is-role-default{color:var(--text-muted);}
+.sa-perm-check.is-role-default small{font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;}
+
+/* ---------- System Configuration ---------- */
+.sa-settings-group{margin-bottom:22px;}
+.sa-settings-group h3{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:10px; font-weight:800;}
+.sa-kv{display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:6px 18px; font-size:13px;}
+.sa-kv dt{color:var(--text-muted);}
+.sa-kv dd{color:var(--text-primary); font-weight:600; margin:0; word-break:break-word;}
+
+/* ---------- Audit entry detail ---------- */
+.sa-audit-diff{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+.sa-audit-diff h4{font-size:11.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:8px;}
+.sa-audit-diff pre{background:var(--hover-bg); border:1px solid var(--border-color); border-radius:10px; padding:12px; font-size:11.5px; line-height:1.6; max-height:340px; overflow:auto; white-space:pre-wrap; word-break:break-word; margin:0;}
+.sa-audit-changed{background:var(--gold-soft); border-radius:4px; padding:0 3px;}
+
+/* A <select> sizes itself to its widest option, and the admin picker's options
+   are "Full Name — email@domain", which is far wider than a phone. */
+#saPermAdminPicker{max-width:100%;}
+
+@media (max-width: 720px){
+  .sa-audit-diff{grid-template-columns:1fr;}
+  .sa-kv{grid-template-columns:1fr; gap:2px 0;}
+  .sa-kv dd{margin-bottom:10px;}
+}
+
+/* Below ~480px the shared two-column stat grid and info grid no longer fit:
+   a .stat-card is a 44px icon plus 22px of padding either side plus its
+   number, which exceeds half of a 375px viewport. Single column instead of
+   overflowing the page. Scoped here rather than in partner-portal.css for
+   the same reason as .main above. */
+@media (max-width: 480px){
+  .stat-grid{grid-template-columns:1fr;}
+  .info-grid{grid-template-columns:1fr;}
+}

@@ -79,6 +79,33 @@ def generate_otp_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
+# The spec's login is password -> OTP -> dashboard. Between those two steps
+# the caller has proved the password but is not yet authenticated, so it
+# carries a short-lived challenge token instead of a session. Signed with the
+# same secret and marked `scope: "otp_challenge"`, so it is rejected by every
+# other dependency — it can only be spent at /api/auth/verify-otp.
+OTP_CHALLENGE_SCOPE = "otp_challenge"
+OTP_CHALLENGE_TTL_MINUTES = 10
+
+
+def create_otp_challenge_token(user_id: int) -> str:
+    delta = datetime.timedelta(minutes=OTP_CHALLENGE_TTL_MINUTES)
+    return _create_token(str(user_id), delta, "challenge", extra_claims={"scope": OTP_CHALLENGE_SCOPE})
+
+
+def decode_otp_challenge_token(token: str) -> int | None:
+    """Returns the user id a challenge token refers to, or None if invalid."""
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "challenge":
+        return None
+    if payload.get("scope") != OTP_CHALLENGE_SCOPE:
+        return None
+    try:
+        return int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def decode_token(token: str) -> dict | None:
     try:
         return jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])

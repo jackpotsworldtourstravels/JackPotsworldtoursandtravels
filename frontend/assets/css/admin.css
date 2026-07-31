@@ -3,6 +3,9 @@
   --navy:#0B3C6D; --navy-2:#0F4A85; --navy-3:#155A9E;
   --coral:#FF6B35; --coral-dark:#E85A2A; --coral-hover:#FFEFE8;
   --bg:#F5F7FA; --white:#FFFFFF; --sky:#1E88E5; --emerald:#12B76A; --gold:#FFB020;
+  /* --gold is a fill colour; at 13px on white it fails contrast, so text that
+     needs the same "attention, not error" tone uses this darker pair. */
+  --gold-dark:#8A5A00;
   --ink:#0B3C6D; --muted:#5B6B82; --line:rgba(11,60,109,0.10);
   --shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18); --shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
   --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
@@ -15,6 +18,8 @@
 :root[data-theme="dark"]{
   --page-bg:#0B1220; --card-bg:#131B2E; --text-primary:#E7ECF5; --text-muted:#93A2BE;
   --border-color:rgba(255,255,255,0.08); --hover-bg:rgba(255,255,255,0.05);
+  /* Inverted for dark: the light-mode brown reads as dirt on a dark card. */
+  --gold-dark:#F0B429;
   --shadow-sm:0 8px 24px -12px rgba(0,0,0,0.5); --shadow-lg:0 30px 70px -20px rgba(0,0,0,0.65);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
@@ -34,7 +39,14 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   transition:width .25s ease, transform .25s ease;
 }
 .sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
-.main{flex:1; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
+/* min-width:0 is load-bearing, not tidying. `.main` is a flex item, and a flex
+   item defaults to min-width:auto — it refuses to shrink below its content's
+   min-content width. A wide table therefore pushes `.main` past the viewport
+   and the whole page scrolls sideways, even though `.table-wrap` has
+   overflow-x:auto and would have scrolled the table by itself. With this, the
+   table scrolls inside its own box and the page does not. Measured at 768px:
+   Merchant Management was 830px wide against a 768px viewport before this. */
+.main{flex:1; min-width:0; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
 .layout.collapsed .sidebar{width:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .main{margin-left:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .nav-item span.nav-label, .layout.collapsed .brand-text, .layout.collapsed .sidebar-collapse-btn span{display:none;}
@@ -56,6 +68,8 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 .nav-item.active::before{content:''; position:absolute; left:-12px; top:8px; bottom:8px; width:3px; border-radius:3px; background:var(--coral);}
 .nav-item .icon{opacity:.85;}
 .nav-item.active .icon{opacity:1; color:var(--coral);}
+.nav-badge{margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--coral); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center;}
+.layout.collapsed .nav-badge{display:none;}
 .sidebar .spacer{flex:1;}
 .sidebar .nav-item.logout{color:#ffb4b4; margin-top:4px;}
 .sidebar .nav-item.logout:hover{background:rgba(255,77,77,0.14); color:#fff;}
@@ -159,6 +173,33 @@ tbody tr:hover{background:var(--hover-bg);}
   width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border-color); font-size:13.5px; color:var(--text-primary); background:var(--card-bg);
 }
 .form-field input:focus, .form-field select:focus, .form-field textarea:focus{outline:none; border-color:var(--coral);}
+
+/* ---------- Auth shell (2026-07-29) ----------
+   Same pattern as the Merchant/Super Admin portals (partner-portal.css), adapted to Admin's
+   own --navy/--gold/--card-bg tokens so the three portals share one visual language without
+   sharing a stylesheet. Used by the new embedded Login -> Password -> OTP shell in admin.html. */
+.partner-auth-shell{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:radial-gradient(1200px 700px at 15% -10%, var(--navy-2) 0%, transparent 60%), linear-gradient(165deg, #071B33 0%, var(--navy) 60%, var(--navy-2) 100%);}
+.partner-auth-card{width:100%; max-width:420px; background:var(--card-bg); border-radius:20px; box-shadow:var(--shadow-lg); padding:38px 36px; border-top:3px solid var(--gold);}
+.partner-auth-brand{text-align:center; margin-bottom:22px;}
+.partner-auth-brand img{height:42px; width:auto; margin-bottom:8px;}
+.pab-sub{font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--gold);}
+.auth-stepper{display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:28px;}
+.auth-step-dot{width:26px; height:26px; border-radius:50%; background:var(--hover-bg); color:var(--text-muted); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; transition:background .2s ease, color .2s ease;}
+.auth-step-dot.active, .auth-step-dot.done{background:var(--navy); color:#fff;}
+.auth-step-line{width:28px; height:2px; background:var(--border-color);}
+.auth-step{display:none;}
+.auth-step.active{display:block; animation:fadeUp .28s ease;}
+.auth-step h1{font-size:20px; margin-bottom:6px; text-align:center;}
+.auth-step-sub{font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:22px;}
+.otp-input{letter-spacing:.5em; text-align:center; font-size:20px; font-weight:800;}
+.auth-forgot-row{text-align:right; margin:-10px 0 18px;}
+.auth-forgot-row a{font-size:12.5px; font-weight:700; color:var(--coral);}
+.partner-auth-footer{text-align:center; margin-top:22px;}
+.partner-auth-footer a{font-size:12.5px; color:var(--text-muted); font-weight:600;}
+.partner-auth-card .btn{margin-bottom:10px; width:100%;}
+.partner-auth-card .msg{text-align:center;}
+@keyframes fadeUp{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
 
 .status-select{padding:6px 8px; border-radius:8px; border:1.5px solid var(--border-color); font-size:12.5px; background:var(--card-bg); color:var(--text-primary);}
 .msg{margin-top:12px; font-size:13px; font-weight:600;}
@@ -448,6 +489,13 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .drawer-section-title:first-child{margin-top:0;}
 @media (max-width:640px){ .drawer-panel{width:100%;} }
 
+/* Support Management / Live Chat conversation */
+.chat-msg{max-width:82%; margin-bottom:14px; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.45;}
+.chat-msg-in{background:var(--card-bg); border:1px solid var(--border-color); margin-right:auto; border-bottom-left-radius:3px;}
+.chat-msg-out{background:var(--coral); color:#fff; margin-left:auto; border-bottom-right-radius:3px;}
+.chat-msg-meta{font-size:11px; opacity:.7; margin-bottom:3px;}
+.chat-msg-body{white-space:pre-wrap; word-break:break-word;}
+
 @media print{
   body:not(.printing-section) > *:not(.modal-overlay):not(.drawer-overlay){display:none !important;}
   .modal-overlay{position:static !important; background:none !important; display:block !important; padding:0 !important;}
@@ -501,4 +549,50 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .stat-grid{grid-template-columns:1fr 1fr;}
   .panel{padding:18px;}
   .topbar h1{font-size:18px;}
+}
+
+/* ---------- Ticket Enquiries (Phase 2) ----------
+   Built from the tokens already defined above so the screen inherits light/dark
+   automatically; nothing here hard-codes a colour that isn't a variable. */
+.panel-sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+/* Secondary line inside a table cell — merchant contact under the company,
+   flight under the route, reviewer under the status badge. */
+.cell-sub{font-size:11.5px; font-weight:600; color:var(--text-muted); margin-top:2px;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700;}
+
+.msg.warn{color:var(--gold-dark);}
+.msg.info{color:var(--text-muted);}
+
+/* A stat card that navigates. Keyboard-reachable, so it also needs a focus ring
+   the mouse path never shows. */
+.stat-card-link{cursor:pointer;}
+.stat-card-link:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+
+/* Enquiry detail — label/value pairs, two across on desktop and one on mobile. */
+.detail-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:10px 18px; margin:16px 0 4px;
+}
+.detail-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.detail-label{font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.detail-value{font-size:13.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.detail-note{
+  margin-top:14px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px solid var(--border-color);
+}
+.detail-note strong{font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
+.detail-note p{margin:4px 0 0; font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.modal-sub{margin:-8px 0 4px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+.enq-claim{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:16px 0 4px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px dashed var(--border-color);
+}
+
+@media (max-width:640px){
+  .detail-grid{grid-template-columns:1fr;}
 }

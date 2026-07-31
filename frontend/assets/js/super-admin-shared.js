@@ -15,11 +15,48 @@ const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http:
 function saEscapeHtml(str) { return escapeHtml(str); }
 function saFmtDate(s) { return fmtDate(s); }
 
+/* ---------- Small shared render helpers ----------
+   Prev/Next pager, mirroring admin.js::renderPagination so both staff portals
+   page through their tables the same way. */
+const SA_PAGE_SIZE = 10;
+function saRenderPagination(containerId, page, totalPages, total, onChange) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!total) { container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <span>Page ${page} of ${totalPages} (${total} total)</span>
+    <button type="button" class="btn btn-ghost btn-sm" data-page-prev ${page <= 1 ? 'disabled' : ''}>&larr; Prev</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-page-next ${page >= totalPages ? 'disabled' : ''}>Next &rarr;</button>
+  `;
+  container.querySelector('[data-page-prev]').addEventListener('click', () => onChange(page - 1));
+  container.querySelector('[data-page-next]').addEventListener('click', () => onChange(page + 1));
+}
+
+/* UserStatus is active|inactive|blocked|suspended (models_v2.py). The badge
+   modifier classes live in super-admin.css. */
+function saStatusBadge(status) {
+  const label = String(status || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `<span class="badge ${saEscapeHtml(status)}">${saEscapeHtml(label)}</span>`;
+}
+
+/* One place to turn an axios failure into a human sentence. The 401 case is
+   already handled by the interceptor below (refresh, then sign-out), so this
+   only ever describes the errors a Super Admin can actually act on. */
+function saErrorText(err, fallback) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail[0]?.msg || fallback;
+  return detail || fallback;
+}
+function saTableError(tbody, colspan, message) {
+  tbody.innerHTML = `<tr><td colspan="${colspan}" class="empty-state">${saEscapeHtml(message)}</td></tr>`;
+}
+
 axios.interceptors.response.use(
   res => res,
-  err => {
-    const url = err.config?.url || '';
-    if (err.response?.status === 401 && url.includes('/api/super-admin')) {
+  async err => {
+    if (err.response?.status === 401) {
+      const retried = await handlePortalUnauthorized('super_admin', err);
+      if (retried) return retried;
       clearSuperAdminSession();
       showSuperAdminAuthShell();
     }
@@ -40,7 +77,15 @@ function showSuperAdminPortal() {
   saNavigateToSection('dashboard');
 }
 
-const saSectionTitles = { dashboard: 'Dashboard', admin: 'Admin Management', profile: 'Profile' };
+const saSectionTitles = {
+  dashboard: 'Dashboard',
+  admin: 'Admin Management',
+  roles: 'Role & Permission Management',
+  reports: 'Global Reports & Analytics',
+  audit: 'Audit Logs',
+  settings: 'System Configuration',
+  profile: 'Profile & Security',
+};
 const saLoadedSections = new Set();
 function saNavigateToSection(name) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
@@ -53,7 +98,15 @@ function saNavigateToSection(name) {
   }
 }
 function saLoadSection(name) {
-  const loaders = { dashboard: () => loadSaDashboard(), admin: () => loadSaAdmins(), profile: () => loadSaProfile() };
+  const loaders = {
+    dashboard: () => loadSaDashboard(),
+    admin: () => loadSaAdmins(),
+    roles: () => loadSaPermissions(),
+    reports: () => loadSaReports(),
+    audit: () => loadSaAuditLogs(),
+    settings: () => loadSaSettings(),
+    profile: () => loadSaProfile(),
+  };
   return loaders[name]?.();
 }
 document.querySelectorAll('.nav-item[data-section]').forEach(link => {
@@ -76,8 +129,7 @@ document.getElementById('saSignOutBtn').addEventListener('click', e => {
 });
 document.getElementById('saCancelSignOutBtn').addEventListener('click', () => saSignOutModalOverlay.classList.remove('open'));
 document.getElementById('saConfirmSignOutBtn').addEventListener('click', async () => {
-  try { await axios.post(`${API_BASE}/api/super-admin/auth/logout`, {}, { headers: saAuthHeaders() }); } catch (err) { /* ignore */ }
-  clearSuperAdminSession();
+  await logoutPortalSession('super_admin');
   saLoadedSections.clear();
   saSignOutModalOverlay.classList.remove('open');
   showSuperAdminAuthShell();
