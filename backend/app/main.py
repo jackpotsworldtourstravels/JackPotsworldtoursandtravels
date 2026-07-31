@@ -23,6 +23,7 @@ from app.routers import (
     enquiries,
     finance,
     manager,
+    merchant_approvals,
     merchant_team,
     merchants,
     notifications_v2,
@@ -124,6 +125,10 @@ app.include_router(finance.router)
 # Booking Operations queue. Its own router because its permission codes are its
 # own: an Admin holds none of them.
 app.include_router(manager.router)
+# CR-3 — the merchant's own approval desk, which replaces the platform Manager
+# as the approver. Same service underneath, scoped to the caller's merchant;
+# its own permission codes so a merchant can never address the platform queue.
+app.include_router(merchant_approvals.router)
 
 
 @app.on_event("startup")

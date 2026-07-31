@@ -67,17 +67,70 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-def _assert_manager_surface(actor: User) -> None:
-    """Refuse anyone who is not platform staff.
+def is_merchant_approver(actor: User) -> bool:
+    """True for a merchant's own approver (CR-3).
 
-    The permission codes on the router decide *which* staff; this is the same
-    belt-and-braces the operations desk uses, so an internal caller cannot get
-    a merchant into this module by not being an HTTP request.
+    Deliberately not "has the code": this answers *whose* bookings the actor
+    may see, which is a property of being merchant-bound. The codes decide
+    which actions they may take once scoped.
     """
-    if not actor.is_platform_staff:
+    return not actor.is_platform_staff and actor.merchant_id is not None
+
+
+def _assert_approver_surface(actor: User) -> None:
+    """Refuse anyone who is neither platform staff nor a merchant approver.
+
+    CR-3 moved the sign-off to the merchant that raised the booking, so this
+    module now serves two kinds of actor. It stays belt-and-braces for both:
+    the router's permission codes decide *which* actor, this decides that the
+    actor is one of the two kinds at all, so an internal caller cannot get an
+    unscoped user into this module by not being an HTTP request.
+
+    A merchant actor is additionally confined to its own merchant by
+    :func:`_scope_for` and :func:`_assert_own_merchant` — holding the code is
+    never enough to see another merchant's booking.
+    """
+    if actor.is_platform_staff or is_merchant_approver(actor):
+        return
+    raise HTTPException(
+        status_code=http_status.HTTP_403_FORBIDDEN,
+        detail="Booking approval is restricted to platform staff and merchant approvers",
+    )
+
+
+def _assert_own_merchant(actor: User, booking: ServiceRequest) -> None:
+    """A merchant approver may only touch its own merchant's bookings.
+
+    The single most important guard in CR-3. Platform staff are unaffected —
+    ``is_platform_staff`` is what the cross-tenant rules key on everywhere else.
+    """
+    if not is_merchant_approver(actor):
+        return
+    if booking.merchant_id != actor.merchant_id:
+        # 404 rather than 403: confirming the booking exists would leak another
+        # merchant's request numbers to anyone willing to enumerate them.
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Booking request not found"
+        )
+
+
+def _assert_not_self_approval(actor: User, booking: ServiceRequest) -> None:
+    """A merchant approver may not decide a booking they raised themselves.
+
+    The manager sub-role holds ``ticket.request``, so the same person can raise
+    and — without this — sign off the same booking, which makes the step
+    decorative for exactly the people most likely to use it. Platform staff
+    never raise bookings, so this does not apply to them.
+    """
+    if not is_merchant_approver(actor):
+        return
+    if booking.user_id == actor.user_id:
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Manager approval is restricted to platform staff",
+            detail=(
+                f"{booking.request_number} was raised by you. Another approver at "
+                "your organisation must decide it."
+            ),
         )
 
 
@@ -243,7 +296,7 @@ def list_queue(
     status. They compose, so ``bucket=awaiting&status=in_review`` is "claimed,
     of the ones waiting on me".
     """
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
 
     statuses = BUCKETS.get(bucket) if bucket else None
     if bucket and statuses is None:
@@ -253,6 +306,12 @@ def list_queue(
         )
 
     conditions = [_classic_bookings_filter()]
+    # CR-3 — a merchant approver sees only its own merchant, and the caller
+    # does not get a say. Applied before the optional `merchant_id` filter
+    # below so that passing someone else's id narrows to nothing rather than
+    # widening: two conditions, both ANDed, and the actor's own always wins.
+    if is_merchant_approver(actor):
+        conditions.append(ServiceRequest.merchant_id == actor.merchant_id)
     if status is not None:
         if statuses is not None and status not in statuses:
             # Contradictory filters would silently return nothing, which reads
@@ -311,10 +370,15 @@ def list_queue(
 
 def queue_counts(db: Session, actor: User) -> dict[str, int]:
     """Tab badges for the Manager's queue, in one grouped query."""
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
+    scope = [_classic_bookings_filter(), ServiceRequest.status.in_(QUEUE_STATUSES)]
+    # Same scoping rule as list_queue, or a merchant approver's badges would
+    # count every merchant's work while the list below showed only its own.
+    if is_merchant_approver(actor):
+        scope.append(ServiceRequest.merchant_id == actor.merchant_id)
     rows = db.execute(
         select(ServiceRequest.status, func.count())
-        .where(and_(_classic_bookings_filter(), ServiceRequest.status.in_(QUEUE_STATUSES)))
+        .where(and_(*scope))
         .group_by(ServiceRequest.status)
     ).all()
     counts = {s.value: 0 for s in QUEUE_STATUSES}
@@ -328,7 +392,7 @@ def queue_counts(db: Session, actor: User) -> dict[str, int]:
 
 def get_booking(db: Session, actor: User, request_id: int) -> ServiceRequest:
     """One Booking Request, for the Manager's read-only review screen."""
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
     booking = db.scalars(
         select(ServiceRequest)
         .options(
@@ -342,6 +406,7 @@ def get_booking(db: Session, actor: User, request_id: int) -> ServiceRequest:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND, detail="Booking request not found"
         )
+    _assert_own_merchant(actor, booking)
     _assert_classic(booking)
     return booking
 
@@ -355,8 +420,9 @@ def start_review(db: Session, actor: User, request_id: int) -> ServiceRequest:
     Re-claiming your own booking is a no-op rather than an error — a manager
     who reopens the screen should not be punished for it.
     """
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
     booking = _locked(db, request_id)
+    _assert_own_merchant(actor, booking)
     _assert_classic(booking)
 
     if booking.status is S.IN_REVIEW:
@@ -407,9 +473,11 @@ def approve(
     Manager Approved simply has no payment edge — so this cannot drift back
     into a billing path by accident.
     """
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
     booking = _locked(db, request_id)
+    _assert_own_merchant(actor, booking)
     _assert_classic(booking)
+    _assert_not_self_approval(actor, booking)
     _guard_claim(booking, actor)
 
     if booking.status not in PENDING_STATUSES:
@@ -467,7 +535,7 @@ def return_for_correction(
     ``lifecycle`` requires the reason on that edge, so a booking can never come
     back with nothing to act on.
     """
-    _assert_manager_surface(actor)
+    _assert_approver_surface(actor)
     remarks = (remarks or "").strip()
     if not remarks:
         raise HTTPException(
@@ -476,7 +544,9 @@ def return_for_correction(
         )
 
     booking = _locked(db, request_id)
+    _assert_own_merchant(actor, booking)
     _assert_classic(booking)
+    _assert_not_self_approval(actor, booking)
     _guard_claim(booking, actor)
 
     if booking.status not in PENDING_STATUSES:

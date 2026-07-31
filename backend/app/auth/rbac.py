@@ -73,6 +73,17 @@ class P:
     BOOKING_MANAGER_APPROVE = "booking.manager_approve"
     BOOKING_MANAGER_RETURN = "booking.manager_return"
 
+    # The merchant's own sign-off on a Booking Request its staff raised (CR-3).
+    #
+    # WHY THESE ARE NOT THE TWO CODES ABOVE
+    # Those are held only by platform staff, and
+    # ``manager_service._assert_approver_surface`` refuses a merchant actor
+    # holding them outright. Reusing them would let a merchant reach the
+    # platform queue and decide *other* merchants' bookings — the scoping is
+    # what makes these a different permission, not the verb.
+    BOOKING_MERCHANT_APPROVE = "booking.merchant_approve"
+    BOOKING_MERCHANT_RETURN = "booking.merchant_return"
+
     # Service requests (date change, cancellation, refund, ancillaries)
     SERVICE_REQUEST_CREATE = "servicerequest.create"
     SERVICE_REQUEST_MANAGE = "servicerequest.manage"
@@ -163,6 +174,11 @@ _MERCHANT_ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
     P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
     P.SERVICE_REQUEST_CREATE,
+    # CR-3 — approves its own merchant's booking requests. Held here as well as
+    # by MerchantRole.MANAGER on purpose: every merchant has a Merchant Admin by
+    # construction, but not every merchant has a manager sub-role, and a single
+    # manager being away must not stop the merchant submitting work.
+    P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
     P.PAYMENT_PAY, P.PAYMENT_VIEW,
     P.REPORT_VIEW, P.REPORT_EXPORT,
     P.CHAT_CREATE, P.CHAT_VIEW,
@@ -215,6 +231,8 @@ MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
         P.PAYMENT_PAY, P.PAYMENT_VIEW,
         P.REPORT_VIEW, P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
+        # CR-3 — this sub-role is the approver for its own merchant.
+        P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
     }),
     MerchantRole.SUPERVISOR: frozenset({
         P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,

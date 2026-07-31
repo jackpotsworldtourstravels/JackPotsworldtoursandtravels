@@ -54,10 +54,20 @@ class Transition:
     """One edge of the state machine."""
 
     to: S
-    permission: str
+    #: The code required to walk this edge, or a tuple of codes of which the
+    #: actor needs **any one**. A tuple is for an edge that two different kinds
+    #: of actor may legitimately walk — CR-3's approval, which either the
+    #: merchant's own approver or a platform Manager can take. It is deliberately
+    #: any-of and not all-of: no actor holds both sets, and requiring both would
+    #: close the edge to everyone.
+    permission: str | tuple[str, ...]
     label: str
     #: Free-text reason required (rejections must say why).
     requires_reason: bool = False
+
+    @property
+    def codes(self) -> tuple[str, ...]:
+        return (self.permission,) if isinstance(self.permission, str) else self.permission
 
 
 #: Allowed edges, keyed by current status. Anything not listed is refused.
@@ -112,25 +122,36 @@ TRANSITIONS: dict[S, tuple[Transition, ...]] = {
 #: booking comes back editable, keeps its passengers, its enquiry link and its
 #: whole history, and can be resubmitted. The remark rides on the transition's
 #: ``reason``, which the timeline already renders.
+#: Who may sign off a Classic Tours booking. The merchant's own approver (CR-3)
+#: is listed first because it is the one that actually does it now; the platform
+#: Manager (CR-2) is kept so the earlier workflow still walks the same edges and
+#: can be reinstated without touching the state machine.
+_APPROVER: tuple[str, ...] = (P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MANAGER_APPROVE)
+_RETURNER: tuple[str, ...] = (P.BOOKING_MERCHANT_RETURN, P.BOOKING_MANAGER_RETURN)
+
 CLASSIC_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.DRAFT: (
         Transition(S.PENDING_APPROVAL, P.TICKET_REQUEST, "Submitted for approval"),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
+    # CR-3 moved this sign-off to the merchant that raised the booking, so both
+    # approver codes open these edges. The *scope* — which bookings each actor
+    # may reach — is enforced in ``manager_service``, not here: this table says
+    # "may this actor walk this edge at all", never "whose booking is it".
     S.PENDING_APPROVAL: (
-        Transition(S.IN_REVIEW, P.BOOKING_MANAGER_APPROVE, "Taken under manager review"),
-        Transition(S.APPROVED, P.BOOKING_MANAGER_APPROVE, "Approved by manager"),
+        Transition(S.IN_REVIEW, _APPROVER, "Taken under review"),
+        Transition(S.APPROVED, _APPROVER, "Approved"),
         Transition(
-            S.DRAFT, P.BOOKING_MANAGER_RETURN,
-            "Returned to merchant for correction", requires_reason=True,
+            S.DRAFT, _RETURNER,
+            "Returned for correction", requires_reason=True,
         ),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
     S.IN_REVIEW: (
-        Transition(S.APPROVED, P.BOOKING_MANAGER_APPROVE, "Approved by manager"),
+        Transition(S.APPROVED, _APPROVER, "Approved"),
         Transition(
-            S.DRAFT, P.BOOKING_MANAGER_RETURN,
-            "Returned to merchant for correction", requires_reason=True,
+            S.DRAFT, _RETURNER,
+            "Returned for correction", requires_reason=True,
         ),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
@@ -296,7 +317,8 @@ def _now() -> datetime.datetime:
 def allowed_transitions(request: ServiceRequest, actor: User) -> list[Transition]:
     """Edges the actor may currently walk — drives the UI's action buttons."""
     return [
-        t for t in _table(request).get(request.status, ()) if has_permission(actor, t.permission)
+        t for t in _table(request).get(request.status, ())
+        if any(has_permission(actor, code) for code in t.codes)
     ]
 
 
@@ -348,10 +370,10 @@ def transition(
     """
     edge = _find(request, target, settlement=settlement)
 
-    if not has_permission(actor, edge.permission):
+    if not any(has_permission(actor, code) for code in edge.codes):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail=f"Missing required permission: {edge.permission}",
+            detail="Missing required permission: " + " or ".join(edge.codes),
         )
     if edge.requires_reason and not (reason or "").strip():
         raise HTTPException(
