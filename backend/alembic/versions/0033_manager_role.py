@@ -19,11 +19,27 @@ created through the ordinary user-creation path. ``users.merchant_role`` stays
 NULL for a Manager, which the existing ``ck_users_merchant_role_scope``
 constraint already requires of every non-merchant role.
 
-WHY THE VALUE IS ADDED IN ITS OWN MIGRATION STEP
+WHY THE VALUE IS ADDED IN ITS OWN MIGRATION STEP, IN AN AUTOCOMMIT BLOCK
 ``ALTER TYPE ... ADD VALUE`` is transactional on PostgreSQL 12+, but the new
 label cannot be *used* by the same transaction that adds it. Nothing here writes
 a 'manager' row for exactly that reason — see migration 0025, which added
 request-status values the same way.
+
+Splitting the label and its first use across two migrations is **not** enough on
+its own. ``alembic/env.py`` wraps the whole upgrade run in one transaction
+(``with context.begin_transaction(): context.run_migrations()``), so a run that
+applies 0033 and 0034 together leaves the label uncommitted when 0034 names it,
+and PostgreSQL rejects it::
+
+    (psycopg2.errors.UnsafeNewEnumValueUsage) unsafe use of new value "manager"
+    of enum type user_role_enum
+    HINT:  New enum values must be committed before they can be used.
+
+0025 never hit this only because its label and its first use happened to be
+applied in different deploys. ``autocommit_block()`` makes the guarantee real
+instead of incidental: it commits the pending transaction and runs the
+``ALTER TYPE`` outside it, so the label is durable before any later migration
+refers to it — regardless of how many migrations one run applies.
 """
 from typing import Sequence, Union
 
@@ -36,7 +52,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS 'manager'")
+    with op.get_context().autocommit_block():
+        op.execute("ALTER TYPE user_role_enum ADD VALUE IF NOT EXISTS 'manager'")
 
 
 def downgrade() -> None:

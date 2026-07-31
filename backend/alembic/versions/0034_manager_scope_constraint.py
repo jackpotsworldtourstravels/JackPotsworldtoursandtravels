@@ -14,8 +14,10 @@ so adding 'manager' to ``user_role_enum`` was not enough — every Manager inser
 failed the constraint, because a Manager has no merchant and 'manager' was in
 neither list. Rewriting the constraint has to compare against the literal
 'manager', which PostgreSQL must cast to ``user_role_enum``, and **a new enum
-label cannot be used by the transaction that added it**. 0033 adds the label and
-commits; this migration, in its own transaction, can finally name it.
+label cannot be used by the transaction that added it**. 0033 adds the label
+inside an ``autocommit_block()`` so it is committed before this migration runs —
+being a separate revision is not by itself enough, because ``env.py`` runs the
+whole upgrade in a single transaction. See 0033 for the failure this caused.
 
 The rule itself is unchanged in spirit: a merchant's staff must have a merchant,
 and platform staff must not. Manager joins the second group.
