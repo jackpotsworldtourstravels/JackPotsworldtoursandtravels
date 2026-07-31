@@ -81,10 +81,15 @@ instance is replaced and its IP changes.
 
 ## Step 2 — RDS Postgres
 
-RDS → **Create database** → **Standard create**.
+RDS → **Create database** → engine **PostgreSQL** → creation method
+**Full configuration**.
 
-Standard, not **Easy create**: Easy create hides the network settings and
-defaults public access on.
+Recent consoles label this pair *Full configuration* / *Easy create*; older ones
+say *Standard create* / *Easy create*. Either way, take the left-hand one.
+**Easy create does not offer "Initial database name"**, so it produces a
+Postgres server with no database on it — and it hides the public-access and
+security-group settings as well. The omission is invisible until the app boots
+and Alembic fails against a database that was never created.
 
 **Engine:** PostgreSQL, version 17 (or 18 if your region offers it).
 
