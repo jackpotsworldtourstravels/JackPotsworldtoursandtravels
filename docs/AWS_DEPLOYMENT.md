@@ -308,6 +308,13 @@ upload leaves a part that is billed and never cleaned up.
 Then IAM → **Roles** → **Create role** → **AWS service** → **EC2** → attach
 `jackpotsworld-documents-rw` → name it `jackpotsworld-ec2-role`.
 
+> **Confirm the policy actually attached.** Open the finished role and check
+> that **Permissions policies** reads `(1)`, not `(0)`. Ticking the policy in
+> the create-role wizard is easy to miss, and a role with no policy still
+> creates, still attaches to the instance, and still reports its own name from
+> instance metadata — everything looks correct right up until the first upload
+> returns AccessDenied. Step 5's verification catches it if you skip this.
+
 ---
 
 ## Step 5 — The EC2 instance
@@ -345,6 +352,61 @@ usermod -aG docker ec2-user
 Launch. Then give it a fixed address — EC2 → **Elastic IPs** → **Allocate**,
 then **Associate** it with the instance. Without this the public IP changes on
 every stop/start and your DNS silently points at nothing.
+
+### Verify the instance before going further
+
+Everything from Steps 1–5 can be proved now, in about a minute, while there is
+still only one thing it could be. Each of these failures is much harder to
+diagnose after Step 8, when a broken deploy has a dozen candidate causes.
+
+```bash
+ssh -i ~/.ssh/jackpotsworld-key.pem ec2-user@YOUR_ELASTIC_IP
+```
+
+```bash
+# Arm image, and user data ran: expect aarch64, a docker version, "done"
+uname -m
+docker --version && systemctl is-active docker
+cloud-init status
+
+# Step 1's security group rule: expect REACHABLE, not a hang
+timeout 8 bash -c "cat < /dev/null > /dev/tcp/YOUR_RDS_ENDPOINT/5432" \
+  && echo REACHABLE || echo BLOCKED
+
+# Step 4's role reached the instance: expect jackpotsworld-ec2-role
+TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+Then the one that matters most — the bucket, the prefix and the policy agreeing
+with each other:
+
+```bash
+echo test > /tmp/hc.txt
+aws s3api put-object --bucket jackpotsworld-documents \
+  --key documents/_healthcheck.txt --body /tmp/hc.txt --region ap-south-1
+aws s3api get-object --bucket jackpotsworld-documents \
+  --key documents/_healthcheck.txt --region ap-south-1 /tmp/out.txt
+aws s3api delete-object --bucket jackpotsworld-documents \
+  --key documents/_healthcheck.txt --region ap-south-1
+```
+
+`put-object` should report `"ServerSideEncryption": "AES256"`, confirming the
+bucket default from Step 3. And two calls that must **fail** with AccessDenied,
+proving the policy is scoped rather than merely present:
+
+```bash
+aws s3api put-object --bucket jackpotsworld-documents --key notallowed.txt \
+  --body /tmp/hc.txt --region ap-south-1        # outside documents/
+aws s3api list-objects-v2 --bucket jackpotsworld-documents --region ap-south-1
+```
+
+Note that the role reporting its own name from instance metadata proves only
+that the *role* is attached, not that it *grants* anything — an unattached
+policy looks identical there. The `put-object` round-trip is the only check
+that distinguishes them.
 
 ---
 
