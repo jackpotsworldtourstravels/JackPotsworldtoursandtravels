@@ -36,3 +36,19 @@
 		format console
 	}
 }
+
+# www redirects to the bare domain rather than serving a second copy of the
+# site. One canonical origin keeps sessions, CORS_ORIGINS and FRONTEND_BASE_URL
+# all agreeing on a single name — a visitor who signed in at www and navigated
+# to the apex would otherwise arrive logged out.
+#
+# This block is why Step 6 asks for a www A record: Caddy obtains a certificate
+# per site address, so without it www resolves here and then fails TLS.
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+
+	log {
+		output stdout
+		format console
+	}
+}
