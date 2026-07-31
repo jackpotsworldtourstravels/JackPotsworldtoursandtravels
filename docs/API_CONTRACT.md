@@ -572,6 +572,46 @@ Super Admin and a merchant, and 400 for anything that is not a Classic Tours
 booking (an enquiry, a change request, a catalog-led booking).
 ```
 
+#### §6.3d — Merchant approval desk (CR-3)
+
+**CR-3 moved this sign-off to the merchant that raised the booking.** The endpoints above still
+work and the platform Manager role still exists, but in practice its queue stays empty: a merchant
+approves before the platform ever sees the booking. Same statuses, same lifecycle edges, **no
+migration** — only who may walk the approval edge changed.
+
+**Two more permission codes**, held by `MerchantRole.MANAGER` and by `merchant_admin`:
+
+| Code | Grants |
+|---|---|
+| `booking.merchant_approve` | read this merchant's approval queue, claim, approve |
+| `booking.merchant_return` | return a booking to the raiser with remarks |
+
+Deliberately **not** the `booking.manager_*` codes: those are gated on `is_platform_staff`, and a
+merchant must not be able to address the platform queue at all rather than be refused by it late.
+`merchant_admin` holds them as well as the manager sub-role because every merchant has a Merchant
+Admin by construction, and one manager's absence must not stop a merchant submitting work.
+
+```
+GET  /api/merchant/approvals
+     ?bucket=awaiting|approved|returned|ticketed  &status  &search  &page  &page_size
+   → Page[ManagerBookingSummary]
+   NO merchant_id parameter: scope comes from the token and cannot be widened.
+
+GET  /api/merchant/approvals/counts       → ManagerQueueCounts
+GET  /api/merchant/approvals/{id}         → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/start-review        → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/approve  {note?}    → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/return   {remarks}  → ManagerBookingDetail
+```
+
+Two refusals specific to this surface:
+
+* **Another merchant's booking is a 404, not a 403** — confirming it exists would leak request
+  numbers to anyone willing to enumerate them.
+* **The raiser cannot decide their own booking → 403.** The manager sub-role holds
+  `ticket.request`, so without this the same person could raise and sign off the same booking.
+  `ManagerBookingDetail.can_decide` is false in that case, so the UI never offers the buttons.
+
 **Two tracks in one state machine** (`services/lifecycle.py`). `is_classic_track(request)` is
 true for a booking raised from an answered enquiry — and **false once a booking has entered
 Payment Pending or Paid**, so bookings already in the payment workflow when this shipped finish

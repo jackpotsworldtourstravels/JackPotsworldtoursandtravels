@@ -6,6 +6,8 @@ lives only in a chat session. If this file and a conversation disagree, this fil
 
 Last updated: **2026-07-31** · Current milestone: **M4 — Finance, Billing & Payment Tracking**
 · Last approved: **CR-2 — Manager approval + Classic Tours payment bypass ✅ (2026-07-31)**
+· **Built, awaiting approval: CR-3 — booking approval moved to the merchant's own manager**,
+which *alters CR-2*. See `docs/CR-3_MERCHANT_INTERNAL_APPROVAL.md`.
 
 ---
 
@@ -45,7 +47,8 @@ Added 2026-07-31, on approval of CR-2. Everything in §1 is **locked**.
 The practical test: if a reviewer who approved the milestone would be surprised by the diff, it
 needed approval first.
 
-**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2.
+**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2 — with CR-2's *approver* superseded by
+CR-3 (built 2026-07-31, not yet approved). CR-2's payment bypass remains locked and unchanged.
 
 ### Where the work lives
 

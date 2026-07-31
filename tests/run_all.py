@@ -34,6 +34,7 @@ SUITE = [
     ("verify_m3.py", "M3: cancellation & reschedule, money bounds, cross-tenant, concurrency"),
     ("verify_m4.py", "M4: ledger arithmetic, wallet, credit limit, refunds, payment concurrency"),
     ("verify_cr2.py", "CR-2: manager approval, payment bypass, ticket delivery, RBAC, concurrency"),
+    ("verify_cr3.py", "CR-3: merchant approves its own bookings, scoping, self-approval, concurrency"),
 ]
 
 
