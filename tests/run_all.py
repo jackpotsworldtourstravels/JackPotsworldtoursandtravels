@@ -32,6 +32,8 @@ SUITE = [
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
     ("verify_m2.py", "M2: ticket upload, invoice/confirmation PDFs, delivery"),
     ("verify_m3.py", "M3: cancellation & reschedule, money bounds, cross-tenant, concurrency"),
+    ("verify_m4.py", "M4: ledger arithmetic, wallet, credit limit, refunds, payment concurrency"),
+    ("verify_cr2.py", "CR-2: manager approval, payment bypass, ticket delivery, RBAC, concurrency"),
 ]
 
 

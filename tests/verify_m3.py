@@ -50,7 +50,7 @@ def main():
                       json={"reason": "changed our mind"})
     check("cancelling a PENDING booking -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
 
-    done = flows.make_booking(mtok, atok, upto="completed", label="M3 completed")
+    done = flows.make_catalog_booking(mtok, atok, upto="completed", label="M3 completed")
     r = requests.post(f"{BASE}/api/bookings/{done['id']}/cancellation", headers=H(mtok),
                       json={"reason": "too late"})
     check("cancelling a COMPLETED booking -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
@@ -64,7 +64,7 @@ def main():
 
     # --------------------------------------------------------- raise: validation
     print("\n== raising a request: validation ==")
-    live = flows.make_booking(mtok, atok, upto="approved", label="M3 validation")
+    live = flows.make_catalog_booking(mtok, atok, upto="approved", label="M3 validation")
 
     r = requests.post(f"{BASE}/api/bookings/{live['id']}/cancellation", headers=H(mtok),
                       json={"reason": "   "})
@@ -193,7 +193,7 @@ def main():
 
     # ------------------------------------------------------- free cancellation
     print("\n== a free cancellation ==")
-    freeb = flows.make_booking(mtok, atok, upto="paid", label="M3 free cancel")
+    freeb = flows.make_catalog_booking(mtok, atok, upto="paid", label="M3 free cancel")
     r = requests.post(f"{BASE}/api/bookings/{freeb['id']}/cancellation", headers=H(mtok),
                       json={"reason": "Airline cancelled the flight."})
     check("cancellation on a PAID booking -> 201", r.status_code == 201, f"{r.status_code} {r.text[:250]}")
@@ -208,7 +208,7 @@ def main():
 
     # --------------------------------------------- cancelling a ticketed booking
     print("\n== a ticketed booking can still be cancelled ==")
-    tkt = flows.make_booking(mtok, atok, upto="ticket_issued", label="M3 ticketed cancel")
+    tkt = flows.make_catalog_booking(mtok, atok, upto="ticket_issued", label="M3 ticketed cancel")
     r = requests.post(f"{BASE}/api/bookings/{tkt['id']}/cancellation", headers=H(mtok),
                       json={"reason": "Passenger hospitalised."})
     check("cancellation on a TICKET ISSUED booking -> 201", r.status_code == 201,
@@ -222,7 +222,7 @@ def main():
 
     # ------------------------------------------------------------- reschedule
     print("\n== reschedule ==")
-    resb = flows.make_booking(mtok, atok, upto="paid", label="M3 reschedule")
+    resb = flows.make_catalog_booking(mtok, atok, upto="paid", label="M3 reschedule")
     before = requests.get(f"{BASE}/api/requests/{resb['id']}", headers=H(mtok)).json()["request"]
     target = new_date(120)
 
@@ -282,7 +282,7 @@ def main():
 
     # ------------------------------------------------------------------- RBAC
     print("\n== permissions ==")
-    open_b = flows.make_booking(mtok, atok, upto="approved", label="M3 rbac")
+    open_b = flows.make_catalog_booking(mtok, atok, upto="approved", label="M3 rbac")
     r = requests.post(f"{BASE}/api/bookings/{open_b['id']}/cancellation", headers=H(mtok),
                       json={"reason": "for the RBAC checks"})
     check("merchant raises one for the RBAC checks -> 201", r.status_code == 201, f"{r.status_code} {r.text[:220]}")
@@ -400,7 +400,7 @@ def main():
 
     # ---------------------------------------------- one settlement path only
     print("\n== the generic paths refuse a change request ==")
-    bypass_b = flows.make_booking(mtok, atok, upto="approved", label="M3 bypass")
+    bypass_b = flows.make_catalog_booking(mtok, atok, upto="approved", label="M3 bypass")
     r = requests.post(f"{BASE}/api/bookings/{bypass_b['id']}/cancellation", headers=H(mtok),
                       json={"reason": "for the bypass checks"})
     bypass_id = r.json()["request"]["id"]
@@ -451,7 +451,7 @@ def main():
 
     # ------------------------------------------------------ no bare cancel path
     print("\n== the settlement edge is not published as an action ==")
-    paid = flows.make_booking(mtok, atok, upto="paid", label="M3 no bare cancel")
+    paid = flows.make_catalog_booking(mtok, atok, upto="paid", label="M3 no bare cancel")
     actions = requests.get(f"{BASE}/api/requests/{paid['id']}", headers=H(atok)).json().get("actions") or []
     check("a PAID booking offers no bare Cancel action to an admin",
           all(a.get("to") != "cancelled" for a in actions), str(actions))
@@ -464,7 +464,7 @@ def main():
 
     # ------------------------------------------------------------- concurrency
     print("\n== two admins approving at once ==")
-    race = flows.make_booking(mtok, atok, upto="approved", label="M3 race")
+    race = flows.make_catalog_booking(mtok, atok, upto="approved", label="M3 race")
     r = requests.post(f"{BASE}/api/bookings/{race['id']}/cancellation", headers=H(mtok),
                       json={"reason": "concurrency check"})
     race_id = r.json()["request"]["id"]

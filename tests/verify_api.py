@@ -8,7 +8,7 @@ import json
 import sys
 
 import minihttp as requests
-from config import ADMIN, BASE, JPEG, MERCHANT, PDF, PNG, Checker, H, login
+from config import ADMIN, BASE, JPEG, MANAGER, MERCHANT, PDF, PNG, Checker, H, login
 
 _c = Checker()
 check = _c
@@ -352,8 +352,21 @@ def main():
     check("international submit with zero documents -> 200", r.status_code == 200, f"{r.status_code} {r.text[:300]}")
     check("no refusal ever mentions uploading",
           "upload" not in r.text.lower(), r.text[:200])
-    check("it reaches the approval queue",
+    # CR-2 moved this booking's approval from the Admin to the Manager. It must
+    # reach the Manager's desk and must NOT sit in the Admin's approval queue —
+    # a queue that offered Approve on a booking the service refuses by track
+    # would be worse than not listing it at all.
+    gtok = login(*MANAGER)
+    mgr = requests.get(f"{BASE}/api/manager/bookings/{rid2}", headers=H(gtok))
+    check("the manager can open it", mgr.status_code == 200, f"{mgr.status_code} {mgr.text[:200]}")
+    number = mgr.json()["request"]["request_number"]
+    # Searched by number rather than read off page 1: the queue is oldest-first
+    # (it is a work queue), so the booking just created is the last thing on it.
+    check("it reaches the manager's queue",
           any(i["id"] == rid2 for i in requests.get(
+              f"{BASE}/api/manager/bookings?search={number}", headers=H(gtok)).json()["items"]))
+    check("and not the admin approval queue",
+          not any(i["id"] == rid2 and i.get("kind") == "request" for i in requests.get(
               f"{BASE}/api/admin/approval-queue?page_size=100", headers=H(atok)).json()["items"]))
 
     # --------------------------------------------------------- admin verify

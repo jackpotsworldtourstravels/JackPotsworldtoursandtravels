@@ -4,6 +4,17 @@ Every verification script needs a booking at a known stage, and hunting for one
 in existing data makes suites order-dependent — the M2 run ticketed the only
 candidate and the next run had nothing to work with. This builds one from
 scratch instead, so any script can ask for exactly the stage it needs.
+
+TWO BUILDERS, BECAUSE THERE ARE TWO WORKFLOWS (CR-2)
+:func:`make_booking` builds an **enquiry-led** booking, which now runs the
+Classic Tours workflow: a Manager approves it and it has no payment stage at
+all. :func:`make_catalog_booking` builds a **catalog-led** one, which keeps the
+original Admin-approves-then-merchant-pays path.
+
+A suite that needs to exercise money — invoices, the ledger, credit limits,
+refunds — must use the catalog builder. Asking :func:`make_booking` for a paid
+booking is not a stage it can reach, and it says so rather than walking a
+booking somewhere the state machine will not go.
 """
 import datetime
 import time
@@ -11,11 +22,16 @@ import time
 import minihttp as requests
 # Re-exported so a script can `import flows` and reach the accounts without a
 # second import; config.py is the one definition of both.
-from config import ADMIN, ADMIN2, BASE, MERCHANT, PDF, SUPER, H, login  # noqa: F401
+from config import ADMIN, ADMIN2, BASE, MANAGER, MERCHANT, PDF, SUPER, H, login  # noqa: F401
 
 #: Stage order, so a caller can ask for "at least paid" and the flow knows how
 #: far to walk.
 ORDER = ["draft", "pending_approval", "approved", "payment_pending", "paid", "ticket_issued", "completed"]
+
+#: The stages an enquiry-led (Classic Tours) booking can actually occupy.
+#: Payment Pending and Paid are absent because they are unreachable on that
+#: track — see ``lifecycle.CLASSIC_TRANSITIONS``.
+CLASSIC_ORDER = ["draft", "pending_approval", "approved", "ticket_issued", "completed"]
 
 
 def rival_merchant(atok):
@@ -73,11 +89,28 @@ def rival_merchant(atok):
     )
 
 
-def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label="verification"):
-    """Create a booking via the real enquiry flow and walk it to ``upto``.
+def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label="verification",
+                 gtok=None):
+    """Create an **enquiry-led** booking and walk it to ``upto``.
+
+    This is the Classic Tours workflow (CR-2): the Admin answers the enquiry,
+    the merchant submits, and a **Manager** approves. ``gtok`` is a Manager
+    token; it is obtained from :data:`config.MANAGER` when not supplied, so
+    existing callers keep working without passing one.
+
+    ``upto`` may be any of :data:`CLASSIC_ORDER`. Asking for ``payment_pending``
+    or ``paid`` fails loudly — those stages do not exist on this track, and
+    silently stopping short would leave a suite asserting against a booking that
+    is not where it thinks it is. Use :func:`make_catalog_booking` for money.
 
     Returns ``{"id", "request_number", "enquiry_id", "status", "passenger_ids"}``.
     """
+    if upto not in CLASSIC_ORDER:
+        raise AssertionError(
+            f"'{upto}' is not a stage an enquiry-led booking can reach — the Classic "
+            f"Tours workflow has no payment step (CR-2). Stages: {', '.join(CLASSIC_ORDER)}. "
+            f"For a booking that can be paid, use flows.make_catalog_booking()."
+        )
     travel = datetime.date.today() + datetime.timedelta(days=60)
 
     dest, dest_city = ("DXB", "Dubai") if international else ("BOM", "Mumbai")
@@ -127,6 +160,81 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
                           files={"file": (f"pp{pid}.pdf", PDF, "application/pdf")},
                           data={"doc_type": "passport", "passenger_id": pid})
 
+    want = CLASSIC_ORDER.index(upto)
+
+    if want >= CLASSIC_ORDER.index("pending_approval"):
+        r = requests.post(f"{BASE}/api/requests/{rid}/submit", headers=H(mtok))
+        assert r.status_code == 200, f"submit: {r.status_code} {r.text[:300]}"
+
+    if want >= CLASSIC_ORDER.index("approved"):
+        gtok = gtok or login(*MANAGER)
+        r = requests.post(f"{BASE}/api/manager/bookings/{rid}/approve", headers=H(gtok),
+                          json={"note": "Verified against the enquiry."})
+        assert r.status_code == 200, f"manager approve: {r.status_code} {r.text[:300]}"
+
+    if want >= CLASSIC_ORDER.index("ticket_issued"):
+        # The desk must attach what it bought before it may say "issued" — on
+        # this track that status is what tells the merchant its paperwork is
+        # ready, so there is no later stage at which the file could arrive.
+        r = requests.post(f"{BASE}/api/requests/{rid}/documents", headers=H(atok),
+                          files={"file": (f"eticket-{rid}.pdf", PDF, "application/pdf")},
+                          data={"doc_type": "ticket"})
+        assert r.status_code in (200, 201), f"ticket upload: {r.status_code} {r.text[:300]}"
+        r = requests.post(f"{BASE}/api/admin/requests/{rid}/issue-ticket", headers=H(atok), json={})
+        assert r.status_code == 200, f"issue: {r.status_code} {r.text[:300]}"
+
+    if want >= CLASSIC_ORDER.index("completed"):
+        r = requests.post(f"{BASE}/api/admin/requests/{rid}/complete", headers=H(atok), json={})
+        assert r.status_code == 200, f"complete: {r.status_code} {r.text[:300]}"
+
+    final = requests.get(f"{BASE}/api/requests/{rid}", headers=H(mtok)).json()["request"]
+    return {
+        "id": rid,
+        "request_number": final["request_number"],
+        "enquiry_id": enq["id"],
+        "status": final["status"],
+        "passenger_ids": pax_ids,
+    }
+
+
+def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
+                         label="verification"):
+    """Create a **catalog-led** booking and walk it to ``upto``.
+
+    The standard track: the merchant books against live inventory, an Admin
+    approves with a fare, the merchant pays and an Admin verifies. This is the
+    workflow CR-2 left untouched, and it is the one to use whenever a suite
+    needs a booking that has money on it — invoices, the ledger, credit limits,
+    refunds and cancellation settlements.
+
+    Returns the same shape as :func:`make_booking`, with ``enquiry_id`` set to
+    ``None`` — there is no enquiry behind a catalog booking.
+    """
+    if upto not in ORDER:
+        raise AssertionError(f"'{upto}' is not a stage; use one of {', '.join(ORDER)}")
+
+    items = requests.get(
+        f"{BASE}/api/catalog/search?page_size=20", headers=H(mtok)
+    ).json().get("items", [])
+    item = next((i for i in items if (i.get("available_units") or 0) >= pax), None)
+    assert item, "no catalog item with available units — cannot build a catalog booking"
+
+    passengers = [
+        {"title": "Mr", "first_name": f"Cat{i}", "last_name": "Traveller",
+         "passenger_type": "adult"}
+        for i in range(1, pax + 1)
+    ]
+    r = requests.post(f"{BASE}/api/requests", headers=H(mtok), json={
+        "catalog_item_id": item["id"],
+        "passengers": passengers,
+        "travel_date": item.get("travel_date"),
+        "remarks": label,
+    })
+    assert r.status_code in (200, 201), f"catalog booking: {r.status_code} {r.text[:300]}"
+    detail = r.json()
+    rid = detail["request"]["id"]
+    pax_ids = [p["id"] for p in detail["request"]["passengers"]]
+
     want = ORDER.index(upto)
 
     if want >= ORDER.index("pending_approval"):
@@ -135,12 +243,12 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
 
     if want >= ORDER.index("approved"):
         r = requests.post(f"{BASE}/api/admin/requests/{rid}/approve", headers=H(atok),
-                          json={"final_amount": "24500.00", "note": "Confirmed with airline."})
+                          json={"final_amount": amount, "note": "Confirmed with airline."})
         assert r.status_code == 200, f"approve: {r.status_code} {r.text[:300]}"
 
     if want >= ORDER.index("paid"):
         r = requests.post(f"{BASE}/api/requests/{rid}/pay", headers=H(mtok),
-                          json={"amount": "24500.00", "method": "bank_transfer",
+                          json={"amount": amount, "method": "bank_transfer",
                                 "transaction_id": f"TXN-{rid}-VERIFY"})
         assert r.status_code == 200, f"pay: {r.status_code} {r.text[:300]}"
         pend = requests.get(f"{BASE}/api/admin/payments/pending?page_size=100", headers=H(atok)).json()
@@ -162,7 +270,7 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
     return {
         "id": rid,
         "request_number": final["request_number"],
-        "enquiry_id": enq["id"],
+        "enquiry_id": None,
         "status": final["status"],
         "passenger_ids": pax_ids,
     }

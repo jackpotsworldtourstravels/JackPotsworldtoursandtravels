@@ -21,7 +21,7 @@ def main():
     # ticketed the only candidate and left the next run with nothing, which
     # made the suite order-dependent.
     print("== build a fresh booking, driven to Paid ==")
-    b = flows.make_booking(mtok, atok, upto="paid", label="M2 verification")
+    b = flows.make_catalog_booking(mtok, atok, upto="paid", label="M2 verification")
     rid, status = b["id"], b["status"]
     print(f"     {b['request_number']} (id {rid}) at {status}")
     check("flow produced a paid booking", status == "paid", status)

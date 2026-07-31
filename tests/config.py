@@ -36,6 +36,13 @@ ADMIN = _account("ADMIN", "priya.raghavan@jackpotsworldtours.com", "97TJ96JtTfRS
 ADMIN2 = _account("ADMIN2", "ops.desk@jackpotsworldtours.com", "OpsDesk#2026x", "admin")
 SUPER = _account("SUPER", "admin@jackpotsworldtours.com", "AdminPass#2026", "super_admin")
 
+#: The platform Manager (CR-2) — its own role, its own portal, and the only
+#: account that can approve a Classic Tours booking request. Deliberately not an
+#: Admin: the whole point of the role is that the desk which answered the ticket
+#: enquiry cannot also sign off the booking, so a suite that reused ADMIN here
+#: would prove nothing.
+MANAGER = _account("MANAGER", "manager.desk@jackpotsworldtours.com", "MgrDesk#2026x", "manager")
+
 #: Smallest byte sequences that pass the upload signature check, so a test can
 #: exercise the document paths without carrying binary fixtures in the repo.
 PDF = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n"

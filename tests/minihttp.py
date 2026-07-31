@@ -69,5 +69,14 @@ def put(url, **kw):
     return request("PUT", url, **kw)
 
 
+def patch(url, **kw):
+    """PATCH — used by the notification read-marker and the admin status change.
+
+    Missing until CR-2 needed it, which is why those endpoints had never been
+    driven from the suite.
+    """
+    return request("PATCH", url, **kw)
+
+
 def delete(url, **kw):
     return request("DELETE", url, **kw)
