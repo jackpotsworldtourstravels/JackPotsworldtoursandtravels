@@ -232,6 +232,48 @@ const MerchantApi = {
     });
   },
 
+  /* ------------------------------------------------------------ approvals */
+
+  /* CR-3. The merchant signs off the booking requests its own staff raised,
+     replacing the platform Manager step. Every one of these is scoped to the
+     caller's merchant by the server — there is no merchant_id parameter to
+     pass, and passing one would not widen the result. */
+  approvalQueue({ bucket, status, search, page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/merchant/approvals', {
+      params: {
+        bucket: bucket || undefined, status: status || undefined,
+        search: search || undefined, page, page_size: pageSize,
+      },
+    });
+  },
+
+  approvalCounts() {
+    return this._req('get', '/api/merchant/approvals/counts');
+  },
+
+  approvalDetail(requestId) {
+    return this._req('get', `/api/merchant/approvals/${requestId}`);
+  },
+
+  approvalStartReview(requestId) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/start-review`);
+  },
+
+  /* 403 when the caller raised this booking themselves — someone else at the
+     merchant has to decide it. The screen hides the buttons in that case, but
+     the server is the one that enforces it. */
+  approvalApprove(requestId, note) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/approve`, {
+      data: { note: note || null },
+    });
+  },
+
+  approvalReturn(requestId, remarks) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/return`, {
+      data: { remarks },
+    });
+  },
+
   /* ----------------------------------------------------- service requests */
 
   /* `details` shape depends on request_type:

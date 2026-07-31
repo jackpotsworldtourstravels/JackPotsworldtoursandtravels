@@ -109,7 +109,8 @@ const CL_TITLES = {
      for it, because "the booking you just clicked" is not a destination you
      navigate to cold. */
   'booking-detail': 'Booking Request Details',
-  requests: 'My Requests', payments: 'Payments', 'service-request': 'Service Requests',
+  requests: 'My Requests', approvals: 'Approvals',
+  payments: 'Payments', 'service-request': 'Service Requests',
   reports: 'Reports', notifications: 'Notifications', profile: 'Profile & Settings',
   support: 'Support',
 };
@@ -125,6 +126,7 @@ const CL_LOADERS = {
   'booking-request': () => clInitBookingRequest(),
   'booking-detail': () => clInitBookingDetail(),
   requests: () => clInitRequests(),
+  approvals: () => clInitApprovals(),
   payments: () => clInitPayments(),
   'service-request': () => clInitServiceRequest(),
   reports: () => clInitReports(),
@@ -189,8 +191,18 @@ function clShowApp() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  /* Deep links survive a reload: #payments lands on Payments. */
-  clGo((location.hash || '').replace('#', '') || 'dashboard');
+  /* CR-3 — Approvals is only a destination for the merchant's approvers. Hiding
+     it is presentation only; the endpoints behind it are permission-gated
+     server-side, so a hidden link is not what keeps anyone out. */
+  const canApprove = clCanApprove();
+  $('clNavApprovals').style.display = canApprove ? '' : 'none';
+
+  /* Deep links survive a reload: #payments lands on Payments. A user without
+     the permission who follows #approvals would otherwise render an empty
+     section with no way back. */
+  let target = (location.hash || '').replace('#', '') || 'dashboard';
+  if (target === 'approvals' && !canApprove) target = 'dashboard';
+  clGo(target);
   clLoadUnreadCount();
 }
 

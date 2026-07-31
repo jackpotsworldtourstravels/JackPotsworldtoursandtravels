@@ -149,6 +149,9 @@
 
       <div class="cl-side-group">Operations</div>
       <a href="#" data-cl-nav="requests"><span class="cl-side-ico">☰</span>My Requests</a>
+      <!-- CR-3 — only the merchant's approvers see this; revealed by
+           classic-shell.js once the session's permissions are known. -->
+      <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;"><span class="cl-side-ico">✓</span>Approvals</a>
       <a href="#" data-cl-nav="payments"><span class="cl-side-ico">₹</span>Payments</a>
       <a href="#" data-cl-nav="service-request"><span class="cl-side-ico">⇄</span>Service Requests</a>
 
@@ -177,6 +180,7 @@
              action on My Requests or from the submit confirmation. -->
         <section class="cl-section" id="cl-booking-detail"></section>
         <section class="cl-section" id="cl-requests"></section>
+        <section class="cl-section" id="cl-approvals"></section>
         <section class="cl-section" id="cl-payments"></section>
         <section class="cl-section" id="cl-service-request"></section>
         <section class="cl-section" id="cl-reports"></section>
@@ -221,13 +225,14 @@
      the head of the file — so the table lives in the UI layer and is shared,
      unchanged, with the other frontends. -->
 <script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260731m4b"></script>
-<script src="../shared/merchant-api.js?v=20260731cr2"></script>
+<script src="js/classic-shell.js?v=20260731cr3"></script>
+<script src="../shared/merchant-api.js?v=20260731cr3"></script>
 <script src="js/classic-dashboard.js?v=20260731m4"></script>
 <script src="js/classic-enquiry.js?v=20260731a"></script>
 <script src="js/classic-booking.js?v=20260731a"></script>
 <script src="js/classic-booking-detail.js?v=20260731cr2"></script>
 <script src="js/classic-requests.js?v=20260731cr2"></script>
+<script src="js/classic-approvals.js?v=20260731cr3b"></script>
 <script src="js/classic-payments.js?v=20260731m4"></script>
 <script src="js/classic-service.js?v=20260730m3"></script>
 <script src="js/classic-reports.js?v=20260731m4"></script>
