@@ -1,7 +1,7 @@
 """Schemas for catalog search, ticket requests, and the request lifecycle."""
 import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -138,8 +138,23 @@ class ReplacePassengersRequest(BaseModel):
 
 class ApproveRequest(BaseModel):
     #: Optional override — the spec lets an Admin approve at a final amount.
+    #:
+    #: Still optional, and still ``ge=0``, because a catalog-led booking already
+    #: carries a price computed from the catalog row and does not need one sent.
+    #: That a *priced* booking must result is enforced in
+    #: ``ticket_service.approve_request``, where the request's own total is in
+    #: hand — a schema rule here could only ever see this field.
     final_amount: Decimal | None = Field(default=None, ge=0)
     note: str | None = None
+
+
+class RepriceRequest(BaseModel):
+    """Correct the amount on a booking already at Payment Pending."""
+
+    amount: Decimal = Field(gt=0)
+    #: Mandatory: this changes what a merchant owes, and the merchant is told
+    #: why. Same standard as a rejection reason.
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class RejectRequest(BaseModel):
@@ -238,6 +253,12 @@ class RequestResponse(BaseModel):
     request_type: RequestType
     status: RequestStatus
     status_label: str
+    #: ``classic_tours`` for an enquiry-led booking running the CR-2 workflow
+    #: (Manager approval, no payment step), ``standard`` for everything else.
+    #: Frontends branch on this rather than re-deriving the rule — the Classic
+    #: portal hides its payment surfaces on it, and the operations desk shows
+    #: "upload tickets" instead of "awaiting payment".
+    workflow: Literal["classic_tours", "standard"] = "standard"
     parent_request_id: int | None = None
     merchant_id: int | None = None
     merchant_name: str | None = None
@@ -267,14 +288,16 @@ class RequestResponse(BaseModel):
 
     @classmethod
     def of(cls, r, *, include_passengers: bool = True) -> "RequestResponse":
-        from app.services.lifecycle import SPEC_LABELS
+        from app.services import lifecycle
 
+        classic = lifecycle.is_classic_track(r)
         return cls(
             id=r.request_id,
             request_number=r.request_number,
             request_type=r.request_type,
             status=r.status,
-            status_label=SPEC_LABELS.get(r.status, r.status.value),
+            status_label=lifecycle.label_of(r),
+            workflow="classic_tours" if classic else "standard",
             parent_request_id=r.parent_request_id,
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,

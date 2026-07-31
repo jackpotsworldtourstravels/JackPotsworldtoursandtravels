@@ -62,6 +62,17 @@ class P:
     TICKET_REJECT = "ticket.reject"
     TICKET_ISSUE = "ticket.issue"
 
+    # Manager sign-off on a submitted Booking Request (CR-2).
+    #
+    # WHY THESE ARE NOT ``TICKET_APPROVE`` / ``TICKET_REJECT``
+    # Those two are the Admin's codes for the catalog-led approval queue, and
+    # the whole point of the Manager step is that the desk which answered the
+    # enquiry cannot also sign off the booking. Reusing the Admin's codes would
+    # have handed every Admin the Manager's job on day one; giving the Manager
+    # the Admin's codes would have handed it the catalog queue as well.
+    BOOKING_MANAGER_APPROVE = "booking.manager_approve"
+    BOOKING_MANAGER_RETURN = "booking.manager_return"
+
     # Service requests (date change, cancellation, refund, ancillaries)
     SERVICE_REQUEST_CREATE = "servicerequest.create"
     SERVICE_REQUEST_MANAGE = "servicerequest.manage"
@@ -132,6 +143,22 @@ _ADMIN: frozenset[str] = frozenset({
     P.SYSTEM_ACTIVITY_VIEW, P.AUDIT_VIEW,
 })
 
+# The Manager (CR-2) exists to do exactly one thing: read a submitted Booking
+# Request in full and either send it to the operations desk or send it back to
+# the merchant. Everything it needs to *see* comes through its own endpoints,
+# which scope by ``is_platform_staff``, so it holds no ``ticket.view`` — that
+# code is what opens the Admin's booking screens, the operations queue and the
+# internal-notes API, none of which are the Manager's business.
+#
+# Notably absent, and deliberately: ticket.approve / ticket.reject (the Admin's
+# catalog queue), ticket.issue (the operations desk), every payment code (this
+# workflow has no payment step), and merchant/admin lifecycle codes.
+_MANAGER: frozenset[str] = frozenset({
+    P.BOOKING_MANAGER_APPROVE, P.BOOKING_MANAGER_RETURN,
+    P.PROFILE_MANAGE,
+    P.NOTIFICATION_VIEW,
+})
+
 _MERCHANT_ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
     P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
@@ -155,6 +182,7 @@ _MERCHANT_USER: frozenset[str] = frozenset({
 ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
     UserRole.SUPER_ADMIN: _SUPER_ADMIN,
     UserRole.ADMIN: _ADMIN,
+    UserRole.MANAGER: _MANAGER,
     UserRole.MERCHANT_ADMIN: _MERCHANT_ADMIN,
     UserRole.MERCHANT_USER: _MERCHANT_USER,
     UserRole.CUSTOMER: frozenset(),   # retail customers are out of scope

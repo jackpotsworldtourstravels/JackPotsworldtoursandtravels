@@ -6,6 +6,7 @@ system activity. Notably absent, and enforced by the permission codes rather
 than by convention: a Super Admin cannot raise tickets or manage payments.
 """
 import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -64,16 +65,23 @@ def super_admin_dashboard(
     "/admins",
     response_model=Page[AccountResponse],
     summary="List all administrators",
-    description="Requires `admin.view`. Paginated, with an optional name/email search.",
+    description=(
+        "Requires `admin.view`. Paginated, with an optional name/email search. "
+        "Returns **Admins and Managers** — both are staff accounts this screen owns "
+        "(CR-2). Pass `role=admin` or `role=manager` to narrow it."
+    ),
 )
 def list_admins(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str | None = None,
+    role: Literal["admin", "manager"] | None = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(require(P.ADMIN_VIEW)),
 ):
-    admins, total = account_service.list_admins(db, page, page_size, search)
+    admins, total = account_service.list_admins(
+        db, page, page_size, search, role=UserRole(role) if role else None
+    )
     return Page.build([AccountResponse.of(a) for a in admins], total, page, page_size)
 
 
@@ -84,7 +92,9 @@ def list_admins(
     summary="Create an administrator",
     description=(
         "Requires `admin.create` — held only by the Super Admin. Returns the generated password "
-        "**once**; it is hashed on write and cannot be retrieved again."
+        "**once**; it is hashed on write and cannot be retrieved again. "
+        "`role` may be `admin` (default) or `manager`; a Manager signs into the manager portal "
+        "and approves submitted Booking Requests."
     ),
 )
 def create_admin(
@@ -93,7 +103,8 @@ def create_admin(
     current_user: User = Depends(require(P.ADMIN_CREATE)),
 ):
     admin, temp_password = account_service.create_admin(
-        db, current_user, payload.full_name, payload.email, payload.phone, payload.password
+        db, current_user, payload.full_name, payload.email, payload.phone, payload.password,
+        role=UserRole(payload.role),
     )
     return CredentialsResponse(
         account=AccountResponse.of(admin), temporary_password=temp_password
@@ -118,7 +129,12 @@ def get_admin(
     "/admins/{user_id}",
     response_model=AccountResponse,
     summary="Edit an administrator",
-    description="Requires `admin.edit`.",
+    description=(
+        "Requires `admin.edit`. `role` is optional: omit it to leave the account's role "
+        "alone, or pass `admin`/`manager` to move it between the two. Changing a role "
+        "revokes that account's sessions (its permissions change underneath it) and is "
+        "refused with a 409 while a Manager still holds a booking under review."
+    ),
 )
 def update_admin(
     user_id: int,
@@ -127,7 +143,8 @@ def update_admin(
     current_user: User = Depends(require(P.ADMIN_EDIT)),
 ):
     admin = account_service.update_admin(
-        db, current_user, user_id, payload.full_name, payload.email, payload.phone
+        db, current_user, user_id, payload.full_name, payload.email, payload.phone,
+        role=UserRole(payload.role) if payload.role else None,
     )
     return AccountResponse.of(admin)
 

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260730m3">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260731cr2c">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -110,6 +110,15 @@
     <a href="#" class="nav-item" data-section="partner-requests">
       <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
       <span class="nav-label">Approval Queue</span>
+    </a>
+    <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
+         from the Approval Queue above: a booking is in exactly one of the two
+         screens at any time, so nothing is ever worked twice. Classic Tours
+         bookings arrive here only once a Manager has approved them. -->
+    <a href="#" class="nav-item" data-section="booking-ops">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
+      <span class="nav-label">Booking Operations</span>
+      <span class="nav-badge" id="opsNavBadge" hidden></span>
     </a>
     <!-- Cancellations & Reschedules is its own screen, not a filter on Service
          Request Management below. Those two settle money and change the booking
@@ -378,9 +387,13 @@
         <div class="panel-head"><h2>Approval Queue</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <select id="aqStatusFilter" class="status-select">
+            <!-- "Awaiting action" means awaiting *ours*: Pending Approval and
+                 Under Review, plus any booking approved without a fare, which
+                 sits in Payment Pending with nothing the merchant can pay. -->
             <option value="">Awaiting action</option>
             <option value="pending_approval">Pending Approval</option>
             <option value="in_review">Under Review</option>
+            <option value="payment_pending">Payment Pending</option>
           </select>
           <!-- Cancellation and Date Change are absent on purpose: approving one
                here would walk it to Payment Pending — a Pay button on a request
@@ -400,6 +413,31 @@
           <th>Type</th><th>Title</th><th>Merchant</th><th>Status</th><th>Submitted</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="aqPagination"></div>
+      </div>
+    </section>
+
+    <!-- Booking Operations desk (M1/M2 backend, surfaced by CR-2). Rendered by
+         admin-booking-ops.js. -->
+    <section class="section" id="section-booking-ops">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Booking Operations</h2>
+          <button type="button" class="btn btn-navy btn-sm" id="opsRefreshBtn">Refresh</button>
+        </div>
+        <div class="ops-tabs" id="opsTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <input type="text" id="opsSearch" placeholder="Request no., booking ref, PNR or ticket no.">
+          <select id="opsAssignFilter" class="status-select" aria-label="Assignment">
+            <option value="">Everyone</option>
+            <option value="mine">Assigned to me</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="opsTable"><thead><tr>
+          <th>Booking</th><th>Merchant</th><th>Travellers</th><th>Travel date</th>
+          <th>Stage</th><th>Assigned</th><th>Waiting</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="opsPagination"></div>
       </div>
     </section>
 
@@ -564,6 +602,12 @@
   <div class="modal-card modal-lg" id="bookingReviewModalBody"></div>
 </div>
 
+<!-- Work one booking: assignment, airline references, ticket uploads, internal
+     notes and the two lifecycle actions. Rendered by admin-booking-ops.js. -->
+<div class="modal-overlay" id="opsWorkOverlay">
+  <div class="modal-card modal-lg" id="opsWorkBody" role="dialog" aria-modal="true" aria-labelledby="opsWorkTitle"></div>
+</div>
+
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
   <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
 </div>
@@ -592,20 +636,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
+<script src="../components/focus-trap.js?v=20260731cr2"></script>
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260730m3"></script>
+<script src="../assets/js/admin.js?v=20260731m4"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260730a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260731a"></script>
+<script src="../assets/js/admin-bookings.js?v=20260731b"></script>
 <!-- Cancellation & reschedule settlement (M3). Also after admin.js. -->
 <script src="../assets/js/admin-change-requests.js?v=20260730m3"></script>
+<!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
+<script src="../assets/js/admin-booking-ops.js?v=20260731cr2b"></script>
 </body>
 </html>

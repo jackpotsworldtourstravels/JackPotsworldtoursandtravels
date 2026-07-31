@@ -84,6 +84,23 @@ function storeSuperAdminSession(data) {
 function clearSuperAdminSession() { Object.values(SA_KEYS).forEach(k => localStorage.removeItem(k)); }
 
 /* ---------------------------------------------------------------------
+   Manager Portal (CR-2) — its own namespace (manager_jwt_*), like every
+   other portal. Sharing the Admin's `jwt_*` keys would have let a signed-in
+   Manager and a signed-in Admin overwrite each other on the same browser,
+   which is exactly the pair of roles most likely to be open side by side
+   while a booking is being chased.
+   --------------------------------------------------------------------- */
+const MGR_KEYS = { access: 'manager_jwt_access', refresh: 'manager_jwt_refresh', fullName: 'manager_full_name' };
+function managerAuthHeaders() { return { Authorization: `Bearer ${localStorage.getItem(MGR_KEYS.access)}` }; }
+function isManagerLoggedIn() { return !!localStorage.getItem(MGR_KEYS.access); }
+function storeManagerSession(data) {
+  localStorage.setItem(MGR_KEYS.access, data.access_token);
+  localStorage.setItem(MGR_KEYS.refresh, data.refresh_token);
+  if (data.full_name) localStorage.setItem(MGR_KEYS.fullName, data.full_name);
+}
+function clearManagerSession() { Object.values(MGR_KEYS).forEach(k => localStorage.removeItem(k)); }
+
+/* ---------------------------------------------------------------------
    2026-07-29 additions — the unified Login -> Password -> OTP -> Dashboard
    flow used by all three B2B portals (docs/API_CONTRACT.md §1), against
    the live /api/auth/* endpoints. Purely additive: every namespace/
@@ -113,10 +130,16 @@ async function resendPortalOtp(challengeToken) {
 }
 
 function portalAccessKey(portal) {
-  return portal === 'admin' ? 'jwt_access' : portal === 'merchant' ? PARTNER_KEYS.access : SA_KEYS.access;
+  if (portal === 'admin') return 'jwt_access';
+  if (portal === 'merchant') return PARTNER_KEYS.access;
+  if (portal === 'manager') return MGR_KEYS.access;
+  return SA_KEYS.access;
 }
 function portalRefreshKey(portal) {
-  return portal === 'admin' ? 'jwt_refresh' : portal === 'merchant' ? PARTNER_KEYS.refresh : SA_KEYS.refresh;
+  if (portal === 'admin') return 'jwt_refresh';
+  if (portal === 'merchant') return PARTNER_KEYS.refresh;
+  if (portal === 'manager') return MGR_KEYS.refresh;
+  return SA_KEYS.refresh;
 }
 
 /** Persist a TokenResponse under the calling portal's existing namespace — populating both
@@ -132,6 +155,8 @@ function storePortalTokens(portal, data) {
       access_token: data.access_token, refresh_token: data.refresh_token,
       full_name: u.full_name, company_name: u.merchant_name,
     });
+  } else if (portal === 'manager') {
+    storeManagerSession({ access_token: data.access_token, refresh_token: data.refresh_token, full_name: u.full_name });
   } else if (portal === 'super_admin') {
     storeSuperAdminSession({ access_token: data.access_token, refresh_token: data.refresh_token, full_name: u.full_name });
   }
@@ -178,6 +203,7 @@ async function logoutPortalSession(portal) {
   } catch (e) { /* best-effort — clear locally regardless */ }
   if (portal === 'admin') clearStoredAuth();
   else if (portal === 'merchant') clearPartnerSession();
+  else if (portal === 'manager') clearManagerSession();
   else if (portal === 'super_admin') clearSuperAdminSession();
   localStorage.removeItem(`${portal}_user_json`);
 }

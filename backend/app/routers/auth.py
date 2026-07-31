@@ -56,12 +56,18 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 PORTAL_ROLES: dict[str, tuple[UserRole, ...]] = {
     "super_admin": (UserRole.SUPER_ADMIN,),
     "admin": (UserRole.ADMIN,),
+    # The Manager gets its own portal rather than a corner of the Admin one.
+    # An Admin signing into a screen it may not act on would be a 403 tour, and
+    # the separation between the enquiry desk and the approver is the point of
+    # the role (CR-2).
+    "manager": (UserRole.MANAGER,),
     "merchant": (UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER),
 }
 
 _PORTAL_OF_ROLE: dict[UserRole, str] = {
     UserRole.SUPER_ADMIN: "super_admin",
     UserRole.ADMIN: "admin",
+    UserRole.MANAGER: "manager",
     UserRole.MERCHANT_ADMIN: "merchant",
     UserRole.MERCHANT_USER: "merchant",
     UserRole.CUSTOMER: "none",

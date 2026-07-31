@@ -414,7 +414,7 @@ input[readonly]{background:var(--cl-hover-bg);}
 }
 :root[data-theme="dark"] .cl-tag{background:var(--cl-hover-bg);}
 .cl-tag-ok{background:rgba(18,183,106,0.12); color:var(--cl-emerald);}
-.cl-tag-warn{background:rgba(255,176,32,0.15); color:#a06600;}
+.cl-tag-warn{background:rgba(255,176,32,0.15); color:#8f5c00;}
 :root[data-theme="dark"] .cl-tag-warn{color:var(--cl-gold);}
 .cl-tag-err{background:rgba(230,57,70,0.12); color:var(--cl-coral-dark);}
 :root[data-theme="dark"] .cl-tag-err{color:#ff9c8a;}
@@ -473,6 +473,11 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 :root[data-theme="dark"] .cl-msg-err{color:#ff9c8a;}
 .cl-msg-info{background:rgba(47,128,237,0.12); border-color:rgba(47,128,237,0.28); color:var(--cl-sky);}
 .cl-msg-muted{background:var(--cl-hover-bg); border-color:var(--cl-border-color); color:var(--cl-text-muted);}
+/* "Your booking came back for a correction" (CR-2). Not an error — nothing
+   failed and nothing is lost — but not neutral either: it is the one message
+   on the page the merchant has to act on. */
+.cl-msg-warn{background:rgba(255,176,32,0.14); border-color:rgba(255,176,32,0.40); color:#8a5a00;}
+:root[data-theme="dark"] .cl-msg-warn{color:#ffc766;}
 
 /* ==============================  modal  ================================= */
 

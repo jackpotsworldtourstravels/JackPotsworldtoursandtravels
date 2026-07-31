@@ -49,7 +49,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, storage, ticket_service
+from app.services import activity_service, lifecycle, storage, ticket_service
 
 # ---------------------------------------------------------------------------
 # What may be uploaded
@@ -95,6 +95,24 @@ STAFF_LATE_TYPES: frozenset[DocumentType] = frozenset(
 #: anyone presses "Ticket Issued".
 STAFF_LATE_STAGES: frozenset[S] = frozenset({S.PAID, S.TICKET_ISSUED, S.COMPLETED})
 
+#: The same window on the Classic Tours track (CR-2), which has no Paid stage
+#: at all. There, Manager Approved is the moment the booking reaches the desk
+#: and the operator goes off to book it on the airline's own site; the issued
+#: tickets come back and have to attach *before* anyone presses "Ticket
+#: Issued", because on this track that button is the last step, not the middle
+#: one. Reusing STAFF_LATE_STAGES unchanged would have left the operator with a
+#: booking to work and nowhere to put the tickets it bought.
+CLASSIC_STAFF_LATE_STAGES: frozenset[S] = frozenset(
+    {S.APPROVED, S.TICKET_ISSUED, S.COMPLETED}
+)
+
+
+def staff_upload_stages(request: ServiceRequest) -> frozenset[S]:
+    """When platform staff may attach ticket paperwork to this booking."""
+    if lifecycle.is_classic_track(request):
+        return CLASSIC_STAFF_LATE_STAGES
+    return STAFF_LATE_STAGES
+
 
 def _assert_may_modify(request: ServiceRequest, actor: User, doc_type: DocumentType | None) -> None:
     """Gate every write to a request's documents.
@@ -106,16 +124,21 @@ def _assert_may_modify(request: ServiceRequest, actor: User, doc_type: DocumentT
         return
     if (
         actor.is_platform_staff
-        and request.status in STAFF_LATE_STAGES
+        and request.status in staff_upload_stages(request)
         and (doc_type is None or doc_type in STAFF_LATE_TYPES)
     ):
         return
 
     if actor.is_platform_staff:
         allowed = ", ".join(sorted(t.value for t in STAFF_LATE_TYPES))
+        when = (
+            "once a booking is approved by a manager"
+            if lifecycle.is_classic_track(request)
+            else "only once a booking is paid"
+        )
         detail = (
             f"{request.request_number} is at '{request.status.value}'. Staff may attach "
-            f"{allowed} documents only once a booking is paid."
+            f"{allowed} documents {when}."
         )
     else:
         detail = (

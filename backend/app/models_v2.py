@@ -49,6 +49,12 @@ class Base(DeclarativeBase):
 class UserRole(str, enum.Enum):
     SUPER_ADMIN = "super_admin"
     ADMIN = "admin"
+    #: Platform staff who sign off a submitted Booking Request before the
+    #: operations desk may act on it (CR-2, migration 0033). Deliberately its
+    #: own role rather than an Admin holding one extra code — the Admin who
+    #: answered the Ticket Enquiry must not also be able to approve the booking
+    #: that came out of it.
+    MANAGER = "manager"
     MERCHANT_ADMIN = "merchant_admin"
     MERCHANT_USER = "merchant_user"
     CUSTOMER = "customer"
@@ -451,7 +457,8 @@ class User(Base):
         ),
         CheckConstraint(
             "(role IN ('merchant_admin', 'merchant_user') AND merchant_id IS NOT NULL) "
-            "OR (role IN ('super_admin', 'admin', 'customer') AND merchant_id IS NULL)",
+            "OR (role IN ('super_admin', 'admin', 'manager', 'customer') "
+            "AND merchant_id IS NULL)",
             name="ck_users_merchant_scope",
         ),
         Index("ix_users_merchant_id", "merchant_id"),
@@ -467,7 +474,20 @@ class User(Base):
 
     @property
     def is_platform_staff(self) -> bool:
-        return self.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN)
+        """Works for the platform rather than for one merchant.
+
+        A Manager is included: it reviews bookings across every merchant, so
+        the cross-tenant scoping rules (``ticket_service.scoped_query``,
+        ``assert_same_merchant``) must let it through. What a Manager may
+        actually *do* is decided by its permission codes, which are a much
+        smaller set than an Admin's — this property answers "whose data",
+        never "which action".
+        """
+        return self.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER)
+
+    @property
+    def is_manager(self) -> bool:
+        return self.role is UserRole.MANAGER
 
     @property
     def is_merchant_user(self) -> bool:

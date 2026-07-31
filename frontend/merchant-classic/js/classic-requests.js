@@ -117,6 +117,10 @@ function clRenderRequestRows() {
    payable for the move — the same column, three different meanings. Left bare
    it reads as a bill, so the direction is spelled out rather than inferred. */
 function clRequestAmount(r) {
+  /* A Classic Tours booking is settled outside the portal (CR-2), so it has no
+     amount and never will. "₹0" or "Awaiting amount" would both read as a
+     figure still to come. */
+  if (r.workflow === 'classic_tours') return '<span class="cl-kpi-sub">Not payable here</span>';
   const amount = money(r.total_amount);
   if (!(Number(r.total_amount) > 0)) return amount;
   if (r.request_type === 'cancellation') return `${amount}<div class="cl-kpi-sub">refund due</div>`;
@@ -129,7 +133,7 @@ function clRequestRow(r) {
     <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
     <td>${escapeHtml(r.title || '—')}</td>
     <td class="cl-nowrap">${escapeHtml(clLabel(r.request_type || r.travel_type || '—'))}</td>
-    <td>${clTag(r.status)}</td>
+    <td>${clTag(r.status, r.status_label)}</td>
     <td class="cl-num">${clRequestAmount(r)}</td>
     <td class="cl-nowrap">${escapeHtml(fmtDate(r.travel_date))}</td>
     <td class="cl-nowrap">${escapeHtml(fmtDate(r.created_at))}</td>

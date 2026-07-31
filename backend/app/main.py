@@ -21,6 +21,7 @@ from app.routers import (
     dashboard,
     documents,
     enquiries,
+    manager,
     merchant_team,
     merchants,
     notifications_v2,
@@ -114,6 +115,10 @@ app.include_router(support_tickets.router)
 app.include_router(documents.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
+# CR-2 — the Manager's approval desk, between the merchant's submission and the
+# Booking Operations queue. Its own router because its permission codes are its
+# own: an Admin holds none of them.
+app.include_router(manager.router)
 
 
 @app.on_event("startup")

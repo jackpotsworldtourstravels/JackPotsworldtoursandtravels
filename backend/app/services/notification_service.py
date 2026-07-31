@@ -11,7 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from app.models_v2 import MessageStatus, MessageType, MsgLog, User, UserRole
+from app.models_v2 import MessageStatus, MessageType, MsgLog, User, UserRole, UserStatus
 from app.services import activity_service
 
 _ADMIN_ROLES = (UserRole.SUPER_ADMIN, UserRole.ADMIN)
@@ -54,6 +54,25 @@ def notify_admins(db: Session, title: str, message: str) -> int:
         db.add(_new(admin_id, email, title, message))
     db.commit()
     return len(admins)
+
+
+def notify_managers(db: Session, title: str, message: str) -> int:
+    """Notify the Manager approval desk (CR-2).
+
+    Separate from :func:`notify_admins` on purpose. A submitted Classic Tours
+    booking is not the admins' work — the generic approval path refuses that
+    track — so telling them would be an alert nobody can act on, and telling
+    only the managers keeps the two desks' inboxes honest about what is theirs.
+    """
+    managers = db.execute(
+        select(User.user_id, User.email).where(
+            and_(User.role == UserRole.MANAGER, User.status == UserStatus.ACTIVE)
+        )
+    ).all()
+    for manager_id, email in managers:
+        db.add(_new(manager_id, email, title, message))
+    db.commit()
+    return len(managers)
 
 
 def notify_request_merchant(db, request, title: str, message: str) -> None:

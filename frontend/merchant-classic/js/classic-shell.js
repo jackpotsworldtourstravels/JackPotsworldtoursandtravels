@@ -28,13 +28,24 @@ function clLabel(s) {
 /* Status -> tag colour. Kept in one place so a status never renders green on
    one screen and grey on another. */
 const CL_STATUS_TONE = {
-  draft: '', pending_approval: 'warn', approved: 'info', payment_pending: 'warn',
-  paid: 'ok', ticketed: 'ok', completed: 'ok', cancelled: 'err', rejected: 'err',
+  draft: '', pending_approval: 'warn', in_review: 'warn', approved: 'info',
+  payment_pending: 'warn', paid: 'ok', ticket_issued: 'ok', ticketed: 'ok',
+  completed: 'ok', cancelled: 'err', rejected: 'err',
 };
-function clTag(status) {
+/* `label` is the server's own wording when it has one. It matters on the
+   Classic Tours track (CR-2), where `pending_approval` means "Pending Manager
+   Approval" and `approved` means "Manager Approved" — deriving the text from
+   the enum value here would tell the merchant the wrong thing about who is
+   holding its booking. */
+function clTag(status, label) {
   const tone = CL_STATUS_TONE[status];
-  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(clLabel(status))}</span>`;
+  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(label || clLabel(status))}</span>`;
 }
+
+/* Money that came from finance_service is formatted by `moneyStr()` in
+   shared/formatters.js — one implementation for every portal, so the Classic
+   merchant screen and the Admin screen cannot render the same balance
+   differently. There is deliberately no `cl`-prefixed copy of it here. */
 
 function clMsg(el, text, kind) {
   if (!el) return;

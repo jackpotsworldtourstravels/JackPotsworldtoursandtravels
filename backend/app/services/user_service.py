@@ -28,6 +28,7 @@ _ROLE_ALIASES = {
     "user": UserRole.CUSTOMER,
     "customer": UserRole.CUSTOMER,
     "admin": UserRole.ADMIN,
+    "manager": UserRole.MANAGER,
     "super_admin": UserRole.SUPER_ADMIN,
     "merchant_admin": UserRole.MERCHANT_ADMIN,
     "merchant_user": UserRole.MERCHANT_USER,
