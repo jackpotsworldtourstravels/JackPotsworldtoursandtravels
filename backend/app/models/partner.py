@@ -12,6 +12,13 @@ from app.database.session import Base
 partner_status_enum = SAEnum("active", "inactive", "suspended", name="partner_status_enum", create_type=False)
 partner_user_status_enum = SAEnum("active", "inactive", "blocked", name="partner_user_status_enum", create_type=False)
 otp_purpose_enum = SAEnum("login", "password_reset", name="otp_purpose_enum", create_type=False)
+merchant_role_type_enum = SAEnum(
+    "admin", "user", "maker", "checker", name="merchant_role_type_enum", create_type=False
+)
+merchant_member_role_enum = SAEnum(
+    "admin", "user", "data_operator", "request_ticket", "cancellation_ticket", "supervisor", "manager",
+    name="merchant_member_role_enum", create_type=False,
+)
 
 
 class Partner(Base):
@@ -35,12 +42,16 @@ class PartnerUser(Base):
 
     partner_user_id: Mapped[int] = mapped_column(primary_key=True)
     partner_id: Mapped[int] = mapped_column(ForeignKey("partners.partner_id", ondelete="CASCADE"), nullable=False)
-    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    username: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(partner_user_status_enum, nullable=False, default="active")
+    # Real authorization mechanism (see get_current_partner_admin) — role_id/the
+    # shared `roles` table is legacy, being retired in favor of these.
+    role_type: Mapped[str | None] = mapped_column(merchant_role_type_enum, nullable=True)
+    member_role: Mapped[str | None] = mapped_column(merchant_member_role_enum, nullable=True)
     last_login_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -60,4 +71,8 @@ class PartnerOTPRequest(Base):
     attempt_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     verified_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set once a verified OTP has been spent on a login — see the login guard in
+    # app/services/partner_auth_service.py. verified_at alone never clears, so
+    # without this one OTP would authorize logins for its whole 15-minute window.
+    consumed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)

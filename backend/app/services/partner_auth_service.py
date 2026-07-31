@@ -54,16 +54,30 @@ def login(db: Session, email: str, password: str, ip_address: str | None) -> dic
     if user["status"] != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This partner account is not active")
 
+    # Claim and spend the OTP in one statement. Selecting then updating
+    # separately would let two concurrent logins both observe the same
+    # unconsumed row and each get a token off a single OTP; here the UPDATE
+    # only returns a row to whichever transaction wins, so an OTP authorizes
+    # exactly one login. FOR UPDATE SKIP LOCKED keeps the loser from blocking
+    # on the winner and then re-reading a row that is already spent.
     verified = db.execute(
         text("""
-            SELECT 1 FROM partner_otp_requests
-            WHERE partner_user_id = :id AND purpose = 'login' AND verified_at IS NOT NULL
-              AND verified_at > now() - interval '15 minutes'
-            ORDER BY created_at DESC LIMIT 1
+            UPDATE partner_otp_requests SET consumed_at = now()
+            WHERE otp_id = (
+                SELECT otp_id FROM partner_otp_requests
+                WHERE partner_user_id = :id AND purpose = 'login'
+                  AND verified_at IS NOT NULL
+                  AND consumed_at IS NULL
+                  AND verified_at > now() - interval '15 minutes'
+                ORDER BY created_at DESC LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING otp_id
         """),
         {"id": user["partner_user_id"]},
     ).first()
     if not verified:
+        db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please verify the OTP sent to your email first")
 
     db.execute(text("SELECT sp_partner_record_login(:id, :ip)"), {"id": user["partner_user_id"], "ip": ip_address})

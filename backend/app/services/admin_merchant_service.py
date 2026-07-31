@@ -222,21 +222,18 @@ def create_merchant_user(db: Session, partner_id: int, payload: MerchantUserCrea
         if db.execute(text(f"SELECT 1 FROM partner_users WHERE {field} = :v"), {"v": value}).first():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"This {field.replace('_', ' ')} is already in use")
 
-    role_name = "partner_admin" if payload.role_type == "admin" else "partner_staff"
-    role_id = db.scalar(text("SELECT id FROM roles WHERE name = :n"), {"n": role_name})
-
     row = db.execute(
         text("""
             INSERT INTO partner_users (
-                partner_id, role_id, full_name, username, email, phone_number, password_hash,
+                partner_id, full_name, username, email, phone_number, password_hash,
                 role_type, member_role, status, created_at, updated_at
             ) VALUES (
-                :partner_id, :role_id, :full_name, :username, :email, :phone_number, :password_hash,
+                :partner_id, :full_name, :username, :email, :phone_number, :password_hash,
                 :role_type, :member_role, 'active', now(), now()
             ) RETURNING partner_user_id
         """),
         {
-            "partner_id": partner_id, "role_id": role_id, "full_name": payload.full_name,
+            "partner_id": partner_id, "full_name": payload.full_name,
             "username": payload.username, "email": payload.email, "phone_number": payload.phone_number,
             "password_hash": hash_password(payload.password),
             "role_type": payload.role_type, "member_role": payload.member_role,
@@ -275,8 +272,6 @@ def update_merchant_user(db: Session, partner_user_id: int, payload: MerchantUse
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Member Role '{fields['member_role']}' is not valid for Role Type '{fields['role_type']}'",
             )
-        role_name = "partner_admin" if fields["role_type"] == "admin" else "partner_staff"
-        fields["role_id"] = db.scalar(text("SELECT id FROM roles WHERE name = :n"), {"n": role_name})
     set_clause = ", ".join(f"{k} = :{k}" for k in fields)
     db.execute(text(f"UPDATE partner_users SET {set_clause}, updated_at = now() WHERE partner_user_id = :id"), {**fields, "id": partner_user_id})
     db.commit()

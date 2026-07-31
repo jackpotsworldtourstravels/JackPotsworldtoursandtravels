@@ -24,7 +24,11 @@
 -- Demo password: Aurora@2026
 SELECT sp_register_partner(
     'Aurora Gaming Studios', 'AURORA01', 'AU', 'jackpotsworldtours.travels+aurora@gmail.com', '+91-9800011122',
-    'Meera Iyer', 'jackpotsworldtours.travels@gmail.com',
+    -- Plus-tagged (was the bare address) so the bare
+    -- jackpotsworldtours.travels@gmail.com stays free for the TESTM001 test
+    -- merchant seeded later in 0026_test_data_users. Same inbox either way;
+    -- uq_partner_users_email only needs the strings to differ.
+    'Meera Iyer', 'jackpotsworldtours.travels+meera@gmail.com',
     '$2b$12$KwIT.AUFzf0r.GsXinVSTu1kzUeiArBLUul9rRnwvEtCLd97hDpaC',
     'partner_admin'
 );

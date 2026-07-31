@@ -14,25 +14,20 @@ CREATE OR REPLACE FUNCTION sp_register_partner(
     p_admin_full_name             VARCHAR,
     p_admin_email                   VARCHAR,
     p_admin_password_hash             VARCHAR,
-    p_role_name                         VARCHAR DEFAULT 'partner_admin'
+    p_role_type                         merchant_role_type_enum DEFAULT 'admin',
+    p_member_role                        merchant_member_role_enum DEFAULT 'admin'
 )
 RETURNS TABLE (partner_id INTEGER, partner_user_id INTEGER) AS $$
 DECLARE
     v_partner_id       INTEGER;
-    v_role_id          INTEGER;
     v_partner_user_id  INTEGER;
 BEGIN
-    SELECT id INTO v_role_id FROM roles WHERE name = p_role_name;
-    IF v_role_id IS NULL THEN
-        RAISE EXCEPTION 'Role % not found', p_role_name;
-    END IF;
-
     INSERT INTO partners (company_name, company_code, reference_prefix, email, phone_number, status)
     VALUES (p_company_name, p_company_code, p_reference_prefix, p_partner_email, p_phone_number, 'active')
     RETURNING partners.partner_id INTO v_partner_id;
 
-    INSERT INTO partner_users (partner_id, role_id, full_name, email, password_hash, status)
-    VALUES (v_partner_id, v_role_id, p_admin_full_name, p_admin_email, p_admin_password_hash, 'active')
+    INSERT INTO partner_users (partner_id, full_name, email, password_hash, role_type, member_role, status)
+    VALUES (v_partner_id, p_admin_full_name, p_admin_email, p_admin_password_hash, p_role_type, p_member_role, 'active')
     RETURNING partner_users.partner_user_id INTO v_partner_user_id;
 
     RETURN QUERY SELECT v_partner_id, v_partner_user_id;

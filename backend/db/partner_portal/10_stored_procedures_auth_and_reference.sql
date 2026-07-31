@@ -10,12 +10,12 @@ RETURNS TABLE (
     partner_id        INTEGER,
     password_hash      VARCHAR,
     status              partner_user_status_enum,
-    role_id             INTEGER,
+    role_type           merchant_role_type_enum,
     full_name           VARCHAR
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT pu.partner_user_id, pu.partner_id, pu.password_hash, pu.status, pu.role_id, pu.full_name
+    SELECT pu.partner_user_id, pu.partner_id, pu.password_hash, pu.status, pu.role_type, pu.full_name
     FROM partner_users pu
     WHERE pu.email = p_email;
 END;

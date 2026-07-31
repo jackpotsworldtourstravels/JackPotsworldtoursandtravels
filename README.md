@@ -55,8 +55,19 @@ python -m alembic upgrade head
 
 # 6. Start the API
 python -m uvicorn app.main:app --reload --port 8000
-```
+python -m uvicorn app.main:app --reload --port 8080
 
+---------------------------------------------------------------#imt
+Try a different port — quickest fix, often works immediately:
+python -m uvicorn app.main:app --reload --port 8080
+Check if something already owns port 8000:
+netstat -ano | findstr :8000
+If a PID shows up, that process (maybe a previous uvicorn instance that didn't shut down cleanly) is holding the port.
+
+Check Windows' reserved port ranges (Windows sometimes excludes ranges for Hyper-V/WSL):
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+----------------------------------------------------------------------------------------#imt
 Leave this running. The API is now live at http://127.0.0.1:8000 (interactive docs at
 [/docs](http://127.0.0.1:8000/docs)).
 

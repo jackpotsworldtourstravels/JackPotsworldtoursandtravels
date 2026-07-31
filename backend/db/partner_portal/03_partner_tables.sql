@@ -45,9 +45,16 @@ CREATE TABLE partner_otp_requests (
     attempt_count    SMALLINT NOT NULL DEFAULT 0,
     expires_at       TIMESTAMPTZ NOT NULL,
     verified_at      TIMESTAMPTZ,
+    -- Set when a verified OTP has actually been spent on a login. verified_at
+    -- alone is not enough: it stays set forever, so the login guard would keep
+    -- accepting the same OTP for its whole validity window. Login claims the
+    -- row atomically (UPDATE ... RETURNING), making each OTP good for exactly
+    -- one login. Kept as a timestamp rather than deleting the row so the
+    -- attempt history stays auditable.
+    consumed_at      TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ck_partner_otp_attempt_count CHECK (attempt_count >= 0)
 );
 
 CREATE INDEX idx_partner_otp_requests_user_purpose
-    ON partner_otp_requests (partner_user_id, purpose, verified_at);
+    ON partner_otp_requests (partner_user_id, purpose, verified_at, consumed_at);

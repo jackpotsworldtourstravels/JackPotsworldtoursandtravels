@@ -83,7 +83,11 @@ BEGIN
         INSERT INTO partner_audit_logs (partner_id, partner_user_id, action, entity_type, entity_id, description)
         VALUES (NEW.partner_id, NEW.partner_user_id, 'partner_user_created', 'partner_users', NEW.partner_user_id,
                 NEW.full_name || ' (' || NEW.email || ') added');
-    ELSIF TG_OP = 'UPDATE' AND (NEW.status IS DISTINCT FROM OLD.status OR NEW.role_id IS DISTINCT FROM OLD.role_id) THEN
+    ELSIF TG_OP = 'UPDATE' AND (
+        NEW.status IS DISTINCT FROM OLD.status
+        OR NEW.role_type IS DISTINCT FROM OLD.role_type
+        OR NEW.member_role IS DISTINCT FROM OLD.member_role
+    ) THEN
         INSERT INTO partner_audit_logs (partner_id, partner_user_id, action, entity_type, entity_id, description)
         VALUES (NEW.partner_id, NEW.partner_user_id, 'partner_user_updated', 'partner_users', NEW.partner_user_id,
                 'Status/role changed for ' || NEW.email);

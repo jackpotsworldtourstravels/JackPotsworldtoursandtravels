@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.auth.security import decode_token
 from app.database.session import get_db
 from app.models.partner import PartnerUser
-from app.models.user import Role
 
 partner_bearer_scheme = HTTPBearer()
 
@@ -25,9 +24,7 @@ def get_current_partner_user(
 
 def get_current_partner_admin(
     current: PartnerUser = Depends(get_current_partner_user),
-    db: Session = Depends(get_db),
 ) -> PartnerUser:
-    role = db.get(Role, current.role_id)
-    if not role or role.name != "partner_admin":
+    if current.role_type != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Partner admin access required")
     return current
