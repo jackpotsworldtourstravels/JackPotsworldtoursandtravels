@@ -1,19 +1,40 @@
-/* Admin — Booking review and document verification (Phase 3)
+/* Admin — Booking review from the Approval Queue
    =========================================================
    The Approval Queue could always approve or reject a booking; what it could
-   not do was let an admin *look* at one first. Now that a booking carries
-   passports and visas, approving without opening them would be signing off on
-   paperwork nobody read.
+   not do was let an admin *look* at one first. Approving a request without
+   seeing who is flying, on what, and on whose word, is signing a form nobody
+   read. This is that form: everything the merchant submitted, in one modal,
+   read-only.
+
+   WHAT IT SHOWS, AND WHY ALL OF IT
+   Booking reference, merchant, and the enquiry reference the booking came from
+   — the three identifiers an admin needs to answer a phone call about it.
+   Then the itinerary the desk already agreed to (trip type, route, dates,
+   airline, flight, class), the party size, and then every passenger in full:
+   name, gender, date of birth, type, nationality, passport details where the
+   merchant supplied them, and their seat and meal preferences. The booking's
+   contact and special requests sit alongside, and the lifecycle timeline
+   closes it out so the reviewer can see when it was raised and submitted
+   before deciding.
+
+   READ-ONLY BY CONSTRUCTION. There is not an input on this modal. Approve and
+   Reject stay on the queue row where they always were — this screen exists to
+   inform that decision, not to duplicate it, and an admin editing a merchant's
+   passenger list mid-approval is not a workflow anyone asked for.
+
+   DOCUMENTS ARE NO LONGER PART OF THE MERCHANT FLOW. The upload UI was removed
+   from the Classic Booking Request screen, so an enquiry-led booking arrives
+   with no attachments and this modal renders no Documents section for one. The
+   verification controls are still here and still work, shown only when a
+   booking actually carries files, so the API and the admin's ability to act on
+   them survive intact for whenever documents come back.
 
    DELIBERATELY NOT A NEW SCREEN. The queue, its filters, and its approve/reject
    endpoints are untouched — this adds one Review button that opens a modal over
-   the existing overlay markup. Verification is independent of the booking's own
-   lifecycle: rejecting a document does not reject the booking, because the two
-   are different decisions and an admin may well want a replacement file without
-   sending the whole request back.
+   the existing overlay markup.
 
-   Endpoints, both pre-existing or Phase 3:
-     GET  /api/requests/{id}                  booking + passengers + documents
+   Endpoints, both pre-existing:
+     GET  /api/requests/{id}                  booking + passengers + timeline
      POST /api/admin/documents/{id}/verify    document.verify
 
    Loaded after admin.js and reuses its API_BASE, authHeaders, escapeHtml,
@@ -33,6 +54,25 @@ function admFileSize(bytes) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/* 'payment_pending' -> 'Payment Pending'. The API sends enum values for the
+   small fields (gender, passenger type, seat preference) and a ready-made
+   label only for status, so these get title-cased here rather than being
+   printed raw at a reviewer. */
+function admLabel(s) {
+  return String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/* '18:30' -> '6:30 PM'. Preferred times are stored as HH:MM strings on the
+   enquiry and carried onto the booking verbatim. */
+function admTimeLabel(hhmm) {
+  if (!hhmm) return null;
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h)) return String(hhmm);
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+const admDash = v => (v === null || v === undefined || v === '' ? '—' : v);
 
 let admReviewRequestId = null;
 
@@ -72,15 +112,27 @@ function renderBookingReview(data) {
   const d = r.details || {};
   const contact = d.contact || {};
   const docs = data.documents || [];
+  const timeline = data.timeline || [];
 
-  /* Surfaced prominently: an international booking whose passports are not all
-     verified is exactly the case an approving admin should hesitate over. */
   const intl = !!d.international;
-  const paxCount = (r.passengers || []).length;
-  const verifiedPassports = new Set(
-    docs.filter(x => x.doc_type === 'passport' && x.verification_status === 'verified' && x.passenger_id)
-      .map(x => x.passenger_id));
-  const outstanding = intl ? paxCount - verifiedPassports.size : 0;
+  const roundTrip = d.trip_type === 'round_trip';
+  const passengers = r.passengers || [];
+  const paxCount = passengers.length;
+
+  /* The party as the merchant described it on the enquiry, next to the party
+     they actually entered. They are normally identical; when they are not, the
+     enquiry was answered for a different number of people and that is precisely
+     what a reviewer needs to notice before approving. */
+  const declared = Number(d.passenger_count) || null;
+  const mix = [
+    d.adults ? `${d.adults} adult${d.adults === 1 ? '' : 's'}` : null,
+    d.children ? `${d.children} child${d.children === 1 ? '' : 'ren'}` : null,
+    d.infants ? `${d.infants} infant${d.infants === 1 ? '' : 's'}` : null,
+  ].filter(Boolean).join(', ');
+
+  const cell = (label, value) => `
+      <div class="detail-item"><span class="detail-label">${label}</span>
+        <span class="detail-value">${value}</span></div>`;
 
   body.innerHTML = `
     <h2>${escapeHtml(r.request_number)}</h2>
@@ -89,72 +141,111 @@ function renderBookingReview(data) {
       ${d.enquiry_reference ? ` · from ${escapeHtml(d.enquiry_reference)}` : ''}
     </p>
 
-    ${intl ? `<div class="msg ${outstanding > 0 ? 'warn' : 'success'}">
-      International booking — ${outstanding > 0
-        ? `${outstanding} of ${paxCount} traveller${paxCount === 1 ? '' : 's'} still without a verified passport.`
-        : 'every traveller has a verified passport.'}
-    </div>` : ''}
-
     <div class="detail-grid">
-      <div class="detail-item"><span class="detail-label">Status</span>
-        <span class="detail-value"><span class="badge ${aqStatusBadgeClass(r.status)}">${escapeHtml(r.status_label || r.status)}</span></span></div>
-      <div class="detail-item"><span class="detail-label">Route</span>
-        <span class="detail-value">${escapeHtml([d.origin_city || d.origin, d.destination_city || d.destination].filter(Boolean).join(' → ') || '—')}</span></div>
-      <div class="detail-item"><span class="detail-label">Flight</span>
-        <span class="detail-value">${escapeHtml([d.airline, d.flight_number].filter(Boolean).join(' ') || '—')}</span></div>
-      <div class="detail-item"><span class="detail-label">Departure</span>
-        <span class="detail-value">${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}</span></div>
-      <div class="detail-item"><span class="detail-label">Class</span>
-        <span class="detail-value">${escapeHtml(d.travel_class || '—')}</span></div>
-      <div class="detail-item"><span class="detail-label">Travellers</span>
-        <span class="detail-value">${paxCount}</span></div>
-      <div class="detail-item"><span class="detail-label">Contact</span>
-        <span class="detail-value">${escapeHtml(contact.email || '—')}${contact.phone ? `<br>${escapeHtml(contact.phone)}` : ''}</span></div>
-      <div class="detail-item"><span class="detail-label">Route type</span>
-        <span class="detail-value">${intl ? 'International' : 'Domestic'}</span></div>
+      ${cell('Status', `<span class="badge ${aqStatusBadgeClass(r.status)}">${
+        escapeHtml(r.status_label || r.status)}</span>`)}
+      ${cell('Booking reference', escapeHtml(admDash(r.booking_reference)))}
+      ${cell('Merchant', escapeHtml(admDash(r.merchant_name)))}
+      ${cell('Enquiry reference', escapeHtml(admDash(d.enquiry_reference)))}
+      ${cell('Trip type', roundTrip ? 'Round Trip' : 'One Way')}
+      ${cell('Route', escapeHtml(admDash(
+        [d.origin_city || d.origin, d.destination_city || d.destination].filter(Boolean).join(' → '))))}
+      ${cell('Airline', escapeHtml(admDash(d.airline)))}
+      ${cell('Flight number', escapeHtml(admDash(d.flight_number)))}
+      ${cell('Departure', `${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}${
+        d.preferred_time ? ` · ${escapeHtml(admTimeLabel(d.preferred_time))}` : ''}`)}
+      ${cell('Return', roundTrip
+        ? `${escapeHtml(r.return_date ? fmtDate(r.return_date) : '—')}${
+            d.return_preferred_time ? ` · ${escapeHtml(admTimeLabel(d.return_preferred_time))}` : ''}`
+        : 'One way')}
+      ${cell('Class', escapeHtml(admDash(d.travel_class)))}
+      ${cell('Route type', intl ? 'International' : 'Domestic')}
+      ${cell('Passengers', `${paxCount}${mix ? `<div class="cell-sub">${escapeHtml(mix)}</div>` : ''}${
+        declared && declared !== paxCount
+          ? `<div class="cell-sub">Enquiry was for ${declared}</div>` : ''}`)}
+      ${cell('Raised by', `${escapeHtml(admDash(r.raised_by))}<div class="cell-sub">${
+        escapeHtml(fmtDateTime(r.created_at))}</div>`)}
+      ${cell('Contact', contact.email || contact.phone || contact.name
+        ? `${escapeHtml(admDash(contact.name))}${
+            contact.email ? `<div class="cell-sub">${escapeHtml(contact.email)}</div>` : ''}${
+            contact.phone ? `<div class="cell-sub">${escapeHtml(contact.phone)}${
+              contact.alternate_phone ? ` · ${escapeHtml(contact.alternate_phone)}` : ''}</div>` : ''}`
+        : '—')}
     </div>
 
     ${d.special_requests ? `<div class="detail-note"><strong>Special requests</strong><p>${escapeHtml(d.special_requests)}</p></div>` : ''}
     ${r.remarks ? `<div class="detail-note"><strong>Merchant remarks</strong><p>${escapeHtml(r.remarks)}</p></div>` : ''}
+    ${d.admin_response ? `<div class="detail-note"><strong>Our answer on the enquiry</strong><p>${escapeHtml(d.admin_response)}</p></div>` : ''}
 
-    <h3 style="font-size:13px;margin:18px 0 8px;">Passengers</h3>
+    <h3 style="font-size:13px;margin:18px 0 8px;">Passengers (${paxCount})</h3>
     <div class="table-wrap"><table><thead><tr>
-      <th>Name</th><th>Type</th><th>DOB</th><th>Nationality</th><th>Passport</th><th>Expiry</th>
+      <th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
+      <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Preferences</th>
     </tr></thead><tbody>
-      ${(r.passengers || []).map(p => `<tr>
+      ${passengers.map((p, i) => `<tr>
+        <td>${i + 1}</td>
         <td>${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' '))}</td>
-        <td style="text-transform:capitalize">${escapeHtml(p.passenger_type || 'adult')}</td>
+        <td>${escapeHtml(admLabel(p.passenger_type || 'adult'))}</td>
+        <td>${escapeHtml(p.gender ? admLabel(p.gender) : '—')}</td>
         <td>${escapeHtml(p.dob ? fmtDate(p.dob) : '—')}</td>
-        <td>${escapeHtml(p.nationality || '—')}</td>
-        <td>${escapeHtml(p.passport_number || '—')}</td>
+        <td>${escapeHtml(admDash(p.nationality))}</td>
+        <td>${escapeHtml(admDash(p.passport_number))}${
+          p.passport_issue_country
+            ? `<div class="cell-sub">${escapeHtml(p.passport_issue_country)}${
+                p.passport_issue_date ? ` · issued ${escapeHtml(fmtDate(p.passport_issue_date))}` : ''}</div>`
+            : ''}</td>
         <td>${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
-      </tr>`).join('') || '<tr><td colspan="6" class="empty-state">No passengers.</td></tr>'}
+        <td>${escapeHtml([
+          p.seat_preference ? `${admLabel(p.seat_preference)} seat` : null,
+          p.meal_preference ? `${admLabel(p.meal_preference)} meal` : null,
+        ].filter(Boolean).join(', ') || '—')}</td>
+      </tr>`).join('') || '<tr><td colspan="9" class="empty-state">No passengers.</td></tr>'}
     </tbody></table></div>
 
-    <h3 style="font-size:13px;margin:18px 0 8px;">Documents</h3>
-    <div class="table-wrap"><table><thead><tr>
-      <th>File</th><th>Type</th><th>For</th><th>Status</th><th>Actions</th>
-    </tr></thead><tbody id="admDocRows">
-      ${docs.length ? docs.map(doc => `<tr>
-        <td>${escapeHtml(doc.original_filename)}<div class="cell-sub">${admFileSize(doc.size_bytes)} · ${escapeHtml(doc.uploaded_by_name || '')}</div></td>
-        <td>${escapeHtml(ADM_DOC_LABEL[doc.doc_type] || doc.doc_type)}</td>
-        <td>${escapeHtml(admPassengerName(r, doc.passenger_id))}</td>
-        <td><span class="badge ${ADM_DOC_TONE[doc.verification_status]}">${escapeHtml(doc.verification_label)}</span>
-          ${doc.rejection_reason ? `<div class="cell-sub">${escapeHtml(doc.rejection_reason)}</div>` : ''}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-ghost btn-sm" data-adm-doc-view="${doc.id}">View</button>
-          ${doc.verification_status !== 'verified'
-            ? `<button class="btn btn-navy btn-sm" data-adm-doc-ok="${doc.id}">Verify</button>` : ''}
-          ${doc.verification_status !== 'rejected'
-            ? `<button class="btn btn-danger btn-sm" data-adm-doc-no="${doc.id}">Reject</button>` : ''}
-        </td>
-      </tr>`).join('') : '<tr><td colspan="5" class="empty-state">No documents attached.</td></tr>'}
-    </tbody></table></div>
+    ${docs.length ? `
+      <h3 style="font-size:13px;margin:18px 0 8px;">Documents</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>File</th><th>Type</th><th>For</th><th>Status</th><th>Actions</th>
+      </tr></thead><tbody id="admDocRows">
+        ${docs.map(doc => `<tr>
+          <td>${escapeHtml(doc.original_filename)}<div class="cell-sub">${admFileSize(doc.size_bytes)} · ${escapeHtml(doc.uploaded_by_name || '')}</div></td>
+          <td>${escapeHtml(ADM_DOC_LABEL[doc.doc_type] || doc.doc_type)}</td>
+          <td>${escapeHtml(admPassengerName(r, doc.passenger_id))}</td>
+          <td><span class="badge ${ADM_DOC_TONE[doc.verification_status]}">${escapeHtml(doc.verification_label)}</span>
+            ${doc.rejection_reason ? `<div class="cell-sub">${escapeHtml(doc.rejection_reason)}</div>` : ''}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-ghost btn-sm" data-adm-doc-view="${doc.id}">View</button>
+            ${doc.verification_status !== 'verified'
+              ? `<button class="btn btn-navy btn-sm" data-adm-doc-ok="${doc.id}">Verify</button>` : ''}
+            ${doc.verification_status !== 'rejected'
+              ? `<button class="btn btn-danger btn-sm" data-adm-doc-no="${doc.id}">Reject</button>` : ''}
+          </td>
+        </tr>`).join('')}
+      </tbody></table></div>` : ''}
+
+    <h3 style="font-size:13px;margin:18px 0 8px;">Timeline</h3>
+    <div class="timeline">
+      ${timeline.length ? timeline.map(step => `
+        <div class="timeline-item"${step.state === 'pending' ? ' style="opacity:.55;"' : ''}>
+          <div class="timeline-dot"${step.state === 'pending'
+            ? ' style="background:var(--border-color);"' : ''}></div>
+          <div class="timeline-body">
+            <div class="timeline-text">${escapeHtml(step.label || admLabel(step.status))}</div>
+            <div class="timeline-time">${step.at ? escapeHtml(fmtDateTime(step.at)) : 'Not yet'}${
+              step.by ? ` · ${escapeHtml(step.by)}` : ''}</div>
+            ${step.reason ? `<div class="timeline-time">${escapeHtml(step.reason)}</div>` : ''}
+            ${step.note ? `<div class="timeline-time">${escapeHtml(step.note)}</div>` : ''}
+          </div>
+        </div>`).join('') : '<div class="empty-state">No timeline recorded.</div>'}
+    </div>
 
     <div class="msg" id="admReviewMsg"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-adm-close type="button">Close</button>
-    </div>`;
+    </div>
+    <p class="modal-sub" style="margin:10px 0 0;">
+      Read-only. Approve and Reject stay on the queue row behind this dialog.
+    </p>`;
 
   body.querySelectorAll('[data-adm-close]').forEach(b =>
     b.addEventListener('click', () => overlay.classList.remove('open')));

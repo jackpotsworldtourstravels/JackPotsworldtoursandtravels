@@ -25,37 +25,41 @@
    Saving without submitting is a legitimate outcome, so Save as draft stops
    after the first.
 
-   DOCUMENTS NEED A DRAFT TO EXIST FIRST (Phase 3)
-   A file has to be attached *to* something, and the request row is only born
-   on the first call above. So the page has two shapes:
+   NO DOCUMENTS ON THIS SCREEN
+   There was once a Documents panel here, and on an international sector it was
+   a gate: the merchant had to Save as draft, attach a passport per traveller,
+   and only then could submit. That is gone. The flow is now the same shape on
+   every route —
 
-     domestic       fill -> Submit                (one step, as before)
-     international  fill -> Save as draft -> attach passports -> Submit
+     fill in the travellers -> (optionally) Save as draft -> Submit
 
-   The Documents panel is therefore inert until a draft id exists, and says so
-   rather than showing controls that would 404. Resuming a saved draft comes
-   back through Request Ticket, which loads it instead of refusing as a
-   duplicate — see clRequestTicket in classic-enquiry.js.
+   — and Save as draft is a convenience, never a required step. Nothing about a
+   file may stand between a filled-in form and the approvals desk. The upload
+   API, the request_documents table and the Admin's verification screen all
+   still exist and still work, so documents can come back later without a
+   migration; they are simply not part of this workflow. Resuming a saved draft
+   still comes back through Request Ticket, which loads it instead of refusing
+   as a duplicate — see clRequestTicket in classic-enquiry.js.
 
-   WHY THE UI DECIDES "INTERNATIONAL"
+   WHY THE UI STILL DECIDES "INTERNATIONAL"
    The API stores an IATA code and a city name, no country. travel-locations.js
-   is the only place countries exist, so the flag is computed here and sent
-   with the draft; the backend then enforces passports at submit. When a code
-   is missing from that dataset the answer is "not international", so an
-   unknown airport can never invent a requirement the merchant cannot meet. */
+   is the only place countries exist, so the flag is computed here and sent with
+   the draft. It now drives passport *details* only — a number the merchant
+   types, and an expiry that must outlast the travel date — which the backend
+   still enforces at submit. When a code is missing from that dataset the answer
+   is "not international", so an unknown airport can never invent a requirement
+   the merchant cannot meet. */
 
 /* The enquiry this screen is currently working from. Set by clStartBookingRequest,
    which Request Ticket calls just before navigating here. */
 let clBookingEnquiry = null;
 /* The saved draft, once one exists — null until Save as draft (or a resume).
-   Its presence is what unlocks the Documents panel. */
+   Its presence is what routes the next save to update rather than create. */
 let clBookingDraft = null;
-let clBookingDocs = [];
 
 function clStartBookingRequest(enquiry, draft = null) {
   clBookingEnquiry = enquiry;
   clBookingDraft = draft;
-  clBookingDocs = [];
 }
 
 function clInitBookingRequest() {
@@ -197,24 +201,10 @@ function clRenderBookingForm(e) {
       <div class="cl-panel-body" id="clBrPaxList"></div>
       <div class="cl-panel-note">
         ${intl
-          ? 'This is an international sector, so every traveller needs a passport number, an '
-            + 'expiry after the travel date, and a passport document attached below.'
+          ? 'This is an international sector, so every traveller needs a passport number and an '
+            + 'expiry after the travel date. No documents need to be uploaded.'
           : 'First and last name are required for every passenger. Passport details are optional '
             + 'on a domestic sector and can be supplied later.'}
-      </div>
-    </div>
-
-    <div class="cl-panel">
-      <div class="cl-panel-head">
-        <h2>Documents</h2>
-        <div class="cl-panel-tools"><span class="cl-kpi-sub">PDF, JPEG, PNG or WebP · up to 10 MB</span></div>
-      </div>
-      <div class="cl-panel-body" id="clBrDocsBody"></div>
-      <div class="cl-panel-note">
-        Uploaded files are private to your company and are only visible to you and our
-        ticketing team. ${intl
-          ? 'A passport is required for each traveller on this booking.'
-          : 'Nothing is required for a domestic sector — attach anything that helps.'}
       </div>
     </div>
 
@@ -235,7 +225,8 @@ function clRenderBookingForm(e) {
         <div class="cl-form-actions">
           <button type="button" class="cl-btn cl-btn-primary" id="clBrSubmitBtn">Submit for approval</button>
           <button type="button" class="cl-btn" id="clBrDraftBtn">Save as draft</button>
-          <span class="cl-kpi-sub">Draft stays in My Requests and can be submitted later.</span>
+          <span class="cl-kpi-sub">Saving a draft is optional — you can submit straight away.
+            A draft stays in My Requests and can be submitted later.</span>
         </div>
         <div class="cl-msg" id="clBrMsg"></div>
       </div>
@@ -257,7 +248,6 @@ function clRenderBookingForm(e) {
   } else {
     clSeedPassengerRows(list, e);
   }
-  clRenderDocuments();
 
   $('clBrAddPax').addEventListener('click', () => {
     clAddPaxCard(list, list.querySelectorAll('[data-cl-pax]').length);
@@ -272,159 +262,6 @@ function clRenderBookingForm(e) {
   });
   $('clBrSubmitBtn').addEventListener('click', () => clSubmitBookingRequest(true));
   $('clBrDraftBtn').addEventListener('click', () => clSubmitBookingRequest(false));
-}
-
-/* ---------------------------------------------------------------- documents */
-
-const CL_DOC_TYPES = [
-  ['passport', 'Passport'], ['visa', 'Visa'], ['photo_id', 'Photo ID'],
-  ['ticket', 'Ticket'], ['other', 'Other'],
-];
-const CL_DOC_TONE = { verified: 'ok', rejected: 'err', pending: '' };
-
-/* Inert until a draft exists: there is nothing to attach a file to before the
-   request row is created, and offering an upload control that could only 404
-   would be worse than explaining why it is not there yet. */
-function clRenderDocuments() {
-  const body = $('clBrDocsBody');
-  if (!body) return;
-
-  if (!clBookingDraft) {
-    body.innerHTML = `
-      <div class="cl-msg cl-msg-muted" style="margin-top:0">
-        Press <b>Save as draft</b> first — documents attach to the saved request.
-        ${clIsInternational(clBookingEnquiry)
-          ? 'This is an international booking, so passports are required before it can be submitted.'
-          : ''}
-      </div>`;
-    return;
-  }
-
-  const cards = [...($('clBrPaxList')?.querySelectorAll('[data-cl-pax]') || [])];
-  const paxOptions = clBookingDraft.passengers.map((p, i) => {
-    const card = cards[i];
-    const name = card
-      ? [card.querySelector('[data-field="first_name"]')?.value,
-         card.querySelector('[data-field="last_name"]')?.value].filter(Boolean).join(' ').trim()
-      : '';
-    return `<option value="${p.id}">${escapeHtml(name || `Passenger ${i + 1}`)}</option>`;
-  }).join('');
-
-  body.innerHTML = `
-    <div class="cl-form cl-form-3" style="align-items:end;">
-      <div class="cl-field">
-        <label for="clBrDocPax">Belongs to</label>
-        <select id="clBrDocPax">
-          <option value="">The booking (not one traveller)</option>
-          ${paxOptions}
-        </select>
-      </div>
-      <div class="cl-field">
-        <label for="clBrDocType">Document type</label>
-        <select id="clBrDocType">
-          ${CL_DOC_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
-        </select>
-      </div>
-      <div class="cl-field">
-        <label for="clBrDocFile">File</label>
-        <input type="file" id="clBrDocFile" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
-      </div>
-    </div>
-    <div class="cl-form-actions" style="margin-top:6px;">
-      <button type="button" class="cl-btn cl-btn-sm cl-btn-primary" id="clBrDocUpload">Upload</button>
-      <span class="cl-msg" id="clBrDocMsg"></span>
-    </div>
-    <div class="cl-table-wrap" style="margin-top:12px;">
-      <table class="cl-table">
-        <thead><tr><th>File</th><th>Type</th><th>For</th><th>Status</th><th>Uploaded</th><th></th></tr></thead>
-        <tbody id="clBrDocRows"></tbody>
-      </table>
-    </div>`;
-
-  $('clBrDocUpload').addEventListener('click', clUploadDocument);
-  clRenderDocumentRows();
-}
-
-function clRenderDocumentRows() {
-  const tbody = $('clBrDocRows');
-  if (!tbody) return;
-  const nameFor = pid => {
-    if (!pid) return 'Booking';
-    const idx = clBookingDraft.passengers.findIndex(p => p.id === pid);
-    const p = clBookingDraft.passengers[idx];
-    return p ? `${p.first_name} ${p.last_name}`.trim() || `Passenger ${idx + 1}` : '—';
-  };
-
-  tbody.innerHTML = clBookingDocs.length ? clBookingDocs.map(d => `
-    <tr>
-      <td>${escapeHtml(d.original_filename)}<div class="cl-kpi-sub">${clFileSize(d.size_bytes)}</div></td>
-      <td>${escapeHtml((CL_DOC_TYPES.find(t => t[0] === d.doc_type) || [, d.doc_type])[1])}</td>
-      <td>${escapeHtml(nameFor(d.passenger_id))}</td>
-      <td><span class="cl-tag${CL_DOC_TONE[d.verification_status] ? ` cl-tag-${CL_DOC_TONE[d.verification_status]}` : ''}">${
-        escapeHtml(d.verification_label)}</span>${
-        d.rejection_reason ? `<div class="cl-kpi-sub">${escapeHtml(d.rejection_reason)}</div>` : ''}</td>
-      <td>${escapeHtml(fmtDateTime(d.created_at))}</td>
-      <td style="white-space:nowrap;">
-        <button type="button" class="cl-btn cl-btn-sm" data-cl-doc-view="${d.id}">View</button>
-        <button type="button" class="cl-btn cl-btn-sm" data-cl-doc-del="${d.id}">Remove</button>
-      </td>
-    </tr>`).join('') : clEmptyRow(6, 'No documents attached yet.');
-
-  tbody.querySelectorAll('[data-cl-doc-view]').forEach(b =>
-    b.addEventListener('click', () => clViewDocument(b.dataset.clDocView)));
-  tbody.querySelectorAll('[data-cl-doc-del]').forEach(b =>
-    b.addEventListener('click', () => clDeleteDocument(b.dataset.clDocDel)));
-}
-
-async function clUploadDocument() {
-  const msg = $('clBrDocMsg');
-  const input = $('clBrDocFile');
-  const file = input.files?.[0];
-  if (!file) return clMsg(msg, 'Choose a file first.', 'err');
-
-  const btn = $('clBrDocUpload');
-  btn.disabled = true;
-  clMsg(msg, 'Uploading…', 'muted');
-  try {
-    const doc = await MerchantApi.uploadDocument(clBookingDraft.id, file, {
-      docType: $('clBrDocType').value,
-      passengerId: $('clBrDocPax').value || null,
-    });
-    clBookingDocs.push(doc);
-    input.value = '';
-    clMsg(msg, `${doc.original_filename} attached.`, 'ok');
-    clRenderDocumentRows();
-  } catch (err) {
-    clMsg(msg, clError(err, 'Could not upload that file.'), 'err');
-  }
-  btn.disabled = false;
-}
-
-/* The download endpoint needs an Authorization header, so this cannot be a
-   plain link — the bytes are fetched as a blob and opened from an object URL,
-   which is revoked once the tab has taken it. */
-async function clViewDocument(id) {
-  const msg = $('clBrDocMsg');
-  try {
-    const url = await MerchantApi.downloadDocument(id);
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch (err) {
-    clMsg(msg, clError(err, 'Could not open that document.'), 'err');
-  }
-}
-
-async function clDeleteDocument(id) {
-  const doc = clBookingDocs.find(d => String(d.id) === String(id));
-  if (!await clConfirm(`Remove ${doc?.original_filename || 'this document'} from the booking?`, 'Remove')) return;
-  try {
-    await MerchantApi.deleteDocument(id);
-    clBookingDocs = clBookingDocs.filter(d => String(d.id) !== String(id));
-    clRenderDocumentRows();
-    clMsg($('clBrDocMsg'), 'Document removed.', 'ok');
-  } catch (err) {
-    clMsg($('clBrDocMsg'), clError(err, 'Could not remove that document.'), 'err');
-  }
 }
 
 /* Adults first, then children, then infants — the order every airline lists a
@@ -585,9 +422,11 @@ function clPassengerPayload(card) {
   };
 }
 
-/* First and last name on every passenger, plus passport details when the route
-   is international. The offending field is focused and outlined rather than
-   described in prose. Returns an error string, or null when clean. */
+/* First and last name on every passenger, plus passport *details* — a number
+   and a usable expiry — when the route is international. No attachment is
+   involved: a merchant can complete this screen entirely by typing. The
+   offending field is focused and outlined rather than described in prose.
+   Returns an error string, or null when clean. */
 function clFlagMissingPassengerFields(intl, travelDate) {
   let firstBad = null;
   let problem = null;
@@ -674,9 +513,10 @@ async function clSubmitBookingRequest(finalize) {
   const contactProblem = clFlagMissingContact();
   if (contactProblem) return clMsg(msg, contactProblem, 'err');
 
-  /* Passport rules bite only on submit. Saving a draft with them incomplete is
-     the whole point of the draft — it is how the merchant gets a request id to
-     attach the passports to in the first place. */
+  /* Passport rules bite only on submit — a half-filled draft is a legitimate
+     thing to save. There is nothing else to satisfy: an international sector
+     asks for passport numbers typed into the form, never for an upload, so a
+     merchant who has filled the grid in can always go straight to Submit. */
   const paxProblem = clFlagMissingPassengerFields(finalize && intl, enquiry.travel_date);
   if (paxProblem) return clMsg(msg, paxProblem, 'err');
 
@@ -684,25 +524,6 @@ async function clSubmitBookingRequest(finalize) {
   if (!cards.length) return clMsg(msg, 'Add at least one passenger.', 'err');
 
   const passengers = cards.map(clPassengerPayload);
-
-  /* Checked here as well as server-side so the merchant is told which traveller
-     is missing paperwork while the form is still in front of them, rather than
-     bouncing off a 400 after pressing Submit. */
-  if (finalize && intl) {
-    const covered = new Set(
-      clBookingDocs.filter(d => d.doc_type === 'passport' && d.passenger_id).map(d => d.passenger_id));
-    const missing = (clBookingDraft?.passengers || [])
-      .filter(p => !covered.has(p.id))
-      .map((p, i) => `${p.first_name} ${p.last_name}`.trim() || `Passenger ${i + 1}`);
-    if (!clBookingDraft) {
-      return clMsg(msg,
-        'Save this as a draft first, then attach a passport for each traveller — '
-        + 'required on an international sector.', 'err');
-    }
-    if (missing.length) {
-      return clMsg(msg, `Attach a passport document for: ${missing.join(', ')}.`, 'err');
-    }
-  }
 
   /* The party size the desk answered for is part of what was quoted, so a
      mismatch is worth confirming rather than silently sending. */
@@ -721,8 +542,14 @@ async function clSubmitBookingRequest(finalize) {
   const specialRequests = ($('clBrSpecial').value || '').trim();
   const contact = clContactPayload();
 
+  /* THREE try BLOCKS, NOT ONE.
+     These steps fail in different ways and must be reported differently. When
+     they shared a handler, a throw from any of the bookkeeping below was
+     rendered as "Could not raise the booking request." over a draft the server
+     had already created — so the merchant pressed Save again and got a second
+     one. A save that succeeded is never reported as a failure now. */
+  let request;
   try {
-    let request;
     if (clBookingDraft) {
       /* Resuming a saved draft: push whatever changed, then submit. Passengers
          are replaced wholesale because that is the endpoint's contract, and
@@ -739,21 +566,42 @@ async function clSubmitBookingRequest(finalize) {
         passengers, remarks, contact, international: intl, specialRequests,
       });
     }
+  } catch (err) {
+    clMsg(msg, clError(err, 'Could not raise the booking request.'), 'err');
+    submitBtn.disabled = false; draftBtn.disabled = false;
+    return;
+  }
 
-    if (finalize) {
+  /* The row exists from here on. Recorded before anything else can throw: a
+     later failure that left this null would send the next press back down the
+     create path and raise a second booking against the same enquiry. */
+  clBookingDraft = request;
+
+  if (finalize) {
+    try {
       await MerchantApi.submitRequest(request.id);
+    } catch (err) {
+      /* The draft survived even though the submit did not, so say so — the
+         merchant has lost no typing and can press Submit again. */
+      clMsg(msg, clError(err,
+        `${request.request_number} was saved as a draft, but could not be submitted.`), 'err');
+      draftBtn.textContent = 'Save changes';
+      submitBtn.disabled = false; draftBtn.disabled = false;
+      return;
+    }
+  }
+
+  /* Cosmetic from here: the screen, the cached section lists and the unread
+     badge. None of it can undo what the server has already accepted, so a
+     throw is logged and the outcome still reported as the success it was. */
+  try {
+    if (finalize) {
       clBookingSubmitted(request.request_number, enquiry.reference_number);
     } else {
-      /* Hold onto the saved draft so Documents can attach to it and a second
-         save updates rather than duplicating — the API 409s on a re-book. */
-      clBookingDraft = request;
       clSyncPassengerIds(request.passengers);
-      clBookingDocs = await MerchantApi.listDocuments(request.id).catch(() => []);
-      clRenderDocuments();
       clMsg(msg,
-        `Draft saved — ${request.request_number}.`
-        + (intl ? ' Attach a passport for each traveller, then submit.'
-                : ' Submit it here or from My Requests when ready.'), 'ok');
+        `Draft saved — ${request.request_number}. `
+        + 'Submit it here or from My Requests when ready.', 'ok');
       draftBtn.textContent = 'Save changes';
     }
 
@@ -763,15 +611,20 @@ async function clSubmitBookingRequest(finalize) {
     clSearchCache = null;
     clLoadUnreadCount();
   } catch (err) {
-    clMsg(msg, clError(err, 'Could not raise the booking request.'), 'err');
-    submitBtn.disabled = false; draftBtn.disabled = false;
-    return;
+    console.error('Booking request went through, but this screen could not be updated', err);
+    if (!finalize) {
+      clMsg(msg,
+        `Draft saved — ${request.request_number}. `
+        + 'Reload the page if this screen looks out of date.', 'ok');
+      draftBtn.textContent = 'Save changes';
+    }
   }
 
   /* Re-enabled after a draft save, unlike Phase 1 where saving ended the
-     screen's usefulness. The merchant now has more to do here — attach
-     passports, then submit — and clSubmitBookingRequest routes to update
-     rather than create on the next press, so pressing again cannot duplicate. */
+     screen's usefulness. Saving is now purely a checkpoint — the merchant can
+     carry on editing and then submit from here — and clSubmitBookingRequest
+     routes to update rather than create on the next press, so pressing again
+     cannot duplicate. */
   if (!finalize) {
     submitBtn.disabled = false;
     draftBtn.disabled = false;

@@ -25,17 +25,6 @@ function clLabel(s) {
   return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/* File size for a document row. Bytes below a kilobyte are shown as bytes:
-   rounding them to "0 KB" reads as a failed upload rather than a small file.
-   Here rather than in one screen's file because both the Booking Request form
-   and the Booking Request Details page list the same documents. */
-function clFileSize(bytes) {
-  const n = Number(bytes) || 0;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /* Status -> tag colour. Kept in one place so a status never renders green on
    one screen and grey on another. */
 const CL_STATUS_TONE = {

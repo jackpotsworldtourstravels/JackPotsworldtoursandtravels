@@ -875,16 +875,14 @@ async function clRequestTicket(enquiryId) {
     clUpsertEnquiryRow(enquiry);
 
     if (enquiry.booking_request_id) {
-      /* An unsubmitted draft is work in progress, not a duplicate. Documents
-         can only be attached once the draft exists, so a merchant on an
-         international sector *has* to come back here — refusing them would
-         strand the booking they were told to finish. Anything past draft is
-         genuinely already raised and stays read-only. */
+      /* An unsubmitted draft is work in progress, not a duplicate. A merchant
+         who saved one and came back is resuming, so it is reopened with its
+         passengers rather than refused. Anything past draft is genuinely
+         already raised and stays read-only. */
       const detail = await MerchantApi.getRequest(enquiry.booking_request_id).catch(() => null);
       const booking = detail?.request || detail;
       if (booking && booking.status === 'draft') {
         clStartBookingRequest(enquiry, booking);
-        clBookingDocs = await MerchantApi.listDocuments(booking.id).catch(() => []);
         clLoaded.delete('booking-request');
         return clGo('booking-request');
       }

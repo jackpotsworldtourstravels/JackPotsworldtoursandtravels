@@ -2,19 +2,25 @@
 /* Classic — Booking Request Details (Phase 3).
    ===========================================================================
    A dedicated page, not another modal. A booking request carries an itinerary,
-   a contact, a party, a document set with its own verification states, and a
-   full status timeline — that is more than a dialog should hold, and it is
-   something a merchant wants to link to, refresh, and read side by side with
-   an email from our desk.
+   a contact, a party and a full status timeline — that is more than a dialog
+   should hold, and it is something a merchant wants to link to, refresh, and
+   read side by side with an email from our desk.
 
    The existing request modal in classic-requests.js still handles every OTHER
    request type (cancellations, refunds, ancillaries). Only bookings come here,
    so nothing that already worked was taken away.
 
+   NO DOCUMENTS PANEL. There was one, and it went with the upload controls on
+   the Booking Request screen — documents are no longer part of the Classic
+   merchant workflow, so a permanently empty table telling merchants to "open it
+   from Ticket Enquiry to add documents" would be an instruction they could not
+   follow. The `documents` key is still on the payload and the Admin still has
+   its verification screen, so nothing has to be rebuilt if they return.
+
    ONE CALL, NO NEW ENDPOINT
    GET /api/requests/{id} already returns request + timeline + actions +
-   payments, and Phase 3 added `documents` to that same response. This page is
-   a renderer over that payload; it invents no API of its own. */
+   payments. This page is a renderer over that payload; it invents no API of
+   its own. */
 
 let clDetailRequestId = null;
 let clDetailData = null;
@@ -61,7 +67,6 @@ function clRenderBookingDetail() {
   const r = data.request || data;
   const d = r.details || {};
   const contact = d.contact || {};
-  const docs = data.documents || [];
   const timeline = data.timeline || [];
   const roundTrip = d.trip_type === 'round_trip';
 
@@ -90,9 +95,10 @@ function clRenderBookingDetail() {
       <div class="cl-kpi"><div class="cl-kpi-label">Travellers</div>
         <div class="cl-kpi-value">${(r.passengers || []).length}</div>
         <div class="cl-kpi-sub">${escapeHtml(d.travel_class || '')}</div></div>
-      <div class="cl-kpi"><div class="cl-kpi-label">Documents</div>
-        <div class="cl-kpi-value">${docs.length}</div>
-        <div class="cl-kpi-sub">${docs.filter(x => x.verification_status === 'verified').length} verified</div></div>
+      <div class="cl-kpi"><div class="cl-kpi-label">Booking reference</div>
+        <div class="cl-kpi-value cl-ref">${escapeHtml(r.booking_reference || '—')}</div>
+        <div class="cl-kpi-sub">${d.enquiry_reference
+          ? `From enquiry ${escapeHtml(d.enquiry_reference)}` : ''}</div></div>
     </div>
 
     <div class="cl-panel">
@@ -157,36 +163,6 @@ function clRenderBookingDetail() {
     </div>
 
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Documents</h2></div>
-      <div class="cl-table-wrap">
-        <table class="cl-table">
-          <thead><tr><th>File</th><th>Type</th><th>For</th><th>Status</th><th>Uploaded</th><th></th></tr></thead>
-          <tbody>${docs.length ? docs.map(doc => `
-            <tr>
-              <td>${escapeHtml(doc.original_filename)}
-                <div class="cl-kpi-sub">${clFileSize(doc.size_bytes)}</div></td>
-              <td>${escapeHtml(clLabel(doc.doc_type))}</td>
-              <td>${escapeHtml(clDetailPassengerName(r, doc.passenger_id))}</td>
-              <td><span class="cl-tag${
-                doc.verification_status === 'verified' ? ' cl-tag-ok'
-                : doc.verification_status === 'rejected' ? ' cl-tag-err' : ''}">${
-                escapeHtml(doc.verification_label)}</span>${
-                doc.rejection_reason ? `<div class="cl-kpi-sub">${escapeHtml(doc.rejection_reason)}</div>` : ''}</td>
-              <td>${escapeHtml(fmtDateTime(doc.created_at))}
-                <div class="cl-kpi-sub">${escapeHtml(doc.uploaded_by_name || '')}</div></td>
-              <td><button type="button" class="cl-btn cl-btn-sm" data-cl-bd-doc="${doc.id}">View</button></td>
-            </tr>`).join('') : clEmptyRow(6, 'No documents attached to this booking.')}</tbody>
-        </table>
-      </div>
-      ${r.status === 'draft' ? `<div class="cl-panel-note">
-        This booking is still a draft — open it from Ticket Enquiry to add or remove documents.
-      </div>` : `<div class="cl-panel-note">
-        Documents can only be changed while a booking is a draft. Contact our team if something
-        needs to be added now.
-      </div>`}
-    </div>
-
-    <div class="cl-panel">
       <div class="cl-panel-head"><h2>Timeline</h2></div>
       <div class="cl-panel-body">
         <ol class="cl-timeline">${timeline.map(step => `
@@ -206,24 +182,4 @@ function clRenderBookingDetail() {
     clLoaded.delete('booking-detail');
     clGo('booking-detail');
   });
-  $('cl-booking-detail').querySelectorAll('[data-cl-bd-doc]').forEach(b =>
-    b.addEventListener('click', async () => {
-      try {
-        const url = await MerchantApi.downloadDocument(b.dataset.clBdDoc);
-        window.open(url, '_blank', 'noopener');
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } catch (err) {
-        clOpenModal('Could not open the document',
-          `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Please try again.'))}</div>`,
-          '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
-      }
-    }));
-}
-
-function clDetailPassengerName(request, passengerId) {
-  if (!passengerId) return 'Booking';
-  const idx = (request.passengers || []).findIndex(p => p.id === passengerId);
-  if (idx < 0) return '—';
-  const p = request.passengers[idx];
-  return `${p.first_name} ${p.last_name}`.trim() || `Passenger ${idx + 1}`;
 }

@@ -24,7 +24,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.rbac import P, has_permission
 from app.models_v2 import (
-    DocumentType,
     Merchant,
     PassengerData,
     Payment,
@@ -435,13 +434,20 @@ def _validate_enquiry_led_submission(request: ServiceRequest) -> None:
 
     Scoped to enquiry-led bookings on purpose. ``submit_request`` is shared with
     the catalog-led flow the Premium portal and Operations still use, and those
-    have never collected a contact or documents — applying these rules to every
-    request would break both the moment this shipped.
+    have never collected a contact — applying these rules to every request would
+    break both the moment this shipped.
 
     The international rule follows the same decision: a booking is treated as
     international only when the Classic UI positively said so from its airport
     reference data. When the country is unknown, passports stay optional rather
     than blocking a merchant on a fact nobody recorded.
+
+    **Attachments are never checked here.** Documents were dropped from the
+    Classic booking workflow: a merchant fills in the travellers and submits, and
+    nothing about a file may stand between them and the approvals desk. The
+    documents table, service and endpoints are all still in place and still work
+    — they are simply not a precondition of submitting. Re-introducing a check
+    here would silently make them mandatory again.
     """
     details = request.travel_details or {}
 
@@ -465,9 +471,11 @@ def _validate_enquiry_led_submission(request: ServiceRequest) -> None:
     if not details.get("international"):
         return
 
-    # International: each traveller needs passport details and a passport
-    # document. Infants travel on an adult's passport in some markets but still
-    # need their own for immigration, so they are not exempt here.
+    # International: each traveller needs passport *details*. This is passenger
+    # data the merchant types on the form, not an upload — the scan that used to
+    # be demanded alongside it is no longer part of the workflow. Infants travel
+    # on an adult's passport in some markets but still need their own for
+    # immigration, so they are not exempt here.
     for p in request.passengers:
         if not (p.passport_number or "").strip():
             raise HTTPException(
@@ -485,20 +493,6 @@ def _validate_enquiry_led_submission(request: ServiceRequest) -> None:
                     "on or before the travel date"
                 ),
             )
-
-    with_passport_doc = {
-        d.passenger_id for d in request.documents
-        if d.doc_type is DocumentType.PASSPORT and d.passenger_id is not None
-    }
-    missing_docs = [p.full_name for p in request.passengers if p.passenger_id not in with_passport_doc]
-    if missing_docs:
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Upload a passport document for: " + ", ".join(missing_docs)
-                + " — required on international bookings"
-            ),
-        )
 
 
 def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
