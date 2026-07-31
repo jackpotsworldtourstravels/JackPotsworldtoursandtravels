@@ -6,10 +6,10 @@ visibility rules, and splitting them would mean duplicating the scoping.
 
 Who may call what is decided by permission code, not URL prefix:
 
-* ``ticket.enquiry`` raises an enquiry — the code a Data Operator holds
-  *without* ``ticket.request``, which is the point. Under the old flow that
-  role could look up inventory but not book; under this one it can ask the
-  desk but not turn the answer into a booking.
+* ``ticket.enquiry`` raises an enquiry. Every merchant sub-role that works
+  bookings holds it — Operator and Data Operator became the same role on
+  2026-07-31, so the enquiry-only capability this split used to describe no
+  longer exists. Finance is the one merchant role without it.
 * ``ticket.view`` lists and reads them.
 * ``ticket.approve`` / ``ticket.reject`` answer them (Admin only — the
   merchant permission sets carry neither).

@@ -162,6 +162,23 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
 
 
 # Merchant sub-roles refine what a merchant_user may do inside their company.
+#
+# Operator and Data Operator are the SAME ROLE, by the business's decision
+# (2026-07-31). They used to differ by ``ticket.request``: a Data Operator could
+# ask the desk about a sector but not turn the answer into a booking. In
+# practice the two names described one job, and the split only surfaced as a
+# 403 at the end of a filled-in booking form.
+#
+# Bound to one frozenset rather than copied, so the two cannot drift apart
+# again — that drift is the whole bug. Both enum members are kept: they are
+# stored in ``users.merchant_role`` on live rows and named in migration 0025,
+# so removing either means a data migration, not an edit here.
+_MERCHANT_OPERATOR: frozenset[str] = frozenset({
+    P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
+    P.SERVICE_REQUEST_CREATE,
+    P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
+})
+
 MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
     MerchantRole.MANAGER: frozenset({
         P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
@@ -178,20 +195,13 @@ MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
         P.REPORT_VIEW, P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
     }),
-    MerchantRole.OPERATOR: frozenset({
-        P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
-        P.SERVICE_REQUEST_CREATE,
-        P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
-    }),
+    MerchantRole.OPERATOR: _MERCHANT_OPERATOR,
     MerchantRole.FINANCE: frozenset({
         P.TICKET_VIEW,
         P.PAYMENT_PAY, P.PAYMENT_VIEW,
         P.REPORT_VIEW, P.REPORT_EXPORT,
     }),
-    MerchantRole.DATA_OPERATOR: frozenset({
-        P.TICKET_ENQUIRY, P.TICKET_VIEW,
-        P.DOCUMENT_UPLOAD,
-    }),
+    MerchantRole.DATA_OPERATOR: _MERCHANT_OPERATOR,
 }
 
 

@@ -4,7 +4,7 @@
 It is updated whenever a milestone is completed and verified, and it outranks any plan that
 lives only in a chat session. If this file and a conversation disagree, this file wins.
 
-Last updated: **2026-07-30** · Current milestone: **M3 — implemented and verified, awaiting approval**
+Last updated: **2026-07-31** · Current milestone: **M4 — Finance, Billing & Payment Tracking, in progress**
 
 ---
 
@@ -130,6 +130,33 @@ one of the two screens at any time.
 - Backend: `services/invoice_service.py`, `routers/tickets.py`, `services/document_service.py`
 - Verified by: `tests/verify_m2.py` (drives a real booking Payment Pending → Ticket Issued)
 
+### CR-1 — Documents removed from the Classic merchant workflow ✅ **Complete & Approved**
+
+An out-of-band change request, approved 2026-07-31, not a numbered milestone. It **reverses the
+merchant-facing half of Phase 3** while leaving that milestone's backend entirely in place.
+
+- Merchant Booking Request no longer shows a Documents section, and no upload, passport scan or
+  any other file is a precondition of submitting. `Save as draft` is now genuinely optional on
+  every route — on an international sector it had become mandatory, because passports could only
+  be attached to a saved draft.
+- Passport **details** (number, and an expiry after the travel date) are still required on an
+  international sector. They are passenger data typed into the form, not an upload.
+- The Admin Approval Queue's Review modal now shows the whole submitted booking read-only:
+  booking reference, merchant, enquiry reference, trip type, journey, both travel dates, airline,
+  flight number, passenger count, every passenger field, contact, special requests, the lifecycle
+  timeline and the current status. The queue's own approve/reject workflow is untouched.
+- **Kept, deliberately:** migration `0031`, `request_documents`, `document_service`,
+  `routers/documents.py`, the `document.upload` / `document.verify` codes, and the Admin's
+  verification controls — which now render only when a booking actually carries files. Documents
+  can be reinstated without a migration.
+
+- Backend: `services/ticket_service.py` (`_validate_enquiry_led_submission`)
+- Frontend: `classic-booking.js`, `classic-booking-detail.js`, `classic-enquiry.js`,
+  `classic-shell.js`, `assets/js/admin-bookings.js`
+- Verified by: `tests/verify_api.py`, whose submit-validation section previously asserted the
+  **opposite** rule and was rewritten to assert the new contract (including a booking that never
+  touches a document endpoint at all)
+
 ---
 
 ## 2. Remaining milestones
@@ -139,7 +166,7 @@ Each milestone below carries **Scope**, **Depends on**, **Verification requireme
 
 ---
 
-### M3 — Cancellation & Reschedule Workflow ✅ **Implemented & verified — awaiting approval**
+### M3 — Cancellation & Reschedule Workflow ✅ **Complete & Approved**
 
 **Why it comes first:** M1/M2 assume a booking moves forwards. Every real desk spends most of
 its time on bookings that move sideways or backwards, and today the platform has only a thin
@@ -562,7 +589,7 @@ python tests/run_all.py
 Each milestone adds its own script and **all** prior scripts must still pass. See
 `tests/README.md` for how to run them and how to write a new one.
 
-**Last full run: 2026-07-30 — 317 checks, 5/5 scripts passed, 0 failures.**
+**Last full run: 2026-07-31 — 332 checks, 7/7 scripts passed, 0 failures.**
 
 Note: `POST /api/auth/login` is rate-limited to 10/minute *per IP*, which a full suite run
 exceeds. `config.login` caches tokens per process and waits out a 429 rather than failing. The
@@ -576,3 +603,4 @@ limit is correct behaviour and is not to be weakened for the suite's convenience
 | --- | --- |
 | 2026-07-30 | Created. Phases 1–3, M1, M2 recorded as complete & approved. M3–M10 planned. |
 | 2026-07-30 | M3 implemented and verified (128 checks); suite green at 317 checks. Awaiting approval. |
+| 2026-07-31 | M3 approved. CR-1 (documents removed from the Classic merchant workflow, expanded Admin review) implemented, verified and approved. `tests/verify_api.py` rewritten where it asserted the old mandatory-document rule; suite green at 332 checks, 7/7. M4 started. |

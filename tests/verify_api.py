@@ -266,24 +266,32 @@ def main():
     r = put_pax(str(travel + datetime.timedelta(days=400)))
     check("fix the expiry -> 200", r.status_code == 200, f"{r.status_code} {r.text[:250]}")
 
-    # Strip every passport document so the next rung is genuinely missing one.
+    # DOCUMENTS ARE NOT A PRECONDITION OF SUBMITTING (changed 2026-07-31).
+    # This used to be the opposite assertion: an international booking whose
+    # travellers had no passport scan was refused, and the refusal named the
+    # traveller still missing one. Documents were then removed from the Classic
+    # merchant workflow, so that rule went with them — a merchant fills in the
+    # travellers and submits, and nothing about a file may stand in the way.
+    #
+    # Arjun's passport is dropped here and deliberately not replaced, so this
+    # booking reaches submit with one traveller covered and one not. Under the
+    # old rule that was a 400 naming Arjun. Kavya's stays attached so the admin
+    # verification section below still has a real document to act on — the
+    # upload API is fully supported, just no longer required.
+    # Every one of Arjun's, not just d1 — the identity section above attached
+    # him a second passport, and leaving it would mean he was still covered and
+    # this would prove nothing.
+    def passport_coverage():
+        return {d["passenger_id"] for d in requests.get(U, headers=H(mtok)).json()
+                if d["doc_type"] == "passport"}
+
     for d in requests.get(U, headers=H(mtok)).json():
-        if d["doc_type"] == "passport":
-            requests.delete(f"{BASE}/api/documents/{d['id']}", headers=H(mtok))
-    r = requests.post(SUB, headers=H(mtok))
-    check("missing passport document -> 400", r.status_code == 400 and "passport document" in r.text.lower(), f"{r.status_code} {r.text[:250]}")
-
-    # Only one of the two travellers — the message must name the other.
-    r = requests.post(U, headers=H(mtok), files={"file": ("pp1.pdf", PDF, "application/pdf")},
-                      data={"doc_type": "passport", "passenger_id": p1})
-    check("attach a passport for the first traveller", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
-    r = requests.post(SUB, headers=H(mtok))
-    check("one passport short -> 400 naming the traveller",
-          r.status_code == 400 and "Kavya" in r.text and "Arjun" not in r.text, f"{r.status_code} {r.text[:250]}")
-
-    r = requests.post(U, headers=H(mtok), files={"file": ("pp2.pdf", PDF, "application/pdf")},
-                      data={"doc_type": "passport", "passenger_id": p2})
-    check("attach a passport for the second traveller", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+        if d["doc_type"] == "passport" and d["passenger_id"] == p1:
+            r = requests.delete(f"{BASE}/api/documents/{d['id']}", headers=H(mtok))
+            check("drop one of that traveller's passports -> 204", r.status_code == 204,
+                  f"{r.status_code} {r.text[:200]}")
+    check("one traveller now has no passport document at all",
+          p1 not in passport_coverage() and p2 in passport_coverage(), str(passport_coverage()))
 
     # blank the contact and confirm it is required
     requests.put(f"{BASE}/api/requests/{rid}", headers=H(mtok), json={"contact": {}})
@@ -296,11 +304,12 @@ def main():
     # sequence is what the cascade used to break, so assert it directly.
     r = put_pax(str(travel + datetime.timedelta(days=400)))
     check("re-save passengers just before submitting -> 200", r.status_code == 200, f"{r.status_code} {r.text[:250]}")
-    kept = [d for d in requests.get(U, headers=H(mtok)).json() if d["doc_type"] == "passport"]
-    check("both passports still attached after that save", len(kept) == 2, str(len(kept)))
+    check("the other traveller's passport survived that save",
+          passport_coverage() == {p2}, str(passport_coverage()))
 
     r = requests.post(SUB, headers=H(mtok))
-    check("complete international booking submits -> 200", r.status_code == 200, f"{r.status_code} {r.text[:300]}")
+    check("international booking submits with a traveller's passport missing -> 200",
+          r.status_code == 200, f"{r.status_code} {r.text[:300]}")
     st = r.json()["request"]["status"] if r.status_code == 200 else "?"
     check("submitted lands at pending_approval", st == "pending_approval", str(st))
 
@@ -308,13 +317,49 @@ def main():
     print("\n== documents are frozen after submit ==")
     r = requests.post(U, headers=H(mtok), files={"file": ("late.pdf", PDF, "application/pdf")}, data={"doc_type": "other"})
     check("upload after submit -> 409", r.status_code == 409, f"{r.status_code} {r.text[:200]}")
-    r = requests.delete(f"{BASE}/api/documents/{d1['id']}", headers=H(mtok))
-    check("delete after submit -> 409/404", r.status_code in (409, 404), f"{r.status_code} {r.text[:200]}")
+    # d2, not d1 — d1 was dropped before submit, so deleting it would 404 for a
+    # reason that has nothing to do with the booking having left draft.
+    r = requests.delete(f"{BASE}/api/documents/{d2['id']}", headers=H(mtok))
+    check("delete after submit -> 409", r.status_code == 409, f"{r.status_code} {r.text[:200]}")
+
+    # ------------------------------ an enquiry-led booking with NO documents
+    # The headline of the 2026-07-31 change, asserted on its own booking rather
+    # than inferred from the one above: a merchant that never opens a document
+    # endpoint can still take an international sector all the way to the desk.
+    print("\n== a booking that never touches a document endpoint ==")
+    r = requests.post(f"{BASE}/api/enquiries", headers=H(mtok), json={
+        "trip_type": "one_way", "origin": "BOM", "origin_city": "Mumbai",
+        "destination": "SIN", "destination_city": "Singapore",
+        "airline": "Singapore Airlines", "flight_number": "SQ423",
+        "travel_date": str(travel), "preferred_time": "01:30",
+        "travel_class": "Economy", "passenger_count": 1, "adults": 1,
+    })
+    eid2 = r.json()["id"]
+    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/review", headers=H(atok))
+    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/respond", headers=H(atok), json={"available": True})
+    r = requests.post(f"{BASE}/api/enquiries/{eid2}/booking-request", headers=H(mtok), json={
+        "passengers": [{"title": "Mr", "first_name": "Nikhil", "last_name": "Bose",
+                        "passenger_type": "adult", "passport_number": "M9988776",
+                        "passport_expiry": str(travel + datetime.timedelta(days=500))}],
+        "contact": {"name": "Nikhil Bose", "email": "nikhil@example.com", "phone": "+919700000000"},
+        "international": True,
+    })
+    check("draft created in a single call", r.status_code in (200, 201), f"{r.status_code} {r.text[:250]}")
+    rid2 = r.json()["id"]
+    check("it genuinely has no documents",
+          requests.get(f"{BASE}/api/requests/{rid2}/documents", headers=H(mtok)).json() == [])
+    r = requests.post(f"{BASE}/api/requests/{rid2}/submit", headers=H(mtok))
+    check("international submit with zero documents -> 200", r.status_code == 200, f"{r.status_code} {r.text[:300]}")
+    check("no refusal ever mentions uploading",
+          "upload" not in r.text.lower(), r.text[:200])
+    check("it reaches the approval queue",
+          any(i["id"] == rid2 for i in requests.get(
+              f"{BASE}/api/admin/approval-queue?page_size=100", headers=H(atok)).json()["items"]))
 
     # --------------------------------------------------------- admin verify
     print("\n== admin document verification ==")
     docs = requests.get(U, headers=H(atok)).json()
-    check("admin lists the documents", len(docs) >= 2, str(len(docs)))
+    check("admin lists the documents", len(docs) >= 1, str(len(docs)))
     target = docs[0]["id"]
     r = requests.post(f"{BASE}/api/admin/documents/{target}/verify", headers=H(atok), json={"approved": False})
     check("reject without a reason -> 400", r.status_code == 400, f"{r.status_code} {r.text[:200]}")
