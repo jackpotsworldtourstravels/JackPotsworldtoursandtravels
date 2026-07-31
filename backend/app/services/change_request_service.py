@@ -46,7 +46,13 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, catalog_service, lifecycle, notification_service
+from app.services import (
+    activity_service,
+    catalog_service,
+    finance_service,
+    lifecycle,
+    notification_service,
+)
 
 #: The two request types this module owns. The other members of
 #: ``ticket_service.SERVICE_REQUEST_TYPES`` keep going through the generic hook.
@@ -661,7 +667,15 @@ def approve(
     if request.status is S.PENDING_APPROVAL:
         lifecycle.transition(db, request, S.IN_REVIEW, actor, commit=False)
 
-    request.pricing = pricing
+    # A COPY, not ``pricing`` itself. The cancellation branch below mutates
+    # ``pricing`` and reassigns it, and ``settle_refund`` runs a query on the way
+    # — which autoflushes. After that flush the attribute's committed baseline
+    # *is* the object it was assigned; mutating that same object in place moves
+    # the baseline too, so the reassignment that follows compares equal to it and
+    # SQLAlchemy emits no UPDATE. The refund settlement figures were written in
+    # memory and silently dropped at commit. Copying here keeps ``pricing`` a
+    # plain local, which is what the rest of this function assumes.
+    request.pricing = dict(pricing)
     request.total_amount = amount
     lifecycle.transition(db, request, S.APPROVED, actor, note=note or summary, commit=False)
 
@@ -679,6 +693,33 @@ def approve(
             note=summary, commit=False, settlement=True,
         )
         applied = {"booking_status": S.CANCELLED.value}
+
+        # ---- settle the refund against the ledger (M4) ------------------
+        # M3 computed the refund position and deliberately stopped there. Now
+        # the money actually moves: the refund is written onto the booking's own
+        # payments, clamped to what those payments took. A cancellation on an
+        # unpaid booking refunds nothing and is not an error — there is simply
+        # nothing to give back, and `settled_refund` says 0 rather than lying.
+        wanted = _money(pricing.get("refund_amount") or 0, "refund_amount")
+        refundable = finance_service.refundable_against(db, booking)
+        settled = min(wanted, refundable)
+        if settled > 0:
+            finance_service.settle_refund(
+                db, booking, settled, actor_id=actor.user_id,
+                reason=f"{request.request_number}: cancellation refund",
+                commit=False,
+            )
+        applied.update({
+            "refund_due": str(wanted),
+            "refund_settled": str(settled),
+            "refund_unsettled": str(wanted - settled),
+        })
+        pricing["refund_settled"] = str(settled)
+        # Recorded so the desk can see a refund that could not be completed
+        # from this booking's own payments — it needs a manual disbursement,
+        # and a silent shortfall is exactly the class of bug M4 exists to stop.
+        pricing["refund_unsettled"] = str(wanted - settled)
+        request.pricing = dict(pricing)
     else:
         details = request.travel_details or {}
         previous = {

@@ -40,6 +40,7 @@ from app.services import (
     activity_service,
     catalog_service,
     change_request_service,
+    finance_service,
     lifecycle,
     merchant_service,
     notification_service,
@@ -514,7 +515,16 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
         if item is not None:
             catalog_service.reserve_units(db, item, request.quantity)
 
+    classic = lifecycle.is_classic_track(request)
     lifecycle.transition(db, request, S.PENDING_APPROVAL, actor, commit=False)
+    if classic:
+        # A resubmission after a return-for-correction must not carry the old
+        # remarks: the merchant has acted on them, and leaving them on the row
+        # would show "needs correcting" on a booking that is now waiting on us.
+        request.travel_details = {
+            k: v for k, v in (request.travel_details or {}).items()
+            if not k.startswith("manager_returned") and k != "manager_remarks"
+        }
     db.commit()
     db.refresh(request)
 
@@ -524,13 +534,21 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
         description=f"{actor.full_name} submitted {request.request_number} for approval",
         reference_id=request.request_id, merchant_id=request.merchant_id,
     )
-    notification_service.notify_admins(
-        db,
-        "New ticket request awaiting approval",
-        f"{request.request_number} from "
-        f"{request.merchant.company_name if request.merchant else 'a merchant'} "
-        f"needs review.",
-    )
+    merchant_name = request.merchant.company_name if request.merchant else "a merchant"
+    if classic:
+        # Straight to the Managers. Telling the admins would put it on a desk
+        # that cannot act on it — the generic approval path refuses this track.
+        notification_service.notify_managers(
+            db,
+            "Booking request awaiting your approval",
+            f"{request.request_number} from {merchant_name} is ready for manager review.",
+        )
+    else:
+        notification_service.notify_admins(
+            db,
+            "New ticket request awaiting approval",
+            f"{request.request_number} from {merchant_name} needs review.",
+        )
     return request
 
 
@@ -540,7 +558,8 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
 def _reject_enquiry_here(request: ServiceRequest) -> None:
     """Keep the booking approval path off rows that have their own workflow.
 
-    Two kinds now: ticket enquiries (Phase 2) and change requests (M3).
+    Three kinds now: ticket enquiries (Phase 2), change requests (M3) and
+    Classic Tours bookings (CR-2).
 
     An enquiry is a ``service_requests`` row like any other, so these generic
     endpoints would happily accept one — and :func:`approve_request` would walk
@@ -572,6 +591,22 @@ def _reject_enquiry_here(request: ServiceRequest) -> None:
                 "amounts and applies the change to the booking."
             ),
         )
+    # CR-2, and the sharpest case of the three. A Classic Tours booking IS a
+    # booking, so nothing about its type stops this path — an Admin holding
+    # ticket.approve could approve it here, which would price it, check a credit
+    # limit it has no fare against, and walk it to Payment Pending: a payment
+    # step in the one workflow that is supposed to have none, taken by the desk
+    # that answered its enquiry, with the Manager's sign-off skipped entirely.
+    # Refused by track, the same way the two above are refused by type.
+    if lifecycle.is_classic_track(request):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a Classic Tours booking request. "
+                "It is approved by a Manager through /api/manager/bookings, and has "
+                "no payment stage."
+            ),
+        )
 
 
 def approve_request(
@@ -583,6 +618,22 @@ def approve_request(
     The spec has Approved and Payment Pending as separate stages but no
     action between them, so both edges are walked here — the timeline still
     records each one.
+
+    **This is where the credit limit is enforced (M4).** An enquiry-led booking
+    carries ₹0 from submit until the desk prices it here, so this is the first
+    moment there is an amount to check — anything earlier would be checking
+    nothing. The check happens *before* the amount is written, so a refusal
+    leaves the request exactly as it was rather than half-priced.
+
+    **And this is where an unpriced approval is refused.** Because approval ends
+    at Payment Pending, approving without a price produces a booking the merchant
+    is asked to pay and *cannot*: :func:`record_payment` rejects ``amount <= 0``,
+    so every portal correctly renders "Awaiting amount" instead of a Pay button
+    and the booking sits there with no action available to anyone — the desk has
+    no second chance to price it on this path, since Payment Pending has no edge
+    back to Approved. Enquiry-led bookings reach here at exactly ₹0 by design, so
+    this is not a rare case; it is the default one. Use
+    :func:`reprice_request` to correct a booking already at Payment Pending.
     """
     request = get_request(db, actor, request_id)
     _reject_enquiry_here(request)
@@ -593,6 +644,32 @@ def approve_request(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail="Final amount cannot be negative",
             )
+
+    # The exposure this approval would add is the *new* amount less whatever
+    # this booking already contributed to `outstanding`; re-approving at the
+    # same price must not look like a second commitment.
+    merchant = db.get(Merchant, request.merchant_id) if request.merchant_id else None
+    proposed = Decimal(final_amount if final_amount is not None else request.total_amount)
+    if proposed <= 0:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} has no amount to pay. Enter the fare "
+                "when approving — a booking approved at 0 lands in Payment "
+                "Pending showing the merchant nothing it can pay."
+            ),
+        )
+    if merchant is not None:
+        already = (
+            finance_service.balance_due(request)
+            if request.status in finance_service.BILLABLE_STATUSES
+            else Decimal("0")
+        )
+        finance_service.assert_within_credit_limit(
+            db, merchant, proposed - already, request_number=request.request_number,
+        )
+
+    if final_amount is not None:
         request.total_amount = final_amount
         request.pricing = {**(request.pricing or {}), "final_amount": str(final_amount)}
 
@@ -613,6 +690,122 @@ def approve_request(
     _notify_merchant(
         db, request, "Your request was approved",
         f"{request.request_number} is approved. Amount due: {request.total_amount}.",
+    )
+    return request
+
+
+def reprice_request(
+    db: Session, actor: User, request_id: int, *, amount: Decimal, reason: str,
+) -> ServiceRequest:
+    """Correct the amount on a booking that is already **Payment Pending**.
+
+    WHY THIS EXISTS AS ITS OWN FUNCTION
+    ``final_amount`` used to be settable in exactly one place —
+    :func:`approve_request` — and that call walks the booking to Payment
+    Pending. Payment Pending has no edge back to Approved, so calling approve a
+    second time to fix a price returns "Cannot move a request from Payment
+    Pending to Approved". A mistyped fare, or an approval sent with no fare at
+    all, was therefore unfixable: the desk could not re-price it and the
+    merchant could not pay it. Approval now refuses an unpriced booking, but
+    that only prevents new ones — this is what recovers the rows already stuck,
+    and the ordinary "we quoted the wrong number" correction.
+
+    **Payment Pending only, deliberately.** Before it there is nothing to fix
+    (approve takes the amount); after it money has moved, and re-pricing a paid
+    or ticketed booking is a refund or an additional charge — the change-request
+    and refund paths, which compute and settle amounts, not a silent overwrite
+    of the figure the invoice was raised on.
+
+    **The status is untouched.** This changes what is owed, not where the
+    booking is, so it does not call :func:`lifecycle.transition` — and must not:
+    the state machine records movement, and there is none here. The audit trail
+    is the ``pricing.history`` entry, the activity log and the merchant's
+    notification.
+    """
+    # Row-locked, with the scope filter *inside* the locked query — the same
+    # shape as enquiry_service._locked, and for the same two reasons. Two admins
+    # re-pricing at once would otherwise both read the old total, both pass the
+    # credit check against it, and the second write would win with an exposure
+    # nobody checked; and a separate scope query would leave the lock and the
+    # permission decision looking at two different reads. ``scoped_query``
+    # contributes only WHERE terms, which is what makes FOR UPDATE legal here.
+    request = db.scalars(
+        select(ServiceRequest)
+        .where(and_(ServiceRequest.request_id == request_id, scoped_query(actor)))
+        .with_for_update()
+    ).first()
+    if request is None:
+        # 404 rather than 403 — don't confirm another merchant's request exists.
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Request not found")
+    _reject_enquiry_here(request)
+
+    if request.status is not S.PAYMENT_PENDING:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"An amount can only be corrected while a booking is Payment Pending — "
+                f"{request.request_number} is "
+                f"{lifecycle.SPEC_LABELS.get(request.status, request.status.value)}"
+            ),
+        )
+    if amount <= 0:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Amount must be greater than zero",
+        )
+
+    previous = finance_service.q(request.total_amount)
+    new_amount = finance_service.q(amount)
+    if new_amount == previous:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"{request.request_number} is already {previous}",
+        )
+
+    # What this changes in the merchant's outstanding is exactly the difference
+    # between the two totals: the booking already contributes
+    # ``previous - net_paid`` and will contribute ``new - net_paid``, so whatever
+    # has been paid cancels out. Passing the *new total* instead would count the
+    # part already committed at approval a second time and refuse corrections
+    # that add nothing. A reduction passes a negative delta, which
+    # ``assert_within_credit_limit`` handles — a cheaper fare cannot breach a
+    # limit.
+    merchant = db.get(Merchant, request.merchant_id) if request.merchant_id else None
+    if merchant is not None:
+        finance_service.assert_within_credit_limit(
+            db, merchant, new_amount - previous, request_number=request.request_number,
+        )
+
+    pricing = {**(request.pricing or {})}
+    # Reassigned rather than mutated: SQLAlchemy does not track in-place changes
+    # to a JSONB dict — the same reason lifecycle rebuilds status_history.
+    pricing["history"] = list(pricing.get("history") or []) + [{
+        "from": str(previous),
+        "to": str(new_amount),
+        "reason": reason,
+        "by": actor.user_id,
+        "by_name": actor.full_name,
+        "at": _now().isoformat(),
+    }]
+    pricing["final_amount"] = str(new_amount)
+    request.pricing = pricing
+    request.total_amount = new_amount
+
+    db.commit()
+    db.refresh(request)
+
+    activity_service.log_activity(
+        db, actor.user_id, "Booking amount corrected",
+        activity_type="Booking", module="Ticket Approval",
+        description=(
+            f"{actor.full_name} changed the amount on {request.request_number} "
+            f"from {previous} to {new_amount}: {reason}"
+        ),
+        reference_id=request.request_id, merchant_id=request.merchant_id,
+    )
+    _notify_merchant(
+        db, request, "The amount on your booking has changed",
+        f"{request.request_number} is now {new_amount} (was {previous}). Reason: {reason}",
     )
     return request
 
@@ -674,8 +867,33 @@ def record_payment(
     db: Session, actor: User, request_id: int, *, amount: Decimal, method: str,
     transaction_id: str | None = None,
 ) -> Payment:
-    """Merchant pays. Lands as ``pending`` until an Admin verifies it."""
+    """Merchant pays. Lands as ``pending`` until an Admin verifies it.
+
+    M4 added two rules that were simply absent before: a merchant could pay any
+    amount it liked, twice, and a "wallet" payment moved no wallet.
+
+    - **Never more than is owed.** The balance is read from the ledger, so
+      payments already submitted and awaiting verification count against it —
+      otherwise pressing Pay twice queues two full payments and the second one
+      is a refund waiting to happen.
+    - **A wallet payment moves the wallet.** It is debited here, at submission,
+      not at verification: the funds are committed the moment the merchant
+      spends them, and a refused verification refunds them (see verify_payment).
+    """
     request = get_request(db, actor, request_id)
+    # CR-2 disabled the payment workflow for Classic Tours bookings. They can
+    # never *be* Payment Pending — the status has no inbound edge on that track —
+    # so the check below would already refuse them, but with a message about the
+    # wrong stage rather than the real reason. Say the real reason: a merchant
+    # who reaches this path is owed an explanation, not a stage name.
+    if lifecycle.is_classic_track(request):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a Classic Tours booking and is not paid "
+                "through the portal. Nothing is owed here."
+            ),
+        )
     if request.status is not S.PAYMENT_PENDING:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -687,6 +905,37 @@ def record_payment(
     if amount <= 0:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST, detail="Amount must be positive"
+        )
+
+    position = finance_service.booking_position(request)
+    still_owed = finance_service.q(
+        position["balance_due"] - position["awaiting_verification"]
+    )
+    if finance_service.q(amount) > still_owed:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} has {still_owed} left to pay"
+                + (f" ({position['awaiting_verification']} is already submitted and "
+                   f"awaiting verification)" if position["awaiting_verification"] > 0 else "")
+                + f". {finance_service.q(amount)} would overpay it."
+            ),
+        )
+
+    merchant = db.get(Merchant, request.merchant_id) if request.merchant_id else None
+    from_wallet = (method or "").strip().lower() == "wallet"
+    if from_wallet:
+        if merchant is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="A wallet payment needs a merchant account to draw on",
+            )
+        finance_service.assert_wallet_covers(merchant, amount)
+        finance_service.adjust_wallet(
+            db, merchant, -finance_service.q(amount), actor_id=actor.user_id,
+            payment_type=PaymentType.ADJUSTMENT,
+            reason=f"Paid against {request.request_number}",
+            commit=False,
         )
 
     payment = Payment(
@@ -719,8 +968,23 @@ def record_payment(
 
 def verify_payment(db: Session, actor: User, payment_id: int, *, approve: bool = True,
                    note: str | None = None) -> Payment:
-    """Admin verifies a submitted payment, moving the request to Paid."""
-    payment = db.get(Payment, payment_id)
+    """Admin verifies a submitted payment, moving the request to Paid.
+
+    **Row-locked (M4).** Two admins clicking Verify on the same payment used to
+    both read it as ``pending`` and both walk the booking to Paid, writing two
+    timeline entries for one payment. The status re-check now happens under
+    ``SELECT … FOR UPDATE``, after any competing transaction has committed, so
+    exactly one wins and the loser gets a 400 rather than a duplicate.
+
+    **Partial payments no longer mark a booking Paid (M4).** Any verified
+    payment used to walk the request straight to Paid — so ₹100 verified against
+    a ₹48,000 booking marked it settled, and the remaining ₹47,900 silently
+    stopped being owed by anything the UI displayed. The booking now moves only
+    once the ledger says nothing is left.
+    """
+    payment = db.execute(
+        select(Payment).where(Payment.payment_id == payment_id).with_for_update()
+    ).scalar_one_or_none()
     if not payment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Payment not found")
     if payment.payment_status is not PaymentStatus.PENDING:
@@ -734,6 +998,17 @@ def verify_payment(db: Session, actor: User, payment_id: int, *, approve: bool =
     if not approve:
         payment.payment_status = PaymentStatus.FAILED
         payment.refund_reason = note
+        # Money taken off the wallet at submission has to go back, or a refused
+        # verification silently confiscates it.
+        if (payment.payment_method or "").strip().lower() == "wallet" and payment.merchant_id:
+            merchant = db.get(Merchant, payment.merchant_id)
+            if merchant is not None:
+                finance_service.adjust_wallet(
+                    db, merchant, finance_service.q(payment.amount), actor_id=actor.user_id,
+                    payment_type=PaymentType.ADJUSTMENT,
+                    reason=f"Returned — payment {payment.payment_id} could not be verified",
+                    commit=False,
+                )
         db.commit()
         db.refresh(payment)
         if request:
@@ -747,7 +1022,9 @@ def verify_payment(db: Session, actor: User, payment_id: int, *, approve: bool =
     db.flush()
 
     if request is not None:
-        lifecycle.transition(db, request, S.PAID, actor, note=note, commit=False)
+        db.refresh(request)
+        if finance_service.balance_due(request) <= finance_service.ZERO:
+            lifecycle.transition(db, request, S.PAID, actor, note=note, commit=False)
     db.commit()
     db.refresh(payment)
 
@@ -774,8 +1051,14 @@ def refund_payment(
     lifecycle: a refund changes the *payment*, not the booking's approval status — a merchant
     raising a Refund service request (Phase 2) is the path that actually cancels/adjusts the
     booking itself.
+
+    Row-locked since M4, for the same reason :func:`verify_payment` is: two admins refunding the
+    same payment at once both read ``refund_amount`` as it stood before either wrote, so both
+    pass the "would this exceed the original" check and together give back more than was taken.
     """
-    payment = db.get(Payment, payment_id)
+    payment = db.execute(
+        select(Payment).where(Payment.payment_id == payment_id).with_for_update()
+    ).scalar_one_or_none()
     if not payment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Payment not found")
     if payment.payment_status is not PaymentStatus.SUCCESS:
@@ -818,6 +1101,32 @@ def refund_payment(
 def issue_ticket(db: Session, actor: User, request_id: int) -> ServiceRequest:
     """Issue the ticket: allocate PNR, ticket and invoice numbers."""
     request = get_request(db, actor, request_id)
+
+    # On the Classic Tours track "Ticket Issued" is what tells the merchant its
+    # paperwork is ready to download, and it is the last step before Completed
+    # — there is no later stage at which the files could still arrive. Marking
+    # it issued with nothing attached would send that notification against an
+    # empty documents list. On the standard track the merchant has an invoice
+    # and a confirmation PDF regardless, and the airline file may legitimately
+    # follow later, so the requirement is scoped to this track (CR-2).
+    if lifecycle.is_classic_track(request):
+        # Imported here, not at module scope: document_service imports this
+        # module for its scoping rules, so a top-level import would be a cycle.
+        from app.services import document_service
+
+        tickets = [
+            d for d in request.documents
+            if d.doc_type in document_service.STAFF_LATE_TYPES
+        ]
+        if not tickets:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Upload the issued ticket documents before marking "
+                    f"{request.request_number} as Ticket Issued — the merchant "
+                    "downloads them from this status."
+                ),
+            )
 
     # Validate the transition *before* allocating any numbers. Sequences are
     # non-transactional: a nextval survives the rollback that an illegal

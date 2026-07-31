@@ -21,6 +21,7 @@ from app.routers import (
     dashboard,
     documents,
     enquiries,
+    finance,
     manager,
     merchant_team,
     merchants,
@@ -115,6 +116,10 @@ app.include_router(support_tickets.router)
 app.include_router(documents.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
+# M4 — the finance surface. Distinct from the payment endpoints in tickets.py
+# and admin_ops.py, which move money; this one only reports on it, plus the one
+# wallet write that has nowhere else to live.
+app.include_router(finance.router)
 # CR-2 — the Manager's approval desk, between the merchant's submission and the
 # Booking Operations queue. Its own router because its permission codes are its
 # own: an Admin holds none of them.

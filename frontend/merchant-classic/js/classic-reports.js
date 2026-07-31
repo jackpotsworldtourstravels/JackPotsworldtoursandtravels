@@ -129,18 +129,22 @@ function clRepRow(r) {
   </tr>`;
 }
 
-/* Sums over the rows returned. Explicitly labelled as being over the listed
-   rows so nobody reads it as a statement of account — and if the API capped the
-   page, that is said out loud rather than quietly under-reporting. */
+/* Counts over the rows returned, explicitly labelled as being over the listed
+   rows so nobody reads them as a statement of account.
+
+   M4: the "Value listed" tile is gone. It summed `total_amount` across one page
+   of rows in JavaScript floats, and however carefully it was labelled, a money
+   figure on a reports screen gets read as a total — while being neither the
+   period's value (the page was capped) nor the account's position. Money on this
+   portal now comes from finance_service alone; Payments carries the position and
+   the statement. Counts are not money and stay. */
 function clRenderRepSummary(rows, total) {
-  const value = rows.reduce((n, r) => n + (Number(r.total_amount) || 0), 0);
   const byStatus = rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   const capped = total && total > rows.length;
 
   $('clRepSummary').innerHTML = `
     <div class="cl-kpis" style="margin:0;border-left:none;border-right:none;border-radius:0;">
       ${clKpi('Bookings listed', rows.length, capped ? `of ${total} total` : 'all matching rows')}
-      ${clKpi('Value listed', money(value), 'sum of the rows below')}
       ${clKpi('Ticketed', (byStatus.ticketed || 0) + (byStatus.ticket_issued || 0), 'documents issued')}
       ${clKpi('Cancelled', byStatus.cancelled || 0, 'in this period')}
     </div>

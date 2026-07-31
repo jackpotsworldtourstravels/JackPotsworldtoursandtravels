@@ -15,7 +15,27 @@
 
    2. AN UNPRICED ROW IS NOT PAYABLE. record_payment rejects amount <= 0 with a
       400, so a Payment Pending row with no amount can only ever fail. It shows
-      "Awaiting amount from our team" instead of a button that 400s. */
+      "Awaiting amount from our team" instead of a button that 400s.
+
+   ACCOUNT POSITION AND STATEMENT (M4)
+   Every figure in the strip and the ledger below comes from
+   GET /api/merchant/finance/position and /statement, which are served by
+   finance_service — the single money computation. Nothing on this screen adds
+   up a column of its own, deliberately: the bug this milestone exists to
+   prevent is four surfaces each computing "outstanding" slightly differently
+   and one of them being wrong. If a number is needed here that the API does not
+   send, the fix is to add it to finance_service, not to sum it in JavaScript.
+
+   That paragraph described an intention for some time before it described the
+   code — the endpoints and the API-client methods existed, and nothing called
+   them. The audit of 2026-07-31 found the screen unbuilt and a dead
+   `clFinancePosition` variable where it should have been. This is that screen.
+
+   MONEY ARRIVES AS A STRING AND IS NEVER PARSED
+   `Decimal` fields serialise as JSON strings precisely so a float cannot get
+   near them. `moneyStr` formats the string for display; nothing here calls
+   `Number()` on an amount, because the moment anything does, this screen has a
+   second opinion about the merchant's money. */
 
 let clPayRows = [];
 
@@ -26,6 +46,50 @@ function clInitPayments() {
         <h1>Payments</h1>
         <p>Requests at a payment stage. Submitted payments are verified by our team before ticketing.</p>
       </div>
+    </div>
+
+    <!-- CR-2 disabled the payment workflow for enquiry-led (Classic Tours)
+         bookings. They never reach a payment stage, so they will never appear
+         on this screen — said here rather than leaving a merchant hunting for
+         a booking that is deliberately absent. -->
+    <div class="cl-msg cl-msg-muted" style="margin:0 0 16px;">
+      Bookings raised from a Ticket Enquiry are settled directly with our team and
+      do not appear here. Track them under <b>My Requests</b>.
+    </div>
+
+    <!-- Account position. Every figure is rendered from the payload of
+         GET /api/merchant/finance/position exactly as sent. -->
+    <div class="cl-kpis" id="clFinKpis">
+      <div class="cl-kpi"><div class="cl-kpi-label">Account position</div>
+        <div class="cl-kpi-value"><span class="cl-spin"></span></div>
+        <div class="cl-kpi-sub">Loading…</div></div>
+    </div>
+
+    <div class="cl-panel">
+      <div class="cl-panel-head">
+        <h2>Statement</h2>
+        <div class="cl-panel-tools">
+          <label class="cl-sr" for="clStmtFrom">From date</label>
+          <input type="date" id="clStmtFrom">
+          <label class="cl-sr" for="clStmtTo">To date</label>
+          <input type="date" id="clStmtTo">
+          <button type="button" class="cl-btn cl-btn-sm" id="clStmtApply">Apply</button>
+          <button type="button" class="cl-btn cl-btn-sm" id="clStmtClear">Clear</button>
+        </div>
+      </div>
+      <div class="cl-panel-body cl-flush">
+        <div class="cl-table-wrap">
+          <table class="cl-table">
+            <thead><tr>
+              <th>Date</th><th>Reference</th><th>Description</th>
+              <th class="cl-num">Debit</th><th class="cl-num">Credit</th><th class="cl-num">Balance</th>
+            </tr></thead>
+            <tbody id="clStmtBody"></tbody>
+            <tfoot id="clStmtFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+      <div class="cl-panel-note" id="clStmtNote"></div>
     </div>
 
     <div class="cl-panel">
@@ -68,9 +132,108 @@ function clInitPayments() {
       </div>
     </div>`;
 
-  $('clPayRefresh').addEventListener('click', () => clLoadPayments());
+  $('clPayRefresh').addEventListener('click', () => { clLoadPayments(); clLoadFinance(); });
   $('clPayStatus').addEventListener('change', () => clLoadPayments());
-  return clLoadPayments();
+  $('clStmtApply').addEventListener('click', () => clLoadStatement());
+  $('clStmtClear').addEventListener('click', () => {
+    $('clStmtFrom').value = '';
+    $('clStmtTo').value = '';
+    clLoadStatement();
+  });
+  return Promise.all([clLoadPayments(), clLoadFinance()]);
+}
+
+/* ------------------------------------------------- account position (M4) */
+
+/* One call, one render. Nothing is derived: `credit_used`, `credit_available`
+   and `spending_power` are all computed by finance_service and sent, precisely
+   so this screen cannot disagree with the admin's view of the same merchant. */
+async function clLoadFinance() {
+  const box = $('clFinKpis');
+  try {
+    const p = await MerchantApi.financePosition();
+
+    const tiles = [
+      ['Balance due', moneyStr(p.outstanding), `across ${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`],
+      ['Billed', moneyStr(p.billed), 'total raised to date'],
+      ['Paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified payments'],
+      ['Wallet', moneyStr(p.wallet_balance), 'available on account'],
+    ];
+    if (moneyIsPositive(p.awaiting_verification)) {
+      tiles.push(['Awaiting verification', moneyStr(p.awaiting_verification),
+                  'submitted, not yet confirmed']);
+    }
+    /* A credit limit is only meaningful next to what is left of it — showing the
+       ceiling alone is the misreading M4 exists to prevent. */
+    tiles.push(p.has_credit_limit
+      ? ['Credit available', moneyStr(p.credit_available),
+         `${moneyStr(p.credit_used)} used of ${moneyStr(p.credit_limit)}`]
+      : ['Credit limit', 'Not set', 'no standing credit on this account']);
+    tiles.push(['Spending power', moneyStr(p.spending_power), 'wallet plus available credit']);
+
+    box.innerHTML = tiles.map(([label, value, sub]) => `
+      <div class="cl-kpi">
+        <div class="cl-kpi-label">${escapeHtml(label)}</div>
+        <div class="cl-kpi-value">${escapeHtml(value)}</div>
+        <div class="cl-kpi-sub">${escapeHtml(sub)}</div>
+      </div>`).join('');
+
+    return clLoadStatement();
+  } catch (err) {
+    box.innerHTML = `<div class="cl-kpi"><div class="cl-kpi-label">Account position</div>
+      <div class="cl-kpi-value">—</div>
+      <div class="cl-kpi-sub">${escapeHtml(clError(err, 'Could not load your position.'))}</div></div>`;
+  }
+}
+
+/* The ledger. `balance` is a running total the server computed per row, and the
+   footer totals are the server's own — this renders them, it does not add up
+   the column. */
+async function clLoadStatement() {
+  const body = $('clStmtBody');
+  const foot = $('clStmtFoot');
+  const note = $('clStmtNote');
+  body.innerHTML = clLoadingRow(6, 'Loading statement…');
+  foot.innerHTML = '';
+
+  try {
+    const s = await MerchantApi.financeStatement({
+      dateFrom: $('clStmtFrom').value || undefined,
+      dateTo: $('clStmtTo').value || undefined,
+    });
+    const entries = s.entries || [];
+
+    body.innerHTML = entries.length ? entries.map(e => `
+      <tr>
+        <td class="cl-nowrap">${escapeHtml(e.at ? fmtDate(e.at) : '—')}</td>
+        <td class="cl-ref">${escapeHtml(e.reference || '—')}</td>
+        <td>${escapeHtml(e.description || clLabel(e.kind))}
+          ${moneyIsPositive(e.unverified)
+            ? `<div class="cl-kpi-sub">${escapeHtml(moneyStr(e.unverified))} awaiting verification</div>` : ''}</td>
+        <td class="cl-num">${moneyIsPositive(e.debit) ? escapeHtml(moneyStr(e.debit)) : ''}</td>
+        <td class="cl-num">${moneyIsPositive(e.credit) ? escapeHtml(moneyStr(e.credit)) : ''}</td>
+        <td class="cl-num">${escapeHtml(moneyStr(e.balance))}</td>
+      </tr>`).join('')
+      : clEmptyRow(6, 'No entries in this period.');
+
+    foot.innerHTML = entries.length ? `
+      <tr>
+        <td colspan="3"><b>Totals</b>${
+          s.date_from || s.date_to
+            ? ` <span class="cl-kpi-sub">${escapeHtml([s.date_from, s.date_to].filter(Boolean).map(fmtDate).join(' – '))}</span>`
+            : ''}</td>
+        <td class="cl-num"><b>${escapeHtml(moneyStr(s.total_debits))}</b></td>
+        <td class="cl-num"><b>${escapeHtml(moneyStr(s.total_credits))}</b></td>
+        <td class="cl-num"><b>${escapeHtml(moneyStr(s.closing_balance))}</b></td>
+      </tr>` : '';
+
+    note.innerHTML = `Opening balance <b>${escapeHtml(moneyStr(s.opening_balance))}</b>,
+      closing balance <b>${escapeHtml(moneyStr(s.closing_balance))}</b>.
+      A debit is money you owe; a credit is money received or refunded.`;
+  } catch (err) {
+    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load your statement.'));
+    note.textContent = '';
+  }
 }
 
 async function clLoadPayments() {

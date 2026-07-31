@@ -180,6 +180,14 @@ const MerchantApi = {
     return this._req('get', `/api/requests/${requestId}/documents`);
   },
 
+  /* The airline's own files, attached by the operations desk. A narrower list
+     than listDocuments(): that one returns everything on the booking, and on
+     the Classic Tours track the merchant should only ever be offered the
+     paperwork it is meant to download (M2). */
+  listTicketDocuments(requestId) {
+    return this._req('get', `/api/requests/${requestId}/tickets`);
+  },
+
   deleteDocument(documentId) {
     return this._req('delete', `/api/documents/${documentId}`);
   },
@@ -205,6 +213,22 @@ const MerchantApi = {
   payRequest(id, { amount, method, transactionId }) {
     return this._req('post', `/api/requests/${id}/pay`, {
       data: { amount, method, transaction_id: transactionId || undefined },
+    });
+  },
+
+  /* ------------------------------------------------------------- finance */
+
+  /* M4. Both of these are served by finance_service, which is the only place
+     money is computed — do not re-derive any of these figures on the client.
+     `credit_available` is null when no credit limit is configured, which is not
+     the same as a limit of zero: render "No limit set", never "0". */
+  financePosition() {
+    return this._req('get', '/api/merchant/finance/position');
+  },
+
+  financeStatement({ dateFrom, dateTo } = {}) {
+    return this._req('get', '/api/merchant/finance/statement', {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
     });
   },
 

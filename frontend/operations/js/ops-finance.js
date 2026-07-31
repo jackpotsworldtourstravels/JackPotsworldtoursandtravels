@@ -164,9 +164,12 @@ function opsPendingPaymentsGrid(host) {
       run: async (rows, api) => {
         const eligible = rows.filter(r => r.status === 'pending');
         if (!eligible.length) return opsToast('Only pending payments can be verified.', 'err');
+        /* M4: no total here. Summing the selected rows in JavaScript would be
+           this screen's own opinion of an amount, in a float, next to a ledger
+           that is Decimal. The count is what the operator is confirming. */
         if (!await opsConfirm(
-          `Verify ${eligible.length} payment${eligible.length === 1 ? '' : 's'} totalling `
-          + `${money(eligible.reduce((s, r) => s + Number(r.amount), 0))}? Each linked request moves to Paid.`,
+          `Verify ${eligible.length} payment${eligible.length === 1 ? '' : 's'}? `
+          + 'Each linked request moves to Paid.',
           'Verify all')) return;
         let ok = 0;
         const errs = [];
@@ -191,13 +194,15 @@ function opsPendingPaymentsGrid(host) {
     },
     actions: opsPaymentActions(() => grid),
     onLoad: res => {
-      /* A running total of the money on this page — the first thing a finance
-         clerk wants and the endpoint does not provide. */
+      /* M4: the money total that used to be here was summed in JavaScript from
+         one page of rows, so it read as "outstanding" while only ever being
+         "this page". The authoritative figures live on a merchant's Financial
+         position (Admin -> Merchant Management), computed by finance_service.
+         A count of rows is not money and stays. */
       const rows = res.rows || [];
-      const sum = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
       const head = opsEl('.ops-panel-tools', host);
       if (head) {
-        head.innerHTML = `<span class="ops-grid-count">${rows.length} on this page · ${money(sum)}</span>`;
+        head.innerHTML = `<span class="ops-grid-count">${rows.length} on this page of ${res.total ?? rows.length}</span>`;
       }
     },
   });
@@ -250,8 +255,8 @@ function opsAllPaymentsGrid(host) {
       const ok = rows.filter(r => r.status === 'success');
       const head = opsEl('.ops-panel-tools', host);
       if (head) {
-        head.innerHTML = `<span class="ops-grid-count">${res.total} records · this page:
-          ${money(ok.reduce((s, r) => s + Number(r.amount || 0), 0))} successful</span>`;
+        /* Counts, not a summed amount — see the note on the pending queue. */
+        head.innerHTML = `<span class="ops-grid-count">${res.total} records · ${ok.length} successful on this page</span>`;
       }
     },
   });
@@ -326,13 +331,16 @@ function opsPayablesGrid(host) {
     },
     onLoad: res => {
       const rows = res.rows || [];
-      const due = rows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
-      const zero = rows.filter(r => !(Number(r.total_amount) > 0)).length;
+      /* M4: "due on this page" was a JavaScript float sum and is gone. What is
+         genuinely owed is `outstanding` on the merchant's position. The count of
+         unpriced rows is a count, not money, and is the one thing on this strip
+         an operator has to act on. */
+      const zero = rows.filter(r => !moneyIsPositive(r.total_amount)).length;
       const head = opsEl('.ops-panel-tools', host);
       if (head) {
-        head.innerHTML = `<span class="ops-grid-count">${money(due)} due on this page${
+        head.innerHTML = `<span class="ops-grid-count">${rows.length} payable on this page${
           zero ? ` · ${zero} awaiting an amount` : ''}${
-          res.total > rows.length ? ` · ${res.total} rows in total` : ''}</span>`;
+          res.total > rows.length ? ` · ${res.total} in total` : ''}</span>`;
       }
     },
   });
@@ -402,9 +410,11 @@ async function opsMerchantPaymentHistory(host) {
     const paint = () => {
       const want = $('opsMphStatus').value;
       const shown = want ? rows.filter(r => r.status === want) : rows;
-      const paid = shown.filter(r => r.status === 'success').reduce((s, r) => s + Number(r.amount || 0), 0);
+      /* M4: the summed "verified" figure is gone — it was a float total of a
+         client-filtered subset. The count of verified payments is not money. */
+      const paid = shown.filter(r => r.status === 'success').length;
       $('opsMphCount').textContent =
-        `${shown.length} payment${shown.length === 1 ? '' : 's'}${want ? ` of ${rows.length}` : ''} · ${money(paid)} verified`;
+        `${shown.length} payment${shown.length === 1 ? '' : 's'}${want ? ` of ${rows.length}` : ''} · ${paid} verified`;
 
       $('opsMphBody').innerHTML = shown.length ? `
         <div class="ops-table-wrap"><table class="ops-table">
@@ -501,13 +511,17 @@ function opsInitWallet() {
 
 async function opsOwnWallet(host) {
   try {
-    const [dash, due] = await Promise.all([
+    /* M4: the position comes from finance_service. This screen used to fetch one
+       page of payment_pending requests and sum `total_amount` in JavaScript to
+       get "Owed now" — which under-reported the moment a merchant had more than
+       a page of them, and admitted as much in its own footnote. `outstanding` is
+       computed over every billable booking, in Decimal, by the same function the
+       merchant sees on the Classic portal and the desk sees on Merchant
+       Management. */
+    const [dash, pos] = await Promise.all([
       OpsApi.merchantDashboard(),
-      OpsApi.listRequests({ status: 'payment_pending', page_size: OPS_PAGE_MAX }).catch(() => ({ items: [], total: 0 })),
+      OpsApi.financePosition().catch(() => null),
     ]);
-    const dueRows = due.items || [];
-    const dueTotal = dueRows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
-    const capped = (due.total ?? dueRows.length) > dueRows.length;
 
     host.innerHTML = `
       <div class="ops-panel">
@@ -518,20 +532,24 @@ async function opsOwnWallet(host) {
         </div>
         <div class="ops-panel-body">
           <div class="ops-kpis">
-            ${opsKpi({ label: 'Wallet balance', value: money(Number(dash.wallet_balance)), sub: 'available' })}
-            ${opsKpi({ label: 'Credit limit', value: money(Number(dash.credit_limit)), sub: 'sanctioned' })}
-            ${opsKpi({ label: 'Owed now', value: money(dueTotal), tone: dueTotal ? 'warn' : '',
-              sub: capped ? `${dueRows.length} of ${due.total} rows` : `${dueRows.length} request(s)` })}
-            ${opsKpi({ label: 'In verification', value: dash.pending_payments_count || 0,
-              tone: dash.pending_payments_count ? 'warn' : '', sub: 'payments submitted' })}
+            ${opsKpi({ label: 'Wallet balance', value: moneyStr(pos ? pos.wallet_balance : dash.wallet_balance), sub: 'available' })}
+            ${pos && pos.has_credit_limit
+              ? opsKpi({ label: 'Credit available', value: moneyStr(pos.credit_available),
+                  sub: `${moneyStr(pos.credit_used)} of ${moneyStr(pos.credit_limit)} used` })
+              : opsKpi({ label: 'Credit limit', value: pos ? 'Not set' : moneyStr(dash.credit_limit), sub: 'sanctioned' })}
+            ${opsKpi({ label: 'Outstanding', value: pos ? moneyStr(pos.outstanding) : '—',
+              tone: pos && moneyIsPositive(pos.outstanding) ? 'warn' : '',
+              sub: pos ? `${pos.bookings_billable} billable booking(s)` : 'unavailable' })}
+            ${opsKpi({ label: 'Awaiting verification', value: pos ? moneyStr(pos.awaiting_verification) : '—',
+              tone: pos && moneyIsPositive(pos.awaiting_verification) ? 'warn' : '', sub: 'submitted, unconfirmed' })}
           </div>
         </div>
         <div class="ops-panel-note">
-          <b>Owed now</b> is the total of your requests at Payment Pending${capped ? ' — capped at the API\'s 100-row page, so the real figure is higher' : ''}.
-          <b>In verification</b> is a different thing: payments you have already submitted that an
-          administrator has not checked yet. Neither figure is a statement of account —
-          <code>wallet_balance</code> and <code>credit_limit</code> are the authoritative fields and
-          are set by the platform, not derived here.
+          <b>Outstanding</b> is what you owe across every billable booking.
+          <b>Awaiting verification</b> is money you have already sent that an administrator has not
+          confirmed yet — it does not reduce Outstanding until it is verified. Every figure here is
+          computed by the platform's finance service, not derived on this screen, so it matches what
+          our desk sees against your account.
         </div>
       </div>
       <div id="opsWalletDue"></div>`;

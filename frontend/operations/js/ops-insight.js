@@ -55,11 +55,13 @@ function opsInitReports() {
   ], { hash: 'reports' });
 }
 
-/* A totals strip under a grid, computed from the rows in hand and labelled as
-   exactly that. Rendered after each load so it can never describe a stale set. */
+/* A strip under a grid describing the rows in hand.
+
+   M4: the "Value shown" tile is gone. It summed `total_amount` across one page
+   in JavaScript floats, which is neither the period's value nor anyone's
+   position — and money on this platform comes from finance_service alone. Row
+   counts are not money and stay. */
 function opsTotalsStrip(rows, total, extras) {
-  const amounts = rows.map(r => Number(r.total_amount || 0));
-  const sum = amounts.reduce((a, b) => a + b, 0);
   const partial = total > rows.length;
   return `
     <div class="ops-panel">
@@ -67,7 +69,6 @@ function opsTotalsStrip(rows, total, extras) {
       <div class="ops-panel-body">
         <div class="ops-kpis">
           ${opsKpi({ label: 'Rows shown', value: rows.length, sub: partial ? `of ${total} matching` : 'all matches' })}
-          ${opsKpi({ label: 'Value shown', value: money(sum), sub: 'sum of the rows above' })}
           ${opsKpi({ label: 'Average', value: rows.length ? money(sum / rows.length) : '—', sub: 'per row shown' })}
           ${extras || ''}
         </div>
@@ -241,9 +242,11 @@ function opsGlobalSummary(host) {
       const rows = res.rows || [];
       const head = opsEl('.ops-panel-tools', host);
       if (head) {
-        const rev = rows.reduce((s, r) => s + Number(r.total_revenue || 0), 0);
+        /* Request count is a count and is summed here. Revenue is money and is
+           not: a float total of one page of merchants is not a revenue figure.
+           Per-merchant revenue is on each row, from the server. */
         const req = rows.reduce((s, r) => s + Number(r.total_requests || 0), 0);
-        head.innerHTML = `<span class="ops-grid-count">${rows.length} merchants · ${req} requests · ${money(rev)} revenue</span>`;
+        head.innerHTML = `<span class="ops-grid-count">${rows.length} merchants · ${req} requests</span>`;
       }
     },
   });

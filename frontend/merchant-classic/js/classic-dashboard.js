@@ -28,6 +28,9 @@
    depending on which screen you read it from. */
 
 let clDashData = null;
+/* The finance_service position for this merchant (M4). Held alongside the
+   dashboard payload because the Account panel renders from it too. */
+let clDashPosition = null;
 
 async function clInitDashboard() {
   const root = $('cl-dashboard');
@@ -77,8 +80,23 @@ async function clEnquiryCounts() {
 async function clLoadDashboard() {
   const kpis = $('clDashKpis');
   try {
-    const [data, enq] = await Promise.all([MerchantApi.dashboard(), clEnquiryCounts()]);
+    /* M4: the money tiles come from finance_service, not from the dashboard
+       payload's raw `wallet_balance` / `credit_limit` columns. A credit limit
+       shown on its own is the misreading this milestone exists to prevent — it
+       is a ceiling with no indication of how much is left, and the merchant
+       reads it as headroom. `position` carries `credit_used`, `credit_available`
+       and `outstanding`, all computed server-side.
+
+       The position is optional: if that call fails the rest of the dashboard
+       still renders, with the money tiles saying so rather than the whole screen
+       breaking over a KPI strip. */
+    const [data, enq, position] = await Promise.all([
+      MerchantApi.dashboard(),
+      clEnquiryCounts(),
+      MerchantApi.financePosition().catch(() => null),
+    ]);
     clDashData = data;
+    clDashPosition = position;
     const s = data.requests_by_status || {};
 
     /* `pending_approval + in_review` mirrors Premium: both are "with our team,
@@ -88,8 +106,15 @@ async function clLoadDashboard() {
     const awaiting = (s.pending_approval || 0) + (s.in_review || 0);
 
     kpis.innerHTML = `<div class="cl-kpis">
-      ${clKpi('Wallet balance', money(data.wallet_balance), 'Available to spend', 'payments')}
-      ${clKpi('Credit limit', money(data.credit_limit), 'Standing account term')}
+      ${clKpi('Wallet balance',
+              position ? moneyStr(position.wallet_balance) : '—',
+              position ? 'Available to spend' : 'Position unavailable', 'payments')}
+      ${position && position.has_credit_limit
+          ? clKpi('Credit available', moneyStr(position.credit_available),
+                  `${moneyStr(position.credit_used)} of ${moneyStr(position.credit_limit)} used`, 'payments')
+          : clKpi('Balance due',
+                  position ? moneyStr(position.outstanding) : '—',
+                  position ? 'Across your billable bookings' : 'Position unavailable', 'payments')}
       ${clKpi('Enquiries open', enq ? enq.open : '—', 'Awaiting our answer', 'enquiry')}
       ${clKpi('Ready to book', enq ? enq.ready : '—', 'Answered — request a ticket', 'enquiry')}
       ${clKpi('Pending approval', awaiting, 'Bookings + enquiries with us', 'requests', 'pending_approval')}
@@ -149,8 +174,15 @@ function clRenderDashAccount(data) {
         <dl class="cl-dl">
           <div><dt>Company</dt><dd>${escapeHtml(data.company_name || localStorage.getItem(PARTNER_KEYS.companyName) || '—')}</dd></div>
           <div><dt>Merchant code</dt><dd class="cl-ref">${escapeHtml(data.merchant_code || '—')}</dd></div>
-          <div><dt>Wallet balance</dt><dd>${money(data.wallet_balance)}</dd></div>
-          <div><dt>Credit limit</dt><dd>${money(data.credit_limit)}</dd></div>
+          <div><dt>Wallet balance</dt><dd>${clDashPosition
+            ? escapeHtml(moneyStr(clDashPosition.wallet_balance)) : '—'}</dd></div>
+          <div><dt>Credit limit</dt><dd>${clDashPosition
+            ? (clDashPosition.has_credit_limit
+                ? `${escapeHtml(moneyStr(clDashPosition.credit_limit))} · ${escapeHtml(moneyStr(clDashPosition.credit_available))} available`
+                : 'Not set')
+            : '—'}</dd></div>
+          <div><dt>Balance due</dt><dd>${clDashPosition
+            ? escapeHtml(moneyStr(clDashPosition.outstanding)) : '—'}</dd></div>
           <div><dt>Support contact</dt><dd>${escapeHtml(data.support_contact || data.support_email || '—')}</dd></div>
         </dl>
       </div>

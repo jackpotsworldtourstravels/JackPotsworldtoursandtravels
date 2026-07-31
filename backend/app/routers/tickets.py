@@ -42,6 +42,7 @@ from app.schemas.ticket import (
     QuoteResponse,
     RejectRequest,
     ReplacePassengersRequest,
+    RepriceRequest,
     RequestDetailResponse,
     RequestResponse,
     ResolveServiceRequest,
@@ -320,6 +321,31 @@ def approve_request(
 ):
     request = ticket_service.approve_request(
         db, current_user, request_id, final_amount=payload.final_amount, note=payload.note
+    )
+    return _detail(db, request, current_user)
+
+
+@router.post(
+    "/admin/requests/{request_id}/reprice",
+    response_model=RequestDetailResponse,
+    tags=["admin · approvals"],
+    summary="Correct the amount on a booking",
+    description=(
+        "Requires `ticket.approve`. Sets a new amount on a booking that is already **Payment "
+        "Pending** — the only stage where what is owed can still change without money moving. "
+        "The status is untouched; the reason is mandatory and the merchant is notified. "
+        "Approval walks a booking to Payment Pending, which has no edge back to Approved, so "
+        "this is the only way to correct a fare after the fact."
+    ),
+)
+def reprice_request(
+    request_id: int,
+    payload: RepriceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_APPROVE)),
+):
+    request = ticket_service.reprice_request(
+        db, current_user, request_id, amount=payload.amount, reason=payload.reason
     )
     return _detail(db, request, current_user)
 
