@@ -347,7 +347,21 @@ dnf update -y
 dnf install -y docker git
 systemctl enable --now docker
 usermod -aG docker ec2-user
+
+# Compose is NOT in the Amazon Linux 2023 repositories — `dnf install docker`
+# gives the engine alone, and `docker compose` simply prints the docker help
+# text. Install the plugin from Docker's own release.
+COMPOSE_TAG=$(curl -fsSL https://api.github.com/repos/docker/compose/releases/latest \
+  | awk -F'"' '/"tag_name"/{t=$4} END{print t}')
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
+  "https://github.com/docker/compose/releases/download/${COMPOSE_TAG}/docker-compose-linux-aarch64"
+chmod 0755 /usr/libexec/docker/cli-plugins/docker-compose
 ```
+
+Note the `aarch64` in that URL — it pairs with the Arm AMI above. On an x86
+instance it would be `x86_64`, and the wrong one installs happily and then
+fails to execute.
 
 Launch. Then give it a fixed address — EC2 → **Elastic IPs** → **Allocate**,
 then **Associate** it with the instance. Without this the public IP changes on
@@ -493,8 +507,23 @@ If **DB name** was blank back in Step 2, create the database now — before this
 command, not after it. The `CREATE DATABASE` one-liner is at the end of Step 2.
 
 ```bash
-cd deploy && docker compose up -d --build
+cd ~/JackPotsworldtoursandtravels
+DOCKER_BUILDKIT=0 docker build -t deploy-app -f Dockerfile .
+cd deploy && docker compose up -d
 ```
+
+> **Why not `docker compose up -d --build`.** Compose delegates building to
+> **buildx**, which Amazon Linux 2023's `docker` package does not include
+> either, so `--build` stops with *"compose build requires buildx 0.17.0 or
+> later"*. Building with `DOCKER_BUILDKIT=0` uses the engine's classic builder,
+> which is present.
+>
+> The tag matters: Compose looks for `<project>-<service>`, and the project name
+> comes from the directory — `deploy` — so the image must be `deploy-app`. Tag
+> it anything else and Compose tries to build it again, and fails again.
+>
+> Installing buildx as a second plugin is the alternative if you would rather
+> keep the one-line form.
 
 First build takes a few minutes. On start the app runs `alembic upgrade head`
 against RDS, creating all 12 tables, and Caddy obtains the certificate.
@@ -541,7 +570,9 @@ prefix and the streaming download all agree with each other.
 **Deploying a change**
 
 ```bash
-cd ~/JackPotsworldtoursandtravels && git pull && cd deploy && docker compose up -d --build
+cd ~/JackPotsworldtoursandtravels && git pull \
+  && DOCKER_BUILDKIT=0 docker build -t deploy-app -f Dockerfile . \
+  && cd deploy && docker compose up -d
 ```
 
 Migrations run automatically on restart. Expect a few seconds of downtime; this
