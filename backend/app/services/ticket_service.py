@@ -24,11 +24,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth.rbac import P, has_permission
 from app.models_v2 import (
+    DocumentType,
     Merchant,
     PassengerData,
     Payment,
     PaymentStatus,
     PaymentType,
+    RequestDocument,
     RequestStatus as S,
     RequestType,
     ServiceRequest,
@@ -38,6 +40,7 @@ from app.models_v2 import (
 from app.services import (
     activity_service,
     catalog_service,
+    change_request_service,
     lifecycle,
     merchant_service,
     notification_service,
@@ -188,6 +191,17 @@ def list_requests(
 # ---------------------------------------------------------------------------
 # Merchant: create and submit
 # ---------------------------------------------------------------------------
+def passenger_columns(payload: dict) -> dict:
+    """Column values for a new ``PassengerData`` row.
+
+    ``PassengerInput`` carries an optional ``id`` so :func:`replace_passengers`
+    can tell an edited traveller from a new one. It is identity, not data, and
+    spreading it into the model raises ``TypeError`` — every creation path goes
+    through here so that cannot happen again.
+    """
+    return {k: v for k, v in payload.items() if k != "id"}
+
+
 def create_booking_request(
     db: Session,
     actor: User,
@@ -247,7 +261,7 @@ def create_booking_request(
             PassengerData(
                 request_id=request.request_id,
                 merchant_id=actor.merchant_id,
-                **p,
+                **passenger_columns(p),
             )
         )
 
@@ -266,6 +280,7 @@ def create_booking_request(
 def update_draft(
     db: Session, actor: User, request_id: int, *, remarks: str | None = None,
     travel_date: datetime.date | None = None, return_date: datetime.date | None = None,
+    contact: dict | None = None, special_requests: str | None = None,
 ) -> ServiceRequest:
     request = get_request(db, actor, request_id)
     if request.status not in lifecycle.EDITABLE_STATUSES:
@@ -279,6 +294,19 @@ def update_draft(
         request.travel_date = travel_date
     if return_date is not None:
         request.return_date = return_date
+
+    # Merged, never replaced: travel_details also holds the locked itinerary
+    # copied from the enquiry, and this endpoint must not be a way to edit it.
+    # Reassigned rather than mutated because SQLAlchemy does not track in-place
+    # changes to a JSONB dict.
+    if contact is not None or special_requests is not None:
+        details = dict(request.travel_details or {})
+        if contact is not None:
+            details["contact"] = contact
+        if special_requests is not None:
+            details["special_requests"] = special_requests.strip() or None
+        request.travel_details = details
+
     db.commit()
     db.refresh(request)
     return request
@@ -287,7 +315,21 @@ def update_draft(
 def replace_passengers(
     db: Session, actor: User, request_id: int, passengers: list[dict]
 ) -> ServiceRequest:
-    """Replace the passenger list on a draft and reprice accordingly."""
+    """Replace the passenger list on a draft and reprice accordingly.
+
+    Identity is preserved for any traveller the caller sends back with its
+    ``id``. This is not cosmetic: ``request_documents.passenger_id`` cascades on
+    delete, so the original delete-everything-then-reinsert would destroy a
+    merchant's uploaded passport scans — and their bytes on disk — every time
+    the passenger list was saved. The Classic booking screen saves passengers
+    immediately before submitting, so an international booking could never
+    satisfy its own "a passport per traveller" rule.
+
+    Positional matching was rejected as the fix: if a traveller is removed from
+    the middle of the list, the row that shifts up would inherit the previous
+    occupant's passport scan and mis-attribute a document to the wrong person.
+    An explicit id is the only unambiguous answer.
+    """
     request = get_request(db, actor, request_id)
     if request.status not in lifecycle.EDITABLE_STATUSES:
         raise HTTPException(
@@ -300,18 +342,69 @@ def replace_passengers(
             detail="At least one passenger is required",
         )
 
-    for existing in list(request.passengers):
-        db.delete(existing)
+    existing = {p.passenger_id: p for p in request.passengers}
+    keep: set[int] = set()
+    for p in passengers:
+        pid = p.get("id")
+        if pid is None:
+            continue
+        if pid not in existing:
+            # A passenger id from another booking, or one already removed.
+            # Inserting it as a new traveller would hide the mistake.
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="That passenger is not on this booking request",
+            )
+        if pid in keep:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="The same passenger was sent twice",
+            )
+        keep.add(pid)
+
+    # Files belonging to travellers who are genuinely being removed. Collected
+    # before the delete, while the rows still exist; unlinked after the commit,
+    # so a rollback can never leave a row pointing at bytes that are gone.
+    dropped = [pid for pid in existing if pid not in keep]
+    orphaned_paths: list[str] = []
+    if dropped:
+        orphaned_paths = list(
+            db.scalars(
+                select(RequestDocument.stored_path).where(
+                    RequestDocument.passenger_id.in_(dropped)
+                )
+            ).all()
+        )
+
+    for pid in dropped:
+        db.delete(existing[pid])
     db.flush()
 
     for p in passengers:
-        db.add(
-            PassengerData(request_id=request.request_id, merchant_id=request.merchant_id, **p)
-        )
+        fields = passenger_columns(p)
+        pid = p.get("id")
+        if pid is not None:
+            row = existing[pid]
+            for key, value in fields.items():
+                setattr(row, key, value)
+        else:
+            db.add(
+                PassengerData(
+                    request_id=request.request_id, merchant_id=request.merchant_id, **fields
+                )
+            )
 
     if request.parent_request_id:
         item = db.get(ServiceRequest, request.parent_request_id)
-        if item is not None:
+        # Reprice against a catalog parent only. An enquiry-led booking's parent
+        # is the *enquiry*, which carries no base_fare or taxes — quoting against
+        # it yields a zero catalog quote that silently replaces the
+        # {"quoted": false, "source": "ticket_enquiry"} provenance with something
+        # that reads as "priced at zero from the catalog". The fare on these
+        # bookings is set by the Admin at approval (approve_request's
+        # final_amount), so there is nothing to recompute here. Catalog-led
+        # pricing behaviour is unchanged.
+        if item is not None and item.request_type is not RequestType.TICKET_ENQUIRY:
             priced = catalog_service.quote(item, len(passengers))
             request.pricing = {
                 k: str(v) if isinstance(v, Decimal) else v for k, v in priced.items()
@@ -321,7 +414,91 @@ def replace_passengers(
 
     db.commit()
     db.refresh(request)
+
+    # The document rows went with their passenger via ON DELETE CASCADE; the
+    # bytes would otherwise stay under the upload root forever. Imported here
+    # rather than at module scope because document_service imports this module.
+    if orphaned_paths:
+        from app.services import document_service
+
+        for stored in orphaned_paths:
+            try:
+                document_service.discard_file(stored)
+            except Exception:
+                pass  # a stray blob is not worth failing the save over
+
     return request
+
+
+def _validate_enquiry_led_submission(request: ServiceRequest) -> None:
+    """Completeness rules for a booking raised from an answered enquiry.
+
+    Scoped to enquiry-led bookings on purpose. ``submit_request`` is shared with
+    the catalog-led flow the Premium portal and Operations still use, and those
+    have never collected a contact or documents — applying these rules to every
+    request would break both the moment this shipped.
+
+    The international rule follows the same decision: a booking is treated as
+    international only when the Classic UI positively said so from its airport
+    reference data. When the country is unknown, passports stay optional rather
+    than blocking a merchant on a fact nobody recorded.
+    """
+    details = request.travel_details or {}
+
+    contact = details.get("contact") or {}
+    if not (contact.get("email") or "").strip() or not (contact.get("phone") or "").strip():
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="A contact email and phone are required before submitting this booking",
+        )
+
+    missing_names = [
+        p.passenger_id for p in request.passengers
+        if not (p.first_name or "").strip() or not (p.last_name or "").strip()
+    ]
+    if missing_names:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Every passenger needs a first and last name",
+        )
+
+    if not details.get("international"):
+        return
+
+    # International: each traveller needs passport details and a passport
+    # document. Infants travel on an adult's passport in some markets but still
+    # need their own for immigration, so they are not exempt here.
+    for p in request.passengers:
+        if not (p.passport_number or "").strip():
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"{p.full_name} needs a passport number — this is an "
+                    "international booking"
+                ),
+            )
+        if p.passport_expiry and p.passport_expiry <= request.travel_date:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"{p.full_name}'s passport expires on {p.passport_expiry:%d %b %Y}, "
+                    "on or before the travel date"
+                ),
+            )
+
+    with_passport_doc = {
+        d.passenger_id for d in request.documents
+        if d.doc_type is DocumentType.PASSPORT and d.passenger_id is not None
+    }
+    missing_docs = [p.full_name for p in request.passengers if p.passenger_id not in with_passport_doc]
+    if missing_docs:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Upload a passport document for: " + ", ".join(missing_docs)
+                + " — required on international bookings"
+            ),
+        )
 
 
 def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
@@ -332,6 +509,11 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="Add at least one passenger before submitting",
         )
+
+    # Only bookings that came from an answered enquiry carry the extra rules.
+    parent = db.get(ServiceRequest, request.parent_request_id) if request.parent_request_id else None
+    if parent is not None and parent.request_type is RequestType.TICKET_ENQUIRY:
+        _validate_enquiry_led_submission(request)
 
     if request.parent_request_id:
         item = db.get(ServiceRequest, request.parent_request_id)
@@ -361,6 +543,43 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
 # ---------------------------------------------------------------------------
 # Admin: approve / reject
 # ---------------------------------------------------------------------------
+def _reject_enquiry_here(request: ServiceRequest) -> None:
+    """Keep the booking approval path off rows that have their own workflow.
+
+    Two kinds now: ticket enquiries (Phase 2) and change requests (M3).
+
+    An enquiry is a ``service_requests`` row like any other, so these generic
+    endpoints would happily accept one — and :func:`approve_request` would walk
+    it to **Payment Pending**, showing the merchant a Pay button against an
+    enquiry that owes nothing. Enquiries have their own answer endpoint with
+    its own rules (final answers, reviewer claims, no payable stage), so the
+    generic path refuses them by type rather than trusting callers to know.
+    """
+    if request.request_type is RequestType.TICKET_ENQUIRY:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a ticket enquiry, not a booking. "
+                "Use POST /api/admin/enquiries/{id}/respond to answer it."
+            ),
+        )
+    # Same argument, one milestone later. A cancellation walked through this
+    # path lands at **Payment Pending** — a Pay button on a request to cancel,
+    # and the booking untouched. M3 gave them a settlement path that quotes the
+    # charge and applies the outcome; this one refuses them by type rather than
+    # trusting callers to know.
+    if request.request_type in change_request_service.CHANGE_TYPES:
+        label = change_request_service.TYPE_LABELS[request.request_type].lower()
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a {label} request, not a booking. "
+                "Settle it through /api/admin/change-requests, which quotes the "
+                "amounts and applies the change to the booking."
+            ),
+        )
+
+
 def approve_request(
     db: Session, actor: User, request_id: int, *, final_amount: Decimal | None = None,
     note: str | None = None,
@@ -372,6 +591,7 @@ def approve_request(
     records each one.
     """
     request = get_request(db, actor, request_id)
+    _reject_enquiry_here(request)
 
     if final_amount is not None:
         if final_amount < 0:
@@ -405,6 +625,7 @@ def approve_request(
 
 def reject_request(db: Session, actor: User, request_id: int, reason: str) -> ServiceRequest:
     request = get_request(db, actor, request_id)
+    _reject_enquiry_here(request)
 
     if request.parent_request_id:
         catalog_service.release_units(
@@ -430,6 +651,18 @@ def reject_request(db: Session, actor: User, request_id: int, reason: str) -> Se
 
 def cancel_request(db: Session, actor: User, request_id: int, reason: str | None = None) -> ServiceRequest:
     request = get_request(db, actor, request_id)
+    # A change request is withdrawn, not cancelled. Same end state, but the
+    # withdraw endpoint refuses once an operator has claimed it and tells the
+    # desk it went away — both of which this path would skip.
+    if request.request_type in change_request_service.CHANGE_TYPES:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a "
+                f"{change_request_service.TYPE_LABELS[request.request_type].lower()} request. "
+                f"Withdraw it with POST /api/change-requests/{request.request_id}/withdraw."
+            ),
+        )
     if request.parent_request_id:
         catalog_service.release_units(
             db, db.get(ServiceRequest, request.parent_request_id), request.quantity
@@ -648,6 +881,19 @@ def create_service_request(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=f"'{request_type.value}' is not a service request type",
         )
+    # See resolve_service_request: these two have their own workflow, and a
+    # request raised here could never be settled anywhere. Refused at the door
+    # rather than left to become an orphan.
+    if request_type in change_request_service.CHANGE_TYPES:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Raise a {change_request_service.TYPE_LABELS[request_type].lower()} through "
+                f"POST /api/bookings/{{id}}/"
+                f"{'cancellation' if request_type is RequestType.CANCELLATION else 'reschedule'} — "
+                "that path quotes the amounts and applies the change to the booking."
+            ),
+        )
     booking = get_request(db, actor, booking_id)
     if booking.request_type is not RequestType.BOOKING:
         raise HTTPException(
@@ -704,6 +950,21 @@ def resolve_service_request(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="Not a service request",
         )
+    # Cancellation and date change settle money and change the parent booking,
+    # and this generic path does neither — approving one here would mark the
+    # request Approved while leaving the booking exactly as it was, which is
+    # the bug M3 exists to remove. Refused rather than quietly mishandled, the
+    # same way the generic approve/reject refuses an enquiry.
+    if request.request_type in change_request_service.CHANGE_TYPES:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is a "
+                f"{change_request_service.TYPE_LABELS[request.request_type].lower()} request — "
+                "settle it through /api/admin/change-requests, which quotes the amounts and "
+                "applies the change to the booking."
+            ),
+        )
 
     if not approve:
         lifecycle.transition(db, request, S.REJECTED, actor, reason=reason, commit=False)
@@ -728,14 +989,13 @@ def resolve_service_request(
 
 
 def _notify_merchant(db: Session, request: ServiceRequest, title: str, message: str) -> None:
-    """Notify whoever raised the request, falling back to the company's admins."""
-    if request.user_id:
-        notification_service.create_notification(db, request.user_id, title, message)
-        return
-    if request.merchant is None:
-        return
-    for user in request.merchant.users:
-        notification_service.create_notification(db, user.user_id, title, message)
+    """Notify whoever raised the request, falling back to the company's admins.
+
+    The logic moved to ``notification_service`` once the change-request
+    workflow needed it too; this stays as the name every caller here already
+    uses.
+    """
+    notification_service.notify_request_merchant(db, request, title, message)
 
 
 def action_menu(request: ServiceRequest, actor: User) -> list[dict]:

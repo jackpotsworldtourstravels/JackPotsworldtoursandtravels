@@ -360,6 +360,83 @@ Permission: P.DOCUMENT_VERIFY
 Stored path convention: `uploads/<merchant_id>/<uuid4>_<original_filename>`; mime/size validated
 server-side before write (existing `python-multipart` dependency covers the upload parsing).
 
+### 6.3a Cancellation & Reschedule (M3)
+
+A confirmed booking moving backwards. These are `ServiceRequest` rows of
+`request_type = cancellation | date_change`, linked to the booking by `parent_request_id` — no new
+table and no migration.
+
+**Why these are not `POST /api/service-requests`.** That generic hook stays, for baggage, meals,
+seats, refunds and passenger corrections. Cancellation and date change settle money and change the
+parent booking, which the generic hook does neither of, so the three generic paths now **refuse
+these two types with 400** — `/api/admin/requests/{id}/approve`, `/api/admin/requests/{id}/reject`,
+`/api/admin/service-requests/{id}/resolve`, plus `/api/requests/{id}/cancel` (withdraw instead).
+Same treatment ticket enquiries got.
+
+**No amounts are sent when raising.** The cancellation charge and the fare difference come from the
+airline and are quoted by staff at approval; a pending request carries `pricing = {}` and
+`total_amount = 0.00`. Amounts cross the wire as **strings**, never JSON numbers.
+
+```
+POST /api/bookings/{booking_id}/cancellation
+  Body: {reason: str}
+→ ChangeRequestDetail                                      201
+Permission: P.SERVICE_REQUEST_CREATE
+409 unless the booking is approved | payment_pending | paid | ticket_issued
+409 if another change request is already open against it (names it)
+```
+
+```
+POST /api/bookings/{booking_id}/reschedule
+  Body: {new_travel_date: date, new_return_date?: date, reason: str}
+→ ChangeRequestDetail                                      201
+Permission: P.SERVICE_REQUEST_CREATE
+400 if the date is not in the future, equals the current one, or return < travel
+The booking's own dates are NOT touched until approval.
+```
+
+```
+GET  /api/change-requests
+  ?type=cancellation|date_change &request_status=<RequestStatus>
+  &merchant_id=<int> (staff) &search=<request no. | booking ref | PNR | title>
+  &page &page_size
+→ Page[ChangeRequestItem]      newest first; merchant sees only its own
+GET  /api/change-requests/counts        → ChangeRequestCounts  (adds `open` = pending + in_review)
+GET  /api/change-requests/{id}          → ChangeRequestDetail
+GET  /api/bookings/{id}/change-requests → ChangeRequestItem[]  (every change ever raised on it)
+Permission: P.TICKET_VIEW
+```
+
+```
+POST /api/change-requests/{id}/withdraw → ChangeRequestDetail
+Permission: P.SERVICE_REQUEST_CREATE
+Only while Pending — 409 naming the operator once claimed.
+```
+
+```
+POST /api/admin/change-requests/{id}/review   → ChangeRequestDetail   (Pending → Under Review)
+POST /api/admin/change-requests/{id}/approve
+  Body (cancellation): {cancellation_charge?: str, note?: str}
+  Body (reschedule):   {fare_difference?: str, change_fee?: str, note?: str}
+→ ChangeRequestDetail
+POST /api/admin/change-requests/{id}/reject
+  Body: {reason: str}                                       reason mandatory
+→ ChangeRequestDetail
+Permission: P.SERVICE_REQUEST_MANAGE
+```
+
+Approval is row-locked on **both** the request and its booking, and the booking's status is
+re-checked under that lock (409 if it closed while queued). The refund is derived server-side as
+`booking_total - cancellation_charge` and never sent; a charge above the booking total is refused.
+A reschedule's amounts must both be non-negative — a date change never produces a refund.
+
+`ChangeRequestItem`: `{id, request_number, change_type, change_type_label, status, status_label,
+booking_id, booking_request_number, booking_reference, pnr, merchant_id, merchant_name, reason,
+pricing, amount, new_travel_date, current_travel_date, review_claimed_by, review_claimed_by_name,
+rejection_reason, created_at, updated_at}`.
+
+`ChangeRequestDetail`: `{request, booking, timeline, can_review, can_settle, can_withdraw}`.
+
 ### 6.4 Notification Center
 
 Backed by the existing `msg_logs` table, `message_type=notification`.

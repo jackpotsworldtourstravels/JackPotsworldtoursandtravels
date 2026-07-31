@@ -977,18 +977,14 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
-/** Where merchant onboarding requests go — the address the site already
-    publishes in its Contact section. */
-const MERCHANT_ONBOARDING_EMAIL = 'info@jackpotsworldtours.com';
-
 /* ---------------------------------------------------------------------------
    Merchant access request.
 
    Merchants don't self-register: an Admin creates the company
    (POST /api/admin/merchants) and it stays pending_approval until approved, so
    there is no /api/auth/signup in the v2 API to post to. This collects the
-   details the team needs and routes them through the existing contact channel
-   rather than pretending an account was created.
+   details the team needs and tells the applicant plainly that registration is
+   approval-based, rather than pretending an account was created.
    --------------------------------------------------------------------------- */
 document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
   const company = document.getElementById('suCompany').value.trim();
@@ -1006,24 +1002,16 @@ document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
   if (!name) return fail('Please tell us your name.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid work email.');
 
-  /* Opens the visitor's mail client rather than posting anywhere: the legacy
-     /api/contact route isn't mounted under the v2 schema, and a form that
-     silently swallowed the request would be worse than one that plainly
-     hands it over. Swap this for a real endpoint when one exists. */
-  const body = [
-    `Company: ${company}`,
-    `Contact: ${name}`,
-    `Email: ${email}`,
-    `Phone: ${phone || '—'}`,
-    '',
-    'We would like a merchant account on JackPots World Tours & Travels.',
-  ].join('\n');
-  window.location.href = `mailto:${MERCHANT_ONBOARDING_EMAIL}`
-    + `?subject=${encodeURIComponent(`Merchant access request — ${company}`)}`
-    + `&body=${encodeURIComponent(body)}`;
-
-  msg.textContent = `Opening your email app — or write to ${MERCHANT_ONBOARDING_EMAIL}.`;
-  msg.style.color = 'var(--emerald)';
+  /* Holding state until the registration endpoint exists.
+     Partner registration is approval-based: an Admin creates the company and
+     it waits in pending_approval before it can trade, so there is nothing for
+     this form to POST to yet. Rather than fake a submission, say plainly how
+     onboarding works. When the registration module lands, replace this block
+     with the real call — the fields above are already the ones it needs, so
+     the swap is this handler only. */
+  msg.textContent = 'Partner registration is currently by approval. '
+    + 'Please contact our team or wait for the onboarding module.';
+  msg.style.color = 'var(--ink)';
   msg.classList.add('show');
 });
 
@@ -1032,11 +1020,31 @@ document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
 
    Runs the same two-step flow as the Merchant Portal's own shell
    (Login -> Password -> OTP -> Portal, API_CONTRACT.md §1) using the shared
-   helpers in auth.js, then hands off to /merchant/. Tokens are written under
-   the merchant namespace by storePortalTokens, so arriving at the portal the
-   session is already live and no second sign-in is needed.
+   helpers in auth.js, then hands off to the merchant's workspace. Tokens are
+   written under the merchant namespace by storePortalTokens, so arriving there
+   the session is already live and no second sign-in is needed.
+
+   WHERE A MERCHANT LANDS AFTER SIGNING IN
+   This one constant is the whole of it. Authentication — this modal, the OTP
+   step, forgot-password, reset-password, registration — is unchanged; only the
+   destination changes.
+
+   THE MERCHANT UI IS THE CLASSIC PORTAL. The other two merchant-facing
+   frontends are out of service for merchants:
+
+     merchant/     Premium — redirects here to Classic on load. Files kept.
+     operations/   still live for admin and super admin, but a merchant who
+                   reaches it is sent to Classic (see opsStartSession).
+
+   Nothing was deleted for this: both portals still exist on disk and both
+   redirects are a single statement, so restoring either is removing one line
+   and pointing this constant back at it.
+
+   Admin and Super Admin are untouched: they never route through here, they
+   sign in at admin/ and super-admin/ and land in their own portals, and
+   Operations continues to work for them.
    --------------------------------------------------------------------------- */
-const MERCHANT_PORTAL_URL = 'merchant/';
+const MERCHANT_PORTAL_URL = 'merchant-classic/';
 let loginChallengeToken = null;
 
 function showLoginStep(step) {
@@ -1047,7 +1055,7 @@ function showLoginStep(step) {
 function setModalMsg(el, text, tone) {
   el.textContent = text;
   el.style.color = tone === 'error' ? 'var(--coral-dark)'
-    : tone === 'ok' ? 'var(--emerald)' : 'var(--text-muted)';
+    : tone === 'ok' ? 'var(--emerald)' : 'var(--muted)';
   el.classList.toggle('show', !!text);
 }
 
@@ -1090,12 +1098,40 @@ document.getElementById('liVerifyBtn')?.addEventListener('click', async () => {
   try {
     const data = await verifyPortalOtp(loginChallengeToken, code);
     storePortalTokens('merchant', data);
-    setModalMsg(msg, 'Signed in — taking you to your portal…', 'ok');
+    setModalMsg(msg, 'Signed in — taking you to your workspace…', 'ok');
     window.location.href = MERCHANT_PORTAL_URL;
   } catch (err) {
     setModalMsg(msg, apiErrorText(err, 'That code was not accepted.'), 'error');
   }
 });
+
+/* ---------------------------------------------------------------------------
+   Arriving here to sign in, sent by the Operations workspace.
+
+   /operations/ has no login of its own; when it is opened without a session it
+   redirects to this page with #login (and an ops_reason explaining why), so the
+   merchant lands on the login they already know rather than a second one. This
+   only reacts to that hash — a normal visit to the site is untouched.
+   --------------------------------------------------------------------------- */
+(function handleOperationsSignInHandoff() {
+  if (location.hash !== '#login') return;
+
+  /* A live session means they did not need to sign in at all — just go. */
+  if (isPartnerLoggedIn()) {
+    window.location.replace(MERCHANT_PORTAL_URL);
+    return;
+  }
+
+  const reasons = {
+    'session-expired': 'Your session expired. Please sign in again.',
+    'signed-out': 'You have been signed out.',
+    'sign-in-required': 'Please sign in to open your workspace.',
+  };
+  const reason = new URLSearchParams(location.search).get('ops_reason');
+
+  openAuth('login');
+  if (reasons[reason]) setModalMsg(document.getElementById('loginMsg'), reasons[reason], 'muted');
+})();
 
 document.getElementById('liResendBtn')?.addEventListener('click', async e => {
   e.preventDefault();

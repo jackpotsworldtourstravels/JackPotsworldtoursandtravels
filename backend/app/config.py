@@ -30,7 +30,24 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_from_name: str = "JackPots World Tours & Travels"
 
+    # Where booking-request documents (passports, visas, IDs) are written.
+    # Deliberately OUTSIDE any served directory and never mounted with
+    # StaticFiles — these files are returned only through an authenticated
+    # endpoint that re-checks merchant scope on every read. Point this at a
+    # volume with restricted filesystem permissions in production.
+    upload_root: str = str(BACKEND_DIR.parent / "uploads")
+    #: Per-file cap, in megabytes. A passport scan is well under this.
+    max_upload_mb: int = 10
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
+
+    @property
+    def upload_root_path(self) -> Path:
+        return Path(self.upload_root).resolve()
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
     @property
     def cors_origins_list(self) -> list[str]:

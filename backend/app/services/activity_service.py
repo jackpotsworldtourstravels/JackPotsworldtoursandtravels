@@ -94,12 +94,23 @@ def log_activity(
     device: str | None = None,
     status: str = "success",
     merchant_id: int | None = None,
+    details: dict | None = None,
 ) -> None:
+    """Write one activity/audit entry.
+
+    ``details`` merges caller-specific facts into ``extra_data`` — used by the
+    enquiry workflow to record ``from_status``/``to_status`` alongside the
+    actor. The DB-level ``audit_logs`` trigger captures the full before/after
+    row but cannot know *which user* made the change (it has no session
+    context), so the actor-attributed trail lives here.
+    """
     extra: dict = {}
     if activity_type:
         extra["activity_type"] = activity_type
     if reference_id is not None:
         extra["reference_id"] = reference_id
+    if details:
+        extra.update(details)
 
     db.add(
         SystemLog(

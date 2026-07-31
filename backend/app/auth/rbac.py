@@ -114,7 +114,13 @@ _SUPER_ADMIN: frozenset[str] = frozenset({
 _ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_CREATE, P.MERCHANT_APPROVE, P.MERCHANT_EDIT,
     P.MERCHANT_SUSPEND, P.MERCHANT_VIEW,
-    P.MERCHANT_USER_MANAGE,        # manages merchant staff; does not create merchants' logins
+    # Full lifecycle of a merchant's staff logins from the Admin portal: list,
+    # create (POST /api/admin/merchants/{id}/users), and reset password. The
+    # separate MERCHANT_USER_CREATE below stays a merchant-only code — it is
+    # what lets a merchant add staff to its OWN company via /api/merchant/team,
+    # and admins reach the same service through the merchant-scoped path above
+    # rather than by holding it.
+    P.MERCHANT_USER_MANAGE,
     P.TICKET_VIEW, P.TICKET_APPROVE, P.TICKET_REJECT, P.TICKET_ISSUE,
     P.SERVICE_REQUEST_MANAGE,
     P.PAYMENT_MANAGE, P.PAYMENT_VERIFY, P.PAYMENT_VIEW,

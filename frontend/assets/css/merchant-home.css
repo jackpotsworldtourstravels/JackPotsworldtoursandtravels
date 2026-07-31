@@ -1,0 +1,1003 @@
+/* Merchant Home — public-travel-site design language inside the Merchant Portal.
+   ---------------------------------------------------------------------------
+   Why every selector here is `mh-` prefixed instead of just loading main.css:
+   main.css and partner-portal.css both define .btn / .btn-coral / .field / .tab /
+   .modal-card / .section / .empty-state with DIFFERENT values (partner-portal.css
+   even redefines --coral to navy for the enterprise look). Loading both sheets on
+   this page would restyle every existing merchant screen depending on load order.
+   So the landing page's look is re-declared here under its own namespace: Home
+   gets the travel-site feel, and Dashboard/Reports/Profile/etc. keep rendering
+   exactly as they did before this pass. Values below are copied from main.css so
+   the two surfaces stay visually identical.
+
+   Token names are local (--mh-*) for the same reason — partner-portal.css owns
+   --navy/--coral/--line on :root and means different colours by them. */
+
+.mh-scope{
+  --mh-navy:#0A2540;
+  --mh-coral:#FF4D4D;
+  --mh-coral-dark:#E63946;
+  --mh-coral-hover:#FFF0F0;
+  --mh-muted:#5B6B82;
+  --mh-line:rgba(10,37,64,0.10);
+  --mh-bg:#F8FAFC;
+  --mh-surface:#FFFFFF;
+  --mh-emerald:#12B76A;
+  --mh-gold:#FFB020;
+  --mh-sky:#2F80ED;
+  --mh-radius:20px;
+  --mh-radius-sm:14px;
+  --mh-shadow-sm:0 8px 24px -12px rgba(10,37,64,0.18);
+  --mh-shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35);
+  --mh-field-bg:rgba(10,37,64,0.04);
+  --mh-field-bg-hover:rgba(10,37,64,0.07);
+  --mh-card-glass:rgba(255,255,255,0.82);
+  --mh-card-glass-border:rgba(255,255,255,0.6);
+  font-family:'Montserrat', sans-serif;
+}
+/* Dark theme: the public site is light-only, but the portal has a theme toggle,
+   so Home has to answer for dark mode too or it flashes white inside a dark shell.
+   Both signals are mirrored because partner-portal.css supports both. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .mh-scope{
+    --mh-bg:#0A1220; --mh-surface:#121B2E; --mh-navy:#E9EEF7; --mh-muted:#8FA0BC;
+    --mh-line:rgba(255,255,255,0.08);
+    --mh-field-bg:rgba(255,255,255,0.05); --mh-field-bg-hover:rgba(255,255,255,0.09);
+    --mh-card-glass:rgba(18,27,46,0.86); --mh-card-glass-border:rgba(255,255,255,0.10);
+    --mh-shadow-sm:0 8px 24px -12px rgba(0,0,0,0.55);
+    --mh-shadow-lg:0 30px 70px -20px rgba(0,0,0,0.7);
+    /* A white sweep over a dark card reads as a flash, not a skeleton. */
+    --mh-shimmer:rgba(255,255,255,0.11);
+  }
+}
+:root[data-theme="dark"] .mh-scope{
+  --mh-bg:#0A1220; --mh-surface:#121B2E; --mh-navy:#E9EEF7; --mh-muted:#8FA0BC;
+  --mh-line:rgba(255,255,255,0.08);
+  --mh-field-bg:rgba(255,255,255,0.05); --mh-field-bg-hover:rgba(255,255,255,0.09);
+  --mh-card-glass:rgba(18,27,46,0.86); --mh-card-glass-border:rgba(255,255,255,0.10);
+  --mh-shadow-sm:0 8px 24px -12px rgba(0,0,0,0.55);
+  --mh-shadow-lg:0 30px 70px -20px rgba(0,0,0,0.7);
+}
+
+.mh-wrap{max-width:1280px; margin:0 auto; padding:0 32px;}
+
+/* ---------------- Portal shell adjustments ----------------
+   These are the only non-mh- selectors in this file, and each is qualified by
+   .mh-headed / .mh-full on the merchant layout so nothing here can reach the
+   Admin or Super Admin portals (separate documents, separate stylesheets).
+
+   The sidebar stays in the DOM rather than being deleted: partner-shared.js binds
+   #partnerSignOutBtn, #sidebarCollapseBtn and #sidebarBackdrop unconditionally, and
+   navigateToSection still toggles .active on its items. Hiding it keeps all of that
+   wiring valid while the travel header does the navigating. */
+.layout.mh-headed{min-height:calc(100vh - 76px);}
+.layout.mh-headed > .sidebar,
+.layout.mh-headed > .sidebar-backdrop{display:none;}
+.mobile-topbar{display:none !important;}
+
+/* Home is full-bleed (its hero spans the viewport); every other section keeps the
+   portal's normal gutters. Toggled from navigateToSection rather than :has() so the
+   behaviour doesn't depend on selector support. */
+.main.mh-full{padding:0; max-width:none;}
+@media (max-width:900px){
+  .layout.mh-headed{min-height:calc(100vh - 66px);}
+}
+
+/* ---------------- Buttons (travel-site coral, not the portal's navy) ---------------- */
+.mh-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  font-family:'Montserrat', sans-serif; font-weight:700; font-size:14px;
+  padding:13px 24px; border-radius:100px; border:none; cursor:pointer;
+  transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.mh-btn:hover{transform:translateY(-1px);}
+.mh-btn:disabled{opacity:.55; cursor:default; transform:none;}
+.mh-btn-coral{
+  background:linear-gradient(135deg, #FF4D4D 0%, #E63946 100%); color:#fff;
+  box-shadow:0 14px 30px -10px rgba(255,77,77,0.55);
+}
+.mh-btn-outline{
+  background:transparent; color:var(--mh-navy); border:1.5px solid var(--mh-line);
+}
+.mh-btn-outline:hover{border-color:var(--mh-coral); color:var(--mh-coral); background:var(--mh-coral-hover);}
+.mh-btn-sm{padding:10px 18px; font-size:13px;}
+
+/* ================================================================
+   TOP HEADER — mirrors the public site's nav so login doesn't feel
+   like switching applications.
+   ================================================================ */
+.mh-header{
+  position:sticky; top:0; z-index:120;
+  background:linear-gradient(180deg, rgba(6,18,34,0.96) 0%, rgba(6,18,34,0.88) 100%);
+  backdrop-filter:blur(14px) saturate(140%);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.mh-nav{display:flex; align-items:center; gap:22px; height:76px;}
+.mh-logo{display:flex; align-items:center; gap:10px; flex-shrink:0;}
+.mh-logo img{height:44px; width:auto; object-fit:contain;}
+.mh-logo-badge{
+  font-size:9.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  color:#FFD9D9; background:rgba(255,77,77,0.18); border:1px solid rgba(255,77,77,0.35);
+  padding:3px 8px; border-radius:100px; white-space:nowrap;
+}
+.mh-navlinks{display:flex; gap:26px; margin-left:8px;}
+.mh-navlinks button{
+  position:relative; padding:8px 0; font-size:14px; font-weight:600;
+  color:rgba(255,255,255,0.82); background:none; border:none; cursor:pointer;
+  font-family:'Montserrat', sans-serif; transition:color .25s ease;
+}
+.mh-navlinks button::after{
+  content:''; position:absolute; left:0; bottom:2px; height:2px; width:0;
+  background:var(--mh-coral); border-radius:2px; transition:width .25s ease;
+}
+.mh-navlinks button:hover{color:#fff;}
+.mh-navlinks button:hover::after,
+.mh-navlinks button.active::after{width:100%;}
+.mh-navlinks button.active{color:#fff;}
+
+.mh-nav-actions{display:flex; align-items:center; gap:12px; margin-left:auto;}
+
+/* Global search — kept from the existing portal, restyled for the travel shell */
+.mh-gsearch{position:relative; width:230px;}
+.mh-gsearch input{
+  width:100%; padding:10px 14px 10px 38px; border-radius:100px;
+  background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.18);
+  color:#fff; font-size:13px; font-weight:600; font-family:'Montserrat', sans-serif;
+  outline:none; transition:background .2s ease, border-color .2s ease;
+}
+.mh-gsearch input::placeholder{color:rgba(255,255,255,0.6); font-weight:500;}
+.mh-gsearch input:focus{background:rgba(255,255,255,0.18); border-color:var(--mh-coral);}
+.mh-gsearch svg{
+  position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  width:15px; height:15px; color:rgba(255,255,255,0.7);
+  fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round;
+}
+.mh-gsearch-results{
+  position:absolute; top:calc(100% + 10px); right:0; width:380px; max-height:420px; overflow-y:auto;
+  background:var(--mh-surface); border:1px solid var(--mh-line); border-radius:var(--mh-radius);
+  box-shadow:var(--mh-shadow-lg); padding:8px; display:none; z-index:130;
+}
+.mh-gsearch-results.open{display:block;}
+.mh-gsr-item{
+  display:block; width:100%; text-align:left; padding:11px 13px; border-radius:11px;
+  background:none; border:none; cursor:pointer; font-family:'Montserrat', sans-serif;
+  transition:background .15s ease;
+}
+.mh-gsr-item:hover{background:var(--mh-field-bg);}
+.mh-gsr-title{font-size:13.5px; font-weight:700; color:var(--mh-navy);}
+.mh-gsr-sub{font-size:11.5px; color:var(--mh-muted); margin-top:3px;}
+.mh-gsr-empty{padding:22px 14px; text-align:center; font-size:13px; color:var(--mh-muted);}
+.mh-gsr-label{
+  padding:8px 13px 4px; font-size:10px; font-weight:800; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--mh-muted);
+}
+
+.mh-iconbtn{
+  position:relative; width:38px; height:38px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.18);
+  color:#fff; cursor:pointer; transition:background .2s ease, border-color .2s ease;
+}
+.mh-iconbtn:hover{background:rgba(255,255,255,0.2); border-color:var(--mh-coral);}
+.mh-iconbtn svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.mh-badge{
+  position:absolute; top:-3px; right:-3px; min-width:17px; height:17px; padding:0 4px;
+  border-radius:100px; background:var(--mh-coral-dark); color:#fff;
+  font-size:9.5px; font-weight:800; display:none; align-items:center; justify-content:center;
+  border:2px solid #0A1220;
+}
+
+/* Account chip + dropdown — the home for every secondary page */
+.mh-acct-wrap{position:relative;}
+.mh-acct{
+  display:flex; align-items:center; gap:9px; padding:5px 13px 5px 5px; border-radius:100px;
+  background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.18);
+  cursor:pointer; transition:background .2s ease;
+}
+.mh-acct:hover{background:rgba(255,255,255,0.2);}
+.mh-acct-avatar{
+  width:29px; height:29px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg, #FF4D4D 0%, #E63946 100%); color:#fff;
+  font-size:11.5px; font-weight:800; display:flex; align-items:center; justify-content:center;
+}
+.mh-acct-text{display:flex; flex-direction:column; line-height:1.25; text-align:left;}
+.mh-acct-name{font-size:12.5px; font-weight:700; color:#fff; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.mh-acct-co{font-size:10.5px; color:rgba(255,255,255,0.62); max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.mh-acct-menu{
+  position:absolute; top:calc(100% + 10px); right:0; width:262px;
+  background:var(--mh-surface); border:1px solid var(--mh-line); border-radius:var(--mh-radius);
+  box-shadow:var(--mh-shadow-lg); padding:8px; display:none; z-index:130;
+}
+.mh-acct-menu.open{display:block;}
+.mh-acct-menu-head{
+  padding:12px 13px 10px; border-bottom:1px solid var(--mh-line); margin-bottom:6px;
+}
+.mh-acct-menu-head b{display:block; font-size:13.5px; font-weight:800; color:var(--mh-navy);}
+.mh-acct-menu-head small{display:block; font-size:11.5px; color:var(--mh-muted); margin-top:3px;}
+.mh-acct-menu a{
+  display:flex; align-items:center; gap:11px; padding:10px 13px; border-radius:11px;
+  font-size:13.5px; font-weight:600; color:var(--mh-navy); cursor:pointer;
+  transition:background .15s ease, color .15s ease;
+}
+.mh-acct-menu a:hover{background:var(--mh-field-bg); color:var(--mh-coral);}
+.mh-acct-menu a svg{width:17px; height:17px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.mh-acct-menu .mh-acct-sep{height:1px; background:var(--mh-line); margin:6px 0;}
+.mh-acct-menu a.mh-danger{color:var(--mh-coral-dark);}
+.mh-acct-menu a.mh-danger:hover{background:var(--mh-coral-hover); color:var(--mh-coral-dark);}
+
+.mh-burger{display:none; width:38px; height:38px; border-radius:10px; align-items:center; justify-content:center; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.18); cursor:pointer;}
+.mh-burger svg{width:20px; height:20px; color:#fff; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round;}
+
+/* ================================================================
+   HERO + SEARCH
+   ================================================================ */
+.mh-home{background:var(--mh-bg); min-height:calc(100vh - 76px);}
+/* Hero deliberately mirrors main.css's `.hero` so the merchant's post-login
+   surface reads as the same product as the public site: same video layer, same
+   navy+coral overlay, same gold dashed eyebrow, same left-aligned display
+   headline. Values are copied rather than shared because main.css cannot be
+   loaded on a portal page (see the namespace note at the top of this file). */
+.mh-hero{
+  position:relative; min-height:620px; display:flex; flex-direction:column;
+  justify-content:center; padding:112px 0 40px; overflow:hidden;
+}
+.mh-hero-bg{
+  position:absolute; inset:0; z-index:0;
+  background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80');
+  background-size:cover; background-position:center; will-change:transform;
+}
+.mh-hero-video-layer{position:absolute; inset:0; z-index:0; overflow:hidden; will-change:transform;}
+.mh-hero-video-layer video{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center;
+  opacity:0; background:#0A2540; transition:opacity 650ms ease;
+}
+.mh-hero-video-layer video.active{opacity:1;}
+.mh-hero-video-layer video[data-mh-video="package"]{object-position:center 40%;}
+@media (min-width:901px){
+  .mh-hero-video-layer video[data-mh-video="package"]{transform:translate(0%,-15%) scale(1.4); transform-origin:center;}
+}
+.mh-hero-overlay{
+  position:absolute; inset:0; z-index:1; pointer-events:none;
+  background-image:
+    linear-gradient(180deg, rgba(10,37,64,0.55) 0%, rgba(10,37,64,0.72) 55%, rgba(10,37,64,0.94) 100%),
+    radial-gradient(ellipse 900px 500px at 12% 0%, rgba(255,77,77,0.35), transparent 60%);
+}
+.mh-hero-inner{position:relative; z-index:2; color:#fff; padding-bottom:8px;}
+.mh-eyebrow{
+  display:flex; align-items:center; gap:12px; font-size:12px; font-weight:800;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--mh-gold, #FFB020);
+}
+.mh-eyebrow::before{content:''; width:24px; height:2px; background:var(--mh-gold, #FFB020); border-radius:2px;}
+.mh-hero h1{
+  color:#fff; font-weight:800; font-size:clamp(40px,6.4vw,78px); max-width:16ch;
+  letter-spacing:-.02em; line-height:1.05; margin:18px 0 0;
+}
+.mh-hero h1 .mh-accent{
+  background:linear-gradient(90deg, #FFB020, #FF4D4D);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+}
+.mh-hero .mh-sub{
+  font-size:18.5px; color:rgba(255,255,255,0.82); max-width:560px;
+  margin:22px 0 0; line-height:1.6;
+}
+
+.mh-dock{position:relative; z-index:5; margin-top:30px; padding-bottom:34px;}
+.mh-card{
+  background:var(--mh-card-glass); backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--mh-card-glass-border); border-radius:24px;
+  box-shadow:var(--mh-shadow-lg); padding:14px;
+}
+.mh-tabs{display:flex; gap:6px; padding:6px 6px 16px; flex-wrap:wrap;}
+.mh-tab{
+  padding:11px 20px; border-radius:100px; font-size:14px; font-weight:700;
+  color:var(--mh-navy); opacity:.55; background:none; border:none; cursor:pointer;
+  display:flex; align-items:center; gap:8px; font-family:'Montserrat', sans-serif;
+  transition:all .25s ease;
+}
+.mh-tab.active{background:var(--mh-navy); color:var(--mh-surface); opacity:1; box-shadow:var(--mh-shadow-sm);}
+.mh-tab:hover:not(.active){opacity:.9; background:var(--mh-field-bg);}
+
+/* Panels stacked with grid-area so the tallest sets the height once and tab
+   switching never resizes the card (same trick main.css uses). */
+.mh-body{display:grid;}
+.mh-panel{grid-area:1/1; visibility:hidden;}
+.mh-panel.active{visibility:visible;}
+.mh-fields{display:grid; gap:3px; padding:6px; grid-template-columns:1.1fr auto 1.1fr .95fr .9fr .9fr auto;}
+.mh-fields.mh-cols-5{grid-template-columns:1.2fr .95fr .9fr .9fr auto;}
+.mh-fields.mh-cols-4{grid-template-columns:1.3fr 1fr .9fr auto;}
+.mh-field{
+  padding:14px 18px; border-radius:14px; background:var(--mh-field-bg);
+  position:relative; transition:background .2s ease; text-align:left;
+}
+.mh-field:hover{background:var(--mh-field-bg-hover);}
+.mh-field label{
+  display:block; font-size:10.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--mh-muted); margin-bottom:4px;
+}
+.mh-field input, .mh-field select{
+  border:none; background:none; width:100%; outline:none;
+  font-family:'Montserrat', sans-serif; font-weight:700; font-size:15.5px; color:var(--mh-navy);
+}
+.mh-field input::placeholder{color:var(--mh-navy); opacity:.45; font-weight:600;}
+.mh-field select{
+  appearance:none; -webkit-appearance:none; cursor:pointer; padding-right:22px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6B82' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat; background-position:right 2px center; background-size:16px;
+}
+.mh-swap{
+  display:flex; align-items:center; justify-content:center; align-self:center;
+  width:42px; height:42px; border-radius:50%; background:var(--mh-surface);
+  border:1px solid var(--mh-line); color:var(--mh-coral); cursor:pointer; font-size:17px;
+  transition:transform .3s ease, background .2s ease;
+}
+.mh-swap:hover{transform:rotate(180deg); background:var(--mh-coral-hover);}
+.mh-go{border-radius:14px; font-size:15px; padding:0 30px; min-height:60px; height:100%;}
+
+/* B2B strip — the one thing the public site doesn't have. Deliberately styled as
+   travel-site trust chips rather than ERP stat cards. Each is a real <button>
+   now (wallet -> Dashboard, awaiting -> My Requests, due -> Payments), so the
+   numbers are a way in rather than decoration. */
+.mh-quick{display:flex; gap:10px 26px; flex-wrap:wrap; padding:14px 20px 8px;}
+.mh-quick-item{
+  display:flex; align-items:center; gap:9px; font-size:13px; font-weight:700;
+  color:var(--mh-navy); background:none; border:none; padding:4px 2px; cursor:pointer;
+  font-family:'Montserrat', sans-serif; border-radius:8px; position:relative;
+  transition:color .2s ease;
+}
+.mh-quick-item:hover{color:var(--mh-coral);}
+.mh-quick-static{cursor:default;}
+.mh-quick-static:hover{color:var(--mh-navy);}
+.mh-quick-item svg{width:16px; height:16px; flex-shrink:0; color:var(--mh-emerald); fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.mh-quick-item b{font-weight:800;}
+.mh-quick-item.mh-warn svg{color:var(--mh-gold);}
+.mh-quick-cta{font-weight:800; color:var(--mh-coral); text-decoration:underline;}
+
+/* ================================================================
+   DISCOVER — recent searches + popular destinations
+   ================================================================ */
+.mh-discover{padding:30px 0 4px;}
+.mh-disc-row + .mh-disc-row{margin-top:26px;}
+.mh-disc-head{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;}
+.mh-disc-head h3{font-size:15px; font-weight:800; color:var(--mh-navy); letter-spacing:-.005em;}
+.mh-disc-clear{
+  background:none; border:none; cursor:pointer; font-family:'Montserrat', sans-serif;
+  font-size:12px; font-weight:700; color:var(--mh-muted); text-decoration:underline;
+}
+.mh-disc-clear:hover{color:var(--mh-coral);}
+.mh-disc-chips{display:flex; gap:9px; flex-wrap:wrap;}
+
+/* Pill button used by recent searches, empty-state alternatives and the mobile
+   filter toggle — one shape for "tap this to change the search". */
+.mh-chipbtn{
+  display:inline-flex; align-items:center; gap:7px; position:relative; overflow:hidden;
+  padding:9px 16px; border-radius:100px; cursor:pointer;
+  background:var(--mh-surface); border:1px solid var(--mh-line); color:var(--mh-navy);
+  font-family:'Montserrat', sans-serif; font-size:12.5px; font-weight:700;
+  transition:border-color .2s ease, color .2s ease, transform .2s ease, background .2s ease;
+}
+.mh-chipbtn:hover{border-color:var(--mh-coral); color:var(--mh-coral); transform:translateY(-1px);}
+.mh-chipbtn svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round;}
+
+.mh-pop-grid{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px;}
+.mh-pop{
+  position:relative; overflow:hidden; cursor:pointer; text-align:left; padding:0;
+  border:1px solid var(--mh-line); border-radius:var(--mh-radius-sm);
+  background:var(--mh-surface); box-shadow:var(--mh-shadow-sm);
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.mh-pop:hover{transform:translateY(-3px); box-shadow:0 20px 40px -20px rgba(10,37,64,0.34);}
+.mh-pop .mh-thumb{border-radius:0; aspect-ratio:16/9;}
+.mh-pop:hover .mh-thumb svg{transform:scale(1.06);}
+.mh-pop-text{display:block; padding:11px 14px 13px;}
+.mh-pop-city{display:block; font-size:14px; font-weight:800; color:var(--mh-navy);}
+.mh-pop-sub{display:block; font-size:11.5px; font-weight:600; color:var(--mh-muted); margin-top:2px;}
+
+/* ================================================================
+   GENERATED IMAGERY — see the header of assets/js/mh-visuals.js for why
+   these are drawn rather than loaded.
+   ================================================================ */
+.mh-thumb{
+  position:relative; overflow:hidden; border-radius:var(--mh-radius-sm);
+  aspect-ratio:16/10; background:var(--mh-field-bg); flex-shrink:0;
+}
+.mh-thumb svg{
+  position:absolute; inset:0; width:100%; height:100%; display:block;
+  transition:transform .45s ease;
+}
+.mh-thumb-cap{
+  position:absolute; left:0; right:0; bottom:0; padding:18px 12px 8px;
+  font-size:11.5px; font-weight:800; color:#fff; letter-spacing:.01em;
+  text-shadow:0 1px 6px rgba(0,0,0,.5);
+  background:linear-gradient(180deg, rgba(6,18,34,0) 0%, rgba(6,18,34,0.62) 100%);
+}
+/* ---------------- airline logo tiles ----------------
+   Real carrier marks from assets/images/airlines/ (see mh-visuals.js).
+
+   The tile is 2.4:1, NOT square. The dataset's logos are horizontal wordmarks —
+   measured across the 77 vendored files the aspect ratio runs 1.2:1 to 11.5:1
+   with a median of 3.95:1 (Air France is 150×13). Inside a 48×48 square with the
+   aspect ratio preserved, a median logo renders about 48×12px and Air France
+   about 48×4px, which is unreadable. At a consistent 96×40 every carrier in the
+   catalog lands between 96×17 and 96×39 and stays legible, still one fixed tile
+   size for every row, still centred, still undistorted.
+
+   The tile stays LIGHT in dark mode on purpose: 14 of the 77 PNGs (Air India,
+   IndiGo and Qatar among them) have no alpha channel and carry a baked-in white
+   background, so a dark tile would show them as white rectangles. Airline marks
+   are drawn for light backgrounds; every OTA seats them on white for the same
+   reason. */
+.mh-logo-tile{
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  background:#FFFFFF; border:1px solid var(--mh-line); border-radius:12px;
+  padding:5px 7px; overflow:hidden;
+  box-shadow:0 2px 6px -3px rgba(10,37,64,0.28);
+}
+/* Fills the tile's content box, with object-fit doing the aspect-ratio work —
+   this is the pair that prevents distortion, and the box must be DEFINITE.
+   `width:auto;height:auto;max-width:100%` looks equivalent but deadlocks:
+   before the image loads its intrinsic size is unknown, so an auto-sized box
+   computes to 0×0, `loading="lazy"` never sees a box near the viewport, the fetch
+   never starts, and the intrinsic size stays unknown. Caught in the browser —
+   every logo silently stayed blank with no failed request to show for it. */
+.mh-logo-img{
+  display:block; width:100%; height:100%; object-fit:contain;
+}
+.mh-logo-sm{width:96px; height:40px;}
+.mh-logo-md{width:112px; height:48px;}
+
+/* No logo for this carrier, or the file failed to load: a clean aeroplane mark,
+   never initials. Muted so it reads as "no mark" rather than a brand. */
+.mh-logo-none{background:var(--mh-field-bg); border-color:transparent;}
+.mh-logo-none .mh-logo-fallback{
+  width:24px; height:24px; fill:var(--mh-muted); opacity:.75;
+}
+.mh-logo-md.mh-logo-none .mh-logo-fallback{width:28px; height:28px;}
+/* Hotels, cruises and packages have no carrier at all, so they keep their type
+   glyph — an aeroplane on a cruise would be simply wrong. */
+.mh-logo-glyph{
+  background:var(--mh-field-bg); border-color:transparent;
+  font-size:20px; line-height:1;
+}
+
+/* ================================================================
+   RESULTS
+   ================================================================ */
+.mh-results{padding:34px 0 60px;}
+.mh-results-head{
+  display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+  flex-wrap:wrap; margin-bottom:16px;
+}
+.mh-results-head h2{font-size:21px; font-weight:800; color:var(--mh-navy); letter-spacing:-.01em;}
+.mh-results-count{display:block; font-size:13px; font-weight:600; color:var(--mh-muted); margin-top:3px;}
+.mh-loading-msg{color:var(--mh-coral); font-weight:700;}
+.mh-results-tools{display:flex; align-items:center; gap:10px;}
+.mh-sort{display:inline-flex; align-items:center; gap:8px;}
+.mh-sort > span{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--mh-muted);}
+.mh-sort select{
+  appearance:none; -webkit-appearance:none; cursor:pointer;
+  font-family:'Montserrat', sans-serif; font-size:12.5px; font-weight:700; color:var(--mh-navy);
+  background:var(--mh-surface); border:1px solid var(--mh-line); border-radius:100px;
+  padding:9px 32px 9px 14px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6B82' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat; background-position:right 11px center; background-size:15px;
+}
+.mh-sort select:hover{border-color:var(--mh-coral);}
+.mh-ftoggle{display:none;}
+.mh-fbadge{
+  display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
+  padding:0 5px; border-radius:100px; background:var(--mh-coral); color:#fff;
+  font-size:10.5px; font-weight:800;
+}
+
+/* Rail + list. Flex rather than grid columns on purpose: when there are no
+   facets to show the rail carries [hidden], and a flex container simply drops a
+   display:none child — a grid would keep an empty 264px track. */
+.mh-results-body{display:flex; align-items:flex-start; gap:20px;}
+.mh-results-list{flex:1; min-width:0; display:flex; flex-direction:column; gap:12px;}
+
+/* ---------------- filter rail ---------------- */
+.mh-frail{
+  flex:0 0 262px; position:sticky; top:96px; max-height:calc(100vh - 124px);
+  display:flex; flex-direction:column;
+  background:var(--mh-surface); border:1px solid var(--mh-line);
+  border-radius:var(--mh-radius); box-shadow:var(--mh-shadow-sm); overflow:hidden;
+}
+.mh-frail-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:15px 16px; border-bottom:1px solid var(--mh-line); flex-shrink:0;
+}
+.mh-frail-head h3{display:flex; align-items:center; gap:7px; font-size:14px; font-weight:800; color:var(--mh-navy);}
+.mh-fcount{
+  display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px;
+  padding:0 5px; border-radius:100px; background:var(--mh-coral); color:#fff; font-size:10.5px; font-weight:800;
+}
+.mh-fclear{
+  background:none; border:none; cursor:pointer; font-family:'Montserrat', sans-serif;
+  font-size:12px; font-weight:700; color:var(--mh-coral); text-decoration:underline;
+}
+.mh-fclear:disabled{color:var(--mh-muted); text-decoration:none; cursor:default; opacity:.6;}
+.mh-frail-body{overflow-y:auto; padding:4px 0; flex:1; min-height:0;}
+.mh-frail-foot{display:none;}
+.mh-fgroup{padding:14px 16px; border-bottom:1px solid var(--mh-line);}
+.mh-fgroup:last-child{border-bottom:none;}
+.mh-fgroup-h{
+  display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:9px;
+  font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--mh-muted);
+}
+.mh-fprice-out{font-size:12.5px; font-weight:800; color:var(--mh-navy); text-transform:none; letter-spacing:0;}
+.mh-fopt{
+  display:flex; align-items:center; gap:9px; padding:6px 0; cursor:pointer;
+  font-size:12.5px; font-weight:600; color:var(--mh-navy);
+}
+.mh-fopt input{position:absolute; opacity:0; width:0; height:0;}
+.mh-fbox{
+  width:16px; height:16px; border-radius:5px; flex-shrink:0;
+  border:1.5px solid var(--mh-line); background:var(--mh-surface);
+  transition:background .15s ease, border-color .15s ease;
+}
+.mh-fopt input:checked + .mh-fbox{
+  background:var(--mh-coral) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round'><path d='M20 6 9 17l-5-5'/></svg>") center/12px no-repeat;
+  border-color:var(--mh-coral);
+}
+.mh-fopt input:focus-visible + .mh-fbox{outline:2px solid var(--mh-coral); outline-offset:2px;}
+.mh-fopt-label{flex:1; min-width:0; display:flex; align-items:center; gap:6px;}
+.mh-fopt-ico{font-size:12px;}
+.mh-fopt-n{font-size:11px; font-weight:700; color:var(--mh-muted); flex-shrink:0;}
+.mh-fopt:hover .mh-fopt-label{color:var(--mh-coral);}
+.mh-fmore{
+  background:none; border:none; padding:6px 0 0; cursor:pointer; font-family:'Montserrat', sans-serif;
+  font-size:12px; font-weight:800; color:var(--mh-coral);
+}
+.mh-frange{
+  -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:4px;
+  background:var(--mh-field-bg-hover); outline:none; margin:6px 0 4px;
+}
+.mh-frange::-webkit-slider-thumb{
+  -webkit-appearance:none; width:18px; height:18px; border-radius:50%; cursor:pointer;
+  background:var(--mh-coral); border:3px solid var(--mh-surface);
+  box-shadow:0 2px 8px -2px rgba(255,77,77,0.8);
+}
+.mh-frange::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%; cursor:pointer;
+  background:var(--mh-coral); border:3px solid var(--mh-surface);
+}
+.mh-frange:focus-visible{outline:2px solid var(--mh-coral); outline-offset:4px;}
+.mh-frange-ends{display:flex; justify-content:space-between; font-size:10.5px; font-weight:700; color:var(--mh-muted);}
+.mh-frail-backdrop{display:none;}
+
+/* ---------------- result cards ---------------- */
+.mh-rcard{
+  position:relative; padding:16px 20px;
+  background:var(--mh-surface); border:1px solid var(--mh-line);
+  border-radius:var(--mh-radius); box-shadow:var(--mh-shadow-sm);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.mh-rcard:hover{
+  transform:translateY(-2px); border-color:rgba(255,77,77,0.25);
+  box-shadow:0 18px 40px -18px rgba(10,37,64,0.3);
+}
+.mh-rcard:hover .mh-thumb svg{transform:scale(1.06);}
+
+/* Flights: carrier | leg | fare, with the chip row spanning under the first two
+   so a long chip list never squeezes the price column. */
+/* The carrier column is wider than it was for the monogram tile: a 96px logo plus
+   the airline name and flight number need ~215px before the leg diagram starts
+   getting squeezed. */
+.mh-rcard-flight{
+  display:grid; gap:12px 20px; align-items:center;
+  grid-template-columns:minmax(215px,1fr) minmax(220px,1.4fr) auto;
+  grid-template-areas:"head leg right" "chips chips right";
+}
+.mh-rhead{grid-area:head; display:flex; align-items:center; gap:12px; min-width:0;}
+.mh-rleg{grid-area:leg; display:flex; align-items:center; gap:14px;}
+.mh-rcard-flight .mh-rright{grid-area:right;}
+.mh-rcard-flight .mh-rchips{grid-area:chips;}
+.mh-rcarrier{min-width:0;}
+.mh-rname{font-size:15px; font-weight:800; color:var(--mh-navy); overflow:hidden; text-overflow:ellipsis;}
+.mh-rmeta{
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+  font-size:12px; font-weight:600; color:var(--mh-muted); margin-top:3px;
+}
+.mh-stars{color:var(--mh-gold); font-size:12px; letter-spacing:.04em;}
+.mh-rend{min-width:56px;}
+.mh-rend-r{text-align:right;}
+.mh-rtime{font-size:17px; font-weight:900; color:var(--mh-navy); letter-spacing:-.01em; line-height:1.15;}
+.mh-rcode{font-size:12.5px; font-weight:800; color:var(--mh-muted); margin-top:2px;}
+.mh-rcity{font-size:11px; font-weight:600; color:var(--mh-muted); opacity:.85;}
+.mh-rmid{flex:1; min-width:74px; display:flex; flex-direction:column; align-items:center; gap:3px;}
+.mh-rdur{font-size:11px; font-weight:700; color:var(--mh-muted);}
+.mh-rline{
+  position:relative; display:block; width:100%; height:1.5px;
+  background:linear-gradient(90deg, transparent, var(--mh-line) 12%, var(--mh-line) 88%, transparent);
+}
+.mh-rdot{
+  position:absolute; left:0; top:50%; width:5px; height:5px; margin-top:-2.5px;
+  border-radius:50%; background:var(--mh-line);
+}
+.mh-rplane{
+  position:absolute; right:-2px; top:50%; transform:translateY(-50%);
+  font-size:11px; color:var(--mh-coral); background:var(--mh-surface); padding-left:3px;
+}
+.mh-rstops{font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--mh-emerald);}
+
+/* Hotels, cruises, packages: picture | detail | fare. */
+.mh-rcard-media{
+  display:grid; gap:16px; align-items:center; padding:14px;
+  grid-template-columns:150px minmax(0,1fr) auto;
+}
+/* Hotels get a larger picture than the drawn-scene cards: it is a photograph now,
+   and at 150px a hotel facade is unreadable. Top-aligned rather than centred so
+   the picture lines up with the hotel name, not with the middle of a chip list
+   whose height varies per card. */
+.mh-rcard-hotel{grid-template-columns:224px minmax(0,1fr) auto; align-items:start;}
+.mh-rcard-hotel .mh-rbody{padding-top:2px;}
+.mh-rcard-hotel .mh-rright{align-self:center;}
+.mh-rbody{min-width:0;}
+.mh-rbody .mh-rname{font-size:16px;}
+.mh-rdates{font-size:11.5px; font-weight:600; color:var(--mh-muted); margin-top:8px;}
+.mh-rchips{display:flex; gap:7px; flex-wrap:wrap; margin-top:9px;}
+.mh-chip{
+  font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:100px;
+  background:var(--mh-field-bg); color:var(--mh-muted); white-space:nowrap;
+}
+.mh-chip-plain{background:var(--mh-field-bg); color:var(--mh-muted);}
+.mh-chip.mh-chip-low{background:rgba(255,176,32,0.16); color:#8A5B00;}
+/* ---------------- hotel photography ----------------
+   Real, freely licensed photographs from assets/hotels/, resolved by
+   hotel-image-map.js. Unlike the drawn scenes above, these are files, so the
+   box has to behave before the file lands.
+
+   The 4:3 box is fixed with aspect-ratio and the <img> carries width/height, so
+   the row reserves its space up front — no reflow as pictures arrive, and no
+   cumulative layout shift. It is also what makes loading="lazy" work at all: an
+   auto-sized box measures 0x0 before load, so the lazy loader never sees it near
+   the viewport and the fetch never starts. */
+.mh-hotel-media{
+  position:relative; overflow:hidden; border-radius:var(--mh-radius-sm);
+  aspect-ratio:4/3; background:var(--mh-field-bg); margin:0; flex-shrink:0;
+}
+.mh-hotel-img{
+  width:100%; height:100%; display:block;
+  object-fit:cover;            /* crops cleanly, never distorts the building */
+  object-position:center;
+  opacity:1; transition:opacity .35s ease, transform .45s ease;
+}
+.mh-rcard:hover .mh-hotel-img{transform:scale(1.05);}
+
+/* Skeleton: a shimmer in the reserved box while the file is in flight. Driven by
+   an is-loading class that JS removes on load, rather than by the image's own
+   opacity alone, so a failed load still ends in a real picture (the fallback)
+   instead of a permanent shimmer. */
+.mh-hotel-media.is-loading .mh-hotel-img{opacity:0;}
+.mh-hotel-media.is-loading::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(100deg,
+    var(--mh-field-bg) 20%, var(--mh-shimmer, rgba(255,255,255,0.55)) 42%, var(--mh-field-bg) 64%);
+  background-size:220% 100%;
+  animation:mh-hotel-shimmer 1.25s ease-in-out infinite;
+}
+@keyframes mh-hotel-shimmer{
+  from{background-position:130% 0;}
+  to{background-position:-30% 0;}
+}
+@media (prefers-reduced-motion: reduce){
+  .mh-hotel-media.is-loading::after{animation:none;}
+  .mh-hotel-img{transition:none;}
+  .mh-rcard:hover .mh-hotel-img{transform:none;}
+}
+/* Both files missing — keep the reserved box filled rather than showing a hole
+   or a browser broken-image glyph. */
+.mh-hotel-media.is-blank{background:var(--mh-field-bg);}
+.mh-hotel-media.is-blank .mh-hotel-img{display:none;}
+/* ::after, not ::before — ::before already carries the "Representative image"
+   pill, and a card can be both blank and a brand match. ::after is free here
+   because the shimmer that uses it only exists while .is-loading is set. */
+.mh-hotel-media.is-blank::after{
+  content:'🏨'; position:absolute; inset:0; display:flex;
+  align-items:center; justify-content:center; font-size:26px; opacity:.45;
+  animation:none; background:none;
+}
+
+/* CC BY / CC BY-SA oblige us to name the photographer where the user can see it.
+   Small, bottom-left, over a gradient so it stays legible on any photograph. */
+.mh-hotel-credit{
+  position:absolute; left:0; right:0; bottom:0; padding:14px 8px 4px;
+  font-size:9px; font-weight:600; color:rgba(255,255,255,.92);
+  letter-spacing:.01em; line-height:1.3;
+  text-shadow:0 1px 3px rgba(0,0,0,.6);
+  background:linear-gradient(180deg, rgba(6,18,34,0) 0%, rgba(6,18,34,0.55) 100%);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* A chain photograph standing in for a property we have no picture of. Said out
+   loud, because a booking card implying "this is your hotel" when it is not is
+   the one thing this feature must not do. */
+.mh-hotel-media[data-hotel-match="brand"]::before,
+.mh-hotel-media[data-hotel-match="default"]::before{
+  content:'Representative image'; position:absolute; top:7px; left:7px; z-index:1;
+  padding:3px 7px; border-radius:100px;
+  font-size:9px; font-weight:800; letter-spacing:.02em;
+  color:#fff; background:rgba(6,18,34,0.58); backdrop-filter:blur(3px);
+}
+
+/* Badges — free cancellation and breakfast. Louder than a chip because they are
+   the two things a corporate booker scans for. */
+.mh-badges{display:flex; gap:7px; flex-wrap:wrap; margin-top:9px;}
+.mh-badge{
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:6px;
+}
+.mh-badge-ok{background:rgba(16,185,129,0.13); color:#046C4E;}
+.mh-badge-warm{background:rgba(255,176,32,0.16); color:#8A5B00;}
+.mh-rplace{display:inline-flex; align-items:center; gap:3px;}
+
+.mh-rright{text-align:right; flex-shrink:0; min-width:118px;}
+.mh-rprice{font-size:21px; font-weight:900; color:var(--mh-navy); white-space:nowrap; letter-spacing:-.01em;}
+.mh-rprice small{font-size:11px; font-weight:600; color:var(--mh-muted);}
+.mh-rtotal{font-size:11.5px; color:var(--mh-muted); margin-top:2px; white-space:nowrap;}
+.mh-rcta{margin-top:10px; width:100%;}
+
+.mh-more-wrap{display:flex; justify-content:center; padding:6px 0 2px;}
+
+/* ---------------- empty + loading ---------------- */
+.mh-empty{
+  text-align:center; padding:52px 24px; background:var(--mh-surface);
+  border:1px solid var(--mh-line); border-radius:var(--mh-radius);
+}
+.mh-empty-emoji{font-size:34px; display:block; margin-bottom:12px;}
+.mh-empty b{display:block; font-size:16px; font-weight:800; color:var(--mh-navy); margin-bottom:6px;}
+.mh-empty span{font-size:13.5px; color:var(--mh-muted); line-height:1.6;}
+.mh-empty .mh-btn{margin-top:18px;}
+.mh-empty-alts{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:18px;}
+
+/* Skeletons mirror the real card's shape (logo, three lines, fare) so the layout
+   doesn't jump when results land. */
+.mh-skel{
+  display:grid; grid-template-columns:44px minmax(0,1fr) 96px; gap:18px; align-items:center;
+  padding:18px 20px; background:var(--mh-surface); border:1px solid var(--mh-line);
+  border-radius:var(--mh-radius);
+}
+.mh-skel-logo{width:44px; height:44px; border-radius:13px;}
+.mh-skel-lines{display:flex; flex-direction:column; gap:8px;}
+.mh-skel-lines span{height:11px; border-radius:6px;}
+.mh-skel-lines span:nth-child(1){width:44%;}
+.mh-skel-lines span:nth-child(2){width:72%;}
+.mh-skel-lines span:nth-child(3){width:30%;}
+.mh-skel-price{height:26px; border-radius:8px;}
+.mh-skel-logo, .mh-skel-lines span, .mh-skel-price{
+  background:linear-gradient(90deg, var(--mh-field-bg) 25%, var(--mh-field-bg-hover) 50%, var(--mh-field-bg) 75%);
+  background-size:200% 100%; animation:mhShimmer 1.3s infinite;
+}
+@keyframes mhShimmer{0%{background-position:200% 0;} 100%{background-position:-200% 0;}}
+
+/* ---------------- micro-interactions ----------------
+   The ripple is appended by mhInitRipple(); the reveal classes are added by
+   mhReveal(). Both are JS-applied, so with JS-driven motion disabled (or
+   prefers-reduced-motion) content is simply present and static — the stylesheet
+   never hides anything on its own. */
+.mh-btn, .mh-iconbtn, .mh-tab, .mh-chipbtn{position:relative; overflow:hidden;}
+.mh-ink{
+  position:absolute; border-radius:50%; background:currentColor; opacity:.22;
+  transform:scale(0); pointer-events:none; animation:mhInk .6s ease-out forwards;
+}
+.mh-btn-coral .mh-ink{background:#fff; opacity:.35;}
+@keyframes mhInk{to{transform:scale(1); opacity:0;}}
+.mh-pre{opacity:0; transform:translateY(10px);}
+.mh-in{opacity:1; transform:none; transition:opacity .45s ease, transform .45s ease;}
+
+/* ================================================================
+   NOTIFICATION DRAWER
+   ================================================================ */
+.mh-notif-backdrop{
+  position:fixed; inset:0; z-index:190; background:rgba(6,18,34,0.42);
+  opacity:0; pointer-events:none; transition:opacity .25s ease;
+  backdrop-filter:blur(2px);
+}
+.mh-notif-backdrop.open{opacity:1; pointer-events:auto;}
+.mh-notif-drawer{
+  position:fixed; top:0; right:0; z-index:200;
+  width:min(408px, 100vw); height:100vh; height:100dvh;
+  display:flex; flex-direction:column;
+  background:var(--mh-surface); border-left:1px solid var(--mh-line);
+  box-shadow:-24px 0 60px -20px rgba(10,37,64,0.35);
+  transform:translateX(103%); transition:transform .3s cubic-bezier(.32,.72,0,1);
+  visibility:hidden;
+}
+.mh-notif-drawer.open{transform:none; visibility:visible;}
+.mh-nd-head{
+  display:flex; align-items:center; gap:12px; flex-shrink:0;
+  padding:20px 20px 16px; border-bottom:1px solid var(--mh-line);
+}
+.mh-nd-head h2{flex:1; font-size:18px; font-weight:900; color:var(--mh-navy); letter-spacing:-.01em;}
+.mh-nd-unread{
+  display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px;
+  padding:0 7px; border-radius:100px; background:var(--mh-coral); color:#fff;
+  font-size:11px; font-weight:800;
+}
+.mh-nd-close{
+  display:flex; align-items:center; justify-content:center; width:34px; height:34px;
+  border-radius:50%; border:none; background:var(--mh-field-bg); color:var(--mh-navy);
+  cursor:pointer; font-size:17px; line-height:1; transition:background .2s ease;
+}
+.mh-nd-close:hover{background:var(--mh-field-bg-hover); color:var(--mh-coral);}
+.mh-nd-tools{
+  display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-shrink:0;
+  padding:10px 20px; border-bottom:1px solid var(--mh-line);
+}
+.mh-nd-markall{
+  background:none; border:none; cursor:pointer; font-family:'Montserrat', sans-serif;
+  font-size:12px; font-weight:800; color:var(--mh-coral); text-decoration:underline;
+}
+.mh-nd-markall:disabled{color:var(--mh-muted); text-decoration:none; cursor:default; opacity:.6;}
+.mh-nd-list{flex:1; min-height:0; overflow-y:auto; padding:6px 0 24px;}
+.mh-nd-day{
+  position:sticky; top:0; z-index:1; padding:11px 20px 7px;
+  background:var(--mh-surface);
+  font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--mh-muted);
+}
+.mh-nd-item{
+  display:flex; gap:12px; width:100%; text-align:left; padding:13px 20px;
+  background:none; border:none; border-bottom:1px solid var(--mh-line);
+  cursor:pointer; font-family:'Montserrat', sans-serif; transition:background .18s ease;
+}
+.mh-nd-item:hover{background:var(--mh-field-bg);}
+.mh-nd-item.unread{background:rgba(255,77,77,0.045);}
+.mh-nd-ico{
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:34px; height:34px; border-radius:50%; font-size:14px; font-weight:800;
+  background:var(--mh-field-bg); color:var(--mh-navy);
+}
+.mh-nd-ico-ok{background:rgba(18,183,106,0.15); color:#067647;}
+.mh-nd-ico-bad{background:rgba(255,77,77,0.14); color:#B3261E;}
+.mh-nd-ico-wait{background:rgba(255,176,32,0.18); color:#8A5B00;}
+.mh-nd-body{flex:1; min-width:0;}
+.mh-nd-title{font-size:13.5px; font-weight:800; color:var(--mh-navy);}
+.mh-nd-msg{font-size:12.5px; font-weight:500; color:var(--mh-muted); line-height:1.5; margin-top:3px;}
+.mh-nd-time{font-size:11px; font-weight:600; color:var(--mh-muted); opacity:.8; margin-top:5px;}
+.mh-nd-dot{width:7px; height:7px; border-radius:50%; background:var(--mh-coral); flex-shrink:0; margin-top:6px;}
+.mh-nd-empty{text-align:center; padding:56px 26px; color:var(--mh-muted);}
+.mh-nd-empty svg{width:40px; height:40px; fill:none; stroke:currentColor; stroke-width:1.6; opacity:.5; margin-bottom:12px;}
+.mh-nd-empty b{display:block; font-size:15px; font-weight:800; color:var(--mh-navy); margin-bottom:5px;}
+.mh-nd-empty span{font-size:13px; line-height:1.6;}
+
+/* ================================================================
+   MOBILE BOTTOM NAV — phone only
+   ================================================================ */
+.mh-bottomnav{
+  display:none; position:fixed; bottom:0; left:0; right:0; z-index:130;
+  background:var(--mh-surface); border-top:1px solid var(--mh-line);
+  box-shadow:0 -6px 22px -14px rgba(10,37,64,0.4);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.mh-bottomnav button{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:9px 2px 8px; background:none; border:none; cursor:pointer;
+  font-family:'Montserrat', sans-serif; font-size:9.5px; font-weight:700;
+  color:var(--mh-muted); transition:color .2s ease;
+}
+.mh-bottomnav button svg{
+  width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.9;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.mh-bottomnav button.active{color:var(--mh-coral);}
+.mh-noscroll{overflow:hidden;}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width:1180px){
+  .mh-pop-grid{grid-template-columns:repeat(3, minmax(0,1fr));}
+}
+@media (max-width:1080px){
+  .mh-gsearch{width:170px;}
+  .mh-navlinks{gap:18px;}
+  .mh-frail{flex-basis:236px;}
+  /* Tighter logo so the leg diagram keeps its room; the ratio is unchanged, so
+     nothing distorts — the whole tile just scales down. */
+  .mh-logo-sm{width:80px; height:34px;}
+  .mh-rcard-flight{grid-template-columns:minmax(185px,1fr) minmax(190px,1.3fr) auto;}
+}
+@media (max-width:960px){
+  .mh-navlinks{display:none;}
+  .mh-gsearch{display:none;}
+  .mh-burger{display:flex;}
+  .mh-acct-text{display:none;}
+  .mh-acct{padding:5px;}
+  /* Tablet: the rail becomes the mobile bottom sheet rather than eating a third
+     of a narrow result card. */
+  .mh-ftoggle{display:inline-flex;}
+  .mh-frail{
+    position:fixed; inset:auto 0 0 0; z-index:180; flex:none; width:100%;
+    max-height:82vh; border-radius:22px 22px 0 0; border-left:none; border-right:none;
+    border-bottom:none; transform:translateY(102%);
+    transition:transform .3s cubic-bezier(.32,.72,0,1); visibility:hidden;
+  }
+  .mh-frail.mh-frail-open{transform:none; visibility:visible;}
+  .mh-frail-foot{
+    display:flex; flex-shrink:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--mh-line);
+  }
+  .mh-frail-foot .mh-btn{width:100%;}
+  /* Visibility is driven by an `open` class that mhInitFilterSheet toggles, not
+     by :has() — the rest of this sheet avoids :has() so behaviour never depends
+     on selector support. */
+  .mh-frail-backdrop{
+    display:block; position:fixed; inset:0; z-index:170; background:rgba(6,18,34,0.42);
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .mh-frail-backdrop.open{opacity:1; pointer-events:auto;}
+  /* Tablet: the picture stays beside the details but gives width back to them. */
+  .mh-rcard-hotel{grid-template-columns:176px minmax(0,1fr) auto; gap:14px;}
+}
+@media (max-width:900px){
+  .mh-fields, .mh-fields.mh-cols-5, .mh-fields.mh-cols-4{grid-template-columns:1fr;}
+  .mh-swap{display:none;}
+  .mh-go{min-height:52px; padding:16px;}
+  .mh-wrap{padding:0 20px;}
+  .mh-nav{height:66px;}
+  /* Shorter than desktop so the video hero doesn't eat a whole phone screen
+     before the search card. */
+  .mh-hero{min-height:520px; padding-top:48px;}
+  /* The panels normally stack in one grid cell (grid-area:1/1) so switching tabs
+     doesn't reflow — fine on desktop where every tab is a single row of equal
+     height. Once fields go one-per-row the tallest tab (Flights, 6 fields) sets
+     the height for all of them, leaving a dead gap under Hotels/Cruises/
+     Packages. Below 900px let the card collapse to the active panel instead.
+     Values survive the toggle — display:none doesn't clear inputs. */
+  .mh-body{display:block;}
+  .mh-panel{grid-area:auto; display:none; visibility:visible;}
+  .mh-panel.active{display:block;}
+  /* Bottom nav takes over navigation; reserve its height so the last row of any
+     section stays reachable above it. */
+  .mh-bottomnav{display:flex;}
+  .layout.mh-headed{padding-bottom:60px;}
+  .mh-pop-grid{grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}
+  .mh-frail{max-height:78vh;}
+}
+@media (max-width:640px){
+  /* Flight card goes vertical: carrier, then the leg, then fare as a full-width
+     row so the price and CTA stay side by side instead of stacking twice. */
+  .mh-rcard-flight{grid-template-columns:1fr; grid-template-areas:"head" "leg" "chips" "right"; gap:12px;}
+  .mh-rcard-flight .mh-rright{
+    text-align:left; min-width:0; display:flex; align-items:center; justify-content:space-between;
+    gap:12px; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--mh-line);
+  }
+  .mh-rcard-flight .mh-rcta{width:auto; margin-top:0;}
+  .mh-rcard-media{grid-template-columns:104px minmax(0,1fr); grid-template-areas:none;}
+  .mh-rcard-media .mh-rright{
+    grid-column:1 / -1; text-align:left; display:flex; align-items:center;
+    justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding-top:12px; border-top:1px solid var(--mh-line);
+  }
+  .mh-rcard-media .mh-rcta{width:auto; margin-top:0;}
+  /* Phone: photograph on top, full bleed to the card edge, details beneath —
+     the layout every travel app uses at this width. The negative margins undo
+     the card's own padding so the picture reaches the rounded corners; the
+     4:3 box would be only ~90px tall in the 104px thumbnail column above. */
+  .mh-rcard-hotel{grid-template-columns:1fr; gap:0; padding:0; align-items:stretch;}
+  .mh-rcard-hotel .mh-hotel-media{
+    aspect-ratio:16/9; border-radius:var(--mh-radius) var(--mh-radius) 0 0;
+  }
+  .mh-rcard-hotel .mh-rbody{padding:12px 14px 0;}
+  .mh-rcard-hotel .mh-rright{
+    grid-column:auto; margin:12px 14px 14px; padding-top:12px;
+    text-align:left; display:flex; align-items:center; justify-content:space-between;
+    gap:12px; flex-wrap:wrap; border-top:1px solid var(--mh-line);
+  }
+  .mh-rcard-hotel .mh-rcta{width:auto; margin-top:0;}
+  .mh-hotel-credit{font-size:9.5px;}
+  .mh-rprice{font-size:19px;}
+  .mh-quick{gap:10px 18px;}
+  .mh-gsearch-results, .mh-acct-menu{width:min(320px, calc(100vw - 40px));}
+  .mh-hero .mh-sub{font-size:14px;}
+  .mh-results-head{align-items:flex-start;}
+  .mh-results-tools{width:100%; justify-content:space-between;}
+  .mh-discover{padding:24px 0 0;}
+  /* The bell's panel comes from partner-portal.css at a fixed 340px; scoped to the
+     travel header so the merchant's notifications don't overflow a phone viewport. */
+  .mh-header .notif-dropdown{width:min(340px, calc(100vw - 28px));}
+}
+@media (max-width:420px){
+  .mh-pop-grid{grid-template-columns:1fr 1fr; gap:10px;}
+  .mh-thumb-cap{font-size:10.5px;}
+}

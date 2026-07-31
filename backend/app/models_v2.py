@@ -225,6 +225,20 @@ class AuditOperation(str, enum.Enum):
     DELETE = "DELETE"
 
 
+class DocumentType(str, enum.Enum):
+    PASSPORT = "passport"
+    VISA = "visa"
+    PHOTO_ID = "photo_id"
+    TICKET = "ticket"
+    OTHER = "other"
+
+
+class DocumentVerification(str, enum.Enum):
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
 def _pg_enum(python_enum: type[enum.Enum], name: str) -> SAEnum:
     """Bind to an existing PostgreSQL ENUM by value, without re-creating it."""
     return SAEnum(
@@ -591,10 +605,28 @@ class ServiceRequest(Base):
     user: Mapped[Optional["User"]] = relationship(
         back_populates="requests", foreign_keys=[user_id]
     )
+    # Ordered explicitly: an UPDATE writes a new tuple in Postgres, so an
+    # unordered read can return an edited passenger last and silently reshuffle
+    # the traveller list the merchant is looking at. The id is a sequence, so
+    # this is the order they were added in.
     passengers: Mapped[list["PassengerData"]] = relationship(
-        back_populates="request", cascade="all, delete-orphan"
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="PassengerData.passenger_id",
     )
     payments: Mapped[list["Payment"]] = relationship(back_populates="request")
+    documents: Mapped[list["RequestDocument"]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="RequestDocument.document_id",
+    )
+    #: Internal operator notes. Never serialised into a merchant-facing
+    #: response — see RequestNote and migration 0032.
+    notes: Mapped[list["RequestNote"]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="RequestNote.note_id",
+    )
 
     __table_args__ = (
         UniqueConstraint("request_number", name="uq_service_requests_number"),
@@ -1028,6 +1060,141 @@ class AuditLog(Base):
     )
 
 
+# =====================================================================
+# 10. request_documents  (migration 0031)
+# =====================================================================
+class RequestDocument(Base):
+    """A supporting file attached to a booking request.
+
+    Only metadata lives here — the bytes sit under the upload root with a
+    generated name and are streamed back through an authenticated endpoint.
+    ``merchant_id`` is denormalised from the request so scope can be enforced
+    without a join, exactly as :class:`PassengerData` does.
+    """
+
+    __tablename__ = "request_documents"
+
+    document_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    request_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("service_requests.request_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE"), nullable=False
+    )
+    #: NULL when the document is about the booking rather than one traveller.
+    passenger_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("passenger_data.passenger_id", ondelete="CASCADE")
+    )
+
+    doc_type: Mapped[DocumentType] = mapped_column(
+        _pg_enum(DocumentType, "document_type_enum"),
+        nullable=False,
+        server_default=text("'other'"),
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Server-side path under the upload root. Never returned to a client.
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    checksum: Mapped[Optional[str]] = mapped_column(String(64))
+
+    uploaded_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    verification_status: Mapped[DocumentVerification] = mapped_column(
+        _pg_enum(DocumentVerification, "document_verification_enum"),
+        nullable=False,
+        server_default=text("'pending'"),
+    )
+    verified_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    verified_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    request: Mapped["ServiceRequest"] = relationship(back_populates="documents")
+
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="ck_request_documents_size_positive"),
+        CheckConstraint(
+            "verification_status <> 'rejected' OR rejection_reason IS NOT NULL",
+            name="ck_request_documents_rejection_reason",
+        ),
+        Index("ix_request_documents_request", "request_id"),
+        Index("ix_request_documents_merchant", "merchant_id"),
+        Index(
+            "ix_request_documents_passenger", "passenger_id",
+            postgresql_where=text("passenger_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_request_documents_pending", "verification_status",
+            postgresql_where=text("verification_status = 'pending'"),
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<RequestDocument {self.original_filename} req={self.request_id}>"
+
+
+# =====================================================================
+# 10. request_notes
+# =====================================================================
+class RequestNote(Base):
+    """An internal operator note on a booking.
+
+    Staff-only by design — see migration 0032 for why there is no visibility
+    column. Nothing in this class enforces that; ``booking_ops_service`` does,
+    on every read and write, and no merchant-facing schema references it.
+    """
+
+    __tablename__ = "request_notes"
+
+    note_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    request_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("service_requests.request_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    merchant_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE")
+    )
+    #: SET NULL so an operator leaving does not erase what happened on a booking.
+    author_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    #: NULL until the note is edited, so "edited" is distinguishable from "new".
+    edited_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    request: Mapped["ServiceRequest"] = relationship(back_populates="notes")
+
+    __table_args__ = (
+        CheckConstraint("length(btrim(body)) > 0", name="ck_request_notes_body_not_blank"),
+        Index("ix_request_notes_request", "request_id", "note_id"),
+        Index("ix_request_notes_merchant", "merchant_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<RequestNote {self.note_id} req={self.request_id}>"
+
+
 __all__ = [
     "Base",
     "User",
@@ -1057,4 +1224,8 @@ __all__ = [
     "MessageType",
     "MessageStatus",
     "AuditOperation",
+    "RequestDocument",
+    "RequestNote",
+    "DocumentType",
+    "DocumentVerification",
 ]

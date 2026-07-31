@@ -56,6 +56,25 @@ def notify_admins(db: Session, title: str, message: str) -> int:
     return len(admins)
 
 
+def notify_request_merchant(db, request, title: str, message: str) -> None:
+    """Notify whoever raised a request, falling back to the company's admins.
+
+    Lives here rather than in one caller because two services now need it, and
+    a second copy of "who counts as the merchant for this request" is exactly
+    how one of them ends up notifying nobody after a refactor.
+
+    ``request`` is a ``ServiceRequest``; typed loosely to avoid a circular
+    import back into the models this module already reaches through ``User``.
+    """
+    if request.user_id:
+        create_notification(db, request.user_id, title, message)
+        return
+    if request.merchant is None:
+        return
+    for user in request.merchant.users:
+        create_notification(db, user.user_id, title, message)
+
+
 def list_user_notifications(db: Session, user_id: int) -> list[MsgLog]:
     stmt = (
         select(MsgLog)

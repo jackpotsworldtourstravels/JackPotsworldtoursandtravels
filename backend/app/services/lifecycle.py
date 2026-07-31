@@ -79,6 +79,36 @@ TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.CANCELLED: (),
 }
 
+#: Edges that exist **only** as the settled outcome of an approved change
+#: request (M3: cancellation / reschedule).
+#:
+#: WHY THESE ARE NOT IN ``TRANSITIONS``
+#: A paid or ticketed booking genuinely can be cancelled — money has moved and
+#: an airline seat exists, so the cancellation has to compute a charge and a
+#: refund before it settles. Putting the edge in ``TRANSITIONS`` would publish
+#: it through :func:`allowed_transitions`, which drives every action menu in
+#: every portal, and an admin would get a bare "Cancel" button that skips the
+#: charge, the refund and the merchant's request entirely — a second path to
+#: the same state with none of the accounting.
+#:
+#: Keeping them here means the state machine is still the single place that
+#: knows the edge exists, but only a caller passing ``settlement=True`` — the
+#: change-request service — can walk it.
+SETTLEMENT_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
+    S.APPROVED: (
+        Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
+    ),
+    S.PAYMENT_PENDING: (
+        Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
+    ),
+    S.PAID: (
+        Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
+    ),
+    S.TICKET_ISSUED: (
+        Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
+    ),
+}
+
 #: Statuses at which a merchant may still edit passengers/details.
 EDITABLE_STATUSES = frozenset({S.DRAFT})
 
@@ -123,8 +153,18 @@ def allowed_transitions(request: ServiceRequest, actor: User) -> list[Transition
     ]
 
 
-def _find(request: ServiceRequest, target: S) -> Transition:
-    for transition in TRANSITIONS.get(request.status, ()):
+def _find(request: ServiceRequest, target: S, *, settlement: bool = False) -> Transition:
+    edges = TRANSITIONS.get(request.status, ())
+    if settlement:
+        # Settlement edges are tried FIRST, not appended. Approved and Payment
+        # Pending already have a Cancelled edge in TRANSITIONS — the merchant's
+        # own "I changed my mind", which requires ``ticket.request``. Searching
+        # in the other order finds that one and refuses the admin settling an
+        # approved cancellation, because an admin does not hold a merchant's
+        # permission. A caller that explicitly asked to settle means the
+        # settlement edge.
+        edges = SETTLEMENT_TRANSITIONS.get(request.status, ()) + edges
+    for transition in edges:
         if transition.to is target:
             return transition
     raise HTTPException(
@@ -146,14 +186,19 @@ def transition(
     reason: str | None = None,
     note: str | None = None,
     commit: bool = True,
+    settlement: bool = False,
 ) -> ServiceRequest:
     """Move a request to ``target``, enforcing the edge and its permission.
 
     Appends to ``status_history`` and stamps the matching timestamp column.
     Callers must not set ``request.status`` directly — this is the only
     supported path, which is what keeps the timeline complete.
+
+    ``settlement=True`` additionally allows the edges in
+    :data:`SETTLEMENT_TRANSITIONS`. Only the change-request service passes it;
+    see that constant for why those edges are not offered to everyone.
     """
-    edge = _find(request, target)
+    edge = _find(request, target, settlement=settlement)
 
     if not has_permission(actor, edge.permission):
         raise HTTPException(

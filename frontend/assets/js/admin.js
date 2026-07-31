@@ -66,6 +66,8 @@ const sectionTitles = {
   reports: 'Dashboard', users: 'Merchant Management', 'active-users': 'Active Users',
   support: 'Support Management', 'reports-export': 'Reports', payments: 'Payment Management',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
+  'ticket-enquiries': 'Ticket Enquiries',
+  'change-requests': 'Cancellations & Reschedules',
   notifications: 'Communication', profile: 'Profile',
 };
 const loadedSections = new Set();
@@ -101,6 +103,8 @@ function loadSection(name) {
   if (name === 'notifications') return initNotificationForm();
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
+  if (name === 'ticket-enquiries') return loadTicketEnquiries();
+  if (name === 'change-requests') return loadChangeRequests();
   if (name === 'profile') return loadAdminProfile();
 }
 
@@ -196,13 +200,19 @@ async function loadReports() {
     issued: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>',
     support: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/>',
     chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>',
+    enquiry: '<path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/>',
   };
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/dashboard`, { headers: authHeaders() });
     const s = data.requests_by_status;
+    /* Defaulted rather than assumed: an older backend that predates the split
+       returns no `enquiries` block, and the dashboard should still render. */
+    const enq = data.enquiries || { pending: 0, in_review: 0, awaiting_response: 0, answered_today: 0 };
+    updateEnquiryNavBadge(enq.awaiting_response);
     grid.innerHTML = `
       <div class="stat-card">${statIcon('coral', ICONS.merchant)}<div class="stat-body"><div class="num">${data.merchants.total}</div><div class="label">Total Merchants</div><div class="stat-sub">${data.merchants.active} active · ${data.merchants.pending_approval} pending · ${data.merchants.suspended} suspended</div></div></div>
-      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${s.pending_approval + s.in_review}</div><div class="label">Awaiting Approval</div></div></div>
+      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${s.pending_approval + s.in_review}</div><div class="label">Awaiting Approval</div><div class="stat-sub">Bookings only — enquiries counted separately</div></div></div>
+      <div class="stat-card stat-card-link" data-goto-section="ticket-enquiries" role="button" tabindex="0">${statIcon('coral', ICONS.enquiry)}<div class="stat-body"><div class="num coral">${enq.awaiting_response}</div><div class="label">Enquiries Awaiting Answer</div><div class="stat-sub">${enq.pending} pending · ${enq.in_review} under review · ${enq.answered_today} answered today</div></div></div>
       <div class="stat-card">${statIcon('sky', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_pending_count}</div><div class="label">Payments Awaiting Verification</div></div></div>
       <div class="stat-card">${statIcon('emerald', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_verified_today}</div><div class="label">Payments Verified Today</div></div></div>
       <div class="stat-card">${statIcon('', ICONS.issued)}<div class="stat-body"><div class="num">${s.ticket_issued}</div><div class="label">Ticket Issued</div></div></div>
@@ -222,10 +232,15 @@ async function loadReports() {
 }
 
 /* ---------- Merchant Management ---------- GET/POST/PUT /api/admin/merchants (existing,
-   live v2 endpoints — API_CONTRACT.md §2/§3). Admin cannot create merchant staff users
-   directly (that's the merchant's own MERCHANT_USER_CREATE permission, Merchant Portal only) —
-   Admin's remit here is view/edit/approve/suspend the company plus reset an existing user's
-   password. */
+   live v2 endpoints — API_CONTRACT.md §2/§3). Admin's remit here is view/edit/approve/suspend
+   the company, plus the full staff-login lifecycle for it: list users, ADD a user
+   (POST /api/admin/merchants/{id}/users) and reset an existing user's password. All three are
+   gated on `merchant_user.manage`, which Admin holds.
+
+   The merchant's own MERCHANT_USER_CREATE is a different thing and still merchant-only: it is
+   what lets a merchant add staff to its own company from the Merchant Portal. An admin never
+   holds it — they create through the merchant-scoped admin path above, where the company comes
+   from the URL rather than from the caller's account. */
 const COMPANY_TYPE_LABELS = { gaming_company: 'Gaming Company', corporate_company: 'Corporate Company', travel_agency: 'Travel Agency', business_partner: 'Business Partner', direct_customer: 'Direct Customer' };
 const MERCHANT_STATUS_BADGE = { active: 'active', pending_approval: 'pending', suspended: 'cancelled', inactive: 'inactive' };
 
@@ -435,17 +450,117 @@ async function openMerchantDetail(merchantId) {
         </div>
       </div>
       <div class="panel">
-        <h2 style="font-size:14px;margin-bottom:10px;">Users</h2>
+        <div class="panel-head">
+          <h2 style="font-size:14px;">Users</h2>
+          <button class="btn btn-coral btn-sm" id="addMerchantUserBtn">+ Add User</button>
+        </div>
         <div class="table-wrap"><table id="merchantUsersTable"><thead><tr>
           <th>Full Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     `;
     document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
+    document.getElementById('addMerchantUserBtn').addEventListener('click', () => openMerchantUserModal(merchantId, m.company_name));
     loadMerchantUsersTable(merchantId);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
   }
+}
+
+/* ---------- Add a user to a merchant ---------- POST /api/admin/merchants/{id}/users.
+
+   The company comes from the URL, never from the form, so an admin cannot land a
+   user in the wrong company by editing a field. `merchant_role` is the internal
+   role the backend uses to widen a merchant_user's permissions (rbac
+   MERCHANT_ROLE_PERMISSIONS); it does not apply to a merchant_admin, who already
+   holds the full merchant set, so the field is disabled for that choice. */
+const MERCHANT_USER_ROLES = { merchant_user: 'Merchant User (staff)', merchant_admin: 'Merchant Admin (manages the company)' };
+const MERCHANT_INTERNAL_ROLES = {
+  '': 'None — base permissions only',
+  manager: 'Manager', supervisor: 'Supervisor', operator: 'Operator',
+  finance: 'Finance', data_operator: 'Data Operator',
+};
+
+function openMerchantUserModal(merchantId, companyName) {
+  const overlay = document.getElementById('merchantUserModalOverlay');
+  const body = document.getElementById('merchantUserModalBody');
+  body.innerHTML = `
+    <h2>Add User</h2>
+    <p style="font-size:13px;color:var(--text-muted);font-weight:600;margin:-10px 0 16px;">
+      New login for ${escapeHtml(companyName)}.
+    </p>
+    <form id="merchantUserForm">
+      <div class="form-grid">
+        <div class="form-field"><label>Full Name</label><input name="full_name" required maxlength="150"></div>
+        <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
+        <div class="form-field"><label>Phone</label><input name="phone" maxlength="30"></div>
+        <div class="form-field"><label>Account Role</label>
+          <select name="role">
+            ${Object.entries(MERCHANT_USER_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Internal Role</label>
+          <select name="merchant_role">
+            ${Object.entries(MERCHANT_INTERNAL_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Password</label>
+          <input name="password" type="text" minlength="8" maxlength="72" placeholder="leave blank to generate one">
+        </div>
+      </div>
+      <div class="msg" id="merchantUserMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Create User</button>
+        <button type="button" class="btn btn-ghost" id="merchantUserCancelBtn">Cancel</button>
+      </div>
+    </form>`;
+  overlay.classList.add('open');
+
+  const form = document.getElementById('merchantUserForm');
+  const roleSel = form.elements.role;
+  const internalSel = form.elements.merchant_role;
+  const syncInternal = () => {
+    const isAdmin = roleSel.value === 'merchant_admin';
+    internalSel.disabled = isAdmin;
+    if (isAdmin) internalSel.value = '';
+  };
+  roleSel.addEventListener('change', syncInternal);
+  syncInternal();
+
+  document.getElementById('merchantUserCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const msg = document.getElementById('merchantUserMsg');
+    const submit = form.querySelector('button[type=submit]');
+    const payload = {
+      full_name: f.full_name.value.trim(),
+      email: f.email.value.trim(),
+      phone: f.phone.value.trim() || null,
+      role: f.role.value,
+      merchant_role: f.merchant_role.value || null,
+    };
+    if (f.password.value) payload.password = f.password.value;
+
+    submit.disabled = true;
+    msg.textContent = 'Creating…';
+    msg.className = 'msg';
+    try {
+      const { data } = await axios.post(
+        `${API_BASE}/api/admin/merchants/${merchantId}/users`, payload, { headers: authHeaders() });
+      overlay.classList.remove('open');
+      /* Shown once — the backend hashes it and cannot return it again. */
+      alert(`User created.\n\nLogin: ${data.account.email}\nTemporary password: ${data.temporary_password}\n\nShare these credentials securely — this password cannot be retrieved again.`);
+      /* Re-open the whole detail rather than just the table, so the "Number of
+         Users" figure in the info grid moves with it. */
+      openMerchantDetail(merchantId);
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to create user.';
+      msg.className = 'msg error';
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 async function loadMerchantUsersTable(merchantId) {
@@ -577,6 +692,8 @@ async function loadApprovalQueue(page = aqPage) {
         <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span></td>
         <td>${fmtDateTime(i.submitted_at)}</td>
         <td style="white-space:nowrap;">
+          ${i.request_type === 'booking'
+            ? `<button class="btn btn-ghost btn-sm" data-aq-review="${i.id}">Review</button>` : ''}
           <button class="btn btn-navy btn-sm" data-aq-approve="${i.id}" data-kind="${i.kind}" data-request-type="${i.request_type || ''}">Approve</button>
           ${i.kind === 'request' ? `<button class="btn btn-danger btn-sm" data-aq-reject="${i.id}" data-request-type="${i.request_type || ''}">Reject</button>` : ''}
         </td>
@@ -587,6 +704,12 @@ async function loadApprovalQueue(page = aqPage) {
        service request's resolve (walks Pending -> Under Review -> Approved, no payment step —
        calling the booking endpoint on one of these would wrongly push it through the booking
        lifecycle instead, landing it at "Payment Pending"). */
+    /* Booking rows get a Review step before the one-click Approve, because a
+       booking now carries traveller documents that ought to be looked at
+       first. Implemented in admin-bookings.js; the queue itself is unchanged. */
+    tbody.querySelectorAll('[data-aq-review]').forEach(btn => {
+      btn.addEventListener('click', () => openBookingReview(btn.dataset.aqReview));
+    });
     tbody.querySelectorAll('[data-aq-approve]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.aqApprove;
@@ -625,6 +748,17 @@ async function loadApprovalQueue(page = aqPage) {
 /* ---------- Service Request Management ---------- GET /api/requests?request_type=...
    (existing), POST /api/admin/service-requests/{id}/resolve (existing). */
 const SERVICE_REQUEST_TYPES = ['cancellation', 'date_change', 'refund', 'passenger_modification', 'extra_baggage', 'meal', 'seat'];
+
+/* What Service Request Management may actually resolve. Cancellation and date
+   change are settled on the Cancellations & Reschedules screen instead — they
+   quote money and change the booking, and the resolve endpoint behind this
+   screen refuses them (ticket_service.resolve_service_request). Listing them
+   here would only offer a Resolve button that comes back 400.
+
+   SERVICE_REQUEST_TYPES above keeps the full list on purpose: reports should
+   still report on cancellations. */
+const SRM_RESOLVABLE_TYPES = SERVICE_REQUEST_TYPES.filter(
+  t => t !== 'cancellation' && t !== 'date_change');
 let srmPage = 1;
 let srmFiltersWired = false;
 async function loadServiceRequestManagement(page = srmPage) {
@@ -638,7 +772,7 @@ async function loadServiceRequestManagement(page = srmPage) {
   const typeFilter = document.getElementById('srmTypeFilter').value;
   const statusFilter = document.getElementById('srmStatusFilter').value;
   try {
-    const types = typeFilter ? [typeFilter] : SERVICE_REQUEST_TYPES;
+    const types = typeFilter ? [typeFilter] : SRM_RESOLVABLE_TYPES;
     const results = await Promise.all(types.map(t => axios.get(`${API_BASE}/api/requests`, {
       headers: authHeaders(), params: { request_type: t, status: statusFilter || undefined, page: 1, page_size: 100 },
     }).then(r => r.data.items).catch(() => [])));

@@ -5,11 +5,11 @@ import datetime
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.rbac import P, require
 from app.database.session import get_db
-from app.models_v2 import Payment, PaymentStatus, User, UserRole, UserStatus
+from app.models_v2 import Payment, PaymentStatus, ServiceRequest, User, UserRole, UserStatus
 from app.schemas.accounts import AccountResponse
 from app.schemas.admin_ops import (
     ApprovalQueueItemResponse,
@@ -110,6 +110,9 @@ def list_payments(
     total = db.scalar(select(func.count()).select_from(Payment).where(*where)) or 0
     rows = db.scalars(
         select(Payment)
+        # PaymentSummary reads the booking and its merchant for every row; without
+        # this that is two extra queries per payment on a cross-merchant listing.
+        .options(selectinload(Payment.request).selectinload(ServiceRequest.merchant))
         .where(*where)
         .order_by(Payment.created_at.desc())
         .limit(page_size)

@@ -1,0 +1,24 @@
+# Render blueprint — one Docker web service serving the API and the frontend.
+# The database is deliberately NOT declared here: Render's own free Postgres
+# expires after 30 days, so DATABASE_URL is set manually and can point at any
+# provider (Neon, Supabase, Render paid) without touching this file.
+services:
+  - type: web
+    name: jackpotsworld
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      # Paste the connection string from your Postgres provider.
+      - key: DATABASE_URL
+        sync: false
+      # Generated once by Render and kept across deploys.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      # Set to the service's public URL after the first deploy, so password-reset
+      # emails link somewhere real.
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: 2

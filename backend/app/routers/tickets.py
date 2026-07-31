@@ -12,13 +12,22 @@ state machine when the status actually moves.
 import datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth.rbac import P, require
 from app.database.session import get_db
-from app.models_v2 import Payment, RequestStatus, RequestType, TravelType, User
+from app.models_v2 import (
+    Payment,
+    PaymentStatus,
+    RequestStatus,
+    RequestType,
+    ServiceRequest,
+    TravelType,
+    User,
+)
+from app.schemas.document import DocumentResponse
 from app.schemas.pagination import Page
 from app.schemas.ticket import (
     ActionOption,
@@ -40,7 +49,7 @@ from app.schemas.ticket import (
     UpdateDraftRequest,
     VerifyPaymentRequest,
 )
-from app.services import catalog_service, lifecycle, ticket_service
+from app.services import catalog_service, invoice_service, lifecycle, ticket_service
 
 router = APIRouter(prefix="/api", tags=["tickets"])
 
@@ -49,15 +58,23 @@ def _detail(db: Session, request, actor: User) -> RequestDetailResponse:
     payments = list(
         db.scalars(
             select(Payment)
+            .options(selectinload(Payment.request).selectinload(ServiceRequest.merchant))
             .where(Payment.request_id == request.request_id)
             .order_by(Payment.created_at.desc())
         ).all()
     )
+    def _name(uid):
+        return db.get(User, uid).full_name if uid else None
+
     return RequestDetailResponse(
         request=RequestResponse.of(request),
         timeline=[TimelineStep(**s) for s in lifecycle.timeline(request)],
         actions=[ActionOption(**a) for a in ticket_service.action_menu(request, actor)],
         payments=[PaymentSummary.of(p) for p in payments],
+        documents=[
+            DocumentResponse.of(d, uploader=_name(d.uploaded_by), verifier=_name(d.verified_by))
+            for d in sorted(request.documents, key=lambda d: d.created_at)
+        ],
         can_download=ticket_service.can_download(request, actor),
     )
 
@@ -219,6 +236,7 @@ def update_request(
     request = ticket_service.update_draft(
         db, current_user, request_id,
         remarks=payload.remarks, travel_date=payload.travel_date, return_date=payload.return_date,
+        contact=payload.contact, special_requests=payload.special_requests,
     )
     return _detail(db, request, current_user)
 
@@ -393,7 +411,11 @@ def pay_request(
     response_model=Page[PaymentSummary],
     tags=["admin · payments"],
     summary="Payments awaiting verification",
-    description="Requires `payment.verify`. The Admin's verification queue.",
+    description=(
+        "Requires `payment.verify`. The Admin's verification queue, oldest first. Each row "
+        "carries the booking and merchant it belongs to — approving an amount without seeing "
+        "what it buys is not a review."
+    ),
 )
 def pending_payments(
     page: int = Query(1, ge=1),
@@ -401,14 +423,13 @@ def pending_payments(
     db: Session = Depends(get_db),
     _: User = Depends(require(P.PAYMENT_VERIFY)),
 ):
-    from sqlalchemy import func
-
-    from app.models_v2 import PaymentStatus
-
     where = Payment.payment_status == PaymentStatus.PENDING
     total = db.scalar(select(func.count()).select_from(Payment).where(where)) or 0
     rows = db.scalars(
         select(Payment)
+        # Eager-loaded because PaymentSummary now reads the booking and its
+        # merchant for every row — lazily that is two extra queries per payment.
+        .options(selectinload(Payment.request).selectinload(ServiceRequest.merchant))
         .where(where)
         .order_by(Payment.created_at.asc())
         .limit(page_size)
@@ -484,3 +505,92 @@ def resolve_service_request(
         db, current_user, request_id, approve=payload.approve, reason=payload.reason
     )
     return _detail(db, request, current_user)
+
+
+# ---------------------------------------------------------------------------
+# Booking paperwork — invoice, confirmation, and the airline's own ticket
+# ---------------------------------------------------------------------------
+# Rendered on demand rather than stored: every figure already lives in these
+# rows, and a saved copy would be a second source of truth that disagrees with
+# the ledger the moment a refund lands. See invoice_service for why the ticket
+# itself is uploaded instead.
+def _pdf(payload: tuple[bytes, str]) -> Response:
+    content, filename = payload
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            # attachment, not inline: same reasoning as document downloads —
+            # nothing served from this origin should render in it.
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.get(
+    "/requests/{request_id}/invoice",
+    response_class=Response,
+    tags=["merchant · requests"],
+    summary="Download the invoice PDF",
+    description=(
+        "Requires `ticket.view`, and the booking must be **ticketed or completed** (409 "
+        "otherwise) — that is when `issue_ticket` allocates the invoice number. Merchants get "
+        "their own bookings only, enforced by the same scoping rule as every other read. "
+        "Generated on demand from the booking and its payments, so a refund is reflected the "
+        "moment it is recorded."
+    ),
+)
+def download_invoice(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_VIEW)),
+):
+    return _pdf(invoice_service.build_invoice(db, current_user, request_id))
+
+
+@router.get(
+    "/requests/{request_id}/confirmation",
+    response_class=Response,
+    tags=["merchant · requests"],
+    summary="Download the booking confirmation PDF",
+    description=(
+        "Requires `ticket.view`; ticketed or completed bookings only. A readable summary of the "
+        "itinerary, passengers and PNR. **Explicitly not an e-ticket** — it says so on its face, "
+        "because handing someone a platform-generated page that looks like a boarding document "
+        "is how people get turned away at check-in."
+    ),
+)
+def download_confirmation(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_VIEW)),
+):
+    return _pdf(invoice_service.build_confirmation(db, current_user, request_id))
+
+
+@router.get(
+    "/requests/{request_id}/tickets",
+    response_model=list[DocumentResponse],
+    tags=["merchant · requests"],
+    summary="E-tickets attached to this booking",
+    description=(
+        "Requires `ticket.view`. The airline's own ticket files, uploaded by the operations "
+        "desk. Metadata only — fetch the bytes from `/api/documents/{id}/download`, which "
+        "re-checks merchant scope per file."
+    ),
+)
+def list_ticket_documents(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_VIEW)),
+):
+    docs = invoice_service.ticket_documents(db, current_user, request_id)
+    return [
+        DocumentResponse.of(
+            d,
+            uploader=(db.get(User, d.uploaded_by).full_name if d.uploaded_by else None),
+            verifier=(db.get(User, d.verified_by).full_name if d.verified_by else None),
+        )
+        for d in docs
+    ]

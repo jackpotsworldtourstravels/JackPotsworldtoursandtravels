@@ -3,6 +3,9 @@
   --navy:#0B3C6D; --navy-2:#0F4A85; --navy-3:#155A9E;
   --coral:#FF6B35; --coral-dark:#E85A2A; --coral-hover:#FFEFE8;
   --bg:#F5F7FA; --white:#FFFFFF; --sky:#1E88E5; --emerald:#12B76A; --gold:#FFB020;
+  /* --gold is a fill colour; at 13px on white it fails contrast, so text that
+     needs the same "attention, not error" tone uses this darker pair. */
+  --gold-dark:#8A5A00;
   --ink:#0B3C6D; --muted:#5B6B82; --line:rgba(11,60,109,0.10);
   --shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18); --shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
   --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
@@ -15,6 +18,8 @@
 :root[data-theme="dark"]{
   --page-bg:#0B1220; --card-bg:#131B2E; --text-primary:#E7ECF5; --text-muted:#93A2BE;
   --border-color:rgba(255,255,255,0.08); --hover-bg:rgba(255,255,255,0.05);
+  /* Inverted for dark: the light-mode brown reads as dirt on a dark card. */
+  --gold-dark:#F0B429;
   --shadow-sm:0 8px 24px -12px rgba(0,0,0,0.5); --shadow-lg:0 30px 70px -20px rgba(0,0,0,0.65);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
@@ -34,7 +39,14 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   transition:width .25s ease, transform .25s ease;
 }
 .sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
-.main{flex:1; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
+/* min-width:0 is load-bearing, not tidying. `.main` is a flex item, and a flex
+   item defaults to min-width:auto — it refuses to shrink below its content's
+   min-content width. A wide table therefore pushes `.main` past the viewport
+   and the whole page scrolls sideways, even though `.table-wrap` has
+   overflow-x:auto and would have scrolled the table by itself. With this, the
+   table scrolls inside its own box and the page does not. Measured at 768px:
+   Merchant Management was 830px wide against a 768px viewport before this. */
+.main{flex:1; min-width:0; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
 .layout.collapsed .sidebar{width:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .main{margin-left:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .nav-item span.nav-label, .layout.collapsed .brand-text, .layout.collapsed .sidebar-collapse-btn span{display:none;}
@@ -537,4 +549,50 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .stat-grid{grid-template-columns:1fr 1fr;}
   .panel{padding:18px;}
   .topbar h1{font-size:18px;}
+}
+
+/* ---------- Ticket Enquiries (Phase 2) ----------
+   Built from the tokens already defined above so the screen inherits light/dark
+   automatically; nothing here hard-codes a colour that isn't a variable. */
+.panel-sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+/* Secondary line inside a table cell — merchant contact under the company,
+   flight under the route, reviewer under the status badge. */
+.cell-sub{font-size:11.5px; font-weight:600; color:var(--text-muted); margin-top:2px;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700;}
+
+.msg.warn{color:var(--gold-dark);}
+.msg.info{color:var(--text-muted);}
+
+/* A stat card that navigates. Keyboard-reachable, so it also needs a focus ring
+   the mouse path never shows. */
+.stat-card-link{cursor:pointer;}
+.stat-card-link:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+
+/* Enquiry detail — label/value pairs, two across on desktop and one on mobile. */
+.detail-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:10px 18px; margin:16px 0 4px;
+}
+.detail-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.detail-label{font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.detail-value{font-size:13.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.detail-note{
+  margin-top:14px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px solid var(--border-color);
+}
+.detail-note strong{font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
+.detail-note p{margin:4px 0 0; font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.modal-sub{margin:-8px 0 4px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+.enq-claim{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:16px 0 4px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px dashed var(--border-color);
+}
+
+@media (max-width:640px){
+  .detail-grid{grid-template-columns:1fr;}
 }
