@@ -84,6 +84,28 @@ instance is replaced and its IP changes.
 RDS → **Create database** → engine **PostgreSQL** → creation method
 **Full configuration**.
 
+> ### Pick PostgreSQL, not Aurora
+>
+> The engine grid offers both **PostgreSQL** and **Aurora (PostgreSQL
+> Compatible)**. They are different products at wildly different prices, and
+> the names invite the mistake.
+>
+> Aurora has **no free tier**, starts at `db.r7g.large` (16 GiB RAM), defaults
+> to a replica in a second availability zone, and turns on DevOps Guru,
+> Enhanced Monitoring and Database Insights Advanced. A default Aurora cluster
+> in ap-south-1 estimates at about **USD 595/month**. The equivalent RDS
+> PostgreSQL instance for this application is free-tier eligible and about
+> **USD 13/month** afterwards.
+>
+> Two tells that the wrong engine is selected: the **Free tier** template
+> disappears from the Templates section, and the form grows Aurora-only
+> sections — *Cluster scalability type*, *Cluster storage configuration*,
+> *Read replica write forwarding*, *Babelfish settings*. If you see any of
+> those, go back to the top and choose plain **PostgreSQL**.
+>
+> Aurora is a good product; it is built for workloads far larger than 12
+> tables and 20 MB. Nothing in this application benefits from it.
+
 Recent consoles label this pair *Full configuration* / *Easy create*; older ones
 say *Standard create* / *Easy create*. Either way, take the left-hand one.
 **Easy create does not offer "Initial database name"**, so it produces a
@@ -93,15 +115,50 @@ and Alembic fails against a database that was never created.
 
 **Engine:** PostgreSQL, version 17 (or 18 if your region offers it).
 
-**Templates:** Free tier if your account has it, otherwise Dev/Test.
+**Templates:** **Sandbox** (called *Free tier* in older consoles). Not
+**Production**.
+
+> ### The template decides almost everything, including the bill
+>
+> Choosing *Production* is the single most expensive click on this page,
+> because it silently sets four other fields:
+>
+> | It sets | To | Cost effect |
+> |---|---|---|
+> | Deployment | Multi-AZ DB **cluster** (3 instances) | ~$600/mo — three servers |
+> | Instance class | `db.m5d.large` | vs `db.t4g.micro` |
+> | Storage type | Provisioned IOPS **io2** | ~$945/mo — 100 GiB and 1,000 IOPS minimums |
+> | Monitoring | Insights Advanced, Performance Insights (15-month retention), Enhanced Monitoring, DevOps Guru | each billed separately |
+>
+> A Production-template PostgreSQL instance in ap-south-1 estimates at about
+> **USD 1,700/month**. The same engine on the Sandbox template, sized for this
+> application, is free-tier eligible and about **USD 13/month** after that.
+>
+> io2 storage is the biggest single line and the least justified: it is built
+> for write-heavy transactional systems, and its 100 GiB floor is 5,000× this
+> database. Use gp3.
+>
+> **Always read the "Estimated monthly costs" box at the bottom of the page
+> before clicking Create.** Every trap on this page is visible there, and
+> nowhere else.
+
+If *Production* was selected at any point, also re-check **Deployment options**
+(should be *Single-AZ DB instance deployment*), **Storage type** (gp3),
+**Instance configuration** (*Burstable classes* → `db.t4g.micro`) and the whole
+Monitoring section — changing the template afterwards does not always reset
+them. And untick **"Show only versions that support the Multi-AZ DB cluster"**
+under Engine version, or the version list stays filtered to cluster-capable
+releases.
 
 | Setting | Value |
 |---|---|
 | DB instance identifier | `jackpotsworld-db` |
 | Master username | `jpwadmin` — avoid `admin` and `root`, which RDS reserves |
-| Credentials management | **Self managed**, and choose a strong password |
-| Instance class | `db.t4g.micro` |
-| Storage type | gp3, 20 GiB |
+| Credentials management | **Self managed**, and choose a strong password — *Managed in AWS Secrets Manager* is the default on some engines and bills separately |
+| Deployment options | **Single-AZ DB instance deployment (1 instance)** |
+| Instance class | **Burstable classes (includes t classes)** → `db.t4g.micro` |
+| Storage type | **General Purpose SSD (gp3)**, 20 GiB — never Provisioned IOPS io2 |
+| Monitoring | Database Insights **Standard**; Performance Insights, Enhanced Monitoring and DevOps Guru all **off** |
 | Enable storage autoscaling | Yes, max 100 GiB |
 | Multi-AZ | No |
 | Compute resource | **Don't connect to an EC2 compute resource** |
