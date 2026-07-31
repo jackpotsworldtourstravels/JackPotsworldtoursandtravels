@@ -1,4 +1,16 @@
-# Deploying to AWS EC2
+# Deploying to AWS EC2 — SUPERSEDED
+
+> **Use [../docs/AWS_DEPLOYMENT.md](../docs/AWS_DEPLOYMENT.md) instead.**
+>
+> This guide predates the Docker image and the S3 document backend, and it
+> installs PostgreSQL on the web server — where an instance rebuild takes the
+> database with it, and where booking documents live only on that one disk.
+> The current guide uses RDS and S3 so the instance stays disposable.
+>
+> Kept because the nginx and systemd files here are still a working reference
+> for a no-Docker deployment. Do not follow both guides: `setup.sh` installs a
+> second PostgreSQL and an nginx that will fight the Caddy container for
+> port 80.
 
 All-in-one setup: one EC2 instance runs nginx (static frontend + reverse proxy),
 the FastAPI backend (gunicorn/uvicorn via systemd), and PostgreSQL.

@@ -350,8 +350,13 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
 The frontend is fully static — deploy the HTML files as-is to any static host (Netlify, Vercel,
 GitHub Pages, S3 + CloudFront). The backend needs a Python host with PostgreSQL.
 
-For a complete guide to deploying both on a single AWS EC2 instance (nginx + gunicorn/uvicorn +
-PostgreSQL, systemd service, HTTPS via certbot), see [deploy/README.md](deploy/README.md).
+**The current deployment guide is [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md)** — one EC2
+instance running the Docker image, RDS Postgres, S3 for booking documents, and automatic TLS.
+
+[deploy/README.md](deploy/README.md) describes an earlier approach (nginx + systemd + PostgreSQL
+installed on the instance itself). It is kept for reference but is **superseded**: it predates both
+the Docker image and the S3 document backend, and it puts the database on the web server, where an
+instance rebuild destroys it. Follow one guide or the other, not a mixture.
 
 Minimum steps for any host:
 1. Provision PostgreSQL and set `DATABASE_URL`, `JWT_SECRET_KEY`, and `CORS_ORIGINS` (pointing at

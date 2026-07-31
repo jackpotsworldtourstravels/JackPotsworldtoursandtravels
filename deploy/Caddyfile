@@ -1,0 +1,38 @@
+# TLS terminator in front of the app container.
+#
+# Caddy rather than nginx+certbot because the certificate lifecycle is the part
+# that breaks silently: Caddy obtains and renews from Let's Encrypt on its own,
+# with no cron job to forget and no renewal that expires while nobody is
+# watching. The domain comes from SITE_DOMAIN in deploy/.env.
+#
+# DNS must already point at this server's Elastic IP before the container
+# starts — Let's Encrypt validates by connecting back to the name, so a
+# certificate cannot be issued until the A record resolves here.
+
+{$SITE_DOMAIN} {
+	reverse_proxy app:8000
+
+	# Above the app's own MAX_UPLOAD_MB (10) so the 413 comes from the
+	# application, which explains itself, rather than from the proxy, which
+	# does not. Still bounded, so a hostile body is cut off at the edge.
+	request_body {
+		max_size 12MB
+	}
+
+	encode gzip
+
+	header {
+		# HSTS: once a browser has seen this site over HTTPS it will refuse
+		# plaintext. Safe here because Caddy redirects 80 -> 443 anyway.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
