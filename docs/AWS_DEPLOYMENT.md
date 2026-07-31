@@ -185,6 +185,30 @@ not the one under Connectivity:
 *Available*. Copy the **Endpoint** from the Connectivity & security tab; it
 looks like `jackpotsworld-db.abc123xyz.ap-south-1.rds.amazonaws.com`.
 
+**Check whether it actually happened.** Open the **Configuration** tab and read
+**DB name**. Do this now rather than at first deploy — the field is the only
+place the answer appears, and a blank one costs an hour of confused debugging
+later. If it shows `jackpotsworldtours`, skip the next paragraph.
+
+If it shows `-`, the database was not created. *Initial database name* cannot be
+set afterwards; Modify does not offer the field. The fix is to create it by
+hand, and because Public access is `No` that must be done **from the EC2
+instance**, so it belongs between Step 5 and Step 8:
+
+```bash
+docker run --rm -it postgres:18-alpine \
+  psql "host=YOUR_RDS_ENDPOINT port=5432 dbname=postgres user=jpwadmin sslmode=require" \
+  -c "CREATE DATABASE jackpotsworldtours;"
+```
+
+Run it on the instance, after Docker is installed and before
+`docker compose up`. It connects to the built-in `postgres` database — which
+always exists — and creates the real one beside it. Using the `postgres:18`
+image avoids installing a Postgres client on the host, and omitting the password
+from the command means psql prompts for it instead of writing it to your shell
+history. Expect `CREATE DATABASE` as the only output; `already exists` means
+someone got there first and is equally fine.
+
 Your connection string, for later:
 
 ```
@@ -382,6 +406,9 @@ Both files are gitignored, so neither can reach GitHub.
 ---
 
 ## Step 8 — Start it
+
+If **DB name** was blank back in Step 2, create the database now — before this
+command, not after it. The `CREATE DATABASE` one-liner is at the end of Step 2.
 
 ```bash
 cd deploy && docker compose up -d --build
