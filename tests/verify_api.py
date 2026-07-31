@@ -207,6 +207,18 @@ def main():
     check("served as attachment, not inline", cd.lower().startswith("attachment"), cd)
     check("Cache-Control private/no-store", "no-store" in r.headers.get("cache-control", ""), r.headers.get("cache-control"))
     check("no path leaked in headers", "requests/" not in cd and "uploads" not in cd.lower(), cd)
+    # The suggested save-name is built by hand now that downloads stream (an S3
+    # object has no path for FileResponse to take), so check it still arrives.
+    check("the display filename is offered to the browser",
+          d1["original_filename"] in cd, cd)
+
+    r = requests.get(f"{BASE}/api/documents/{d2['id']}/download", headers=H(mtok))
+    check("a png document downloads with its own type",
+          r.status_code == 200 and r.content == PNG
+          and r.headers.get("content-type", "").startswith("image/png"),
+          f"{r.status_code} {r.headers.get('content-type')}")
+    check("Content-Length matches the stored size",
+          r.headers.get("content-length") == str(len(PNG)), r.headers.get("content-length"))
 
     r = requests.get(f"{BASE}/api/documents/{d1['id']}/download")
     check("download without a token -> 401/403", r.status_code in (401, 403), str(r.status_code))

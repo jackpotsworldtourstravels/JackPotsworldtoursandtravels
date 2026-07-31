@@ -4,11 +4,13 @@ THE THREAT MODEL, BECAUSE IT SHAPES EVERYTHING BELOW
 These files are passport and visa scans. Three rules follow from that and none
 of them are negotiable:
 
-1. **No static mount.** Files live under ``settings.upload_root`` with
-   generated names and are returned only by :func:`open_for_download`, which
-   re-checks merchant scope on every read. Serving ``uploads/`` with
-   ``StaticFiles`` would make every scan readable by URL, across merchants,
-   with no authentication — the single worst thing this module could do.
+1. **No static mount, and no public bucket.** Files are stored under generated
+   names and returned only by :func:`open_for_download`, which re-checks
+   merchant scope on every read. Serving ``uploads/`` with ``StaticFiles`` — or
+   pointing a browser at a readable S3 bucket — would make every scan readable
+   by URL, across merchants, with no authentication: the single worst thing
+   this module could do. For the same reason the S3 backend proxies downloads
+   rather than handing out presigned URLs.
 2. **Never trust the client's filename or content type.** The browser-supplied
    name is stored for display only and never used to build a path; the declared
    MIME type is checked against the *bytes* (:func:`_sniff`) before anything is
@@ -18,17 +20,21 @@ of them are negotiable:
    reach another company's document even by guessing an id.
 
 WHERE THE BYTES GO
-``<upload_root>/requests/<request_id>/<uuid4><ext>``. The uuid means an
-uploaded name can never traverse ("../../etc/passwd") or collide, and the
-per-request directory keeps a merchant's files together for retention work.
-:func:`_resolve_within_root` re-checks containment on read, so even a corrupted
-``stored_path`` in the database cannot escape the root.
+Under the key ``requests/<request_id>/<uuid4><ext>``, in whichever backend
+:mod:`app.services.storage` is configured for — a directory on disk in
+development, an S3 bucket in a deployment where the server is disposable. The
+uuid means an uploaded name can never traverse ("../../etc/passwd") or collide,
+and the per-request prefix keeps a merchant's files together for retention work.
+The storage layer re-validates every key it is given, so even a corrupted
+``stored_path`` in the database cannot be turned into an arbitrary read or
+unlink; :func:`_storage_key` is where that refusal becomes an HTTP error.
 """
 import datetime
 import hashlib
-import shutil
+import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 
 from fastapi import HTTPException, UploadFile, status as http_status
 from sqlalchemy import and_, select
@@ -43,7 +49,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, ticket_service
+from app.services import activity_service, storage, ticket_service
 
 # ---------------------------------------------------------------------------
 # What may be uploaded
@@ -153,23 +159,26 @@ def discard_file(stored_path: str) -> None:
 
     Needed because ``request_documents.passenger_id`` cascades: removing a
     traveller takes their document rows with it inside the database, and
-    nothing would otherwise clean up the files. Containment is still checked,
-    so a tampered ``stored_path`` cannot be turned into an arbitrary unlink.
+    nothing would otherwise clean up the files. The key is still validated, so
+    a tampered ``stored_path`` cannot be turned into an arbitrary delete.
     """
-    _resolve_within_root(stored_path).unlink(missing_ok=True)
+    storage.backend.delete(_storage_key(stored_path))
 
 
-def _resolve_within_root(stored_path: str) -> Path:
-    """Resolve a stored path, refusing anything that escapes the upload root."""
-    root = settings.upload_root_path
-    candidate = (root / stored_path).resolve()
-    if not candidate.is_relative_to(root):
-        # Only reachable if a stored_path were tampered with directly in the
-        # database; still refused rather than trusted.
+def _storage_key(stored_path: str) -> str:
+    """Check a stored path before it reaches the storage backend.
+
+    The backend refuses a malformed key on its own; this exists to turn that
+    refusal into the 400 the API has always returned, rather than letting a
+    ``ValueError`` become a 500. Only reachable if a ``stored_path`` were
+    tampered with directly in the database — still refused rather than trusted.
+    """
+    try:
+        return storage.validate_key(stored_path)
+    except storage.InvalidDocumentKey:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST, detail="Invalid document path"
-        )
-    return candidate
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -268,16 +277,22 @@ def upload(
             ),
         )
 
-    target_dir = settings.upload_root_path / "requests" / str(request.request_id)
-    target_dir.mkdir(parents=True, exist_ok=True)
     stored_name = f"{uuid.uuid4().hex}{_EXTENSIONS[declared]}"
-    absolute = target_dir / stored_name
     relative = f"requests/{request.request_id}/{stored_name}"
 
+    # Stream to a scratch file first, then hand the finished file to the
+    # backend. The cap and the checksum therefore run in exactly one place for
+    # both backends, and a rejected upload never reaches storage at all — which
+    # matters more for S3 than for a disk, where a partial object would have to
+    # be deleted over the network and would linger if that call failed too.
     digest = hashlib.sha256()
     size = 0
+    scratch_dir = settings.upload_root_path / "incoming"
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+    fd, scratch_name = tempfile.mkstemp(dir=scratch_dir, suffix=_EXTENSIONS[declared])
+    scratch = Path(scratch_name)
     try:
-        with absolute.open("wb") as out:
+        with open(fd, "wb") as out:
             while chunk := upload_file.file.read(_CHUNK):
                 size += len(chunk)
                 if size > settings.max_upload_bytes:
@@ -293,10 +308,15 @@ def upload(
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST, detail="That file is empty."
             )
+        storage.backend.put(relative, scratch, content_type=declared)
     except Exception:
         # Never leave a partial file behind for a rejected upload.
-        absolute.unlink(missing_ok=True)
+        scratch.unlink(missing_ok=True)
         raise
+    finally:
+        # The local backend moves the scratch file into place, so by now it is
+        # usually gone; S3 leaves it behind and it must not accumulate.
+        scratch.unlink(missing_ok=True)
 
     document = RequestDocument(
         request_id=request.request_id,
@@ -341,21 +361,26 @@ def upload(
 # ---------------------------------------------------------------------------
 # Download
 # ---------------------------------------------------------------------------
-def open_for_download(db: Session, actor: User, document_id: int) -> tuple[Path, RequestDocument]:
-    """Resolve a document to a readable path, after re-checking scope.
+def open_for_download(db: Session, actor: User, document_id: int) -> tuple[BinaryIO, RequestDocument]:
+    """Open a document's bytes, after re-checking scope.
 
     Scope is re-checked here rather than assumed from the id: a document id is
     a plain integer, and this is the only thing standing between one merchant
     and another's passport scans.
+
+    Returns an open handle rather than a path because an S3 object has no path.
+    The caller owns closing it — :func:`storage.iter_chunks` does that, and the
+    router streams through it.
     """
     doc = get_document(db, actor, document_id)
-    path = _resolve_within_root(doc.stored_path)
-    if not path.is_file():
+    try:
+        stream = storage.backend.open(_storage_key(doc.stored_path))
+    except storage.DocumentBytesMissing:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="The stored file for this document is missing.",
-        )
-    return path, doc
+        ) from None
+    return stream, doc
 
 
 # ---------------------------------------------------------------------------
@@ -383,15 +408,17 @@ def delete(db: Session, actor: User, document_id: int) -> None:
         "doc_type": doc.doc_type.value,
         "checksum": doc.checksum,
     }
-    # Resolved before the delete, while the row is still attached.
-    path = _resolve_within_root(doc.stored_path)
+    # Read before the delete, while the row is still attached.
+    key = _storage_key(doc.stored_path)
     db.delete(doc)
     db.commit()
 
     try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        pass  # row is gone; a stray blob is not worth failing the request over
+        storage.backend.delete(key)
+    except Exception:
+        # Row is gone; a stray blob is not worth failing the request over. Broad
+        # rather than OSError because an S3 delete fails with a botocore error.
+        pass
 
     activity_service.log_activity(
         db, actor.user_id, "Booking document deleted",

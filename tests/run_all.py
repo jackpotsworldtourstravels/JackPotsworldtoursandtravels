@@ -20,6 +20,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 #: ASCII only — the Windows console this is run on renders an em dash as a
 #: replacement character, which makes the section headers unreadable.
 SUITE = [
+    # First because it needs no server: if the storage layer under the document
+    # endpoints is broken, every document failure downstream is a symptom.
+    ("verify_storage.py", "Storage: local and S3 backends, key validation"),
+    ("verify_storage_s3.py", "Storage: the S3 backend against real boto3 (needs moto)"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),

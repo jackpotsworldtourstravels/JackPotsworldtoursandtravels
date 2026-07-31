@@ -39,6 +39,22 @@ class Settings(BaseSettings):
     #: Per-file cap, in megabytes. A passport scan is well under this.
     max_upload_mb: int = 10
 
+    # Where those documents are actually stored: "local" (the machine's own
+    # disk, at upload_root) or "s3". Use s3 wherever the server is disposable —
+    # on EC2 an instance refresh takes its disk with it, and these files must
+    # outlive any one server. The bucket must be private; downloads are proxied
+    # through the authenticated endpoint either way, never served by URL.
+    storage_backend: str = "local"
+    s3_bucket: str | None = None
+    s3_region: str | None = None
+    #: Key prefix inside the bucket, so one bucket can hold other things safely.
+    s3_prefix: str = "documents"
+    #: Override only for an S3-compatible service or a local test double.
+    s3_endpoint_url: str | None = None
+    #: Server-side encryption. "AES256" is S3-managed keys; set to a KMS mode
+    #: only alongside a key policy that the instance role can actually use.
+    s3_sse: str = "AES256"
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

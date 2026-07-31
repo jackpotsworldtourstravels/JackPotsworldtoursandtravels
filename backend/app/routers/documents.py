@@ -9,17 +9,37 @@ Every byte is served by :func:`download_document`, which resolves the file only
 after :func:`document_service.get_document` has re-checked that this caller's
 merchant owns it.
 """
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require
 from app.database.session import get_db
 from app.models_v2 import DocumentType, User
 from app.schemas.document import DocumentResponse, DocumentVerifyRequest
-from app.services import document_service
+from app.services import document_service, storage
 
 router = APIRouter(prefix="/api", tags=["documents"])
+
+
+def _attachment(filename: str) -> str:
+    """Build the Content-Disposition header for a download.
+
+    ``FileResponse`` used to do this; the S3 backend has no path to hand it, so
+    downloads stream instead and the header is built here. Same two-form rule
+    Starlette applies: a plain quoted name when it is ASCII, and the RFC 5987
+    encoded form otherwise, because a bare non-ASCII byte in a header is not
+    something every client parses the same way. The name has already been
+    stripped of quotes and newlines by ``_safe_display_name`` upstream, so it
+    cannot forge a second header line here.
+    """
+    try:
+        filename.encode("ascii")
+    except UnicodeEncodeError:
+        return f"attachment; filename*=utf-8''{quote(filename)}"
+    return f'attachment; filename="{filename}"'
 
 
 def _named(db: Session, doc) -> DocumentResponse:
@@ -89,7 +109,7 @@ def list_documents(
 
 @router.get(
     "/documents/{document_id}/download",
-    response_class=FileResponse,
+    response_class=StreamingResponse,
     summary="Download a document",
     description=(
         "Requires `ticket.view`, **and** the document must belong to the caller's merchant "
@@ -103,13 +123,16 @@ def download_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.TICKET_VIEW)),
 ):
-    path, doc = document_service.open_for_download(db, current_user, document_id)
-    return FileResponse(
-        path,
+    stream, doc = document_service.open_for_download(db, current_user, document_id)
+    return StreamingResponse(
+        storage.iter_chunks(stream),
         media_type=doc.content_type,
-        filename=doc.original_filename,
-        # Passport scans should not sit in a shared cache.
-        headers={"Cache-Control": "private, no-store"},
+        headers={
+            "Content-Disposition": _attachment(doc.original_filename),
+            "Content-Length": str(doc.size_bytes),
+            # Passport scans should not sit in a shared cache.
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
