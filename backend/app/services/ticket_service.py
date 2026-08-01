@@ -510,6 +510,19 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
     if parent is not None and parent.request_type is RequestType.TICKET_ENQUIRY:
         _validate_enquiry_led_submission(request)
 
+    # CR-4b: a hard credit block, at the first point the merchant commits. On the
+    # enquiry-led track the fare is not known until the desk books it, so the
+    # only honest question here is whether any credit is left at all —
+    # assert_credit_available says exactly that and no more. Checked again at
+    # approval, where the amount may have appeared: a gate only at submission is
+    # one a re-price walks straight through.
+    if request.merchant is not None:
+        finance_service.assert_credit_available(
+            db, request.merchant,
+            request.total_amount if finance_service.q(request.total_amount) > 0 else None,
+            request_number=request.request_number,
+        )
+
     if request.parent_request_id:
         item = db.get(ServiceRequest, request.parent_request_id)
         if item is not None:
@@ -1098,9 +1111,43 @@ def refund_payment(
     return payment
 
 
-def issue_ticket(db: Session, actor: User, request_id: int) -> ServiceRequest:
-    """Issue the ticket: allocate PNR, ticket and invoice numbers."""
-    request = get_request(db, actor, request_id)
+def issue_ticket(
+    db: Session, actor: User, request_id: int, *, fare_amount: Decimal | None = None,
+) -> ServiceRequest:
+    """Issue the ticket: allocate PNR, ticket and invoice numbers, bill the wallet.
+
+    ``fare_amount`` is what the desk actually paid the airline. It is **required
+    on a wallet-billed booking that still carries no amount**, and ignored on a
+    booking that already has one — see :func:`_capture_fare_for_wallet_billing`.
+
+    **The booking row is locked first**, the same way :func:`reprice` and
+    ``manager_service`` lock theirs, and for a sharper reason since CR-4b: this
+    function now moves money. Without the lock every step from here down is a
+    check-then-act on a status two requests can both read as ``approved`` —
+    measured with six simultaneous issues, the result was **two 200s and three
+    500s**. The money survived, because
+    ``uq_wallet_transactions_booking_debit`` is a database guarantee rather than
+    an application one, but the desks saw raw ``IntegrityError``s and two of them
+    were told they had issued the same ticket. Serialising here is what turns the
+    losers into an ordinary "already issued" refusal.
+
+    ``populate_existing`` for the reason recorded in
+    ``docs/WALLET_ARCHITECTURE.md`` §6: without it the lock is taken and the
+    *stale* identity-map instance is returned, so the status re-check below would
+    read the value from before the lock and let the second caller straight
+    through — the precise failure the lock is here to stop.
+    """
+    request = db.scalars(
+        select(ServiceRequest)
+        .where(and_(ServiceRequest.request_id == request_id, scoped_query(actor)))
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).first()
+    if request is None:
+        # 404 rather than 403 — don't confirm another merchant's request exists.
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
 
     # On the Classic Tours track "Ticket Issued" is what tells the merchant its
     # paperwork is ready to download, and it is the last step before Completed
@@ -1133,6 +1180,10 @@ def issue_ticket(db: Session, actor: User, request_id: int) -> ServiceRequest:
     # transition triggers, so allocating first would burn a ticket and
     # invoice number on every rejected attempt and leave permanent gaps in
     # the invoice series.
+    # Before the transition, so a booking with no fare is refused without having
+    # moved and without burning a ticket number.
+    _capture_fare_for_wallet_billing(request, fare_amount)
+
     lifecycle.transition(db, request, S.TICKET_ISSUED, actor, commit=False)
 
     if not request.pnr:
@@ -1141,6 +1192,14 @@ def issue_ticket(db: Session, actor: User, request_id: int) -> ServiceRequest:
         request.ticket_number = _next_number(db, "TKT")
     if not request.invoice_number:
         request.invoice_number = _next_number(db, "INV")
+
+    # CR-4b: the platform has just bought a ticket with its own money, so the
+    # merchant owes for it from this moment. Same transaction as the transition
+    # — a ticket issued without its debit is an unbilled booking, and one that
+    # needs a human to notice.
+    debit = finance_service.bill_booking_to_wallet(
+        db, request, actor_id=actor.user_id, commit=False
+    )
 
     db.commit()
     db.refresh(request)
@@ -1151,11 +1210,79 @@ def issue_ticket(db: Session, actor: User, request_id: int) -> ServiceRequest:
         description=f"{actor.full_name} issued {request.ticket_number} for {request.request_number}",
         reference_id=request.request_id, merchant_id=request.merchant_id,
     )
+    if debit is not None:
+        # Quoted by txn_number, never txn_id — the reference is what appears in
+        # the UI, in reports and in support conversations. See
+        # docs/WALLET_ARCHITECTURE.md §2.5.
+        activity_service.log_activity(
+            db, actor.user_id, "Wallet debited for booking",
+            activity_type="Payment", module="Payments",
+            description=(
+                f"{debit.txn_number}: {request.request_number} billed "
+                f"{debit.debit} to {request.merchant.company_name if request.merchant else 'the merchant'}"
+                f"; wallet {debit.balance_before} -> {debit.balance_after}"
+            ),
+            reference_id=request.request_id, merchant_id=request.merchant_id,
+        )
     _notify_merchant(
         db, request, "Your ticket has been issued",
-        f"{request.request_number} — PNR {request.pnr}. You can now download the ticket and invoice.",
+        f"{request.request_number} — PNR {request.pnr}. You can now download the ticket and invoice."
+        + (f" {debit.debit} has been debited from your wallet ({debit.txn_number}); "
+           f"the balance is now {debit.balance_after}." if debit is not None else ""),
     )
     return request
+
+
+def _capture_fare_for_wallet_billing(
+    request: ServiceRequest, fare_amount: Decimal | None
+) -> None:
+    """Record what the desk paid, on a booking that has no amount yet (CR-4b).
+
+    WHY THIS EXISTS
+    An enquiry-led booking is created with ``total_amount = 0`` and there is no
+    live path that ever sets it: ``enquiry_service`` says the fare "is set on the
+    booking the Admin approves", but CR-2 closed ``approve_request`` to this
+    track and CR-3's merchant approval takes no amount by design. So a Classic
+    booking reaches this function at zero, and a wallet debit of zero is not a
+    feature — it is a wallet that silently never bills.
+
+    The desk issuing the ticket is the first actor who knows the real number,
+    which is also where the business put it: *"Admin books ticket externally →
+    uploads ticket documents → the amount is deducted."*
+
+    Deliberately narrow:
+
+    * Only when the booking is wallet-billed **and** still at zero. A booking
+      that already carries an amount is untouched, so every catalog-led booking
+      and every pre-CR-2 enquiry-led booking behaves exactly as before.
+    * The refusal mirrors ``approve_request``'s existing one for the standard
+      track — a booking ticketed at 0 shows the merchant an invoice for nothing
+      and bills nobody.
+    """
+    if not finance_service.is_wallet_billed(request):
+        return
+    if finance_service.q(request.total_amount) > 0:
+        return
+
+    if fare_amount is None or finance_service.q(fare_amount) <= 0:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} has no amount. Enter the fare paid to the "
+                "airline when issuing the ticket — it is what the merchant's wallet is "
+                "debited, and a booking issued at 0 bills nobody and invoices nothing."
+            ),
+        )
+
+    amount = finance_service.q(fare_amount)
+    request.total_amount = amount
+    request.pricing = {
+        **(request.pricing or {}),
+        "currency": (request.pricing or {}).get("currency", "INR"),
+        "quoted": True,
+        "final_amount": str(amount),
+        "priced_at": "ticket_issue",
+    }
 
 
 def complete_request(db: Session, actor: User, request_id: int) -> ServiceRequest:

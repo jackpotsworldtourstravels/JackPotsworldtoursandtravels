@@ -228,7 +228,12 @@ def main():
     check("and never cached",
           "no-store" in (dl.headers.get("cache-control") or ""), dl.headers.get("cache-control"))
 
-    r = requests.post(f"{BASE}/api/admin/requests/{rid}/issue-ticket", headers=H(atok), json={})
+    # CR-4b: an enquiry-led booking carries no amount until the desk issuing the
+    # ticket supplies the fare it paid, which is what the merchant's wallet is
+    # debited. Before CR-4b this call omitted it and produced a ticketed booking
+    # worth nothing — the assertion below was passing on a ₹0 booking.
+    r = requests.post(f"{BASE}/api/admin/requests/{rid}/issue-ticket", headers=H(atok),
+                      json={"fare_amount": "24500.00"})
     check("with the tickets attached, Ticket Issued -> 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
 
     d = detail(mtok, rid)["request"]

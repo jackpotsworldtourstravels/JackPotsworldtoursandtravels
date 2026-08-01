@@ -171,6 +171,18 @@ class PayRequest(BaseModel):
     transaction_id: str | None = Field(default=None, max_length=100)
 
 
+class IssueTicketRequest(BaseModel):
+    """CR-4b. The fare the desk actually paid the airline.
+
+    Required only on a wallet-billed booking that still carries no amount —
+    enquiry-led bookings are created at 0 and no live path sets a fare before
+    this point. Ignored where an amount already exists, which is every
+    catalog-led booking, so the standard track is untouched.
+    """
+
+    fare_amount: Decimal | None = Field(default=None, gt=0)
+
+
 class VerifyPaymentRequest(BaseModel):
     approve: bool = True
     note: str | None = Field(default=None, max_length=500)

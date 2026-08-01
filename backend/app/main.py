@@ -32,6 +32,7 @@ from app.routers import (
     super_admin,
     support_tickets,
     tickets,
+    wallet,
 )
 from app.services import user_service
 
@@ -129,6 +130,11 @@ app.include_router(manager.router)
 # as the approver. Same service underneath, scoped to the caller's merchant;
 # its own permission codes so a merchant can never address the platform queue.
 app.include_router(merchant_approvals.router)
+# CR-4c — the merchant's own wallet: balance, ledger, and telling us money has
+# been sent. Separate from finance.router because that one reports on bookings
+# and this one is the running account; every route here is implicitly scoped to
+# the caller's merchant, so no path carries a merchant_id to tamper with.
+app.include_router(wallet.router)
 
 
 @app.on_event("startup")

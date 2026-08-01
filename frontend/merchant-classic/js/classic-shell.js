@@ -110,7 +110,7 @@ const CL_TITLES = {
      navigate to cold. */
   'booking-detail': 'Booking Request Details',
   requests: 'My Requests', approvals: 'Approvals',
-  payments: 'Payments', 'service-request': 'Service Requests',
+  wallet: 'Wallet', payments: 'Payments', 'service-request': 'Service Requests',
   reports: 'Reports', notifications: 'Notifications', profile: 'Profile & Settings',
   support: 'Support',
 };
@@ -127,6 +127,7 @@ const CL_LOADERS = {
   'booking-detail': () => clInitBookingDetail(),
   requests: () => clInitRequests(),
   approvals: () => clInitApprovals(),
+  wallet: () => clInitWallet(),
   payments: () => clInitPayments(),
   'service-request': () => clInitServiceRequest(),
   reports: () => clInitReports(),

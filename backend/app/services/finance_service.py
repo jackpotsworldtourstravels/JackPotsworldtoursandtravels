@@ -51,6 +51,8 @@ from app.models_v2 import (
     RequestStatus as S,
     RequestType,
     ServiceRequest,
+    WalletTransaction,
+    WalletTxnType,
 )
 
 ZERO = Decimal("0.00")
@@ -282,7 +284,15 @@ def assert_within_credit_limit(
 # Wallet
 # ---------------------------------------------------------------------------
 def assert_wallet_covers(merchant: Merchant, amount: Decimal) -> None:
-    """A wallet payment is real money moving off a real balance."""
+    """A wallet payment is real money moving off a real balance.
+
+    **Left in force by CR-4a, deliberately.** The wallet may now go negative, but
+    that is billing — a booking the platform has committed to — not a merchant
+    choosing to spend money it has not sent. This guards the standard
+    catalog-led track's ``POST /api/requests/{id}/pay``, where the merchant is
+    settling a specific invoice from funds on account, and letting that overdraw
+    would turn "pay from wallet" into a second, ungated credit facility.
+    """
     if q(merchant.wallet_balance) < q(amount):
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -296,26 +306,48 @@ def assert_wallet_covers(merchant: Merchant, amount: Decimal) -> None:
 def adjust_wallet(
     db: Session, merchant: Merchant, amount: Decimal, *, actor_id: int | None,
     payment_type: PaymentType, reason: str | None = None, commit: bool = True,
+    txn_type: "WalletTxnType | None" = None, request_id: int | None = None,
+    enforce_limit: bool = True,
 ) -> Payment:
-    """Move the wallet and write the ledger row that explains why.
+    """Move the wallet and write the ledger rows that explain why.
 
-    Never call this without writing a ``payments`` row — a wallet that moves
-    without a ledger entry is a balance nobody can reconcile, which is the exact
-    failure this milestone exists to make impossible. ``amount`` is signed:
-    positive credits the wallet, negative debits it.
+    ``amount`` is signed: positive credits the wallet, negative debits it.
+
+    **CR-4a re-pointed the balance change at ``wallet_service``**, which is now
+    the only code that assigns ``merchant.wallet_balance``, and which does it
+    under ``SELECT ... FOR UPDATE``. This function previously did the read and
+    the write itself, unlocked, so two concurrent movements both read the old
+    balance and one was silently lost.
+
+    **Two rows are written, on purpose and only for now.** The authoritative
+    entry is the ``wallet_transactions`` row; the ``payments`` row is kept
+    because ``statement()`` below still builds its wallet lines from
+    ``discount_meta['wallet_direction']``, and CR-4a's approved scope is the
+    ledger foundation with **no change to any read surface**. CR-4c moves
+    ``statement()`` onto the ledger and this second write goes away. The two
+    cannot drift meanwhile: the ``payments`` row is derived from the transaction
+    that has already been posted, never computed a second time.
+
+    **A debit may now take the wallet negative** — migration 0036 dropped
+    ``ck_merchants_wallet_non_negative`` and CR-4 makes a negative balance the
+    merchant's outstanding position. What bounds it is the credit limit, checked
+    inside ``wallet_service.post``.
     """
+    from app.models_v2 import WalletTxnType
+    from app.services import wallet_service
+
     amount = q(amount)
-    new_balance = q(merchant.wallet_balance) + amount
-    if new_balance < ZERO:
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"That would take the wallet to {new_balance}. "
-                f"ck_merchants_wallet_non_negative forbids a negative balance."
-            ),
+    if txn_type is None:
+        txn_type = (
+            WalletTxnType.WALLET_RECHARGE if payment_type is PaymentType.WALLET_TOPUP
+            else WalletTxnType.MANUAL_ADJUSTMENT
         )
 
-    merchant.wallet_balance = new_balance
+    txn = wallet_service.post(
+        db, merchant, txn_type=txn_type, amount=amount, actor_id=actor_id,
+        reason=reason, request_id=request_id, enforce_limit=enforce_limit, commit=False,
+    )
+
     entry = Payment(
         merchant_id=merchant.merchant_id,
         request_id=None,
@@ -330,14 +362,214 @@ def adjust_wallet(
         paid_date=datetime.datetime.now(datetime.timezone.utc),
         discount_meta={
             "wallet_direction": "credit" if amount >= ZERO else "debit",
-            "wallet_balance_after": str(new_balance),
+            "wallet_balance_after": str(txn.balance_after),
+            "wallet_txn_number": txn.txn_number,
         },
     )
     db.add(entry)
+    db.flush()
+    # Link the ledger row back to its instrument, so a statement line and the
+    # payments row it mirrors can be reconciled from either end.
+    txn.payment_id = entry.payment_id
+
     if commit:
         db.commit()
         db.refresh(entry)
     return entry
+
+
+# ---------------------------------------------------------------------------
+# Billing a booking to the wallet (CR-4b)
+# ---------------------------------------------------------------------------
+def is_wallet_billed(request: ServiceRequest) -> bool:
+    """Does this booking settle through the wallet rather than a payment?
+
+    One predicate, and it is deliberately the one CR-2 already wrote:
+    ``lifecycle.is_classic_track``. Enquiry-led bookings have no payment stage,
+    so the wallet is their only settlement path; catalog-led bookings keep
+    ``POST /api/requests/{id}/pay`` and must **not** be billed here or they pay
+    twice.
+
+    It also carries the backward-compatibility guarantee for free. A booking
+    that has ever been in a payment status returns False permanently, so an
+    enquiry-led booking raised before CR-2 — which settled the old way — is
+    never re-billed under rules that did not exist when it was made.
+    """
+    from app.services import lifecycle
+
+    return lifecycle.is_classic_track(request)
+
+
+def existing_booking_debit(db: Session, request_id: int) -> WalletTransaction | None:
+    """The wallet debit already posted for this booking, if there is one."""
+    return db.scalars(
+        select(WalletTransaction).where(
+            WalletTransaction.request_id == request_id,
+            WalletTransaction.txn_type == WalletTxnType.BOOKING_DEBIT,
+        )
+    ).first()
+
+
+def bill_booking_to_wallet(
+    db: Session, booking: ServiceRequest, *, actor_id: int | None, commit: bool = False,
+) -> WalletTransaction | None:
+    """Charge a ticketed booking to the merchant's wallet (CR-4b).
+
+    Called from ``ticket_service.issue_ticket``, in the same transaction as the
+    lifecycle move to Ticket Issued: the platform has just bought a ticket with
+    its own money, and the merchant owes for it from that moment.
+
+    **The credit limit is deliberately not enforced here.** It is a gate on
+    *taking on* a commitment — checked at submission and at approval, where a
+    refusal can still change the outcome. Refusing this debit would leave real
+    money spent and recorded nowhere, which is worse than an over-limit balance
+    the desk can see. See ``wallet_service.post``'s ``enforce_limit``.
+
+    **Two rows, one debt.** Besides the wallet debit this writes a ``payments``
+    row against the booking, so ``booking_position`` reads it as settled. Without
+    it the booking stays in ``BILLABLE_STATUSES`` with a full ``balance_due``
+    *and* the wallet is negative by the same amount — one debt reported twice,
+    on every screen that adds them up. The wallet is where the exposure lives.
+
+    Returns None when there is nothing to bill, which is not an error: a zero
+    amount, a catalog-led booking, or a booking already billed.
+    """
+    from app.services import wallet_service
+
+    if not is_wallet_billed(booking):
+        return None
+    if booking.merchant_id is None:
+        return None
+
+    amount = q(booking.total_amount)
+    if amount <= ZERO:
+        return None
+
+    # Belt and braces beside uq_wallet_transactions_booking_debit. The index is
+    # the guarantee; this is so a re-issue returns the original entry instead of
+    # surfacing an IntegrityError to a desk that did nothing wrong.
+    already = existing_booking_debit(db, booking.request_id)
+    if already is not None:
+        return already
+
+    merchant = db.get(Merchant, booking.merchant_id)
+    txn = wallet_service.post(
+        db, merchant,
+        txn_type=WalletTxnType.BOOKING_DEBIT,
+        amount=-amount,
+        actor_id=actor_id,
+        reason=f"Ticket issued for {booking.request_number}",
+        request_id=booking.request_id,
+        # The commitment was made at approval; this is the accounting entry for
+        # a ticket that has already been bought.
+        enforce_limit=False,
+        commit=False,
+    )
+
+    settlement = Payment(
+        merchant_id=booking.merchant_id,
+        request_id=booking.request_id,
+        user_id=actor_id,
+        amount=amount,
+        payment_type=PaymentType.BOOKING_PAYMENT,
+        payment_method="wallet",
+        payment_status=PaymentStatus.SUCCESS,
+        paid_date=datetime.datetime.now(datetime.timezone.utc),
+        # No `wallet_direction` key: this is a booking payment, not a wallet
+        # movement, and statement() must render it as one. The reference is
+        # carried so a statement line and its ledger entry reconcile by number.
+        discount_meta={"wallet_txn_number": txn.txn_number, "billed_to_wallet": True},
+    )
+    db.add(settlement)
+    db.flush()
+    txn.payment_id = settlement.payment_id
+
+    if commit:
+        db.commit()
+    return txn
+
+
+def refund_booking_to_wallet(
+    db: Session, booking: ServiceRequest, amount: Decimal, *,
+    actor_id: int | None, reason: str, commit: bool = False,
+) -> WalletTransaction | None:
+    """Give a wallet-billed booking's money back to the wallet (CR-4b).
+
+    ``settle_refund`` reverses the booking's ``payments`` — which, for a
+    wallet-billed booking, is the settlement row :func:`bill_booking_to_wallet`
+    wrote. That fixes the *booking's* position but leaves the merchant's wallet
+    still carrying the debit, so the money has to come back to where it went.
+
+    Only the amount genuinely settled is credited; a shortfall that needs a
+    manual disbursement stays a shortfall, and ``change_request_service`` already
+    records it rather than hiding it.
+    """
+    from app.services import wallet_service
+
+    amount = q(amount)
+    if amount <= ZERO or not is_wallet_billed(booking) or booking.merchant_id is None:
+        return None
+    # Nothing was ever taken off the wallet for this booking, so nothing goes
+    # back onto it — the refund belongs to whatever else paid for it.
+    if existing_booking_debit(db, booking.request_id) is None:
+        return None
+
+    merchant = db.get(Merchant, booking.merchant_id)
+    return wallet_service.post(
+        db, merchant,
+        txn_type=WalletTxnType.REFUND_CREDIT,
+        amount=amount,
+        actor_id=actor_id,
+        reason=reason,
+        request_id=booking.request_id,
+        commit=commit,
+    )
+
+
+def assert_credit_available(
+    db: Session, merchant: Merchant, amount: Decimal | None = None, *,
+    request_number: str | None = None,
+) -> None:
+    """CR-4b's gate on taking on a new commitment. A hard block, by decision.
+
+    Two cases, because the Classic track does not know its fare until the desk
+    books it:
+
+    * **Amount known** (catalog-led, or a re-price) — the full check: would this
+      specific amount take the merchant past its limit?
+    * **Amount not yet known** (enquiry-led at submission and approval) — the
+      only honest question left is whether there is *any* headroom. A merchant
+      already at or past its limit may not commit to more work of unknown value.
+
+    Refusing is the whole point: the business decided this is a hard block with
+    no per-booking override, so the message has to carry what the merchant needs
+    to act. Both branches raise ``wallet_service.credit_refusal_message``, which
+    names the balance, the outstanding, the limit, the credit remaining and —
+    where it is known — the amount required. Two gates giving two different
+    accounts of the same refusal is how a merchant ends up on the phone.
+    """
+    from app.services import wallet_service
+
+    if not wallet_service.has_credit_limit(merchant):
+        return
+
+    if amount is not None and q(amount) > ZERO:
+        wallet_service.assert_within_credit_limit(
+            merchant, q(amount), request_number=request_number
+        )
+        return
+
+    available = wallet_service.available_credit(merchant)
+    if available is not None and available <= ZERO:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            # No `required`: on the enquiry-led track the fare is not known until
+            # the desk books it, and inventing a number here would be worse than
+            # the gap.
+            detail=wallet_service.credit_refusal_message(
+                merchant, request_number=request_number
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------

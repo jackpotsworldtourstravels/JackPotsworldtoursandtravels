@@ -4,10 +4,20 @@
 It is updated whenever a milestone is completed and verified, and it outranks any plan that
 lives only in a chat session. If this file and a conversation disagree, this file wins.
 
-Last updated: **2026-07-31** · Current milestone: **M4 — Finance, Billing & Payment Tracking**
-· Last approved: **CR-2 — Manager approval + Classic Tours payment bypass ✅ (2026-07-31)**
+Last updated: **2026-08-01** · Current milestone: **CR-4 — Merchant wallet & transaction ledger**
+· Last approved: **CR-4b — automatic wallet debit & credit limit ✅ (2026-08-01)**
 · **Built, awaiting approval: CR-3 — booking approval moved to the merchant's own manager**,
 which *alters CR-2*. See `docs/CR-3_MERCHANT_INTERNAL_APPROVAL.md`.
+· **CR-4a — merchant wallet ledger foundation ✅ approved and locked (2026-08-01).** First of four
+gates in **CR-4 — merchant wallet & transaction ledger**. The architecture it established is
+documented in **`docs/WALLET_ARCHITECTURE.md`, which is the single source of truth for every
+later milestone that touches money.** Spec and per-gate record: `docs/CR-4_MERCHANT_WALLET.md`.
+· **CR-4b — automatic wallet debit at Ticket Issued ✅ approved, complete and FROZEN (2026-08-01):**
+credit-limit hard block at submit *and* approve, refunds and credit notes. The credit-refusal text
+is one shared function (`docs/WALLET_ARCHITECTURE.md` §5a) — do not add a second.
+· **Built, awaiting approval: CR-4c — the merchant Wallet screen**, transaction history, Add Money
+against the admin payment accounts, UTR + screenshot upload. **Submitting a top-up credits nothing**
+— the wallet moves only on admin verification, which is CR-4d. **CR-4d not started.**
 
 ---
 
@@ -47,8 +57,52 @@ Added 2026-07-31, on approval of CR-2. Everything in §1 is **locked**.
 The practical test: if a reviewer who approved the milestone would be surprised by the diff, it
 needed approval first.
 
-**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2 — with CR-2's *approver* superseded by
-CR-3 (built 2026-07-31, not yet approved). CR-2's payment bypass remains locked and unchanged.
+**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2, **CR-4a**, **CR-4b** — with CR-2's
+*approver* superseded by CR-3 (built 2026-07-31, not yet approved). CR-2's payment bypass remains
+locked and unchanged.
+
+**CR-4a carries an extra instruction, given on approval:** the wallet ledger schema and
+`services/wallet_service.py` are **not to be modified by a later gate or milestone unless a genuine
+bug is found**. Every consumer calls `wallet_service.post()`; nothing re-implements the arithmetic,
+and nothing else assigns `merchants.wallet_balance`. See `docs/WALLET_ARCHITECTURE.md`.
+
+> **CR-4b invoked that exception once, and only once.** The credit-refusal text in
+> `wallet_service` did not name the five figures CR-4b's approved scope requires, so the two gates
+> gave two different accounts of the same block — a defect in the deliverable, not a preference.
+> Fixed by adding `credit_refusal_message` (plus `outstanding`) and pointing both gates at it. **The
+> ledger schema, `post()`, `lock()` and the arithmetic were not touched**, and migration 0036 was
+> not reopened. Recorded in `docs/WALLET_ARCHITECTURE.md` §5a.
+
+**CR-4b carries the same freeze, given on approval (2026-08-01).** These are **not to be modified
+by CR-4c, CR-4d or any later milestone unless a genuine bug is discovered** — and if one is, it is
+named in the change log the way CR-4b's own two were, not fixed quietly:
+
+| Frozen | Where |
+| --- | --- |
+| The debit fires at **Ticket Issued**, once, in the transition's transaction | `ticket_service.issue_ticket` → `finance_service.bill_booking_to_wallet` |
+| The settlement `payments` row that keeps **one debt as one number** | `bill_booking_to_wallet` |
+| The **row lock** on issuance, and the lock order ServiceRequest → Merchant | `ticket_service.issue_ticket` |
+| The credit limit as a **hard block at submit and approve, never at issuance** | `finance_service.assert_credit_available` |
+| **One** credit-refusal text naming all five figures | `wallet_service.credit_refusal_message` |
+| `booking_debit` refused on the manual wallet endpoint | `schemas/finance.py` |
+
+**Backward compatibility for historical bookings is a frozen guarantee, not a side effect.**
+`lifecycle.is_classic_track` is the single predicate, and CR-4c/CR-4d must not add a second test for
+"is this wallet-billed":
+
+- A **catalog-led (standard) booking is never wallet-billed** — it keeps `POST /api/requests/{id}/pay`
+  and its Payment Pending → Paid statuses. Billing it would charge it twice.
+- **A booking that has ever entered a payment status stays on the standard track permanently**, so
+  enquiry-led bookings raised before CR-2 are never re-billed under rules that did not exist when
+  they were made.
+- **Nothing is retro-billed and no in-flight booking becomes unmovable.** Bookings already in
+  flight finish on the path they were created on.
+- The 26 pre-CR-2 ticketed bookings that carry amounts, and the 72 backfilled wallet movements,
+  are history: **read-only, never recomputed.** A later gate that "corrects" them is changing the
+  past, which is what the append-only ledger exists to prevent.
+
+`verify_cr4b.py` asserts the first two of these directly; any later gate that touches billing must
+keep those checks green rather than adjust them.
 
 ### Where the work lives
 
@@ -62,6 +116,7 @@ CR-3 (built 2026-07-31, not yet approved). CR-2's payment bypass remains locked 
 | Operations portal (V2, role-adaptive) | `frontend/operations/` |
 | Verification harness | `tests/` |
 | API contract | `docs/API_CONTRACT.md` |
+| **Wallet & money movement** | **`docs/WALLET_ARCHITECTURE.md`** — authoritative |
 
 ### Conventions that bind every milestone
 
@@ -71,6 +126,11 @@ production-ready, regardless of whether its own feature works.
 - **One state machine.** `services/lifecycle.py::transition` is the *only* function permitted
   to change `service_requests.status`. It writes `status_history`, which is what the Activity
   Timeline renders. Never assign `request.status` directly.
+- **One wallet.** `services/wallet_service.py::post` is the *only* function permitted to change
+  `merchants.wallet_balance`, and it never changes it without writing the `wallet_transactions`
+  row that explains why. Read `docs/WALLET_ARCHITECTURE.md` before touching money — it is
+  authoritative, and it records two traps (a row lock that silently does nothing, and a ledger
+  ordered by the wrong column) that cost real defects to find.
 - **Permissions, not roles.** Every endpoint declares a code from `auth/rbac.py::P` via
   `Depends(require(P.X))`. New behaviour reuses an existing code unless the spec genuinely
   describes a new capability.
@@ -183,6 +243,72 @@ merchant-facing half of Phase 3** while leaving that milestone's backend entirel
   **opposite** rule and was rewritten to assert the new contract (including a booking that never
   touches a document endpoint at all)
 
+### CR-4a — Merchant wallet ledger foundation ✅ **Complete & Approved**
+
+**Approved 2026-08-01. This is LOCKED — see §0's "Changing approved functionality" and the extra
+instruction recorded there.** First of the four gates in CR-4; 4b–d are separate approvals.
+
+The wallet stopped being two columns and an improvisation and became a ledger.
+
+- **Migration `0036_wallet_ledger`** — drops `ck_merchants_wallet_non_negative` (a negative wallet
+  is now the merchant's outstanding balance, which is the point of CR-4); creates
+  `wallet_transactions`, `wallet_topups` and `payment_accounts`; backfills 72 historical movements
+  from the `payments` rows that carried `discount_meta->>'wallet_direction'`. Exercised **down and
+  up**. The downgrade deliberately fails if any merchant is negative.
+- **The invariant is a database constraint.** `balance_after = balance_before + credit - debit` is
+  checked on every insert, and a row that is both a debit and a credit — or neither — is refused.
+- **`services/wallet_service.py`** — `post()` is the only code in the repository that assigns
+  `merchants.wallet_balance`, always under `SELECT … FOR UPDATE`, never without its ledger row.
+- **Two defects found by running the concurrency section**, both fixed: the row lock was returning
+  SQLAlchemy's *stale* identity-map instance so only 4 of 8 concurrent movements reached the
+  balance (`populate_existing=True`), and `created_at` — being transaction-*start* time — could
+  order a statement against the sequence in which the balance actually moved (ledger orders by
+  `txn_id`, allocated after the lock).
+- **A transitional dual-write** in `finance_service.adjust_wallet` keeps every M4 read surface
+  byte-identical; CR-4c removes it when `statement()` moves onto the ledger.
+- Full architecture, and the rules later milestones must follow: **`docs/WALLET_ARCHITECTURE.md`**.
+
+- Backend: `services/wallet_service.py`, `services/finance_service.py`, `models_v2.py`
+- Migration: `0036_wallet_ledger`
+- Verified by: `tests/verify_cr4a.py` — **52 checks**; suite 696 checks, 12/12
+
+### CR-4b — Automatic wallet debit & credit limit ✅ **Complete & Approved**
+
+**Approved 2026-08-01. This is LOCKED — see §0's "Changing approved functionality" and the freeze
+recorded there. Do not modify it unless a genuine bug is discovered.** Second of the four gates in
+CR-4; 4c–d are separate approvals.
+
+The wallet stopped being a table nothing wrote to and started carrying the debt.
+
+- **Auto-debit at Ticket Issued** — `finance_service.bill_booking_to_wallet`, called from
+  `ticket_service.issue_ticket` in the same transaction as the lifecycle move. It also writes a
+  `method='wallet'` settlement `payments` row, which is what stops **one debt being two numbers**:
+  without it the booking keeps a full `balance_due` *and* the wallet is negative by the same
+  amount, and every screen that adds them up double-counts.
+- **The fare is captured at issuance.** Enquiry-led bookings are created at `total_amount = 0` and
+  **no live path ever set one** — 88 Manager-Approved bookings were sitting on the ops desk at ₹0.
+  `fare_amount` on `/issue-ticket` is required only where the amount is still 0, validated before
+  the transition so a refusal burns no ticket or invoice number.
+- **Credit limit, hard block, at submission *and* approval** — never at issuance: refusing to
+  record a ticket already bought loses the debt rather than preventing it. One shared refusal text
+  (`wallet_service.credit_refusal_message`, `WALLET_ARCHITECTURE.md` §5a) names all five figures.
+- **Refunds and credit notes** — `refund_booking_to_wallet` on cancellation; the admin wallet
+  endpoint takes an optional `txn_type`. `booking_debit` is refused there, so nothing routes around
+  the one-debit-per-booking index.
+- **`issue_ticket` is row-locked.** It never had been, while `reprice` in the same file always was.
+  Six simultaneous issues returned **two 200s and three 500s** — the money stayed correct in every
+  run (one debit, wallet moved once; the unique index is a database guarantee) but the
+  `IntegrityError` reached callers raw and two desks were told they had issued the same ticket.
+  **A unique index protects the money; it does not protect the response.** Lock order is
+  **ServiceRequest → Merchant**.
+
+- Backend: `services/ticket_service.py`, `services/finance_service.py`, `services/manager_service.py`,
+  `services/change_request_service.py`, `routers/tickets.py`, `routers/finance.py`
+- Frontend: `assets/js/admin-booking-ops.js` (one fare field — without it the desk cannot issue a
+  Classic ticket at all)
+- Migrations: **none** — CR-4a's schema was sufficient and was not reopened
+- Verified by: `tests/verify_cr4b.py` — **77 checks**; suite **773 checks, 13/13**
+
 ### CR-2 — Manager approval step + Classic Tours payment bypass ✅ **Complete & Approved**
 
 **Approved 2026-07-31. This workflow is LOCKED — see §0's "Changing approved functionality".**
@@ -216,8 +342,11 @@ and every other workflow keep their payment path intact.
   and the Admin Approval Queue listing.
 - **M1's Booking Operations queue finally has a frontend.** It had none — the entire M1/M2
   backend was unrendered by any portal. CR-2 required it, so `frontend/assets/js/admin-booking-ops.js`
-  now surfaces the queue, assignment, airline references, internal notes, multi-file ticket
-  upload, Mark Ticket Issued and Mark Completed.
+  now surfaces the queue, airline references, internal notes, multi-file ticket
+  upload, Mark Ticket Issued and Mark Completed. The work modal's **Assignment** form was later
+  dropped — the queue's own assignment filter and column already cover who is working what — and
+  replaced by the booking's journey and passenger details, read-only, off the payload the modal
+  already loads. The assignment *endpoint* is untouched and still live.
 - **Two pre-existing M4 defects found while making the suite green**, both fixed:
   `change_request_service.approve` mutated `pricing` in place after assigning it, and an
   autoflush inside `settle_refund` made that dict the attribute's committed baseline — so
@@ -904,13 +1033,16 @@ python tests/run_all.py
 | `tests/verify_m2.py` | M2 — ticket upload, invoice/confirmation PDFs, merchant delivery, reissue |
 | `tests/verify_m3.py` | M3 — cancellation & reschedule, money bounds, cross-tenant, concurrency, bypass guards |
 | `tests/verify_m4.py` | M4 — ledger arithmetic, wallet, credit limit, refunds, payment concurrency, and merchant/admin surface parity (the same eleven position fields, as decimal strings) |
+| `tests/verify_cr4b.py` | CR-4b - wallet debit at Ticket Issued, one-debt-one-number, idempotency, **six simultaneous issues of one booking**, catalog track untouched, credit-limit hard block (every figure asserted by name and value), cancellation refunds, credit notes |
+| `tests/verify_cr4c.py` | CR-4c - wallet summary against SQL, ledger pagination, **a submitted top-up credits nothing**, every form rule, duplicate UTR, upload allowlist/magic-bytes/size cap, proof served as an attachment, six simultaneous submissions, cross-tenant |
+| `tests/verify_cr4a.py` | CR-4a — wallet ledger schema and constraints, backfill fidelity, balance chain, arithmetic across zero, booking-debit idempotency, credit limit, 8-actor concurrency. Serverless |
 | `tests/verify_cr2.py` | CR-2 — manager approval, payment bypass, ticket delivery, RBAC, concurrency |
 | `tests/verify_m5.py` … | one per milestone, added as each lands |
 
 Each milestone adds its own script and **all** prior scripts must still pass. See
 `tests/README.md` for how to run them and how to write a new one.
 
-**Last full run: 2026-07-31 — 613 checks, 10/10 scripts passed, 0 failures.**
+**Last full run: 2026-08-01 — 756 checks, 13/13 scripts passed, 0 failures.**
 
 Note: `POST /api/auth/login` is rate-limited to 10/minute *per IP*, which a full suite run
 exceeds. `config.login` caches tokens per process and waits out a 429 rather than failing. The
@@ -929,4 +1061,8 @@ limit is correct behaviour and is not to be weakened for the suite's convenience
 | 2026-07-31 | **CR-2 approved and locked.** §0 gained "Changing approved functionality": everything in §1 is frozen, a bug is the only unilateral edit, and any wanted behaviour change is a change request needing approval *before* the behaviour moves. Final regression 594 checks, 10/10. |
 | 2026-07-31 | CR-2 completion pass before approval: Super Admin can now create/edit/re-role Manager accounts from the UI, Manager notifications and profile added, modal focus trapping (`components/focus-trap.js`), Manager queue indexed (migration `0035`). Two accessibility defects found by measuring rather than asserting — missing `:focus-visible` on the Manager's tabs, and a `.badge.pending` contrast of 4.35:1 against AA's 4.5 (now 5.17:1). §3 checklist signed off for the first time. `tests/verify_cr2.py` 91 → 118 checks. |
 | 2026-07-31 | CR-2 (Manager approval step, Classic Tours payment bypass) implemented and verified — `tests/verify_cr2.py`, 91 checks. Two pre-existing M4 defects fixed in passing (dropped refund-settlement figures; credit limit refusing reductions). `flows.py` split into enquiry-led and catalog-led builders; 20 call sites across `verify_m2/m3/m4` moved to the catalog builder, and `verify_api.py`'s "reaches the approval queue" assertion rewritten to the new contract. Awaiting approval. |
+| 2026-08-01 | **CR-4b approved, completed and locked.** The completion pass against the approved scope found **two gaps that a green suite had hidden**. (1) *The credit-refusal message named 3 of the 5 figures the scope requires at one gate and 2 of 5 at the other*, so the same hard block read differently depending on which gate caught the merchant — the test asserted only `"credit limit" in text and "wallet" in text`, loose enough to pass the broken string. Both gates now share `wallet_service.credit_refusal_message`; every figure is asserted by name **and** value. (2) *`verify_cr4b.py` had **no concurrency section at all***, though the scope asked to "verify concurrent requests cannot create duplicate debits" — its sequential re-issue check never reaches the race. Six simultaneous issues returned **two 200s and three 500s**: `uq_wallet_transactions_booking_debit` kept the money exactly right (one debit, wallet moved once, every run) but the `IntegrityError` reached callers raw and two desks were told they had issued the same ticket. Cause predates CR-4b — **`ticket_service.issue_ticket` was never row-locked**, while `reprice` in the same file always was; CR-4b is what put money on the path. Fixed with `SELECT … FOR UPDATE` + `populate_existing=True`; losers now get an ordinary 400. Lock order **ServiceRequest → Merchant**, matching `change_request_service`. Verified over three consecutive runs, zero unhandled exceptions in the log. `verify_cr4b.py` **60 → 77 checks**; suite **773 checks, 13/13, 0 failures** — every other script's count identical to baseline, so the lock changed no existing behaviour. Browser-verified end to end: a real issue of **₹16,480.75** moved the wallet 37,500.00 → 21,019.25, paise intact, `balance_due` 0.00, no overflow at 1280/768/375, console clean. **This invoked CR-4a's "do not modify `wallet_service.py` unless a genuine bug is found" exception — schema, `post()`, `lock()` and the arithmetic untouched; migration 0036 not reopened.** CR-4c not started. |
+| 2026-08-01 | **CR-4a approved and locked**; `docs/WALLET_ARCHITECTURE.md` written as the authoritative reference for money movement, and linked from §0's conventions. **CR-4b built and verified.** Auto-debit at Ticket Issued (`finance_service.bill_booking_to_wallet`), credit limit as a hard block at submit *and* approve, refund credits on cancellation, typed credit notes. **The blocker found before writing any code: enquiry-led bookings carry no fare and no live path sets one** — `enquiry_service` creates them at 0, CR-2 closed `approve_request` to the track and CR-3's approval takes no amount, so **88 Manager-Approved bookings were sitting on the ops desk at ₹0** and an auto-debit would have billed nothing on every one. The fare is now captured at issuance by the desk that bought the ticket (`fare_amount`, required only where the amount is still 0). One UI field added — without it the desk could not issue a Classic ticket at all. `tests/verify_cr4b.py` — **60 checks**; `flows.make_booking` and `verify_cr2.py` rewritten where they asserted the pre-CR-4b contract (the flows builder had been producing ticketed bookings worth ₹0). Suite **756 checks, 13/13**. Awaiting approval; CR-4c not started. |
+| 2026-08-01 | **CR-4a built and verified** — migration `0036_wallet_ledger` (constraint dropped, `wallet_transactions` / `wallet_topups` / `payment_accounts` created, 72 historical movements backfilled with zero discrepancy, **down and up both exercised**), `services/wallet_service.py` as the single row-locked write path, and the transitional dual-write in `adjust_wallet` that keeps every M4 read surface byte-identical. **Two defects found by running the concurrency section, not by reading the code:** `SELECT FOR UPDATE` was returning the session's *stale* identity-map instance so only 4 of 8 concurrent movements reached the balance (`populate_existing`), and `created_at` — being transaction-*start* time — could order a statement against the sequence in which the balance actually moved (ledger now ordered by `txn_id`). Also found: `verify_m4.py`'s "debit past zero is refused" had silently stopped testing anything once the seeded wallet grew past the ₹999,999 it tried to overdraw. `tests/verify_cr4a.py` — **51 checks**; suite **696 checks, 12/12**. Awaiting approval; CR-4b not started. |
+| 2026-08-01 | **CR-4 proposed** — merchant wallet & transaction ledger replacing per-booking settlement for new enquiry-led bookings. Written up in `docs/CR-4_MERCHANT_WALLET.md` against the code: the wallet already exists but is **constrained non-negative**, its ledger is improvised inside `payments.discount_meta`, `request_documents.request_id` is NOT NULL so a recharge screenshot has nowhere to live, admin payment accounts (bank/UPI/QR) do not exist at all, and `adjust_wallet()` never row-locks the merchant. Three business decisions taken: debit at **Ticket Issued**, wallet-only for new enquiry-led bookings, credit limit is a **hard block**. Four gated sub-milestones planned. **No code changed.** |
 | 2026-07-31 | **M4's approved remaining work (A–E) built and verified.** The milestone was never a backend one: the merchant position + statement screen and the admin per-merchant position were wired to endpoints that had existed with **zero callers**, and ten client-side money calculations were deleted — including Operations' "Owed now", which summed one *capped* page and admitted in its own footnote that the true figure was higher. `shared/formatters.js` gained `moneyStr()`/`moneyIsPositive()`, which format the API's decimal **string** without parsing it; `money()` floated the value and dropped the paise (₹24,500.50 → ₹24,501) and is now used only for counts. `verify_m4.py` 104 → **125 checks**, asserting merchant and admin read an identical value for all eleven position fields. Suite **613 checks, 10/10**. The revised plan section retitled *approved and delivered*. M4 awaiting approval. |

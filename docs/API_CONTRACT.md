@@ -462,16 +462,108 @@ GET  /api/admin/merchants/{merchant_id}/statement  ?date_from&date_to  → State
 Permission: P.PAYMENT_VIEW   (staff see any; a merchant reaching for another id gets 404)
 
 POST /api/admin/merchants/{merchant_id}/wallet
-     {amount, reason}                          → WalletAdjustmentResult
+     {amount, reason, txn_type?}               → WalletAdjustmentResult
 Permission: P.PAYMENT_MANAGE  (staff only)
+
+POST /api/admin/requests/{request_id}/issue-ticket
+     {fare_amount?: Decimal > 0}               → RequestDetailResponse
+Permission: P.TICKET_ISSUE
 
 POST /api/admin/requests/{request_id}/reprice
      {amount: Decimal > 0, reason: str}        → RequestDetailResponse
 Permission: P.TICKET_APPROVE   (no new code — this is the approver's own figure)
 ```
 
+**The wallet (CR-4, `docs/WALLET_ARCHITECTURE.md` is authoritative).** A merchant holds a running
+account that **may go negative** — a negative balance is its outstanding position, bounded by
+`merchants.credit_limit` rather than by a floor at zero. Every movement is one
+`wallet_transactions` row written by `wallet_service.post` under a row lock, and every response
+that names a movement quotes its **`WTX-…` reference, never an internal id**.
+
+- `txn_type` on the wallet endpoint (CR-4b) is optional: `manual_adjustment`, `credit_note`,
+  `refund_credit` or `cancellation_charge`. Omitted, a credit defaults to `wallet_recharge` and a
+  debit to `manual_adjustment`, exactly as before. `booking_debit` is **refused (422)** — only
+  ticket issuance writes that type, and posting it by hand would route around the one-debit-per-
+  booking unique index.
+- `WalletAdjustmentResult` carries `transaction_reference`.
+
+**`/issue-ticket` — `fare_amount` (CR-4b).** What the desk paid the airline. **Required** on a
+wallet-billed (enquiry-led) booking that still carries no amount: those are created at
+`total_amount = 0` and no earlier step on that track ever sets a fare, so without it the wallet
+would be debited nothing. It becomes the booking's `total_amount` and is the amount debited.
+Omitted or ≤ 0 on such a booking → **400**, raised *before* the transition so no ticket or invoice
+number is burned. **Ignored** where an amount already exists, so every catalog-led booking behaves
+exactly as it did. Issuance also writes a wallet settlement `payments` row, so the booking reads as
+settled and the debt is not counted twice.
+
+**Issuance is serialised.** The booking row is locked (`SELECT … FOR UPDATE`) for the whole
+operation, so simultaneous issues of one booking resolve to **one 200 and the rest 400**
+("already Ticket Issued") — never two successes, never a 500. Before the lock, six concurrent
+issues returned two 200s and three 500s: the debit stayed correct (one row, enforced by
+`uq_wallet_transactions_booking_debit`) but the `IntegrityError` reached callers raw and two desks
+were told they had issued the same ticket. Clients should treat a 400 here as "someone else got
+there first" and re-read the booking.
+
+**Credit limit (CR-4b) is a hard block**, enforced at `POST /api/requests/{id}/submit` and at
+`POST /api/manager/bookings/{id}/approve`. It is deliberately **not** applied at issuance: a ticket
+already bought must be recorded.
+
+The 400 `detail` is built by `wallet_service.credit_refusal_message` — one text shared by both
+gates, so the same refusal does not read two different ways depending on which one caught it. It
+names all five figures the business asked for: **wallet balance, outstanding, credit limit,
+available credit**, and — where the amount is known — **the amount required and the shortfall**. On
+the enquiry-led track at submission the fare is genuinely unknown, so that last pair is omitted
+rather than guessed. Because there is no per-booking override, this message is the merchant's whole
+remedy, which is why it carries the numbers rather than only a refusal.
+
+### The merchant's own wallet (CR-4c)
+
+```
+GET  /api/merchant/wallet                                  → WalletSummary
+GET  /api/merchant/wallet/transactions ?date_from&date_to&page&page_size
+                                                           → WalletTransactionPage
+GET  /api/merchant/wallet/payment-accounts                 → [PaymentAccountOut]
+GET  /api/merchant/wallet/payment-accounts/{id}/qr         → image stream
+GET  /api/merchant/wallet/topups       ?status&page&page_size → TopupPage
+POST /api/merchant/wallet/topups       (multipart)         → TopupOut          201
+GET  /api/merchant/wallet/topups/{id}/proof                → file stream
+Permission: payment.view on every read; payment.pay to submit a top-up. No new codes.
+```
+
+**Every route is implicitly scoped to the caller's own merchant — no path carries a
+`merchant_id`,** so there is no id to tamper with. The two that take an id (a top-up, its proof)
+re-check ownership and return **404, not 403**. A platform staff account has no merchant of its own
+and gets a **400** pointing at `/api/admin/merchants/{id}/finance`.
+
+**`POST /topups` records a claim and credits nothing.** This is the rule the whole flow rests on:
+the wallet moves only when an admin verifies the claim (CR-4d), which is what stops a merchant
+raising its own spending power by typing a number into a form. Multipart fields:
+
+| Field | Rule |
+| --- | --- |
+| `amount` | Decimal > 0. Required. |
+| `method` | `bank_transfer` \| `upi` \| `qr`. `cash`/`other` are **refused** — a merchant cannot claim an instrument nobody can check. |
+| `payment_account_id` | Optional; must be an **active** account, else 404. |
+| `utr` | **Required for `bank_transfer`.** Otherwise required *unless* a proof file is attached. |
+| `proof` | Optional file. Same allowlist, magic-byte sniff and 10 MB streaming cap as a passport scan — literally the same `document_service.store_upload`. 415 / 400 / 413. |
+
+**A UTR may be claimed once.** `uq_wallet_topups_utr` is platform-wide and excludes rejected
+claims; a repeat returns **400** naming the reference, not a 500. The message never says *who* holds
+the existing claim — the index spans every merchant, and confirming it would let anyone probe for
+other companies' bank references.
+
+**`WalletSummary` reports `pending_topups` separately and never inside `balance`.** `balance` may
+be **negative** (that is the outstanding position) and is `SUM(credit) - SUM(debit)` over the
+ledger; a submitted claim is not in it. Adding the two together on a client is the bug this shape
+exists to prevent. `credit_available` is `null` when no limit is configured — not zero.
+
+Transactions come back **oldest first, ordered by `txn_id`**, each carrying the `balance_after` the
+server stored when the balance moved; clients render it and never accumulate their own (see
+`WALLET_ARCHITECTURE.md` §6). Proofs are served as **attachments** with `Cache-Control: no-store`;
+QR images stream inline from an authenticated route and are **never** public URLs.
+
 **`/reprice` — correcting what a booking owes.** The only way to change `total_amount` after
-approval. Rules, all server-side:
+approval *on the standard track*. Rules, all server-side:
 
 - **Payment Pending only.** Before it, approval carries the amount; after it money has moved and
   a change is a refund or an extra charge — the change-request and refund paths, which quote and

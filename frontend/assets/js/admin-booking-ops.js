@@ -1,7 +1,7 @@
 /* Admin — Booking Operations (CR-2, over the M1/M2 backend)
    =========================================================
-   The desk that works a booking *after* it is approved: who is handling it,
-   what the airline said, the tickets that came back, and the two lifecycle
+   The desk that works a booking *after* it is approved: who the merchant is
+   sending where, with whom, the tickets that came back, and the two lifecycle
    moves that end the job.
 
    WHY THIS EXISTS NOW
@@ -17,12 +17,26 @@
    booking still waits for money. The row's own `workflow` field decides which
    next action is offered, rather than this file re-deriving the rule.
 
+   WHAT THE WORK MODAL SHOWS
+   Everything the desk needs to book the trip, and the one thing it must type
+   back. The Assignment form was removed — the queue's own assignment filter
+   already covers who is working what, and a second control for it inside the
+   modal bought nothing. In its place is the booking and passenger data exactly
+   as the merchant submitted it and the Manager approved it, read from the same
+   `GET /api/requests/{id}` payload this modal already loads, so there is one
+   copy of a traveller's details and the Manager and the desk cannot disagree
+   about them.
+
+   The Airline-references form stays, and is the point of the screen: the desk
+   books the trip externally and comes back here to key in the PNR, the ticket
+   number and the airline's own reference. Those three are what the issued
+   ticket and the final booking information are generated from, so they have to
+   be captured, not inferred from an attached PDF.
+
    ENDPOINTS (all pre-existing)
      GET    /api/admin/bookings/queue                  the list
      GET    /api/admin/bookings/queue/counts           tab badges
-     GET    /api/admin/bookings/operators              assignees + their load
-     POST   /api/admin/bookings/{id}/assign            assign / unassign
-     PUT    /api/admin/bookings/{id}/references        PNR, ticket no., airline ref
+     PUT    /api/admin/bookings/{id}/references        PNR / ticket no / airline ref
      GET/POST /api/admin/bookings/{id}/notes           internal notes (staff-only)
      POST   /api/requests/{id}/documents               attach a ticket file
      GET    /api/requests/{id}/documents               what is attached
@@ -51,7 +65,6 @@ let opsSearch = '';
 let opsAssign = '';
 let opsSearchTimer = null;
 let opsFiltersWired = false;
-let opsOperators = null;
 let opsCurrent = null;
 /* Returned by trapFocus() while the work modal is open. */
 let opsReleaseFocus = null;
@@ -71,6 +84,16 @@ function opsAge(hours) {
   const days = Math.floor(hours / 24);
   return `${days}d ${hours % 24}h`;
 }
+
+/* 'non_veg' -> 'Non Veg'. The API sends raw enum values for the small passenger
+   fields — gender, passenger type, seat and meal preference — and a ready-made
+   label only for status, so these are title-cased here rather than printed at a
+   desk in their database spelling. */
+function opsLabel(s) {
+  return String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+const opsDash = v => (v === null || v === undefined || v === '' ? '—' : v);
 
 /* ------------------------------------------------------------------ list */
 
@@ -191,17 +214,6 @@ function opsCloseWork() {
   opsReleaseFocus = null;
 }
 
-async function opsLoadOperators() {
-  if (opsOperators) return opsOperators;
-  try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/bookings/operators`, { headers: authHeaders() });
-    opsOperators = data || [];
-  } catch {
-    opsOperators = [];
-  }
-  return opsOperators;
-}
-
 async function opsOpenWork(id) {
   const overlay = document.getElementById('opsWorkOverlay');
   document.getElementById('opsWorkBody').innerHTML = `<div class="empty-state" style="padding:40px;">Loading booking…</div>`;
@@ -212,16 +224,17 @@ async function opsOpenWork(id) {
   if (!opsReleaseFocus) opsReleaseFocus = trapFocus(document.getElementById('opsWorkBody'));
 
   try {
-    /* Four reads, in parallel — the detail, the paperwork, the desk's notes and
-       who could take it. They are independent, so serialising them would just
-       be four round trips of latency on every open. */
-    const [detail, docs, notes, operators] = await Promise.all([
+    /* Three reads, in parallel — the detail, the paperwork and the desk's
+       notes. They are independent, so serialising them would just be three
+       round trips of latency on every open. The detail carries the booking and
+       its passengers, which is why the read-only information below needs no
+       call of its own. */
+    const [detail, docs, notes] = await Promise.all([
       axios.get(`${API_BASE}/api/requests/${id}`, { headers: authHeaders() }).then(r => r.data),
       axios.get(`${API_BASE}/api/requests/${id}/documents`, { headers: authHeaders() }).then(r => r.data).catch(() => []),
       axios.get(`${API_BASE}/api/admin/bookings/${id}/notes`, { headers: authHeaders() }).then(r => r.data).catch(() => []),
-      opsLoadOperators(),
     ]);
-    opsCurrent = { id, detail, docs, notes, operators };
+    opsCurrent = { id, detail, docs, notes };
     opsRenderWork();
   } catch (err) {
     document.getElementById('opsWorkBody').innerHTML = `
@@ -232,18 +245,83 @@ async function opsOpenWork(id) {
   }
 }
 
+/* One traveller, exactly as the merchant typed them — the same row the Manager
+   approved, off the same payload, so there is no second copy to drift.
+   A card rather than a table column: thirteen fields across a table would need
+   a horizontal scrollbar at every width, and the desk reads one passenger at a
+   time when it books them. */
+function opsPassengerCard(p, i) {
+  const item = (label, value) => `
+    <div class="ops-pax-item"><span class="ops-pax-label">${label}</span>
+      <span class="ops-pax-value">${value}</span></div>`;
+
+  /* Every portal that creates a traveller posts `special_services: []`, so
+     today this renders on nobody. It is here because that array is the only
+     per-passenger request the schema carries, and a screen promising complete
+     passenger information must not be the reason one goes unseen. Party-wide
+     special requests are a booking field and are shown below the list. */
+  const services = (p.special_services || [])
+    .map(s => [s.label || s.code, s.category].filter(Boolean).join(' · '))
+    .filter(Boolean);
+
+  return `
+    <article class="ops-pax">
+      <header class="ops-pax-head">
+        <span class="ops-pax-num">${i + 1}</span>
+        <span class="ops-pax-name">${escapeHtml(
+          [p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || `Passenger ${i + 1}`)}</span>
+        <span class="badge read">${escapeHtml(opsLabel(p.passenger_type || 'adult'))}</span>
+        ${p.is_cancelled ? '<span class="badge cancelled">Cancelled</span>' : ''}
+      </header>
+      <div class="ops-pax-grid">
+        ${item('Passenger type', escapeHtml(opsLabel(p.passenger_type || 'adult')))}
+        ${item('Title', escapeHtml(opsDash(p.title)))}
+        ${item('First name', escapeHtml(opsDash(p.first_name)))}
+        ${item('Last name', escapeHtml(opsDash(p.last_name)))}
+        ${item('Gender', escapeHtml(p.gender ? opsLabel(p.gender) : '—'))}
+        ${item('Date of birth', escapeHtml(fmtDate(p.dob)))}
+        ${item('Nationality', escapeHtml(opsDash(p.nationality)))}
+        ${item('Passport number', escapeHtml(opsDash(p.passport_number)))}
+        ${item('Passport expiry', escapeHtml(fmtDate(p.passport_expiry)))}
+        ${item('Passport issue country', escapeHtml(opsDash(p.passport_issue_country)))}
+        ${item('Passport issue date', escapeHtml(fmtDate(p.passport_issue_date)))}
+        ${item('Meal preference', escapeHtml(p.meal_preference ? opsLabel(p.meal_preference) : '—'))}
+        ${item('Seat preference', escapeHtml(p.seat_preference ? opsLabel(p.seat_preference) : '—'))}
+      </div>
+      ${services.length
+        ? `<div class="ops-pax-note"><strong>Special requests</strong>${escapeHtml(services.join(', '))}</div>`
+        : ''}
+    </article>`;
+}
+
 function opsRenderWork() {
-  const { id, detail, docs, notes, operators } = opsCurrent;
+  const { id, detail, docs, notes } = opsCurrent;
   const r = detail.request;
   const d = r.details || {};
+  const contact = d.contact || {};
+  const passengers = r.passengers || [];
+  const roundTrip = d.trip_type === 'round_trip';
   const classic = r.workflow === 'classic_tours';
   const tickets = (docs || []).filter(x => x.doc_type === 'ticket' || x.doc_type === 'other');
   const canIssue = r.status === (classic ? 'approved' : 'paid');
+  /* CR-4b. An enquiry-led booking is created at 0 and no step before this one
+     sets a fare — the desk issuing the ticket is the first actor who knows what
+     was paid. The server requires it in exactly this case and 400s without it,
+     so the field appears in exactly this case too: the UI must not offer an
+     action the server will refuse. A booking that already carries an amount
+     (every catalog-led one) never sees this. */
+  const needsFare = classic && Number(r.total_amount || 0) <= 0;
   const canComplete = r.status === 'ticket_issued';
 
   const cell = (label, value) => `
     <div class="detail-item"><span class="detail-label">${label}</span>
       <span class="detail-value">${value}</span></div>`;
+
+  /* An enquiry-led booking carries the cabin the merchant asked for as
+     `travel_class`; a catalog-led one inherits the inventory row's
+     `cabin_class`. This queue holds both tracks, so reading only the first
+     would print "—" over a class the booking plainly has. */
+  const travelClass = opsLabel(d.travel_class || d.cabin_class) || '—';
 
   document.getElementById('opsWorkBody').innerHTML = `
     <div class="ops-modal-head">
@@ -261,31 +339,55 @@ function opsRenderWork() {
         downloads them from that status. There is no payment step on this workflow.
       </div>` : ''}
 
-      <div class="detail-grid">
-        ${cell('Merchant', escapeHtml(r.merchant_name || '—'))}
-        ${cell('Booking reference', escapeHtml(r.booking_reference || '—'))}
-        ${cell('From enquiry', escapeHtml(d.enquiry_reference || '—'))}
-        ${cell('Journey', escapeHtml([d.origin, d.destination].filter(Boolean).join(' → ') || r.title || '—'))}
-        ${cell('Airline', escapeHtml([d.airline, d.flight_number].filter(Boolean).join(' ') || '—'))}
-        ${cell('Departure', escapeHtml(fmtDate(r.travel_date)))}
-        ${cell('Travellers', String((r.passengers || []).length))}
-        ${cell('Contact', escapeHtml((d.contact || {}).phone || (d.contact || {}).email || '—'))}
-      </div>
-
-      <div class="ops-section">
-        <h3>Assignment</h3>
-        <div class="ops-row">
-          <select id="opsAssignSelect" class="status-select" aria-label="Assign to operator">
-            <option value="">Unassigned</option>
-            ${(operators || []).map(o => `
-              <option value="${o.id}">${escapeHtml(o.full_name)} · ${o.open_bookings} open</option>`).join('')}
-          </select>
-          <button type="button" class="btn btn-ghost btn-sm" id="opsAssignBtn">Save assignment</button>
+      <div class="ops-section ops-section-first">
+        <h3>Booking information</h3>
+        <div class="detail-grid">
+          ${cell('Booking reference', escapeHtml(opsDash(r.booking_reference)))}
+          ${cell('Enquiry reference', escapeHtml(opsDash(d.enquiry_reference)))}
+          ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
+          ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
+          ${cell('Journey type', roundTrip ? 'Round trip' : 'One way')}
+          ${cell('From', escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—'))}
+          ${cell('To', escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—'))}
+          ${cell('Airline', escapeHtml(opsDash(d.airline)))}
+          ${cell('Flight number', escapeHtml(opsDash(d.flight_number)))}
+          ${cell('Travel date', escapeHtml(fmtDate(r.travel_date)))}
+          ${roundTrip ? cell('Return date', escapeHtml(fmtDate(r.return_date))) : ''}
+          ${cell('Class', escapeHtml(travelClass))}
+          ${cell('Total passengers', String(passengers.length))}
+          ${cell('Contact name', escapeHtml(opsDash(contact.name)))}
+          ${cell('Contact email', escapeHtml(opsDash(contact.email)))}
+          ${cell('Contact phone', escapeHtml(opsDash(contact.phone)))}
         </div>
       </div>
 
       <div class="ops-section">
-        <h3>Airline references</h3>
+        ${/* Not "…and approved by the Manager": this queue also holds catalog-led
+             bookings, which an Admin approves. True of both tracks or not said. */''}
+        <h3>Passenger information
+          <span class="ops-staff-note">as submitted by the merchant</span></h3>
+        ${passengers.length
+          ? passengers.map(opsPassengerCard).join('')
+          : '<p class="ops-sub">No passengers recorded on this booking.</p>'}
+        ${d.special_requests
+          ? `<div class="detail-note"><strong>Special requests — whole party</strong>
+               <p>${escapeHtml(d.special_requests)}</p></div>` : ''}
+        ${r.remarks
+          ? `<div class="detail-note"><strong>Merchant remarks</strong>
+               <p>${escapeHtml(r.remarks)}</p></div>` : ''}
+      </div>
+
+      ${/* After the desk books the trip on the airline's own site. These three
+            are read back when the ticket is issued and when the final booking
+            information is generated, which is why they are typed rather than
+            left to be read off the attached PDF. Every stage this queue shows
+            is inside the server's REFERENCE_STAGES, so the form is never
+            offered where it would be refused. */''}
+      <div class="ops-section">
+        <h3>Airline references
+          <span class="ops-staff-note">after booking with the airline</span></h3>
+        <p class="ops-sub">Blank fields are left as they are — the server writes only what you send,
+          so correcting the PNR cannot wipe the ticket number.</p>
         <div class="ops-grid-3">
           <div class="form-field"><label for="opsPnr">PNR</label>
             <input id="opsPnr" value="${escapeHtml(r.pnr || '')}" placeholder="H4X9PQ"></div>
@@ -338,6 +440,16 @@ function opsRenderWork() {
       </div>
 
       <div class="ops-actions">
+        ${canIssue && needsFare ? `
+          <div class="ops-fare">
+            <label for="opsFareInput">Fare paid to the airline (₹)</label>
+            <input type="number" id="opsFareInput" min="0.01" step="0.01" inputmode="decimal"
+                   placeholder="0.00" aria-describedby="opsFareHelp">
+            <p class="ops-sub" id="opsFareHelp">
+              This becomes the booking amount and is debited from the merchant's wallet
+              when the ticket is issued.
+            </p>
+          </div>` : ''}
         ${canIssue ? `<button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>` : ''}
         ${canComplete ? `<button type="button" class="btn btn-coral" id="opsCompleteBtn">Mark Completed</button>` : ''}
         ${!canIssue && !canComplete
@@ -350,15 +462,17 @@ function opsRenderWork() {
     </div>`;
 
   document.getElementById('opsWorkClose').addEventListener('click', opsCloseWork);
-  if (r.assigned_admin) document.getElementById('opsAssignSelect').value = String(r.assigned_admin);
 
   /* The body was just replaced, so focus has fallen to <body>. Put it back on
-     the first real control inside the still-trapped container. */
-  const firstControl = document.getElementById('opsWorkBody').querySelector(
-    'select, input, textarea, button:not([data-focus-trap-skip]), a[href]');
-  if (firstControl) firstControl.focus();
+     the dialog itself rather than on its first control: that control is the PNR
+     box, and landing there would step a keyboard or screen-reader user straight
+     past the booking and passenger details this modal opens to show — the very
+     details they need before they can fill it in. The trap is still in place on
+     the container, which does not change. */
+  const dialog = document.getElementById('opsWorkBody');
+  dialog.setAttribute('tabindex', '-1');
+  dialog.focus();
 
-  document.getElementById('opsAssignBtn').addEventListener('click', () => opsSaveAssignment(id));
   document.getElementById('opsRefsBtn').addEventListener('click', () => opsSaveReferences(id));
   document.getElementById('opsUploadBtn').addEventListener('click', () => opsUploadTickets(id));
   document.getElementById('opsNoteBtn').addEventListener('click', () => opsAddNote(id));
@@ -369,25 +483,19 @@ function opsRenderWork() {
   });
 }
 
-async function opsSaveAssignment(id) {
-  const raw = document.getElementById('opsAssignSelect').value;
-  try {
-    await axios.post(`${API_BASE}/api/admin/bookings/${id}/assign`,
-      { operator_id: raw ? Number(raw) : null }, { headers: authHeaders() });
-    showToast('Assignment saved.');
-    opsOpenWork(id);
-    loadBookingOps();
-  } catch (err) {
-    showToast(opsErr(err, 'Could not save the assignment.'), true);
-  }
-}
-
+/* A field left blank is sent as null, not as "", because the server treats null
+   as "leave this one alone" and "" on the airline reference as "clear it". A
+   desk correcting one box must not silently blank the other two. */
 async function opsSaveReferences(id) {
   const payload = {
     pnr: document.getElementById('opsPnr').value.trim() || null,
     ticket_number: document.getElementById('opsTicketNo').value.trim() || null,
     airline_reference: document.getElementById('opsAirlineRef').value.trim() || null,
   };
+  if (!payload.pnr && !payload.ticket_number && !payload.airline_reference) {
+    showToast('Enter a PNR, ticket number or airline reference first.', true);
+    return;
+  }
   try {
     await axios.put(`${API_BASE}/api/admin/bookings/${id}/references`, payload, { headers: authHeaders() });
     showToast('References saved.');
@@ -471,16 +579,34 @@ async function opsAddNote(id) {
 
 async function opsLifecycle(id, action) {
   const msg = document.getElementById('opsActionMsg');
+  const fareInput = document.getElementById('opsFareInput');
+  const body = {};
+
+  if (action === 'issue-ticket' && fareInput) {
+    const fare = Number(fareInput.value);
+    if (!(fare > 0)) {
+      msg.className = 'msg error';
+      msg.textContent = 'Enter the fare paid to the airline — it is what the merchant is billed.';
+      fareInput.focus();
+      return;
+    }
+    /* Sent as typed, not as a Number: the schema is Decimal and M4's rule is
+       that money never becomes a float on its way to the server. */
+    body.fare_amount = fareInput.value.trim();
+  }
+
   const label = action === 'issue-ticket' ? 'Mark this booking as Ticket Issued?' : 'Mark this booking Completed?';
   const detail = action === 'issue-ticket'
-    ? 'The merchant is notified and can download the attached ticket documents.'
+    ? (body.fare_amount
+        ? `The merchant is notified, can download the attached ticket documents, and its wallet is debited ₹${body.fare_amount}.`
+        : 'The merchant is notified and can download the attached ticket documents.')
     : 'This closes the booking.';
   if (!await confirmDialog({ title: label, message: detail, confirmText: 'Confirm' })) return;
 
   msg.className = 'msg';
   msg.textContent = 'Working…';
   try {
-    await axios.post(`${API_BASE}/api/admin/requests/${id}/${action}`, {}, { headers: authHeaders() });
+    await axios.post(`${API_BASE}/api/admin/requests/${id}/${action}`, body, { headers: authHeaders() });
     showToast(action === 'issue-ticket' ? 'Ticket issued.' : 'Booking completed.');
     opsCloseWork();
     loadBookingOps();

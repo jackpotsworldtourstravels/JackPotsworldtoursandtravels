@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, assert_same_merchant, require
 from app.database.session import get_db
-from app.models_v2 import Merchant, PaymentType, User
+from app.models_v2 import Merchant, PaymentType, User, WalletTxnType
 from app.schemas.finance import (
     MerchantPosition,
     Statement,
@@ -177,6 +177,10 @@ def adjust_wallet(
             PaymentType.WALLET_TOPUP if payload.amount > 0 else PaymentType.ADJUSTMENT
         ),
         reason=payload.reason,
+        # CR-4b: staff may say what kind of movement this is — a credit note is
+        # not a refund and neither is an adjustment. Omitted keeps the previous
+        # defaulting exactly, so nothing that already calls this changes.
+        txn_type=WalletTxnType(payload.txn_type) if payload.txn_type else None,
     )
     activity_service.log_activity(
         db, current_user.user_id, "Wallet adjusted",
@@ -194,4 +198,5 @@ def adjust_wallet(
         "amount": finance_service.q(payload.amount),
         "wallet_balance": finance_service.q(merchant.wallet_balance),
         "position": finance_service.merchant_position(db, merchant),
+        "transaction_reference": (entry.discount_meta or {}).get("wallet_txn_number"),
     }

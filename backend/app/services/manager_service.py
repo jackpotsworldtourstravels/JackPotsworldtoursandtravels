@@ -37,7 +37,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, lifecycle, notification_service
+from app.services import activity_service, finance_service, lifecycle, notification_service
 
 #: Where a Booking Request sits while it is the Manager's problem.
 PENDING_STATUSES: tuple[S, ...] = (S.PENDING_APPROVAL, S.IN_REVIEW)
@@ -495,6 +495,19 @@ def approve(
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=f"{booking.request_number} has no passengers and cannot be approved",
+        )
+
+    # CR-4b: the authoritative credit gate. Approval is what puts this booking on
+    # the desk that will spend the platform's money on it, so it is the last
+    # point at which a refusal can still change the outcome — by the time the
+    # ticket is issued the money is gone and the debit is only accounting.
+    # The merchant's balance can have moved since submission, which is why this
+    # is checked again here and not assumed from the earlier pass.
+    if booking.merchant is not None:
+        finance_service.assert_credit_available(
+            db, booking.merchant,
+            booking.total_amount if finance_service.q(booking.total_amount) > 0 else None,
+            request_number=booking.request_number,
         )
 
     before = booking.status

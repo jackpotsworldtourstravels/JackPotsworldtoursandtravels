@@ -36,6 +36,7 @@ from app.schemas.ticket import (
     CatalogItemResponse,
     CreateBookingRequest,
     CreateServiceRequest,
+    IssueTicketRequest,
     PassengerResponse,
     PayRequest,
     PaymentSummary,
@@ -376,16 +377,26 @@ def reject_request(
     tags=["admin · approvals"],
     summary="Issue the ticket",
     description=(
-        "Requires `ticket.issue`. Only valid once the payment is verified (**Paid**). Allocates "
-        "the PNR, ticket number and invoice number."
+        "Requires `ticket.issue`. On the standard track, only valid once the payment is verified "
+        "(**Paid**); on the enquiry-led track, once the booking is Manager Approved and its ticket "
+        "documents are attached. Allocates the PNR, ticket number and invoice number.\n\n"
+        "**CR-4b — `fare_amount`.** On a wallet-billed (enquiry-led) booking that still carries no "
+        "amount, this is **required**: it is the fare the desk paid the airline, it becomes the "
+        "booking's `total_amount`, and it is what the merchant's wallet is debited. Issuing "
+        "such a booking without it returns 400. On any booking that already has an amount the "
+        "field is ignored, so the standard track is unchanged."
     ),
 )
 def issue_ticket(
     request_id: int,
+    payload: IssueTicketRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.TICKET_ISSUE)),
 ):
-    request = ticket_service.issue_ticket(db, current_user, request_id)
+    request = ticket_service.issue_ticket(
+        db, current_user, request_id,
+        fare_amount=payload.fare_amount if payload else None,
+    )
     return _detail(db, request, current_user)
 
 

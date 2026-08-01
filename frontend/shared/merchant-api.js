@@ -232,6 +232,75 @@ const MerchantApi = {
     });
   },
 
+  /* -------------------------------------------------------------- wallet */
+
+  /* CR-4c. The running account. Every route is scoped to the caller's merchant
+     by the server — there is no merchant_id to pass, and none of these figures
+     may be re-derived on the client: `balance` may legitimately be NEGATIVE
+     (that is the outstanding position) and `pending_topups` is deliberately NOT
+     part of it, because an unverified claim is not money. Render them as two
+     separate numbers; adding them together is the bug this shape prevents. */
+  wallet() {
+    return this._req('get', '/api/merchant/wallet');
+  },
+
+  /* Oldest first, with `balance_after` computed by the server per row. Never
+     accumulate a running balance here — see WALLET_ARCHITECTURE §6 for why the
+     client's idea of the order can disagree with the ledger's. */
+  walletTransactions({ dateFrom, dateTo, page = 1, pageSize = 25 } = {}) {
+    return this._req('get', '/api/merchant/wallet/transactions', {
+      params: {
+        date_from: dateFrom || undefined, date_to: dateTo || undefined,
+        page, page_size: pageSize,
+      },
+    });
+  },
+
+  /* Staff configure these (CR-4d); this side is read-only. An empty array is a
+     valid answer and means none has been configured yet — say so, rather than
+     rendering an empty box. */
+  paymentAccounts() {
+    return this._req('get', '/api/merchant/wallet/payment-accounts');
+  },
+
+  /* The QR is authenticated, so a plain <img src> cannot fetch it — pulled as a
+     blob with the bearer token. Callers must revoke the object URL. */
+  async paymentAccountQr(accountId) {
+    const blob = await this._req(
+      'get', `/api/merchant/wallet/payment-accounts/${accountId}/qr`,
+      { responseType: 'blob' },
+    );
+    return URL.createObjectURL(blob);
+  },
+
+  /* Multipart, so this bypasses _req's JSON shape — the browser must set its
+     own boundary. Submitting CREDITS NOTHING: it records a claim, and the
+     wallet moves only when an admin verifies it. */
+  submitTopup({ amount, method, paymentAccountId, utr, proof }) {
+    const form = new FormData();
+    form.append('amount', amount);
+    form.append('method', method);
+    if (paymentAccountId != null) form.append('payment_account_id', String(paymentAccountId));
+    if (utr) form.append('utr', utr);
+    if (proof) form.append('proof', proof);
+    return axios.post(`${API_BASE}/api/merchant/wallet/topups`, form, {
+      headers: partnerAuthHeaders(),
+    }).then(r => r.data);
+  },
+
+  listTopups({ status, page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/merchant/wallet/topups', {
+      params: { status: status || undefined, page, page_size: pageSize },
+    });
+  },
+
+  async downloadTopupProof(topupId) {
+    const blob = await this._req(
+      'get', `/api/merchant/wallet/topups/${topupId}/proof`, { responseType: 'blob' },
+    );
+    return URL.createObjectURL(blob);
+  },
+
   /* ------------------------------------------------------------ approvals */
 
   /* CR-3. The merchant signs off the booking requests its own staff raised,

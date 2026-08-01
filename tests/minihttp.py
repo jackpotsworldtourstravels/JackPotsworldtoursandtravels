@@ -3,6 +3,7 @@ import json as _json
 import urllib.error
 import urllib.request
 import uuid
+from urllib.parse import urlencode as _urlencode
 
 
 class Resp:
@@ -49,6 +50,16 @@ def request(method, url, headers=None, json=None, files=None, data=None):
         parts.append(f"--{boundary}--\r\n".encode())
         body = b"".join(parts)
         h["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+    elif data is not None:
+        # `data` with no `files` is a plain form post. Before CR-4c this branch
+        # did not exist, so such a call sent **no body at all** and every field
+        # came back "Field required" — a harness bug that looks exactly like an
+        # endpoint bug, and cost a debugging round trip on the first form-only
+        # endpoint in the suite (a top-up submitted without a screenshot).
+        # Nothing relied on the old behaviour: every existing `data=` caller
+        # passes `files=` alongside it.
+        body = _urlencode({k: str(v) for k, v in data.items()}).encode()
+        h["Content-Type"] = "application/x-www-form-urlencoded"
     elif json is not None:
         body = _json.dumps(json).encode()
         h["Content-Type"] = "application/json"

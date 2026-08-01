@@ -178,6 +178,49 @@ class PaymentStatus(str, enum.Enum):
     PARTIALLY_REFUNDED = "partially_refunded"
 
 
+class WalletTxnType(str, enum.Enum):
+    """Why the wallet moved (CR-4, migration 0036).
+
+    The direction is *not* encoded here — it lives in the ``debit`` / ``credit``
+    columns, because a refund credits and a cancellation charge debits and both
+    arise from the same event. Reading direction off the type is how a ledger
+    ends up with two answers.
+    """
+
+    #: A booking reached Ticket Issued and was billed to the wallet (CR-4b).
+    BOOKING_DEBIT = "booking_debit"
+    #: A merchant's top-up, verified by an admin.
+    WALLET_RECHARGE = "wallet_recharge"
+    #: Money given back against a cancelled or re-priced booking.
+    REFUND_CREDIT = "refund_credit"
+    #: Staff correcting the balance by hand, always with a reason.
+    MANUAL_ADJUSTMENT = "manual_adjustment"
+    #: A goodwill or commercial credit that is not a refund of a specific payment.
+    CREDIT_NOTE = "credit_note"
+    #: The charge retained when a booking is cancelled (M3 computes it).
+    CANCELLATION_CHARGE = "cancellation_charge"
+
+
+class WalletTopupStatus(str, enum.Enum):
+    SUBMITTED = "submitted"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
+class WalletTopupMethod(str, enum.Enum):
+    BANK_TRANSFER = "bank_transfer"
+    UPI = "upi"
+    QR = "qr"
+    CASH = "cash"
+    OTHER = "other"
+
+
+class PaymentAccountType(str, enum.Enum):
+    BANK = "bank"
+    UPI = "upi"
+    QR = "qr"
+
+
 class Gender(str, enum.Enum):
     MALE = "male"
     FEMALE = "female"
@@ -340,7 +383,11 @@ class Merchant(Base):
         UniqueConstraint("merchant_code", name="uq_merchants_code"),
         UniqueConstraint("email", name="uq_merchants_email"),
         UniqueConstraint("reference_prefix", name="uq_merchants_prefix"),
-        CheckConstraint("wallet_balance >= 0", name="ck_merchants_wallet_non_negative"),
+        # No non-negative constraint on wallet_balance: CR-4 (migration 0036)
+        # made the wallet a running account, and a negative balance is the
+        # merchant's outstanding position, not a corruption. Exposure is bounded
+        # by credit_limit in wallet_service, which is a per-merchant business
+        # limit rather than a floor at zero identical for everyone.
         CheckConstraint("credit_limit >= 0", name="ck_merchants_credit_non_negative"),
         CheckConstraint("booking_sequence >= 0", name="ck_merchants_sequence_non_negative"),
         Index("ix_merchants_status", "status"),
@@ -1215,6 +1262,209 @@ class RequestNote(Base):
         return f"<RequestNote {self.note_id} req={self.request_id}>"
 
 
+# =====================================================================
+# CR-4 — the merchant wallet (migration 0036)
+# =====================================================================
+class PaymentAccount(Base):
+    """A platform account a merchant can send money to: bank, UPI or QR.
+
+    Configured by staff under Account Management (CR-4d) and shown read-only to
+    merchants on the Add Money screen. ``details`` is JSONB because a UPI handle
+    and a current account share almost no fields, and the set grows every time a
+    new payment rail is added.
+    """
+
+    __tablename__ = "payment_accounts"
+
+    account_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_type: Mapped[PaymentAccountType] = mapped_column(
+        _pg_enum(PaymentAccountType, "payment_account_type_enum"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    #: Storage key, never a URL — served through an authenticated endpoint.
+    qr_image_path: Mapped[Optional[str]] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    display_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "length(btrim(label)) > 0", name="ck_payment_accounts_label_not_blank"
+        ),
+        Index("ix_payment_accounts_active", "is_active", "display_order"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PaymentAccount {self.account_id} {self.account_type.value} {self.label!r}>"
+
+
+class WalletTopup(Base):
+    """A merchant's claim that it has sent money, awaiting verification.
+
+    Deliberately **not** a ``payments`` row and **not** a ``request_documents``
+    row: a top-up belongs to no booking, and ``request_documents.request_id`` is
+    NOT NULL, so the proof file has nowhere to live there. Credit only reaches
+    the wallet when an admin verifies this, at which point exactly one
+    :class:`WalletTransaction` is written and linked back through ``topup_id``.
+    """
+
+    __tablename__ = "wallet_topups"
+
+    topup_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    topup_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE"), nullable=False
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    method: Mapped[WalletTopupMethod] = mapped_column(
+        _pg_enum(WalletTopupMethod, "wallet_topup_method_enum"), nullable=False
+    )
+    payment_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("payment_accounts.account_id", ondelete="SET NULL")
+    )
+    #: Denormalised so a retired account still reads correctly on old top-ups.
+    payment_account_label: Mapped[Optional[str]] = mapped_column(String(120))
+
+    utr: Mapped[Optional[str]] = mapped_column(String(64))
+    proof_path: Mapped[Optional[str]] = mapped_column(String(500))
+    proof_filename: Mapped[Optional[str]] = mapped_column(String(255))
+    proof_content_type: Mapped[Optional[str]] = mapped_column(String(100))
+    proof_size_bytes: Mapped[Optional[int]] = mapped_column(BigInteger)
+
+    status: Mapped[WalletTopupStatus] = mapped_column(
+        _pg_enum(WalletTopupStatus, "wallet_topup_status_enum"),
+        nullable=False,
+        server_default=text("'submitted'"),
+    )
+    submitted_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    submitted_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    reviewed_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    reviewed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    review_remarks: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("topup_number", name="uq_wallet_topups_number"),
+        CheckConstraint("amount > 0", name="ck_wallet_topups_amount_positive"),
+        Index("ix_wallet_topups_merchant", "merchant_id", "topup_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<WalletTopup {self.topup_number} {self.amount} {self.status.value}>"
+
+
+class WalletTransaction(Base):
+    """One movement of a merchant's wallet. Append-only, and the source of truth.
+
+    ``merchants.wallet_balance`` is a cache of ``SUM(credit) - SUM(debit)`` over
+    this table, kept in step because every write goes through
+    ``wallet_service.post`` under a row lock on the merchant. The verification
+    script asserts the two agree after every scenario — a cached total that can
+    drift from its ledger is precisely the class of bug M4 was written to make
+    impossible.
+
+    ``balance_before`` / ``balance_after`` are stored rather than derived so a
+    statement line is readable on its own, and the database checks the
+    arithmetic on every insert (``ck_wallet_transactions_balance_math``).
+
+    There is no ``updated_at`` and no update path. A wrong entry is corrected by
+    posting the opposite entry, the way ledgers have always worked; editing
+    history would make every balance before the edit unexplainable.
+    """
+
+    __tablename__ = "wallet_transactions"
+
+    txn_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    txn_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="RESTRICT"), nullable=False
+    )
+    txn_type: Mapped[WalletTxnType] = mapped_column(
+        _pg_enum(WalletTxnType, "wallet_txn_type_enum"), nullable=False
+    )
+
+    debit: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    credit: Mapped[Decimal] = mapped_column(
+        Numeric(14, 2), nullable=False, server_default=text("0")
+    )
+    balance_before: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    balance_after: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+    payment_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("payments.payment_id", ondelete="SET NULL")
+    )
+    topup_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("wallet_topups.topup_id", ondelete="SET NULL")
+    )
+    reason: Mapped[Optional[str]] = mapped_column(Text)
+    created_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("txn_number", name="uq_wallet_transactions_number"),
+        CheckConstraint("debit >= 0", name="ck_wallet_transactions_debit_non_negative"),
+        CheckConstraint("credit >= 0", name="ck_wallet_transactions_credit_non_negative"),
+        CheckConstraint(
+            "(debit > 0 AND credit = 0) OR (credit > 0 AND debit = 0)",
+            name="ck_wallet_transactions_one_direction",
+        ),
+        CheckConstraint(
+            "balance_after = balance_before + credit - debit",
+            name="ck_wallet_transactions_balance_math",
+        ),
+        Index("ix_wallet_transactions_merchant", "merchant_id", "created_at", "txn_id"),
+        Index("ix_wallet_transactions_request", "request_id"),
+        Index("ix_wallet_transactions_topup", "topup_id"),
+    )
+
+    @property
+    def signed_amount(self) -> Decimal:
+        """Positive for a credit, negative for a debit."""
+        return Decimal(self.credit or 0) - Decimal(self.debit or 0)
+
+    def __repr__(self) -> str:
+        return (
+            f"<WalletTransaction {self.txn_number} {self.txn_type.value} "
+            f"-{self.debit}/+{self.credit} -> {self.balance_after}>"
+        )
+
+
 __all__ = [
     "Base",
     "User",
@@ -1248,4 +1498,11 @@ __all__ = [
     "RequestNote",
     "DocumentType",
     "DocumentVerification",
+    "WalletTransaction",
+    "WalletTopup",
+    "PaymentAccount",
+    "WalletTxnType",
+    "WalletTopupStatus",
+    "WalletTopupMethod",
+    "PaymentAccountType",
 ]

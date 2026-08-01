@@ -6,6 +6,7 @@ nothing here is typed ``float`` — not even the ones that "can't" have fraction
 """
 import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -89,6 +90,22 @@ class WalletAdjustment(BaseModel):
 
     amount: Decimal = Field(description="Positive to credit the wallet, negative to debit it")
     reason: str = Field(min_length=3, max_length=500)
+    #: CR-4b. What kind of movement this is, so the ledger says *why* rather
+    #: than filing everything as an adjustment. Optional and defaulted, so an
+    #: existing caller keeps its existing behaviour exactly.
+    #:
+    #: A credit note is not a refund: it is a commercial credit that reverses no
+    #: particular payment, which is why it is its own type on the statement.
+    #: ``booking_debit`` is deliberately **not** accepted here — that type is
+    #: written only by ticket issuance, and letting it be posted by hand would
+    #: put a second, unindexed path around the one-debit-per-booking guarantee.
+    txn_type: Literal[
+        "manual_adjustment", "credit_note", "refund_credit", "cancellation_charge"
+    ] | None = Field(
+        default=None,
+        description="Ledger transaction type; defaults to wallet_recharge on a "
+                    "credit and manual_adjustment on a debit.",
+    )
 
 
 class WalletAdjustmentResult(BaseModel):
@@ -97,3 +114,5 @@ class WalletAdjustmentResult(BaseModel):
     amount: Decimal
     wallet_balance: Decimal
     position: MerchantPosition
+    #: CR-4b. The ledger reference for this movement — quote this, never an id.
+    transaction_reference: str | None = None

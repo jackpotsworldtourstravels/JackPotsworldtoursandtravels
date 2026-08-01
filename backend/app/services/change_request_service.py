@@ -703,12 +703,28 @@ def approve(
         wanted = _money(pricing.get("refund_amount") or 0, "refund_amount")
         refundable = finance_service.refundable_against(db, booking)
         settled = min(wanted, refundable)
+        wallet_refund = None
         if settled > 0:
             finance_service.settle_refund(
                 db, booking, settled, actor_id=actor.user_id,
                 reason=f"{request.request_number}: cancellation refund",
                 commit=False,
             )
+            # CR-4b. ``settle_refund`` reverses the booking's own payments —
+            # which, on a wallet-billed booking, is the settlement row written
+            # when the ticket was issued. That squares the *booking*, but the
+            # money came off the *wallet* and has to go back to where it came
+            # from, or the merchant stays down the full fare on a booking it no
+            # longer has. A no-op on any booking that was never wallet-billed.
+            wallet_refund = finance_service.refund_booking_to_wallet(
+                db, booking, settled, actor_id=actor.user_id,
+                reason=f"{request.request_number}: cancellation refund on {booking.request_number}",
+                commit=False,
+            )
+        if wallet_refund is not None:
+            # By reference, never by internal id — docs/WALLET_ARCHITECTURE.md §2.5.
+            pricing["wallet_refund_reference"] = wallet_refund.txn_number
+            pricing["wallet_balance_after"] = str(wallet_refund.balance_after)
         applied.update({
             "refund_due": str(wanted),
             "refund_settled": str(settled),

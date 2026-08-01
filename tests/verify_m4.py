@@ -181,11 +181,31 @@ def main():
           money(r.json()["wallet_balance"]) - start_wallet == D("50000.00"),
           f"{start_wallet} -> {r.json()['wallet_balance']}")
 
+    # CR-4a changed this rule, and the roadmap's §0 requires the script to
+    # assert the new contract rather than the old one. The wallet is a running
+    # account now: a debit past zero is the *ordinary* case, and what bounds it
+    # is the credit limit (exercised in verify_cr4a.py), not a floor at zero.
+    #
+    # The old assertion had also quietly stopped testing anything. It tried to
+    # overdraw by a fixed 999,999 and expected a refusal — but the seeded wallet
+    # grows by 50,000 on every run of this script, so once it passed 999,999 the
+    # debit no longer crossed zero and the check was asserting a refusal that had
+    # nothing to do with the rule. The replacement is computed from the balance
+    # and therefore says the same thing on every run.
+    before_overdraw = money(position(mtok)["wallet_balance"])
+    overdraw = before_overdraw + D("50000.00")
     r = requests.post(f"{BASE}/api/admin/merchants/{merchant_id}/wallet", headers=H(atok),
-                      json={"amount": "-999999.00", "reason": "overdraw attempt"})
-    check("a debit past zero is refused -> 400", r.status_code == 400, f"{r.status_code} {r.text[:200]}")
-    check("...naming the constraint that forbids it",
-          "negative" in r.text.lower(), r.text[:200])
+                      json={"amount": f"-{overdraw}", "reason": "CR-4a: debit past zero"})
+    check("a debit past zero is now accepted -> 200", r.status_code == 200,
+          f"{r.status_code} {r.text[:250]}")
+    check("...and leaves the wallet negative by exactly the overdraw",
+          money(r.json()["wallet_balance"]) == D("-50000.00"), r.text[:200])
+
+    r = requests.post(f"{BASE}/api/admin/merchants/{merchant_id}/wallet", headers=H(atok),
+                      json={"amount": str(overdraw), "reason": "CR-4a: settle the overdraw"})
+    check("crediting it back lifts the balance through zero again",
+          money(r.json()["wallet_balance"]) == before_overdraw,
+          f"{before_overdraw} vs {r.json()['wallet_balance']}")
 
     r = requests.post(f"{BASE}/api/admin/merchants/{merchant_id}/wallet", headers=H(atok),
                       json={"amount": "0", "reason": "nothing"})

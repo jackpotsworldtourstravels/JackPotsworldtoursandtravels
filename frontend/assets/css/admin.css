@@ -633,6 +633,17 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
                 gap:10px; flex-wrap:wrap;}
 .ops-staff-only{font-size:11px; font-weight:700; text-transform:none; letter-spacing:0;
                 color:var(--coral-dark);}
+/* Same shape as .ops-staff-only but muted — a provenance note, not a warning. */
+.ops-staff-note{font-size:11px; font-weight:600; text-transform:none; letter-spacing:0;
+                color:var(--text-muted);}
+/* The first section under the modal head supplies no rule of its own: the head
+   already has a bottom border, and a second one 24px below it reads as an empty
+   band where the removed Assignment form used to sit. */
+.ops-section-first{margin-top:16px; padding-top:0; border-top:none;}
+/* .detail-grid carries its own 16px top margin for the enquiry screens, where
+   it follows body text rather than a heading. Under an .ops-section h3 that
+   stacks into a 26px gap the heading looks detached from its own contents. */
+.ops-section .detail-grid{margin-top:2px;}
 .ops-sub{font-size:12.5px; color:var(--text-muted); margin:0 0 10px;}
 .ops-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
 .ops-row input[type="text"], .ops-row input[type="file"], .ops-row select{
@@ -640,16 +651,56 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   background:var(--card-bg); color:var(--text-primary); min-width:200px; flex:1;}
 .ops-grid-3{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px 16px;
             margin-bottom:12px;}
+/* One card per traveller. A table would need thirteen columns and therefore a
+   horizontal scrollbar at every viewport; the desk reads one passenger at a
+   time, so the cards win on the screen this is actually used on. */
+.ops-pax{border:1px solid var(--border-color); border-radius:12px; padding:12px 14px;
+         background:var(--hover-bg); margin-bottom:10px;}
+.ops-pax:last-of-type{margin-bottom:0;}
+.ops-pax-head{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:11px;}
+.ops-pax-num{width:22px; height:22px; border-radius:50%; background:var(--navy); color:#fff;
+             font-size:11px; font-weight:800; flex-shrink:0;
+             display:inline-flex; align-items:center; justify-content:center;}
+.ops-pax-name{font-size:14px; font-weight:800; color:var(--text-primary); overflow-wrap:anywhere;}
+/* 150px min: the values here are short (a gender, a meal code, a date), so a
+   220px track like .detail-grid's would strand half of every column. */
+.ops-pax-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+              gap:10px 16px;}
+.ops-pax-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.ops-pax-label{font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+               color:var(--text-muted);}
+.ops-pax-value{font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-pax-note{margin-top:11px; padding-top:9px; border-top:1px dashed var(--border-color);
+              font-size:12.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-pax-note strong{display:block; margin-bottom:3px; font-size:10px; font-weight:800;
+                     letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+
 .ops-note{padding:10px 12px; border-radius:10px; background:var(--hover-bg);
           border:1px solid var(--border-color); margin-bottom:8px;}
 .ops-note-body{font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
 .ops-note-meta{font-size:11.5px; color:var(--text-muted); margin-top:3px;}
 .ops-actions{display:flex; gap:12px; align-items:center; flex-wrap:wrap;
              margin-top:24px; padding-top:18px; border-top:1px solid var(--border-color);}
+/* CR-4b: the fare the desk paid, captured on an enquiry-led booking that has no
+   amount yet. Full width so it sits above the action buttons rather than
+   competing with them for the row. */
+.ops-fare{flex:1 1 100%; min-width:0;}
+.ops-fare label{display:block; font-size:12px; font-weight:700; color:var(--text-primary);
+                margin-bottom:6px;}
+.ops-fare input{width:100%; max-width:260px; padding:9px 12px; font-size:14px;
+                border:1px solid var(--border-color); border-radius:8px;
+                background:var(--surface); color:var(--text-primary);}
+.ops-fare input:focus-visible{outline:2px solid var(--brand-coral); outline-offset:1px;}
+.ops-fare .ops-sub{margin-top:6px;}
 
 @media (max-width:640px){
   .ops-modal-head{padding:20px 20px 14px;}
   .ops-modal-body{padding:4px 20px 24px;}
   .ops-grid-3{grid-template-columns:1fr;}
   .ops-row input[type="text"], .ops-row input[type="file"], .ops-row select{min-width:0; width:100%;}
+  /* Two columns still fit at 375px once the modal and card padding are taken
+     out, and these values are short enough to read at that width — one column
+     would double the height of a six-passenger booking for nothing. */
+  .ops-pax{padding:11px 12px;}
+  .ops-pax-grid{grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:9px 12px;}
 }

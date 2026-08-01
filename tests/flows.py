@@ -90,7 +90,7 @@ def rival_merchant(atok):
 
 
 def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label="verification",
-                 gtok=None):
+                 gtok=None, fare="24500.00"):
     """Create an **enquiry-led** booking and walk it to ``upto``.
 
     This is the Classic Tours workflow (CR-2): the Admin answers the enquiry,
@@ -102,6 +102,12 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
     or ``paid`` fails loudly — those stages do not exist on this track, and
     silently stopping short would leave a suite asserting against a booking that
     is not where it thinks it is. Use :func:`make_catalog_booking` for money.
+
+    ``fare`` is what the desk pays the airline, supplied at ticket issuance
+    (CR-4b). An enquiry-led booking is created at 0 and no earlier step sets an
+    amount, so before CR-4b this builder produced a ticketed booking worth
+    nothing; the wallet debit is that fare. Only used when ``upto`` reaches
+    ``ticket_issued``.
 
     Returns ``{"id", "request_number", "enquiry_id", "status", "passenger_ids"}``.
     """
@@ -180,7 +186,10 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
                           files={"file": (f"eticket-{rid}.pdf", PDF, "application/pdf")},
                           data={"doc_type": "ticket"})
         assert r.status_code in (200, 201), f"ticket upload: {r.status_code} {r.text[:300]}"
-        r = requests.post(f"{BASE}/api/admin/requests/{rid}/issue-ticket", headers=H(atok), json={})
+        # CR-4b: the fare is captured here, because nothing before this point on
+        # the enquiry-led track ever sets one.
+        r = requests.post(f"{BASE}/api/admin/requests/{rid}/issue-ticket", headers=H(atok),
+                          json={"fare_amount": fare})
         assert r.status_code == 200, f"issue: {r.status_code} {r.text[:300]}"
 
     if want >= CLASSIC_ORDER.index("completed"):

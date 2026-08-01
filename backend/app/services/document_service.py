@@ -34,7 +34,7 @@ import hashlib
 import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO
+from typing import BinaryIO, NamedTuple
 
 from fastapi import HTTPException, UploadFile, status as http_status
 from sqlalchemy import and_, select
@@ -252,33 +252,37 @@ def list_documents(db: Session, actor: User, request_id: int) -> list[RequestDoc
 # ---------------------------------------------------------------------------
 # Upload
 # ---------------------------------------------------------------------------
-def upload(
-    db: Session,
-    actor: User,
-    request_id: int,
-    upload_file: UploadFile,
-    *,
-    doc_type: DocumentType,
-    passenger_id: int | None = None,
-) -> RequestDocument:
-    """Attach a file to a draft booking request.
+class StoredUpload(NamedTuple):
+    """What :func:`store_upload` put in storage, ready to record in a row."""
 
-    Locked because the draft-status check and the insert must agree: without
-    it, a submit committing between the two would let a document land on a
-    request that is already with the approvals desk.
+    relative_path: str
+    content_type: str
+    size_bytes: int
+    checksum: str
+    display_filename: str
+
+
+def store_upload(upload_file: UploadFile, *, prefix: str) -> StoredUpload:
+    """Validate a file and stream it into storage. The only upload path.
+
+    WHY THIS IS A SEPARATE FUNCTION (CR-4c)
+    Everything here is security-critical — the declared-type allowlist, the
+    magic-byte sniff that stops an HTML payload arriving as ``image/png``, the
+    size cap enforced *while streaming* rather than from a client-supplied
+    ``Content-Length``, and the rule that a rejected upload never reaches
+    storage at all. CR-4c adds a second thing a user can upload (a wallet
+    top-up's payment screenshot, which belongs to no booking). Copying these
+    sixty lines would mean two copies of the checks, and the copy that gets
+    forgotten during the next change is the one with the hole in it.
+
+    So the checks live here once and both callers pass through them.
+    ``prefix`` is the storage folder — ``requests/{id}`` for a booking document,
+    ``topups/{merchant_id}`` for a payment proof — and is the *only* thing that
+    differs between them.
+
+    Extracted from :func:`upload` without a behaviour change; ``verify_api.py``
+    and ``verify_storage.py`` cover the original path and are what proves it.
     """
-    request = _request_for(db, actor, request_id, lock=True)
-    _assert_may_modify(request, actor, doc_type)
-
-    if passenger_id is not None:
-        if not any(p.passenger_id == passenger_id for p in request.passengers):
-            # Checked against *this* request's passengers, so a valid id from
-            # another booking cannot be attached here.
-            raise HTTPException(
-                status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail="That passenger is not on this booking request",
-            )
-
     declared = (upload_file.content_type or "").split(";")[0].strip().lower()
     if declared not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
@@ -301,7 +305,7 @@ def upload(
         )
 
     stored_name = f"{uuid.uuid4().hex}{_EXTENSIONS[declared]}"
-    relative = f"requests/{request.request_id}/{stored_name}"
+    relative = f"{prefix.strip('/')}/{stored_name}"
 
     # Stream to a scratch file first, then hand the finished file to the
     # backend. The cap and the checksum therefore run in exactly one place for
@@ -341,19 +345,57 @@ def upload(
         # usually gone; S3 leaves it behind and it must not accumulate.
         scratch.unlink(missing_ok=True)
 
+    return StoredUpload(
+        relative_path=relative,
+        content_type=declared,
+        size_bytes=size,
+        checksum=digest.hexdigest(),
+        # Display only — the path above comes from a uuid, and this is reduced
+        # to a bare leaf name so it is safe to echo in JSON and in the
+        # download's Content-Disposition.
+        display_filename=_safe_display_name(upload_file.filename),
+    )
+
+
+def upload(
+    db: Session,
+    actor: User,
+    request_id: int,
+    upload_file: UploadFile,
+    *,
+    doc_type: DocumentType,
+    passenger_id: int | None = None,
+) -> RequestDocument:
+    """Attach a file to a draft booking request.
+
+    Locked because the draft-status check and the insert must agree: without
+    it, a submit committing between the two would let a document land on a
+    request that is already with the approvals desk.
+    """
+    request = _request_for(db, actor, request_id, lock=True)
+    _assert_may_modify(request, actor, doc_type)
+
+    if passenger_id is not None:
+        if not any(p.passenger_id == passenger_id for p in request.passengers):
+            # Checked against *this* request's passengers, so a valid id from
+            # another booking cannot be attached here.
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="That passenger is not on this booking request",
+            )
+
+    stored = store_upload(upload_file, prefix=f"requests/{request.request_id}")
+
     document = RequestDocument(
         request_id=request.request_id,
         merchant_id=request.merchant_id,
         passenger_id=passenger_id,
         doc_type=doc_type,
-        # Display only — the path above comes from a uuid, and this is reduced
-        # to a bare leaf name so it is safe to echo in JSON and in the
-        # download's Content-Disposition.
-        original_filename=_safe_display_name(upload_file.filename),
-        stored_path=relative,
-        content_type=declared,
-        size_bytes=size,
-        checksum=digest.hexdigest(),
+        original_filename=stored.display_filename,
+        stored_path=stored.relative_path,
+        content_type=stored.content_type,
+        size_bytes=stored.size_bytes,
+        checksum=stored.checksum,
         uploaded_by=actor.user_id,
         verification_status=V.PENDING,
     )
@@ -374,7 +416,7 @@ def upload(
             "request_number": request.request_number,
             "doc_type": doc_type.value,
             "passenger_id": passenger_id,
-            "size_bytes": size,
+            "size_bytes": document.size_bytes,
             "checksum": document.checksum,
         },
     )

@@ -27,6 +27,11 @@ SUITE = [
     # Also serverless, and before the HTTP scripts: it tests the startup hook
     # that every one of those scripts needs to have already succeeded.
     ("verify_seed_race.py", "Startup: concurrent admin seeding across gunicorn workers"),
+    # Also serverless — CR-4a is a migration, a ledger table and the service that
+    # writes it, with no endpoint of its own. It runs before the HTTP scripts
+    # because a wallet whose ledger does not reconcile explains every money
+    # failure downstream.
+    ("verify_cr4a.py", "CR-4a: wallet ledger, locking, credit limit, backfill"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
@@ -35,6 +40,8 @@ SUITE = [
     ("verify_m4.py", "M4: ledger arithmetic, wallet, credit limit, refunds, payment concurrency"),
     ("verify_cr2.py", "CR-2: manager approval, payment bypass, ticket delivery, RBAC, concurrency"),
     ("verify_cr3.py", "CR-3: merchant approves its own bookings, scoping, self-approval, concurrency"),
+    ("verify_cr4b.py", "CR-4b: wallet debit at Ticket Issued, credit limit, refunds, credit notes"),
+    ("verify_cr4c.py", "CR-4c: merchant wallet screen, ledger, top-ups, payment accounts, proofs"),
 ]
 
 
