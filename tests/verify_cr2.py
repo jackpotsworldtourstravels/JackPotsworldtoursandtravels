@@ -67,8 +67,20 @@ def main():
           "booking.manager_approve" not in admin_perms, str(sorted(admin_perms)))
 
     # A manager's credentials must not open another portal.
-    r = requests.post(f"{BASE}/api/auth/login",
-                      json={"email": MANAGER[0], "password": MANAGER[1], "portal": "admin"})
+    #
+    # Retried past a 429 the way `config.login` is. This is a *raw* login rather
+    # than a cached one — it has to be, since the point is that it fails — so it
+    # spends one of the ten logins per minute the rate limiter allows per IP, and
+    # in a full suite run it can land on an exhausted budget. A 429 here says
+    # nothing about the portal check either way, so treating it as a failure
+    # reports a defect that is not there.
+    for _ in range(6):
+        r = requests.post(f"{BASE}/api/auth/login",
+                          json={"email": MANAGER[0], "password": MANAGER[1], "portal": "admin"})
+        if r.status_code != 429:
+            break
+        print("     (login rate-limited; waiting 12s and retrying)")
+        time.sleep(12)
     check("manager credentials on the admin portal -> 401", r.status_code == 401, f"{r.status_code} {r.text[:150]}")
 
     # =====================================================================
@@ -176,8 +188,13 @@ def main():
     check("manager approves -> 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
     d = detail(mtok, rid)["request"]
     check("it reads 'Manager Approved'", d["status_label"] == "Manager Approved", d["status_label"])
-    check("and no amount was invented along the way",
-          str(d["total_amount"]) in ("0", "0.00", "0.0"), str(d["total_amount"]))
+    # CR-5 rewrote this assertion. It used to require the amount still be 0 here,
+    # because nothing on this track priced a booking before the desk issued the
+    # ticket. The quotation is binding now, so the booking carries the fare the
+    # Admin quoted — what CR-2 actually guarantees is that *the manager's
+    # approval* invents nothing, which is now stated as "unchanged", not "zero".
+    check("the manager's approval changed no amount",
+          str(d["total_amount"]) == "24500.00", str(d["total_amount"]))
 
     queue = requests.get(f"{BASE}/api/admin/bookings/queue?stage=approved&search={number}",
                          headers=H(atok)).json()

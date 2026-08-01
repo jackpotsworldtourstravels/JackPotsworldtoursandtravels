@@ -47,9 +47,13 @@ def main():
     r = requests.post(f"{BASE}/api/admin/requests/{eid}/reject", headers=H(atok), json={"reason": "no"})
     check("generic reject refuses an enquiry -> 400", r.status_code == 400, f"{r.status_code} {r.text[:200]}")
 
+    # CR-5 rewrote this call. The answer used to be a bare `available: true`;
+    # it is now a quotation, and the two new fields are required by the schema.
     r = requests.post(f"{BASE}/api/admin/enquiries/{eid}/respond", headers=H(atok),
-                      json={"available": True, "response": "Seats held at INR 24,500 all-in."})
-    check("admin answers available", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+                      json={"available": True, "response": "Seats held.",
+                            "total_fare": "24500.00",
+                            "reason": "INR 21,500 fare + INR 3,000 baggage."})
+    check("admin sends a quotation", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------- enquiry -> draft
     print("\n== enquiry -> draft booking ==")
@@ -336,7 +340,9 @@ def main():
     })
     eid2 = r.json()["id"]
     requests.post(f"{BASE}/api/admin/enquiries/{eid2}/review", headers=H(atok))
-    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/respond", headers=H(atok), json={"available": True})
+    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/respond", headers=H(atok),
+                  json={"available": True, "total_fare": "48000.00",
+                        "reason": "Return fare, taxes included."})
     r = requests.post(f"{BASE}/api/enquiries/{eid2}/booking-request", headers=H(mtok), json={
         "passengers": [{"title": "Mr", "first_name": "Nikhil", "last_name": "Bose",
                         "passenger_type": "adult", "passport_number": "M9988776",

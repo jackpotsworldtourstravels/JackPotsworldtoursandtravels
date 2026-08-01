@@ -217,6 +217,21 @@ def main():
 
     # --- paying from the wallet actually moves it ------------------------
     b2 = flows.make_catalog_booking(mtok, atok, upto="payment_pending", label="m4 wallet")
+
+    # Fund the scenario instead of hoping the shared wallet is deep enough.
+    # This asserted against whatever balance the development wallet happened to
+    # carry, which worked only while the suite put more in than it took out.
+    # Since CR-5 an enquiry-led booking is priced from the draft onwards, so more
+    # of the fixtures ahead of this one bill the wallet for real, and the balance
+    # arrives lower — the same "fixed expectation against a drifting fixture"
+    # trap the roadmap records against this file's overdraw test, in the other
+    # direction. Topping up to cover the payment makes the check independent of
+    # what ran before it.
+    shortfall = D("24500.00") - money(position(mtok)["wallet_balance"])
+    if shortfall > 0:
+        requests.post(f"{BASE}/api/admin/merchants/{merchant_id}/wallet", headers=H(atok),
+                      json={"amount": str(shortfall), "reason": "m4: fund the wallet payment"})
+
     wallet_before = money(position(mtok)["wallet_balance"])
     r = requests.post(f"{BASE}/api/requests/{b2['id']}/pay", headers=H(mtok),
                       json={"amount": "24500.00", "method": "wallet",

@@ -13,7 +13,7 @@
    NO DOCUMENTS PANEL. There was one, and it went with the upload controls on
    the Booking Request screen — documents are no longer part of the Classic
    merchant workflow, so a permanently empty table telling merchants to "open it
-   from Ticket Enquiry to add documents" would be an instruction they could not
+   from Booking Enquiry to add documents" would be an instruction they could not
    follow. The `documents` key is still on the payload and the Admin still has
    its verification screen, so nothing has to be rebuilt if they return.
 

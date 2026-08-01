@@ -90,7 +90,7 @@ def rival_merchant(atok):
 
 
 def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label="verification",
-                 gtok=None, fare="24500.00"):
+                 gtok=None, fare="24500.00", quote=None):
     """Create an **enquiry-led** booking and walk it to ``upto``.
 
     This is the Classic Tours workflow (CR-2): the Admin answers the enquiry,
@@ -103,11 +103,19 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
     silently stopping short would leave a suite asserting against a booking that
     is not where it thinks it is. Use :func:`make_catalog_booking` for money.
 
+    ``quote`` is the total fare the Admin quotes when answering the enquiry
+    (CR-5), and it defaults to ``fare`` so the booking this builder produces
+    carries a real amount from the moment it is drafted. **A quotation is now
+    mandatory** — ``/respond`` refuses ``available: true`` without a positive
+    ``total_fare`` — so this is not optional plumbing; a caller passing
+    ``quote=None`` gets ``fare`` anyway rather than a 422 three lines later.
+
     ``fare`` is what the desk pays the airline, supplied at ticket issuance
-    (CR-4b). An enquiry-led booking is created at 0 and no earlier step sets an
-    amount, so before CR-4b this builder produced a ticketed booking worth
-    nothing; the wallet debit is that fare. Only used when ``upto`` reaches
-    ``ticket_issued``.
+    (CR-4b). Since CR-5 the booking normally already carries the quoted amount,
+    and ``_capture_fare_for_wallet_billing`` then ignores this value — it is
+    still sent because the endpoint still accepts it, and because a booking that
+    reaches issuance at 0 (a pre-CR-5 one) still requires it. Only used when
+    ``upto`` reaches ``ticket_issued``.
 
     Returns ``{"id", "request_number", "enquiry_id", "status", "passenger_ids"}``.
     """
@@ -136,8 +144,12 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
     enq = r.json()
 
     requests.post(f"{BASE}/api/admin/enquiries/{enq['id']}/review", headers=H(atok))
+    # CR-5: the answer is a quotation. `total_fare` and remarks are both
+    # required by the schema, and the fare becomes the booking's total_amount.
     r = requests.post(f"{BASE}/api/admin/enquiries/{enq['id']}/respond", headers=H(atok),
-                      json={"available": True, "response": "Seats confirmed."})
+                      json={"available": True, "response": "Seats confirmed.",
+                            "total_fare": str(quote if quote is not None else fare),
+                            "reason": "Base fare plus taxes and baggage."})
     assert r.status_code == 200, f"respond: {r.status_code} {r.text[:300]}"
 
     passengers = [

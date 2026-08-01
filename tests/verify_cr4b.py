@@ -22,6 +22,7 @@ It reuses `verify_cr4a`'s invariants rather than restating them: after every
 scenario the cached balance still equals the ledger and the chain is unbroken.
 """
 import concurrent.futures
+import datetime
 import os
 import sys
 from decimal import Decimal as D
@@ -200,7 +201,13 @@ print("\n== six desks issuing the same ticket at once ==")
 # CR-4a's lesson was that the concurrency section found two defects that reading
 # the code did not, so this is asserted rather than reasoned about.
 RACE_FARE = D("7250.00")
-race = flows.make_booking(mtok, atok, gtok=gtok, upto="approved", label="cr4b race")
+# `fare=` also sets the quotation (CR-5), so the booking carries RACE_FARE from
+# the draft onwards. Without it the builder would quote its default 24,500 and
+# the `fare_amount` sent at issuance below would be *ignored* — correctly, since
+# `_capture_fare_for_wallet_billing` no-ops on a booking that already has an
+# amount — leaving this section asserting a debit of 7,250 against one of 24,500.
+race = flows.make_booking(mtok, atok, gtok=gtok, upto="approved",
+                          fare=str(RACE_FARE), label="cr4b race")
 requests.post(f"{BASE}/api/requests/{race['id']}/documents", headers=H(atok),
               files={"file": ("race.pdf", PDF, "application/pdf")},
               data={"doc_type": "ticket"})
@@ -249,6 +256,23 @@ nofare = flows.make_booking(mtok, atok, gtok=gtok, upto="approved", label="cr4b 
 requests.post(f"{BASE}/api/requests/{nofare['id']}/documents", headers=H(atok),
               files={"file": ("t.pdf", PDF, "application/pdf")}, data={"doc_type": "ticket"})
 
+# CR-5 note. This section tests CR-4b's frozen rule that a wallet-billed booking
+# sitting at zero cannot be ticketed without a fare. Since CR-5 an enquiry cannot
+# be answered without a quotation, so `flows.make_booking` no longer *produces* a
+# zero-amount booking and the state has to be created directly.
+#
+# That is not the test going stale — it is what the rule now guards. The bookings
+# that reach issuance at zero are the pre-CR-5 ones, which are exactly rows in a
+# database rather than anything an API call can still make. Zeroing the row here
+# reproduces that population faithfully; asserting through the (now impossible)
+# API call would have quietly stopped testing anything, which is the failure mode
+# recorded against verify_m4.py in the roadmap.
+db = SessionLocal()
+db.execute(text("UPDATE service_requests SET total_amount = 0 WHERE request_id = :r"),
+           {"r": nofare["id"]})
+db.commit()
+db.close()
+
 r = requests.post(f"{BASE}/api/admin/requests/{nofare['id']}/issue-ticket", headers=H(atok), json={})
 check("issuing an enquiry-led booking with no fare -> 400", r.status_code == 400,
       f"{r.status_code} {r.text[:200]}")
@@ -263,6 +287,23 @@ st = requests.get(f"{BASE}/api/requests/{nofare['id']}", headers=H(mtok)).json()
 check("...and the refused booking never left Manager Approved", st["status"] == "approved",
       st["status"])
 check("...and burned no ticket number", not st.get("ticket_number"), str(st.get("ticket_number")))
+
+# The other half of the same guarantee, added by CR-5: the state above can no
+# longer be reached through the API at all, because the answer that creates the
+# booking must carry a fare.
+_e = requests.post(f"{BASE}/api/enquiries", headers=H(mtok), json={
+    "trip_type": "one_way", "origin": "HYD", "origin_city": "Hyderabad",
+    "destination": "BOM", "destination_city": "Mumbai",
+    "airline": "IndiGo", "flight_number": "6E1423",
+    "travel_date": str(datetime.date.today() + datetime.timedelta(days=60)),
+    "preferred_time": "09:30", "travel_class": "Economy",
+    "passenger_count": 1, "adults": 1, "notes": "cr4b nofare unreachable",
+}).json()
+requests.post(f"{BASE}/api/admin/enquiries/{_e['id']}/review", headers=H(atok))
+r = requests.post(f"{BASE}/api/admin/enquiries/{_e['id']}/respond", headers=H(atok),
+                  json={"available": True, "reason": "Seats held."})
+check("an enquiry can no longer be answered without a fare -> 422 (CR-5)",
+      r.status_code == 422, f"{r.status_code} {r.text[:200]}")
 
 # ===========================================================================
 print("\n== credit limit: a hard block ==")
@@ -286,7 +327,17 @@ check("a booking taking the merchant exactly to its limit is allowed",
 
 # A draft, built the same way every other fixture is, and left unsubmitted so
 # the gate below is the first thing it meets.
-blocked_id = flows.make_booking(mtok, atok, gtok=gtok, upto="draft", label="cr4b blocked")["id"]
+#
+# `fare="12000.00"` is CR-5's doing and it matters in two places. The booking now
+# carries its quotation from the draft onwards, so (a) every credit assertion
+# below is against 12,000 rather than against nothing, and (b) the `fare_amount`
+# this section sends at issuance is ignored — the booking already has an amount —
+# so the quotation and that figure have to be the same number or the final
+# "billed even past the limit" assertion is checking the wrong one. Before CR-5
+# this booking reached both gates at 0 and only the "any headroom at all" branch
+# could ever fire.
+blocked_id = flows.make_booking(mtok, atok, gtok=gtok, upto="draft",
+                                fare="12000.00", label="cr4b blocked")["id"]
 
 r = requests.post(f"{BASE}/api/requests/{blocked_id}/submit", headers=H(mtok))
 check("submitting with no credit left -> 400", r.status_code == 400, f"{r.status_code} {r.text[:250]}")
@@ -308,10 +359,16 @@ check("...naming the credit remaining",
       "available credit 0.00" in low, refusal[:300])
 check("...and offering both ways forward",
       "add money" in low and "raise the credit limit" in low, refusal[:300])
-# Not invented: on the enquiry-led track the fare is genuinely unknown until the
-# desk books it, so the one figure that cannot be honest is left out.
-check("...without inventing an amount it cannot know",
-      "this booking needs" not in low, refusal[:300])
+# CR-5 inverted this assertion, deliberately. It used to check that the refusal
+# did NOT name an amount, because on the enquiry-led track the fare was genuinely
+# unknown until the desk booked it. The quotation is binding now, so the amount
+# IS known at submission — and a refusal that stayed silent about it would be
+# hiding the one figure the merchant needs. `credit_refusal_message` is unchanged;
+# it simply receives an amount now where it used to receive None.
+check("...and, since CR-5, the amount the booking needs", "this needs 12000.00" in low,
+      refusal[:300])
+check("...and by how much it falls short", "12000.00 more than is available" in low,
+      refusal[:300])
 
 st = requests.get(f"{BASE}/api/requests/{blocked_id}", headers=H(mtok)).json()["request"]
 check("...and the booking stayed a draft", st["status"] == "draft", st["status"])

@@ -53,7 +53,7 @@ function clInitPayments() {
          on this screen — said here rather than leaving a merchant hunting for
          a booking that is deliberately absent. -->
     <div class="cl-msg cl-msg-muted" style="margin:0 0 16px;">
-      Bookings raised from a Ticket Enquiry are settled directly with our team and
+      Bookings raised from a Booking Enquiry are settled directly with our team and
       do not appear here. Track them under <b>My Requests</b>.
     </div>
 

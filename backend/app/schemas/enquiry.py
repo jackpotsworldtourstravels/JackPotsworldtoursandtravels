@@ -10,6 +10,7 @@ trust boundary, and the "From ≠ To" / "return after departure" rules are the
 kind that silently produce nonsense bookings when only the UI checks them.
 """
 import datetime
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -47,9 +48,12 @@ class EnquiryCreate(BaseModel):
         default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
     )
 
-    #: Free text on purpose — the spec's placeholder lists Economy / Business /
-    #: Premium Economy / First Class, but airlines sell fare families that do
-    #: not fit a fixed enum, and this is a request to a human, not a filter.
+    #: Still free text on the wire, though CR-5 made the merchant form a
+    #: four-option dropdown (Economy / Premium Economy / Business / First
+    #: Class). Narrowing this to an enum would be a contract change that breaks
+    #: every enquiry already stored with a fare-family name, and the dropdown is
+    #: a strict subset of what is accepted — the UI offers less than the server
+    #: allows, which is the safe direction.
     travel_class: str = Field(min_length=1, max_length=80)
 
     passenger_count: int = Field(ge=1, le=99)
@@ -93,16 +97,64 @@ class EnquiryCreate(BaseModel):
 
 
 class EnquiryRespond(BaseModel):
-    """The Admin's answer. Phase 2 builds the screen; this is the contract."""
+    """The Admin's answer — **Send Quotation**, or decline (CR-5).
 
-    #: True marks the enquiry available and unlocks Request Ticket for the
-    #: merchant. False rejects it.
+    Phase 2 shipped this as a bare availability flag: the admin marked an
+    enquiry available and the merchant learned nothing about what it would
+    cost. CR-5 makes the positive answer a quotation, because that is what the
+    desk is actually producing — a total the merchant has to accept before a
+    ticket is bought on its behalf.
+
+    Both new requirements apply **only to the positive answer**. Declining is
+    unchanged: a reason, and no fare, because there is nothing to quote.
+    """
+
+    #: True sends a quotation, marks the enquiry available and unlocks Request
+    #: Ticket for the merchant. False declines it.
     available: bool
-    #: Mandatory on a rejection — the state machine refuses the edge without one.
-    reason: str | None = Field(default=None, max_length=500)
-    #: Free-text answer shown to the merchant either way (fare, timing, an
-    #: alternative flight).
+
+    #: The quoted total, in INR. **Required, and strictly positive, on a
+    #: quotation.** Free-text on purpose — the business types what it has
+    #: worked out, and nothing on the platform recomputes it. ``Decimal``, never
+    #: ``float``: this figure becomes the booking's ``total_amount`` and is what
+    #: the merchant's wallet is debited, so it crosses the wire as a decimal
+    #: string like every other money field (``docs/WALLET_ARCHITECTURE.md``).
+    total_fare: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+
+    #: Mandatory either way, and for two different reasons. On a decline the
+    #: state machine refuses the ``rejected`` edge without one. On a quotation
+    #: it is the breakdown — "₹3,000 ticket fare, ₹12,000 baggage" — that tells
+    #: the merchant why the total differs from the bare fare. A number with no
+    #: explanation is what puts the merchant on the phone.
+    reason: str | None = Field(default=None, max_length=2000)
+
+    #: Retained from Phase 2 and still accepted, so an existing caller does not
+    #: break. When both are sent the two are kept distinct: ``response`` is the
+    #: covering note, ``reason`` the breakdown.
     response: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _check(self) -> "EnquiryRespond":
+        if not self.available:
+            # Declining takes no fare. Silently dropping one would be worse
+            # than refusing it — the desk would believe it had quoted.
+            if self.total_fare is not None:
+                raise ValueError(
+                    "A declined enquiry cannot carry a total fare — there is nothing to quote"
+                )
+            return self
+
+        if self.total_fare is None or self.total_fare <= 0:
+            raise ValueError(
+                "Enter the total fare being quoted. It becomes the amount the "
+                "merchant is billed, so a quotation of 0 bills nobody"
+            )
+        if not (self.reason or "").strip() and not (self.response or "").strip():
+            raise ValueError(
+                "Add the remarks explaining the quotation — what the total is made "
+                "up of. The merchant sees this beside the amount"
+            )
+        return self
 
 
 class BookingContact(BaseModel):
@@ -170,6 +222,14 @@ class EnquiryResponse(BaseModel):
     admin_response: str | None = None
     rejection_reason: str | None = None
 
+    #: CR-5 — the quoted total, set when the enquiry was answered with a
+    #: quotation. ``Decimal`` so it serialises as a string and no browser can
+    #: float it; ``None`` on a pending, declined or pre-CR-5 enquiry, which is
+    #: why every surface has to handle its absence rather than assume a zero.
+    quoted_fare: Decimal | None = None
+    #: The breakdown shown beside the amount — the whole point of quoting.
+    quotation_remarks: str | None = None
+
     #: Set once the merchant has turned this enquiry into a booking, so the
     #: listing can show the booking instead of offering Request Ticket twice.
     booking_request_id: int | None = None
@@ -216,6 +276,13 @@ class EnquiryResponse(BaseModel):
             notes=r.remarks,
             admin_response=d.get("admin_response"),
             rejection_reason=r.rejection_reason,
+            # Stored as a string in JSONB (Decimal is not JSON-serialisable) and
+            # rebuilt as a Decimal here, so the value that reaches the wire has
+            # never been through a float.
+            quoted_fare=(
+                Decimal(d["quoted_fare"]) if d.get("quoted_fare") is not None else None
+            ),
+            quotation_remarks=d.get("quotation_remarks"),
             booking_request_id=d.get("booking_request_id"),
             booking_request_number=d.get("booking_request_number"),
             review_claimed_by=d.get("review_claimed_by"),

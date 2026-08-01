@@ -18,30 +18,52 @@
    next action is offered, rather than this file re-deriving the rule.
 
    WHAT THE WORK MODAL SHOWS
-   Everything the desk needs to book the trip, and the one thing it must type
-   back. The Assignment form was removed — the queue's own assignment filter
-   already covers who is working what, and a second control for it inside the
-   modal bought nothing. In its place is the booking and passenger data exactly
-   as the merchant submitted it and the Manager approved it, read from the same
-   `GET /api/requests/{id}` payload this modal already loads, so there is one
-   copy of a traveller's details and the Manager and the desk cannot disagree
-   about them.
+   The booking and passenger data exactly as the merchant submitted it and the
+   Manager approved it, read from the same `GET /api/requests/{id}` payload this
+   modal already loads — so there is one copy of a traveller's details and the
+   Manager and the desk cannot disagree about them. It is deliberately the same
+   set the Manager portal reviews, plus the fields only this desk needs.
 
-   The Airline-references form stays, and is the point of the screen: the desk
-   books the trip externally and comes back here to key in the PNR, the ticket
-   number and the airline's own reference. Those three are what the issued
-   ticket and the final booking information are generated from, so they have to
-   be captured, not inferred from an attached PDF.
+   THE SIX SECTIONS, IN THIS ORDER
+     1. Booking information   what the merchant asked for
+     2. Passenger information as the merchant submitted it
+     3. Quotation             the fare and remarks the merchant agreed to
+     4. Airline references    EDITABLE — what the desk got back from the airline
+     5. Issued ticket documents
+     6. Internal notes        staff-only
 
-   ENDPOINTS (all pre-existing)
+   ONLY THE ASSIGNMENT FORM IS GONE (CR-2): the queue's own assignment filter
+   and column already covered who is working what, and a second control for it
+   inside the modal bought nothing. `POST .../assign` is still live and still
+   covered by `tests/verify_m1.py`, so restoring it is a UI change and nothing
+   else.
+
+   THE AIRLINE-REFERENCES FORM IS THE POINT OF THIS SCREEN AND STAYS EDITABLE.
+   The desk books the trip on the airline's own site and comes back here to key
+   in the PNR, the ticket number and the airline's own reference. **These inputs
+   are the only editable copy of those three values anywhere in the product** —
+   every other surface that shows a PNR or a ticket number (merchant portal,
+   Operations, partner history) renders it read-only. Without this form a booking
+   would carry only the PNR `issue_ticket` generates for it, and the airline's
+   real reference would never reach the merchant's paperwork. It was briefly
+   removed and put back by request; the values are deliberately *not* also
+   repeated read-only in section 1, because one dialog showing a field twice is
+   a field someone edits in one place and reads from the other.
+
+   ENDPOINTS THIS FILE CALLS (all pre-existing)
      GET    /api/admin/bookings/queue                  the list
      GET    /api/admin/bookings/queue/counts           tab badges
+     GET    /api/requests/{id}                         the booking, for the modal
      PUT    /api/admin/bookings/{id}/references        PNR / ticket no / airline ref
      GET/POST /api/admin/bookings/{id}/notes           internal notes (staff-only)
      POST   /api/requests/{id}/documents               attach a ticket file
      GET    /api/requests/{id}/documents               what is attached
      POST   /api/admin/requests/{id}/issue-ticket      mark Ticket Issued
      POST   /api/admin/requests/{id}/complete          mark Completed
+
+   LIVE, BUT NO LONGER CALLED FROM HERE — its form was removed, not its
+   endpoint (see above):
+     POST   /api/admin/bookings/{id}/assign            operator assignment
 
    Loaded after admin.js and reuses its helpers (API_BASE, authHeaders,
    escapeHtml, fmtDate, fmtDateTime, rowsSkeleton, loadedSections) plus the
@@ -94,6 +116,19 @@ function opsLabel(s) {
 }
 
 const opsDash = v => (v === null || v === undefined || v === '' ? '—' : v);
+
+/* The merchant's preferred departure / return time, as it was entered.
+   The API stores "HH:MM" on a 24-hour clock and the merchant portal now both
+   collects and displays it that way, so it is printed unconverted: this field
+   is a request the merchant made, and the desk reading a different clock from
+   the person who filled the form in is how "09:30" becomes an evening flight.
+   Normalised to two digits so a column of times lines up. */
+function opsTime(hhmm) {
+  if (!hhmm) return '—';
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h)) return String(hhmm);
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+}
 
 /* ------------------------------------------------------------------ list */
 
@@ -340,24 +375,42 @@ function opsRenderWork() {
       </div>` : ''}
 
       <div class="ops-section ops-section-first">
-        <h3>Booking information</h3>
+        <h3>Booking information
+          <span class="ops-staff-note">as submitted by the merchant</span></h3>
         <div class="detail-grid">
           ${cell('Booking reference', escapeHtml(opsDash(r.booking_reference)))}
           ${cell('Enquiry reference', escapeHtml(opsDash(d.enquiry_reference)))}
           ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
           ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
+          ${cell('Submitted', escapeHtml(fmtDateTime(r.created_at)))}
           ${cell('Journey type', roundTrip ? 'Round trip' : 'One way')}
+          ${cell('Route', d.international ? 'International' : 'Domestic')}
           ${cell('From', escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—'))}
           ${cell('To', escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—'))}
           ${cell('Airline', escapeHtml(opsDash(d.airline)))}
           ${cell('Flight number', escapeHtml(opsDash(d.flight_number)))}
-          ${cell('Travel date', escapeHtml(fmtDate(r.travel_date)))}
-          ${roundTrip ? cell('Return date', escapeHtml(fmtDate(r.return_date))) : ''}
+          ${cell('Departure', escapeHtml(fmtDate(r.travel_date)))}
+          ${cell('Preferred departure time', escapeHtml(opsTime(d.preferred_time)))}
+          ${roundTrip ? cell('Return', escapeHtml(fmtDate(r.return_date))) : ''}
+          ${roundTrip ? cell('Preferred return time', escapeHtml(opsTime(d.return_preferred_time))) : ''}
           ${cell('Class', escapeHtml(travelClass))}
           ${cell('Total passengers', String(passengers.length))}
+          ${/* The desk is about to spend the platform's money against this
+                figure, so it belongs on the screen where that happens. It was
+                absent entirely: the only money this modal ever showed was the
+                fare input, which a quoted booking no longer renders. */''}
+          ${cell('Booking amount', moneyIsPositive(r.total_amount)
+            ? `<strong>${escapeHtml(moneyStr(r.total_amount))}</strong>${
+                classic ? ' <span class="ops-sub">settled from the wallet at ticketing</span>' : ''}`
+            : '<span class="ops-sub">Not priced yet</span>')}
+          ${/* PNR, ticket number and airline reference are NOT repeated here.
+                They are editable in Airline references below, and a value shown
+                twice in one dialog is a value someone will eventually edit in
+                one place and read from the other. */''}
           ${cell('Contact name', escapeHtml(opsDash(contact.name)))}
           ${cell('Contact email', escapeHtml(opsDash(contact.email)))}
           ${cell('Contact phone', escapeHtml(opsDash(contact.phone)))}
+          ${cell('Alternate phone', escapeHtml(opsDash(contact.alternate_phone)))}
         </div>
       </div>
 
@@ -377,23 +430,49 @@ function opsRenderWork() {
                <p>${escapeHtml(r.remarks)}</p></div>` : ''}
       </div>
 
-      ${/* After the desk books the trip on the airline's own site. These three
-            are read back when the ticket is issued and when the final booking
-            information is generated, which is why they are typed rather than
-            left to be read off the attached PDF. Every stage this queue shows
-            is inside the server's REFERENCE_STAGES, so the form is never
-            offered where it would be refused. */''}
+      ${/* 3. QUOTATION — its own section rather than a footnote under Booking
+            information. It is what the merchant agreed to, in the merchant's own
+            words, and the desk about to buy the ticket is the last person who
+            can notice that the quote and the itinerary disagree. Absent on a
+            catalog-led booking and on anything raised before quotations existed,
+            which is stated rather than left as an empty panel. */''}
+      <div class="ops-section">
+        <h3>Quotation
+          <span class="ops-staff-note">what the merchant was quoted</span></h3>
+        ${d.quoted_fare != null ? `
+          <div class="detail-grid">
+            ${cell('Total fare', `<strong>${escapeHtml(moneyStr(d.quoted_fare))}</strong>`)}
+            ${cell('Booking raised at', moneyIsPositive(r.total_amount)
+              ? escapeHtml(moneyStr(r.total_amount)) : '<span class="ops-sub">—</span>')}
+          </div>
+          ${d.quotation_remarks
+            ? `<div class="detail-note"><strong>Remarks sent to the merchant</strong>
+                 <p style="white-space:pre-wrap;">${escapeHtml(d.quotation_remarks)}</p></div>`
+            : '<p class="ops-sub">No remarks were recorded with this quotation.</p>'}`
+        : `<p class="ops-sub">${classic
+            ? 'This booking was raised before enquiries carried a quotation, so no fare was quoted to the merchant.'
+            : 'Catalog-led booking — priced from the inventory row, not from a quotation.'}</p>`}
+      </div>
+
+      ${/* 4. AIRLINE REFERENCES. The desk books the trip on the airline's own
+            site and comes back here to key in what it got. These are the only
+            editable copy of these three values anywhere in the product — every
+            other surface that shows a PNR or ticket number renders it read-only
+            — so this form is what puts the airline's own reference on the
+            merchant's paperwork. Every stage this queue shows is inside the
+            server's REFERENCE_STAGES, so the form is never offered where it
+            would be refused. */''}
       <div class="ops-section">
         <h3>Airline references
           <span class="ops-staff-note">after booking with the airline</span></h3>
         <p class="ops-sub">Blank fields are left as they are — the server writes only what you send,
           so correcting the PNR cannot wipe the ticket number.</p>
         <div class="ops-grid-3">
-          <div class="form-field"><label for="opsPnr">PNR</label>
+          <div class="form-field"><label for="opsPnr">Airline PNR</label>
             <input id="opsPnr" value="${escapeHtml(r.pnr || '')}" placeholder="H4X9PQ"></div>
           <div class="form-field"><label for="opsTicketNo">Ticket number</label>
             <input id="opsTicketNo" value="${escapeHtml(r.ticket_number || '')}"></div>
-          <div class="form-field"><label for="opsAirlineRef">Airline reference</label>
+          <div class="form-field"><label for="opsAirlineRef">Airline reference <span class="ops-sub">(if applicable)</span></label>
             <input id="opsAirlineRef" value="${escapeHtml(d.airline_reference || '')}"></div>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" id="opsRefsBtn">Save references</button>
@@ -466,9 +545,9 @@ function opsRenderWork() {
   /* The body was just replaced, so focus has fallen to <body>. Put it back on
      the dialog itself rather than on its first control: that control is the PNR
      box, and landing there would step a keyboard or screen-reader user straight
-     past the booking and passenger details this modal opens to show — the very
-     details they need before they can fill it in. The trap is still in place on
-     the container, which does not change. */
+     past the booking, passenger and quotation details this modal opens to show —
+     the very details they need before they can fill it in. The trap is still in
+     place on the container, which does not change. */
   const dialog = document.getElementById('opsWorkBody');
   dialog.setAttribute('tabindex', '-1');
   dialog.focus();
@@ -595,10 +674,22 @@ async function opsLifecycle(id, action) {
     body.fare_amount = fareInput.value.trim();
   }
 
+  /* CR-5. The fare used to be typed here on every Classic booking, so naming it
+     in this confirmation only needed `body.fare_amount`. A quoted booking
+     already carries its amount, the field does not render, and the operator was
+     then told nothing about the debit they were about to trigger — on the one
+     screen where the platform's money actually moves. The amount comes off the
+     booking in that case; `moneyStr`, because it is a decimal string. */
+  const req = opsCurrent?.detail?.request || {};
+  const walletBilled = req.workflow === 'classic_tours';
+  const debit = body.fare_amount
+    ? `₹${body.fare_amount}`
+    : (walletBilled && moneyIsPositive(req.total_amount) ? moneyStr(req.total_amount) : null);
+
   const label = action === 'issue-ticket' ? 'Mark this booking as Ticket Issued?' : 'Mark this booking Completed?';
   const detail = action === 'issue-ticket'
-    ? (body.fare_amount
-        ? `The merchant is notified, can download the attached ticket documents, and its wallet is debited ₹${body.fare_amount}.`
+    ? (debit
+        ? `The merchant is notified, can download the attached ticket documents, and its wallet is debited ${debit}.`
         : 'The merchant is notified and can download the attached ticket documents.')
     : 'This closes the booking.';
   if (!await confirmDialog({ title: label, message: detail, confirmText: 'Confirm' })) return;

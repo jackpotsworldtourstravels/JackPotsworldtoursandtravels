@@ -1,8 +1,24 @@
-"""Ticket Enquiry — ask the desk about a sector, then book what it confirms.
+"""Ticket Enquiry — ask the desk about a sector, then book what it quotes.
 
     Merchant: Enquire Ticket -> (Pending)
-    Admin:    Reviews -> marks Available / Not available
-    Merchant: Request Ticket -> Booking Request, pre-filled -> Submit
+    Admin:    Reviews -> Send Quotation (total fare + remarks) / Decline
+    Merchant: Request Ticket -> Booking Request at the quoted fare -> Submit
+
+Called **Booking Enquiry** in the merchant portal since CR-5 and **Ticket
+Enquiry** everywhere on the staff side, which is a deliberate split: the
+merchant is starting a booking, the desk is working an enquiry queue. The
+stored ``request_type`` is ``ticket_enquiry`` either way — the difference is
+wording, and it lives entirely in the two UIs.
+
+THE QUOTATION IS BINDING (CR-5)
+The admin's positive answer carries a total fare and the remarks explaining it.
+That fare is copied onto the booking's ``total_amount`` by
+:func:`to_booking_request`, which makes it the figure the credit limit is
+checked against at submission and approval, and the figure the merchant's
+wallet is debited at ticket issuance. Before CR-5 the answer was a bare
+availability flag and the booking sat at zero until the desk typed a number in
+at issuance; bookings raised under those rules still finish under them, because
+an enquiry with no ``quoted_fare`` still produces a zero-amount booking.
 
 WHERE AN ENQUIRY LIVES
 In ``service_requests``, as ``request_type = 'ticket_enquiry'`` — a value the
@@ -51,6 +67,7 @@ from app.models_v2 import (
 )
 from app.services import (
     activity_service,
+    finance_service,
     lifecycle,
     merchant_service,
     notification_service,
@@ -382,17 +399,26 @@ def start_review(db: Session, actor: User, enquiry_id: int) -> ServiceRequest:
 def respond(
     db: Session, actor: User, enquiry_id: int, *, available: bool,
     reason: str | None = None, response: str | None = None,
+    total_fare: Decimal | None = None,
 ) -> ServiceRequest:
-    """Answer an enquiry: available for booking, or not.
+    """Answer an enquiry: a **quotation**, or a decline.
 
     Approving stops at **Approved**. It deliberately does *not* walk on to
     Payment Pending the way :func:`ticket_service.approve_request` does for a
-    booking — nothing is owed on an enquiry, and a payable enquiry would show
-    the merchant a Pay button against a zero amount.
+    booking — nothing is owed on the *enquiry* itself, and a payable enquiry
+    would show the merchant a Pay button against a row that is only a question.
+
+    CR-5 — WHAT THE POSITIVE ANSWER NOW CARRIES
+    ``total_fare`` and the remarks that explain it. The quotation is stored on
+    the enquiry and is **binding**: :func:`to_booking_request` copies it onto
+    the booking's ``total_amount``, so the number the merchant accepted is the
+    number the credit limit is checked against and the number its wallet is
+    debited. It is stored as a *string* in JSONB, which is both what JSONB can
+    hold and what keeps a float out of the money path.
 
     The answer is final either way: :func:`_guard_not_answered` refuses a
-    second response, so a merchant who needs a different answer raises a new
-    enquiry rather than having this one quietly rewritten underneath a booking
+    second response, so a merchant who needs a different quotation raises a new
+    enquiry rather than having this one quietly repriced underneath a booking
     they may already have made against it.
     """
     enquiry = _locked(db, actor, enquiry_id)
@@ -400,33 +426,55 @@ def respond(
     _guard_claim(enquiry, actor)
 
     before = enquiry.status
+    # One reassignment, not three: SQLAlchemy does not track in-place mutation
+    # of a JSONB dict, so every key this function writes has to go in together.
+    details = dict(enquiry.travel_details or {})
     if response:
-        enquiry.travel_details = {**(enquiry.travel_details or {}), "admin_response": response}
+        details["admin_response"] = response
 
     if not available:
+        if details:
+            enquiry.travel_details = details
         lifecycle.transition(db, enquiry, S.REJECTED, actor, reason=reason, commit=False)
         db.commit()
         db.refresh(enquiry)
 
-        _audit(db, actor, enquiry, "Ticket enquiry marked not available",
+        _audit(db, actor, enquiry, "Ticket enquiry declined",
                before=before, after=S.REJECTED, note=reason)
         ticket_service._notify_merchant(
-            db, enquiry, "Ticket enquiry: not available",
+            db, enquiry, "Booking enquiry: declined",
             f"{enquiry.request_number} — {reason or 'this sector is not available.'}",
         )
         return enquiry
 
+    # Quantised on the way in, exactly as `finance_service` quantises every
+    # other amount, so the enquiry, the booking and the ledger cannot disagree
+    # in the third decimal place.
+    fare = finance_service.q(total_fare)
+    details["quoted_fare"] = str(fare)
+    details["quotation_remarks"] = (reason or "").strip() or None
+    details["quoted_by"] = actor.user_id
+    details["quoted_by_name"] = actor.full_name
+    details["quoted_at"] = _now().isoformat()
+    enquiry.travel_details = details
+
+    # The quotation belongs in the timeline too — `note` is what the Activity
+    # Timeline renders, and "marked available" alone loses the number the whole
+    # answer was about.
+    quote_note = f"Quoted {fare}" + (f" — {details['quotation_remarks']}"
+                                     if details["quotation_remarks"] else "")
     if enquiry.status is S.PENDING_APPROVAL:
         lifecycle.transition(db, enquiry, S.IN_REVIEW, actor, commit=False)
-    lifecycle.transition(db, enquiry, S.APPROVED, actor, note=response, commit=False)
+    lifecycle.transition(db, enquiry, S.APPROVED, actor, note=quote_note, commit=False)
     db.commit()
     db.refresh(enquiry)
 
-    _audit(db, actor, enquiry, "Ticket enquiry marked available",
-           before=before, after=S.APPROVED, note=response)
+    _audit(db, actor, enquiry, "Ticket enquiry quoted",
+           before=before, after=S.APPROVED, note=quote_note)
     ticket_service._notify_merchant(
-        db, enquiry, "Ticket enquiry: available to book",
-        f"{enquiry.request_number} is available. Use Request Ticket to raise the booking.",
+        db, enquiry, "Booking enquiry: quotation received",
+        f"{enquiry.request_number} has been quoted at INR {fare}. "
+        "Use Request Ticket to raise the booking against it.",
     )
     return enquiry
 
@@ -482,6 +530,14 @@ def to_booking_request(
             detail="At least one passenger is required",
         )
 
+    # CR-5: the quotation the admin sent is what this booking is worth. It was
+    # stored as a string in JSONB; rebuilt as a Decimal here so no float ever
+    # touches it. A pre-CR-5 enquiry has no quotation and lands at zero — the
+    # CR-4b path then still asks the desk for the fare at issuance, which is
+    # exactly the behaviour those bookings were made under.
+    quoted = details.get("quoted_fare")
+    fare = finance_service.q(Decimal(quoted)) if quoted is not None else Decimal("0")
+
     merchant = db.get(Merchant, enquiry.merchant_id)
     booking = ServiceRequest(
         request_number=ticket_service._next_number(db, "REQ"),
@@ -498,20 +554,47 @@ def to_booking_request(
         # verbatim what was answered; only the booking-specific additions are
         # layered on. The review claim is dropped — it belongs to the enquiry's
         # workflow, not this booking's.
+        #
+        # CR-5 drops the quotation's *attribution* for the same reason, and it
+        # matters more here than it did for the claim: `travel_details` is
+        # returned wholesale to the merchant as `details` (schemas/ticket.py), so
+        # `quoted_by` would put a platform staff **user id** on a merchant-facing
+        # response. `quoted_fare` and `quotation_remarks` stay — those are the
+        # merchant's own price and the explanation of it.
         travel_details={
-            **{k: v for k, v in details.items() if not k.startswith("review_claimed")},
+            **{k: v for k, v in details.items()
+               if not k.startswith("review_claimed")
+               and k not in ("quoted_by", "quoted_by_name", "quoted_at")},
             "enquiry_reference": enquiry.request_number,
             "contact": contact or {},
             "international": bool(international),
             "special_requests": (special_requests or "").strip() or None,
         },
-        # There is no catalog row to price against: the fare on an enquiry-led
-        # booking is whatever the Admin confirms at approval (approve_request's
-        # `final_amount`). A zero here is honest — the Classic UI shows
-        # "Awaiting amount" rather than a Pay button that could only 400.
-        pricing={"currency": "INR", "quoted": False, "source": "ticket_enquiry"},
+        # CR-5: priced from the enquiry's quotation, not left at zero.
+        #
+        # This is the one place the binding quotation takes effect, and it is
+        # deliberately the *only* place — nothing downstream needed changing:
+        #
+        #   * `ticket_service._capture_fare_for_wallet_billing` returns early
+        #     once `total_amount > 0`, so CR-4b's "the desk enters the fare at
+        #     issuance" path simply stops firing for quoted bookings and still
+        #     fires for the unquoted historical ones. CR-4b is untouched.
+        #   * Both `assert_credit_available` call sites already pass the amount
+        #     when it is non-zero and `None` when it is not, so the credit limit
+        #     upgrades itself from "is there any headroom" to the full
+        #     "does this specific amount fit" check, at submission and at
+        #     approval, with no edit to frozen code.
+        #
+        # `quoted` distinguishes a real price from the zero a pre-CR-5 enquiry
+        # still produces; every screen keys off it rather than off `== 0`.
+        pricing={
+            "currency": "INR",
+            "quoted": fare > 0,
+            "source": "ticket_enquiry",
+            **({"final_amount": str(fare), "priced_at": "enquiry_quotation"} if fare > 0 else {}),
+        },
         quantity=len(passengers),
-        total_amount=Decimal("0"),
+        total_amount=fare,
         travel_date=enquiry.travel_date,
         return_date=enquiry.return_date,
         status_history=[],

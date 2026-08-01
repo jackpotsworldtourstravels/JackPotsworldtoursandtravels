@@ -165,13 +165,17 @@ def start_enquiry_review(
     "/admin/enquiries/{enquiry_id}/respond",
     response_model=EnquiryResponse,
     tags=["admin · enquiry"],
-    summary="Answer a ticket enquiry",
+    summary="Answer a ticket enquiry — send a quotation, or decline",
     description=(
-        "`available: true` requires `ticket.approve` and moves the enquiry to **Approved**, "
-        "which is what unlocks Request Ticket for the merchant. `available: false` requires "
-        "`ticket.reject` and a mandatory reason. Approval stops at Approved — an enquiry never "
-        "becomes payable, because nothing is owed on it. The answer is final: a second response "
-        "returns 409, as does answering an enquiry another admin is reviewing."
+        "`available: true` is **Send Quotation**: it requires `ticket.approve`, a strictly "
+        "positive `total_fare` and remarks explaining it, and moves the enquiry to **Approved**, "
+        "which is what unlocks Request Ticket for the merchant. `available: false` is a decline: "
+        "it requires `ticket.reject`, a mandatory reason, and no fare. Approval stops at Approved "
+        "— the enquiry itself never becomes payable. **The quotation is binding (CR-5):** the "
+        "booking raised against this enquiry is created at `total_fare`, so it is the figure the "
+        "credit limit is checked against and the figure the merchant's wallet is debited at "
+        "ticket issuance. The answer is final: a second response returns 409, as does answering "
+        "an enquiry another admin is reviewing."
     ),
 )
 def respond_to_enquiry(
@@ -195,5 +199,6 @@ def respond_to_enquiry(
     enquiry = enquiry_service.respond(
         db, current_user, enquiry_id,
         available=payload.available, reason=payload.reason, response=payload.response,
+        total_fare=payload.total_fare,
     )
     return EnquiryResponse.of(enquiry)

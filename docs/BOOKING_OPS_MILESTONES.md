@@ -6,6 +6,11 @@ lives only in a chat session. If this file and a conversation disagree, this fil
 
 Last updated: **2026-08-01** · Current milestone: **CR-4 — Merchant wallet & transaction ledger**
 · Last approved: **CR-4b — automatic wallet debit & credit limit ✅ (2026-08-01)**
+· **Built, awaiting approval: CR-5 — Booking Enquiry quotation + merchant portal refinements.**
+The admin's enquiry answer becomes a **binding quotation** (total fare + remarks), and the merchant
+portal gets the wording, form and dashboard pass the business asked for.
+See `docs/CR-5_BOOKING_ENQUIRY_QUOTATION.md`. **It alters Phase 1 and Phase 2, and it changes
+where CR-4b's fare comes from without editing a line of CR-4b** — see the note below.
 · **Built, awaiting approval: CR-3 — booking approval moved to the merchant's own manager**,
 which *alters CR-2*. See `docs/CR-3_MERCHANT_INTERNAL_APPROVAL.md`.
 · **CR-4a — merchant wallet ledger foundation ✅ approved and locked (2026-08-01).** First of four
@@ -58,8 +63,9 @@ The practical test: if a reviewer who approved the milestone would be surprised 
 needed approval first.
 
 **Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2, **CR-4a**, **CR-4b** — with CR-2's
-*approver* superseded by CR-3 (built 2026-07-31, not yet approved). CR-2's payment bypass remains
-locked and unchanged.
+*approver* superseded by CR-3 (built 2026-07-31, not yet approved), and **Phase 1's and Phase 2's
+enquiry surfaces amended by CR-5** (built 2026-08-01, not yet approved). CR-2's payment bypass
+remains locked and unchanged.
 
 **CR-4a carries an extra instruction, given on approval:** the wallet ledger schema and
 `services/wallet_service.py` are **not to be modified by a later gate or milestone unless a genuine
@@ -103,6 +109,17 @@ named in the change log the way CR-4b's own two were, not fixed quietly:
 
 `verify_cr4b.py` asserts the first two of these directly; any later gate that touches billing must
 keep those checks green rather than adjust them.
+
+> **CR-5 changes where the fare comes from, and edits none of the frozen code.** With the
+> quotation binding, an enquiry-led booking is created carrying its amount, so:
+> `_capture_fare_for_wallet_billing` returns early (it already no-ops above zero) and stops asking
+> the desk for a fare; and `assert_credit_available` gets the real amount at submission and at
+> approval (both call sites already passed it when non-zero). **No line of `ticket_service.py`,
+> `finance_service.py` or `wallet_service.py` was touched.** The zero-amount path is not dead —
+> it is what every pre-CR-5 enquiry-led booking still finishes on, and `verify_cr5.py` proves it
+> still fires by zeroing a row and issuing against it. `verify_cr4b.py`'s "no fare" section was
+> rewritten for the same reason: `flows.make_booking` no longer *produces* a zero-amount booking,
+> so asserting through it would have silently stopped testing anything.
 
 ### Where the work lives
 
@@ -152,6 +169,12 @@ production-ready, regardless of whether its own feature works.
 Merchant-side enquiry capture in the Classic V2 portal. Enquiries ride `service_requests` with
 `request_type = ticket_enquiry`; no new table. Inventory Search was retired in favour of it.
 
+> **Amended by CR-5 (awaiting approval).** Called **Booking Enquiry** in the merchant portal (the
+> API and every staff screen keep *ticket enquiry*); the passenger count is typeable and reconciled
+> against the breakdown, reversing this phase's recorded "deliberate spec deviation"; the class is a
+> dropdown; the time control is 24-hour; and the booking is created at the quoted fare rather than
+> at `0`.
+
 - Backend: `routers/enquiries.py`, `services/enquiry_service.py`
 - Migration: `0030_enquiry_number_sequence`
 - Frontend: `frontend/merchant-classic/js/classic-enquiry.js`
@@ -161,6 +184,10 @@ Merchant-side enquiry capture in the Classic V2 portal. Enquiries ride `service_
 Admin-side review and response. "Start Review" is a claim, taken under `SELECT FOR UPDATE`, so
 two admins cannot both believe they own an enquiry. The generic approve/reject endpoints
 deliberately refuse enquiries — they have their own resolution path.
+
+> **Amended by CR-5 (awaiting approval).** The answer is no longer a bare availability flag: it
+> carries a **total fare and mandatory remarks**, and the fare is binding. The claim, the row lock
+> and the finality of the answer are unchanged.
 
 - Backend: `routers/enquiries.py` (admin section), `services/enquiry_service.py`
 - Frontend: `frontend/admin/` + `frontend/assets/js/admin.js`
@@ -190,6 +217,15 @@ one of the two screens at any time.
 - **External references** — `PUT /api/admin/bookings/{id}/references` for the real airline PNR,
   ticket number and airline reference. Partial update; overwrite permitted and logged with the
   previous value; duplicate ticket number returns a 409 naming the other booking.
+  > **This form is section 4 of the Booking Operations popup and is editable.** Operations books
+  > the ticket on the airline's own site and keys the references back here. Its three inputs are
+  > the **only editable copy of the PNR, ticket number and airline reference anywhere in the
+  > product** — every other surface renders them read-only — so removing it would leave a booking
+  > carrying only the PNR `issue_ticket` generates. CR-5's second pass removed it briefly and
+  > restored it by decision on 2026-08-01; the endpoint never moved. (The *Assignment* form is a
+  > different story: CR-2 removed it for good, because the queue's own filter and column already
+  > cover who is working what. `POST .../assign` is likewise still live and still covered by
+  > `verify_m1.py`.)
 - **Internal notes** — `GET/POST /api/admin/bookings/{id}/notes`, `PUT/DELETE
   /api/admin/bookings/notes/{note_id}`. Staff-only at the service layer, not just the router.
   Only the author may edit or delete. The note body is never copied into the activity feed.
@@ -347,6 +383,10 @@ and every other workflow keep their payment path intact.
   dropped — the queue's own assignment filter and column already cover who is working what — and
   replaced by the booking's journey and passenger details, read-only, off the payload the modal
   already loads. The assignment *endpoint* is untouched and still live.
+  > **Extended by CR-5's second pass (2026-08-01):** the modal is now six sections in a
+  > business-specified order — booking information, passenger information, **quotation**, airline
+  > references (still editable), ticket documents, internal notes. The references form was removed
+  > in that pass and restored by decision within it; only *Assignment* stays gone.
 - **Two pre-existing M4 defects found while making the suite green**, both fixed:
   `change_request_service.approve` mutated `pricing` in place after assigning it, and an
   autoflush inside `settle_refund` made that dict the attribute's committed baseline — so
@@ -1036,13 +1076,14 @@ python tests/run_all.py
 | `tests/verify_cr4b.py` | CR-4b - wallet debit at Ticket Issued, one-debt-one-number, idempotency, **six simultaneous issues of one booking**, catalog track untouched, credit-limit hard block (every figure asserted by name and value), cancellation refunds, credit notes |
 | `tests/verify_cr4c.py` | CR-4c - wallet summary against SQL, ledger pagination, **a submitted top-up credits nothing**, every form rule, duplicate UTR, upload allowlist/magic-bytes/size cap, proof served as an attachment, six simultaneous submissions, cross-tenant |
 | `tests/verify_cr4a.py` | CR-4a — wallet ledger schema and constraints, backfill fidelity, balance chain, arithmetic across zero, booking-debit idempotency, credit limit, 8-actor concurrency. Serverless |
+| `tests/verify_cr5.py` | CR-5 — quotation required and positive, remarks required, a fare refused on a decline, the fare reaching the merchant as a decimal string on detail/list/timeline, **the booking raised at exactly the quoted amount**, the credit limit biting at submission with all five figures by name *and* value, issuance needing no `fare_amount`, a zeroed pre-CR-5 booking still demanding one, six simultaneous quotations, cross-tenant 404, and the server rules the new form controls rely on |
 | `tests/verify_cr2.py` | CR-2 — manager approval, payment bypass, ticket delivery, RBAC, concurrency |
 | `tests/verify_m5.py` … | one per milestone, added as each lands |
 
 Each milestone adds its own script and **all** prior scripts must still pass. See
 `tests/README.md` for how to run them and how to write a new one.
 
-**Last full run: 2026-08-01 — 756 checks, 13/13 scripts passed, 0 failures.**
+**Last full run: 2026-08-01 — 944 checks, 15/15 scripts passed, 0 failures** (CR-5).
 
 Note: `POST /api/auth/login` is rate-limited to 10/minute *per IP*, which a full suite run
 exceeds. `config.login` caches tokens per process and waits out a 429 rather than failing. The
@@ -1054,6 +1095,8 @@ limit is correct behaviour and is not to be weakened for the suite's convenience
 
 | Date | Change |
 | --- | --- |
+| 2026-08-01 | **CR-5 second pass — the Booking Operations popup**, requested after the first review, then corrected within the same pass. The modal is now **six sections in the order the business specified**: booking information, passenger information, **quotation**, **airline references (editable)**, ticket documents, internal notes. **Assignment was already gone** — CR-2 removed it, and it stays removed. **The airline-references form was deleted and then restored by decision**: the cost of removing it was flagged at the time and the business ruled that Operations, which books the ticket externally, must be able to key back the PNR, ticket number and airline reference. A search confirmed those three inputs are the **only editable copy of those values anywhere in the product** before restoring them, so nothing is duplicated; for the same reason they are *not* also repeated read-only in section 1. **No endpoint moved in either direction.** **Passenger and booking data brought up to — and past — the Manager portal:** a field-for-field diff returned an empty missing-list, with **13 passenger fields to the Manager's 7**. Added `Submitted`, `Route`, `Alternate phone`, and three the Manager portal does not show: **preferred departure/return time** (the merchant picks these and *neither* portal displayed them — printed as stored 24-hour `HH:MM`, because a desk reading a different clock from the person who filled in the form is how "09:30" becomes an evening flight), the **booking amount** (this modal showed *no money at all* — its only figure was the fare input, which a quoted booking no longer renders), and the **quotation**, promoted to its own section so a quote that disagrees with the itinerary is visible to the last person who can catch it. Verified across **four real bookings** covering every branch — quoted+ticketed, quoted+priced, quoted-but-raised-at-zero, and pre-quotation — with the references **save round-trip driven for real** and the partial-update promise tested (a blank ticket-number box did not wipe the stored value). A wrapping label was dropping one input 16 px below its neighbours; fixed with `align-items:end` **scoped to `#opsWorkBody`**, because the Manager portal reuses `.ops-grid-3` for a form whose email field carries a hint *below* its input. No overflow at 1280/768/375, console clean. Suite re-run: **944 checks, 15/15, 0 failures — identical to the pre-change baseline**. **The binding quotation was explicitly reaffirmed by the business and left unchanged**; no wallet, finance or payment code was touched — the five files this pass edited are three frontend files and two documents. |
+| 2026-08-01 | **CR-5 built and verified** — the enquiry answer becomes a **binding quotation** (total fare + mandatory remarks; "Mark Available" → **Send Quotation**), plus the merchant-portal pass the business asked for: **Booking Enquiry** naming, *Departure & Arrival*, a **typeable** passenger count reconciled against the breakdown, a cabin-class dropdown, 24-hour time, *Find* → *Search*, and four tiles gone from the dashboard. **Three of the Booking Request items were already delivered by CR-1** and were verified rather than rebuilt; **the "remove Ticket Upload" item has no referent** — no such control exists in the merchant portal. **The quotation is binding by explicit business decision**, taken over the non-binding alternative after its effect on CR-4b was stated. **No line of `ticket_service.py` / `finance_service.py` / `wallet_service.py` was edited**: `_capture_fare_for_wallet_billing` already no-ops above zero and both credit gates already pass a non-zero amount, so the fare simply arrives earlier and the zero path stays live for pre-CR-5 bookings. **No migration** — the quotation lives in existing `travel_details` JSONB. **Five suite assertions encoded the old contract** and were rewritten, not coerced: `flows.make_booking` + two `verify_api.py` calls sent the now-refused bare `{available:true}`; `verify_cr2.py` required the amount still be `0` after manager approval; and `verify_cr4b.py`'s credit section both asserted the refusal must *not* name an amount (it must now) and could no longer construct the zero-amount booking it tests — rewritten to zero the row, which is exactly the population that rule guards, with a CR-5 check beside it proving the API can no longer create one. Two failures were **not** CR-5's: `verify_m4.py`'s wallet payment asserted against a drifting shared balance and now funds itself, and `verify_cr2.py`'s raw portal-login check now waits out the rate limit. **Six defects found by reading the screens rather than the API** — the ops desk stopped telling the operator what it was about to debit; Booking Request still promised a zero amount; My Requests hid the figure behind "Not payable here"; the stepper narrated the old lifecycle; a clamp warning outlived its cause; and `quoted_by` (a platform staff **user id**) would have reached a merchant response, closed the way the review claim already was. `tests/verify_cr5.py` — **81 checks**; suite **944 checks, 15/15, 0 failures**. Browser-verified end to end on both portals at 1280/768/375, console clean; **screenshots impossible** — the Browser pane is not displayed. Awaiting approval. |
 | 2026-07-30 | Created. Phases 1–3, M1, M2 recorded as complete & approved. M3–M10 planned. |
 | 2026-07-30 | M3 implemented and verified (128 checks); suite green at 317 checks. Awaiting approval. |
 | 2026-07-31 | M3 approved. CR-1 (documents removed from the Classic merchant workflow, expanded Admin review) implemented, verified and approved. `tests/verify_api.py` rewritten where it asserted the old mandatory-document rule; suite green at 332 checks, 7/7. M4 started. |

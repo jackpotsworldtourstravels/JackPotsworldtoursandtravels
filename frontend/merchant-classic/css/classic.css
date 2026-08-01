@@ -647,22 +647,14 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 .cl-combo-opt mark{background:none; color:var(--cl-coral); font-weight:800;}
 .cl-combo-empty{padding:12px 11px; font-size:12.5px; font-weight:600; color:var(--cl-text-muted);}
 
-/* ---- time: hour select + AM/PM toggle ---- */
+/* ---- time ----
+   CR-5 replaced the hour-select + AM/PM toggle with a single 24-hour <select>,
+   so `.cl-mer` / `.cl-mer-btn` were deleted here along with their only markup.
+   `.cl-time` is kept: it is a plain flex row, and it is what any future
+   two-part time control would sit in. */
 
 .cl-time{display:flex; gap:8px; align-items:stretch;}
 .cl-time select{flex:1; min-width:0;}
-.cl-mer{
-  display:inline-flex; gap:2px; padding:3px; flex-shrink:0;
-  background:var(--cl-hover-bg); border-radius:12px;
-}
-.cl-mer-btn{
-  min-width:44px; padding:0 12px; border:none; background:none; cursor:pointer;
-  border-radius:9px; font:inherit; font-size:12px; font-weight:800;
-  letter-spacing:.03em; color:var(--cl-text-muted);
-  transition:background .18s ease, color .18s ease;
-}
-.cl-mer-btn:hover{color:var(--cl-text-primary);}
-.cl-mer-btn.active{background:var(--cl-coral); color:#fff;}
 
 /* ---- passenger steppers ---- */
 

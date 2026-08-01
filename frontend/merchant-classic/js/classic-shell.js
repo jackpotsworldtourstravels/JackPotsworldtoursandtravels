@@ -104,7 +104,7 @@ function clConfirm(message, confirmLabel) {
 /* ----------------------------------------------------------------- router */
 
 const CL_TITLES = {
-  dashboard: 'Dashboard', enquiry: 'Ticket Enquiry', 'booking-request': 'Booking Request',
+  dashboard: 'Dashboard', enquiry: 'Booking Enquiry', 'booking-request': 'Booking Request',
   /* Reached from a row action rather than the sidebar — there is no nav item
      for it, because "the booking you just clicked" is not a destination you
      navigate to cold. */

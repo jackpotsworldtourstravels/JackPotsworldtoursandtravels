@@ -369,6 +369,55 @@ Permission: P.DOCUMENT_VERIFY
 Stored path convention: `uploads/<merchant_id>/<uuid4>_<original_filename>`; mime/size validated
 server-side before write (existing `python-multipart` dependency covers the upload parsing).
 
+### 6.3z Booking Enquiry quotation (CR-5)
+
+The Admin's answer to a ticket enquiry stopped being an availability flag and became a **binding
+quotation**. No new endpoint and no migration — one existing request body gained a field, and one
+existing response gained two.
+
+**Naming.** The merchant portal calls this a **Booking Enquiry**; every staff surface and the API
+keep **ticket enquiry** / `request_type = ticket_enquiry`. The split is deliberate and the stored
+value is unchanged.
+
+```
+POST /api/admin/enquiries/{id}/respond
+  Body: {available: bool,
+         total_fare: Decimal|null,      # CR-5 — required and > 0 when available
+         reason: str|null,              # now required on BOTH answers (≤2000)
+         response: str|null}            # optional covering note (≤2000)
+→ EnquiryResponse                                          200
+Permission: require(TICKET_APPROVE, TICKET_REJECT), then the code matching the payload
+422 available:true with no total_fare, a total_fare ≤ 0, or no reason
+422 available:false carrying a total_fare  (refused, never silently dropped)
+409 the enquiry is already answered, or is claimed by another admin
+```
+
+`EnquiryResponse` gains:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `quoted_fare` | `Decimal` \| null | Crosses the wire as a **decimal string**. `null` on a pending enquiry, a declined one, and every enquiry answered before CR-5 — so consumers must handle its absence rather than assume `0` |
+| `quotation_remarks` | str \| null | The breakdown the merchant reads beside the amount |
+
+**The quotation is binding.** `POST /api/enquiries/{id}/booking-request` creates the booking at
+`total_amount = quoted_fare` (was hard-coded `0`), with
+`pricing = {currency, quoted: true, source: "ticket_enquiry", final_amount, priced_at: "enquiry_quotation"}`.
+
+Two consequences follow **without any change to CR-4b's frozen code**:
+
+- The credit limit (§6.3b) now bites with the real amount at **submission and approval**, because
+  both `assert_credit_available` call sites already pass the amount when it is non-zero.
+- `POST /api/admin/requests/{id}/issue-ticket` no longer requires `fare_amount` on a quoted
+  booking, because `_capture_fare_for_wallet_billing` no-ops above zero. It is **still required**
+  on a booking sitting at `0` — that is every enquiry-led booking raised before CR-5, and they
+  finish the way they were made.
+
+`travel_class` is unchanged: still free text, `1..80`. The merchant form narrowed to a four-option
+dropdown (`Economy`, `Premium Economy`, `Business`, `First Class`), which is a strict subset of
+what this endpoint accepts.
+
+---
+
 ### 6.3a Cancellation & Reschedule (M3)
 
 A confirmed booking moving backwards. These are `ServiceRequest` rows of

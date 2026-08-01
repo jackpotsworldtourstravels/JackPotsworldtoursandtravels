@@ -651,6 +651,13 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   background:var(--card-bg); color:var(--text-primary); min-width:200px; flex:1;}
 .ops-grid-3{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px 16px;
             margin-bottom:12px;}
+/* Bottom-aligned, so a label that wraps to two lines does not drop its input
+   16px below its neighbours'. "Airline reference (if applicable)" wraps at most
+   widths where three columns still fit.
+   Scoped to the work modal on purpose: the Manager portal reuses `.ops-grid-3`
+   for its profile form, where one field carries a hint *below* its input —
+   bottom-aligning there would align the hint and lift the input instead. */
+#opsWorkBody .ops-grid-3{align-items:end;}
 /* One card per traveller. A table would need thirteen columns and therefore a
    horizontal scrollbar at every viewport; the desk reads one passenger at a
    time, so the cards win on the screen this is actually used on. */

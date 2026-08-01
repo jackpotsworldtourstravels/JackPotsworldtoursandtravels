@@ -16,7 +16,7 @@
      verify_payment is what moves a request on to Paid — so a payment awaiting
      verification still belongs to a request sitting in Payment Pending.
 
-   A THIRD DISTINCTION, new with Ticket Enquiry. A ticket enquiry is a
+   A THIRD DISTINCTION, new with Booking Enquiry. A booking enquiry is a
    service_requests row like any other, so /api/merchant/dashboard's
    `requests_by_status` counts enquiries alongside bookings — an unanswered
    enquiry lands in `pending_approval` next to a booking awaiting approval.
@@ -42,18 +42,19 @@ async function clInitDashboard() {
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clDashRefresh">Refresh</button>
-        <button type="button" class="cl-btn cl-btn-primary" id="clDashNew">Enquire ticket</button>
+        <!-- CR-5 removed the "Enquire ticket" action from here. Raising an
+             enquiry belongs on the Booking Enquiry screen, which is one click
+             away in the rail and carries the listing the new row lands in; a
+             second entry point on the dashboard opened the same modal over a
+             screen that then could not show the result. -->
       </div>
     </div>
     <div id="clDashKpis"><div class="cl-panel"><div class="cl-panel-body">
       <span class="cl-spin"></span> Loading account summary…
     </div></div></div>
-    <div id="clDashAccount"></div>
     <div id="clDashRecent"></div>`;
 
   $('clDashRefresh').addEventListener('click', () => { clLoaded.add('dashboard'); clInitDashboard(); });
-  /* Straight into the Enquire Ticket form: every booking now starts there. */
-  $('clDashNew').addEventListener('click', () => clGo('enquiry', () => clOpenEnquiryForm()));
 
   await clLoadDashboard();
 }
@@ -119,11 +120,14 @@ async function clLoadDashboard() {
       ${clKpi('Ready to book', enq ? enq.ready : '—', 'Answered — request a ticket', 'enquiry')}
       ${clKpi('Pending approval', awaiting, 'Bookings + enquiries with us', 'requests', 'pending_approval')}
       ${clKpi('Payment pending', s.payment_pending || 0, 'You owe payment', 'payments', 'payment_pending')}
-      ${clKpi('Ticketed', s.ticket_issued || s.ticketed || 0, 'Tickets issued', 'requests', 'ticketed')}
       ${clKpi('Completed', s.completed || 0, 'Closed requests', 'requests', 'completed')}
-      ${clKpi('Awaiting verification', data.pending_payments_count || 0, 'Payments you have sent', 'payments', 'payment_pending')}
-      ${clKpi('Unread notices', data.unread_notifications_count || 0, 'Notification centre', 'notifications')}
     </div>`;
+    /* CR-5 dropped four tiles from this strip: Ticketed, Awaiting verification,
+       Unread notices, and the Account panel below it. Each already had a home
+       that showed more than a bare number — My Requests filtered to Ticketed,
+       the Payments screen's position strip, the notification bell and its
+       centre, and Profile & Settings. Ten tiles is a wall to read past to
+       reach the two that need action today. */
 
     kpis.querySelectorAll('[data-cl-kpi-to]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -144,7 +148,6 @@ async function clLoadDashboard() {
       });
     });
 
-    clRenderDashAccount(data);
     clRenderDashRecent(data.recent_requests || []);
   } catch (err) {
     kpis.innerHTML = `<div class="cl-panel"><div class="cl-panel-body">
@@ -166,35 +169,21 @@ function clKpi(label, value, sub, to, filter) {
     : `<div class="cl-kpi">${inner}</div>`;
 }
 
-function clRenderDashAccount(data) {
-  $('clDashAccount').innerHTML = `
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Account</h2></div>
-      <div class="cl-panel-body">
-        <dl class="cl-dl">
-          <div><dt>Company</dt><dd>${escapeHtml(data.company_name || localStorage.getItem(PARTNER_KEYS.companyName) || '—')}</dd></div>
-          <div><dt>Merchant code</dt><dd class="cl-ref">${escapeHtml(data.merchant_code || '—')}</dd></div>
-          <div><dt>Wallet balance</dt><dd>${clDashPosition
-            ? escapeHtml(moneyStr(clDashPosition.wallet_balance)) : '—'}</dd></div>
-          <div><dt>Credit limit</dt><dd>${clDashPosition
-            ? (clDashPosition.has_credit_limit
-                ? `${escapeHtml(moneyStr(clDashPosition.credit_limit))} · ${escapeHtml(moneyStr(clDashPosition.credit_available))} available`
-                : 'Not set')
-            : '—'}</dd></div>
-          <div><dt>Balance due</dt><dd>${clDashPosition
-            ? escapeHtml(moneyStr(clDashPosition.outstanding)) : '—'}</dd></div>
-          <div><dt>Support contact</dt><dd>${escapeHtml(data.support_contact || data.support_email || '—')}</dd></div>
-        </dl>
-      </div>
-    </div>`;
-}
+/* CR-5 removed `clRenderDashAccount` and the "Account" panel it drew.
+   Every field on it was a second copy of something with a better home: company
+   name and merchant code are in the header and on Profile & Settings; wallet
+   balance, credit limit and balance due are the first three tiles of the
+   Payments position strip, which also shows what is used and what is left;
+   support contact is the Support screen. `clDashPosition` is still held, and
+   still fed by the same `financePosition()` call, because the two money KPIs
+   above render from it. */
 
 function clRenderDashRecent(rows) {
   if (!rows.length) {
     $('clDashRecent').innerHTML = `
       <div class="cl-panel"><div class="cl-panel-head"><h2>Recent requests</h2></div>
       <div class="cl-panel-body"><p style="margin:0;color:var(--cl-text-muted);font-size:12.5px;">
-        Nothing raised yet. Start with a <b>Ticket Enquiry</b> — once our team answers it,
+        Nothing raised yet. Start with a <b>Booking Enquiry</b> — once our team quotes it,
         you can turn it into a booking request.</p></div></div>`;
     return;
   }
