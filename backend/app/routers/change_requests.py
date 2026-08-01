@@ -7,11 +7,16 @@ same one the rest of this API uses: a path a merchant may call never begins
 ``/api/admin``, so "can this caller reach this at all" is answerable from the
 URL before any permission is evaluated.
 
-PERMISSIONS — no new codes
-``servicerequest.create`` to raise or withdraw (merchant roles),
-``servicerequest.manage`` to review, approve or reject (Admin), and
-``ticket.view`` to read. Those three already mean exactly this; a parallel
-``cancellation.*`` family would only give the two a way to drift apart.
+PERMISSIONS
+``servicerequest.create`` to raise (merchant roles), ``servicerequest.manage``
+to review, approve or reject (Admin), and ``ticket.view`` to read. Those three
+already mean exactly this; a parallel ``cancellation.*`` family would only give
+them a way to drift apart.
+
+The merchant's own sign-off — ``servicerequest.approve``, held by their manager
+— is not here. It applies to every service request type, not just these two, so
+it lives in ``routers/manager_approvals.py``. Nothing on this router can be
+actioned by staff until that sign-off has happened.
 
 Note that ``servicerequest.manage`` is held by Admin, which also holds
 ``ticket.approve`` — the lifecycle edges these actions walk require the latter.
@@ -34,7 +39,7 @@ from app.schemas.change_request import (
     RescheduleRequest,
 )
 from app.schemas.pagination import Page
-from app.services import change_request_service, lifecycle
+from app.services import change_request_service, lifecycle, manager_approval
 
 router = APIRouter(prefix="/api", tags=["cancellation & reschedule"])
 
@@ -44,6 +49,9 @@ def _detail(db: Session, request, actor: User) -> ChangeRequestDetail:
     staff = has_permission(actor, P.SERVICE_REQUEST_MANAGE)
     open_now = request.status in change_request_service.OPEN_STATUSES
     holder = (request.travel_details or {}).get("review_claimed_by")
+    # Nothing our desk may do exists until the merchant's own manager has
+    # signed the request off — see services/manager_approval.py.
+    signed_off = manager_approval.is_approved(request)
 
     return ChangeRequestDetail(
         request=ChangeRequestItem.of(request),
@@ -64,14 +72,15 @@ def _detail(db: Session, request, actor: User) -> ChangeRequestDetail:
             if booking else None
         ),
         timeline=lifecycle.timeline(request),
-        can_review=staff and request.status is RequestStatus.PENDING_APPROVAL,
+        can_review=staff and signed_off and request.status is RequestStatus.PENDING_APPROVAL,
         # Only the holder may settle one already under review — the same claim
         # rule the enquiry desk uses.
-        can_settle=staff and open_now and (holder in (None, actor.user_id)),
-        can_withdraw=(
-            not actor.is_platform_staff
-            and request.status is RequestStatus.PENDING_APPROVAL
-            and has_permission(actor, P.SERVICE_REQUEST_CREATE)
+        can_settle=staff and signed_off and open_now and (holder in (None, actor.user_id)),
+        can_manager_decide=(
+            manager_approval.is_pending(request)
+            and manager_approval.is_manager(actor)
+            and actor.merchant_id == request.merchant_id
+            and has_permission(actor, P.SERVICE_REQUEST_APPROVE)
         ),
     )
 
@@ -209,8 +218,9 @@ def change_request_counts(
     response_model=ChangeRequestDetail,
     summary="One change request, with its booking and timeline",
     description=(
-        "Requires `ticket.view`. Carries `can_review` / `can_settle` / `can_withdraw` for the "
-        "calling account, so the UI offers nothing the server would refuse."
+        "Requires `ticket.view`. Carries `can_review` / `can_settle` / `can_manager_decide` for "
+        "the calling account, so the UI offers nothing the server would refuse. The first two "
+        "are false until the merchant's manager has signed the request off."
     ),
 )
 def get_change_request(
@@ -222,24 +232,10 @@ def get_change_request(
     return _detail(db, request, current_user)
 
 
-@router.post(
-    "/change-requests/{request_id}/withdraw",
-    response_model=ChangeRequestDetail,
-    tags=["merchant · change requests"],
-    summary="Take back a change request nobody has picked up",
-    description=(
-        "Requires `servicerequest.create`. Allowed only while it is still **Pending**. Once an "
-        "operator has claimed it they are on the phone to the airline, so a claimed request "
-        "returns 409 naming them — ask them to reject it instead."
-    ),
-)
-def withdraw_change_request(
-    request_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.SERVICE_REQUEST_CREATE)),
-):
-    request = change_request_service.withdraw(db, current_user, request_id)
-    return _detail(db, request, current_user)
+# There is no withdraw endpoint. Whoever raises a change request cannot take it
+# back; their own manager approves it or rejects it, through
+# /api/manager/service-requests — which covers every service request type, not
+# only these two. See routers/manager_approvals.py.
 
 
 # ---------------------------------------------------------------------------

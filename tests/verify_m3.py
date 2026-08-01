@@ -50,10 +50,13 @@ def main():
                       json={"reason": "changed our mind"})
     check("cancelling a PENDING booking -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
 
+    # A completed booking CAN be cancelled, as of 2026-08-01: what is settled
+    # after travel is the money, not the journey. It still cannot be
+    # rescheduled — a flight that has already flown cannot be moved.
     done = flows.make_booking(mtok, atok, upto="completed", label="M3 completed")
     r = requests.post(f"{BASE}/api/bookings/{done['id']}/cancellation", headers=H(mtok),
-                      json={"reason": "too late"})
-    check("cancelling a COMPLETED booking -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
+                      json={"reason": "no-show, settling the fare after travel"})
+    check("cancelling a COMPLETED booking -> 201", r.status_code == 201, f"{r.status_code} {r.text[:220]}")
     r = requests.post(f"{BASE}/api/bookings/{done['id']}/reschedule", headers=H(mtok),
                       json={"new_travel_date": str(new_date()), "reason": "too late"})
     check("rescheduling a COMPLETED booking -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
@@ -107,31 +110,31 @@ def main():
     check("a reschedule while a cancellation is open -> 409", r.status_code == 409,
           f"{r.status_code} {r.text[:220]}")
 
-    # ---------------------------------------------------------------- withdraw
-    print("\n== withdraw ==")
-    # Approval opens the payment window in the same call, so an "approved"
-    # booking is really sitting at Payment Pending by the time we see it.
+    # ------------------------------------------------------------ no withdraw
+    # The withdraw endpoint was removed on 2026-08-01. Whoever raises a request
+    # cannot take it back; their own manager rejects it instead, which leaves a
+    # record of who decided and why. The sign-off stage itself is covered by
+    # tests/verify_manager_approval.py.
+    print("\n== there is no withdraw ==")
     live_status = booking_status(mtok, live["id"])
     r = requests.post(f"{CR}/{first['id']}/withdraw", headers=H(mtok))
-    check("merchant withdraws a pending request -> 200", r.status_code == 200, f"{r.status_code} {r.text[:250]}")
-    check("it is now Cancelled", r.json()["request"]["status"] == "cancelled", r.text[:200])
+    check("the withdraw endpoint is gone -> 404/405", r.status_code in (404, 405),
+          f"{r.status_code} {r.text[:250]}")
+    check("the request is untouched by the attempt",
+          requests.get(f"{CR}/{first['id']}", headers=H(mtok)).json()["request"]["status"]
+          == "pending_approval", "a dead endpoint moved something")
     check("the booking is untouched", booking_status(mtok, live["id"]) == live_status,
           f"{live_status} -> {booking_status(mtok, live['id'])}")
 
-    r = requests.post(f"{BASE}/api/bookings/{live['id']}/cancellation", headers=H(mtok),
-                      json={"reason": "after a withdrawal the slot is free"})
-    check("a withdrawal frees the slot for a new request -> 201", r.status_code == 201,
-          f"{r.status_code} {r.text[:220]}")
-    reopened = r.json()["request"]
+    # The one open request against this booking carries on into the claim checks
+    # below: there is no longer a way to take it back and raise another.
+    reopened = requests.get(f"{CR}/{first['id']}", headers=H(mtok)).json()["request"]
 
     r = requests.post(f"{BASE}/api/admin/change-requests/{reopened['id']}/review", headers=H(atok))
     check("admin claims it -> 200", r.status_code == 200, f"{r.status_code} {r.text[:250]}")
     check("it is Under Review", r.json()["request"]["status"] == "in_review", r.text[:200])
     check("the claim records who holds it",
           r.json()["request"]["review_claimed_by_name"], r.text[:250])
-
-    r = requests.post(f"{CR}/{reopened['id']}/withdraw", headers=H(mtok))
-    check("withdrawing a claimed request -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
 
     # ------------------------------------------------------------ claim conflict
     print("\n== two admins cannot settle the same request ==")
@@ -317,8 +320,15 @@ def main():
     r = requests.get(f"{CR}/{rbac_id}", headers=H(rtok))
     check("another company's change request -> 404 (not 403)", r.status_code == 404,
           f"{r.status_code} {r.text[:200]}")
-    r = requests.post(f"{CR}/{rbac_id}/withdraw", headers=H(rtok))
-    check("another company cannot withdraw it -> 404", r.status_code == 404, f"{r.status_code} {r.text[:200]}")
+    # The cross-tenant path that replaced withdraw: another company's manager
+    # must not be able to sign off, or reject, work that is not theirs.
+    r = requests.post(f"{BASE}/api/manager/service-requests/{rbac_id}/approve", headers=H(rtok))
+    check("another company's manager cannot approve it -> 403/404",
+          r.status_code in (403, 404), f"{r.status_code} {r.text[:200]}")
+    r = requests.post(f"{BASE}/api/manager/service-requests/{rbac_id}/reject", headers=H(rtok),
+                      json={"reason": "not mine to reject"})
+    check("another company's manager cannot reject it -> 403/404",
+          r.status_code in (403, 404), f"{r.status_code} {r.text[:200]}")
     r = requests.post(f"{BASE}/api/bookings/{open_b['id']}/cancellation", headers=H(rtok),
                       json={"reason": "not mine"})
     check("another company cannot cancel our booking -> 404", r.status_code == 404,
@@ -381,12 +391,13 @@ def main():
     check("detail carries the parent booking", d["booking"] and d["booking"]["request_number"],
           str(d.get("booking"))[:200])
     check("detail carries a timeline", isinstance(d["timeline"], list) and d["timeline"], str(d.get("timeline"))[:200])
-    check("merchant may withdraw its own pending request", d["can_withdraw"] is True, str(d))
+    check("can_withdraw is gone from the detail response", "can_withdraw" not in d, str(list(d)))
     check("merchant may not settle it", d["can_settle"] is False and d["can_review"] is False, str(d))
     d_admin = requests.get(f"{CR}/{rbac_id}", headers=H(atok)).json()
     check("admin may review and settle it",
           d_admin["can_review"] is True and d_admin["can_settle"] is True, str(d_admin))
-    check("admin may not withdraw it", d_admin["can_withdraw"] is False, str(d_admin))
+    check("an admin is not the merchant's manager either",
+          d_admin["can_manager_decide"] is False, str(d_admin))
 
     r = requests.get(f"{BASE}/api/bookings/{open_b['id']}/change-requests", headers=H(mtok))
     check("per-booking history -> 200 and finds it",
@@ -444,7 +455,7 @@ def main():
                       json={"reason": "cancelling the cancellation"})
     check("the generic cancel refuses a change request -> 400", r.status_code == 400,
           f"{r.status_code} {r.text[:220]}")
-    check("and points at withdraw", "withdraw" in r.text.lower(), r.text[:250])
+    check("and points at the merchant's manager", "manager" in r.text.lower(), r.text[:250])
     check("it is still Pending after that too",
           requests.get(f"{CR}/{bypass_id}", headers=H(atok)).json()["request"]["status"]
           == "pending_approval", "the generic cancel moved it")

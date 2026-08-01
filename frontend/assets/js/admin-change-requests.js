@@ -1,15 +1,17 @@
-/* Admin — Cancellations & Reschedules (M3)
-   ========================================
-   Where a merchant's request to cancel or move a confirmed booking is settled.
+/* Admin — the cancellation & reschedule settle dialog (M3)
+   ========================================================
+   Where a merchant's request to cancel or move a confirmed booking is priced
+   and applied. It is a DIALOG, not a screen: Service Request Management lists
+   every service request whatever its type, and opens this one for the two that
+   change the booking.
 
-   WHY THIS IS NOT SERVICE REQUEST MANAGEMENT
-   That screen resolves a request by marking it Approved. These two do more than
-   that: an approved cancellation really cancels the booking and states the
-   refund; an approved reschedule really rewrites its travel dates and states
-   what is payable. The generic resolve endpoint does neither, so the backend
-   now refuses it for these two types outright — the same treatment enquiries
-   got in Phase 2. Two screens because they are two workflows, not one workflow
-   with a filter.
+   WHY THESE TWO NEED THEIR OWN DIALOG
+   The generic resolve endpoint settles a request by marking it Approved. These
+   two do more than that: an approved cancellation really cancels the booking
+   and states the refund; an approved reschedule really rewrites its travel
+   dates and states what is payable. The backend refuses the generic endpoint
+   for them outright — the same treatment enquiries got in Phase 2 — so the
+   difference is in the API, not only in this UI.
 
    WHERE THE MONEY COMES FROM
    Here, and nowhere else. A merchant sends no amounts when it raises the
@@ -18,9 +20,12 @@
    derived from the booking total minus the charge, server-side, and the server
    refuses a charge larger than the booking.
 
+   THE MERCHANT'S MANAGER HAS ALREADY APPROVED
+   Or this dialog is read-only. `can_settle` and `can_review` come back false
+   until a manager at the merchant has signed the request off, and every staff
+   endpoint below 409s for one that has not been.
+
    ENDPOINTS
-     GET  /api/change-requests                      list (staff see every merchant)
-     GET  /api/change-requests/counts               tab badges
      GET  /api/change-requests/{id}                 detail + booking + timeline
      POST /api/admin/change-requests/{id}/review    claim: Pending -> Under Review
      POST /api/admin/change-requests/{id}/approve   quote + settle + apply
@@ -30,13 +35,6 @@
    escapeHtml, fmtDate, fmtDateTime, rowsSkeleton, loadedSections) plus the
    shared toast/confirmDialog components. Nothing here restates them. */
 
-const CR_LABELS = {
-  pending_approval: 'Pending',
-  in_review: 'Under Review',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  cancelled: 'Withdrawn',
-};
 const CR_BADGE = {
   pending_approval: 'pending',
   in_review: 'pending',
@@ -44,15 +42,12 @@ const CR_BADGE = {
   rejected: 'cancelled',
   cancelled: 'cancelled',
 };
-/* Still needs someone. One list so the filter, the summary line and the nav
-   badge cannot drift apart. */
-const CR_OPEN = ['pending_approval', 'in_review'];
 
-const crLabel = s => CR_LABELS[s] || s;
+/* No CR_LABELS map. `status_label` comes off the API already worded for the
+   stage the request is at — "Under Manager Approval" and "Manager Approved"
+   are derived server-side (services/manager_approval.py) and a local map would
+   only be a second, staler opinion of the same thing. */
 
-let crRows = [];
-let crFiltersWired = false;
-let crSearchTimer = null;
 let crSelfId = null;
 
 function crSelf() {
@@ -64,125 +59,11 @@ function crSelf() {
   return crSelfId;
 }
 
-function updateChangeRequestNavBadge(count) {
-  const badge = document.getElementById('crNavBadge');
-  if (!badge) return;
-  badge.textContent = count > 99 ? '99+' : String(count);
-  badge.hidden = !count;
-}
-
 function crMoney(value) {
   const n = Number(value);
   return Number.isFinite(n)
     ? n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 })
     : '—';
-}
-
-/* What the merchant actually asked for, in one cell. A reschedule is only
-   meaningful as "from → to", so both dates travel on the list row rather than
-   costing a detail fetch per row. */
-function crAsk(r) {
-  if (r.change_type === 'date_change') {
-    return `<div>${r.current_travel_date ? fmtDate(r.current_travel_date) : '—'} →
-            <strong>${r.new_travel_date ? fmtDate(r.new_travel_date) : '—'}</strong></div>
-            <div class="cell-sub">${escapeHtml(r.reason || '')}</div>`;
-  }
-  return `<div>Cancel the whole booking</div>
-          <div class="cell-sub">${escapeHtml(r.reason || '')}</div>`;
-}
-
-/* The settled figure, or nothing. A pending request shows a dash rather than
-   0.00 — "not priced yet" and "nothing to refund" are different statements. */
-function crSettlement(r) {
-  const p = r.pricing || {};
-  if (p.kind === 'cancellation') {
-    return `<div class="cell-sub">Charge ${crMoney(p.cancellation_charge)} ·
-            refund <strong>${crMoney(p.refund_amount)}</strong></div>`;
-  }
-  if (p.kind === 'reschedule') {
-    return `<div class="cell-sub">Payable <strong>${crMoney(p.total_payable)}</strong></div>`;
-  }
-  return '';
-}
-
-async function loadChangeRequests() {
-  if (!crFiltersWired) {
-    crFiltersWired = true;
-    ['crStatusFilter', 'crTypeFilter'].forEach(id =>
-      document.getElementById(id).addEventListener('change', () => loadChangeRequests()));
-    document.getElementById('crSearch').addEventListener('input', () => {
-      clearTimeout(crSearchTimer);
-      crSearchTimer = setTimeout(() => loadChangeRequests(), 300);
-    });
-    document.getElementById('crRefreshBtn').addEventListener('click', () => loadChangeRequests());
-  }
-
-  const tbody = document.querySelector('#crTable tbody');
-  tbody.innerHTML = `<tr><td colspan="8">${rowsSkeleton(4)}</td></tr>`;
-
-  const statusValue = document.getElementById('crStatusFilter').value;
-  const typeValue = document.getElementById('crTypeFilter').value;
-  const search = document.getElementById('crSearch').value.trim();
-
-  try {
-    /* "Awaiting settlement" spans two statuses and the endpoint takes one, so
-       it is fetched as two calls and merged — the same shape the Ticket
-       Enquiries screen uses. */
-    const statuses = statusValue === 'open' ? CR_OPEN : [statusValue || undefined];
-    const pages = await Promise.all(statuses.map(st =>
-      axios.get(`${API_BASE}/api/change-requests`, {
-        headers: authHeaders(),
-        params: {
-          request_status: st, type: typeValue || undefined,
-          search: search || undefined, page: 1, page_size: 100,
-        },
-      }).then(res => res.data.items).catch(() => [])));
-
-    const items = pages.flat().sort((a, b) => b.id - a.id);
-    crRows = items;
-
-    const openCount = items.filter(r => CR_OPEN.includes(r.status)).length;
-    document.getElementById('crQueueSummary').textContent =
-      `${items.length} request${items.length === 1 ? '' : 's'}` +
-      (openCount ? ` · ${openCount} awaiting settlement` : '');
-
-    tbody.innerHTML = items.length ? items.map(r => {
-      const mine = r.review_claimed_by && r.review_claimed_by === crSelf();
-      const heldByOther = r.status === 'in_review' && r.review_claimed_by && !mine;
-      return `
-      <tr>
-        <td><span class="mono">${escapeHtml(r.request_number)}</span></td>
-        <td>${escapeHtml(r.change_type_label)}</td>
-        <td>${escapeHtml(r.merchant_name || '—')}</td>
-        <td><span class="mono">${escapeHtml(r.booking_request_number || '—')}</span>
-            <div class="cell-sub">${escapeHtml(r.pnr || '')}</div></td>
-        <td>${crAsk(r)}</td>
-        <td>
-          <span class="badge ${CR_BADGE[r.status] || 'pending'}">${escapeHtml(crLabel(r.status))}</span>
-          ${heldByOther ? `<div class="cell-sub">with ${escapeHtml(r.review_claimed_by_name)}</div>` : ''}
-          ${mine && CR_OPEN.includes(r.status) ? '<div class="cell-sub">with you</div>' : ''}
-          ${crSettlement(r)}
-        </td>
-        <td>${fmtDateTime(r.created_at)}</td>
-        <td style="white-space:nowrap;">
-          <button class="btn btn-navy btn-sm" data-cr-open="${r.id}">
-            ${CR_OPEN.includes(r.status) ? 'Settle' : 'View'}
-          </button>
-        </td>
-      </tr>`;
-    }).join('') : `<tr><td colspan="8" class="empty-state">No cancellation or reschedule requests match this filter.</td></tr>`;
-
-    tbody.querySelectorAll('[data-cr-open]').forEach(btn =>
-      btn.addEventListener('click', () => openChangeRequest(btn.dataset.crOpen)));
-
-    // Only meaningful when the view is unfiltered or already showing the open
-    // ones — a badge computed from a "Rejected only" page would be a lie.
-    updateChangeRequestNavBadge(
-      statusValue === 'open' || !statusValue ? openCount : undefined);
-    document.getElementById('crPagination').innerHTML = '';
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load change requests.</td></tr>`;
-  }
 }
 
 function crDetailRow(label, value) {
@@ -225,7 +106,7 @@ async function openChangeRequest(requestId) {
     </p>
 
     <div class="detail-grid">
-      ${crDetailRow('Status', `<span class="badge ${CR_BADGE[r.status] || 'pending'}">${escapeHtml(crLabel(r.status))}</span>`)}
+      ${crDetailRow('Status', `<span class="badge ${CR_BADGE[r.status] || 'pending'}">${escapeHtml(r.status_label)}</span>`)}
       ${crDetailRow('Booking', b ? `<span class="mono">${escapeHtml(b.request_number)}</span>` : '—')}
       ${crDetailRow('Booking status', b ? escapeHtml(b.status_label) : '—')}
       ${crDetailRow('Booking total', b ? crMoney(b.total_amount) : '—')}
@@ -238,6 +119,12 @@ async function openChangeRequest(requestId) {
     </div>
 
     ${r.reason ? `<div class="detail-note"><strong>Merchant's reason</strong><p>${escapeHtml(r.reason)}</p></div>` : ''}
+    ${(r.manager_approval || {}).by_name ? `<div class="detail-note"><strong>Merchant's manager</strong>
+      <p>${escapeHtml(r.manager_approval.by_name)} ${
+        r.manager_approval.self_raised ? 'raised this themselves, as a manager'
+        : r.manager_approval.state === 'approved' ? 'approved it'
+        : `rejected it${r.manager_approval.reason ? `: ${escapeHtml(r.manager_approval.reason)}` : ''}`
+      }.</p></div>` : ''}
     ${r.rejection_reason ? `<div class="detail-note"><strong>Refused because</strong><p>${escapeHtml(r.rejection_reason)}</p></div>` : ''}
     ${p.kind ? `<div class="detail-note"><strong>Settled</strong><p>${
       p.kind === 'cancellation'
@@ -246,7 +133,17 @@ async function openChangeRequest(requestId) {
     }${p.quoted_by_name ? ` Quoted by ${escapeHtml(p.quoted_by_name)}.` : ''}</p></div>` : ''}
 
     ${heldByOther ? `<div class="msg warn">${escapeHtml(r.review_claimed_by_name)} is reviewing this request. Only they can settle it.</div>` : ''}
-    ${!data.can_settle && !heldByOther ? `<div class="msg info">This request has been settled and is now read-only.</div>` : ''}
+    ${!data.can_settle && !heldByOther ? `<div class="msg info">${
+      /* Two very different reasons for the same read-only state, and telling
+         them apart is the difference between "nothing to do" and "not yet". */
+      r.manager_state === 'pending'
+        ? 'This request is still with the merchant’s own manager. It cannot be settled here until '
+          + 'they have approved it — the server refuses it too.'
+        : r.manager_state === 'rejected'
+        ? 'The merchant’s own manager rejected this request. It never reached us and there is '
+          + 'nothing to settle.'
+        : 'This request has been settled and is now read-only.'
+    }</div>` : ''}
 
     ${data.can_settle ? `
       ${data.can_review ? `
@@ -347,7 +244,7 @@ function wireChangeRequestModal(overlay, body, data) {
         await axios.post(`${API_BASE}/api/admin/change-requests/${r.id}/review`, {},
           { headers: authHeaders() });
         showToast(`${r.request_number} is now under your review.`);
-        await loadChangeRequests();
+        await loadServiceRequestManagement();
         openChangeRequest(r.id);          // reopen on the fresh state
       } catch (err) {
         startBtn.disabled = false;
@@ -406,7 +303,7 @@ function wireChangeRequestModal(overlay, body, data) {
         { headers: authHeaders() });
       showToast(`${r.request_number} approved.`);
       overlay.classList.remove('open');
-      loadChangeRequests();
+      loadServiceRequestManagement();
       // Both counters move when a booking is cancelled or repriced.
       if (loadedSections.has('reports')) loadReports();
       if (loadedSections.has('partner-requests')) loadApprovalQueue();
@@ -438,7 +335,7 @@ function wireChangeRequestModal(overlay, body, data) {
         { headers: authHeaders() });
       showToast(`${r.request_number} refused.`);
       overlay.classList.remove('open');
-      loadChangeRequests();
+      loadServiceRequestManagement();
     } catch (err) {
       buttons().forEach(x => x && (x.disabled = false));
       setMsg(err.response?.data?.detail || 'Could not refuse this request.', 'error');

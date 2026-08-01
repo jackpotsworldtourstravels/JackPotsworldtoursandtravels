@@ -370,7 +370,7 @@ table and no migration.
 seats, refunds and passenger corrections. Cancellation and date change settle money and change the
 parent booking, which the generic hook does neither of, so the three generic paths now **refuse
 these two types with 400** — `/api/admin/requests/{id}/approve`, `/api/admin/requests/{id}/reject`,
-`/api/admin/service-requests/{id}/resolve`, plus `/api/requests/{id}/cancel` (withdraw instead).
+`/api/admin/service-requests/{id}/resolve`, plus `/api/requests/{id}/cancel`.
 Same treatment ticket enquiries got.
 
 **No amounts are sent when raising.** The cancellation charge and the fare difference come from the
@@ -382,9 +382,16 @@ POST /api/bookings/{booking_id}/cancellation
   Body: {reason: str}
 → ChangeRequestDetail                                      201
 Permission: P.SERVICE_REQUEST_CREATE
-409 unless the booking is approved | payment_pending | paid | ticket_issued
+409 unless the booking is approved | payment_pending | paid | ticket_issued | completed
 409 if another change request is already open against it (names it)
+409 if a cancellation has EVER been raised on it and was not refused — one per booking
 ```
+
+A **completed** booking may be cancelled: what is being settled after travel is the money, not the
+journey. A reschedule may not — see the `RESCHEDULABLE_PARENT_STATUSES` split in
+`change_request_service`. The `COMPLETED -> CANCELLED` edge lives in
+`lifecycle.SETTLEMENT_TRANSITIONS`, so it is reachable only through an approved cancellation and
+never appears in `allowed_transitions`.
 
 ```
 POST /api/bookings/{booking_id}/reschedule
@@ -407,11 +414,9 @@ GET  /api/bookings/{id}/change-requests → ChangeRequestItem[]  (every change e
 Permission: P.TICKET_VIEW
 ```
 
-```
-POST /api/change-requests/{id}/withdraw → ChangeRequestDetail
-Permission: P.SERVICE_REQUEST_CREATE
-Only while Pending — 409 naming the operator once claimed.
-```
+**There is no withdraw.** It existed and was removed: it let whoever raised a request pull it out
+from under an operator already working it, and left no record of who changed their mind. The
+merchant's manager rejects it instead — §6.3b.
 
 ```
 POST /api/admin/change-requests/{id}/review   → ChangeRequestDetail   (Pending → Under Review)
@@ -431,11 +436,60 @@ re-checked under that lock (409 if it closed while queued). The refund is derive
 A reschedule's amounts must both be non-negative — a date change never produces a refund.
 
 `ChangeRequestItem`: `{id, request_number, change_type, change_type_label, status, status_label,
-booking_id, booking_request_number, booking_reference, pnr, merchant_id, merchant_name, reason,
-pricing, amount, new_travel_date, current_travel_date, review_claimed_by, review_claimed_by_name,
-rejection_reason, created_at, updated_at}`.
+manager_state, manager_approval, booking_id, booking_request_number, booking_reference, pnr,
+merchant_id, merchant_name, reason, pricing, amount, new_travel_date, current_travel_date,
+review_claimed_by, review_claimed_by_name, rejection_reason, created_at, updated_at}`.
 
-`ChangeRequestDetail`: `{request, booking, timeline, can_review, can_settle, can_withdraw}`.
+`ChangeRequestDetail`: `{request, booking, timeline, can_review, can_settle, can_manager_decide}`.
+`can_review` and `can_settle` are false until the merchant's manager has signed the request off.
+
+### 6.3b Manager approval — the merchant's own sign-off
+
+Every service request a merchant raises (`cancellation`, `date_change`, `refund`,
+`passenger_modification`, `extra_baggage`, `meal`, `seat`) waits for a **manager of that merchant**
+before our desk can see or settle it:
+
+```
+raised  ->  Under Manager Approval  ->  Manager Approved  ->  our desk
+```
+
+**No migration, no new enum members.** The stage is a JSONB block at
+`service_requests.travel_details.manager_approval`, `{state, by, by_name, at, reason?}` with
+`state` one of `pending | approved | rejected`. The lifecycle `status` stays `pending_approval`
+throughout — the request *is* pending; the sub-state only says whose approval is outstanding.
+`status_label` is derived, so every surface reads "Under Manager Approval" / "Manager Approved"
+without the state machine, its filters or its dropdowns changing. See
+`services/manager_approval.py`.
+
+A request raised **by** a manager is stamped `approved` on the spot. A request with `state = null`
+predates this stage and is treated as approved, so nothing already on the desk became stuck.
+
+```
+GET  /api/manager/service-requests
+  ?outstanding=bool (default true) &page &page_size
+→ Page[ManagerQueueItem]     newest first; the caller's own merchant, never widenable
+GET  /api/manager/service-requests/counts        → ManagerQueueCounts {pending}
+POST /api/manager/service-requests/{id}/approve  → ManagerQueueItem
+POST /api/manager/service-requests/{id}/reject
+  Body: {reason: str}                                       reason mandatory
+→ ManagerQueueItem
+Permission: P.SERVICE_REQUEST_APPROVE  (NEW code)
+409 if a manager has already decided it (names them); 404 for another company's request
+```
+
+`P.SERVICE_REQUEST_APPROVE` is held by `MerchantRole.MANAGER` and by `merchant_admin`, and by **no
+platform role** — an admin approving on the merchant's behalf would collapse the two approvals this
+stage exists to keep apart. Approving moves no status; rejecting walks the request to `cancelled`
+via the existing merchant-side edge and closes it without our desk ever seeing it.
+
+Staff paths enforce this at the service layer, not only in the UI:
+`/api/admin/change-requests/{id}/review|approve|reject` and
+`/api/admin/service-requests/{id}/resolve` all return **409** for a request the merchant's manager
+has not signed off.
+
+`ManagerQueueItem`: `{id, request_number, request_type, request_type_label, status, status_label,
+manager_state, manager_approval, booking_id, booking_request_number, booking_reference, pnr,
+raised_by, reason, details, created_at, updated_at}`.
 
 ### 6.4 Notification Center
 

@@ -242,7 +242,13 @@ const OpsApi = {
         passenger_modification  { passenger_id: int, changes: {...} }
         extra_baggage/meal/seat  free-form
      Created at draft then immediately transitioned to pending_approval by
-     the service, so it is in the queue the moment this resolves. */
+     the service.
+
+     IT IS NOT ON THE STAFF QUEUE YET. Since 2026-08-01 every service request
+     waits for a manager of the raising merchant first — the response carries
+     `manager_state: 'pending'` and reads "Under Manager Approval" until they
+     sign it off through /api/manager/service-requests. A request raised BY a
+     manager is stamped approved on the spot. */
   createServiceRequest({ bookingId, requestType, remarks, details }) {
     return this._req('post', '/api/service-requests', {
       data: { booking_id: bookingId, request_type: requestType, remarks, details },
@@ -250,7 +256,10 @@ const OpsApi = {
   },
 
   /* servicerequest.manage. approve=false needs a reason. Approving moves the
-     request to `approved` — it does NOT itself change the parent booking. */
+     request to `approved` — it does NOT itself change the parent booking.
+
+     409 while the raising merchant's own manager has not signed it off; see
+     createServiceRequest above. */
   resolveServiceRequest(id, { approve, reason }) {
     return this._req('post', `/api/admin/service-requests/${id}/resolve`, {
       data: { approve, reason: reason || undefined },

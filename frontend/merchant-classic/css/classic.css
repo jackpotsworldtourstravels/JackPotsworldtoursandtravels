@@ -209,17 +209,9 @@ table{border-collapse:collapse;}
   box-shadow:var(--cl-shadow-sm);
   position:sticky; top:16px; z-index:150;
 }
-.cl-top-brand{
-  font-size:16px; font-weight:800; color:var(--cl-text-primary);
-  display:flex; align-items:center; gap:9px; white-space:nowrap;
-}
-/* The square emblem — it already carries its own dark plate, so it needs only
-   rounding to match the topbar's other 12px controls. */
-.cl-top-logo{height:32px; width:32px; border-radius:9px; object-fit:contain; flex-shrink:0;}
-.cl-top-brand span{
-  font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
-  background:var(--cl-coral); color:#fff; padding:3px 9px; border-radius:var(--cl-radius-pill);
-}
+/* No .cl-top-brand rule: the topbar carries no brand block. The rail's logo is
+   the one place the company is named, and the search box takes the width the
+   name used to. */
 .cl-top-search{flex:1; max-width:360px; position:relative;}
 .cl-top-search input{
   width:100%; height:38px; padding:0 14px; font-size:13.5px;
@@ -446,6 +438,35 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
   color:var(--cl-text-primary); font-variant-numeric:tabular-nums;
 }
 .cl-kpi-sub{font-size:10.5px; color:var(--cl-text-muted); margin-top:3px; font-weight:600;}
+
+/* ==============================  charts  ================================
+   The dashboard's three SVG figures. Nothing here sets a colour: the charts
+   themselves reference the same --cl- tokens as every other component, which
+   is what lets the theme switch re-paint them without a redraw. */
+
+.cl-charts{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr));
+  gap:18px; margin-bottom:24px;
+}
+/* The panels are already margin-bottom'd on their own; inside the grid the gap
+   does that job, so the extra margin would double the gutter. */
+.cl-charts .cl-panel{margin-bottom:0;}
+.cl-chart .cl-panel-body{padding-top:14px;}
+/* height:auto with a viewBox is what makes the drawing scale with the column
+   instead of needing a resize observer. */
+.cl-chart-svg{display:block; width:100%; height:auto; overflow:visible;}
+
+.cl-donut{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
+.cl-donut svg{width:140px; height:140px; flex-shrink:0;}
+.cl-legend{list-style:none; margin:0; padding:0; flex:1; min-width:130px;}
+.cl-legend li{
+  display:flex; align-items:center; gap:8px;
+  font-size:11.5px; font-weight:600; color:var(--cl-text-muted);
+  padding:3px 0;
+}
+.cl-legend i{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
+.cl-legend span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cl-legend b{color:var(--cl-text-primary); font-weight:800; font-variant-numeric:tabular-nums;}
 
 /* ==============================  tabs  ================================== */
 
@@ -752,14 +773,13 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 }
 @media (max-width:640px){
   .cl-top{margin:12px 14px 0; padding:12px 14px; gap:10px;}
-  /* Three rows at phone width: brand, then the controls, then the search box
+  /* Two rows at phone width: the burger and the controls, then the search box
      across the full width — nothing is dropped, nothing overflows. */
   .cl-top-right{order:4; flex:1 1 100%; margin-left:0; justify-content:flex-start;}
   .cl-top-search{order:5; flex:1 1 100%; max-width:none;}
   .cl-crumb{padding:14px 14px 0;}
   .cl-content{padding:14px 14px 32px;}
   .cl-crumb-date{display:none;}
-  .cl-top-brand span{display:none;}
   .cl-form, .cl-form-2, .cl-form-3{grid-template-columns:1fr;}
   .cl-field-wide{grid-column:auto;}
   .cl-kpis{grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}

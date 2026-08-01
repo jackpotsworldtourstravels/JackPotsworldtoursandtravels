@@ -107,6 +107,16 @@ SETTLEMENT_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.TICKET_ISSUED: (
         Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
     ),
+    # A completed booking can be cancelled too. The trip is behind it, so this
+    # is not "stop them travelling" — it is the settlement of a post-travel
+    # claim, and it still runs through an approved cancellation request that
+    # quotes the charge and the refund. COMPLETED has no edges at all in
+    # TRANSITIONS and keeps none: without ``settlement=True`` it is still
+    # terminal, which is what stops a Cancel button appearing on a trip that
+    # has already flown.
+    S.COMPLETED: (
+        Transition(S.CANCELLED, P.SERVICE_REQUEST_MANAGE, "Cancellation approved", requires_reason=True),
+    ),
 }
 
 #: Statuses at which a merchant may still edit passengers/details.

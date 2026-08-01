@@ -167,13 +167,67 @@ function clShowAuth() {
   $('clAuth').style.display = 'flex';
   $('clApp').classList.remove('active');
 }
+/* ---------------------------------------------------------------------------
+   Who is signed in, and as what.
+
+   The topbar shows the ROLE beside the name. Two role fields exist on the
+   session: `merchant_role` (Manager / Supervisor / Operator / Finance / Data
+   Operator — the job inside the company) and `role` (merchant_admin /
+   merchant_user — the portal-level one). The merchant role is the one that
+   decides what this person may do day to day, so it wins when present.
+
+   Operator and Data Operator are the same role by the business's decision
+   (see rbac.py::_MERCHANT_OPERATOR), so both print as "Operator" rather than
+   showing two names for one job.
+   --------------------------------------------------------------------------- */
+const CL_MERCHANT_ROLE_LABELS = {
+  manager: 'Manager', supervisor: 'Supervisor', operator: 'Operator',
+  finance: 'Finance', data_operator: 'Operator',
+};
+const CL_PORTAL_ROLE_LABELS = {
+  merchant_admin: 'Merchant Admin', merchant_user: 'Merchant User',
+};
+
+/* The signed-in user, as the login stored it. Null on a session created before
+   `merchant_user_json` existed — clRefreshRole() repairs that from /api/profile. */
+function clSessionUser() {
+  try { return getPortalUser('merchant'); } catch { return null; }
+}
+
+function clRoleLabel(user) {
+  if (!user) return '';
+  return CL_MERCHANT_ROLE_LABELS[user.merchant_role]
+    || CL_PORTAL_ROLE_LABELS[user.role]
+    || clLabel(user.merchant_role || user.role || '');
+}
+
+/* Whether this account may sign off its own company's service requests.
+   Mirrors the server's rule in change_request_service._is_manager. */
+function clIsManager(user = clSessionUser()) {
+  return !!user && (user.merchant_role === 'manager' || user.role === 'merchant_admin');
+}
+
+/* A session stored before the role was needed carries no role at all, and the
+   topbar would sit on a dash forever. /api/profile returns the same shape the
+   login did, so one call repairs it — and it is the same call Profile &
+   Settings already makes, so nothing new is being asked of the backend. */
+async function clRefreshRole() {
+  if (clRoleLabel(clSessionUser())) return;
+  try {
+    const me = await MerchantApi.getProfile();
+    localStorage.setItem('merchant_user_json', JSON.stringify(me));
+    $('clUserRole').textContent = clRoleLabel(me) || '—';
+  } catch { /* the topbar keeps the name; the role stays blank */ }
+}
+
 function clShowApp() {
   $('clAuth').style.display = 'none';
   $('clApp').classList.add('active');
 
   const name = localStorage.getItem(PARTNER_KEYS.fullName) || 'Merchant';
   $('clUserName').textContent = name;
-  $('clUserCompany').textContent = localStorage.getItem(PARTNER_KEYS.companyName) || '';
+  $('clUserRole').textContent = clRoleLabel(clSessionUser()) || '—';
+  clRefreshRole();
   $('clDate').textContent = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
@@ -379,9 +433,10 @@ function clInitSupport() {
         </dl>
       </div>
       <div class="cl-panel-note">
-        Ticketing, date changes, cancellations and refunds are raised through
+        Ticketing, date changes, cancellations and ancillaries are raised through
         <a href="#" data-cl-nav-inline="service-request">Service Requests</a> so they are tracked
-        against the booking — email is for anything that has no request behind it.
+        against the booking — email is for anything that has no request behind it. Every one of
+        them goes to your own manager first, then to our desk.
       </div>
     </div>
 
@@ -394,9 +449,11 @@ function clInitSupport() {
             <tr><td>Booking not yet approved</td><td>My Requests — the status column shows the current stage</td></tr>
             <tr><td>Payment not reflecting</td><td>Payments — submitted payments sit in "awaiting verification"</td></tr>
             <tr><td>Change a traveller's date</td><td>Service Requests → Date change</td></tr>
-            <tr><td>Cancel a traveller</td><td>Service Requests → Cancellation</td></tr>
-            <tr><td>Refund status</td><td>Service Requests → Refund</td></tr>
-            <tr><td>Credit limit or wallet</td><td>Dashboard, then the partner desk</td></tr>
+            <tr><td>Cancel a booking</td><td>Service Requests → Cancellation</td></tr>
+            <tr><td>Refund status</td><td>The refund is quoted on the cancellation that earned it</td></tr>
+            <tr><td>Baggage, meal or seat</td><td>Service Requests → the matching tab</td></tr>
+            <tr><td>A request stuck "Under Manager Approval"</td><td>Your own manager — it has not reached us yet</td></tr>
+            <tr><td>Wallet balance</td><td>Dashboard, then the partner desk</td></tr>
           </tbody>
         </table>
       </div>

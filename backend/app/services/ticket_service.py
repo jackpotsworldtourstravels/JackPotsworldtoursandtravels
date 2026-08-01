@@ -41,6 +41,7 @@ from app.services import (
     catalog_service,
     change_request_service,
     lifecycle,
+    manager_approval,
     merchant_service,
     notification_service,
 )
@@ -645,16 +646,19 @@ def reject_request(db: Session, actor: User, request_id: int, reason: str) -> Se
 
 def cancel_request(db: Session, actor: User, request_id: int, reason: str | None = None) -> ServiceRequest:
     request = get_request(db, actor, request_id)
-    # A change request is withdrawn, not cancelled. Same end state, but the
-    # withdraw endpoint refuses once an operator has claimed it and tells the
-    # desk it went away — both of which this path would skip.
-    if request.request_type in change_request_service.CHANGE_TYPES:
+    # This endpoint cancels a BOOKING. A service request is not the caller's to
+    # take back at all — it belongs to their manager the moment it is raised, and
+    # letting it be cancelled here would be the withdraw that was deliberately
+    # removed, under another name: no record of who decided, no reason, and no
+    # word to the operator who may already be working it.
+    if request.request_type in SERVICE_REQUEST_TYPES:
+        kind = request.request_type.value.replace("_", " ")
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"{request.request_number} is a "
-                f"{change_request_service.TYPE_LABELS[request.request_type].lower()} request. "
-                f"Withdraw it with POST /api/change-requests/{request.request_id}/withdraw."
+                f"{request.request_number} is a {kind} request and cannot be cancelled here. "
+                "Your manager can reject it with "
+                f"POST /api/manager/service-requests/{request.request_id}/reject."
             ),
         )
     if request.parent_request_id:
@@ -912,7 +916,14 @@ def create_service_request(
         status=S.DRAFT,
         title=f"{request_type.value.replace('_', ' ').title()} — {booking.request_number}",
         remarks=remarks,
-        travel_details=details or {},
+        travel_details={
+            **(details or {}),
+            # The merchant's own sign-off stage, in front of ours. Same block,
+            # same rules and the same manager queue as a cancellation — every
+            # service request goes through it, not just the two that settle
+            # money. See services/manager_approval.py.
+            manager_approval.FIELD: manager_approval.stamp_on_raise(actor),
+        },
         status_history=[],
     )
     db.add(request)
@@ -927,10 +938,25 @@ def create_service_request(
         description=f"{actor.full_name} raised {request.request_number} ({request_type.value})",
         reference_id=request.request_id, merchant_id=request.merchant_id,
     )
-    notification_service.notify_admins(
-        db, "New service request",
-        f"{request.request_number} ({request_type.value.replace('_', ' ')}) needs attention.",
-    )
+
+    kind = request_type.value.replace("_", " ")
+    if manager_approval.is_pending(request):
+        # Not our work yet. Announcing it to the admin queue would fill it with
+        # requests nobody there is allowed to touch.
+        told = notification_service.notify_merchant_managers(
+            db, request.merchant_id, "Service request needs your approval",
+            f"{request.request_number} ({kind}) against {booking.request_number}: {remarks}",
+        )
+        if not told:
+            notification_service.notify_admins(
+                db, "Service request stuck awaiting a manager",
+                f"{request.request_number} ({kind}) has no manager who can approve it.",
+            )
+    else:
+        notification_service.notify_admins(
+            db, "New service request",
+            f"{request.request_number} ({kind}) needs attention.",
+        )
     return request
 
 
@@ -959,6 +985,10 @@ def resolve_service_request(
                 "applies the change to the booking."
             ),
         )
+    # The merchant's manager signs off first. Enforced here rather than only on
+    # the Admin screen, so hiding the button is a convenience and this is the
+    # rule.
+    manager_approval.guard_ready_for_staff(request)
 
     if not approve:
         lifecycle.transition(db, request, S.REJECTED, actor, reason=reason, commit=False)

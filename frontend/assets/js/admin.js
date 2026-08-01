@@ -67,7 +67,7 @@ const sectionTitles = {
   support: 'Support Management', 'reports-export': 'Reports', payments: 'Payment Management',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
   'ticket-enquiries': 'Ticket Enquiries',
-  'change-requests': 'Cancellations & Reschedules',
+  'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
 };
 const loadedSections = new Set();
@@ -104,7 +104,7 @@ function loadSection(name) {
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
   if (name === 'ticket-enquiries') return loadTicketEnquiries();
-  if (name === 'change-requests') return loadChangeRequests();
+  if (name === 'booking-ops') return loadBookingOps();
   if (name === 'profile') return loadAdminProfile();
 }
 
@@ -745,81 +745,288 @@ async function loadApprovalQueue(page = aqPage) {
   }
 }
 
-/* ---------- Service Request Management ---------- GET /api/requests?request_type=...
-   (existing), POST /api/admin/service-requests/{id}/resolve (existing). */
+/* ---------- Service Request Management ----------
+   Every service request a merchant has raised, of every type, in one queue.
+
+   THE TWO SCREENS THAT USED TO BE HERE ARE ONE
+   Cancellations and date changes had a screen of their own, because settling
+   one does more than mark it Approved — it cancels the booking and states the
+   refund, or rewrites the travel dates and states what is payable. That is
+   still true, and the dialog that does it is still admin-change-requests.js.
+   What was wrong was making it a separate *queue*: an admin looking for
+   SRQ-000123 had to already know which of the two workflows it belonged to
+   before they could find it. The row now picks the dialog from its own type.
+
+   THE MERCHANT'S MANAGER GOES FIRST
+   A request arrives here only after a manager at the merchant has signed it
+   off. Until then it is listed as "Under Manager Approval" with no action —
+   it is not ours to touch yet, and the backend refuses every staff endpoint
+   for one (services/manager_approval.py). "Manager Approved" is the stage
+   that is actually ours, and it is what this screen opens on.
+
+   ENDPOINTS — all pre-existing
+     GET  /api/requests?request_type=...              the rows, per type
+     POST /api/admin/service-requests/{id}/resolve    approve/reject the generic types
+     GET/POST /api/change-requests/...                the settle dialog, for the two
+                                                      types that change the booking */
+
 const SERVICE_REQUEST_TYPES = ['cancellation', 'date_change', 'refund', 'passenger_modification', 'extra_baggage', 'meal', 'seat'];
 
-/* What Service Request Management may actually resolve. Cancellation and date
-   change are settled on the Cancellations & Reschedules screen instead — they
-   quote money and change the booking, and the resolve endpoint behind this
-   screen refuses them (ticket_service.resolve_service_request). Listing them
-   here would only offer a Resolve button that comes back 400.
+/* The two types whose Settle opens the pricing dialog rather than the plain
+   approve/reject one. The backend refuses the generic resolve endpoint for
+   them, so this list is the UI half of a rule the server also enforces. */
+const SRM_SETTLED_TYPES = ['cancellation', 'date_change'];
 
-   SERVICE_REQUEST_TYPES above keeps the full list on purpose: reports should
-   still report on cancellations. */
-const SRM_RESOLVABLE_TYPES = SERVICE_REQUEST_TYPES.filter(
-  t => t !== 'cancellation' && t !== 'date_change');
+/* Statuses at which the request is still somebody's to action. */
+const SRM_OPEN = ['pending_approval', 'in_review'];
+
+const SRM_TYPE_LABELS = {
+  cancellation: 'Cancellation', date_change: 'Date Change', refund: 'Refund',
+  passenger_modification: 'Passenger Modification', extra_baggage: 'Extra Baggage',
+  meal: 'Meal', seat: 'Seat',
+};
+
 let srmPage = 1;
+let srmRows = [];
 let srmFiltersWired = false;
+let srmSearchTimer = null;
+
+/* Whose approval a row is waiting on. `manager_state` comes straight from the
+   API; a row without one predates manager sign-off and is ours by default. */
+function srmStage(r) {
+  if (r.status === 'pending_approval') {
+    return r.manager_state === 'pending' ? 'awaiting_manager' : 'actionable';
+  }
+  return r.status;
+}
+
+function srmBadge(r) {
+  const stage = srmStage(r);
+  if (stage === 'awaiting_manager') return 'pending';
+  if (stage === 'actionable') return 'confirmed';
+  return aqStatusBadgeClass(r.status);
+}
+
+/* What the merchant actually asked for, in one cell, whatever the type. A
+   reschedule is only meaningful as "from → to"; an ancillary is meaningful as
+   the thing requested. Both come off `details`, which the API returns whole. */
+function srmAsk(r) {
+  const d = r.details || {};
+  let headline;
+  if (r.request_type === 'date_change') {
+    headline = `${d.current_travel_date ? fmtDate(d.current_travel_date) : '—'} →
+                <strong>${d.new_travel_date ? fmtDate(d.new_travel_date) : '—'}</strong>`;
+  } else if (r.request_type === 'cancellation') {
+    headline = 'Cancel the whole booking';
+  } else if (r.request_type === 'extra_baggage') {
+    headline = d.weight_kg ? `${escapeHtml(String(d.weight_kg))} kg extra` : 'Extra baggage';
+  } else if (r.request_type === 'meal') {
+    headline = d.meal ? escapeHtml(admLabel(d.meal)) : 'Meal';
+  } else if (r.request_type === 'seat') {
+    headline = d.seat_preference ? `${escapeHtml(admLabel(d.seat_preference))} seat` : 'Seat';
+  } else if (r.request_type === 'passenger_modification') {
+    headline = d.field
+      ? `${escapeHtml(admLabel(d.field))} → <strong>${escapeHtml(String(d.new_value ?? ''))}</strong>`
+      : 'Passenger correction';
+  } else {
+    headline = escapeHtml(SRM_TYPE_LABELS[r.request_type] || r.request_type);
+  }
+  const reason = d.reason || r.remarks || '';
+  return `<div>${headline}</div>${reason ? `<div class="cell-sub">${escapeHtml(reason)}</div>` : ''}`;
+}
+
+/* The settled figure, or nothing. A request nobody has priced shows a dash
+   rather than 0.00 — "not priced yet" and "nothing to refund" are different
+   statements, and only one of them is good news. */
+function srmSettlement(r) {
+  const p = r.pricing || {};
+  if (p.kind === 'cancellation') {
+    return `<div class="cell-sub">Charge ${crMoney(p.cancellation_charge)} ·
+            refund <strong>${crMoney(p.refund_amount)}</strong></div>`;
+  }
+  if (p.kind === 'reschedule') {
+    return `<div class="cell-sub">Payable <strong>${crMoney(p.total_payable)}</strong></div>`;
+  }
+  return '';
+}
+
+function srmStatusCell(r) {
+  const m = r.manager_approval || {};
+  const stage = srmStage(r);
+  let sub = '';
+  if (stage === 'awaiting_manager') {
+    sub = `<div class="cell-sub">with ${escapeHtml(m.by_name || 'the merchant’s manager')}</div>`;
+  } else if (stage === 'actionable' && m.by_name && !m.self_raised) {
+    sub = `<div class="cell-sub">signed off by ${escapeHtml(m.by_name)}</div>`;
+  } else if (r.status === 'in_review' && r.details?.review_claimed_by_name) {
+    sub = `<div class="cell-sub">with ${escapeHtml(r.details.review_claimed_by_name)}</div>`;
+  }
+  return `<span class="badge ${srmBadge(r)}">${escapeHtml(r.status_label)}</span>${sub}${srmSettlement(r)}`;
+}
+
+/* Settle only what the merchant's manager has released, and only what is still
+   open. Everything else gets View, so a row is never a dead end — an admin can
+   always read what was asked and what was decided. */
+function srmActions(r) {
+  const actionable = srmStage(r) === 'actionable' || r.status === 'in_review';
+  const label = actionable && SRM_OPEN.includes(r.status) ? 'Settle' : 'View';
+  return `<button class="btn ${label === 'Settle' ? 'btn-navy' : 'btn-ghost'} btn-sm"
+                  data-srm-open="${r.id}">${label}</button>`;
+}
+
 async function loadServiceRequestManagement(page = srmPage) {
   srmPage = page;
   if (!srmFiltersWired) {
     srmFiltersWired = true;
-    ['srmTypeFilter', 'srmStatusFilter'].forEach(id => document.getElementById(id).addEventListener('change', () => loadServiceRequestManagement(1)));
-  }
-  const tbody = document.querySelector('#srmTable tbody');
-  tbody.innerHTML = `<tr><td colspan="7">${rowsSkeleton(4)}</td></tr>`;
-  const typeFilter = document.getElementById('srmTypeFilter').value;
-  const statusFilter = document.getElementById('srmStatusFilter').value;
-  try {
-    const types = typeFilter ? [typeFilter] : SRM_RESOLVABLE_TYPES;
-    const results = await Promise.all(types.map(t => axios.get(`${API_BASE}/api/requests`, {
-      headers: authHeaders(), params: { request_type: t, status: statusFilter || undefined, page: 1, page_size: 100 },
-    }).then(r => r.data.items).catch(() => [])));
-    const items = results.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    tbody.innerHTML = items.length ? items.map(r => `
-      <tr>
-        <td>${escapeHtml(r.request_number)}</td>
-        <td style="text-transform:capitalize">${escapeHtml(r.request_type.replace(/_/g, ' '))}</td>
-        <td>${escapeHtml(r.booking_reference || '—')}</td>
-        <td style="max-width:220px;">${escapeHtml(r.remarks || '—')}</td>
-        <td><span class="badge ${aqStatusBadgeClass(r.status)}">${escapeHtml(r.status_label)}</span></td>
-        <td>${fmtDateTime(r.created_at)}</td>
-        <td>${['pending_approval', 'in_review'].includes(r.status) ? `<button class="btn btn-ghost btn-sm" data-srm-resolve="${r.id}">Resolve</button>` : '—'}</td>
-      </tr>
-    `).join('') : `<tr><td colspan="7" class="empty-state">No service requests match this filter.</td></tr>`;
-    tbody.querySelectorAll('[data-srm-resolve]').forEach(btn => {
-      btn.addEventListener('click', () => openServiceRequestResolveModal(btn.dataset.srmResolve));
+    ['srmTypeFilter', 'srmStageFilter'].forEach(id =>
+      document.getElementById(id).addEventListener('change', () => loadServiceRequestManagement(1)));
+    document.getElementById('srmRefreshBtn').addEventListener('click',
+      () => loadServiceRequestManagement(1));
+    document.getElementById('srmSearch').addEventListener('input', () => {
+      clearTimeout(srmSearchTimer);
+      srmSearchTimer = setTimeout(() => srmRender(), 250);
     });
+  }
+
+  const tbody = document.querySelector('#srmTable tbody');
+  tbody.innerHTML = `<tr><td colspan="8">${rowsSkeleton(4)}</td></tr>`;
+  const typeFilter = document.getElementById('srmTypeFilter').value;
+
+  try {
+    /* /api/requests filters on a single request_type, so "all types" is seven
+       calls merged rather than one. Failures are per-type and swallowed: one
+       type erroring should cost that type's rows, not the whole screen. */
+    const types = typeFilter ? [typeFilter] : SERVICE_REQUEST_TYPES;
+    const results = await Promise.all(types.map(t =>
+      axios.get(`${API_BASE}/api/requests`, {
+        headers: authHeaders(), params: { request_type: t, page: 1, page_size: 100 },
+      }).then(r => r.data.items).catch(() => [])));
+    srmRows = results.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    srmRender();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load service requests.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load service requests.</td></tr>`;
   }
 }
 
-function openServiceRequestResolveModal(requestId) {
+/* Stage and search are applied here rather than server-side: neither is a
+   parameter /api/requests takes — the stage is a JSONB sub-field and the
+   endpoint has no free-text filter for requests — and re-fetching seven types
+   per keystroke would be both slower and no more correct. */
+function srmRender() {
+  const tbody = document.querySelector('#srmTable tbody');
+  const stage = document.getElementById('srmStageFilter').value;
+  const q = document.getElementById('srmSearch').value.trim().toLowerCase();
+
+  let rows = srmRows;
+  if (stage) rows = rows.filter(r => srmStage(r) === stage);
+  if (q) {
+    rows = rows.filter(r => [
+      r.request_number, r.booking_reference, r.pnr, r.merchant_name,
+      (r.details || {}).booking_request_number,
+    ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  }
+
+  const actionable = srmRows.filter(r => srmStage(r) === 'actionable').length;
+  const waiting = srmRows.filter(r => srmStage(r) === 'awaiting_manager').length;
+  document.getElementById('srmQueueSummary').textContent =
+    `${srmRows.length} request${srmRows.length === 1 ? '' : 's'}`
+    + (actionable ? ` · ${actionable} ready to action` : '')
+    + (waiting ? ` · ${waiting} with the merchant's manager` : '');
+  updateServiceRequestNavBadge(actionable);
+
+  tbody.innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><span class="mono">${escapeHtml(r.request_number)}</span></td>
+      <td>${escapeHtml(SRM_TYPE_LABELS[r.request_type] || admLabel(r.request_type))}</td>
+      <td>${escapeHtml(r.merchant_name || '—')}</td>
+      <td><span class="mono">${escapeHtml((r.details || {}).booking_request_number || r.booking_reference || '—')}</span>
+          <div class="cell-sub">${escapeHtml(r.pnr || '')}</div></td>
+      <td>${srmAsk(r)}</td>
+      <td>${srmStatusCell(r)}</td>
+      <td>${fmtDateTime(r.created_at)}</td>
+      <td style="white-space:nowrap;">${srmActions(r)}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="8" class="empty-state">No service requests match this filter.</td></tr>`;
+
+  tbody.querySelectorAll('[data-srm-open]').forEach(btn =>
+    btn.addEventListener('click', () => openServiceRequest(btn.dataset.srmOpen)));
+  document.getElementById('srmPagination').innerHTML = '';
+}
+
+function updateServiceRequestNavBadge(count) {
+  const badge = document.getElementById('srmNavBadge');
+  if (!badge) return;
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.hidden = !count;
+}
+
+/* One entry point, two dialogs. A cancellation or a date change opens the
+   pricing dialog in admin-change-requests.js — it quotes the charge, derives
+   the refund and applies the result to the booking. Everything else opens the
+   plain approve/reject dialog below, which is all the generic resolve endpoint
+   can do. Choosing here rather than at the button means a new service request
+   type lands in the right dialog by default. */
+function openServiceRequest(requestId) {
+  const row = srmRows.find(r => String(r.id) === String(requestId));
+  if (row && SRM_SETTLED_TYPES.includes(row.request_type)) {
+    return openChangeRequest(requestId);
+  }
+  openServiceRequestResolveModal(requestId, row);
+}
+
+function openServiceRequestResolveModal(requestId, row) {
   const overlay = document.getElementById('prServiceRequestModalOverlay');
   const body = document.getElementById('prServiceRequestModalBody');
   overlay.classList.add('open');
+
+  const readOnly = row && !SRM_OPEN.includes(row.status);
+  const awaitingManager = row && srmStage(row) === 'awaiting_manager';
+
   body.innerHTML = `
-    <h2>Resolve Service Request</h2>
-    <div class="form-field" style="max-width:none;">
-      <label>Decision</label>
-      <select id="srmResolveDecision" class="status-select" style="width:100%;">
-        <option value="approve">Approve</option>
-        <option value="reject">Reject</option>
-      </select>
-    </div>
-    <div class="form-field" id="srmReasonField" style="max-width:none;display:none;">
-      <label>Reason</label>
-      <textarea id="srmReason" rows="2" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-color);font-family:var(--ff);font-size:14px;"></textarea>
-    </div>
-    <div class="modal-actions" style="margin-top:16px;">
-      <button type="button" class="btn btn-coral" id="srmConfirmBtn">Confirm</button>
-      <button type="button" class="btn btn-ghost" id="srmCloseBtn">Cancel</button>
-    </div>
-    <div class="msg" id="srmModalMsg"></div>
+    <h2>${escapeHtml(row ? SRM_TYPE_LABELS[row.request_type] || admLabel(row.request_type) : 'Service request')}
+        ${escapeHtml(row ? row.request_number : '')}</h2>
+    ${row ? `<p class="modal-sub">${escapeHtml(row.merchant_name || '')} · raised ${fmtDateTime(row.created_at)}</p>
+      <div class="detail-grid">
+        ${crDetailRow('Status', `<span class="badge ${srmBadge(row)}">${escapeHtml(row.status_label)}</span>`)}
+        ${crDetailRow('Booking', `<span class="mono">${escapeHtml((row.details || {}).booking_request_number || '—')}</span>`)}
+        ${crDetailRow('PNR', escapeHtml(row.pnr || '—'))}
+        ${crDetailRow('Asked for', srmAsk(row))}
+      </div>
+      ${(row.manager_approval || {}).by_name ? `<div class="detail-note"><strong>Merchant's manager</strong>
+        <p>${escapeHtml(row.manager_approval.by_name)} —
+        ${escapeHtml(row.manager_approval.state === 'approved' ? 'approved' : 'rejected')}${
+          row.manager_approval.reason ? `: ${escapeHtml(row.manager_approval.reason)}` : ''}</p></div>` : ''}
+      ${row.rejection_reason ? `<div class="detail-note"><strong>Refused because</strong><p>${escapeHtml(row.rejection_reason)}</p></div>` : ''}`
+    : ''}
+
+    ${awaitingManager ? `<div class="msg info">
+      This request is still with the merchant's own manager. It cannot be actioned here until they
+      have approved it — the server refuses it too.</div>` : ''}
+    ${readOnly && !awaitingManager ? '<div class="msg info">This request has been settled and is now read-only.</div>' : ''}
+
+    ${!readOnly && !awaitingManager ? `
+      <div class="form-field" style="max-width:none;">
+        <label for="srmResolveDecision">Decision</label>
+        <select id="srmResolveDecision" class="status-select" style="width:100%;">
+          <option value="approve">Approve</option>
+          <option value="reject">Reject</option>
+        </select>
+      </div>
+      <div class="form-field" id="srmReasonField" style="max-width:none;display:none;">
+        <label for="srmReason">Reason</label>
+        <textarea id="srmReason" rows="2" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-color);font-family:var(--ff);font-size:14px;"></textarea>
+      </div>
+      <div class="msg" id="srmModalMsg"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-coral" id="srmConfirmBtn">Confirm</button>
+        <button type="button" class="btn btn-ghost" id="srmCloseBtn">Cancel</button>
+      </div>`
+    : '<div class="modal-actions"><button type="button" class="btn btn-ghost" id="srmCloseBtn">Close</button></div>'}
   `;
+
   document.getElementById('srmCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  if (readOnly || awaitingManager) return;
+
   document.getElementById('srmResolveDecision').addEventListener('change', e => {
     document.getElementById('srmReasonField').style.display = e.target.value === 'reject' ? 'block' : 'none';
   });
@@ -828,11 +1035,16 @@ function openServiceRequestResolveModal(requestId) {
     const approve = document.getElementById('srmResolveDecision').value === 'approve';
     const reason = document.getElementById('srmReason').value.trim();
     if (!approve && !reason) { msg.textContent = 'Enter a reason for rejecting.'; msg.className = 'msg error'; return; }
+    const btn = document.getElementById('srmConfirmBtn');
+    btn.disabled = true;
     try {
-      await axios.post(`${API_BASE}/api/admin/service-requests/${requestId}/resolve`, { approve, reason: reason || undefined }, { headers: authHeaders() });
+      await axios.post(`${API_BASE}/api/admin/service-requests/${requestId}/resolve`,
+        { approve, reason: reason || undefined }, { headers: authHeaders() });
+      showToast(`${row ? row.request_number : 'Request'} ${approve ? 'approved' : 'rejected'}.`);
       overlay.classList.remove('open');
       loadServiceRequestManagement(srmPage);
     } catch (err) {
+      btn.disabled = false;
       msg.textContent = err.response?.data?.detail || 'Failed to resolve.';
       msg.className = 'msg error';
     }

@@ -4,7 +4,7 @@
 It is updated whenever a milestone is completed and verified, and it outranks any plan that
 lives only in a chat session. If this file and a conversation disagree, this file wins.
 
-Last updated: **2026-07-31** · Current milestone: **M4 — Finance, Billing & Payment Tracking, in progress**
+Last updated: **2026-08-01** · Current milestone: **M4 — Finance, Billing & Payment Tracking, in progress**
 
 ---
 
@@ -156,6 +156,86 @@ merchant-facing half of Phase 3** while leaving that milestone's backend entirel
 - Verified by: `tests/verify_api.py`, whose submit-validation section previously asserted the
   **opposite** rule and was rewritten to assert the new contract (including a booking that never
   touches a document endpoint at all)
+
+
+### CR-2 — Manager approval, portal cleanup, Booking Operations UI ✅ **Complete**
+
+An out-of-band change request, 2026-08-01. Not a numbered milestone: it is a batch of
+merchant- and admin-portal changes plus the one workflow change they all hang off.
+
+**The workflow change — a second approval, in front of ours.** Every service request a merchant
+raises (`cancellation`, `date_change`, `refund`, `passenger_modification`, `extra_baggage`,
+`meal`, `seat`) now waits for a **manager of that merchant** before our desk can see or settle
+it. Raised → *Under Manager Approval* → *Manager Approved* → our desk. A manager's refusal closes
+the request and it never reaches us.
+
+- **No migration and no new enum members.** The stage is a JSONB block at
+  `service_requests.travel_details.manager_approval`; `status` stays `pending_approval`
+  throughout, because the request *is* pending — the sub-state only says whose approval is
+  outstanding. `status_label` is derived, so every surface reads the right thing without the
+  state machine, its filters or its dropdowns changing. See `services/manager_approval.py`.
+- **One new permission code**, `servicerequest.approve`, held by `MerchantRole.MANAGER` and by
+  `merchant_admin` and by **no platform role** — an admin approving on the merchant's behalf
+  would collapse the two approvals the stage exists to keep apart.
+- **Withdraw is gone.** `POST /api/change-requests/{id}/withdraw` was removed: it let whoever
+  raised a request pull it out from under an operator already on the phone to the airline, and
+  left no record of who changed their mind. `POST /api/requests/{id}/cancel` now refuses every
+  service request type for the same reason.
+- **Enforced at the service layer**, not only in the UI: `review` / `approve` / `reject` on
+  `/api/admin/change-requests`, and `/api/admin/service-requests/{id}/resolve`, all 409 for a
+  request the merchant's manager has not signed off.
+- **A completed booking can be cancelled.** What is settled after travel is the money, not the
+  journey. The `COMPLETED -> CANCELLED` edge lives in `lifecycle.SETTLEMENT_TRANSITIONS`, so it
+  is reachable only through an approved cancellation and never appears in `allowed_transitions`.
+  A completed booking still cannot be *rescheduled*.
+- **One cancellation per booking, ever**, checked under the parent's row lock alongside the
+  existing "one open change request" rule.
+
+**Merchant portal (Classic V2)**
+
+- Topbar: the "JackPots World Classic" brand block is gone (the rail already carries the logo),
+  and the chip beside the user's name shows their **role** rather than the company.
+- Every credit figure is gone — the wallet is the balance a merchant spends against, and a
+  second money figure nothing spends only raised the question of which was real. `credit_limit`
+  is untouched on the merchant record and still returned by the dashboard endpoint.
+- The dashboard's Recent Requests table is replaced by three charts over the merchant's own
+  bookings: volume by month, value by month, and a stage mix. Hand-rolled inline SVG against the
+  `--cl-` tokens, so the light/dark switch re-themes them with no redraw.
+- Service Requests: **Select opens a dialog** rather than appending a form below the fold, with a
+  **View booking details** view inside it showing the itinerary, contact and every passenger
+  field. Six type tabs (the three ancillaries are new here); **Refund is not offered** — money
+  comes back through an approved cancellation, which prices it properly. A manager sees Approve
+  and Reject on their company's outstanding requests.
+
+**Admin portal**
+
+- **Cancellations & Reschedules is gone as a screen.** Service Request Management now lists every
+  type; a row opens the pricing dialog or the plain resolve dialog according to its own type, and
+  only *Manager Approved* rows offer Settle. `admin-change-requests.js` keeps the pricing dialog
+  and lost the list.
+- **Booking Operations** — the first UI over M1's API, at `frontend/assets/js/admin-booking-ops.js`.
+  Three tabs: **All Bookings** (every stage, from `/api/requests`), **To Book** and **Ticket
+  Issued** (from the queue endpoint). No Awaiting Payment or Paid tab — those rows are inside To
+  Book, where the work on them is. Every row carries a status-appropriate action *and* View
+  Details. The work dialog assigns an operator, records the airline PNR / ticket number / airline
+  reference, and holds the staff-only internal notes.
+  - **To Book spans `approved` + `payment_pending` + `paid`**, not `approved` alone.
+    `ticket_service.approve_request` walks Approved → Payment Pending in one step, so a booking
+    never rests at Approved and a tab defined as that status alone would always be empty. What
+    the three have in common, and what the tab means, is "settled with us, not yet ticketed".
+
+- Backend: `services/manager_approval.py`, `routers/manager_approvals.py`,
+  `schemas/manager_approval.py`, plus edits to `change_request_service`, `ticket_service`,
+  `lifecycle`, `notification_service`, `rbac` and the two request schemas
+- Frontend: `merchant-classic/` (index, css, shell, dashboard, service, requests, account),
+  `shared/merchant-api.js`, `shared/ops-api.js`, `admin/index.html`, `assets/css/admin.css`,
+  `assets/js/admin.js`, `admin-change-requests.js`, `admin-booking-ops.js` — all `?v=` bumped
+- `docs/API_CONTRACT.md` updated (§6.3a rewritten, §6.3b added)
+- Verified by: `tests/verify_manager_approval.py` (**52 checks**), with `verify_m3.py` rewritten
+  where it asserted the old contract — its withdraw section now asserts the endpoint's absence,
+  and its "completed cannot be cancelled" check now asserts the opposite
+- Regression suite green: **9/9 scripts**. Both portals driven in the browser, console clean,
+  no layout break at 1280 / 768 / 375, charts re-themed in dark mode
 
 ---
 

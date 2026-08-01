@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260730m3">
+<link rel="stylesheet" href="css/classic.css?v=20260801a">
 </head>
 <body>
 
@@ -99,10 +99,8 @@
 
   <header class="cl-top">
     <button type="button" class="cl-burger" id="clBurger" aria-label="Toggle navigation">☰</button>
-    <div class="cl-top-brand">
-      <img class="cl-top-logo" src="../assets/images/favicon-180.png" alt="">
-      JackPots World <span>Classic</span>
-    </div>
+    <!-- No brand block here. The rail below already carries the JackPots logo,
+         and repeating the name on every page bought nothing but width. -->
 
     <div class="cl-top-search">
       <label class="cl-sr" for="clSearch">Search your requests</label>
@@ -111,7 +109,10 @@
     </div>
 
     <div class="cl-top-right">
-      <span class="cl-top-user"><b id="clUserName">—</b> · <span id="clUserCompany">—</span></span>
+      <!-- Name, then the signed-in ROLE — not the company. Every user in this
+           portal belongs to one merchant, so the company name told them
+           nothing; which hat they are wearing decides what they may do. -->
+      <span class="cl-top-user"><b id="clUserName">—</b> · <span id="clUserRole">—</span></span>
 
       <!-- Same light / dark / system control the Admin Portal carries, with the
            same three choices and the same persistence behaviour. -->
@@ -221,17 +222,17 @@
      the head of the file — so the table lives in the UI layer and is shared,
      unchanged, with the other frontends. -->
 <script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260731a"></script>
-<script src="../shared/merchant-api.js?v=20260730m3"></script>
-<script src="js/classic-dashboard.js?v=20260730b"></script>
+<script src="js/classic-shell.js?v=20260801a"></script>
+<script src="../shared/merchant-api.js?v=20260801a"></script>
+<script src="js/classic-dashboard.js?v=20260801a"></script>
 <script src="js/classic-enquiry.js?v=20260731a"></script>
 <script src="js/classic-booking.js?v=20260731a"></script>
 <script src="js/classic-booking-detail.js?v=20260731a"></script>
-<script src="js/classic-requests.js?v=20260730c"></script>
+<script src="js/classic-requests.js?v=20260801a"></script>
 <script src="js/classic-payments.js?v=20260730a"></script>
-<script src="js/classic-service.js?v=20260730m3"></script>
+<script src="js/classic-service.js?v=20260801a"></script>
 <script src="js/classic-reports.js?v=20260730a"></script>
-<script src="js/classic-account.js?v=20260730a"></script>
+<script src="js/classic-account.js?v=20260801a"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

@@ -151,12 +151,14 @@ function clRequestActions(r) {
       ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-pay="${r.id}">Pay</button>`
       : `<span class="cl-tag">Awaiting amount</span>`);
   }
-  /* A cancellation or reschedule request is withdrawn, not cancelled — and only
-     from the Service Requests screen, whose endpoint refuses once an operator
-     has claimed it. This generic Cancel would skip that check and tell nobody,
-     so it is not offered on those rows; the backend refuses it too. */
-  const isChangeRequest = r.request_type === 'cancellation' || r.request_type === 'date_change';
-  if (!isChangeRequest && ['draft', 'pending_approval', 'approved', 'payment_pending'].includes(r.status)) {
+  /* Cancel is for BOOKINGS. A service request is not the raiser's to take back:
+     it belongs to their manager the moment it is raised, and they approve or
+     reject it from the Service Requests screen. Cancelling one here would be
+     the withdraw that was deliberately removed under another name — no record
+     of who decided, no reason, and no word to the operator already working it.
+     The backend refuses it too, so this is the UI half of one rule. */
+  const isServiceRequest = MERCHANT_SERVICE_REQUEST_TYPES.includes(r.request_type);
+  if (!isServiceRequest && ['draft', 'pending_approval', 'approved', 'payment_pending'].includes(r.status)) {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-cancel="${r.id}">Cancel</button>`);
   }
   return out.join('');

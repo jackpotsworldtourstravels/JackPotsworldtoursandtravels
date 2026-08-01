@@ -131,7 +131,6 @@ async function clLoadProfileAccount() {
       <div><dt>Company</dt><dd>${escapeHtml(d.company_name || localStorage.getItem(PARTNER_KEYS.companyName) || '—')}</dd></div>
       <div><dt>Merchant code</dt><dd class="cl-ref">${escapeHtml(d.merchant_code || '—')}</dd></div>
       <div><dt>Wallet balance</dt><dd>${money(d.wallet_balance)}</dd></div>
-      <div><dt>Credit limit</dt><dd>${money(d.credit_limit)}</dd></div>
       <div><dt>Support</dt><dd>${escapeHtml(d.support_contact || d.support_email || '—')}</dd></div>
     </dl>`;
   } catch (err) {

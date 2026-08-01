@@ -260,14 +260,42 @@ const MerchantApi = {
     return this._req('get', `/api/change-requests/${id}`);
   },
 
-  /* Only while it is still Pending — once an operator has claimed it the
-     server returns 409 naming them. */
-  withdrawChangeRequest(id) {
-    return this._req('post', `/api/change-requests/${id}/withdraw`);
-  },
+  /* There is no withdrawChangeRequest(). The endpoint was removed: whoever
+     raises a request cannot take it back, because doing so pulled work out from
+     under an operator already on the phone to the airline and left no record of
+     who changed their mind. Their manager rejects it instead — see the manager
+     approval block below. */
 
   bookingChangeRequests(bookingId) {
     return this._req('get', `/api/bookings/${bookingId}/change-requests`);
+  },
+
+  /* ------------------------------------------------ manager approval
+
+     The merchant's OWN sign-off, in front of ours. Every service request a
+     merchant raises — cancellation, date change, passenger correction, extra
+     baggage, meal, seat — waits for a manager of that merchant before the
+     JackPots desk can see or settle it.
+
+     Held by MerchantRole.MANAGER and by the company's merchant_admin
+     (permission `servicerequest.approve`), and by nobody else: a 403 from these
+     three is the server saying the caller is not a manager. */
+
+  managerQueue(params) {
+    return this._req('get', '/api/manager/service-requests', { params });
+  },
+
+  managerQueueCounts() {
+    return this._req('get', '/api/manager/service-requests/counts');
+  },
+
+  managerApprove(id) {
+    return this._req('post', `/api/manager/service-requests/${id}/approve`);
+  },
+
+  /* A reason is mandatory — the person who raised the request reads it. */
+  managerReject(id, reason) {
+    return this._req('post', `/api/manager/service-requests/${id}/reject`, { data: { reason } });
   },
 
   /* -------------------------------------------------------------- reports */
@@ -328,3 +356,17 @@ const MERCHANT_REQUEST_STATUSES = [
    dashboard counts submitted payments AWAITING VERIFICATION, which is the
    opposite thing and is easy to confuse. */
 const MERCHANT_PAYMENT_STATUSES = ['payment_pending', 'paid', 'ticketed'];
+
+/* Every request_type that is a SERVICE REQUEST — something raised against an
+   existing booking rather than the booking itself. Mirrors
+   ticket_service.SERVICE_REQUEST_TYPES, and lives here beside the status
+   vocabulary because more than one screen needs it: Service Requests lists
+   them, and My Requests must not offer its Cancel button on one.
+
+   `refund` is in this list but is no longer offered as a new request — money
+   comes back through an approved cancellation, which prices it properly. Old
+   refund rows still have to render. */
+const MERCHANT_SERVICE_REQUEST_TYPES = [
+  'cancellation', 'date_change', 'refund', 'passenger_modification',
+  'extra_baggage', 'meal', 'seat',
+];

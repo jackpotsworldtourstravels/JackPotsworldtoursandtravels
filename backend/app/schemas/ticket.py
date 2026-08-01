@@ -237,7 +237,16 @@ class RequestResponse(BaseModel):
     request_number: str
     request_type: RequestType
     status: RequestStatus
+    #: What the status column should READ. On a service request still awaiting
+    #: the merchant's own manager this is "Under Manager Approval" or "Manager
+    #: Approved" rather than the bare "Pending" — `status` itself is unchanged,
+    #: so filters and the state machine are untouched. See
+    #: services/manager_approval.py.
     status_label: str
+    #: `pending` / `approved` / `rejected`, or None on anything that does not go
+    #: through manager sign-off (a booking, an enquiry, a pre-existing row).
+    manager_state: str | None = None
+    manager_approval: dict[str, Any] = {}
     parent_request_id: int | None = None
     merchant_id: int | None = None
     merchant_name: str | None = None
@@ -267,14 +276,18 @@ class RequestResponse(BaseModel):
 
     @classmethod
     def of(cls, r, *, include_passengers: bool = True) -> "RequestResponse":
+        from app.services import manager_approval
         from app.services.lifecycle import SPEC_LABELS
 
+        spec_label = SPEC_LABELS.get(r.status, r.status.value)
         return cls(
             id=r.request_id,
             request_number=r.request_number,
             request_type=r.request_type,
             status=r.status,
-            status_label=SPEC_LABELS.get(r.status, r.status.value),
+            status_label=manager_approval.status_label(r, spec_label),
+            manager_state=manager_approval.state(r),
+            manager_approval=manager_approval.block(r),
             parent_request_id=r.parent_request_id,
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,

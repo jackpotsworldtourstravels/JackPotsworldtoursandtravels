@@ -27,6 +27,15 @@ from the airline's rules and is entered by the operator at approval time. Until
 then the request carries no amounts at all, which is why ``total_amount`` stays
 zero on a pending request rather than holding a number nobody has agreed to.
 
+WHO APPROVES, AND IN WHAT ORDER
+Twice, in this order: the merchant's **own manager** first, then us. A request
+is raised into "Under Manager Approval" and is invisible to our desk until that
+manager signs it off — see ``services/manager_approval.py``. The person who
+raised it can do nothing to it afterwards; in particular there is no withdraw.
+It used to exist, and it let a merchant pull a request out from under an
+operator who was already on the phone to the airline. A manager who wants a
+request to go away rejects it, which leaves a record of who decided and why.
+
 WHAT THIS DOES NOT DO
 Move money. Recording that ₹21,500 is refundable is not the same as refunding
 it; the payment ledger settles in M4. The refund position is written here so
@@ -46,22 +55,50 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, catalog_service, lifecycle, notification_service
+from app.services import (
+    activity_service,
+    catalog_service,
+    lifecycle,
+    manager_approval,
+    notification_service,
+)
 
 #: The two request types this module owns. The other members of
 #: ``ticket_service.SERVICE_REQUEST_TYPES`` keep going through the generic hook.
 CHANGE_TYPES: tuple[RequestType, ...] = (RequestType.CANCELLATION, RequestType.DATE_CHANGE)
 
-#: Parent-booking statuses a change may be raised against.
+#: Parent-booking statuses a **cancellation** may be raised against.
 #:
-#: ``COMPLETED`` is deliberately absent: the trip has happened, and "cancel a
-#: journey that was already flown" is a refund/dispute conversation, not a
-#: cancellation. ``DRAFT``/``PENDING_APPROVAL``/``IN_REVIEW`` are absent too —
-#: nothing is committed yet, so the merchant simply cancels the request itself
-#: through ``POST /api/requests/{id}/cancel``, free of charge.
-CHANGEABLE_PARENT_STATUSES: frozenset[S] = frozenset({
+#: ``COMPLETED`` is included: a trip that has already flown can still be
+#: cancelled, because the thing being settled is the money rather than the
+#: travel — a no-show, a duplicate booking or a post-travel dispute all arrive
+#: after the booking has been completed, and refusing them there only meant the
+#: merchant phoned instead. The charge and refund are quoted exactly as they
+#: are at any other stage. ``DRAFT``/``PENDING_APPROVAL``/``IN_REVIEW`` are
+#: absent — nothing is committed yet, so the merchant simply cancels the
+#: request itself through ``POST /api/requests/{id}/cancel``, free of charge.
+CANCELLABLE_PARENT_STATUSES: frozenset[S] = frozenset({
+    S.APPROVED, S.PAYMENT_PENDING, S.PAID, S.TICKET_ISSUED, S.COMPLETED,
+})
+
+#: Parent-booking statuses a **reschedule** may be raised against. ``COMPLETED``
+#: is absent here and stays absent: moving the date of a journey that has
+#: already been travelled is not a thing that can be done.
+RESCHEDULABLE_PARENT_STATUSES: frozenset[S] = frozenset({
     S.APPROVED, S.PAYMENT_PENDING, S.PAID, S.TICKET_ISSUED,
 })
+
+RAISEABLE_PARENT_STATUSES: dict[RequestType, frozenset[S]] = {
+    RequestType.CANCELLATION: CANCELLABLE_PARENT_STATUSES,
+    RequestType.DATE_CHANGE: RESCHEDULABLE_PARENT_STATUSES,
+}
+
+#: Either kind may be raised against a booking in one of these. The union, for
+#: callers that only ask "is this booking amendable at all" — the per-type sets
+#: above are what the raise path actually enforces.
+CHANGEABLE_PARENT_STATUSES: frozenset[S] = (
+    CANCELLABLE_PARENT_STATUSES | RESCHEDULABLE_PARENT_STATUSES
+)
 
 #: A change request that is still being worked. Exactly one of these may exist
 #: per booking at a time.
@@ -208,6 +245,34 @@ def _open_change_for(db: Session, booking_id: int) -> ServiceRequest | None:
     ).first()
 
 
+#: A cancellation that was refused — by us or by the merchant's own manager —
+#: leaves the booking exactly as it was, so asking again is legitimate. Anything
+#: else means one has already been asked for and is either being worked or has
+#: been settled.
+_DEAD_STATUSES: tuple[S, ...] = (S.REJECTED, S.CANCELLED)
+
+
+def _cancellation_already_raised(db: Session, booking_id: int) -> ServiceRequest | None:
+    """A live cancellation against this booking, open or already settled.
+
+    One cancellation per booking, ever. ``_open_change_for`` above only stops a
+    second one while the first is *open*, which left the door open to raising
+    another the moment ours was approved — and the button that raises it can be
+    clicked as fast as the merchant likes. The row lock on the parent makes this
+    check and the insert one atomic step, so two clicks racing each other cannot
+    both pass it.
+    """
+    return db.scalars(
+        select(ServiceRequest).where(
+            and_(
+                ServiceRequest.parent_request_id == booking_id,
+                ServiceRequest.request_type == RequestType.CANCELLATION,
+                ServiceRequest.status.notin_(_DEAD_STATUSES),
+            )
+        )
+    ).first()
+
+
 # ---------------------------------------------------------------------------
 # Raising
 # ---------------------------------------------------------------------------
@@ -237,7 +302,7 @@ def _raise(
 
     booking = _booking(db, actor, booking_id, lock=True)
 
-    if booking.status not in CHANGEABLE_PARENT_STATUSES:
+    if booking.status not in RAISEABLE_PARENT_STATUSES[request_type]:
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
             detail=(
@@ -248,6 +313,9 @@ def _raise(
                     "A booking that has not been confirmed yet is withdrawn from the booking "
                     "itself, at no charge."
                     if booking.status in (S.DRAFT, S.PENDING_APPROVAL, S.IN_REVIEW)
+                    else "A journey that has already been travelled cannot be moved to another "
+                    "date — raise a cancellation if there is money to settle."
+                    if booking.status is S.COMPLETED
                     else "This booking is closed."
                 )
             ),
@@ -260,9 +328,22 @@ def _raise(
             detail=(
                 f"{TYPE_LABELS.get(existing.request_type, 'A change')} request "
                 f"{existing.request_number} is already open against "
-                f"{booking.request_number}. Settle or withdraw it first."
+                f"{booking.request_number}. It has to be settled before another is raised."
             ),
         )
+
+    if request_type is RequestType.CANCELLATION:
+        raised = _cancellation_already_raised(db, booking.request_id)
+        if raised:
+            raise HTTPException(
+                status_code=http_status.HTTP_409_CONFLICT,
+                detail=(
+                    f"{booking.request_number} has already been asked to be cancelled — "
+                    f"{raised.request_number}, currently "
+                    f"{lifecycle.SPEC_LABELS.get(raised.status, raised.status.value).lower()}. "
+                    "A booking is only cancelled once."
+                ),
+            )
 
     request = ServiceRequest(
         request_number=_next_number(db, "SRQ"),
@@ -281,6 +362,9 @@ def _raise(
             "reason": text,
             "booking_request_number": booking.request_number,
             "booking_status_at_request": booking.status.value,
+            # The merchant's own sign-off stage. Until this reads `approved`
+            # the request is the company's business, not ours.
+            manager_approval.FIELD: manager_approval.stamp_on_raise(actor),
         },
         # No amounts yet, on purpose: staff quote them at approval. A number
         # here would be one nobody has agreed to.
@@ -312,13 +396,43 @@ def _raise(
             **details,
         },
     )
-    notification_service.notify_admins(
-        db,
-        f"{TYPE_LABELS[request_type]} requested",
-        f"{request.request_number}: {booking.request_number} "
-        f"({booking.merchant.company_name if booking.merchant else 'a merchant'}) — {text}",
-    )
+    _announce_raised(db, request, booking, text)
     return request
+
+
+def _announce_raised(db: Session, request, booking, reason: str) -> None:
+    """Tell whoever the request is actually waiting on.
+
+    While it is with the merchant's manager it is not our work, and telling our
+    desk about it would fill the admin queue with requests nobody there may
+    touch. Only a request that arrives already signed off — one a manager
+    raised themselves — is announced to us at raise time; the rest are
+    announced by :func:`manager_decide`.
+    """
+    company = booking.merchant.company_name if booking.merchant else "a merchant"
+    label = TYPE_LABELS[request.request_type]
+
+    if manager_approval.is_pending(request):
+        told = notification_service.notify_merchant_managers(
+            db, request.merchant_id,
+            f"{label} needs your approval",
+            f"{request.request_number} against {booking.request_number} — {reason}",
+        )
+        if told:
+            return
+        # Nobody at the company can sign it off. Rather than let the request
+        # sit in a stage it can never leave, our desk is told it exists so
+        # somebody can chase the merchant for a manager.
+        notification_service.notify_admins(
+            db, f"{label} stuck awaiting a manager",
+            f"{request.request_number} ({company}) has no manager who can approve it.",
+        )
+        return
+
+    notification_service.notify_admins(
+        db, f"{label} requested",
+        f"{request.request_number}: {booking.request_number} ({company}) — {reason}",
+    )
 
 
 def raise_cancellation(db: Session, actor: User, booking_id: int, *, reason: str) -> ServiceRequest:
@@ -470,45 +584,15 @@ def parent_booking(db: Session, request: ServiceRequest) -> ServiceRequest | Non
 # ---------------------------------------------------------------------------
 # Merchant-side settlement
 # ---------------------------------------------------------------------------
-def withdraw(db: Session, actor: User, request_id: int) -> ServiceRequest:
-    """Merchant takes back a change request nobody has picked up yet.
-
-    Allowed only while it is still Pending. Once an operator has claimed it they
-    are on the phone to the airline, and letting the request vanish underneath
-    them is how a seat gets released twice.
-    """
-    request = _change(db, actor, request_id, lock=True)
-    _guard_open(request)
-
-    if request.status is S.IN_REVIEW:
-        holder_id, holder_name = _reviewer(request)
-        raise HTTPException(
-            status_code=http_status.HTTP_409_CONFLICT,
-            detail=(
-                f"{holder_name or 'An operator'} has already started work on "
-                f"{request.request_number}. Ask them to reject it instead."
-            ),
-        )
-
-    lifecycle.transition(
-        db, request, S.CANCELLED, actor,
-        reason="Withdrawn by the merchant", commit=False,
-    )
-    db.commit()
-    db.refresh(request)
-
-    activity_service.log_activity(
-        db, actor.user_id, f"{TYPE_LABELS[request.request_type]} withdrawn",
-        activity_type="Change Request", module="Cancellation & Reschedule",
-        description=f"{actor.full_name} withdrew {request.request_number}",
-        reference_id=request.request_id, merchant_id=request.merchant_id,
-        details={"request_number": request.request_number},
-    )
-    notification_service.notify_admins(
-        db, f"{TYPE_LABELS[request.request_type]} withdrawn",
-        f"{request.request_number} was withdrawn by the merchant.",
-    )
-    return request
+# There is no withdraw. The merchant's side of a change request now ends the
+# moment it is raised: their manager either approves it — sending it to us — or
+# rejects it, which closes it. Both go through
+# ``manager_approval.decide``, which is the one place a merchant-side decision
+# is recorded, for every service request type rather than only these two.
+#
+# The old ``withdraw()`` let the person who raised a request take it back while
+# it was Pending. That was one API call away from pulling work out from under an
+# operator, and it left no record of who changed their mind.
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +606,7 @@ def start_review(db: Session, actor: User, request_id: int) -> ServiceRequest:
     """
     request = _change(db, actor, request_id, lock=True)
     _guard_open(request)
+    manager_approval.guard_ready_for_staff(request)
 
     holder_id, holder_name = _reviewer(request)
     if request.status is S.IN_REVIEW:
@@ -618,6 +703,7 @@ def approve(
     """
     request = _change(db, actor, request_id, lock=True)
     _guard_open(request)
+    manager_approval.guard_ready_for_staff(request)
     _guard_claim(request, actor)
 
     booking = db.scalars(
@@ -763,6 +849,7 @@ def reject(db: Session, actor: User, request_id: int, reason: str) -> ServiceReq
 
     request = _change(db, actor, request_id, lock=True)
     _guard_open(request)
+    manager_approval.guard_ready_for_staff(request)
     _guard_claim(request, actor)
 
     lifecycle.transition(db, request, S.REJECTED, actor, reason=text, commit=False)

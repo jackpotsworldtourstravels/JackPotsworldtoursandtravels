@@ -65,6 +65,12 @@ class P:
     # Service requests (date change, cancellation, refund, ancillaries)
     SERVICE_REQUEST_CREATE = "servicerequest.create"
     SERVICE_REQUEST_MANAGE = "servicerequest.manage"
+    #: A MERCHANT-SIDE code, not one of ours. It is the merchant's own manager
+    #: signing off what their staff raised, before the request reaches our desk
+    #: at all — see services/manager_approval.py. Deliberately absent from
+    #: _ADMIN below: an admin approving on the merchant's behalf would collapse
+    #: the two approvals this stage exists to keep apart.
+    SERVICE_REQUEST_APPROVE = "servicerequest.approve"
 
     # Payments
     PAYMENT_PAY = "payment.pay"
@@ -135,7 +141,9 @@ _ADMIN: frozenset[str] = frozenset({
 _MERCHANT_ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
     P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
-    P.SERVICE_REQUEST_CREATE,
+    # Raise, and — as the account the company was onboarded with — sign off
+    # what the rest of the company raises.
+    P.SERVICE_REQUEST_CREATE, P.SERVICE_REQUEST_APPROVE,
     P.PAYMENT_PAY, P.PAYMENT_VIEW,
     P.REPORT_VIEW, P.REPORT_EXPORT,
     P.CHAT_CREATE, P.CHAT_VIEW,
@@ -183,7 +191,9 @@ MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
     MerchantRole.MANAGER: frozenset({
         P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
         P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
-        P.SERVICE_REQUEST_CREATE,
+        # The sign-off stage in front of ours — the manager is the only
+        # merchant role that holds it.
+        P.SERVICE_REQUEST_CREATE, P.SERVICE_REQUEST_APPROVE,
         P.PAYMENT_PAY, P.PAYMENT_VIEW,
         P.REPORT_VIEW, P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,

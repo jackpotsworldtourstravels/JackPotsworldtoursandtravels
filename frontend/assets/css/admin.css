@@ -593,6 +593,37 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   background:var(--hover-bg); border:1px dashed var(--border-color);
 }
 
+/* ---------- Booking Operations tabs ----------
+   A tab strip inside a panel, for switching one table between queues. The
+   count rides in the tab rather than in a separate badge: "To Book (7)" is one
+   thing to read, and a badge that can disagree with the table beneath it is
+   worse than no badge. */
+.bo-tabs{
+  display:flex; gap:4px; flex-wrap:wrap;
+  margin:0 0 16px; padding-bottom:2px;
+  border-bottom:1.5px solid var(--border-color);
+}
+.bo-tab{
+  padding:9px 16px; border:none; border-bottom:2.5px solid transparent;
+  background:none; cursor:pointer; font:inherit;
+  font-size:13px; font-weight:700; color:var(--text-muted);
+  border-radius:8px 8px 0 0; margin-bottom:-2px;
+}
+.bo-tab:hover{background:var(--hover-bg); color:var(--text-primary);}
+.bo-tab.active{color:var(--coral); border-bottom-color:var(--coral);}
+.bo-tab-count{font-weight:800; opacity:.75;}
+
+/* The search box in a filter bar. Only input[type="text"] was styled, so the
+   type="search" boxes were rendering as unstyled browser defaults next to the
+   selects they sit beside. */
+.filter-bar input[type="search"]{
+  padding:9px 12px; border-radius:10px; border:1.5px solid var(--line);
+  font-size:13px; background:var(--card-bg); color:var(--text-primary);
+  min-width:220px; font-family:inherit;
+}
+
 @media (max-width:640px){
   .detail-grid{grid-template-columns:1fr;}
+  .bo-tabs{overflow-x:auto; flex-wrap:nowrap;}
+  .bo-tab{white-space:nowrap;}
 }

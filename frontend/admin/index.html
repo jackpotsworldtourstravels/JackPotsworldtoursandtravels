@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260730m3">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260801a">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -111,19 +111,26 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
       <span class="nav-label">Approval Queue</span>
     </a>
-    <!-- Cancellations & Reschedules is its own screen, not a filter on Service
-         Request Management below. Those two settle money and change the booking
-         itself; the generic screen's Approve does neither, and the backend now
-         refuses the generic resolve endpoint for them outright. One workflow,
-         one screen. -->
-    <a href="#" class="nav-item" data-section="change-requests">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7M21 12a9 9 0 0 1-15 6.7"/><path d="M18 3v5h-5M6 21v-5h5"/></svg>
-      <span class="nav-label">Cancellations &amp; Reschedules</span>
-      <span class="nav-badge" id="crNavBadge" hidden></span>
+    <!-- Booking Operations — the post-approval desk. Deliberately disjoint from
+         the Approval Queue above: that queue ends the moment a booking is
+         approved and this one begins there, so a booking is on exactly one of
+         them at a time and cannot be worked twice. -->
+    <a href="#" class="nav-item" data-section="booking-ops">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18"/><path d="M8 2v4M16 2v4"/><path d="m9 15 2 2 4-4"/></svg>
+      <span class="nav-label">Booking Operations</span>
+      <span class="nav-badge" id="boNavBadge" hidden></span>
     </a>
+    <!-- One screen for every service request, whatever its type. There used to
+         be a second, "Cancellations & Reschedules", because those two settle
+         money and change the booking while the others do not — but that is a
+         difference in what the Settle button does, not a different queue, and
+         splitting them meant an admin had to know which screen a request had
+         landed on before they could find it. The action is chosen per row from
+         the request's type; the settle dialog itself is unchanged. -->
     <a href="#" class="nav-item" data-section="service-requests-mgmt">
       <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
       <span class="nav-label">Service Request Management</span>
+      <span class="nav-badge" id="srmNavBadge" hidden></span>
     </a>
     <a href="#" class="nav-item" data-section="notifications">
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
@@ -403,41 +410,32 @@
       </div>
     </section>
 
-    <!-- Cancellation & reschedule settlement (M3). Rendered by
-         admin-change-requests.js. -->
-    <section class="section" id="section-change-requests">
+    <!-- Booking Operations — the post-approval desk, over
+         /api/admin/bookings/queue. Rendered by admin-booking-ops.js. -->
+    <section class="section" id="section-booking-ops">
       <div class="panel">
         <div class="panel-head">
-          <h2>Cancellations &amp; Reschedules</h2>
-          <span class="panel-sub" id="crQueueSummary"></span>
+          <h2>Booking Operations</h2>
+          <span class="panel-sub" id="boQueueSummary"></span>
         </div>
+        <!-- Tabs are built by the module from BO_TABS so the labels, the badge
+             counts and the query each tab issues are defined once. -->
+        <div class="bo-tabs" id="boTabs" role="tablist"></div>
         <div class="filter-bar" style="margin-bottom:16px;">
-          <!-- The filter bar has no visible labels by design (it is a compact
-               toolbar), so each control carries an aria-label — otherwise a
-               screen reader announces three unlabelled comboboxes. -->
-          <select id="crStatusFilter" class="status-select" aria-label="Filter by status">
-            <option value="open">Awaiting settlement</option>
-            <option value="">All statuses</option>
-            <option value="pending_approval">Pending</option>
-            <option value="in_review">Under Review</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="cancelled">Withdrawn</option>
+          <input type="search" id="boSearch" aria-label="Search bookings"
+                 placeholder="Request no., booking ref, PNR, ticket no. or title">
+          <select id="boAssignFilter" class="status-select" aria-label="Filter by operator">
+            <option value="">Anyone</option>
+            <option value="mine">Assigned to me</option>
+            <option value="unassigned">Unassigned</option>
           </select>
-          <select id="crTypeFilter" class="status-select" aria-label="Filter by request type">
-            <option value="">Both types</option>
-            <option value="cancellation">Cancellation</option>
-            <option value="date_change">Reschedule</option>
-          </select>
-          <input type="search" id="crSearch" aria-label="Search change requests"
-                 placeholder="Request no., booking ref or PNR">
-          <button class="btn btn-ghost btn-sm" id="crRefreshBtn" type="button">Refresh</button>
+          <button class="btn btn-ghost btn-sm" id="boRefreshBtn" type="button">Refresh</button>
         </div>
-        <div class="table-wrap"><table id="crTable"><thead><tr>
-          <th>Request No.</th><th>Type</th><th>Merchant</th><th>Booking</th>
-          <th>Asked for</th><th>Status</th><th>Raised</th><th>Actions</th>
+        <div class="table-wrap"><table id="boTable"><thead><tr>
+          <th>Request No.</th><th>Merchant</th><th>Booking</th><th>Travel Date</th>
+          <th>Amount</th><th>Operator</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="crPagination"></div>
+        <div class="pagination" id="boPagination"></div>
       </div>
     </section>
 
@@ -445,30 +443,43 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Service Request Management</h2>
-          <span class="panel-sub">Baggage, meals, seats, refunds and passenger corrections</span>
+          <span class="panel-sub" id="srmQueueSummary"></span>
         </div>
-        <!-- Cancellation and Date Change are deliberately absent from this
-             filter: they are settled on the Cancellations &amp; Reschedules
-             screen, and the resolve endpoint behind this one refuses them. -->
+        <!-- Every service request type is here, cancellations and date changes
+             included. They were on a screen of their own until the two were
+             merged; what differs between them is which dialog Settle opens, and
+             the row decides that from its type. -->
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="srmTypeFilter" class="status-select">
+          <select id="srmTypeFilter" class="status-select" aria-label="Filter by request type">
             <option value="">All types</option>
-            <option value="refund">Refund</option>
+            <option value="cancellation">Cancellation</option>
+            <option value="date_change">Date Change</option>
             <option value="passenger_modification">Passenger Modification</option>
             <option value="extra_baggage">Extra Baggage</option>
             <option value="meal">Meal</option>
             <option value="seat">Seat</option>
+            <option value="refund">Refund</option>
           </select>
-          <select id="srmStatusFilter" class="status-select">
-            <option value="">All statuses</option>
-            <option value="pending_approval">Pending Approval</option>
+          <!-- "Manager Approved" and "Under Manager Approval" are not statuses
+               in request_status_enum — both rows are Pending Approval, and the
+               difference is whose approval is outstanding. Filtered client-side
+               on the manager_state the API returns. -->
+          <select id="srmStageFilter" class="status-select" aria-label="Filter by stage">
+            <option value="actionable">Manager Approved — ready to action</option>
+            <option value="">All stages</option>
+            <option value="awaiting_manager">Under Manager Approval</option>
             <option value="in_review">Under Review</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+            <option value="cancelled">Closed by the merchant</option>
           </select>
+          <input type="search" id="srmSearch" aria-label="Search service requests"
+                 placeholder="Request no., booking ref or PNR">
+          <button class="btn btn-ghost btn-sm" id="srmRefreshBtn" type="button">Refresh</button>
         </div>
         <div class="table-wrap"><table id="srmTable"><thead><tr>
-          <th>Request #</th><th>Type</th><th>Booking Ref</th><th>Remarks</th><th>Status</th><th>Raised</th><th>Actions</th>
+          <th>Request #</th><th>Type</th><th>Merchant</th><th>Booking Ref</th>
+          <th>Asked for</th><th>Status</th><th>Raised</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="srmPagination"></div>
       </div>
@@ -553,9 +564,17 @@
 </div>
 
 <!-- Settle a cancellation or reschedule: quote the amounts, then approve or
-     reject. Rendered by admin-change-requests.js. -->
+     reject. Rendered by admin-change-requests.js, opened from a row on Service
+     Request Management. -->
 <div class="modal-overlay" id="crModalOverlay">
   <div class="modal-card modal-lg" id="crModalBody"></div>
+</div>
+
+<!-- Work one booking on the operations desk: assign an operator, record the
+     airline references, read the internal notes. Rendered by
+     admin-booking-ops.js. -->
+<div class="modal-overlay" id="boModalOverlay">
+  <div class="modal-card modal-lg" id="boModalBody"></div>
 </div>
 
 <!-- Review a booking request and verify its documents before approving.
@@ -599,13 +618,17 @@
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260730m3"></script>
+<script src="../assets/js/admin.js?v=20260801a"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260730a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260731a"></script>
-<!-- Cancellation & reschedule settlement (M3). Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260730m3"></script>
+<!-- The cancellation/reschedule settle dialog. Its own screen was merged into
+     Service Request Management; this file now only owns the dialog that screen
+     opens for those two types. Also after admin.js. -->
+<script src="../assets/js/admin-change-requests.js?v=20260801a"></script>
+<!-- Booking Operations — the post-approval desk (M1's API, first UI). -->
+<script src="../assets/js/admin-booking-ops.js?v=20260801a"></script>
 </body>
 </html>

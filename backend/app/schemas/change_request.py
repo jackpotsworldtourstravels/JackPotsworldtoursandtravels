@@ -53,7 +53,13 @@ class ChangeRequestItem(BaseModel):
     change_type_label: str
 
     status: str
+    #: The merchant's manager signs off before we see the request at all, and
+    #: this label says which of the two approvals is outstanding — "Under
+    #: Manager Approval" / "Manager Approved" while `status` is still Pending.
+    #: See services/manager_approval.py.
     status_label: str
+    manager_state: str | None = None
+    manager_approval: dict = Field(default_factory=dict)
 
     booking_id: int | None = None
     booking_request_number: str | None = None
@@ -82,6 +88,8 @@ class ChangeRequestItem(BaseModel):
 
     @classmethod
     def of(cls, r, *, merchant_name: str | None = None) -> "ChangeRequestItem":
+        from app.services import manager_approval
+
         details = r.travel_details or {}
 
         def _date(key):
@@ -96,7 +104,11 @@ class ChangeRequestItem(BaseModel):
                 "Cancellation" if r.request_type.value == "cancellation" else "Reschedule"
             ),
             status=r.status.value,
-            status_label=SPEC_LABELS.get(r.status, r.status.value),
+            status_label=manager_approval.status_label(
+                r, SPEC_LABELS.get(r.status, r.status.value)
+            ),
+            manager_state=manager_approval.state(r),
+            manager_approval=manager_approval.block(r),
             booking_id=r.parent_request_id,
             booking_request_number=details.get("booking_request_number"),
             booking_reference=r.booking_reference,
@@ -126,7 +138,10 @@ class ChangeRequestDetail(BaseModel):
     #: server would refuse.
     can_review: bool = False
     can_settle: bool = False
-    can_withdraw: bool = False
+    #: The merchant's manager may sign this off. There is deliberately no
+    #: `can_withdraw`: once raised, the person who raised it can do nothing —
+    #: their manager approves it or rejects it. See services/manager_approval.py.
+    can_manager_decide: bool = False
 
 
 class ChangeRequestCounts(BaseModel):

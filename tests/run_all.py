@@ -32,6 +32,9 @@ SUITE = [
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
     ("verify_m2.py", "M2: ticket upload, invoice/confirmation PDFs, delivery"),
     ("verify_m3.py", "M3: cancellation & reschedule, money bounds, cross-tenant, concurrency"),
+    # After M3: it builds on the same change requests and asserts the stage that
+    # now sits in front of every one of them.
+    ("verify_manager_approval.py", "Manager approval: the merchant's sign-off before ours"),
 ]
 
 

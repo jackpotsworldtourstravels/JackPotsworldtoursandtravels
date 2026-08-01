@@ -21,6 +21,7 @@ from app.routers import (
     dashboard,
     documents,
     enquiries,
+    manager_approvals,
     merchant_team,
     merchants,
     notifications_v2,
@@ -91,6 +92,9 @@ PORTED_MODULES = [
     # M3 — cancellation & reschedule. No migration: the request types and the
     # parent_request_id link have existed since the nine-table redesign.
     "change_requests",
+    # The merchant's own sign-off in front of ours. No migration: the state is
+    # a JSONB sub-field on service_requests.travel_details.
+    "manager_approval",
 ]
 PENDING_MODULES = [
     "catalog_management",  # deliberately deferred — see docs/SCHEMA_V2.md; not in the approved spec
@@ -114,6 +118,7 @@ app.include_router(support_tickets.router)
 app.include_router(documents.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
+app.include_router(manager_approvals.router)
 
 
 @app.on_event("startup")
