@@ -169,9 +169,12 @@ def list_queue(
             select(ServiceRequest)
             # Eager-loaded: the queue renders passenger names and the merchant
             # company on every row, which is a textbook N+1 without this.
+            # ``documents`` joined the list with CR-2 — every row now reports
+            # whether its tickets are attached yet.
             .options(
                 selectinload(ServiceRequest.passengers),
                 selectinload(ServiceRequest.merchant),
+                selectinload(ServiceRequest.documents),
             )
             .where(where)
             .order_by(ServiceRequest.created_at.asc())

@@ -11,11 +11,26 @@
    deliberately leaves `ticket_enquiry` out of its type list, and the backend
    now refuses the generic approve/reject endpoints for enquiries outright.
 
+   CR-5 — THE ANSWER IS A QUOTATION, NOT A FLAG
+   "Mark Available" was a one-click yes that told the merchant nothing about
+   what the sector would cost. It is now **Send Quotation**: a total fare and
+   the remarks that explain it ("₹3,000 ticket fare, ₹12,000 baggage"), both
+   required by the server. That fare is binding — the booking the merchant
+   raises is created at exactly that amount, so it is what the credit limit is
+   checked against and what the merchant's wallet is debited when the ticket is
+   issued. There is no edit afterwards, which is why the confirmation names the
+   figure.
+
+   THE WORDING HERE IS DELIBERATELY NOT THE MERCHANT'S. The merchant portal
+   calls this a **Booking Enquiry** (CR-5); staff screens keep **Ticket
+   Enquiry**, which is the internal operations vocabulary and the one the specs
+   use. Same rows, same `request_type`, two audiences.
+
    ENDPOINTS — all pre-existing or added in Phase 2, none duplicated here:
      GET  /api/enquiries                          list (platform staff see all)
      GET  /api/enquiries/{id}                     detail
      POST /api/admin/enquiries/{id}/review        claim: Pending -> Under Review
-     POST /api/admin/enquiries/{id}/respond       answer: Available / Not available
+     POST /api/admin/enquiries/{id}/respond       answer: quotation / decline
 
    Loaded after admin.js and reuses its helpers (API_BASE, authHeaders,
    escapeHtml, fmtDateTime, rowsSkeleton, navigateToSection, PAGE_SIZE) plus the
@@ -157,6 +172,8 @@ async function loadTicketEnquiries(page = enqPage) {
           <span class="badge ${ENQ_BADGE[r.status] || 'pending'}">${escapeHtml(enqLabel(r.status))}</span>
           ${heldByOther ? `<div class="cell-sub">with ${escapeHtml(holder)}</div>` : ''}
           ${mine ? '<div class="cell-sub">with you</div>' : ''}
+          ${r.quoted_fare != null
+            ? `<div class="cell-sub">Quoted ${escapeHtml(moneyStr(r.quoted_fare))}</div>` : ''}
         </td>
         <td>${fmtDateTime(r.created_at)}</td>
         <td style="white-space:nowrap;">
@@ -183,6 +200,33 @@ async function loadTicketEnquiries(page = enqPage) {
 function enqDetailRow(label, value) {
   return `<div class="detail-item"><span class="detail-label">${escapeHtml(label)}</span>
           <span class="detail-value">${value}</span></div>`;
+}
+
+/* The quotation, once one has been sent (CR-5). Absent on a pending enquiry, on
+   a declined one, and on every enquiry answered before CR-5 — which is why this
+   returns '' rather than rendering a zero. A quoted fare of 0 cannot occur:
+   the server refuses it. */
+function enqQuotationNote(r) {
+  if (r.quoted_fare == null) return '';
+  return `<div class="detail-note">
+    <strong>Quotation sent</strong>
+    <p><span class="mono" style="font-size:15px;font-weight:700;">${escapeHtml(moneyStr(r.quoted_fare))}</span></p>
+    ${r.quotation_remarks
+      ? `<p style="white-space:pre-wrap;">${escapeHtml(r.quotation_remarks)}</p>` : ''}
+    <p class="cell-sub">Binding — the booking raised against this enquiry carries this amount.</p>
+  </div>`;
+}
+
+/* A 422 from FastAPI carries `detail` as an array of per-field errors rather
+   than a string, and rendering that directly gives the desk "[object Object]".
+   Pydantic's own message is the useful part — the fare and remarks rules are
+   both enforced there, so this is the path a server-side refusal takes. */
+function enqErrorText(err) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    return String(detail[0]?.msg || 'Please check the form.').replace(/^Value error,\s*/, '');
+  }
+  return detail || 'Could not record that answer.';
 }
 
 async function openEnquiryReview(enquiryId) {
@@ -232,6 +276,7 @@ async function openEnquiryReview(enquiryId) {
     </div>
 
     ${r.notes ? `<div class="detail-note"><strong>Merchant's notes</strong><p>${escapeHtml(r.notes)}</p></div>` : ''}
+    ${enqQuotationNote(r)}
     ${r.admin_response ? `<div class="detail-note"><strong>Our response</strong><p>${escapeHtml(r.admin_response)}</p></div>` : ''}
     ${r.rejection_reason ? `<div class="detail-note"><strong>Reason</strong><p>${escapeHtml(r.rejection_reason)}</p></div>` : ''}
 
@@ -245,19 +290,34 @@ async function openEnquiryReview(enquiryId) {
           <span class="cell-sub">Claims this enquiry so another admin cannot answer it at the same time.</span>
         </div>` : ''}
       <div class="form-field" style="max-width:none;">
-        <label for="enqResponseText">Response to merchant</label>
-        <textarea id="enqResponseText" rows="3"
-          placeholder="Fare, timings, alternatives — whatever the merchant needs to decide."></textarea>
+        <label for="enqFareInput">Total fare <span class="cell-sub">(required to send a quotation)</span></label>
+        <!-- inputmode="decimal" rather than type="number": a spinner on a money
+             field invites a stray scroll-wheel repricing, and the value is sent
+             as the string the desk typed so nothing floats it on the way out. -->
+        <input type="text" id="enqFareInput" inputmode="decimal" autocomplete="off"
+               placeholder="e.g. 15000.00">
+        <span class="cell-sub">Typed by you, never calculated. This becomes the amount
+          ${escapeHtml(r.merchant_name || 'the merchant')} is billed when the ticket is issued,
+          and it is checked against their credit limit before the booking reaches this desk.</span>
       </div>
       <div class="form-field" style="max-width:none;">
-        <label for="enqReasonText">Reason <span class="cell-sub">(required when marking not available)</span></label>
-        <input type="text" id="enqReasonText" placeholder="e.g. Sold out in Business on this date">
+        <label for="enqReasonText">Remarks / reason
+          <span class="cell-sub">(required either way)</span></label>
+        <textarea id="enqReasonText" rows="3"
+          placeholder="On a quotation: what the total is made up of — e.g. ₹3,000 ticket fare, ₹12,000 baggage charges.&#10;On a decline: why — e.g. sold out in Business on this date."></textarea>
+        <span class="cell-sub">The merchant reads this beside the amount. It is what explains a
+          total that differs from the bare ticket price.</span>
+      </div>
+      <div class="form-field" style="max-width:none;">
+        <label for="enqResponseText">Covering note <span class="cell-sub">(optional)</span></label>
+        <textarea id="enqResponseText" rows="2"
+          placeholder="Timings, alternatives, anything else the merchant needs to decide."></textarea>
       </div>
       <div class="msg" id="enqReviewMsg"></div>
       <div class="modal-actions">
         <button class="btn btn-ghost" data-enq-close type="button">Cancel</button>
-        <button class="btn btn-danger" id="enqNotAvailableBtn" type="button">Mark Not Available</button>
-        <button class="btn btn-navy" id="enqAvailableBtn" type="button">Mark Available</button>
+        <button class="btn btn-danger" id="enqNotAvailableBtn" type="button">Decline Enquiry</button>
+        <button class="btn btn-navy" id="enqAvailableBtn" type="button">Send Quotation</button>
       </div>`
     : `<div class="modal-actions"><button class="btn btn-ghost" data-enq-close type="button">Close</button></div>`}
   `;
@@ -292,22 +352,49 @@ function wireEnquiryModal(overlay, body, r) {
   const answer = async (available) => {
     const response = (document.getElementById('enqResponseText')?.value || '').trim();
     const reason = (document.getElementById('enqReasonText')?.value || '').trim();
+    const fareRaw = (document.getElementById('enqFareInput')?.value || '').trim();
 
-    if (!available && !reason) {
-      setMsg('A reason is required when marking an enquiry not available.', 'error');
+    if (!reason) {
+      setMsg(available
+        ? 'Add the remarks explaining this quotation — the merchant reads them beside the amount.'
+        : 'A reason is required when declining an enquiry.', 'error');
       document.getElementById('enqReasonText')?.focus();
       return;
     }
 
-    /* Confirmed because the answer is final — there is no edit afterwards.
+    /* Validated here as a *string*, not by parsing it into a number: the value
+       is sent exactly as typed against a Decimal schema, so the only checks
+       that make sense are on its shape. Rejecting it client-side saves the desk
+       a round trip; the server enforces the same rule regardless. */
+    let fare;
+    if (available) {
+      if (!/^\d{1,10}(\.\d{1,2})?$/.test(fareRaw)) {
+        setMsg('Enter the total fare as a plain amount — digits, and at most two decimals.', 'error');
+        document.getElementById('enqFareInput')?.focus();
+        return;
+      }
+      if (!/[1-9]/.test(fareRaw)) {
+        setMsg('The total fare must be more than zero — a quotation of 0 bills nobody.', 'error');
+        document.getElementById('enqFareInput')?.focus();
+        return;
+      }
+      fare = fareRaw;
+    }
+
+    /* Confirmed because the answer is final — there is no edit afterwards, and
+       since CR-5 it is also a price the merchant will be billed, so the figure
+       is named in the confirmation rather than left in a field behind it.
        confirmDialog, not window.confirm: native dialogs are suppressed in the
        automated browser and cannot be driven during verification. */
     const ok = await confirmDialog({
-      title: available ? 'Mark this enquiry available?' : 'Mark this enquiry not available?',
+      title: available ? 'Send this quotation?' : 'Decline this enquiry?',
       message: available
-        ? `${r.reference_number} will be released to ${r.merchant_name || 'the merchant'}, who can then raise a booking against it. This answer is final.`
+        ? `${r.reference_number} will be quoted to ${r.merchant_name || 'the merchant'} at `
+          + `${moneyStr(fare)}. That is the amount their booking is raised at, checked against `
+          + `their credit limit, and debited from their wallet when the ticket is issued. `
+          + `This answer is final and cannot be repriced.`
         : `${r.reference_number} will be closed as not available. This answer is final.`,
-      confirmText: available ? 'Mark Available' : 'Mark Not Available',
+      confirmText: available ? 'Send Quotation' : 'Decline Enquiry',
       danger: !available,
     });
     if (!ok) return;
@@ -316,15 +403,24 @@ function wireEnquiryModal(overlay, body, r) {
     buttons.forEach(b => b && (b.disabled = true));
     try {
       await axios.post(`${API_BASE}/api/admin/enquiries/${r.id}/respond`,
-        { available, reason: reason || undefined, response: response || undefined },
+        {
+          available,
+          reason,
+          response: response || undefined,
+          /* Sent only on a quotation — the server refuses a fare on a decline
+             rather than dropping it, so an accidental one is not swallowed. */
+          ...(available ? { total_fare: fare } : {}),
+        },
         { headers: authHeaders() });
-      showToast(`${r.reference_number} marked ${available ? 'available' : 'not available'}.`);
+      showToast(available
+        ? `${r.reference_number} quoted at ${moneyStr(fare)}.`
+        : `${r.reference_number} declined.`);
       overlay.classList.remove('open');
       loadTicketEnquiries(enqPage);
       if (loadedSections.has('reports')) loadReports();   // keep the counters honest
     } catch (err) {
       buttons.forEach(b => b && (b.disabled = false));
-      setMsg(err.response?.data?.detail || 'Could not record that answer.', 'error');
+      setMsg(enqErrorText(err), 'error');
     }
   };
 

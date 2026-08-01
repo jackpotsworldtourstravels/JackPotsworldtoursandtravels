@@ -87,7 +87,10 @@ function opsInvColumns(travelType, paxRef) {
         const unit = travelType === 'hotel' ? '/stay' : '/pax';
         const pax = paxRef() || 1;
         const total = travelType === 'hotel' || pax === 1
-          ? '' : `<small class="ops-muted" style="display:block">${money(Number(r.total_amount) * pax)} total</small>`;
+          /* M4: the per-passenger multiplication is gone — money is not
+             arithmetic-ed in the browser. The unit price is what the server
+             sent; the total for a party is quoted at approval. */
+          ? '' : '';
         return `${money(Number(r.total_amount))}<small class="ops-muted">${unit}</small>${total}`;
       },
       text: r => String(r.total_amount ?? ''),

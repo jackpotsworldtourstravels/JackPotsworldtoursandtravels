@@ -28,13 +28,24 @@ function clLabel(s) {
 /* Status -> tag colour. Kept in one place so a status never renders green on
    one screen and grey on another. */
 const CL_STATUS_TONE = {
-  draft: '', pending_approval: 'warn', approved: 'info', payment_pending: 'warn',
-  paid: 'ok', ticketed: 'ok', completed: 'ok', cancelled: 'err', rejected: 'err',
+  draft: '', pending_approval: 'warn', in_review: 'warn', approved: 'info',
+  payment_pending: 'warn', paid: 'ok', ticket_issued: 'ok', ticketed: 'ok',
+  completed: 'ok', cancelled: 'err', rejected: 'err',
 };
-function clTag(status) {
+/* `label` is the server's own wording when it has one. It matters on the
+   Classic Tours track (CR-2), where `pending_approval` means "Pending Manager
+   Approval" and `approved` means "Manager Approved" — deriving the text from
+   the enum value here would tell the merchant the wrong thing about who is
+   holding its booking. */
+function clTag(status, label) {
   const tone = CL_STATUS_TONE[status];
-  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(clLabel(status))}</span>`;
+  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(label || clLabel(status))}</span>`;
 }
+
+/* Money that came from finance_service is formatted by `moneyStr()` in
+   shared/formatters.js — one implementation for every portal, so the Classic
+   merchant screen and the Admin screen cannot render the same balance
+   differently. There is deliberately no `cl`-prefixed copy of it here. */
 
 function clMsg(el, text, kind) {
   if (!el) return;
@@ -93,12 +104,13 @@ function clConfirm(message, confirmLabel) {
 /* ----------------------------------------------------------------- router */
 
 const CL_TITLES = {
-  dashboard: 'Dashboard', enquiry: 'Ticket Enquiry', 'booking-request': 'Booking Request',
+  dashboard: 'Dashboard', enquiry: 'Booking Enquiry', 'booking-request': 'Booking Request',
   /* Reached from a row action rather than the sidebar — there is no nav item
      for it, because "the booking you just clicked" is not a destination you
      navigate to cold. */
   'booking-detail': 'Booking Request Details',
-  requests: 'My Requests', payments: 'Payments', 'service-request': 'Service Requests',
+  requests: 'My Requests', approvals: 'Approvals',
+  wallet: 'Wallet', payments: 'Payments', 'service-request': 'Service Requests',
   reports: 'Reports', notifications: 'Notifications', profile: 'Profile & Settings',
   support: 'Support',
 };
@@ -114,6 +126,8 @@ const CL_LOADERS = {
   'booking-request': () => clInitBookingRequest(),
   'booking-detail': () => clInitBookingDetail(),
   requests: () => clInitRequests(),
+  approvals: () => clInitApprovals(),
+  wallet: () => clInitWallet(),
   payments: () => clInitPayments(),
   'service-request': () => clInitServiceRequest(),
   reports: () => clInitReports(),
@@ -232,8 +246,18 @@ function clShowApp() {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  /* Deep links survive a reload: #payments lands on Payments. */
-  clGo((location.hash || '').replace('#', '') || 'dashboard');
+  /* CR-3 — Approvals is only a destination for the merchant's approvers. Hiding
+     it is presentation only; the endpoints behind it are permission-gated
+     server-side, so a hidden link is not what keeps anyone out. */
+  const canApprove = clCanApprove();
+  $('clNavApprovals').style.display = canApprove ? '' : 'none';
+
+  /* Deep links survive a reload: #payments lands on Payments. A user without
+     the permission who follows #approvals would otherwise render an empty
+     section with no way back. */
+  let target = (location.hash || '').replace('#', '') || 'dashboard';
+  if (target === 'approvals' && !canApprove) target = 'dashboard';
+  clGo(target);
   clLoadUnreadCount();
 }
 

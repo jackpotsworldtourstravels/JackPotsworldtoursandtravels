@@ -13,7 +13,7 @@
    NO DOCUMENTS PANEL. There was one, and it went with the upload controls on
    the Booking Request screen — documents are no longer part of the Classic
    merchant workflow, so a permanently empty table telling merchants to "open it
-   from Ticket Enquiry to add documents" would be an instruction they could not
+   from Booking Enquiry to add documents" would be an instruction they could not
    follow. The `documents` key is still on the payload and the Admin still has
    its verification screen, so nothing has to be rebuilt if they return.
 
@@ -69,6 +69,11 @@ function clRenderBookingDetail() {
   const contact = d.contact || {};
   const timeline = data.timeline || [];
   const roundTrip = d.trip_type === 'round_trip';
+  /* CR-2: this booking runs the Classic Tours workflow — a Manager approves it
+     and nothing is ever paid through the portal. */
+  const classic = r.workflow === 'classic_tours';
+  const returned = classic && r.status === 'draft' && d.manager_remarks;
+  const ticketsReady = ['ticket_issued', 'completed'].includes(r.status);
 
   $('cl-booking-detail').innerHTML = `
     <div class="cl-page-head">
@@ -80,18 +85,31 @@ function clRenderBookingDetail() {
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clBdBack">Back to My Requests</button>
         <button type="button" class="cl-btn cl-btn-sm" id="clBdRefresh">Refresh</button>
+        ${returned ? '<button type="button" class="cl-btn cl-btn-primary" id="clBdResubmit">Resubmit for approval</button>' : ''}
       </div>
     </div>
+
+    ${returned ? `<div class="cl-msg cl-msg-warn" style="margin:0 0 16px;">
+      <b>Returned for correction${d.manager_returned_by ? ` by ${escapeHtml(d.manager_returned_by)}` : ''}:</b>
+      ${escapeHtml(d.manager_remarks)}
+      <div style="margin-top:6px;">Open <b>Request Ticket</b> to correct the traveller details, then resubmit.</div>
+    </div>` : ''}
 
     <div class="cl-kpis">
       <div class="cl-kpi"><div class="cl-kpi-label">Status</div>
         <div class="cl-kpi-value">${escapeHtml(r.status_label || r.status)}</div>
         <div class="cl-kpi-sub">${escapeHtml(fmtDateTime(r.created_at))}</div></div>
-      <div class="cl-kpi"><div class="cl-kpi-label">Amount</div>
-        <div class="cl-kpi-value">${r.total_amount && Number(r.total_amount) > 0
-          ? escapeHtml(money(r.total_amount)) : 'Awaiting amount'}</div>
-        <div class="cl-kpi-sub">${d.enquiry_reference
-          ? 'Confirmed by our team at approval' : ''}</div></div>
+      ${classic
+        /* No amount, ever. Showing "Awaiting amount" here would promise a price
+           and then a payment step, neither of which is coming on this track. */
+        ? `<div class="cl-kpi"><div class="cl-kpi-label">Payment</div>
+             <div class="cl-kpi-value">Not required</div>
+             <div class="cl-kpi-sub">Settled directly with our team</div></div>`
+        : `<div class="cl-kpi"><div class="cl-kpi-label">Amount</div>
+             <div class="cl-kpi-value">${r.total_amount && Number(r.total_amount) > 0
+               ? escapeHtml(money(r.total_amount)) : 'Awaiting amount'}</div>
+             <div class="cl-kpi-sub">${d.enquiry_reference
+               ? 'Confirmed by our team at approval' : ''}</div></div>`}
       <div class="cl-kpi"><div class="cl-kpi-label">Travellers</div>
         <div class="cl-kpi-value">${(r.passengers || []).length}</div>
         <div class="cl-kpi-sub">${escapeHtml(d.travel_class || '')}</div></div>
@@ -162,6 +180,14 @@ function clRenderBookingDetail() {
       </div>
     </div>
 
+    ${ticketsReady ? `
+    <div class="cl-panel" id="clBdTicketsPanel">
+      <div class="cl-panel-head"><h2>Ticket documents</h2></div>
+      <div class="cl-panel-body" id="clBdTickets">
+        <span class="cl-spin"></span> Loading your tickets…
+      </div>
+    </div>` : ''}
+
     <div class="cl-panel">
       <div class="cl-panel-head"><h2>Timeline</h2></div>
       <div class="cl-panel-body">
@@ -181,5 +207,85 @@ function clRenderBookingDetail() {
   $('clBdRefresh').addEventListener('click', () => {
     clLoaded.delete('booking-detail');
     clGo('booking-detail');
+  });
+
+  $('clBdResubmit')?.addEventListener('click', async () => {
+    const btn = $('clBdResubmit');
+    btn.disabled = true;
+    try {
+      await MerchantApi.submitRequest(r.id);
+      clInvalidate('dashboard', 'requests', 'booking-detail');
+      clLoaded.delete('booking-detail');
+      clGo('booking-detail');
+    } catch (err) {
+      btn.disabled = false;
+      alert(clError(err, 'Could not resubmit this booking.'));
+    }
+  });
+
+  if (ticketsReady) clLoadTicketDocuments(r.id);
+}
+
+/* The issued paperwork, fetched only once the booking is actually ticketed.
+   Its own call because /api/requests/{id} does not carry documents, and this
+   panel is the merchant's whole reason for coming back to the page.
+
+   Bytes never come from a static path: every file is fetched through the
+   authenticated, merchant-scoped download endpoint, which re-checks scope per
+   request. The browser cannot simply follow an <a href> for that (it would send
+   no Authorization header), so the click fetches the blob and hands it to a
+   temporary object URL. */
+async function clLoadTicketDocuments(requestId) {
+  const box = $('clBdTickets');
+  if (!box) return;
+  let docs = [];
+  try {
+    docs = await MerchantApi.listTicketDocuments(requestId);
+  } catch (err) {
+    box.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:0;">${
+      escapeHtml(clError(err, 'Could not load your ticket documents.'))}</div>`;
+    return;
+  }
+
+  if (!docs.length) {
+    box.innerHTML = '<p class="cl-kpi-sub" style="margin:0;">Our team is attaching your tickets — check back shortly.</p>';
+    return;
+  }
+
+  box.innerHTML = `
+    <p class="cl-kpi-sub" style="margin:0 0 10px;">
+      ${docs.length} document${docs.length === 1 ? '' : 's'} issued for this booking.
+    </p>
+    <div class="cl-table-wrap"><table class="cl-table">
+      <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Issued</th><th></th></tr></thead>
+      <tbody>${docs.map(doc => `
+        <tr>
+          <td>${escapeHtml(doc.original_filename)}</td>
+          <td>${escapeHtml(clLabel(doc.doc_type))}</td>
+          <td class="cl-nowrap">${Math.max(1, Math.round((doc.size_bytes || 0) / 1024))} KB</td>
+          <td class="cl-nowrap">${escapeHtml(fmtDateTime(doc.created_at))}</td>
+          <td><button type="button" class="cl-btn cl-btn-sm cl-btn-primary"
+                data-cl-dl="${doc.id}" data-cl-dlname="${escapeHtml(doc.original_filename)}">Download</button></td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+
+  box.querySelectorAll('[data-cl-dl]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const url = await MerchantApi.downloadDocument(btn.dataset.clDl);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = btn.dataset.clDlname || 'ticket';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(clError(err, 'Could not download that document.'));
+      } finally {
+        btn.disabled = false;
+      }
+    });
   });
 }

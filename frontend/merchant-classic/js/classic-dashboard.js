@@ -16,7 +16,7 @@
      verify_payment is what moves a request on to Paid — so a payment awaiting
      verification still belongs to a request sitting in Payment Pending.
 
-   A THIRD DISTINCTION, new with Ticket Enquiry. A ticket enquiry is a
+   A THIRD DISTINCTION, new with Booking Enquiry. A booking enquiry is a
    service_requests row like any other, so /api/merchant/dashboard's
    `requests_by_status` counts enquiries alongside bookings — an unanswered
    enquiry lands in `pending_approval` next to a booking awaiting approval.
@@ -27,12 +27,13 @@
    shares, which would have made the same number mean different things
    depending on which screen you read it from.
 
-   NO CREDIT FIGURE. The dashboard used to carry a "Credit limit" tile beside
-   the wallet. It is gone, here and on Profile & Settings: the wallet balance
-   is the number a merchant spends against, and a second money figure that
-   nothing on this portal actually spends only invited the question of which
-   one was real. `credit_limit` is still on the merchant record and still
-   returned by /api/merchant/dashboard — this portal simply does not show it.
+   CREDIT, AS HEADROOM RATHER THAN A CEILING. The dashboard once carried a bare
+   "Credit limit" tile beside the wallet, and it was removed: a limit on its own
+   says nothing about how much of it is left, and a merchant reads it as money
+   available. M4 brought the figure back as **Credit available**, computed by
+   finance_service, with "X of Y used" underneath — and on a merchant with no
+   credit limit that tile becomes Balance due instead. Both come from
+   /api/merchant/finance/position, never from the raw `credit_limit` column.
 
    CHARTS, NOT A RECENT-REQUESTS TABLE. The "Recent requests" table that used
    to close this screen was five rows of exactly what My Requests already
@@ -44,6 +45,9 @@
    with the page instead of needing a redraw. */
 
 let clDashData = null;
+/* The finance_service position for this merchant (M4). Held alongside the
+   dashboard payload because the two money KPIs render from it. */
+let clDashPosition = null;
 
 async function clInitDashboard() {
   const root = $('cl-dashboard');
@@ -55,18 +59,19 @@ async function clInitDashboard() {
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clDashRefresh">Refresh</button>
-        <button type="button" class="cl-btn cl-btn-primary" id="clDashNew">Enquire ticket</button>
+        <!-- CR-5 removed the "Enquire ticket" action from here. Raising an
+             enquiry belongs on the Booking Enquiry screen, which is one click
+             away in the rail and carries the listing the new row lands in; a
+             second entry point on the dashboard opened the same modal over a
+             screen that then could not show the result. -->
       </div>
     </div>
     <div id="clDashKpis"><div class="cl-panel"><div class="cl-panel-body">
       <span class="cl-spin"></span> Loading account summary…
     </div></div></div>
-    <div id="clDashCharts"></div>
-    <div id="clDashAccount"></div>`;
+    <div id="clDashCharts"></div>`;
 
   $('clDashRefresh').addEventListener('click', () => { clLoaded.add('dashboard'); clInitDashboard(); });
-  /* Straight into the Enquire Ticket form: every booking now starts there. */
-  $('clDashNew').addEventListener('click', () => clGo('enquiry', () => clOpenEnquiryForm()));
 
   await clLoadDashboard();
 }
@@ -106,10 +111,25 @@ async function clChartBookings() {
 async function clLoadDashboard() {
   const kpis = $('clDashKpis');
   try {
-    const [data, enq, bookings] = await Promise.all([
-      MerchantApi.dashboard(), clEnquiryCounts(), clChartBookings(),
+    /* M4: the money tiles come from finance_service, not from the dashboard
+       payload's raw `wallet_balance` / `credit_limit` columns. A credit limit
+       shown on its own is the misreading this milestone exists to prevent — it
+       is a ceiling with no indication of how much is left, and the merchant
+       reads it as headroom. `position` carries `credit_used`, `credit_available`
+       and `outstanding`, all computed server-side.
+
+       The position is optional: if that call fails the rest of the dashboard
+       still renders, with the money tiles saying so rather than the whole screen
+       breaking over a KPI strip. `bookings` is optional in the same way and for
+       the same reason — it feeds the charts alone. */
+    const [data, enq, position, bookings] = await Promise.all([
+      MerchantApi.dashboard(),
+      clEnquiryCounts(),
+      MerchantApi.financePosition().catch(() => null),
+      clChartBookings(),
     ]);
     clDashData = data;
+    clDashPosition = position;
     const s = data.requests_by_status || {};
 
     /* `pending_approval + in_review` mirrors Premium: both are "with our team,
@@ -119,16 +139,27 @@ async function clLoadDashboard() {
     const awaiting = (s.pending_approval || 0) + (s.in_review || 0);
 
     kpis.innerHTML = `<div class="cl-kpis">
-      ${clKpi('Wallet balance', money(data.wallet_balance), 'Available to spend', 'payments')}
+      ${clKpi('Wallet balance',
+              position ? moneyStr(position.wallet_balance) : '—',
+              position ? 'Available to spend' : 'Position unavailable', 'payments')}
+      ${position && position.has_credit_limit
+          ? clKpi('Credit available', moneyStr(position.credit_available),
+                  `${moneyStr(position.credit_used)} of ${moneyStr(position.credit_limit)} used`, 'payments')
+          : clKpi('Balance due',
+                  position ? moneyStr(position.outstanding) : '—',
+                  position ? 'Across your billable bookings' : 'Position unavailable', 'payments')}
       ${clKpi('Enquiries open', enq ? enq.open : '—', 'Awaiting our answer', 'enquiry')}
       ${clKpi('Ready to book', enq ? enq.ready : '—', 'Answered — request a ticket', 'enquiry')}
       ${clKpi('Pending approval', awaiting, 'Bookings + enquiries with us', 'requests', 'pending_approval')}
       ${clKpi('Payment pending', s.payment_pending || 0, 'You owe payment', 'payments', 'payment_pending')}
-      ${clKpi('Ticketed', s.ticket_issued || s.ticketed || 0, 'Tickets issued', 'requests', 'ticketed')}
       ${clKpi('Completed', s.completed || 0, 'Closed requests', 'requests', 'completed')}
-      ${clKpi('Awaiting verification', data.pending_payments_count || 0, 'Payments you have sent', 'payments', 'payment_pending')}
-      ${clKpi('Unread notices', data.unread_notifications_count || 0, 'Notification centre', 'notifications')}
     </div>`;
+    /* CR-5 dropped four tiles from this strip: Ticketed, Awaiting verification,
+       Unread notices, and the Account panel below it. Each already had a home
+       that showed more than a bare number — My Requests filtered to Ticketed,
+       the Payments screen's position strip, the notification bell and its
+       centre, and Profile & Settings. Ten tiles is a wall to read past to
+       reach the two that need action today. */
 
     kpis.querySelectorAll('[data-cl-kpi-to]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -150,7 +181,6 @@ async function clLoadDashboard() {
     });
 
     clRenderDashCharts(bookings);
-    clRenderDashAccount(data);
   } catch (err) {
     kpis.innerHTML = `<div class="cl-panel"><div class="cl-panel-body">
       <div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Failed to load the dashboard.'))}</div>
@@ -171,20 +201,14 @@ function clKpi(label, value, sub, to, filter) {
     : `<div class="cl-kpi">${inner}</div>`;
 }
 
-function clRenderDashAccount(data) {
-  $('clDashAccount').innerHTML = `
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Account</h2></div>
-      <div class="cl-panel-body">
-        <dl class="cl-dl">
-          <div><dt>Company</dt><dd>${escapeHtml(data.company_name || localStorage.getItem(PARTNER_KEYS.companyName) || '—')}</dd></div>
-          <div><dt>Merchant code</dt><dd class="cl-ref">${escapeHtml(data.merchant_code || '—')}</dd></div>
-          <div><dt>Wallet balance</dt><dd>${money(data.wallet_balance)}</dd></div>
-          <div><dt>Support contact</dt><dd>${escapeHtml(data.support_contact || data.support_email || '—')}</dd></div>
-        </dl>
-      </div>
-    </div>`;
-}
+/* CR-5 removed `clRenderDashAccount` and the "Account" panel it drew.
+   Every field on it was a second copy of something with a better home: company
+   name and merchant code are in the header and on Profile & Settings; wallet
+   balance, credit limit and balance due are the first two tiles of this
+   screen's own KPI strip, which also shows what is used and what is left;
+   support contact is the Support screen. `clDashPosition` is still held, and
+   still fed by the same `financePosition()` call, because those money KPIs
+   render from it. */
 
 /* ================================================================ charts */
 

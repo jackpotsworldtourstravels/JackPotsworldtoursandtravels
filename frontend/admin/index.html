@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260801a">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260801merge">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -111,14 +111,14 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
       <span class="nav-label">Approval Queue</span>
     </a>
-    <!-- Booking Operations — the post-approval desk. Deliberately disjoint from
-         the Approval Queue above: that queue ends the moment a booking is
-         approved and this one begins there, so a booking is on exactly one of
-         them at a time and cannot be worked twice. -->
+    <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
+         from the Approval Queue above: a booking is in exactly one of the two
+         screens at any time, so nothing is ever worked twice. Classic Tours
+         bookings arrive here only once a Manager has approved them. -->
     <a href="#" class="nav-item" data-section="booking-ops">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18"/><path d="M8 2v4M16 2v4"/><path d="m9 15 2 2 4-4"/></svg>
+      <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
       <span class="nav-label">Booking Operations</span>
-      <span class="nav-badge" id="boNavBadge" hidden></span>
+      <span class="nav-badge" id="opsNavBadge" hidden></span>
     </a>
     <!-- One screen for every service request, whatever its type. There used to
          be a second, "Cancellations & Reschedules", because those two settle
@@ -385,9 +385,13 @@
         <div class="panel-head"><h2>Approval Queue</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <select id="aqStatusFilter" class="status-select">
+            <!-- "Awaiting action" means awaiting *ours*: Pending Approval and
+                 Under Review, plus any booking approved without a fare, which
+                 sits in Payment Pending with nothing the merchant can pay. -->
             <option value="">Awaiting action</option>
             <option value="pending_approval">Pending Approval</option>
             <option value="in_review">Under Review</option>
+            <option value="payment_pending">Payment Pending</option>
           </select>
           <!-- Cancellation and Date Change are absent on purpose: approving one
                here would walk it to Payment Pending — a Pay button on a request
@@ -410,34 +414,39 @@
       </div>
     </section>
 
-    <!-- Booking Operations — the post-approval desk, over
-         /api/admin/bookings/queue. Rendered by admin-booking-ops.js. -->
+    <!-- Booking Operations desk (M1/M2 backend, surfaced by CR-2). Rendered by
+         admin-booking-ops.js. Deliberately disjoint from the Approval Queue
+         above: a booking is in exactly one of the two at any time, so nothing
+         is ever worked twice. Classic Tours bookings arrive here only once a
+         Manager has approved them. -->
     <section class="section" id="section-booking-ops">
       <div class="panel">
         <div class="panel-head">
           <h2>Booking Operations</h2>
-          <span class="panel-sub" id="boQueueSummary"></span>
+          <button type="button" class="btn btn-navy btn-sm" id="opsRefreshBtn">Refresh</button>
         </div>
-        <!-- Tabs are built by the module from BO_TABS so the labels, the badge
-             counts and the query each tab issues are defined once. -->
-        <div class="bo-tabs" id="boTabs" role="tablist"></div>
+        <div class="ops-tabs" id="opsTabs" role="tablist"></div>
         <div class="filter-bar" style="margin-bottom:16px;">
-          <input type="search" id="boSearch" aria-label="Search bookings"
-                 placeholder="Request no., booking ref, PNR, ticket no. or title">
-          <select id="boAssignFilter" class="status-select" aria-label="Filter by operator">
-            <option value="">Anyone</option>
+          <input type="text" id="opsSearch" placeholder="Request no., booking ref, PNR or ticket no.">
+          <select id="opsAssignFilter" class="status-select" aria-label="Assignment">
+            <option value="">Everyone</option>
             <option value="mine">Assigned to me</option>
             <option value="unassigned">Unassigned</option>
           </select>
-          <button class="btn btn-ghost btn-sm" id="boRefreshBtn" type="button">Refresh</button>
         </div>
-        <div class="table-wrap"><table id="boTable"><thead><tr>
-          <th>Request No.</th><th>Merchant</th><th>Booking</th><th>Travel Date</th>
-          <th>Amount</th><th>Operator</th><th>Status</th><th>Actions</th>
+        <div class="table-wrap"><table id="opsTable"><thead><tr>
+          <th>Booking</th><th>Merchant</th><th>Travellers</th><th>Travel date</th>
+          <th>Stage</th><th>Assigned</th><th>Waiting</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="boPagination"></div>
+        <div class="pagination" id="opsPagination"></div>
       </div>
     </section>
+
+    <!-- There is no #section-change-requests. Cancellations and reschedules are
+         rows on Service Request Management below, which routes those two types
+         to the settle dialog in admin-change-requests.js and everything else to
+         the plain approve/reject one. The dialog is still that file's; only its
+         standalone queue is gone. -->
 
     <section class="section" id="section-service-requests-mgmt">
       <div class="panel">
@@ -583,6 +592,13 @@
   <div class="modal-card modal-lg" id="bookingReviewModalBody"></div>
 </div>
 
+<!-- Work one booking: the booking and passenger details the merchant submitted,
+     ticket uploads, internal notes and the two lifecycle actions. Rendered by
+     admin-booking-ops.js. -->
+<div class="modal-overlay" id="opsWorkOverlay">
+  <div class="modal-card modal-lg" id="opsWorkBody" role="dialog" aria-modal="true" aria-labelledby="opsWorkTitle"></div>
+</div>
+
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
   <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
 </div>
@@ -611,24 +627,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
+<script src="../components/focus-trap.js?v=20260731cr2"></script>
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260801a"></script>
+<script src="../assets/js/admin.js?v=20260801merge"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260730a"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260801cr5"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260731a"></script>
-<!-- The cancellation/reschedule settle dialog. Its own screen was merged into
-     Service Request Management; this file now only owns the dialog that screen
-     opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260801a"></script>
-<!-- Booking Operations — the post-approval desk (M1's API, first UI). -->
-<script src="../assets/js/admin-booking-ops.js?v=20260801a"></script>
+<script src="../assets/js/admin-bookings.js?v=20260731b"></script>
+<!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
+     into Service Request Management; this file now only owns the dialog that
+     screen opens for those two types. Also after admin.js. -->
+<script src="../assets/js/admin-change-requests.js?v=20260801merge"></script>
+<!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
+<script src="../assets/js/admin-booking-ops.js?v=20260801cr5c"></script>
 </body>
 </html>

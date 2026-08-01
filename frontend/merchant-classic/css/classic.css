@@ -406,7 +406,7 @@ input[readonly]{background:var(--cl-hover-bg);}
 }
 :root[data-theme="dark"] .cl-tag{background:var(--cl-hover-bg);}
 .cl-tag-ok{background:rgba(18,183,106,0.12); color:var(--cl-emerald);}
-.cl-tag-warn{background:rgba(255,176,32,0.15); color:#a06600;}
+.cl-tag-warn{background:rgba(255,176,32,0.15); color:#8f5c00;}
 :root[data-theme="dark"] .cl-tag-warn{color:var(--cl-gold);}
 .cl-tag-err{background:rgba(230,57,70,0.12); color:var(--cl-coral-dark);}
 :root[data-theme="dark"] .cl-tag-err{color:#ff9c8a;}
@@ -494,6 +494,11 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 :root[data-theme="dark"] .cl-msg-err{color:#ff9c8a;}
 .cl-msg-info{background:rgba(47,128,237,0.12); border-color:rgba(47,128,237,0.28); color:var(--cl-sky);}
 .cl-msg-muted{background:var(--cl-hover-bg); border-color:var(--cl-border-color); color:var(--cl-text-muted);}
+/* "Your booking came back for a correction" (CR-2). Not an error — nothing
+   failed and nothing is lost — but not neutral either: it is the one message
+   on the page the merchant has to act on. */
+.cl-msg-warn{background:rgba(255,176,32,0.14); border-color:rgba(255,176,32,0.40); color:#8a5a00;}
+:root[data-theme="dark"] .cl-msg-warn{color:#ffc766;}
 
 /* ==============================  modal  ================================= */
 
@@ -663,22 +668,14 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 .cl-combo-opt mark{background:none; color:var(--cl-coral); font-weight:800;}
 .cl-combo-empty{padding:12px 11px; font-size:12.5px; font-weight:600; color:var(--cl-text-muted);}
 
-/* ---- time: hour select + AM/PM toggle ---- */
+/* ---- time ----
+   CR-5 replaced the hour-select + AM/PM toggle with a single 24-hour <select>,
+   so `.cl-mer` / `.cl-mer-btn` were deleted here along with their only markup.
+   `.cl-time` is kept: it is a plain flex row, and it is what any future
+   two-part time control would sit in. */
 
 .cl-time{display:flex; gap:8px; align-items:stretch;}
 .cl-time select{flex:1; min-width:0;}
-.cl-mer{
-  display:inline-flex; gap:2px; padding:3px; flex-shrink:0;
-  background:var(--cl-hover-bg); border-radius:12px;
-}
-.cl-mer-btn{
-  min-width:44px; padding:0 12px; border:none; background:none; cursor:pointer;
-  border-radius:9px; font:inherit; font-size:12px; font-weight:800;
-  letter-spacing:.03em; color:var(--cl-text-muted);
-  transition:background .18s ease, color .18s ease;
-}
-.cl-mer-btn:hover{color:var(--cl-text-primary);}
-.cl-mer-btn.active{background:var(--cl-coral); color:#fff;}
 
 /* ---- passenger steppers ---- */
 
@@ -829,4 +826,48 @@ button.cl-kpi{cursor:pointer; width:100%; display:block;}
 .cl-timeline-note{
   font-size:11.5px; font-weight:600; color:var(--cl-text-muted); margin-top:4px;
   padding:6px 8px; border-radius:8px; background:var(--cl-hover-bg);
+}
+
+/* ---------------------------------------------------------------- wallet
+   CR-4c. Almost everything on the Wallet screen reuses the existing panel,
+   table, KPI and form classes — the additions below are only what had no
+   equivalent, so the screen cannot drift away from the rest of the portal.
+
+   The `.cl-note` reuse for a payment account deliberately overrides its
+   default `cursor:pointer`: an account card is something to read and copy
+   from, not something to click, and a pointer cursor on it promises an
+   interaction that does not exist. */
+.cl-wallet-qr{
+  max-width:200px; width:100%; margin-top:10px; border-radius:8px;
+  /* A white plate under the code: a QR rendered with a transparent background
+     is unscannable on the dark theme, and this is the one image on the portal
+     a camera has to read. */
+  background:#fff; padding:8px;
+}
+
+/* The account cards inside the Add Money modal. `overflow-wrap` because an
+   IFSC or a UPI handle has no spaces to break at and will otherwise push the
+   modal wider than the viewport on a phone. */
+.cl-wallet-acct{cursor:default;}
+.cl-wallet-acct dd{overflow-wrap:anywhere;}
+
+/* A lakh does not fit in half a phone.
+
+   `.cl-kpis` drops to two fixed columns under 640px, which leaves ~123px of
+   content inside each tile. A wallet figure like ₹60,43,002.00 needs ~189px at
+   the 24px tile type, so it overflowed its tile and pushed the whole page 31px
+   wider than the viewport — a horizontal scrollbar on every phone.
+
+   Fixed by giving the wallet's tiles the full width below 640px, which leaves
+   ~303px and fits the largest figure at full size. One column is also simply
+   the better reading of a running account on a phone: these are numbers you
+   compare down a list, not across.
+
+   **Scoped to `#cl-wallet` on purpose.** `.cl-kpis` and `.cl-kpi-value` are
+   shared with the Payments screen, which is part of the locked M4 surface and
+   has the same latent problem (measured worse, at 429px). Fixing it there is a
+   change to approved functionality and needs its own approval, so it is
+   reported rather than quietly altered here. */
+@media (max-width:640px){
+  #cl-wallet .cl-kpis{grid-template-columns:1fr;}
 }

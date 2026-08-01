@@ -17,7 +17,7 @@ function clInitRequests() {
         <p>Every booking and service request raised by your account.</p>
       </div>
       <div class="cl-page-actions">
-        <button type="button" class="cl-btn cl-btn-primary" id="clReqNew">New enquiry</button>
+        <button type="button" class="cl-btn cl-btn-primary" id="clReqNew">New booking enquiry</button>
       </div>
     </div>
 
@@ -31,7 +31,9 @@ function clInitRequests() {
           </select>
         </div>
         <div class="cl-field">
-          <label for="clReqSearch">Find</label>
+          <!-- CR-5: "Search", not "Find" — one word for this control across the
+               portal. Behaviour unchanged; it still narrows the loaded rows. -->
+          <label for="clReqSearch">Search</label>
           <input type="search" id="clReqSearch" placeholder="Request no. or item">
         </div>
         <div class="cl-field" style="min-width:0;">
@@ -117,6 +119,19 @@ function clRenderRequestRows() {
    payable for the move — the same column, three different meanings. Left bare
    it reads as a bill, so the direction is spelled out rather than inferred. */
 function clRequestAmount(r) {
+  /* A Classic Tours booking has no *payment* in this portal (CR-2) — but since
+     CR-5 it does have an amount, because the enquiry was quoted before the
+     booking was raised. Those are different statements, and this column used to
+     conflate them: it printed "Not payable here" over a figure the merchant had
+     just committed to, so the one screen listing every request was the one
+     screen that would not say what any of them cost.
+     `moneyStr`, not `money()`: the amount is a decimal string and `money()`
+     rounds it through a float, turning ₹60,000.50 into ₹60,001. */
+  if (r.workflow === 'classic_tours') {
+    return moneyIsPositive(r.total_amount)
+      ? `${escapeHtml(moneyStr(r.total_amount))}<div class="cl-kpi-sub">from wallet</div>`
+      : '<span class="cl-kpi-sub">Not payable here</span>';
+  }
   const amount = money(r.total_amount);
   if (!(Number(r.total_amount) > 0)) return amount;
   if (r.request_type === 'cancellation') return `${amount}<div class="cl-kpi-sub">refund due</div>`;
@@ -129,7 +144,7 @@ function clRequestRow(r) {
     <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
     <td>${escapeHtml(r.title || '—')}</td>
     <td class="cl-nowrap">${escapeHtml(clLabel(r.request_type || r.travel_type || '—'))}</td>
-    <td>${clTag(r.status)}</td>
+    <td>${clTag(r.status, r.status_label)}</td>
     <td class="cl-num">${clRequestAmount(r)}</td>
     <td class="cl-nowrap">${escapeHtml(fmtDate(r.travel_date))}</td>
     <td class="cl-nowrap">${escapeHtml(fmtDate(r.created_at))}</td>

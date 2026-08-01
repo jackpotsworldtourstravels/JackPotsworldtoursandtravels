@@ -105,6 +105,8 @@ function loadSection(name) {
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
   if (name === 'ticket-enquiries') return loadTicketEnquiries();
   if (name === 'booking-ops') return loadBookingOps();
+  /* No 'change-requests' case: cancellations and reschedules are rows on
+     Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();
 }
 
@@ -443,12 +445,27 @@ async function openMerchantDetail(merchantId) {
           <div class="info-item"><label>Email</label><div>${escapeHtml(m.email)}</div></div>
           <div class="info-item"><label>Phone</label><div>${escapeHtml(m.phone || '—')}</div></div>
           <div class="info-item"><label>Status</label><div><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></div></div>
-          <div class="info-item"><label>Wallet Balance</label><div>${money(m.wallet_balance)}</div></div>
-          <div class="info-item"><label>Credit Limit</label><div>${money(m.credit_limit)}</div></div>
           <div class="info-item"><label>Created Date</label><div>${fmtDate(m.created_at)}</div></div>
           <div class="info-item"><label>Number of Users</label><div>${m.user_count}</div></div>
         </div>
       </div>
+
+      <!-- M4. Wallet Balance and Credit Limit used to sit in the grid above,
+           read straight off the merchant row and rounded by money(). They are
+           here instead, from GET /api/admin/merchants/{id}/finance — the same
+           finance_service computation the merchant sees on its own Payments
+           screen, so the desk and the customer cannot be looking at two
+           different numbers. A credit limit is shown only beside what is left
+           of it. -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2 style="font-size:14px;">Financial position</h2>
+          <button class="btn btn-ghost btn-sm" id="merchantStmtToggle">Show statement</button>
+        </div>
+        <div id="merchantFinance"><div class="empty-state">Loading…</div></div>
+        <div id="merchantStatement" hidden></div>
+      </div>
+
       <div class="panel">
         <div class="panel-head">
           <h2 style="font-size:14px;">Users</h2>
@@ -462,8 +479,93 @@ async function openMerchantDetail(merchantId) {
     document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
     document.getElementById('addMerchantUserBtn').addEventListener('click', () => openMerchantUserModal(merchantId, m.company_name));
     loadMerchantUsersTable(merchantId);
+    loadMerchantFinance(merchantId);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
+  }
+}
+
+/* ---------- Merchant financial position (M4) ----------
+   GET /api/admin/merchants/{id}/finance and /statement. Both are served by
+   finance_service, which is also what the merchant's own Payments screen reads,
+   so "what does this merchant owe" has exactly one answer on this platform.
+
+   Every value is a Decimal serialised as a string and is rendered with
+   moneyStr() — never money(), which rounds through a float and would show the
+   desk a different number from the one the merchant is looking at. */
+async function loadMerchantFinance(merchantId) {
+  const box = document.getElementById('merchantFinance');
+  if (!box) return;
+  try {
+    const { data: p } = await axios.get(
+      `${API_BASE}/api/admin/merchants/${merchantId}/finance`, { headers: authHeaders() });
+
+    const tile = (label, value, sub) => `
+      <div class="analytics-tile">
+        <div class="num">${escapeHtml(value)}</div>
+        <div class="label">${escapeHtml(label)}</div>
+        ${sub ? `<div class="label" style="text-transform:none;letter-spacing:0;font-weight:600;">${escapeHtml(sub)}</div>` : ''}
+      </div>`;
+
+    box.innerHTML = `
+      <div class="analytics-grid" style="margin:0 0 8px;">
+        ${tile('Outstanding', moneyStr(p.outstanding), `${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`)}
+        ${tile('Billed', moneyStr(p.billed), 'raised to date')}
+        ${tile('Net paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified')}
+        ${tile('Awaiting verification', moneyStr(p.awaiting_verification), 'submitted, unconfirmed')}
+        ${tile('Wallet', moneyStr(p.wallet_balance), 'on account')}
+        ${p.has_credit_limit
+          ? tile('Credit available', moneyStr(p.credit_available), `${moneyStr(p.credit_used)} of ${moneyStr(p.credit_limit)} used`)
+          : tile('Credit limit', 'Not set', 'no standing credit')}
+        ${tile('Spending power', moneyStr(p.spending_power), 'wallet + available credit')}
+        ${moneyIsPositive(p.overpaid) ? tile('Overpaid', moneyStr(p.overpaid), 'refund or allocate') : ''}
+      </div>`;
+
+    document.getElementById('merchantStmtToggle')?.addEventListener('click', async e => {
+      const panel = document.getElementById('merchantStatement');
+      if (!panel.hidden) {
+        panel.hidden = true;
+        e.target.textContent = 'Show statement';
+        return;
+      }
+      e.target.textContent = 'Hide statement';
+      panel.hidden = false;
+      panel.innerHTML = `<div class="empty-state">Loading statement…</div>`;
+      try {
+        const { data: s } = await axios.get(
+          `${API_BASE}/api/admin/merchants/${merchantId}/statement`, { headers: authHeaders() });
+        const entries = s.entries || [];
+        panel.innerHTML = `
+          <div class="table-wrap"><table><thead><tr>
+            <th>Date</th><th>Reference</th><th>Description</th>
+            <th>Debit</th><th>Credit</th><th>Balance</th>
+          </tr></thead><tbody>
+            ${entries.length ? entries.map(en => `
+              <tr>
+                <td>${escapeHtml(en.at ? fmtDate(en.at) : '—')}</td>
+                <td>${escapeHtml(en.reference || '—')}</td>
+                <td>${escapeHtml(en.description || en.kind)}</td>
+                <td>${moneyIsPositive(en.debit) ? escapeHtml(moneyStr(en.debit)) : ''}</td>
+                <td>${moneyIsPositive(en.credit) ? escapeHtml(moneyStr(en.credit)) : ''}</td>
+                <td>${escapeHtml(moneyStr(en.balance))}</td>
+              </tr>`).join('')
+              : '<tr><td colspan="6" class="empty-state">No ledger entries.</td></tr>'}
+          </tbody>
+          ${entries.length ? `<tfoot><tr>
+            <td colspan="3"><strong>Totals</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.total_debits))}</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.total_credits))}</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.closing_balance))}</strong></td>
+          </tr></tfoot>` : ''}
+          </table></div>`;
+      } catch (err) {
+        panel.innerHTML = `<div class="empty-state">${escapeHtml(
+          err.response?.data?.detail || 'Could not load the statement.')}</div>`;
+      }
+    });
+  } catch (err) {
+    box.innerHTML = `<div class="empty-state">${escapeHtml(
+      err.response?.data?.detail || 'Could not load this merchant’s financial position.')}</div>`;
   }
 }
 
@@ -684,21 +786,36 @@ async function loadApprovalQueue(page = aqPage) {
     });
     let items = data.items;
     if (document.getElementById('aqTypeFilter').value === 'merchant') items = items.filter(i => i.kind === 'merchant');
-    tbody.innerHTML = items.length ? items.map(i => `
+    tbody.innerHTML = items.length ? items.map(i => {
+      /* A booking already at Payment Pending is past approval — approve and
+         reject both 400 on it, so it gets the one action it can still take: its
+         amount. Under the default "Awaiting action" filter only *unpriced* ones
+         appear (approval_service._awaits_admin); selecting Payment Pending
+         explicitly also lists priced ones, where the same endpoint serves the
+         ordinary "we quoted the wrong number" correction. */
+      const pastApproval = i.status === 'payment_pending';
+      const unpriced = pastApproval && !(Number(i.total_amount) > 0);
+      return `
       <tr>
         <td style="text-transform:capitalize">${i.kind === 'merchant' ? 'Merchant Onboarding' : escapeHtml((i.request_type || '').replace(/_/g, ' '))}</td>
         <td>${escapeHtml(i.title)}</td>
         <td>${escapeHtml(i.merchant_name || '—')}</td>
-        <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span></td>
+        <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span>
+          ${unpriced ? `<div class="cell-sub">No amount set — the merchant cannot pay</div>` : ''}</td>
         <td>${fmtDateTime(i.submitted_at)}</td>
         <td style="white-space:nowrap;">
           ${i.request_type === 'booking'
             ? `<button class="btn btn-ghost btn-sm" data-aq-review="${i.id}">Review</button>` : ''}
-          <button class="btn btn-navy btn-sm" data-aq-approve="${i.id}" data-kind="${i.kind}" data-request-type="${i.request_type || ''}">Approve</button>
-          ${i.kind === 'request' ? `<button class="btn btn-danger btn-sm" data-aq-reject="${i.id}" data-request-type="${i.request_type || ''}">Reject</button>` : ''}
+          ${pastApproval
+            ? `<button class="btn ${unpriced ? 'btn-coral' : 'btn-ghost'} btn-sm" data-aq-reprice="${i.id}"
+                 data-title="${escapeHtml(i.title)}" data-unpriced="${unpriced ? '1' : ''}"
+                 data-amount="${escapeHtml(String(i.total_amount ?? ''))}"
+               >${unpriced ? 'Set amount' : 'Correct amount'}</button>`
+            : `<button class="btn btn-navy btn-sm" data-aq-approve="${i.id}" data-kind="${i.kind}" data-request-type="${i.request_type || ''}" data-title="${escapeHtml(i.title)}">Approve</button>
+               ${i.kind === 'request' ? `<button class="btn btn-danger btn-sm" data-aq-reject="${i.id}" data-request-type="${i.request_type || ''}">Reject</button>` : ''}`}
         </td>
-      </tr>
-    `).join('') : `<tr><td colspan="6" class="empty-state">Nothing awaiting approval.</td></tr>`;
+      </tr>`;
+    }).join('') : `<tr><td colspan="6" class="empty-state">Nothing awaiting approval.</td></tr>`;
     /* Three different backends share this one queue: a merchant approval, a booking's own
        approve/reject (walks Pending -> Under Review -> Approved -> Payment Pending), and a
        service request's resolve (walks Pending -> Under Review -> Approved, no payment step —
@@ -713,16 +830,68 @@ async function loadApprovalQueue(page = aqPage) {
     tbody.querySelectorAll('[data-aq-approve]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.aqApprove;
+        /* A booking's approval carries the fare. This used to post an empty
+           body, so every enquiry-led booking — which reaches approval at ₹0 by
+           design — was approved at zero and landed in Payment Pending unpayable.
+           The server refuses that now; asking here is what makes the refusal
+           unnecessary. Merchant onboarding and service-request resolution have
+           no amount and are unchanged. */
+        if (btn.dataset.requestType === 'booking') {
+          const result = await admAmountDialog({
+            title: 'Approve this booking',
+            message: `${btn.dataset.title || ''} — the merchant pays this amount, so it cannot be zero.`,
+            amountLabel: 'Final amount (₹)',
+            reasonLabel: 'Note to the merchant (optional)',
+            reasonPlaceholder: 'e.g. Fare confirmed with the airline',
+            confirmText: 'Approve at this amount',
+          });
+          if (!result) return;
+          try {
+            await axios.post(`${API_BASE}/api/admin/requests/${id}/approve`,
+              { final_amount: result.amount, note: result.reason || undefined },
+              { headers: authHeaders() });
+            showToast('Booking approved. The merchant can now pay.');
+            loadApprovalQueue(aqPage);
+          } catch (err) { alert(err.response?.data?.detail || 'Failed to approve.'); }
+          return;
+        }
         try {
           if (btn.dataset.kind === 'merchant') {
             await axios.post(`${API_BASE}/api/admin/merchants/${id}/approve`, {}, { headers: authHeaders() });
-          } else if (btn.dataset.requestType === 'booking') {
-            await axios.post(`${API_BASE}/api/admin/requests/${id}/approve`, {}, { headers: authHeaders() });
           } else {
             await axios.post(`${API_BASE}/api/admin/service-requests/${id}/resolve`, { approve: true }, { headers: authHeaders() });
           }
           loadApprovalQueue(aqPage);
         } catch (err) { alert(err.response?.data?.detail || 'Failed to approve.'); }
+      });
+    });
+    /* Correcting a booking that is already Payment Pending. Its own endpoint,
+       not approve: Payment Pending has no edge back to Approved, so calling
+       approve here returns "Cannot move a request from Payment Pending to
+       Approved". */
+    tbody.querySelectorAll('[data-aq-reprice]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.aqReprice;
+        const unpriced = !!btn.dataset.unpriced;
+        const result = await admAmountDialog({
+          title: unpriced ? 'Set the amount' : 'Correct the amount',
+          message: unpriced
+            ? `${btn.dataset.title || ''} — this booking was approved without a fare, so the merchant is shown "Awaiting amount" and cannot pay.`
+            : `${btn.dataset.title || ''} — the merchant is told the new amount and why it changed.`,
+          amountLabel: 'Amount to charge (₹)',
+          reasonLabel: 'Reason',
+          reasonPlaceholder: 'e.g. Fare confirmed with the airline',
+          value: unpriced ? '' : (btn.dataset.amount || ''),
+          confirmText: unpriced ? 'Set amount' : 'Update amount',
+          requireReason: true,
+        });
+        if (!result) return;
+        try {
+          await axios.post(`${API_BASE}/api/admin/requests/${id}/reprice`,
+            { amount: result.amount, reason: result.reason }, { headers: authHeaders() });
+          showToast('Amount set. The merchant has been notified and can now pay.');
+          loadApprovalQueue(aqPage);
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to set the amount.'); }
       });
     });
     tbody.querySelectorAll('[data-aq-reject]').forEach(btn => {
@@ -1232,7 +1401,16 @@ function openRefundModal(paymentId, maxAmount) {
   if (!amount) return;
   const reason = prompt('Reason for this refund:');
   if (!reason) return;
-  axios.post(`${API_BASE}/api/admin/payments/${paymentId}/refund`, { amount: Number(amount), reason }, { headers: authHeaders() })
+
+  /* M4: the amount is sent as the STRING the operator typed, not Number(amount).
+     The endpoint's schema is `Decimal`, and a float on the way in is a rounding
+     error waiting for a value where one shows — the whole point of keeping money
+     out of JavaScript's number type. Validation is the server's: it already
+     refuses <= 0 and anything above what the payment took, and its message says
+     by how much. Re-checking here would be a second opinion about money, which
+     is exactly what this milestone removes. */
+  const trimmed = String(amount).trim();
+  axios.post(`${API_BASE}/api/admin/payments/${paymentId}/refund`, { amount: trimmed, reason }, { headers: authHeaders() })
     .then(() => loadPayments(pvPage))
     .catch(err => alert(err.response?.data?.detail || 'Refund failed.'));
 }

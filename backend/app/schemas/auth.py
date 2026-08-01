@@ -7,7 +7,7 @@ from pydantic import BaseModel, EmailStr, Field
 #: Which portal a login is being attempted against. The login endpoint
 #: rejects an account whose role doesn't belong to the named portal, so
 #: an Admin's credentials can never open the Super Admin portal.
-Portal = Literal["super_admin", "admin", "merchant"]
+Portal = Literal["super_admin", "admin", "manager", "merchant"]
 
 
 class LoginRequest(BaseModel):

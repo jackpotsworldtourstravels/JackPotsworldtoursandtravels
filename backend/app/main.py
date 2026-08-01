@@ -21,7 +21,10 @@ from app.routers import (
     dashboard,
     documents,
     enquiries,
+    finance,
+    manager,
     manager_approvals,
+    merchant_approvals,
     merchant_team,
     merchants,
     notifications_v2,
@@ -30,6 +33,7 @@ from app.routers import (
     super_admin,
     support_tickets,
     tickets,
+    wallet,
 )
 from app.services import user_service
 
@@ -118,7 +122,28 @@ app.include_router(support_tickets.router)
 app.include_router(documents.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
+# The merchant's manager signing off the service requests its own staff raised,
+# before any of them reach our desk. Distinct from manager.router below: that is
+# the platform Manager approving bookings, this is the merchant approving its own
+# change requests, and neither holds the other's permission codes.
 app.include_router(manager_approvals.router)
+# M4 — the finance surface. Distinct from the payment endpoints in tickets.py
+# and admin_ops.py, which move money; this one only reports on it, plus the one
+# wallet write that has nowhere else to live.
+app.include_router(finance.router)
+# CR-2 — the Manager's approval desk, between the merchant's submission and the
+# Booking Operations queue. Its own router because its permission codes are its
+# own: an Admin holds none of them.
+app.include_router(manager.router)
+# CR-3 — the merchant's own approval desk, which replaces the platform Manager
+# as the approver. Same service underneath, scoped to the caller's merchant;
+# its own permission codes so a merchant can never address the platform queue.
+app.include_router(merchant_approvals.router)
+# CR-4c — the merchant's own wallet: balance, ledger, and telling us money has
+# been sent. Separate from finance.router because that one reports on bookings
+# and this one is the running account; every route here is implicitly scoped to
+# the caller's merchant, so no path carries a merchant_id to tamper with.
+app.include_router(wallet.router)
 
 
 @app.on_event("startup")

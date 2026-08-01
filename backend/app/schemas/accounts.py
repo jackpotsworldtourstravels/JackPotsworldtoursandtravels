@@ -1,5 +1,6 @@
 """Schemas for administrator and merchant-staff account management."""
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -66,12 +67,19 @@ class CreateAdminRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=30)
     #: Omit to have a strong password generated and returned once.
     password: str | None = Field(default=None, min_length=8, max_length=72)
+    #: ``admin`` or ``manager``. Defaults to Admin so every existing caller
+    #: keeps working; the service refuses anything outside that pair.
+    role: Literal["admin", "manager"] = "admin"
 
 
 class UpdateAdminRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=150)
     email: EmailStr
     phone: str | None = Field(default=None, max_length=30)
+    #: Omit to leave the role alone. Supplying `admin` or `manager` moves the
+    #: account between the two; the service refuses while a Manager still holds
+    #: a booking under review.
+    role: Literal["admin", "manager"] | None = None
 
 
 class StatusChangeRequest(BaseModel):

@@ -1,21 +1,31 @@
 'use strict';
-/* Classic — Ticket Enquiry.
+/* Classic — Booking Enquiry.
    ===========================================================================
    This screen replaces Inventory Search outright. The old flow searched a
    catalog and booked a row out of it; this one has the merchant describe the
-   sector it wants, and our team answers. Nothing here talks to /api/catalog.
+   sector it wants, and our team quotes it. Nothing here talks to /api/catalog.
 
-     Enquire Ticket   the form, as a modal
-     Listing          reference / status / created / actions
-     View Details     everything the enquiry captured, plus our answer
-     Request Ticket   appears once the enquiry is Approved — carries the whole
-                      enquiry over to Booking Request, pre-filled
+     New Booking Enquiry  the form, as a modal
+     Listing              reference / status / created / actions
+     View Details         everything the enquiry captured, plus our quotation
+     Request Ticket       appears once the enquiry is Available — carries the
+                          whole enquiry over to Booking Request, pre-filled
+
+   NAMING (CR-5). This is **Booking Enquiry** here and **Ticket Enquiry** on
+   every staff screen; the stored `request_type` is `ticket_enquiry` either way.
+   Renaming the API to match the merchant's word would have meant a migration
+   and a contract break for a label.
+
+   THE ANSWER IS A QUOTATION (CR-5). Our team replies with a total fare and the
+   remarks that explain it, and that fare is binding: the booking raised from
+   this enquiry is created at exactly that amount. So the quotation is rendered
+   as a figure, not buried in a paragraph — see clQuotationPanel.
 
    The form is modelled on how airlines and OTAs collect a journey, because
-   that is the shape merchants already know: trip type first, then route, then
-   flight, then when, then who. The controls (searchable city fields, hour +
-   AM/PM, +/- steppers) are built from this portal's own tokens in
-   classic.css — no widget library, so they theme and focus like everything
+   that is the shape merchants already know: trip type first, then departure and
+   arrival, then flight, then when, then who. The controls (searchable city
+   fields, 24-hour time, +/- steppers) are built from this portal's own tokens
+   in classic.css — no widget library, so they theme and focus like everything
    else here. */
 
 /* Airlines the desk deals with most. A free-text fallback stays available
@@ -58,11 +68,11 @@ function clInitEnquiry() {
   $('cl-enquiry').innerHTML = `
     <div class="cl-page-head">
       <div>
-        <h1>Ticket Enquiry</h1>
-        <p>Tell us the sector you need and our team will confirm availability and fare.</p>
+        <h1>Booking Enquiry</h1>
+        <p>Tell us the sector you need and our team will confirm availability and quote a fare.</p>
       </div>
       <div class="cl-page-actions">
-        <button type="button" class="cl-btn cl-btn-primary" id="clEnqNew">+ Enquire Ticket</button>
+        <button type="button" class="cl-btn cl-btn-primary" id="clEnqNew">+ New Booking Enquiry</button>
       </div>
     </div>
 
@@ -77,7 +87,10 @@ function clInitEnquiry() {
           </select>
         </div>
         <div class="cl-field">
-          <label for="clEnqSearch">Find</label>
+          <!-- CR-5: labelled "Search", not "Find". The behaviour is unchanged —
+               it still narrows the rows already loaded — but "Find" was the only
+               place in the product using that word for it. -->
+          <label for="clEnqSearch">Search</label>
           <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no.">
         </div>
         <div class="cl-field" style="min-width:0;">
@@ -166,7 +179,7 @@ function clRenderEnquiryRows() {
     ? rows.map(clEnquiryRow).join('')
     : clEmptyRow(5, q
       ? 'No enquiries match that search.'
-      : 'No enquiries yet. Press “+ Enquire Ticket” to raise your first one.');
+      : 'No enquiries yet. Press “+ New Booking Enquiry” to raise your first one.');
 
   $('clEnqCount').textContent = `${rows.length} enquir${rows.length === 1 ? 'y' : 'ies'}`
     + (q && rows.length !== clEnquiryRows.length ? ` (filtered from ${clEnquiryRows.length})` : '');
@@ -199,12 +212,17 @@ function clEnquiryRow(r) {
       ${escapeHtml(clEnquiryRoute(r))}
       <small style="display:block;color:var(--cl-text-muted);">
         ${escapeHtml([r.airline, r.flight_number].filter(Boolean).join(' '))}
-        · ${escapeHtml(fmtDate(r.travel_date))}
+        · ${escapeHtml(fmtDate(r.travel_date))} ${escapeHtml(clTimeLabel(r.preferred_time) || '')}
         · ${r.passenger_count} pax
       </small>
     </td>
-    <td>${clEnquiryTag(r.status)}</td>
-    <td class="cl-nowrap">${escapeHtml(fmtDateTime(r.created_at))}</td>
+    <td>
+      ${clEnquiryTag(r.status)}
+      ${r.quoted_fare != null
+        ? `<small style="display:block;color:var(--cl-text-muted);">Quoted ${
+            escapeHtml(moneyStr(r.quoted_fare))}</small>` : ''}
+    </td>
+    <td class="cl-nowrap">${escapeHtml(clDateTime24(r.created_at))}</td>
     <td class="cl-actions">${clEnquiryActions(r)}</td>
   </tr>`;
 }
@@ -253,13 +271,14 @@ async function clOpenEnquiryDetail(id) {
       ['Adults', r.adults],
       ['Children', r.children],
       ['Infants', r.infants],
-      ['Created', fmtDateTime(r.created_at)],
-      ['Answered', r.responded_at ? fmtDateTime(r.responded_at) : null],
+      ['Created', clDateTime24(r.created_at)],
+      ['Answered', r.responded_at ? clDateTime24(r.responded_at) : null],
       ['Booking request', r.booking_request_number],
     ].filter(([k, v]) => k === 'Status' || (v != null && v !== ''));
 
     $('clModalTitle').textContent = `Enquiry ${r.reference_number || ''}`;
     $('clModalBody').innerHTML = `
+      ${clQuotationPanel(r)}
       <dl class="cl-dl">
         ${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${
           k === 'Status' ? clEnquiryTag(r.status) : escapeHtml(String(v))
@@ -273,7 +292,7 @@ async function clOpenEnquiryDetail(id) {
         <div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(r.rejection_reason)}</div>` : ''}
       ${r.status === 'pending_approval' || r.status === 'in_review' ? `
         <div class="cl-msg cl-msg-muted">Our team is checking this sector. You will be notified
-          the moment it is answered, and Request Ticket appears here once it is available.</div>` : ''}`;
+          the moment it is quoted, and Request Ticket appears here once it is available.</div>` : ''}`;
 
     const foot = [];
     if (r.status === 'approved' && !r.booking_request_id) {
@@ -300,6 +319,27 @@ async function clOpenEnquiryDetail(id) {
   }
 }
 
+/* The quotation, given its own block at the top of the detail card (CR-5).
+   ===========================================================================
+   Not a row in the definition list, because it is not one more attribute of the
+   enquiry — it is the answer, it is binding, and it is the number the merchant
+   is deciding on. `moneyStr`, never `money()`: the fare arrives as a decimal
+   string and `money()` would round it through a float and drop the paise.
+
+   Absent on a pending enquiry, on a declined one, and on anything answered
+   before CR-5 — hence the null check rather than a zero. */
+function clQuotationPanel(r) {
+  if (r.quoted_fare == null) return '';
+  return `<div class="cl-msg cl-msg-ok" style="margin-top:0;">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;">Total fare quoted</div>
+      <div style="font-size:22px;font-weight:800;margin:2px 0 6px;">${escapeHtml(moneyStr(r.quoted_fare))}</div>
+      ${r.quotation_remarks
+        ? `<div style="white-space:pre-wrap;font-size:13px;">${escapeHtml(r.quotation_remarks)}</div>` : ''}
+      <div style="font-size:12px;margin-top:6px;">This is the amount your booking will be raised
+        at, and what is settled from your wallet once the ticket is issued.</div>
+    </div>`;
+}
+
 /* Fold a freshly-read enquiry back into the table's data so the row reflects
    an answer that arrived after the list loaded, without a full refetch. */
 function clUpsertEnquiryRow(r) {
@@ -308,15 +348,36 @@ function clUpsertEnquiryRow(r) {
   if ($('cl-enquiry')?.classList.contains('active')) clRenderEnquiryRows();
 }
 
-/* "14:30" -> "2:30 PM". The API stores 24-hour; every screen shows 12-hour,
-   which is what the form collects. */
+/* CR-5 — the merchant portal is 24-hour throughout.
+   ===========================================================================
+   The API has always stored 24-hour ("14:30"); it was the UI that collected
+   1-12 + AM/PM and rendered it back the same way. Both ends of that conversion
+   are gone here: the form's selector is a 24-hour list, and this returns the
+   stored value essentially as-is.
+
+   Kept as a function rather than inlined because it still has work to do —
+   normalising "9:00" to "09:00" so a column of times aligns, and surviving a
+   value the API never wrote. */
 function clTimeLabel(hhmm) {
   if (!hhmm) return null;
   const [h, m] = String(hhmm).split(':').map(Number);
   if (Number.isNaN(h)) return hhmm;
-  const mer = h < 12 ? 'AM' : 'PM';
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${String(m || 0).padStart(2, '0')} ${mer}`;
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+}
+
+/* Timestamps, 24-hour, without touching the shared fmtDateTime().
+   `fmtDateTime` uses en-IN with timeStyle:'short', which is 12-hour, and it is
+   loaded by the Admin, Manager and Super Admin portals too — CR-5 scopes the
+   24-hour clock to the merchant portal, so this is a local override rather than
+   a change to a formatter four portals share. */
+function clDateTime24(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
 }
 
 /* ============================================================ the form ==== */
@@ -334,18 +395,32 @@ function clAddDays(iso, days) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/* Cabin classes offered on the form (CR-5).
+   ===========================================================================
+   Was a free-text box. The four below are what airlines actually sell as a
+   cabin, and typing that into a box produced "Buisness", "eco", "Y" and blanks
+   — none of which the desk can quote against without asking.
+
+   The API field is still free text (schemas/enquiry.py), so this list is a
+   subset of what the server accepts, never a superset: the UI offers less than
+   the server allows, which is the safe direction. Historical enquiries carrying
+   a fare-family name still render, because the detail view prints the stored
+   string rather than looking it up here. */
+const CL_TRAVEL_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First Class'];
+
 function clOpenEnquiryForm() {
   const today = clTodayIso();
   clEnqForm = {
     trip_type: 'one_way',
     from: null, to: null,                 // { code, city, label } once picked
     airline: '',
-    depHour: 9, depMer: 'AM',
-    retHour: 6, retMer: 'PM',
+    /* CR-5 — 24-hour. Was `depHour` 1-12 plus a `depMer` AM/PM toggle. */
+    depTime: '09:00',
+    retTime: '18:00',
     adults: 1, children: 0, infants: 0,
   };
 
-  clOpenModal('Enquire Ticket', `
+  clOpenModal('New Booking Enquiry', `
     <div class="cl-trip" id="clEnqTrip" role="radiogroup" aria-label="Trip type">
       <label class="cl-trip-opt checked" data-cl-trip="one_way">
         <input type="radio" name="clEnqTripType" value="one_way" checked>One Way
@@ -355,7 +430,7 @@ function clOpenEnquiryForm() {
       </label>
     </div>
 
-    <div class="cl-form-legend">Route</div>
+    <div class="cl-form-legend">Departure &amp; Arrival</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
         <label for="clEnqFrom">From city<span class="cl-req">*</span></label>
@@ -402,14 +477,8 @@ function clOpenEnquiryForm() {
         <input type="date" id="clEnqDate" min="${today}" value="${today}">
       </div>
       <div class="cl-field">
-        <label for="clEnqHour">Preferred time<span class="cl-req">*</span></label>
-        <div class="cl-time">
-          <select id="clEnqHour">${clHourOptions(9)}</select>
-          <div class="cl-mer" id="clEnqMer" role="group" aria-label="AM or PM">
-            <button type="button" class="cl-mer-btn active" data-cl-mer="AM" aria-pressed="true">AM</button>
-            <button type="button" class="cl-mer-btn" data-cl-mer="PM" aria-pressed="false">PM</button>
-          </div>
-        </div>
+        <label for="clEnqTime">Preferred time (24h)<span class="cl-req">*</span></label>
+        <select id="clEnqTime">${clTimeOptions('09:00')}</select>
       </div>
     </div>
 
@@ -424,14 +493,8 @@ function clOpenEnquiryForm() {
           <input type="date" id="clEnqReturnDate" min="${clAddDays(today, 1)}">
         </div>
         <div class="cl-field">
-          <label for="clEnqReturnHour">Return preferred time<span class="cl-req">*</span></label>
-          <div class="cl-time">
-            <select id="clEnqReturnHour">${clHourOptions(6)}</select>
-            <div class="cl-mer" id="clEnqReturnMer" role="group" aria-label="AM or PM">
-              <button type="button" class="cl-mer-btn" data-cl-mer="AM" aria-pressed="false">AM</button>
-              <button type="button" class="cl-mer-btn active" data-cl-mer="PM" aria-pressed="true">PM</button>
-            </div>
-          </div>
+          <label for="clEnqReturnTime">Return preferred time (24h)<span class="cl-req">*</span></label>
+          <select id="clEnqReturnTime">${clTimeOptions('18:00')}</select>
         </div>
       </div>
     </div>
@@ -440,13 +503,15 @@ function clOpenEnquiryForm() {
     <div class="cl-form cl-form-2">
       <div class="cl-field">
         <label for="clEnqPax">Number of passengers<span class="cl-req">*</span></label>
-        <input type="number" id="clEnqPax" min="1" max="99" value="1" readonly>
-        <small>Set by the breakdown below.</small>
+        <input type="number" id="clEnqPax" min="1" max="99" value="1" inputmode="numeric">
+        <small id="clEnqPaxHint">Type a total, or use the breakdown below — the two stay in step.</small>
       </div>
       <div class="cl-field">
         <label for="clEnqClass">Class<span class="cl-req">*</span></label>
-        <input type="text" id="clEnqClass" autocomplete="off"
-               placeholder="Economy, Business, Premium Economy, First Class" maxlength="80">
+        <select id="clEnqClass">
+          ${CL_TRAVEL_CLASSES.map((c, i) =>
+            `<option value="${escapeHtml(c)}"${i === 0 ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+        </select>
       </div>
     </div>
 
@@ -466,7 +531,7 @@ function clOpenEnquiryForm() {
 
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
-     <button type="button" class="cl-btn cl-btn-primary" id="clEnqSubmit">Enquire</button>`);
+     <button type="button" class="cl-btn cl-btn-primary" id="clEnqSubmit">Send Enquiry</button>`);
 
   $('clModal').classList.add('cl-modal-form');
   clModalOnClose = () => { $('clModal').classList.remove('cl-modal-form'); clEnqForm = null; };
@@ -475,11 +540,23 @@ function clOpenEnquiryForm() {
   $('clEnqFrom').focus();
 }
 
-function clHourOptions(selected) {
-  /* 12 first: on a 12-hour clock 12 AM precedes 1 AM, and listing 1–12 puts
-     midnight and noon at the wrong end. */
-  return [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    .map(h => `<option value="${h}"${h === selected ? ' selected' : ''}>${h}</option>`).join('');
+/* 00:00 … 23:30, in half hours (CR-5).
+   The old control was an hour 1-12 beside an AM/PM toggle, which is three
+   decisions for one value and where "12" meant midnight or noon depending on a
+   button beside it. A single 24-hour list has no such ambiguity, sorts the way
+   a day runs, and is already the format the API stores — so the value the
+   <select> carries is submitted verbatim, with no conversion left to get wrong.
+   Half hours because a preferred departure of "around 09:30" is a real answer
+   and the hour-only list forced it to 09:00 or 10:00. */
+function clTimeOptions(selected) {
+  const out = [];
+  for (let h = 0; h < 24; h++) {
+    for (const m of ['00', '30']) {
+      const v = `${String(h).padStart(2, '0')}:${m}`;
+      out.push(`<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`);
+    }
+  }
+  return out.join('');
 }
 
 function clStepperCard(key, title, sub, value, min) {
@@ -524,11 +601,9 @@ function clWireEnquiryForm() {
     clEnqForm.airline = picked ? picked.value : '';
   });
 
-  /* ---- AM / PM toggles ---- */
-  clMeridiemToggle($('clEnqMer'), v => { clEnqForm.depMer = v; });
-  clMeridiemToggle($('clEnqReturnMer'), v => { clEnqForm.retMer = v; });
-  $('clEnqHour').addEventListener('change', e => { clEnqForm.depHour = Number(e.target.value); });
-  $('clEnqReturnHour').addEventListener('change', e => { clEnqForm.retHour = Number(e.target.value); });
+  /* ---- 24-hour time selects (CR-5) ---- */
+  $('clEnqTime').addEventListener('change', e => { clEnqForm.depTime = e.target.value; });
+  $('clEnqReturnTime').addEventListener('change', e => { clEnqForm.retTime = e.target.value; });
 
   /* ---- dates ---- */
   $('clEnqDate').addEventListener('change', clSyncReturnMin);
@@ -540,6 +615,13 @@ function clWireEnquiryForm() {
     card.querySelector('[data-cl-step-dec]').addEventListener('click', () => clStepPax(key, -1, min));
     card.querySelector('[data-cl-step-inc]').addEventListener('click', () => clStepPax(key, +1, min));
   });
+
+  /* ---- passenger total, typed (CR-5) ----
+     `input` would fight the merchant mid-keystroke: clearing the box to type
+     "12" momentarily reads as empty, and reconciling on every character would
+     rewrite the breakdown twice on the way to one answer. `change` fires when
+     they are done — on blur, on Enter, and on the spinner. */
+  $('clEnqPax').addEventListener('change', clApplyTypedPaxTotal);
 
   /* ---- flight number: uppercase as typed, so AI217 and ai217 are one thing ---- */
   $('clEnqFlight').addEventListener('input', e => {
@@ -599,11 +681,84 @@ function clSyncReturnMin() {
 function clStepPax(key, delta, min) {
   const next = Math.max(min, Math.min(99, clEnqForm[key] + delta));
   clEnqForm[key] = next;
-
-  const card = $('clModalBody').querySelector(`[data-cl-step="${key}"]`);
-  card.querySelector('[data-cl-step-val]').textContent = String(next);
-  card.querySelector('[data-cl-step-dec]').disabled = next <= min;
+  clRenderStepper(key);
   clSyncPaxTotal();
+}
+
+/* Push one stepper's value back onto its card. Split out of clStepPax because
+   clApplyTypedPaxTotal also moves a stepper, and a value changed in state but
+   not on screen is the exact bug this pair exists to avoid. */
+function clRenderStepper(key) {
+  const card = $('clModalBody')?.querySelector(`[data-cl-step="${key}"]`);
+  if (!card) return;
+  const min = Number(card.dataset.clMin);
+  const value = clEnqForm[key];
+  card.querySelector('[data-cl-step-val]').textContent = String(value);
+  card.querySelector('[data-cl-step-dec]').disabled = value <= min;
+}
+
+/* CR-5 — the merchant typed a total. Make the breakdown agree with it.
+   ===========================================================================
+   The field used to be `readonly`, derived from the three steppers, and that
+   was reported as "the passenger count does not work" — because for a merchant
+   booking nine adults it does not: you cannot type 9, you press "+" eight
+   times, and the box that looks like an input refuses the keyboard.
+
+   It cannot simply become a free input either. The server requires
+   `passenger_count == adults + children + infants` (schemas/enquiry.py) and
+   422s otherwise, so an unreconciled total is a form that looks filled in and
+   cannot be submitted.
+
+   So the two are kept in step, and **adults absorb the difference** — children
+   and infants are only ever set deliberately, and an infant added by arithmetic
+   nobody asked for would travel on a lap nobody booked. Growing is trivial.
+   Shrinking has a floor: adults cannot go below one, nor below the number of
+   infants, so a total that cannot be met by moving adults alone is clamped back
+   to the smallest party the breakdown allows and says so. */
+function clApplyTypedPaxTotal() {
+  if (!clEnqForm) return;
+  const input = $('clEnqPax');
+  const f = clEnqForm;
+  const typed = Math.trunc(Number(input.value));
+
+  /* An empty or nonsense box reverts rather than being interpreted — guessing
+     what "" meant is how a party of one silently becomes a party of eleven.
+     The clamp message is dropped on the way out: the box has just been put back
+     to a total that *is* achievable, and leaving "a party of 2 is not possible"
+     on screen beside a valid party of 6 accuses the merchant of an error they
+     are no longer making. */
+  if (!Number.isFinite(typed) || typed < 1) {
+    clClearPaxClampMsg();
+    clSyncPaxTotal();
+    return;
+  }
+
+  const others = f.children + f.infants;
+  /* One adult minimum, and never fewer adults than infants. */
+  const minAdults = Math.max(1, f.infants);
+  const adults = Math.min(99, Math.max(minAdults, typed - others));
+
+  f.adults = adults;
+  clRenderStepper('adults');
+
+  const reached = f.adults + others;
+  if (reached !== typed) {
+    clMsg($('clEnqMsg'),
+      `A party of ${typed} is not possible with ${f.children} child${f.children === 1 ? '' : 'ren'} `
+      + `and ${f.infants} infant${f.infants === 1 ? '' : 's'} — adjusted to ${reached}. `
+      + 'Change the breakdown below to go lower.', 'err');
+  } else {
+    clClearPaxClampMsg();
+  }
+  clSyncPaxTotal();
+}
+
+/* Retract the clamp message, and only that one. The message area is shared with
+   the infants-per-adult warning and with submit errors, so it is cleared by
+   prefix rather than blanked — the same guard clSyncPaxTotal uses for its own. */
+function clClearPaxClampMsg() {
+  const msg = $('clEnqMsg');
+  if (msg && msg.textContent.startsWith('A party of')) clMsg(msg, '');
 }
 
 function clSyncPaxTotal() {
@@ -735,28 +890,10 @@ function clHighlight(text, query) {
     + escapeHtml(text.slice(at + q.length));
 }
 
-function clMeridiemToggle(group, onChange) {
-  if (!group) return;
-  group.querySelectorAll('[data-cl-mer]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      group.querySelectorAll('[data-cl-mer]').forEach(b => {
-        const on = b === btn;
-        b.classList.toggle('active', on);
-        /* The `active` class is styling only — without aria-pressed a screen
-           reader announces two identical buttons and never says which is set. */
-        b.setAttribute('aria-pressed', String(on));
-      });
-      onChange(btn.dataset.clMer);
-    });
-  });
-}
-
-/* 9 + "PM" -> "21:00". 12 AM is midnight and 12 PM is noon, which is the one
-   case a naive `hour + 12` gets wrong in both directions. */
-function cl24h(hour12, meridiem) {
-  const h = Number(hour12) % 12;
-  return `${String(meridiem === 'PM' ? h + 12 : h).padStart(2, '0')}:00`;
-}
+/* CR-5 removed `clMeridiemToggle` and `cl24h` from this file. The form no
+   longer collects an hour and a meridiem, so there is nothing to toggle and
+   nothing to convert — the <select> already holds "HH:MM". Both were used only
+   by this screen. */
 
 /* ================================================================ submit == */
 
@@ -788,9 +925,9 @@ async function clSubmitEnquiry() {
   if (!flight) return fail('Enter the flight number.', 'clEnqFlight');
   if (!date) return fail('Choose the travel date.', 'clEnqDate');
   if (date < clTodayIso()) return fail('The travel date cannot be in the past.', 'clEnqDate');
-  if (!travelClass) return fail('Enter the class you want — Economy, Business, and so on.', 'clEnqClass');
-  if (f.adults < 1) return fail('At least one adult must travel.', 'clEnqClass');
-  if (f.infants > f.adults) return fail('There cannot be more infants than adults.', 'clEnqClass');
+  if (!travelClass) return fail('Choose the cabin class.', 'clEnqClass');
+  if (f.adults < 1) return fail('At least one adult must travel.', 'clEnqPax');
+  if (f.infants > f.adults) return fail('There cannot be more infants than adults.', 'clEnqPax');
 
   let returnDate = null;
   let returnTime = null;
@@ -798,7 +935,7 @@ async function clSubmitEnquiry() {
     returnDate = $('clEnqReturnDate').value;
     if (!returnDate) return fail('Choose the return date.', 'clEnqReturnDate');
     if (returnDate <= date) return fail('The return date must be after the departure date.', 'clEnqReturnDate');
-    returnTime = cl24h(f.retHour, f.retMer);
+    returnTime = f.retTime;
   }
 
   const payload = {
@@ -808,7 +945,8 @@ async function clSubmitEnquiry() {
     airline,
     flight_number: flight,
     travel_date: date,
-    preferred_time: cl24h(f.depHour, f.depMer),
+    /* Already "HH:MM" — the <select> holds exactly what the API stores. */
+    preferred_time: f.depTime,
     return_date: returnDate,
     return_preferred_time: returnTime,
     travel_class: travelClass,
@@ -830,11 +968,11 @@ async function clSubmitEnquiry() {
       <div class="cl-msg cl-msg-ok" style="margin-top:0">
         Enquiry <b class="cl-ref">${escapeHtml(enquiry.reference_number)}</b> is with our team.
       </div>
-      <p style="font-size:13px;">We will confirm availability and fare for
+      <p style="font-size:13px;">We will confirm availability and quote a total fare for
         <b>${escapeHtml(clEnquiryRoute(enquiry))}</b> on
         <b>${escapeHtml(fmtDate(enquiry.travel_date))}</b>. You will be notified when it is
-        answered — <b>Request Ticket</b> then appears on this row and carries everything you
-        have just entered straight into the booking.</p>`,
+        quoted — <b>Request Ticket</b> then appears on this row and carries everything you
+        have just entered, and the quoted amount, straight into the booking.</p>`,
       '<button type="button" class="cl-btn cl-btn-primary" onclick="clCloseModal()">Done</button>');
   } catch (err) {
     clMsg(msg, clEnquiryError(err), 'err');
@@ -897,7 +1035,7 @@ async function clRequestTicket(enquiryId) {
       return clOpenModal('Not available yet', `
         <div class="cl-msg cl-msg-muted" style="margin-top:0">
           This enquiry is <b>${escapeHtml(clEnquiryStatusLabel(enquiry.status))}</b>. A booking can
-          only be raised once our team has marked it available.
+          only be raised once our team has quoted it.
         </div>`,
         '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
     }

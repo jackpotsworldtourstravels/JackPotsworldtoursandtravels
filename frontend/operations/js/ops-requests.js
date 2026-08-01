@@ -99,8 +99,17 @@ function opsBuildRequestGrid(host, opts) {
       bulk.push({
         label: 'Approve selected',
         run: async (rows, api) => opsBulkLifecycle(rows, api, {
-          verb: 'Approve', filter: r => ['pending_approval', 'in_review'].includes(r.status),
-          skipNote: 'only requests that are Pending or Under Review can be approved',
+          verb: 'Approve',
+          /* A bulk approve sends no amount, and the API refuses to approve a
+             booking at 0 — it would land in Payment Pending unpayable. An
+             unpriced booking therefore needs the one-at-a-time dialog that asks
+             for the fare, so it is skipped here with a reason rather than
+             attempted and reported as a failure. Service requests carry no
+             amount of their own and are unaffected. */
+          filter: r => ['pending_approval', 'in_review'].includes(r.status)
+            && (OPS_SERVICE_REQUEST_TYPES.includes(r.request_type) || Number(r.total_amount) > 0),
+          skipNote: 'only Pending or Under Review requests can be approved, and a booking with '
+            + 'no amount must be approved on its own so the fare can be entered',
           act: r => (OPS_SERVICE_REQUEST_TYPES.includes(r.request_type)
             ? OpsApi.resolveServiceRequest(r.id, { approve: true })
             : OpsApi.approveRequest(r.id, {})),
@@ -431,6 +440,15 @@ function opsRenderRequestDetail(d) {
   if (r.status === 'payment_pending' && opsCan('payment.pay')) {
     extra.push(`<button type="button" class="ops-btn ops-btn-primary" id="opsRdPay">Record payment</button>`);
   }
+  /* Staff-side correction of what is owed. Only at Payment Pending — before it
+     approval carries the amount, after it money has moved and a change is a
+     refund or an extra charge, not an overwrite. Highlighted when the booking
+     is unpriced, because then nobody can do anything else with it. */
+  if (r.status === 'payment_pending' && r.request_type !== 'ticket_enquiry' && opsCan('ticket.approve')) {
+    const unpriced = !(Number(r.total_amount) > 0);
+    extra.push(`<button type="button" class="ops-btn ${unpriced ? 'ops-btn-primary' : ''}" id="opsRdReprice">${
+      unpriced ? 'Set amount' : 'Correct amount'}</button>`);
+  }
   /* Service requests can only be raised against a confirmed booking. */
   if (r.request_type === 'booking'
       && ['approved', 'payment_pending', 'paid', 'ticket_issued', 'completed'].includes(r.status)
@@ -457,6 +475,17 @@ function opsRenderRequestDetail(d) {
   });
 
   $('opsRdPay')?.addEventListener('click', () => opsPayDialog(r));
+  $('opsRdReprice')?.addEventListener('click', async () => {
+    const res = await opsRepriceDialog(r);
+    if (!res) return;
+    try {
+      await OpsApi.repriceRequest(r.id, res);
+      opsCloseModal();
+      opsToast(`${r.request_number} is now ${money(res.amount)}. The merchant has been notified.`, 'ok');
+      opsAfterWrite();
+      opsOpenRequest(r.id);
+    } catch (err) { opsMsg($('opsRpMsg'), opsError(err, 'Could not change the amount.'), 'err'); }
+  });
   $('opsRdService')?.addEventListener('click', () => opsServiceRequestDialog(r));
   $('opsRdEdit')?.addEventListener('click', () => { opsCloseModal(); opsEditDraft(r.id); });
 
@@ -522,6 +551,15 @@ async function opsApplyTransition(r, call, label) {
 }
 
 function opsApproveDialog(r) {
+  /* An enquiry-led booking reaches approval carrying ₹0 — nothing prices it
+     before the desk does. Approving it without a figure produces a Payment
+     Pending booking the merchant is asked to pay and cannot (record_payment
+     refuses 0), with no way back: Payment Pending has no edge to Approved. The
+     API refuses that now, so the field stops being optional exactly when
+     leaving it blank would have created one. A catalog-led booking already
+     carries a quote and keeps the old blank-means-unchanged behaviour. */
+  const quoted = Number(r.total_amount);
+  const needsAmount = !(quoted > 0);
   return new Promise(resolve => {
     opsOpenModal('Approve request', `
       <p style="margin:0 0 10px;font-size:12px">
@@ -531,9 +569,11 @@ function opsApproveDialog(r) {
       </p>
       <div class="ops-form ops-form-2">
         <div class="ops-field">
-          <label for="opsApAmt">Final amount (₹)</label>
-          <input type="number" id="opsApAmt" min="0" step="0.01" placeholder="${escapeHtml(String(r.total_amount))}">
-          <span class="ops-field-hint">Leave blank to keep the quoted ${money(Number(r.total_amount))}. This becomes the payable amount.</span>
+          <label for="opsApAmt">Final amount (₹)${needsAmount ? ' *' : ''}</label>
+          <input type="number" id="opsApAmt" min="0.01" step="0.01" placeholder="${needsAmount ? 'e.g. 48000' : escapeHtml(String(r.total_amount))}">
+          <span class="ops-field-hint">${needsAmount
+            ? 'This booking has no amount yet. It becomes what the merchant pays, so it is required and cannot be zero.'
+            : `Leave blank to keep the quoted ${money(quoted)}. This becomes the payable amount.`}</span>
         </div>
         <div class="ops-field">
           <label for="opsApNote">Note</label>
@@ -551,7 +591,57 @@ function opsApproveDialog(r) {
       if (b.dataset.opsAp === '0') { opsCloseModal(); return finish(null); }
       const amt = $('opsApAmt').value;
       if (amt !== '' && Number(amt) < 0) return opsMsg($('opsApMsg'), 'The amount cannot be negative.', 'err');
+      if (needsAmount && !(Number(amt) > 0)) {
+        return opsMsg($('opsApMsg'), 'Enter the amount to charge — it cannot be blank or zero.', 'err');
+      }
       finish({ finalAmount: amt === '' ? null : Number(amt), note: $('opsApNote').value.trim() });
+    }));
+    opsModalOnClose = () => { done = true; resolve(null); };
+  });
+}
+
+/* Correcting the amount on a booking already at Payment Pending — the only
+   stage where what is owed can still change without money having moved.
+   Deliberately not the approve dialog: approve cannot be called again from
+   here (no Payment Pending → Approved edge), which is what left mispriced and
+   unpriced bookings stuck before POST .../reprice existed. */
+function opsRepriceDialog(r) {
+  const current = Number(r.total_amount);
+  const unpriced = !(current > 0);
+  return new Promise(resolve => {
+    opsOpenModal(unpriced ? 'Set the amount' : 'Correct the amount', `
+      <p style="margin:0 0 10px;font-size:12px">
+        ${unpriced
+          ? `<b>${escapeHtml(r.request_number)}</b> was approved without a fare, so the merchant sees
+             “Awaiting amount” and has nothing to pay.`
+          : `<b>${escapeHtml(r.request_number)}</b> is currently ${money(current)}. The merchant is
+             notified of the new amount and the reason.`}
+        The booking stays in <b>Payment Pending</b>.
+      </p>
+      <div class="ops-form ops-form-2">
+        <div class="ops-field">
+          <label for="opsRpAmt">Amount to charge (₹) *</label>
+          <input type="number" id="opsRpAmt" min="0.01" step="0.01" value="${unpriced ? '' : escapeHtml(String(r.total_amount))}">
+        </div>
+        <div class="ops-field">
+          <label for="opsRpReason">Reason *</label>
+          <input type="text" id="opsRpReason" maxlength="500" placeholder="e.g. Fare confirmed with the airline">
+        </div>
+      </div>
+      <div class="ops-msg" id="opsRpMsg"></div>`,
+      `<span class="ops-spacer"></span>
+       <button type="button" class="ops-btn" data-ops-rp="0">Cancel</button>
+       <button type="button" class="ops-btn ops-btn-primary" data-ops-rp="1">${unpriced ? 'Set amount' : 'Update amount'}</button>`);
+
+    let done = false;
+    const finish = v => { if (done) return; done = true; opsModalOnClose = null; resolve(v); };
+    opsAll('[data-ops-rp]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.opsRp === '0') { opsCloseModal(); return finish(null); }
+      const amount = Number($('opsRpAmt').value);
+      if (!(amount > 0)) return opsMsg($('opsRpMsg'), 'Enter an amount greater than zero.', 'err');
+      const reason = $('opsRpReason').value.trim();
+      if (!reason) return opsMsg($('opsRpMsg'), 'A reason is required — the merchant is told it.', 'err');
+      finish({ amount, reason });
     }));
     opsModalOnClose = () => { done = true; resolve(null); };
   });

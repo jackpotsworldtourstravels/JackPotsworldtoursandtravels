@@ -90,6 +90,15 @@ const OpsApi = {
   merchantDashboard() {
     return this._req('get', '/api/merchant/dashboard');
   },
+  /* payment.view — the caller's own financial position, computed by
+     finance_service (M4). Existing endpoint, previously unused by this portal:
+     the wallet screen was summing one page of payable requests in JavaScript
+     and calling the result "Owed now", which under-reported as soon as a
+     merchant had more than a page of them. `outstanding` here is the real
+     figure, over every billable booking. */
+  financePosition() {
+    return this._req('get', '/api/merchant/finance/position');
+  },
   /* merchant.view — platform-wide counts + recent activity. */
   adminDashboard() {
     return this._req('get', '/api/admin/dashboard');
@@ -203,6 +212,17 @@ const OpsApi = {
         final_amount: finalAmount === '' || finalAmount == null ? undefined : Number(finalAmount),
         note: note || undefined,
       },
+    });
+  },
+  /* ticket.approve. Changes what is owed on a booking that is already
+     Payment Pending, without moving it — approve cannot be called a second
+     time, because Payment Pending has no edge back to Approved. Both fields
+     are mandatory server-side; the merchant is notified of the change. */
+  repriceRequest(id, { amount, reason } = {}) {
+    return this._req('post', `/api/admin/requests/${id}/reprice`, {
+      /* M4: the string as typed. The endpoint's schema is `Decimal`; a float
+         on the wire is the rounding error this milestone removes. */
+      data: { amount: String(amount ?? '').trim(), reason },
     });
   },
   /* ticket.reject. Reason is mandatory server-side (400 without it). */

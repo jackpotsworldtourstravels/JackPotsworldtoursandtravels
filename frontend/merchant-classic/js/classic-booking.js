@@ -4,7 +4,7 @@
    This file used to hold two screens: Inventory Search and Raise Request. The
    search half is GONE — the whole catalog flow (search bar, results table,
    Select, /api/catalog/search and /api/catalog/{id}/quote) was removed with
-   the Ticket Enquiry redesign. A merchant no longer picks a fare off a list;
+   the Booking Enquiry redesign. A merchant no longer picks a fare off a list;
    it enquires, we answer, and only an answered enquiry can be booked.
 
    What is left is the second half, reached only from Request Ticket:
@@ -79,14 +79,14 @@ function clRenderNoEnquiry() {
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head"><div>
       <h1>Booking Request</h1>
-      <p>Every booking starts from a ticket enquiry our team has answered.</p>
+      <p>Every booking starts from a booking enquiry our team has quoted.</p>
     </div></div>
     <div class="cl-panel"><div class="cl-panel-body">
       <p style="margin:0 0 14px;font-size:13px;color:var(--cl-text-muted);">
-        Nothing selected. Open <b>Ticket Enquiry</b>, find an enquiry marked
+        Nothing selected. Open <b>Booking Enquiry</b>, find an enquiry marked
         <b>Available</b>, and press <b>Request Ticket</b> — its details are carried
         over here so you only have to add the travellers.</p>
-      <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Ticket Enquiry</button>
+      <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
     </div></div>`;
   $('clBrToEnquiry').addEventListener('click', () => clGo('enquiry'));
 }
@@ -110,12 +110,16 @@ function clRenderBookingForm(e) {
       </div>
     </div>
 
+    <!-- CR-5: step 2 and step 4 used to say the fare was settled at approval.
+         It is settled at the quotation now, so step 2 names the figure and step
+         4 is what it actually is — a sign-off on a booking already priced. -->
     <div class="cl-stepper">
       <div class="cl-step done"><b>1. Enquiry</b>${escapeHtml(e.reference_number)}</div>
-      <div class="cl-step done"><b>2. Answered</b>Available to book</div>
+      <div class="cl-step done"><b>2. Quoted</b>${e.quoted_fare != null
+        ? escapeHtml(moneyStr(e.quoted_fare)) : 'Available to book'}</div>
       <div class="cl-step current"><b>3. Passengers</b>Enter details</div>
-      <div class="cl-step"><b>4. Approval</b>Our team confirms the fare</div>
-      <div class="cl-step"><b>5. Payment</b>Then ticketing</div>
+      <div class="cl-step"><b>4. Approval</b>Sign-off on this booking</div>
+      <div class="cl-step"><b>5. Ticketing</b>Settled from your wallet</div>
     </div>
 
     <div class="cl-panel">
@@ -149,11 +153,18 @@ function clRenderBookingForm(e) {
                 : ' <span class="cl-kpi-sub">country not on file — passport optional</span>'}</dd></div>
         </dl>
       </div>
+      ${e.quoted_fare != null ? `<div class="cl-panel-note">
+        <b>Quoted fare:</b> <b style="font-size:15px;">${escapeHtml(moneyStr(e.quoted_fare))}</b>
+        ${e.quotation_remarks
+          ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(e.quotation_remarks)}</div>` : ''}
+        <div style="margin-top:4px;">This booking is raised at that amount, and it is settled
+          from your wallet once the ticket is issued.</div>
+      </div>` : ''}
       ${e.admin_response ? `<div class="cl-panel-note">
         <b>Our response:</b> ${escapeHtml(e.admin_response)}</div>` : ''}
       <div class="cl-panel-note">
         These details come from the enquiry and cannot be changed here — they are what our team
-        confirmed. Raise a new enquiry if the journey needs to change.
+        quoted. Raise a new enquiry if the journey needs to change.
       </div>
     </div>
 
@@ -230,9 +241,19 @@ function clRenderBookingForm(e) {
         </div>
         <div class="cl-msg" id="clBrMsg"></div>
       </div>
+      <!-- CR-5 rewrote this note. It said the amount was confirmed at approval
+           and that the request would "show a zero amount until it is approved",
+           which was true only while the enquiry answer carried no price. The
+           quotation is binding now, so the figure is known here and is the one
+           the merchant is committing to — a note still promising a zero would
+           contradict the amount printed directly above it. -->
       <div class="cl-panel-note">
-        The payable amount is confirmed by our team at approval — an enquiry-led booking carries
-        no fare until then, so this request will show a zero amount until it is approved.
+        ${e.quoted_fare != null
+          ? `Submitting commits you to the quoted <b>${escapeHtml(moneyStr(e.quoted_fare))}</b>.
+             It is checked against your credit limit when you submit and again when it is
+             approved, and settled from your wallet once the ticket is issued.`
+          : `This enquiry was answered before fares were quoted on the enquiry, so it carries no
+             amount yet — our team confirms the payable amount when the ticket is issued.`}
       </div>
     </div>`;
 
@@ -255,7 +276,7 @@ function clRenderBookingForm(e) {
   $('clBrCopyFirst').addEventListener('click', clFillDown);
   $('clBrViewEnquiry').addEventListener('click', () => clOpenEnquiryDetail(e.id));
   $('clBrCancel').addEventListener('click', async () => {
-    if (!await clConfirm('Discard this booking request and return to Ticket Enquiry?', 'Discard')) return;
+    if (!await clConfirm('Discard this booking request and return to Booking Enquiry?', 'Discard')) return;
     clBookingEnquiry = null;
     clLoaded.delete('booking-request');
     clGo('enquiry');
@@ -642,13 +663,17 @@ function clBookingSubmitted(requestNumber, enquiryReference) {
     <div class="cl-panel">
       <div class="cl-panel-body">
         <div class="cl-msg cl-msg-ok" style="margin-top:0">
+          <!-- CR-5 corrected this line. It promised a move to "Payment Pending
+               once it is approved and priced", and neither half has been true
+               on this track since CR-2 removed the payment stage from it and
+               CR-5 priced the booking at the quotation. -->
           Request <b>${escapeHtml(requestNumber)}</b>, raised from enquiry
-          <b>${escapeHtml(enquiryReference)}</b>, has been submitted. You will see it move to
-          Payment Pending in My Requests once it is approved and priced.
+          <b>${escapeHtml(enquiryReference)}</b>, has been submitted for approval. Track it in
+          My Requests; the quoted amount is settled from your wallet when the ticket is issued.
         </div>
         <div class="cl-form-actions">
           <button type="button" class="cl-btn cl-btn-primary" id="clBrDoneList">View My Requests</button>
-          <button type="button" class="cl-btn" id="clBrDoneNew">New enquiry</button>
+          <button type="button" class="cl-btn" id="clBrDoneNew">New booking enquiry</button>
         </div>
       </div>
     </div>`;

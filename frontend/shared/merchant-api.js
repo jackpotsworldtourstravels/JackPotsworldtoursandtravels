@@ -180,6 +180,14 @@ const MerchantApi = {
     return this._req('get', `/api/requests/${requestId}/documents`);
   },
 
+  /* The airline's own files, attached by the operations desk. A narrower list
+     than listDocuments(): that one returns everything on the booking, and on
+     the Classic Tours track the merchant should only ever be offered the
+     paperwork it is meant to download (M2). */
+  listTicketDocuments(requestId) {
+    return this._req('get', `/api/requests/${requestId}/tickets`);
+  },
+
   deleteDocument(documentId) {
     return this._req('delete', `/api/documents/${documentId}`);
   },
@@ -205,6 +213,133 @@ const MerchantApi = {
   payRequest(id, { amount, method, transactionId }) {
     return this._req('post', `/api/requests/${id}/pay`, {
       data: { amount, method, transaction_id: transactionId || undefined },
+    });
+  },
+
+  /* ------------------------------------------------------------- finance */
+
+  /* M4. Both of these are served by finance_service, which is the only place
+     money is computed — do not re-derive any of these figures on the client.
+     `credit_available` is null when no credit limit is configured, which is not
+     the same as a limit of zero: render "No limit set", never "0". */
+  financePosition() {
+    return this._req('get', '/api/merchant/finance/position');
+  },
+
+  financeStatement({ dateFrom, dateTo } = {}) {
+    return this._req('get', '/api/merchant/finance/statement', {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
+    });
+  },
+
+  /* -------------------------------------------------------------- wallet */
+
+  /* CR-4c. The running account. Every route is scoped to the caller's merchant
+     by the server — there is no merchant_id to pass, and none of these figures
+     may be re-derived on the client: `balance` may legitimately be NEGATIVE
+     (that is the outstanding position) and `pending_topups` is deliberately NOT
+     part of it, because an unverified claim is not money. Render them as two
+     separate numbers; adding them together is the bug this shape prevents. */
+  wallet() {
+    return this._req('get', '/api/merchant/wallet');
+  },
+
+  /* Oldest first, with `balance_after` computed by the server per row. Never
+     accumulate a running balance here — see WALLET_ARCHITECTURE §6 for why the
+     client's idea of the order can disagree with the ledger's. */
+  walletTransactions({ dateFrom, dateTo, page = 1, pageSize = 25 } = {}) {
+    return this._req('get', '/api/merchant/wallet/transactions', {
+      params: {
+        date_from: dateFrom || undefined, date_to: dateTo || undefined,
+        page, page_size: pageSize,
+      },
+    });
+  },
+
+  /* Staff configure these (CR-4d); this side is read-only. An empty array is a
+     valid answer and means none has been configured yet — say so, rather than
+     rendering an empty box. */
+  paymentAccounts() {
+    return this._req('get', '/api/merchant/wallet/payment-accounts');
+  },
+
+  /* The QR is authenticated, so a plain <img src> cannot fetch it — pulled as a
+     blob with the bearer token. Callers must revoke the object URL. */
+  async paymentAccountQr(accountId) {
+    const blob = await this._req(
+      'get', `/api/merchant/wallet/payment-accounts/${accountId}/qr`,
+      { responseType: 'blob' },
+    );
+    return URL.createObjectURL(blob);
+  },
+
+  /* Multipart, so this bypasses _req's JSON shape — the browser must set its
+     own boundary. Submitting CREDITS NOTHING: it records a claim, and the
+     wallet moves only when an admin verifies it. */
+  submitTopup({ amount, method, paymentAccountId, utr, proof }) {
+    const form = new FormData();
+    form.append('amount', amount);
+    form.append('method', method);
+    if (paymentAccountId != null) form.append('payment_account_id', String(paymentAccountId));
+    if (utr) form.append('utr', utr);
+    if (proof) form.append('proof', proof);
+    return axios.post(`${API_BASE}/api/merchant/wallet/topups`, form, {
+      headers: partnerAuthHeaders(),
+    }).then(r => r.data);
+  },
+
+  listTopups({ status, page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/merchant/wallet/topups', {
+      params: { status: status || undefined, page, page_size: pageSize },
+    });
+  },
+
+  async downloadTopupProof(topupId) {
+    const blob = await this._req(
+      'get', `/api/merchant/wallet/topups/${topupId}/proof`, { responseType: 'blob' },
+    );
+    return URL.createObjectURL(blob);
+  },
+
+  /* ------------------------------------------------------------ approvals */
+
+  /* CR-3. The merchant signs off the booking requests its own staff raised,
+     replacing the platform Manager step. Every one of these is scoped to the
+     caller's merchant by the server — there is no merchant_id parameter to
+     pass, and passing one would not widen the result. */
+  approvalQueue({ bucket, status, search, page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/merchant/approvals', {
+      params: {
+        bucket: bucket || undefined, status: status || undefined,
+        search: search || undefined, page, page_size: pageSize,
+      },
+    });
+  },
+
+  approvalCounts() {
+    return this._req('get', '/api/merchant/approvals/counts');
+  },
+
+  approvalDetail(requestId) {
+    return this._req('get', `/api/merchant/approvals/${requestId}`);
+  },
+
+  approvalStartReview(requestId) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/start-review`);
+  },
+
+  /* 403 when the caller raised this booking themselves — someone else at the
+     merchant has to decide it. The screen hides the buttons in that case, but
+     the server is the one that enforces it. */
+  approvalApprove(requestId, note) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/approve`, {
+      data: { note: note || null },
+    });
+  },
+
+  approvalReturn(requestId, remarks) {
+    return this._req('post', `/api/merchant/approvals/${requestId}/return`, {
+      data: { remarks },
     });
   },
 

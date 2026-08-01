@@ -8,7 +8,7 @@ import json
 import sys
 
 import minihttp as requests
-from config import ADMIN, BASE, JPEG, MERCHANT, PDF, PNG, Checker, H, login
+from config import ADMIN, BASE, JPEG, MANAGER, MERCHANT, PDF, PNG, Checker, H, login
 
 _c = Checker()
 check = _c
@@ -47,9 +47,13 @@ def main():
     r = requests.post(f"{BASE}/api/admin/requests/{eid}/reject", headers=H(atok), json={"reason": "no"})
     check("generic reject refuses an enquiry -> 400", r.status_code == 400, f"{r.status_code} {r.text[:200]}")
 
+    # CR-5 rewrote this call. The answer used to be a bare `available: true`;
+    # it is now a quotation, and the two new fields are required by the schema.
     r = requests.post(f"{BASE}/api/admin/enquiries/{eid}/respond", headers=H(atok),
-                      json={"available": True, "response": "Seats held at INR 24,500 all-in."})
-    check("admin answers available", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+                      json={"available": True, "response": "Seats held.",
+                            "total_fare": "24500.00",
+                            "reason": "INR 21,500 fare + INR 3,000 baggage."})
+    check("admin sends a quotation", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------- enquiry -> draft
     print("\n== enquiry -> draft booking ==")
@@ -336,7 +340,9 @@ def main():
     })
     eid2 = r.json()["id"]
     requests.post(f"{BASE}/api/admin/enquiries/{eid2}/review", headers=H(atok))
-    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/respond", headers=H(atok), json={"available": True})
+    requests.post(f"{BASE}/api/admin/enquiries/{eid2}/respond", headers=H(atok),
+                  json={"available": True, "total_fare": "48000.00",
+                        "reason": "Return fare, taxes included."})
     r = requests.post(f"{BASE}/api/enquiries/{eid2}/booking-request", headers=H(mtok), json={
         "passengers": [{"title": "Mr", "first_name": "Nikhil", "last_name": "Bose",
                         "passenger_type": "adult", "passport_number": "M9988776",
@@ -352,8 +358,21 @@ def main():
     check("international submit with zero documents -> 200", r.status_code == 200, f"{r.status_code} {r.text[:300]}")
     check("no refusal ever mentions uploading",
           "upload" not in r.text.lower(), r.text[:200])
-    check("it reaches the approval queue",
+    # CR-2 moved this booking's approval from the Admin to the Manager. It must
+    # reach the Manager's desk and must NOT sit in the Admin's approval queue —
+    # a queue that offered Approve on a booking the service refuses by track
+    # would be worse than not listing it at all.
+    gtok = login(*MANAGER)
+    mgr = requests.get(f"{BASE}/api/manager/bookings/{rid2}", headers=H(gtok))
+    check("the manager can open it", mgr.status_code == 200, f"{mgr.status_code} {mgr.text[:200]}")
+    number = mgr.json()["request"]["request_number"]
+    # Searched by number rather than read off page 1: the queue is oldest-first
+    # (it is a work queue), so the booking just created is the last thing on it.
+    check("it reaches the manager's queue",
           any(i["id"] == rid2 for i in requests.get(
+              f"{BASE}/api/manager/bookings?search={number}", headers=H(gtok)).json()["items"]))
+    check("and not the admin approval queue",
+          not any(i["id"] == rid2 and i.get("kind") == "request" for i in requests.get(
               f"{BASE}/api/admin/approval-queue?page_size=100", headers=H(atok)).json()["items"]))
 
     # --------------------------------------------------------- admin verify

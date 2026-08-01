@@ -62,6 +62,28 @@ class P:
     TICKET_REJECT = "ticket.reject"
     TICKET_ISSUE = "ticket.issue"
 
+    # Manager sign-off on a submitted Booking Request (CR-2).
+    #
+    # WHY THESE ARE NOT ``TICKET_APPROVE`` / ``TICKET_REJECT``
+    # Those two are the Admin's codes for the catalog-led approval queue, and
+    # the whole point of the Manager step is that the desk which answered the
+    # enquiry cannot also sign off the booking. Reusing the Admin's codes would
+    # have handed every Admin the Manager's job on day one; giving the Manager
+    # the Admin's codes would have handed it the catalog queue as well.
+    BOOKING_MANAGER_APPROVE = "booking.manager_approve"
+    BOOKING_MANAGER_RETURN = "booking.manager_return"
+
+    # The merchant's own sign-off on a Booking Request its staff raised (CR-3).
+    #
+    # WHY THESE ARE NOT THE TWO CODES ABOVE
+    # Those are held only by platform staff, and
+    # ``manager_service._assert_approver_surface`` refuses a merchant actor
+    # holding them outright. Reusing them would let a merchant reach the
+    # platform queue and decide *other* merchants' bookings — the scoping is
+    # what makes these a different permission, not the verb.
+    BOOKING_MERCHANT_APPROVE = "booking.merchant_approve"
+    BOOKING_MERCHANT_RETURN = "booking.merchant_return"
+
     # Service requests (date change, cancellation, refund, ancillaries)
     SERVICE_REQUEST_CREATE = "servicerequest.create"
     SERVICE_REQUEST_MANAGE = "servicerequest.manage"
@@ -138,12 +160,33 @@ _ADMIN: frozenset[str] = frozenset({
     P.SYSTEM_ACTIVITY_VIEW, P.AUDIT_VIEW,
 })
 
+# The Manager (CR-2) exists to do exactly one thing: read a submitted Booking
+# Request in full and either send it to the operations desk or send it back to
+# the merchant. Everything it needs to *see* comes through its own endpoints,
+# which scope by ``is_platform_staff``, so it holds no ``ticket.view`` — that
+# code is what opens the Admin's booking screens, the operations queue and the
+# internal-notes API, none of which are the Manager's business.
+#
+# Notably absent, and deliberately: ticket.approve / ticket.reject (the Admin's
+# catalog queue), ticket.issue (the operations desk), every payment code (this
+# workflow has no payment step), and merchant/admin lifecycle codes.
+_MANAGER: frozenset[str] = frozenset({
+    P.BOOKING_MANAGER_APPROVE, P.BOOKING_MANAGER_RETURN,
+    P.PROFILE_MANAGE,
+    P.NOTIFICATION_VIEW,
+})
+
 _MERCHANT_ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
     P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
     # Raise, and — as the account the company was onboarded with — sign off
     # what the rest of the company raises.
     P.SERVICE_REQUEST_CREATE, P.SERVICE_REQUEST_APPROVE,
+    # CR-3 — approves its own merchant's booking requests. Held here as well as
+    # by MerchantRole.MANAGER on purpose: every merchant has a Merchant Admin by
+    # construction, but not every merchant has a manager sub-role, and a single
+    # manager being away must not stop the merchant submitting work.
+    P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
     P.PAYMENT_PAY, P.PAYMENT_VIEW,
     P.REPORT_VIEW, P.REPORT_EXPORT,
     P.CHAT_CREATE, P.CHAT_VIEW,
@@ -163,6 +206,7 @@ _MERCHANT_USER: frozenset[str] = frozenset({
 ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
     UserRole.SUPER_ADMIN: _SUPER_ADMIN,
     UserRole.ADMIN: _ADMIN,
+    UserRole.MANAGER: _MANAGER,
     UserRole.MERCHANT_ADMIN: _MERCHANT_ADMIN,
     UserRole.MERCHANT_USER: _MERCHANT_USER,
     UserRole.CUSTOMER: frozenset(),   # retail customers are out of scope
@@ -197,6 +241,8 @@ MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
         P.PAYMENT_PAY, P.PAYMENT_VIEW,
         P.REPORT_VIEW, P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
+        # CR-3 — this sub-role is the approver for its own merchant.
+        P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
     }),
     MerchantRole.SUPERVISOR: frozenset({
         P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,

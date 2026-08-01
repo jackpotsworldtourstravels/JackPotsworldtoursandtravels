@@ -18,6 +18,7 @@ from app.models_v2 import (
     MsgLog,
     User,
     UserRole,
+    UserStatus,
 )
 from app.services import activity_service
 
@@ -86,6 +87,25 @@ def notify_merchant_managers(db: Session, merchant_id: int | None, title: str, m
     ).all()
     for user_id, email in managers:
         db.add(_new(user_id, email, title, message, merchant_id))
+    db.commit()
+    return len(managers)
+
+
+def notify_managers(db: Session, title: str, message: str) -> int:
+    """Notify the Manager approval desk (CR-2).
+
+    Separate from :func:`notify_admins` on purpose. A submitted Classic Tours
+    booking is not the admins' work — the generic approval path refuses that
+    track — so telling them would be an alert nobody can act on, and telling
+    only the managers keeps the two desks' inboxes honest about what is theirs.
+    """
+    managers = db.execute(
+        select(User.user_id, User.email).where(
+            and_(User.role == UserRole.MANAGER, User.status == UserStatus.ACTIVE)
+        )
+    ).all()
+    for manager_id, email in managers:
+        db.add(_new(manager_id, email, title, message))
     db.commit()
     return len(managers)
 

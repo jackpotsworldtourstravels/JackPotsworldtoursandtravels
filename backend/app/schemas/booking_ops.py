@@ -6,10 +6,11 @@ migration 0032), and the guarantee is only as good as the schemas that do not
 carry them.
 """
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.services.lifecycle import SPEC_LABELS
+from app.services import lifecycle
 
 
 class QueueItem(BaseModel):
@@ -22,6 +23,15 @@ class QueueItem(BaseModel):
 
     status: str
     status_label: str
+    #: ``classic_tours`` bookings never pass through Payment Pending or Paid —
+    #: the desk books them, attaches the tickets and marks them issued. The
+    #: queue UI reads this to show the right next action instead of waiting for
+    #: a payment that is not coming (CR-2).
+    workflow: Literal["classic_tours", "standard"] = "standard"
+    #: True once the desk has somewhere to send the merchant: at least one
+    #: ticket document is attached. Drives the "Mark Ticket Issued" button,
+    #: which the service refuses without one on the Classic track.
+    has_ticket_documents: bool = False
 
     merchant_id: int | None = None
     merchant_name: str | None = None
@@ -51,13 +61,22 @@ class QueueItem(BaseModel):
         if created.tzinfo is None:
             created = created.replace(tzinfo=datetime.timezone.utc)
         lead = r.passengers[0] if r.passengers else None
+        # Imported lazily so this schema keeps working when it is built from a
+        # row loaded without its documents relationship eagerly populated.
+        from app.models_v2 import DocumentType
+
         return cls(
             id=r.request_id,
             request_number=r.request_number,
             booking_reference=r.booking_reference,
             title=r.title,
             status=r.status.value,
-            status_label=SPEC_LABELS.get(r.status, r.status.value),
+            status_label=lifecycle.label_of(r),
+            workflow="classic_tours" if lifecycle.is_classic_track(r) else "standard",
+            has_ticket_documents=any(
+                d.doc_type in (DocumentType.TICKET, DocumentType.OTHER)
+                for d in r.documents
+            ),
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,
             passengers=len(r.passengers),

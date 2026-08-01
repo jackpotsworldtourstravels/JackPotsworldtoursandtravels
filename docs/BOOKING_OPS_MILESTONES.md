@@ -4,7 +4,29 @@
 It is updated whenever a milestone is completed and verified, and it outranks any plan that
 lives only in a chat session. If this file and a conversation disagree, this file wins.
 
-Last updated: **2026-08-01** · Current milestone: **M4 — Finance, Billing & Payment Tracking, in progress**
+Last updated: **2026-08-01** · Current milestone: **CR-4 — Merchant wallet & transaction ledger**
+· Last approved: **CR-4b — automatic wallet debit & credit limit ✅ (2026-08-01)**
+· **Built, awaiting approval: CR-5 — Booking Enquiry quotation + merchant portal refinements.**
+The admin's enquiry answer becomes a **binding quotation** (total fare + remarks), and the merchant
+portal gets the wording, form and dashboard pass the business asked for.
+See `docs/CR-5_BOOKING_ENQUIRY_QUOTATION.md`. **It alters Phase 1 and Phase 2, and it changes
+where CR-4b's fare comes from without editing a line of CR-4b** — see the note below.
+· **Built, awaiting approval: CR-3 — booking approval moved to the merchant's own manager**,
+which *alters CR-2*. See `docs/CR-3_MERCHANT_INTERNAL_APPROVAL.md`.
+· **CR-4a — merchant wallet ledger foundation ✅ approved and locked (2026-08-01).** First of four
+gates in **CR-4 — merchant wallet & transaction ledger**. The architecture it established is
+documented in **`docs/WALLET_ARCHITECTURE.md`, which is the single source of truth for every
+later milestone that touches money.** Spec and per-gate record: `docs/CR-4_MERCHANT_WALLET.md`.
+· **CR-4b — automatic wallet debit at Ticket Issued ✅ approved, complete and FROZEN (2026-08-01):**
+credit-limit hard block at submit *and* approve, refunds and credit notes. The credit-refusal text
+is one shared function (`docs/WALLET_ARCHITECTURE.md` §5a) — do not add a second.
+· **Built, awaiting approval: CR-4c — the merchant Wallet screen**, transaction history, Add Money
+against the admin payment accounts, UTR + screenshot upload. **Submitting a top-up credits nothing**
+— the wallet moves only on admin verification, which is CR-4d. **CR-4d not started.**
+· **Built, awaiting approval: CR-6 — merchant manager sign-off on *service* requests.** The same
+idea as CR-3 applied to the other queue: a cancellation, date change or ancillary now waits for a
+manager at the raising merchant before our desk sees it. Distinct from CR-2 and CR-3, which govern
+*booking* requests. Developed in parallel with CR-2..CR-5 and merged into them on 2026-08-01.
 
 ---
 
@@ -24,6 +46,85 @@ chained. For each milestone, in order:
 A milestone is not "done" when the code is written. It is done when steps 1–5 have all
 happened and the approval in step 6 has been given.
 
+### Changing approved functionality
+
+Added 2026-07-31, on approval of CR-2. Everything in §1 is **locked**.
+
+1. **Do not modify approved functionality.** Not to tidy it, not to make a later milestone
+   simpler, not because a different pattern would have been nicer. If a later milestone appears
+   to need a change here, that is a signal to check the assumption, not a licence to edit.
+2. **The one exception is a bug** — approved behaviour that does not do what this file and
+   `docs/API_CONTRACT.md` say it does. Fix it, say so plainly in the milestone summary, and add
+   the regression to that milestone's verification script so it cannot come back.
+3. **A wanted behaviour change is a change request, not a milestone task.** Write down what
+   changes, which approved behaviour it alters, and why the milestone cannot proceed without it —
+   then **stop and get explicit approval before altering behaviour**. CR-1 and CR-2 are the shape
+   this takes.
+4. **Additive is not exempt.** Adding a status, a permission code, a lifecycle edge or a field to
+   an approved response changes approved behaviour. The same rule applies.
+
+The practical test: if a reviewer who approved the milestone would be surprised by the diff, it
+needed approval first.
+
+**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2, **CR-4a**, **CR-4b** — with CR-2's
+*approver* superseded by CR-3 (built 2026-07-31, not yet approved), and **Phase 1's and Phase 2's
+enquiry surfaces amended by CR-5** (built 2026-08-01, not yet approved). CR-2's payment bypass
+remains locked and unchanged.
+
+**CR-4a carries an extra instruction, given on approval:** the wallet ledger schema and
+`services/wallet_service.py` are **not to be modified by a later gate or milestone unless a genuine
+bug is found**. Every consumer calls `wallet_service.post()`; nothing re-implements the arithmetic,
+and nothing else assigns `merchants.wallet_balance`. See `docs/WALLET_ARCHITECTURE.md`.
+
+> **CR-4b invoked that exception once, and only once.** The credit-refusal text in
+> `wallet_service` did not name the five figures CR-4b's approved scope requires, so the two gates
+> gave two different accounts of the same block — a defect in the deliverable, not a preference.
+> Fixed by adding `credit_refusal_message` (plus `outstanding`) and pointing both gates at it. **The
+> ledger schema, `post()`, `lock()` and the arithmetic were not touched**, and migration 0036 was
+> not reopened. Recorded in `docs/WALLET_ARCHITECTURE.md` §5a.
+
+**CR-4b carries the same freeze, given on approval (2026-08-01).** These are **not to be modified
+by CR-4c, CR-4d or any later milestone unless a genuine bug is discovered** — and if one is, it is
+named in the change log the way CR-4b's own two were, not fixed quietly:
+
+| Frozen | Where |
+| --- | --- |
+| The debit fires at **Ticket Issued**, once, in the transition's transaction | `ticket_service.issue_ticket` → `finance_service.bill_booking_to_wallet` |
+| The settlement `payments` row that keeps **one debt as one number** | `bill_booking_to_wallet` |
+| The **row lock** on issuance, and the lock order ServiceRequest → Merchant | `ticket_service.issue_ticket` |
+| The credit limit as a **hard block at submit and approve, never at issuance** | `finance_service.assert_credit_available` |
+| **One** credit-refusal text naming all five figures | `wallet_service.credit_refusal_message` |
+| `booking_debit` refused on the manual wallet endpoint | `schemas/finance.py` |
+
+**Backward compatibility for historical bookings is a frozen guarantee, not a side effect.**
+`lifecycle.is_classic_track` is the single predicate, and CR-4c/CR-4d must not add a second test for
+"is this wallet-billed":
+
+- A **catalog-led (standard) booking is never wallet-billed** — it keeps `POST /api/requests/{id}/pay`
+  and its Payment Pending → Paid statuses. Billing it would charge it twice.
+- **A booking that has ever entered a payment status stays on the standard track permanently**, so
+  enquiry-led bookings raised before CR-2 are never re-billed under rules that did not exist when
+  they were made.
+- **Nothing is retro-billed and no in-flight booking becomes unmovable.** Bookings already in
+  flight finish on the path they were created on.
+- The 26 pre-CR-2 ticketed bookings that carry amounts, and the 72 backfilled wallet movements,
+  are history: **read-only, never recomputed.** A later gate that "corrects" them is changing the
+  past, which is what the append-only ledger exists to prevent.
+
+`verify_cr4b.py` asserts the first two of these directly; any later gate that touches billing must
+keep those checks green rather than adjust them.
+
+> **CR-5 changes where the fare comes from, and edits none of the frozen code.** With the
+> quotation binding, an enquiry-led booking is created carrying its amount, so:
+> `_capture_fare_for_wallet_billing` returns early (it already no-ops above zero) and stops asking
+> the desk for a fare; and `assert_credit_available` gets the real amount at submission and at
+> approval (both call sites already passed it when non-zero). **No line of `ticket_service.py`,
+> `finance_service.py` or `wallet_service.py` was touched.** The zero-amount path is not dead —
+> it is what every pre-CR-5 enquiry-led booking still finishes on, and `verify_cr5.py` proves it
+> still fires by zeroing a row and issuing against it. `verify_cr4b.py`'s "no fare" section was
+> rewritten for the same reason: `flows.make_booking` no longer *produces* a zero-amount booking,
+> so asserting through it would have silently stopped testing anything.
+
 ### Where the work lives
 
 | Layer | Path |
@@ -36,6 +137,7 @@ happened and the approval in step 6 has been given.
 | Operations portal (V2, role-adaptive) | `frontend/operations/` |
 | Verification harness | `tests/` |
 | API contract | `docs/API_CONTRACT.md` |
+| **Wallet & money movement** | **`docs/WALLET_ARCHITECTURE.md`** — authoritative |
 
 ### Conventions that bind every milestone
 
@@ -45,6 +147,11 @@ production-ready, regardless of whether its own feature works.
 - **One state machine.** `services/lifecycle.py::transition` is the *only* function permitted
   to change `service_requests.status`. It writes `status_history`, which is what the Activity
   Timeline renders. Never assign `request.status` directly.
+- **One wallet.** `services/wallet_service.py::post` is the *only* function permitted to change
+  `merchants.wallet_balance`, and it never changes it without writing the `wallet_transactions`
+  row that explains why. Read `docs/WALLET_ARCHITECTURE.md` before touching money — it is
+  authoritative, and it records two traps (a row lock that silently does nothing, and a ledger
+  ordered by the wrong column) that cost real defects to find.
 - **Permissions, not roles.** Every endpoint declares a code from `auth/rbac.py::P` via
   `Depends(require(P.X))`. New behaviour reuses an existing code unless the spec genuinely
   describes a new capability.
@@ -66,6 +173,12 @@ production-ready, regardless of whether its own feature works.
 Merchant-side enquiry capture in the Classic V2 portal. Enquiries ride `service_requests` with
 `request_type = ticket_enquiry`; no new table. Inventory Search was retired in favour of it.
 
+> **Amended by CR-5 (awaiting approval).** Called **Booking Enquiry** in the merchant portal (the
+> API and every staff screen keep *ticket enquiry*); the passenger count is typeable and reconciled
+> against the breakdown, reversing this phase's recorded "deliberate spec deviation"; the class is a
+> dropdown; the time control is 24-hour; and the booking is created at the quoted fare rather than
+> at `0`.
+
 - Backend: `routers/enquiries.py`, `services/enquiry_service.py`
 - Migration: `0030_enquiry_number_sequence`
 - Frontend: `frontend/merchant-classic/js/classic-enquiry.js`
@@ -75,6 +188,10 @@ Merchant-side enquiry capture in the Classic V2 portal. Enquiries ride `service_
 Admin-side review and response. "Start Review" is a claim, taken under `SELECT FOR UPDATE`, so
 two admins cannot both believe they own an enquiry. The generic approve/reject endpoints
 deliberately refuse enquiries — they have their own resolution path.
+
+> **Amended by CR-5 (awaiting approval).** The answer is no longer a bare availability flag: it
+> carries a **total fare and mandatory remarks**, and the fare is binding. The claim, the row lock
+> and the finality of the answer are unchanged.
 
 - Backend: `routers/enquiries.py` (admin section), `services/enquiry_service.py`
 - Frontend: `frontend/admin/` + `frontend/assets/js/admin.js`
@@ -104,6 +221,15 @@ one of the two screens at any time.
 - **External references** — `PUT /api/admin/bookings/{id}/references` for the real airline PNR,
   ticket number and airline reference. Partial update; overwrite permitted and logged with the
   previous value; duplicate ticket number returns a 409 naming the other booking.
+  > **This form is section 4 of the Booking Operations popup and is editable.** Operations books
+  > the ticket on the airline's own site and keys the references back here. Its three inputs are
+  > the **only editable copy of the PNR, ticket number and airline reference anywhere in the
+  > product** — every other surface renders them read-only — so removing it would leave a booking
+  > carrying only the PNR `issue_ticket` generates. CR-5's second pass removed it briefly and
+  > restored it by decision on 2026-08-01; the endpoint never moved. (The *Assignment* form is a
+  > different story: CR-2 removed it for good, because the queue's own filter and column already
+  > cover who is working what. `POST .../assign` is likewise still live and still covered by
+  > `verify_m1.py`.)
 - **Internal notes** — `GET/POST /api/admin/bookings/{id}/notes`, `PUT/DELETE
   /api/admin/bookings/notes/{note_id}`. Staff-only at the service layer, not just the router.
   Only the author may edit or delete. The note body is never copied into the activity feed.
@@ -158,10 +284,21 @@ merchant-facing half of Phase 3** while leaving that milestone's backend entirel
   touches a document endpoint at all)
 
 
-### CR-2 — Manager approval, portal cleanup, Booking Operations UI ✅ **Complete**
+### CR-6 — Merchant manager sign-off on service requests ✅ **Built, awaiting approval**
 
 An out-of-band change request, 2026-08-01. Not a numbered milestone: it is a batch of
 merchant- and admin-portal changes plus the one workflow change they all hang off.
+
+**Renumbered from CR-2 on merge.** This was developed in a working tree that had not pulled
+CR-2..CR-5, and it took the number CR-2 while `origin/main` was independently using that number
+for *Manager approval on booking requests* — which is approved and locked. The two are different
+changes on different queues and both survive; only this one moved. Read every "CR-2" in the commit
+history of `manager-approval-service-requests` before 2026-08-01 as CR-6.
+
+**Relationship to CR-3.** CR-3 gives the merchant's own manager the sign-off on *booking* requests.
+This does the same for *service* requests. They are deliberately separate permission codes
+(`servicerequest.approve` here, `booking.merchant_approve` there) and separate services, because a
+merchant may well want a junior to raise a date change but not a booking.
 
 **The workflow change — a second approval, in front of ours.** Every service request a merchant
 raises (`cancellation`, `date_change`, `refund`, `passenger_modification`, `extra_baggage`,
@@ -229,13 +366,200 @@ the request and it never reaches us.
   `lifecycle`, `notification_service`, `rbac` and the two request schemas
 - Frontend: `merchant-classic/` (index, css, shell, dashboard, service, requests, account),
   `shared/merchant-api.js`, `shared/ops-api.js`, `admin/index.html`, `assets/css/admin.css`,
-  `assets/js/admin.js`, `admin-change-requests.js`, `admin-booking-ops.js` — all `?v=` bumped
+  `assets/js/admin.js`, `admin-change-requests.js` — all `?v=` bumped
 - `docs/API_CONTRACT.md` updated (§6.3a rewritten, §6.3b added)
 - Verified by: `tests/verify_manager_approval.py` (**52 checks**), with `verify_m3.py` rewritten
   where it asserted the old contract — its withdraw section now asserts the endpoint's absence,
   and its "completed cannot be cancelled" check now asserts the opposite
-- Regression suite green: **9/9 scripts**. Both portals driven in the browser, console clean,
-  no layout break at 1280 / 768 / 375, charts re-themed in dark mode
+
+**Superseded by the merge, 2026-08-01.** Two things this change originally carried did not survive
+contact with CR-2..CR-5, and the decision in each case was to keep upstream's:
+
+- **`assets/js/admin-booking-ops.js`** — this change wrote one; CR-2 had independently written
+  another at the same path. CR-2's is the one in the tree: it branches on the `workflow` field and
+  carries the ticket-upload and fare steps that the Classic Tours track needs, neither of which
+  this change knew about. Lost with it: the *All Bookings* register tab and the in-modal operator
+  assignment form. Both are re-addable on top of CR-2's file; neither is in the tree today.
+- **The regression figure above is stale.** "9/9 green" was measured before the merge, against a
+  suite that is now 20 scripts. Re-run `python tests/run_all.py` before reading anything into it.
+
+### CR-4a — Merchant wallet ledger foundation ✅ **Complete & Approved**
+
+**Approved 2026-08-01. This is LOCKED — see §0's "Changing approved functionality" and the extra
+instruction recorded there.** First of the four gates in CR-4; 4b–d are separate approvals.
+
+The wallet stopped being two columns and an improvisation and became a ledger.
+
+- **Migration `0036_wallet_ledger`** — drops `ck_merchants_wallet_non_negative` (a negative wallet
+  is now the merchant's outstanding balance, which is the point of CR-4); creates
+  `wallet_transactions`, `wallet_topups` and `payment_accounts`; backfills 72 historical movements
+  from the `payments` rows that carried `discount_meta->>'wallet_direction'`. Exercised **down and
+  up**. The downgrade deliberately fails if any merchant is negative.
+- **The invariant is a database constraint.** `balance_after = balance_before + credit - debit` is
+  checked on every insert, and a row that is both a debit and a credit — or neither — is refused.
+- **`services/wallet_service.py`** — `post()` is the only code in the repository that assigns
+  `merchants.wallet_balance`, always under `SELECT … FOR UPDATE`, never without its ledger row.
+- **Two defects found by running the concurrency section**, both fixed: the row lock was returning
+  SQLAlchemy's *stale* identity-map instance so only 4 of 8 concurrent movements reached the
+  balance (`populate_existing=True`), and `created_at` — being transaction-*start* time — could
+  order a statement against the sequence in which the balance actually moved (ledger orders by
+  `txn_id`, allocated after the lock).
+- **A transitional dual-write** in `finance_service.adjust_wallet` keeps every M4 read surface
+  byte-identical; CR-4c removes it when `statement()` moves onto the ledger.
+- Full architecture, and the rules later milestones must follow: **`docs/WALLET_ARCHITECTURE.md`**.
+
+- Backend: `services/wallet_service.py`, `services/finance_service.py`, `models_v2.py`
+- Migration: `0036_wallet_ledger`
+- Verified by: `tests/verify_cr4a.py` — **52 checks**; suite 696 checks, 12/12
+
+### CR-4b — Automatic wallet debit & credit limit ✅ **Complete & Approved**
+
+**Approved 2026-08-01. This is LOCKED — see §0's "Changing approved functionality" and the freeze
+recorded there. Do not modify it unless a genuine bug is discovered.** Second of the four gates in
+CR-4; 4c–d are separate approvals.
+
+The wallet stopped being a table nothing wrote to and started carrying the debt.
+
+- **Auto-debit at Ticket Issued** — `finance_service.bill_booking_to_wallet`, called from
+  `ticket_service.issue_ticket` in the same transaction as the lifecycle move. It also writes a
+  `method='wallet'` settlement `payments` row, which is what stops **one debt being two numbers**:
+  without it the booking keeps a full `balance_due` *and* the wallet is negative by the same
+  amount, and every screen that adds them up double-counts.
+- **The fare is captured at issuance.** Enquiry-led bookings are created at `total_amount = 0` and
+  **no live path ever set one** — 88 Manager-Approved bookings were sitting on the ops desk at ₹0.
+  `fare_amount` on `/issue-ticket` is required only where the amount is still 0, validated before
+  the transition so a refusal burns no ticket or invoice number.
+- **Credit limit, hard block, at submission *and* approval** — never at issuance: refusing to
+  record a ticket already bought loses the debt rather than preventing it. One shared refusal text
+  (`wallet_service.credit_refusal_message`, `WALLET_ARCHITECTURE.md` §5a) names all five figures.
+- **Refunds and credit notes** — `refund_booking_to_wallet` on cancellation; the admin wallet
+  endpoint takes an optional `txn_type`. `booking_debit` is refused there, so nothing routes around
+  the one-debit-per-booking index.
+- **`issue_ticket` is row-locked.** It never had been, while `reprice` in the same file always was.
+  Six simultaneous issues returned **two 200s and three 500s** — the money stayed correct in every
+  run (one debit, wallet moved once; the unique index is a database guarantee) but the
+  `IntegrityError` reached callers raw and two desks were told they had issued the same ticket.
+  **A unique index protects the money; it does not protect the response.** Lock order is
+  **ServiceRequest → Merchant**.
+
+- Backend: `services/ticket_service.py`, `services/finance_service.py`, `services/manager_service.py`,
+  `services/change_request_service.py`, `routers/tickets.py`, `routers/finance.py`
+- Frontend: `assets/js/admin-booking-ops.js` (one fare field — without it the desk cannot issue a
+  Classic ticket at all)
+- Migrations: **none** — CR-4a's schema was sufficient and was not reopened
+- Verified by: `tests/verify_cr4b.py` — **77 checks**; suite **773 checks, 13/13**
+
+### CR-2 — Manager approval step + Classic Tours payment bypass ✅ **Complete & Approved**
+
+**Approved 2026-07-31. This workflow is LOCKED — see §0's "Changing approved functionality".**
+
+An out-of-band change request, raised 2026-07-31. Inserts a **Manager** sign-off between the
+merchant's submitted Booking Request and the Admin Booking Operations queue, and **disables the
+payment workflow for enquiry-led (Classic Tours) bookings only**. Two scope decisions were taken
+by the business, not assumed: the Manager is a *platform* role (not the existing merchant-side
+`MerchantRole.MANAGER`), and the payment bypass is scoped to the enquiry-led flow so M4 Finance
+and every other workflow keep their payment path intact.
+
+- **New role and codes.** `UserRole.MANAGER`, `P.BOOKING_MANAGER_APPROVE`,
+  `P.BOOKING_MANAGER_RETURN`. Held by the Manager alone; the Admin holds neither, which is what
+  stops the desk that answered an enquiry from also signing off the booking. The Manager
+  deliberately does **not** hold `ticket.view`.
+- **Two migrations, not one.** `0033` adds the enum label; `0034` widens
+  `ck_users_merchant_scope`. PostgreSQL cannot *use* a new enum label in the transaction that
+  added it, and that constraint enumerates roles by literal — so a Manager could not be inserted
+  until the second migration ran.
+- **Two tracks in one state machine.** `lifecycle.CLASSIC_TRANSITIONS` replaces `TRANSITIONS`
+  wholesale for a Classic Tours booking. Payment Pending and Paid have **no inbound edge** there
+  — the bypass is an unreachable state, not a hidden button. `is_classic_track` returns False
+  once a booking has entered a payment status, so bookings already in flight finish the way they
+  started instead of becoming unmovable.
+- **Reject = returned for correction.** Back to Draft with mandatory remarks, editable and
+  resubmittable, not the terminal Rejected. `timeline()` now computes "already done" from history
+  *since the request last entered its current status*, or a returned booking hides the
+  resubmission it still owes.
+- **Bypass paths closed** by track, the same treatment enquiries and change requests got:
+  `/api/admin/requests/{id}/approve`, `.../reject`, `.../reprice`, `POST /api/requests/{id}/pay`,
+  and the Admin Approval Queue listing.
+- **M1's Booking Operations queue finally has a frontend.** It had none — the entire M1/M2
+  backend was unrendered by any portal. CR-2 required it, so `frontend/assets/js/admin-booking-ops.js`
+  now surfaces the queue, airline references, internal notes, multi-file ticket
+  upload, Mark Ticket Issued and Mark Completed. The work modal's **Assignment** form was later
+  dropped — the queue's own assignment filter and column already cover who is working what — and
+  replaced by the booking's journey and passenger details, read-only, off the payload the modal
+  already loads. The assignment *endpoint* is untouched and still live.
+  > **Extended by CR-5's second pass (2026-08-01):** the modal is now six sections in a
+  > business-specified order — booking information, passenger information, **quotation**, airline
+  > references (still editable), ticket documents, internal notes. The references form was removed
+  > in that pass and restored by decision within it; only *Assignment* stays gone.
+- **Two pre-existing M4 defects found while making the suite green**, both fixed:
+  `change_request_service.approve` mutated `pricing` in place after assigning it, and an
+  autoflush inside `settle_refund` made that dict the attribute's committed baseline — so
+  `refund_settled`/`refund_unsettled` were written in memory and silently dropped at commit on
+  **every** cancellation. And `finance_service.assert_within_credit_limit` refused *reductions*
+  when a merchant was already over its limit, contradicting its caller's documented contract.
+- **Test fixtures split.** `flows.make_booking` is enquiry-led and walks the Manager path;
+  `flows.make_catalog_booking` is the standard track, for every money test. Asking the former for
+  a paid booking now fails loudly rather than stopping short.
+
+- Backend: `services/manager_service.py`, `routers/manager.py`, `schemas/manager.py`,
+  `services/lifecycle.py`, `auth/rbac.py`, `services/document_service.py`,
+  `services/ticket_service.py`, `services/approval_service.py`, `services/notification_service.py`
+- Migrations: `0033_manager_role`, `0034_manager_scope_constraint`
+- Frontend: `frontend/manager/` (new portal), `assets/js/manager-portal.js`,
+  `assets/js/admin-booking-ops.js`, `merchant-classic/js/classic-booking-detail.js`,
+  `classic-requests.js`, `classic-shell.js`, `classic-payments.js`, `shared/merchant-api.js`
+- Verified by: `tests/verify_cr2.py` — **118 checks**
+
+**Completion pass (requested before approval).** The first submission left the role working but
+not operable, and three checklist items unmet. All closed:
+
+- **Super Admin → Admin Management now runs Manager accounts.** A Role dropdown on create and
+  edit, a Role column and role filter on the table, and the Manager added to the Role Permission
+  Matrix. `POST /api/super-admin/admins` takes `role`; `PUT .../{id}` takes an optional `role`
+  that is **refused with a 409 while that Manager still holds a booking under review** — the
+  claim would otherwise outlive the permission to act on it, stranding the booking In Review.
+  A role change revokes the account's sessions, because its permission set changes underneath it.
+  The RBAC codes arrive with the role; nothing is granted by hand.
+- **Manager notifications.** `notify_managers` had been writing a row per submission since CR-2
+  landed and the role held `notification.view`, but the portal had no surface — 52 unread had
+  accumulated unreadable. Bell with unread dot, dropdown, a full paginated Notifications section,
+  and mark-one / mark-all. No new endpoint; `/api/notifications` already serves any role holding
+  the code.
+- **Manager profile.** Details and password change, on the pre-existing `/api/profile` and
+  `/api/auth/change-password`.
+- **Modal focus trapping** — new shared `frontend/components/focus-trap.js`, applied to the
+  Manager review modal and the Booking Operations work modal: focus moves to the first real
+  control (not the close button), Tab and Shift+Tab cycle within the dialog, the rest of the page
+  is `aria-hidden` while it is open, and focus returns to the exact trigger on close.
+- **Manager queue queries indexed** — migration `0035`, a partial index on
+  `(created_at, status)`. Measured, not assumed: the list query went from 192 buffers with 277
+  rows discarded to 23 buffers with **none** (status became an index condition rather than a
+  post-filter), and the counts query became an index-only scan, 143 buffers → 34. The obvious
+  `(status, created_at)` ordering was tried first and is the worse one, because every bucket but
+  *Approved* spans more than one status. `tests/minihttp.py` gained the `patch` verb it had
+  always been missing.
+
+**§3 Production Readiness Checklist — CR-2 sign-off.** §3 says it is applied to every milestone
+and that an inapplicable item is marked N/A *with a reason*, not silently skipped. It had not
+been recorded for CR-2. Verified item by item:
+
+| Group | Result |
+| --- | --- |
+| **Security** | All 6 new endpoints authenticated (`no token -> 401/403` asserted). No secret or PII in any new response; the generated password is returned once by a pre-existing endpoint and cleared from the DOM on acknowledge. Uploads unchanged — CR-2 widened *when* staff may attach, not what or how. Every new input is a Pydantic schema; **no f-string SQL anywhere in the new services** (checked). Cross-tenant reads 404, not 403 (asserted). Auth rate limits untouched. |
+| **RBAC** | All 6 manager endpoints declare a `P.*` via `Depends(require(...))`. Two new codes, justified in §6.3c of the contract. Matrix updated and now rendered in the Super Admin UI. Tested from super admin, admin, manager, merchant admin and a rival merchant. Deliberate denials hold — a Manager cannot reach the ops queue, internal notes or ticket upload. The UI offers nothing the server refuses: the Admin Approval Queue drops Classic bookings rather than showing an Approve the service would reject. |
+| **Concurrency** | Manager decisions are row-locked (`SELECT … FOR UPDATE`); claim semantics are first-wins and stated. Six simultaneous approvals tested for real — exactly one wins, losers get 400/409, never a 500. Status changes go through `lifecycle.transition` exclusively. No sequence is allocated before its transition validates. |
+| **Performance** | Queue relationships eager-loaded (7 `selectinload`); `documents` added to the ops queue when `has_ticket_documents` was introduced. Both new queries `EXPLAIN`ed on real data and indexed — see `0035`. `page_size` capped at 100. No unbounded query. |
+| **Accessibility** | Focus trapped and restored in both new modals, verified with a real keyboard Tab. `:focus-visible` rings on every new control — **the Manager's queue tabs and notification rows were missing theirs and were fixed in this pass.** All new inputs have `for`/`id` labels; icon-only buttons have `aria-label`. Colour is never the only carrier — every badge carries text. **Contrast measured, not eyeballed: the "Pending Manager Approval" chip was 4.35:1, below AA for 11.5px bold text; `.badge.pending` and `.cl-tag-warn` moved `#a06600` → `#8f5c00`, now 5.17:1.** No horizontal overflow at 1280 / 768 / 375 on any portal. |
+| **Documentation** | Contract updated in the same pass as the endpoints. All three migrations carry a *why*. Non-obvious decisions commented at the point of the decision. This file updated. Schema docs need no change — they map legacy tables to new ones and document neither enum values nor indexes. |
+| **Regression** | 10/10 scripts, 594 checks. `?v=` bumped on every changed asset. Failures reported with their output; skips stated as skips. |
+
+Two items are **N/A, with reason**: *"Uploads: size-capped, magic-byte checked"* — CR-2 changed the
+upload *window*, not the upload path; `document_service`'s checks are untouched and still covered
+by `verify_api.py`. *"No secret in any PDF"* — CR-2 renders no PDF.
+
+**Known and accepted:** `#a06600` remains on icon tiles, large numerals, and `main.css`'s
+public-site badges. Those meet the 3:1 non-text / large-text threshold, and restyling the public
+site is outside this change request.
 
 ---
 
@@ -329,7 +653,141 @@ in `allowed_transitions` and no portal renders a bare Cancel button that would s
 
 ---
 
-### M4 — Finance, Billing & Payment Tracking ⬜ **Not started**
+### M4 — Finance, Billing & Payment Tracking ⏳ **Complete, awaiting approval**
+
+**Audited 2026-07-31, then completed.** This milestone was labelled "Not started" with an
+entirely unticked checklist. That was wrong in both directions: the backend was complete and
+proven, and the frontend did not exist at all. The audit below is preserved as the record of what
+was found; the approved remaining work (A–E) was then built and is verified. **125 checks in
+`verify_m4.py`; suite 613 checks, 10/10.**
+
+#### Audit — scope items
+
+| # | Requirement | Status |
+| --- | --- | --- |
+| 1 | Coherent merchant financial position, one computation used by **every** surface | ⚠️ Partially Complete |
+| 2 | Wallet + credit limit actually enforced | ✅ Complete |
+| 3 | Payment lifecycle record → verify → refund, incl. M3 cancellation refunds, ledger as source of truth | ✅ Complete |
+| 4 | Statements / ledger view per merchant, **and** an admin payments desk with verification queue | ⚠️ Partially Complete |
+| 5 | Invoice numbering integrity — no gaps, no reuse, verified under failure | ✅ Complete |
+
+#### Audit — verification requirements
+
+| Requirement | Status |
+| --- | --- |
+| Ledger arithmetic against hand-computed fixtures, incl. partial refunds | ✅ Complete |
+| Credit-limit enforcement refused server-side | ✅ Complete |
+| Every money figure on every screen traced to the same service function | ❌ Not Implemented |
+| No float arithmetic anywhere in the money path (`Decimal` only) | ⚠️ Partially Complete |
+| Concurrency: two simultaneous payment verifications on one booking | ✅ Complete |
+
+#### The two partial items, in detail
+
+**1 & 4 — the finance computation exists and nothing consumes it.**
+
+*What exists:* `services/finance_service.py` — 13 functions covering `booking_position`,
+`merchant_position`, `balance_due`, `statement`, `settle_refund`, `refundable_against`,
+`assert_within_credit_limit`, `assert_wallet_covers`, `adjust_wallet`. Four endpoints in
+`routers/finance.py`: merchant position, merchant statement, admin per-merchant position, admin
+per-merchant statement. `shared/merchant-api.js` even declares `financePosition()` and
+`financeStatement()` client methods. All of it is proven by `tests/verify_m4.py`.
+
+*What is missing:* **every one of those has zero callers.** Verified by search:
+`MerchantApi.financePosition` / `financeStatement` — 0 call sites. The admin per-merchant finance
+endpoints — 0 call sites. `classic-payments.js` carries a 7-line docstring headed "ACCOUNT
+POSITION AND STATEMENT (M4)" describing a KPI strip and a ledger, and a
+`let clFinancePosition = null;` that is **declared and never assigned or rendered**. The screen
+described in that comment was never built.
+
+Meanwhile the surfaces that *do* show money get it elsewhere: the merchant dashboard reads
+`merchants.wallet_balance` straight from `dashboard_service` (a raw column, not a position, and
+shown with no "how much of the limit is used"), and `operations/js/ops-finance.js` computes **six
+separate money totals in JavaScript with `Number()`** — floats, summed client-side, from
+`/api/admin/payments`. `classic-reports.js` does the same on line 136. That is precisely the
+failure this milestone was written to make impossible: several surfaces each computing a total
+their own way, in a numeric type the ledger does not use.
+
+*Bug fix or new functionality?* **Both, and they should be counted separately.**
+The unbuilt merchant ledger screen and the unbuilt admin per-merchant position are **new
+functionality**. The seven client-side float sums are a **bug** — screens presenting numbers that
+are not the ledger's, against a stated requirement of this milestone.
+
+**"No float in the money path" — where it actually stands.**
+
+*Backend live code is clean.* A search finds 20 `: float` money fields across
+`admin_partner.py`, `booking_management.py`, `partner_booking.py`, `partner_reports.py`,
+`partner_service_request.py`, `payment_management.py`, `pricing.py` and `inventory.py` — and
+**every one of those schemas belongs to a router that `main.py` does not register.** They are part
+of the documented dead-code set. Fixing them would be refactoring unreachable code; they are
+listed here so the next reader does not re-discover them and assume a live defect.
+
+*The live violations are all frontend:* the six `ops-finance.js` reductions, the one in
+`classic-reports.js`, and `admin.js` sending `Number(amount)` on `POST /api/admin/payments/{id}/refund`.
+The refund one was tested and is **not currently corrupting values** — Pydantic v2 converts
+float→`Decimal` via `str()`, so `1234.56` round-trips exactly — so it is a latent violation of the
+stated rule rather than an active money bug. One-word fix.
+
+#### What is genuinely complete
+
+- `finance_service` as the single computation, with `Decimal` throughout and `q()` quantising.
+- Wallet and credit limit enforced at approval and at wallet payment, not merely displayed.
+  (Two defects in this area were found and fixed during CR-2: a dropped refund-settlement write,
+  and a credit check that refused fare *reductions*.)
+- Record → verify → refund, row-locked (`SELECT … FOR UPDATE` on the payment), with M3's
+  cancellation refund settling into the same ledger, oldest payment first, shortfall recorded
+  rather than hidden.
+- Invoice numbering proven gap-free and never reused, including under a failed attempt.
+- An **admin payments desk does exist** — `admin.js`'s Payment Verification section over
+  `/api/admin/payments`, `/pending`, `/verify`, `/refund` — as does a second one in the
+  Operations portal (`ops-finance.js`, 667 lines). The verification-queue half of scope item 4 is
+  met; the per-merchant position half is not.
+- `docs/API_CONTRACT.md` §6.3b documents all four finance endpoints.
+- `tests/verify_m4.py` — 104 checks across ledger arithmetic, statement reconciliation, wallet,
+  credit limit, M3 refund settlement, payment-verification concurrency, invoice numbering,
+  approval pricing, re-pricing and cross-tenant RBAC.
+
+
+#### M4 — what the approved remaining work (A–E) delivered
+
+**A. Merchant Account Position & Statement** — `classic-payments.js`. A seven-tile position strip
+(balance due, billed, paid, wallet, awaiting verification, credit available *beside what is used*,
+spending power) and a dated ledger with the server's own running balance, from
+`GET /api/merchant/finance/position` and `/statement`. The dead `clFinancePosition` declaration is
+gone. Date-range filter on the statement. No figure is derived on the page.
+
+**B. Admin per-merchant finance** — a "Financial position" panel inside the existing Merchant
+Management detail view, from `GET /api/admin/merchants/{id}/finance`, with a collapsible statement
+from `/statement`. **Wallet Balance and Credit Limit were removed from the info grid above it** —
+they were raw columns rendered through `money()`, and having them beside the computed position was
+two answers to one question. No new endpoint, no new screen architecture.
+
+**C. Client-side money arithmetic removed** — *bug fix.* Ten sites:
+six page-scoped sums in `ops-finance.js` (one of which, "Owed now", **under-reported by design** —
+it summed a single capped page and said so in its own footnote; it is now `outstanding` from the
+position), the "Value listed" tile in `classic-reports.js`, the "Value shown" tile and the revenue
+roll-up in `ops-insight.js`, and a per-passenger multiplication in `ops-inventory.js`. Row *counts*
+are not money and were kept. Two float payloads fixed: `admin.js`'s refund and `ops-api.js`'s
+reprice now send the string as typed, against `Decimal` schemas.
+
+**D. Merchant dashboard** — *bug fix.* The "Credit limit" tile showed a ceiling with no usage,
+read from a raw column. It now shows credit available with used/limit beneath it, or balance due
+when no limit is set, from the position. The Account panel gained Balance due.
+
+**E. Verification** — `verify_m4.py` grew 104 → **125 checks**, including a section asserting the
+merchant and the admin read an *identical* value for all eleven position fields, that money crosses
+the wire as decimal **strings** (so the browser cannot float it), and that the statement carries its
+own totals so no screen has to add a column. Browser-verified on the merchant dashboard, merchant
+Payments, Admin Merchant Management and the Operations finance screens at 1280/768/375, console
+clean. Suite **613 checks, 10/10**.
+
+**One shared formatter, not four.** `moneyStr()` and `moneyIsPositive()` in `shared/formatters.js`
+render a decimal string without parsing it. `money()` — which does `Math.round(n)`, making a float
+*and* discarding the paise — remains correct for counts and is untouched, but nothing that came
+from `finance_service` goes through it any more. A ₹24,500.50 balance used to render ₹24,501.
+
+**Deliberately not done**, per the approved scope: the 20 `: float` money fields in unregistered
+dead routers; `partner-request-history.js` (the retired Premium portal, a redirect stub whose
+scripts never execute); and any change to the finance arithmetic itself, which was already proven.
 
 **Scope**
 
@@ -354,17 +812,71 @@ in `allowed_transitions` and no portal renders a bare Cancel button that would s
 - No float arithmetic anywhere in the money path (`Decimal` only).
 - Concurrency: two simultaneous payment verifications on one booking.
 
-**Checklist**
+**Checklist** — corrected 2026-07-31 to reflect what is actually built
 
-- [ ] Single finance computation service, used by all surfaces
-- [ ] Wallet + credit limit enforced server-side
-- [ ] Refund path from M3 settles correctly
-- [ ] Merchant statement/ledger screen
-- [ ] Admin payments desk
-- [ ] Invoice numbering verified gap-free
-- [ ] `docs/API_CONTRACT.md` updated
-- [ ] `tests/verify_m4.py` written and passing
-- [ ] Regression suite green · Browser verified · Summary written
+- [x] Single finance computation service — `finance_service.py`, `Decimal` throughout
+- [x] …used by all surfaces — merchant Payments, merchant dashboard, Admin Merchant Management
+      and the Operations wallet all read it; asserted equal, field by field, in `verify_m4.py`
+- [x] Wallet + credit limit enforced server-side
+- [x] Refund path from M3 settles correctly
+- [x] Merchant statement/ledger screen — position strip + dated ledger with a server running balance
+- [x] Admin payments desk — verification queue, list, verify, refund
+- [x] Admin per-merchant finance position — in Merchant Management, same computation as the merchant's
+- [x] Invoice numbering verified gap-free
+- [x] `docs/API_CONTRACT.md` updated (§6.3b)
+- [x] `tests/verify_m4.py` written and passing — **125 checks**
+- [x] Regression suite green — 613 checks, 10/10
+- [x] No float in the money path — 10 client-side calculations removed, 2 float payloads fixed;
+      the remaining `: float` money fields are all in unregistered dead routers (out of scope)
+- [x] Browser verified — 4 portals at 1280/768/375, console clean
+- [x] Summary written
+
+---
+
+### M4 — remaining work (revised plan, 2026-07-31) ✅ **Approved, and delivered**
+
+**This is the plan as it was approved, kept as the record of what was agreed.** What it turned
+into is written up above under *"M4 — what the approved remaining work (A–E) delivered"*; if the
+two disagree, the delivered section is what exists.
+
+Only the gaps. No rewrite of the backend, no refactor of the dead-code float schemas, no second
+finance computation — every item below either **consumes** what `finance_service` already exposes
+or **deletes** a duplicate computation that should never have existed.
+
+**A. Merchant account position & statement screen** — *new functionality*
+Build what `classic-payments.js`'s docstring already promises: a KPI strip (billed, paid,
+refunded, balance due, outstanding, wallet, credit available) and a dated ledger with a running
+balance, both from `GET /api/merchant/finance/position` and `/statement`. The client methods
+already exist and are unused; wire them and delete the dead `clFinancePosition` declaration.
+*Touches no approved workflow — CR-2's Classic Tours bookings are non-billable and simply do not
+appear, which the screen already says.*
+
+**B. Admin per-merchant finance position** — *new functionality*
+Surface `GET /api/admin/merchants/{id}/finance` and `/statement` in Merchant Management, so the
+desk answering "what does this merchant owe" reads the same computation the merchant sees. This is
+the concrete meaning of "one computation, used by every surface".
+
+**C. Remove the client-side money arithmetic** — *bug fix*
+Replace the six `Number()` reductions in `operations/js/ops-finance.js` and the one in
+`classic-reports.js` with figures the API already returns, or add the missing figure to
+`finance_service` if one is genuinely absent — never a new sum in JavaScript. Change
+`admin.js`'s refund payload from `Number(amount)` to the string form.
+*If any figure turns out to need a server-side total that does not exist yet, that is a small
+addition to `finance_service`, not a new computation elsewhere — flagged before it is written.*
+
+**D. Merchant dashboard honesty** — *bug fix, small*
+The dashboard shows "Credit limit" with no indication of how much is used. Show `credit_available`
+/ `outstanding` from the position, or drop the tile. A limit with no usage beside it is the same
+class of misreading as the `pending_payments_count` bug this milestone cites.
+
+**E. Verification** — *required by §0*
+Extend `tests/verify_m4.py` to assert that the figures the new screens render equal
+`finance_service`'s, browser-verify every money screen at 1280/768/375, re-run the full suite,
+write the summary.
+
+**Explicitly out of scope:** the 20 `: float` money fields in unregistered routers (dead code —
+`admin_partner`, `booking_management`, `partner_*`, `payment_management`, `pricing`, `inventory`);
+any change to the finance service's arithmetic, which is proven; anything in §1.
 
 ---
 
@@ -664,12 +1176,18 @@ python tests/run_all.py
 | `tests/verify_m1_concurrency.py` | M1 — 8 simultaneous assignments, 10 simultaneous notes |
 | `tests/verify_m2.py` | M2 — ticket upload, invoice/confirmation PDFs, merchant delivery, reissue |
 | `tests/verify_m3.py` | M3 — cancellation & reschedule, money bounds, cross-tenant, concurrency, bypass guards |
-| `tests/verify_m4.py` … | one per milestone, added as each lands |
+| `tests/verify_m4.py` | M4 — ledger arithmetic, wallet, credit limit, refunds, payment concurrency, and merchant/admin surface parity (the same eleven position fields, as decimal strings) |
+| `tests/verify_cr4b.py` | CR-4b - wallet debit at Ticket Issued, one-debt-one-number, idempotency, **six simultaneous issues of one booking**, catalog track untouched, credit-limit hard block (every figure asserted by name and value), cancellation refunds, credit notes |
+| `tests/verify_cr4c.py` | CR-4c - wallet summary against SQL, ledger pagination, **a submitted top-up credits nothing**, every form rule, duplicate UTR, upload allowlist/magic-bytes/size cap, proof served as an attachment, six simultaneous submissions, cross-tenant |
+| `tests/verify_cr4a.py` | CR-4a — wallet ledger schema and constraints, backfill fidelity, balance chain, arithmetic across zero, booking-debit idempotency, credit limit, 8-actor concurrency. Serverless |
+| `tests/verify_cr5.py` | CR-5 — quotation required and positive, remarks required, a fare refused on a decline, the fare reaching the merchant as a decimal string on detail/list/timeline, **the booking raised at exactly the quoted amount**, the credit limit biting at submission with all five figures by name *and* value, issuance needing no `fare_amount`, a zeroed pre-CR-5 booking still demanding one, six simultaneous quotations, cross-tenant 404, and the server rules the new form controls rely on |
+| `tests/verify_cr2.py` | CR-2 — manager approval, payment bypass, ticket delivery, RBAC, concurrency |
+| `tests/verify_m5.py` … | one per milestone, added as each lands |
 
 Each milestone adds its own script and **all** prior scripts must still pass. See
 `tests/README.md` for how to run them and how to write a new one.
 
-**Last full run: 2026-07-31 — 332 checks, 7/7 scripts passed, 0 failures.**
+**Last full run: 2026-08-01 — 944 checks, 15/15 scripts passed, 0 failures** (CR-5).
 
 Note: `POST /api/auth/login` is rate-limited to 10/minute *per IP*, which a full suite run
 exceeds. `config.login` caches tokens per process and waits out a 429 rather than failing. The
@@ -681,6 +1199,17 @@ limit is correct behaviour and is not to be weakened for the suite's convenience
 
 | Date | Change |
 | --- | --- |
+| 2026-08-01 | **CR-5 second pass — the Booking Operations popup**, requested after the first review, then corrected within the same pass. The modal is now **six sections in the order the business specified**: booking information, passenger information, **quotation**, **airline references (editable)**, ticket documents, internal notes. **Assignment was already gone** — CR-2 removed it, and it stays removed. **The airline-references form was deleted and then restored by decision**: the cost of removing it was flagged at the time and the business ruled that Operations, which books the ticket externally, must be able to key back the PNR, ticket number and airline reference. A search confirmed those three inputs are the **only editable copy of those values anywhere in the product** before restoring them, so nothing is duplicated; for the same reason they are *not* also repeated read-only in section 1. **No endpoint moved in either direction.** **Passenger and booking data brought up to — and past — the Manager portal:** a field-for-field diff returned an empty missing-list, with **13 passenger fields to the Manager's 7**. Added `Submitted`, `Route`, `Alternate phone`, and three the Manager portal does not show: **preferred departure/return time** (the merchant picks these and *neither* portal displayed them — printed as stored 24-hour `HH:MM`, because a desk reading a different clock from the person who filled in the form is how "09:30" becomes an evening flight), the **booking amount** (this modal showed *no money at all* — its only figure was the fare input, which a quoted booking no longer renders), and the **quotation**, promoted to its own section so a quote that disagrees with the itinerary is visible to the last person who can catch it. Verified across **four real bookings** covering every branch — quoted+ticketed, quoted+priced, quoted-but-raised-at-zero, and pre-quotation — with the references **save round-trip driven for real** and the partial-update promise tested (a blank ticket-number box did not wipe the stored value). A wrapping label was dropping one input 16 px below its neighbours; fixed with `align-items:end` **scoped to `#opsWorkBody`**, because the Manager portal reuses `.ops-grid-3` for a form whose email field carries a hint *below* its input. No overflow at 1280/768/375, console clean. Suite re-run: **944 checks, 15/15, 0 failures — identical to the pre-change baseline**. **The binding quotation was explicitly reaffirmed by the business and left unchanged**; no wallet, finance or payment code was touched — the five files this pass edited are three frontend files and two documents. |
+| 2026-08-01 | **CR-5 built and verified** — the enquiry answer becomes a **binding quotation** (total fare + mandatory remarks; "Mark Available" → **Send Quotation**), plus the merchant-portal pass the business asked for: **Booking Enquiry** naming, *Departure & Arrival*, a **typeable** passenger count reconciled against the breakdown, a cabin-class dropdown, 24-hour time, *Find* → *Search*, and four tiles gone from the dashboard. **Three of the Booking Request items were already delivered by CR-1** and were verified rather than rebuilt; **the "remove Ticket Upload" item has no referent** — no such control exists in the merchant portal. **The quotation is binding by explicit business decision**, taken over the non-binding alternative after its effect on CR-4b was stated. **No line of `ticket_service.py` / `finance_service.py` / `wallet_service.py` was edited**: `_capture_fare_for_wallet_billing` already no-ops above zero and both credit gates already pass a non-zero amount, so the fare simply arrives earlier and the zero path stays live for pre-CR-5 bookings. **No migration** — the quotation lives in existing `travel_details` JSONB. **Five suite assertions encoded the old contract** and were rewritten, not coerced: `flows.make_booking` + two `verify_api.py` calls sent the now-refused bare `{available:true}`; `verify_cr2.py` required the amount still be `0` after manager approval; and `verify_cr4b.py`'s credit section both asserted the refusal must *not* name an amount (it must now) and could no longer construct the zero-amount booking it tests — rewritten to zero the row, which is exactly the population that rule guards, with a CR-5 check beside it proving the API can no longer create one. Two failures were **not** CR-5's: `verify_m4.py`'s wallet payment asserted against a drifting shared balance and now funds itself, and `verify_cr2.py`'s raw portal-login check now waits out the rate limit. **Six defects found by reading the screens rather than the API** — the ops desk stopped telling the operator what it was about to debit; Booking Request still promised a zero amount; My Requests hid the figure behind "Not payable here"; the stepper narrated the old lifecycle; a clamp warning outlived its cause; and `quoted_by` (a platform staff **user id**) would have reached a merchant response, closed the way the review claim already was. `tests/verify_cr5.py` — **81 checks**; suite **944 checks, 15/15, 0 failures**. Browser-verified end to end on both portals at 1280/768/375, console clean; **screenshots impossible** — the Browser pane is not displayed. Awaiting approval. |
 | 2026-07-30 | Created. Phases 1–3, M1, M2 recorded as complete & approved. M3–M10 planned. |
 | 2026-07-30 | M3 implemented and verified (128 checks); suite green at 317 checks. Awaiting approval. |
 | 2026-07-31 | M3 approved. CR-1 (documents removed from the Classic merchant workflow, expanded Admin review) implemented, verified and approved. `tests/verify_api.py` rewritten where it asserted the old mandatory-document rule; suite green at 332 checks, 7/7. M4 started. |
+| 2026-07-31 | **M4 audited, status corrected.** Was "Not started" with an unticked checklist; is in fact backend-complete (104 checks) with **no frontend at all** — `financePosition`/`financeStatement` and the admin per-merchant finance endpoints have zero callers, and `classic-payments.js` carries a docstring describing a ledger screen that was never built. Found 8 live float money computations, all frontend; the 20 backend `: float` money fields are all in unregistered dead routers and are out of scope. Revised plan covering only the remaining work recorded above. No code changed. |
+| 2026-07-31 | **CR-2 approved and locked.** §0 gained "Changing approved functionality": everything in §1 is frozen, a bug is the only unilateral edit, and any wanted behaviour change is a change request needing approval *before* the behaviour moves. Final regression 594 checks, 10/10. |
+| 2026-07-31 | CR-2 completion pass before approval: Super Admin can now create/edit/re-role Manager accounts from the UI, Manager notifications and profile added, modal focus trapping (`components/focus-trap.js`), Manager queue indexed (migration `0035`). Two accessibility defects found by measuring rather than asserting — missing `:focus-visible` on the Manager's tabs, and a `.badge.pending` contrast of 4.35:1 against AA's 4.5 (now 5.17:1). §3 checklist signed off for the first time. `tests/verify_cr2.py` 91 → 118 checks. |
+| 2026-07-31 | CR-2 (Manager approval step, Classic Tours payment bypass) implemented and verified — `tests/verify_cr2.py`, 91 checks. Two pre-existing M4 defects fixed in passing (dropped refund-settlement figures; credit limit refusing reductions). `flows.py` split into enquiry-led and catalog-led builders; 20 call sites across `verify_m2/m3/m4` moved to the catalog builder, and `verify_api.py`'s "reaches the approval queue" assertion rewritten to the new contract. Awaiting approval. |
+| 2026-08-01 | **CR-4b approved, completed and locked.** The completion pass against the approved scope found **two gaps that a green suite had hidden**. (1) *The credit-refusal message named 3 of the 5 figures the scope requires at one gate and 2 of 5 at the other*, so the same hard block read differently depending on which gate caught the merchant — the test asserted only `"credit limit" in text and "wallet" in text`, loose enough to pass the broken string. Both gates now share `wallet_service.credit_refusal_message`; every figure is asserted by name **and** value. (2) *`verify_cr4b.py` had **no concurrency section at all***, though the scope asked to "verify concurrent requests cannot create duplicate debits" — its sequential re-issue check never reaches the race. Six simultaneous issues returned **two 200s and three 500s**: `uq_wallet_transactions_booking_debit` kept the money exactly right (one debit, wallet moved once, every run) but the `IntegrityError` reached callers raw and two desks were told they had issued the same ticket. Cause predates CR-4b — **`ticket_service.issue_ticket` was never row-locked**, while `reprice` in the same file always was; CR-4b is what put money on the path. Fixed with `SELECT … FOR UPDATE` + `populate_existing=True`; losers now get an ordinary 400. Lock order **ServiceRequest → Merchant**, matching `change_request_service`. Verified over three consecutive runs, zero unhandled exceptions in the log. `verify_cr4b.py` **60 → 77 checks**; suite **773 checks, 13/13, 0 failures** — every other script's count identical to baseline, so the lock changed no existing behaviour. Browser-verified end to end: a real issue of **₹16,480.75** moved the wallet 37,500.00 → 21,019.25, paise intact, `balance_due` 0.00, no overflow at 1280/768/375, console clean. **This invoked CR-4a's "do not modify `wallet_service.py` unless a genuine bug is found" exception — schema, `post()`, `lock()` and the arithmetic untouched; migration 0036 not reopened.** CR-4c not started. |
+| 2026-08-01 | **CR-4a approved and locked**; `docs/WALLET_ARCHITECTURE.md` written as the authoritative reference for money movement, and linked from §0's conventions. **CR-4b built and verified.** Auto-debit at Ticket Issued (`finance_service.bill_booking_to_wallet`), credit limit as a hard block at submit *and* approve, refund credits on cancellation, typed credit notes. **The blocker found before writing any code: enquiry-led bookings carry no fare and no live path sets one** — `enquiry_service` creates them at 0, CR-2 closed `approve_request` to the track and CR-3's approval takes no amount, so **88 Manager-Approved bookings were sitting on the ops desk at ₹0** and an auto-debit would have billed nothing on every one. The fare is now captured at issuance by the desk that bought the ticket (`fare_amount`, required only where the amount is still 0). One UI field added — without it the desk could not issue a Classic ticket at all. `tests/verify_cr4b.py` — **60 checks**; `flows.make_booking` and `verify_cr2.py` rewritten where they asserted the pre-CR-4b contract (the flows builder had been producing ticketed bookings worth ₹0). Suite **756 checks, 13/13**. Awaiting approval; CR-4c not started. |
+| 2026-08-01 | **CR-4a built and verified** — migration `0036_wallet_ledger` (constraint dropped, `wallet_transactions` / `wallet_topups` / `payment_accounts` created, 72 historical movements backfilled with zero discrepancy, **down and up both exercised**), `services/wallet_service.py` as the single row-locked write path, and the transitional dual-write in `adjust_wallet` that keeps every M4 read surface byte-identical. **Two defects found by running the concurrency section, not by reading the code:** `SELECT FOR UPDATE` was returning the session's *stale* identity-map instance so only 4 of 8 concurrent movements reached the balance (`populate_existing`), and `created_at` — being transaction-*start* time — could order a statement against the sequence in which the balance actually moved (ledger now ordered by `txn_id`). Also found: `verify_m4.py`'s "debit past zero is refused" had silently stopped testing anything once the seeded wallet grew past the ₹999,999 it tried to overdraw. `tests/verify_cr4a.py` — **51 checks**; suite **696 checks, 12/12**. Awaiting approval; CR-4b not started. |
+| 2026-08-01 | **CR-4 proposed** — merchant wallet & transaction ledger replacing per-booking settlement for new enquiry-led bookings. Written up in `docs/CR-4_MERCHANT_WALLET.md` against the code: the wallet already exists but is **constrained non-negative**, its ledger is improvised inside `payments.discount_meta`, `request_documents.request_id` is NOT NULL so a recharge screenshot has nowhere to live, admin payment accounts (bank/UPI/QR) do not exist at all, and `adjust_wallet()` never row-locks the merchant. Three business decisions taken: debit at **Ticket Issued**, wallet-only for new enquiry-led bookings, credit limit is a **hard block**. Four gated sub-milestones planned. **No code changed.** |
+| 2026-07-31 | **M4's approved remaining work (A–E) built and verified.** The milestone was never a backend one: the merchant position + statement screen and the admin per-merchant position were wired to endpoints that had existed with **zero callers**, and ten client-side money calculations were deleted — including Operations' "Owed now", which summed one *capped* page and admitted in its own footnote that the true figure was higher. `shared/formatters.js` gained `moneyStr()`/`moneyIsPositive()`, which format the API's decimal **string** without parsing it; `money()` floated the value and dropped the paise (₹24,500.50 → ₹24,501) and is now used only for counts. `verify_m4.py` 104 → **125 checks**, asserting merchant and admin read an identical value for all eleven position fields. Suite **613 checks, 10/10**. The revised plan section retitled *approved and delivered*. M4 awaiting approval. |

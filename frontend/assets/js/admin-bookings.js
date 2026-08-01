@@ -345,3 +345,66 @@ function promptDialog({ title = 'Reason', message = '', placeholder = '', confir
     overlay.addEventListener('click', e => { if (e.target === overlay) done(null); });
   });
 }
+
+/* An amount-capturing dialog, for the two places a booking's fare is set: at
+   approval, and when correcting one that is already Payment Pending.
+
+   WHY APPROVE CANNOT STAY A ONE-CLICK BUTTON
+   Approval walks a booking to Payment Pending, and record_payment refuses an
+   amount of 0 — so approving without a fare produced a booking the merchant was
+   asked to pay and could not, with no way back (Payment Pending has no edge to
+   Approved). The server now refuses it; this is the half that lets an admin
+   supply the number instead of discovering the refusal.
+
+   Resolves to {amount, reason} or null. `reason` is free text: the note on an
+   approval, and the mandatory justification on a correction. */
+function admAmountDialog({
+  title = 'Amount', message = '', amountLabel = 'Amount (₹)', reasonLabel = 'Note',
+  reasonPlaceholder = '', value = '', confirmText = 'Confirm', requireReason = false,
+} = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.innerHTML = `
+      <div class="modal-card" style="max-width:440px;">
+        <h2>${escapeHtml(title)}</h2>
+        ${message ? `<p style="font-size:13.5px;color:var(--text-muted);margin:-6px 0 10px;">${escapeHtml(message)}</p>` : ''}
+        <div class="form-field" style="max-width:none;">
+          <label for="admAmountInput">${escapeHtml(amountLabel)}</label>
+          <input type="number" id="admAmountInput" min="0.01" step="0.01" value="${escapeHtml(String(value))}">
+        </div>
+        <div class="form-field" style="max-width:none;">
+          <label for="admAmountReason">${escapeHtml(reasonLabel)}${requireReason ? ' *' : ''}</label>
+          <input type="text" id="admAmountReason" maxlength="500" placeholder="${escapeHtml(reasonPlaceholder)}">
+        </div>
+        <div class="msg" data-amount-msg></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-coral" data-amount-ok>${escapeHtml(confirmText)}</button>
+          <button type="button" class="btn btn-ghost" data-amount-cancel>Cancel</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const amountInput = overlay.querySelector('#admAmountInput');
+    const reasonInput = overlay.querySelector('#admAmountReason');
+    const msg = overlay.querySelector('[data-amount-msg]');
+    const done = result => { overlay.remove(); resolve(result); };
+    const fail = (text, el) => { msg.textContent = text; msg.className = 'msg error'; el.focus(); };
+    amountInput.focus();
+    amountInput.select();
+
+    overlay.querySelector('[data-amount-ok]').addEventListener('click', () => {
+      const amount = Number(amountInput.value);
+      /* Mirrors the server's own rule rather than guessing at it: the API
+         refuses <= 0, so refusing here means the admin is told at the point of
+         typing instead of after a round trip. */
+      if (!amountInput.value.trim() || !Number.isFinite(amount) || amount <= 0) {
+        return fail('Enter an amount greater than zero.', amountInput);
+      }
+      const reason = reasonInput.value.trim();
+      if (requireReason && !reason) return fail('A reason is required.', reasonInput);
+      done({ amount, reason: reason || null });
+    });
+    overlay.querySelector('[data-amount-cancel]').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(null); });
+  });
+}
