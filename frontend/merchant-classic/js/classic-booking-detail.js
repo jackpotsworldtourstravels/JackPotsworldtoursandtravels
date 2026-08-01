@@ -106,8 +106,11 @@ function clRenderBookingDetail() {
              <div class="cl-kpi-value">Not required</div>
              <div class="cl-kpi-sub">Settled directly with our team</div></div>`
         : `<div class="cl-kpi"><div class="cl-kpi-label">Amount</div>
-             <div class="cl-kpi-value">${r.total_amount && Number(r.total_amount) > 0
-               ? escapeHtml(money(r.total_amount)) : 'Awaiting amount'}</div>
+             <!-- moneyStr, not money(): the amount is a decimal string and
+                  money() rounds it through a float, so ₹60,000.50 rendered as
+                  ₹60,001 on the one screen showing what this booking cost. -->
+             <div class="cl-kpi-value">${moneyIsPositive(r.total_amount)
+               ? escapeHtml(moneyStr(r.total_amount)) : 'Awaiting amount'}</div>
              <div class="cl-kpi-sub">${d.enquiry_reference
                ? 'Confirmed by our team at approval' : ''}</div></div>`}
       <div class="cl-kpi"><div class="cl-kpi-label">Travellers</div>
@@ -186,7 +189,61 @@ function clRenderBookingDetail() {
       <div class="cl-panel-body" id="clBdTickets">
         <span class="cl-spin"></span> Loading your tickets…
       </div>
+    </div>
+
+    <!-- M7. The two PDFs M2 built and no portal ever offered. The ticket-issued
+         notification has been telling merchants "you can now download the ticket
+         and invoice" since CR-4b, while the invoice had no button anywhere in the
+         product. Gated to the same statuses the server gates them to, so the page
+         never offers a download that would come back 409. -->
+    <div class="cl-panel">
+      <div class="cl-panel-head"><h2>Paperwork</h2></div>
+      <div class="cl-panel-body">
+        <p class="cl-kpi-sub" style="margin:0 0 12px;">
+          Generated fresh each time from this booking and its payments — a refund recorded a
+          moment ago is already in the invoice.
+        </p>
+        <div class="cl-page-actions" style="justify-content:flex-start;">
+          <button type="button" class="cl-btn cl-btn-primary" id="clBdInvoice">Download invoice</button>
+          <button type="button" class="cl-btn" id="clBdConfirmation">Download booking confirmation</button>
+        </div>
+        <div class="cl-panel-note" style="margin-top:12px;">
+          The booking confirmation is a readable summary of your itinerary. It is
+          <b>not an e-ticket</b> — the airline's own ticket is in Ticket documents above.
+        </div>
+        <div class="cl-msg" id="clBdPaperMsg"></div>
+      </div>
     </div>` : ''}
+
+    ${(data.payments || []).length ? `
+    <div class="cl-panel">
+      <div class="cl-panel-head"><h2>Payments</h2></div>
+      <div class="cl-table-wrap">
+        <table class="cl-table">
+          <thead><tr><th>Reference</th><th>Method</th><th class="cl-num">Amount</th>
+            <th>Status</th><th>Date</th></tr></thead>
+          <tbody>${data.payments.map(p => `
+            <tr>
+              <td class="cl-ref">${escapeHtml(p.transaction_id || '—')}</td>
+              <td>${escapeHtml(clLabel(p.method || p.payment_method || '—'))}</td>
+              <td class="cl-num">${escapeHtml(moneyStr(p.amount))}</td>
+              <td>${clTag(p.status)}</td>
+              <td class="cl-nowrap">${escapeHtml(fmtDateTime(p.paid_date || p.created_at))}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="cl-panel-note">
+        What this booking has been charged and paid. Your account-wide position — balance due,
+        wallet and statement — is on <b>Payments</b>.
+      </div>
+    </div>` : ''}
+
+    <!-- Cancellations, date changes and ancillaries raised against THIS booking.
+         Its own call: /api/requests/{id} describes the booking, and a child
+         request is a different row with its own lifecycle. Rendered even when
+         empty is pointless, so the panel is inserted by the loader below only
+         when there is something in it. -->
+    <div id="clBdChangesHost"></div>
 
     <div class="cl-panel">
       <div class="cl-panel-head"><h2>Timeline</h2></div>
@@ -223,7 +280,112 @@ function clRenderBookingDetail() {
     }
   });
 
-  if (ticketsReady) clLoadTicketDocuments(r.id);
+  if (ticketsReady) {
+    clLoadTicketDocuments(r.id);
+    $('clBdInvoice').addEventListener('click', () =>
+      clDownloadPaperwork('invoice', r.id, `invoice-${r.request_number}.pdf`));
+    $('clBdConfirmation').addEventListener('click', () =>
+      clDownloadPaperwork('confirmation', r.id, `confirmation-${r.request_number}.pdf`));
+  }
+  clLoadBookingChangeRequests(r.id);
+}
+
+/* M7. Both PDFs come down the same way, so they share one handler: fetch the
+   blob with the bearer token (an <a href> would send none), hand it to a
+   temporary object URL, and revoke on the next tick — revoking synchronously
+   cancels the download in some browsers before they have read it. */
+async function clDownloadPaperwork(kind, requestId, filename) {
+  const btn = kind === 'invoice' ? $('clBdInvoice') : $('clBdConfirmation');
+  const msg = $('clBdPaperMsg');
+  const label = kind === 'invoice' ? 'invoice' : 'booking confirmation';
+  btn.disabled = true;
+  clMsg(msg, `Preparing your ${label}…`, 'muted');
+  try {
+    const blob = kind === 'invoice'
+      ? await MerchantApi.downloadInvoice(requestId)
+      : await MerchantApi.downloadConfirmation(requestId);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    clMsg(msg, `Your ${label} has been downloaded.`, 'ok');
+  } catch (err) {
+    clMsg(msg, clError(err, `Could not download your ${label}.`), 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* Every cancellation, date change or ancillary raised against this booking.
+   M7 asks for them on the booking, and until now the only way to see that a
+   booking had a cancellation in flight was to find the row on another screen.
+
+   The panel is only inserted when there is something to show — an empty
+   "Change requests: none" section on every booking is noise on the majority
+   that never have one. A failure is likewise silent here: this is context on a
+   page that has already rendered, not the page itself. */
+async function clLoadBookingChangeRequests(bookingId) {
+  const host = $('clBdChangesHost');
+  if (!host) return;
+  let rows = [];
+  try {
+    const data = await MerchantApi.bookingChangeRequests(bookingId);
+    rows = Array.isArray(data) ? data : (data.items || []);
+  } catch {
+    return;
+  }
+  if (!rows.length) return;
+
+  host.innerHTML = `
+    <div class="cl-panel">
+      <div class="cl-panel-head">
+        <h2>Change requests against this booking</h2>
+        <span class="cl-kpi-sub">${rows.length} raised</span>
+      </div>
+      <div class="cl-table-wrap">
+        <table class="cl-table">
+          <thead><tr><th>Request no.</th><th>Type</th><th>Status</th>
+            <th class="cl-num">Amount</th><th>Raised</th></tr></thead>
+          <!-- The field is change_type, not request_type: this endpoint returns
+               ChangeRequestItem, which renames it and ships its own
+               change_type_label. Reading request_type here rendered a dash on
+               every row. (No backticks in this comment - it lives inside a
+               template literal.) -->
+          <tbody>${rows.map(cr => `
+            <tr>
+              <td class="cl-ref">${escapeHtml(cr.request_number || '—')}</td>
+              <td class="cl-nowrap">${escapeHtml(
+                cr.change_type_label || clLabel(cr.change_type || '—'))}</td>
+              <td>${clTag(cr.status, cr.status_label)}</td>
+              <td class="cl-num">${clChangeAmount(cr)}</td>
+              <td class="cl-nowrap">${escapeHtml(fmtDate(cr.created_at))}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div class="cl-panel-note">
+        Raised from <b>Service Requests</b>. A cancellation's amount is the refund due back to
+        you; a date change's is what the move costs.
+      </div>
+    </div>`;
+}
+
+/* The same column means opposite things by type, so it is never left bare —
+   this is the `clRequestAmount` rule from My Requests, applied to the two
+   fields a change request actually carries. */
+function clChangeAmount(cr) {
+  const pricing = cr.pricing || {};
+  if (cr.change_type === 'cancellation' && moneyIsPositive(pricing.refund_amount)) {
+    return `${escapeHtml(moneyStr(pricing.refund_amount))}<div class="cl-kpi-sub">refund due</div>`;
+  }
+  if (cr.change_type === 'date_change' && moneyIsPositive(pricing.total_payable)) {
+    return `${escapeHtml(moneyStr(pricing.total_payable))}<div class="cl-kpi-sub">payable</div>`;
+  }
+  /* `amount`, not `total_amount` — the other name this schema gives a field. */
+  return moneyIsPositive(cr.amount) ? escapeHtml(moneyStr(cr.amount)) : '—';
 }
 
 /* The issued paperwork, fetched only once the booking is actually ticketed.

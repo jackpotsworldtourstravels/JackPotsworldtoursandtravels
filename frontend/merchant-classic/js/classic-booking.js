@@ -628,8 +628,13 @@ async function clSubmitBookingRequest(finalize) {
 
     /* Every counter and list that just changed, including the enquiry listing —
        its row now shows the booking instead of Request Ticket. */
-    clInvalidate('dashboard', 'enquiry', 'requests', 'payments', 'service-request', 'reports');
-    clSearchCache = null;
+    /* `booking-history` is in the list because a booking raised today can be
+       cancelled today, and the archive would otherwise still be showing the
+       page it rendered before that happened. The old `clSearchCache = null`
+       that used to sit here went with the topbar's search box — there is no
+       client-side row cache left to invalidate. */
+    clInvalidate('dashboard', 'enquiry', 'requests', 'booking-history',
+      'payments', 'service-request', 'reports');
     clLoadUnreadCount();
   } catch (err) {
     console.error('Booking request went through, but this screen could not be updated', err);

@@ -23,7 +23,7 @@ function saReportRow(m) {
       <td>${saStatusBadge(m.status)}</td>
       <td>${m.total_requests}</td>
       <td>${m.completed_requests}</td>
-      <td>${money(m.total_revenue)}</td>
+      <td>${moneyStr(m.total_revenue)}</td>
       <td>${m.user_count}</td>
     </tr>`;
 }
@@ -38,14 +38,18 @@ async function loadSaReports() {
                                      { headers: saAuthHeaders() });
     const rows = data.merchants;
 
-    /* The endpoint returns one bounded row per merchant and deliberately no
-       totals row — the frontend sums whatever columns it wants. */
-    const sum = key => rows.reduce((acc, r) => acc + Number(r[key] || 0), 0);
+    /* M6: the totals arrive with the rows. They used to be summed here with
+       `Number()` — the last client-side money sum left after M4 removed ten of
+       them — which turns a Decimal into a float and drops the paise, so a
+       platform revenue figure of ₹4,17,71,278.75 rendered as ...279. The server
+       adds them in `Decimal` and sends the result as a string; `moneyStr`
+       renders that string without parsing it. */
+    const t = data.totals;
     grid.innerHTML = [
-      saDashCard(SA_REPORT_ICONS.merchants, 'gold', rows.length, 'Merchants Reporting'),
-      saDashCard(SA_REPORT_ICONS.requests, 'sky', sum('total_requests'), 'Total Requests'),
-      saDashCard(SA_REPORT_ICONS.completed, 'emerald', sum('completed_requests'), 'Completed'),
-      saDashCard(SA_REPORT_ICONS.revenue, 'coral', money(sum('total_revenue')), 'Total Revenue'),
+      saDashCard(SA_REPORT_ICONS.merchants, 'gold', t.merchants, 'Merchants Reporting'),
+      saDashCard(SA_REPORT_ICONS.requests, 'sky', t.total_requests, 'Total Requests'),
+      saDashCard(SA_REPORT_ICONS.completed, 'emerald', t.completed_requests, 'Completed'),
+      saDashCard(SA_REPORT_ICONS.revenue, 'coral', moneyStr(t.total_revenue), 'Total Revenue'),
     ].join('');
 
     tbody.innerHTML = rows.length

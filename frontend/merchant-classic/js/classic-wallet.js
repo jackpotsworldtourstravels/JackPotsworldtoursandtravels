@@ -66,8 +66,13 @@ function clInitWallet() {
         <p>Your running account with us. Tickets are charged to it when they are
            issued; add money any time to settle what is owed.</p>
       </div>
-      <div>
-        <button type="button" class="cl-btn cl-btn-primary" id="clWalletAddBtn">Add money</button>
+      <div class="cl-page-actions">
+        <button type="button" class="cl-btn" id="clWalletRefresh">
+          ${clIco('refresh', { size: 15 })} Refresh
+        </button>
+        <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clWalletAddBtn">
+          ${clIco('plus', { size: 16 })} Add money
+        </button>
       </div>
     </div>
 
@@ -142,13 +147,13 @@ function clInitWallet() {
     </div>
 
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>How your account works</h2></div>
+      <div class="cl-panel-head"><h2>${clIco('info')}How your account works</h2></div>
       <div class="cl-panel-body">
-        <ol style="margin:0;padding-left:17px;font-size:12.5px;color:var(--cl-ink-soft);line-height:1.7;">
+        <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--cl-text-2);line-height:1.85;">
           <li>You book as usual. Nothing is charged while a booking is being arranged.</li>
           <li>When we issue the ticket, its fare is <b>debited from this wallet</b>.</li>
-          <li>The balance may go <b>negative</b> — that is simply what you owe, and you
-              can keep booking up to your credit limit.</li>
+          <li>The balance may go <b>negative</b> — that is simply what you owe. You can keep
+              booking while it is, within whatever headroom your account carries.</li>
           <li>Add money any time. We verify the transfer before it is credited, so a
               submission shows as <b>awaiting verification</b> until then.</li>
         </ol>
@@ -156,6 +161,9 @@ function clInitWallet() {
     </div>`;
 
   $('clWalletAddBtn').addEventListener('click', () => clOpenAddMoney());
+  $('clWalletRefresh').addEventListener('click', () => {
+    clLoadWalletSummary(); clLoadTopups(); clLoadWalletLedger();
+  });
   $('clTopupRefresh').addEventListener('click', () => clLoadTopups());
   $('clWalletApply').addEventListener('click', () => {
     clWalletState.dateFrom = $('clWalletFrom').value;
@@ -192,31 +200,57 @@ async function clLoadWalletSummary() {
        two cannot disagree about whether anything is owed. */
     const owes = moneyIsPositive(w.outstanding);
 
-    const tiles = [
-      owes
-        ? ['Outstanding', moneyStr(w.outstanding), 'owed on your account']
-        : ['Wallet balance', moneyStr(w.balance), 'available on account'],
-      ['Total added', moneyStr(w.total_credits), 'credited to date'],
-      ['Total booked', moneyStr(w.total_debits), 'charged to date'],
-    ];
+    /* THE HERO IS ONE NUMBER, because the wallet answers one question: how do I
+       stand. Everything else on this screen explains how it got there.
 
+       The redesign removed the credit tiles that used to close this strip —
+       credit limit, credit available and "of a X limit". A merchant reading a
+       ceiling next to a balance reads it as money, and now that the wallet is
+       the only finance surface in the portal it has to state one position
+       without a second, softer number beside it. The `has_credit_limit`,
+       `credit_available` and `credit_limit` fields still arrive in this payload
+       and are still what the server gates a booking on — nothing about the
+       business rule changed, only what this screen puts on the glass. */
+    box.innerHTML = `
+      <div class="cl-balance" style="grid-column:1/-1;">
+        <div class="cl-balance-row">
+          <div>
+            <div class="cl-balance-label">${owes ? 'Outstanding balance' : 'Wallet balance'}</div>
+            <div class="cl-balance-value">${escapeHtml(moneyStr(owes ? w.outstanding : w.balance))}</div>
+            <div class="cl-balance-sub">${owes
+              ? 'Owed on your account — add money to settle it'
+              : 'Available to spend on ticketing'}</div>
+          </div>
+          <div class="cl-balance-side">
+            <div>
+              <div class="cl-balance-label">Total added</div>
+              <b>${escapeHtml(moneyStr(w.total_credits))}</b>
+            </div>
+            <div>
+              <div class="cl-balance-label">Total booked</div>
+              <b>${escapeHtml(moneyStr(w.total_debits))}</b>
+            </div>
+            ${w.pending_topup_count > 0 ? `<div>
+              <div class="cl-balance-label">Awaiting verification</div>
+              <b>${escapeHtml(moneyStr(w.pending_topups))}</b>
+            </div>` : ''}
+          </div>
+        </div>
+      </div>`;
+
+    /* Two supporting tiles, and only ones that are facts about movement rather
+       than second opinions about the balance. */
+    const tiles = [];
     if (w.pending_topup_count > 0) {
       /* Its own tile, never folded into the balance — see rule 2 at the top. */
       tiles.push(['Awaiting verification', moneyStr(w.pending_topups),
                   `${w.pending_topup_count} submission${w.pending_topup_count === 1 ? '' : 's'} being checked`]);
     }
-
-    tiles.push(w.has_credit_limit
-      ? ['Credit available', moneyStr(w.credit_available),
-         `of a ${moneyStr(w.credit_limit)} limit`]
-      : ['Credit limit', 'Not set', 'no standing credit on this account']);
-
     if (w.transaction_count > 0 && w.last_transaction_at) {
       tiles.push(['Last movement', fmtDate(w.last_transaction_at),
                   `${w.transaction_count} transaction${w.transaction_count === 1 ? '' : 's'} in total`]);
     }
-
-    box.innerHTML = tiles.map(([label, value, sub]) => `
+    box.innerHTML += tiles.map(([label, value, sub]) => `
       <div class="cl-kpi">
         <div class="cl-kpi-label">${escapeHtml(label)}</div>
         <div class="cl-kpi-value">${escapeHtml(value)}</div>
@@ -226,17 +260,19 @@ async function clLoadWalletSummary() {
     /* The warning states the server's own conclusion (`is_over_limit`,
        `is_low_balance`) rather than re-deriving a threshold here. A screen with
        its own idea of "low" is a screen that eventually disagrees with the gate
-       that actually blocks the booking. */
+       that actually blocks the booking.
+
+       The figures were taken out of the wording with the credit tiles; what a
+       merchant has to ACT on is unchanged and is still said plainly — bookings
+       will be declined, and adding money is what fixes it. */
     if (w.is_over_limit) {
       clMsg(alert,
-        `You have reached your credit limit of ${moneyStr(w.credit_limit)}. `
-        + 'New bookings will be declined until you add money to the wallet, '
-        + 'or ask us to raise the limit.', 'err');
+        'Your account has reached its booking limit. New bookings will be declined until '
+        + 'you add money to the wallet — or ask the partner desk to review the limit.', 'err');
     } else if (w.is_low_balance) {
       clMsg(alert,
-        `Only ${moneyStr(w.credit_available)} of credit remains against your `
-        + `${moneyStr(w.credit_limit)} limit. Add money soon to avoid bookings being declined.`,
-        'warn');
+        'Your account is close to its booking limit. Add money soon to avoid new bookings '
+        + 'being declined.', 'warn');
     } else {
       clMsg(alert, '');
     }

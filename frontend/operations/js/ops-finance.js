@@ -400,12 +400,24 @@ async function opsMerchantPaymentHistory(host) {
     });
     rows.sort((a, b) => new Date(b.paid_date || 0) - new Date(a.paid_date || 0));
 
-    /* Invoice download and proof upload are both in the brief and neither has
-       a route: nothing on the server generates a PDF invoice, and the pay
-       endpoint takes a JSON body (amount, method, transaction id) with no file
-       field. Rendered per row, disabled, reason on hover. */
-    const INVOICE_WHY = 'Invoice generation not yet available — no endpoint produces an invoice document.';
+    /* M7: Invoice is live. `GET /api/requests/{id}/invoice` has existed since
+       M2 and no portal called it — this row rendered a disabled button whose
+       tooltip asserted the endpoint did not exist, which stopped being true two
+       milestones ago. It is gated server-side to ticketed/completed bookings,
+       so the button is enabled on exactly those and explains itself otherwise
+       rather than returning a 409 to a click.
+
+       Proof upload still has no route: the pay endpoint takes a JSON body
+       (amount, method, transaction id) with no file field. Still disabled,
+       still says why. */
+    const INVOICE_EARLY = 'An invoice exists once the ticket is issued — that is when its number is allocated.';
     const PROOF_WHY = 'Proof upload is not yet supported — the payment endpoint accepts a transaction reference, not a file.';
+    const INVOICEABLE = ['ticket_issued', 'completed'];
+    const invoiceableIds = new Set(
+      details.filter(Boolean)
+        .filter(({ r }) => INVOICEABLE.includes(r.status))
+        .map(({ r }) => r.id)
+    );
 
     const paint = () => {
       const want = $('opsMphStatus').value;
@@ -430,7 +442,12 @@ async function opsMerchantPaymentHistory(host) {
             <td class="ops-nowrap">${escapeHtml(p.paid_date ? fmtDateTime(p.paid_date) : '—')}</td>
             <td class="ops-actions">
               <button type="button" class="ops-btn ops-btn-sm" data-ops-mph="${p.request_id}">Open</button>
-              <button type="button" class="ops-btn ops-btn-sm" disabled title="${escapeHtml(INVOICE_WHY)}">Invoice</button>
+              ${invoiceableIds.has(p.request_id)
+                ? `<button type="button" class="ops-btn ops-btn-sm"
+                     data-ops-invoice="${p.request_id}"
+                     data-ops-invoice-ref="${escapeHtml(p.request_number)}">Invoice</button>`
+                : `<button type="button" class="ops-btn ops-btn-sm" disabled
+                     title="${escapeHtml(INVOICE_EARLY)}">Invoice</button>`}
               <button type="button" class="ops-btn ops-btn-sm" disabled title="${escapeHtml(PROOF_WHY)}">Proof</button>
             </td>
           </tr>`).join('')}</tbody>
@@ -439,12 +456,40 @@ async function opsMerchantPaymentHistory(host) {
 
       opsAll('[data-ops-mph]', host).forEach(b =>
         b.addEventListener('click', () => opsOpenRequest(b.dataset.opsMph)));
+      opsAll('[data-ops-invoice]', host).forEach(b =>
+        b.addEventListener('click', () => opsDownloadInvoice(b)));
     };
 
     $('opsMphStatus').addEventListener('change', paint);
     paint();
   } catch (err) {
     $('opsMphBody').innerHTML = `<div class="ops-empty">${escapeHtml(opsError(err, 'Could not assemble your payment history.'))}</div>`;
+  }
+}
+
+/* M7. Authenticated, so a plain <a href> cannot fetch it — no Authorization
+   header would go with the navigation. The blob is pulled with the token and
+   handed to a temporary object URL, revoked on the next tick because revoking
+   synchronously cancels the download in some browsers. */
+async function opsDownloadInvoice(btn) {
+  const requestId = btn.dataset.opsInvoice;
+  const reference = btn.dataset.opsInvoiceRef || requestId;
+  btn.disabled = true;
+  try {
+    const blob = await OpsApi.downloadInvoice(requestId);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${reference}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    opsToast(`Invoice for ${reference} downloaded.`);
+  } catch (err) {
+    opsToast(opsError(err, 'Could not download that invoice.'), true);
+  } finally {
+    btn.disabled = false;
   }
 }
 

@@ -8,6 +8,8 @@ is still meaningful if the account is later deleted (``user_id`` is
 ``ON DELETE SET NULL``).
 """
 from fastapi import HTTPException, status
+import logging
+
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -29,6 +31,41 @@ def _notification_filter():
     return MsgLog.message_type == MessageType.NOTIFICATION
 
 
+def _deliver(recipients, db: Session, title: str, message: str, *,
+             merchant_id: int | None = None, request=None, event: str | None = None):
+    """Hand off to M5's delivery layer, which owns channels and logging.
+
+    Imported inside the function, not at module scope: ``delivery_service``
+    reaches ``email_service`` and the templates, and a top-level import here
+    would put that whole chain behind every module that only wants to write a
+    notification.
+
+    **Delivery never breaks the thing that triggered it.** A mail server being
+    unreachable must not roll back the ticket that was just issued, so anything
+    escaping the delivery layer is logged and swallowed — the in-app row is
+    written first inside ``deliver`` and is what the portals read.
+    """
+    from app.services import delivery_service
+
+    try:
+        return delivery_service.deliver(
+            db, recipients, title, message,
+            merchant_id=merchant_id, request=request, event=event,
+        )
+    except Exception:                              # noqa: BLE001 — see docstring
+        logging.getLogger("jackpots.delivery").exception(
+            "Delivery failed for %r; the triggering action is unaffected.", title
+        )
+        db.rollback()
+        # Fall back to the pre-M5 behaviour so the notification itself is never
+        # lost because email was the thing that broke.
+        for entry in recipients:
+            db.add(_new(entry[0], entry[1], title, message,
+                        entry[2] if len(entry) > 2 else merchant_id))
+        db.commit()
+        return {"in_app": len(list(recipients)), "emailed": 0, "failed": 0, "suppressed": 0}
+
+
 def _new(user_id: int, recipient: str, title: str, message: str, merchant_id: int | None = None) -> MsgLog:
     return MsgLog(
         user_id=user_id,
@@ -47,20 +84,31 @@ def create_notification(db: Session, user_id: int, title: str, message: str) -> 
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    notification = _new(user_id, user.email, title, message, user.merchant_id)
-    db.add(notification)
-    db.commit()
-    db.refresh(notification)
-    return notification
+    # M5 routes this through delivery_service so the same event reaches the
+    # merchant by email too, when that merchant still has email switched on.
+    # The in-app row is returned as before, so every existing caller is
+    # unaffected — including the ones that read its id.
+    before = db.query(MsgLog.message_id).order_by(MsgLog.message_id.desc()).limit(1).scalar()
+    _deliver([(user_id, user.email, user.merchant_id)], db, title, message,
+             merchant_id=user.merchant_id)
+    notification = db.scalars(
+        select(MsgLog).where(
+            MsgLog.user_id == user_id,
+            _notification_filter(),
+            MsgLog.message_id > (before or 0),
+        ).order_by(MsgLog.message_id.desc()).limit(1)
+    ).first()
+    return notification or _new(user_id, user.email, title, message, user.merchant_id)
 
 
 def notify_admins(db: Session, title: str, message: str) -> int:
     """Admins are ordinary ``users`` rows, so their existing
     GET /api/notifications already surfaces these — no extra endpoint."""
     admins = db.execute(select(User.user_id, User.email).where(User.role.in_(_ADMIN_ROLES))).all()
-    for admin_id, email in admins:
-        db.add(_new(admin_id, email, title, message))
-    db.commit()
+    # M5: staff carry no merchant, so delivery_service never opts them out — a
+    # merchant's communication preferences must not be able to silence the
+    # platform's own operational alerts.
+    _deliver([(uid, email, None) for uid, email in admins], db, title, message)
     return len(admins)
 
 
@@ -85,9 +133,8 @@ def notify_merchant_managers(db: Session, merchant_id: int | None, title: str, m
             )
         )
     ).all()
-    for user_id, email in managers:
-        db.add(_new(user_id, email, title, message, merchant_id))
-    db.commit()
+    _deliver([(uid, email, merchant_id) for uid, email in managers], db, title, message,
+             merchant_id=merchant_id)
     return len(managers)
 
 
@@ -104,9 +151,7 @@ def notify_managers(db: Session, title: str, message: str) -> int:
             and_(User.role == UserRole.MANAGER, User.status == UserStatus.ACTIVE)
         )
     ).all()
-    for manager_id, email in managers:
-        db.add(_new(manager_id, email, title, message))
-    db.commit()
+    _deliver([(uid, email, None) for uid, email in managers], db, title, message)
     return len(managers)
 
 

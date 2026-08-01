@@ -28,7 +28,11 @@ from app.schemas.auth import MessageResponse
 from app.schemas.audit import AuditLogEntry
 from app.schemas.dashboard import SuperAdminDashboardResponse
 from app.schemas.pagination import Page
-from app.schemas.reports_summary import GlobalSummaryResponse, MerchantSummaryRow
+from app.schemas.reports_summary import (
+    GlobalSummaryResponse,
+    GlobalSummaryTotals,
+    MerchantSummaryRow,
+)
 from app.schemas.system_info import SystemInfoResponse
 from app.services import (
     account_service,
@@ -356,8 +360,11 @@ def global_reports_summary(
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
-    rows = merchant_service.global_reports_summary(db)
-    return GlobalSummaryResponse(merchants=[MerchantSummaryRow(**r) for r in rows])
+    rows, totals = merchant_service.global_reports_summary(db)
+    return GlobalSummaryResponse(
+        merchants=[MerchantSummaryRow(**r) for r in rows],
+        totals=GlobalSummaryTotals(**totals),
+    )
 
 
 @router.get(

@@ -189,7 +189,7 @@ The verification script for any milestone touching money asserts all four:
 
 `tests/verify_cr4a.py` implements them; later scripts reuse it rather than rewriting it.
 
-## 8. Adding money: a claim, then a credit (CR-4c)
+## 8. Adding money: a claim, then a credit (CR-4c — approved and frozen 2026-08-01)
 
 **Submitting a top-up moves no money.** A merchant filling in an amount, a UTR and a screenshot is
 making a *claim*; the wallet is credited only when an admin verifies it (CR-4d), at which point
@@ -214,6 +214,37 @@ Consequences that every later surface must respect:
   magic-byte sniff and the streaming size cap exist in exactly one place. A payment screenshot gets
   what a passport scan gets. They cannot live in `request_documents` — its `request_id` is NOT NULL
   and a top-up belongs to no booking.
+
+## 8a. Crediting the claim, and the boundary that protects it (CR-4d)
+
+`services/payment_admin_service.verify_topup` is **the only code that credits a
+wallet from a top-up**, and it does it by calling `wallet_service.post` — no
+second arithmetic, no second balance write. Rejection moves nothing and frees
+the UTR (`uq_wallet_topups_utr` excludes rejected rows), so a mistyped reference
+can be corrected rather than locking a merchant out of its own transfer.
+
+**Both guards from §2.6 are present, and one of them is new:**
+`uq_wallet_transactions_topup` (migration 0037) makes a second credit for one
+claim impossible in the database; the row lock on the top-up plus a status
+re-check makes the loser of a race receive a 409 instead of an `IntegrityError`.
+Six simultaneous verifications were run: one 200, five 409s, one credit, no 500.
+**Lock order is top-up → merchant**, the same subject-row-first rule as
+`ServiceRequest → Merchant`.
+
+### The permission boundary — `payment.verify`, never `payment.view`
+
+**`payment.view` is held by every merchant role.** It is what lets a merchant
+read *its own* wallet in `wallet.py`, where the safety comes from the fact that
+**no route carries a merchant id**. Every staff route is platform-wide or takes
+somebody else's merchant id, so it must be gated on `payment.verify` or
+`payment.manage`, which only `_ADMIN` holds.
+
+This was got wrong first: the CR-4d router shipped its reads on `payment.view`,
+and `verify_cr4d.py` proved that any merchant could then read every other
+merchant's balance, credit limit, outstanding position and complete ledger.
+**Adding a staff endpoint to this module means asking which existing code the
+caller must hold that a merchant does not.** The test asserts it from a real
+merchant token, not by reading the decorator.
 
 ## 9. Transitional, and when it ends
 

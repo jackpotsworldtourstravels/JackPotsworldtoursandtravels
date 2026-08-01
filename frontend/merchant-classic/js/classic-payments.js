@@ -121,9 +121,9 @@ function clInitPayments() {
     </div>
 
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>How payment works</h2></div>
+      <div class="cl-panel-head"><h2>${clIco('info')}How payment works</h2></div>
       <div class="cl-panel-body">
-        <ol style="margin:0;padding-left:17px;font-size:12.5px;color:var(--cl-ink-soft);line-height:1.7;">
+        <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--cl-text-2);line-height:1.85;">
           <li>A request is approved by our team and moves to <b>Payment Pending</b>.</li>
           <li>You record the payment here with the amount, method and your transaction reference.</li>
           <li>The request stays in Payment Pending while we verify the transfer.</li>
@@ -153,26 +153,31 @@ async function clLoadFinance() {
   try {
     const p = await MerchantApi.financePosition();
 
+    /* CREDIT IS GONE FROM THIS STRIP.
+       It used to close with "Credit available" (or "Credit limit — Not set")
+       and "Spending power", which is wallet plus available credit. All three
+       were removed in the redesign: the wallet is now the portal's single
+       finance surface, and a second, larger number sitting beside the balance
+       is read as money the merchant has. `has_credit_limit`, `credit_used`,
+       `credit_available` and `spending_power` all still arrive in this payload
+       and are still what the server gates a booking on — nothing about the
+       business rule changed, only what this screen renders. */
     const tiles = [
-      ['Balance due', moneyStr(p.outstanding), `across ${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`],
-      ['Billed', moneyStr(p.billed), 'total raised to date'],
-      ['Paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified payments'],
-      ['Wallet', moneyStr(p.wallet_balance), 'available on account'],
+      ['Balance due', moneyStr(p.outstanding), `across ${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`, 'err'],
+      ['Billed', moneyStr(p.billed), 'total raised to date', ''],
+      ['Paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified payments', 'ok'],
+      ['Wallet', moneyStr(p.wallet_balance), 'available on account', 'accent'],
     ];
     if (moneyIsPositive(p.awaiting_verification)) {
       tiles.push(['Awaiting verification', moneyStr(p.awaiting_verification),
-                  'submitted, not yet confirmed']);
+                  'submitted, not yet confirmed', 'warn']);
     }
-    /* A credit limit is only meaningful next to what is left of it — showing the
-       ceiling alone is the misreading M4 exists to prevent. */
-    tiles.push(p.has_credit_limit
-      ? ['Credit available', moneyStr(p.credit_available),
-         `${moneyStr(p.credit_used)} used of ${moneyStr(p.credit_limit)}`]
-      : ['Credit limit', 'Not set', 'no standing credit on this account']);
-    tiles.push(['Spending power', moneyStr(p.spending_power), 'wallet plus available credit']);
 
-    box.innerHTML = tiles.map(([label, value, sub]) => `
+    const icons = { 'Balance due': 'receipt', Billed: 'file', Paid: 'checkCircle',
+      Wallet: 'wallet', 'Awaiting verification': 'clock' };
+    box.innerHTML = tiles.map(([label, value, sub, tone]) => `
       <div class="cl-kpi">
+        <div class="cl-kpi-head"><span class="cl-kpi-ico ${tone}">${clIco(icons[label] || 'receipt')}</span></div>
         <div class="cl-kpi-label">${escapeHtml(label)}</div>
         <div class="cl-kpi-value">${escapeHtml(value)}</div>
         <div class="cl-kpi-sub">${escapeHtml(sub)}</div>

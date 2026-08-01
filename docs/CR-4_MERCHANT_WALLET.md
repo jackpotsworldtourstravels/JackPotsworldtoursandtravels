@@ -7,8 +7,8 @@ sign-off before approved behaviour moves, and this change request moves several 
 | --- | --- |
 | **CR-4a — ledger foundation** | ✅ **Approved and locked** (2026-08-01). Architecture: `docs/WALLET_ARCHITECTURE.md` |
 | **CR-4b — the money moves** | ✅ **Approved, completed, verified and FROZEN** (2026-08-01) |
-| **CR-4c — merchant surfaces** | ⏳ **Built and verified, awaiting approval** (2026-08-01) |
-| CR-4d — admin surfaces | ⬜ Not started |
+| **CR-4c — merchant surfaces** | ✅ **Approved, verified and FROZEN** (2026-08-01) |
+| **CR-4d — admin surfaces** | ⏳ **Built and verified, awaiting approval** (2026-08-01) — completes the payment module |
 
 ---
 

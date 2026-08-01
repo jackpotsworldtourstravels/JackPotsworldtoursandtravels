@@ -64,7 +64,8 @@ document.getElementById('logoutBtn').addEventListener('click', async e => {
 /* ---------- Section navigation ---------- */
 const sectionTitles = {
   reports: 'Dashboard', users: 'Merchant Management', 'active-users': 'Active Users',
-  support: 'Support Management', 'reports-export': 'Reports', payments: 'Payment Management',
+  support: 'Support Management', 'reports-export': 'Reports', analytics: 'Analytics',
+  payments: 'Payment Management',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
   'ticket-enquiries': 'Ticket Enquiries',
   'booking-ops': 'Booking Operations',
@@ -99,6 +100,8 @@ function loadSection(name) {
   if (name === 'active-users') return loadActiveUsers();
   if (name === 'support') return loadSupportQueue();
   if (name === 'reports-export') return initReportsExport();
+  /* M6. Defined in admin-analytics.js, loaded after this file. */
+  if (name === 'analytics') return loadAnalytics();
   if (name === 'payments') return loadPayments();
   if (name === 'notifications') return initNotificationForm();
   if (name === 'partner-requests') return loadApprovalQueue();
@@ -1251,6 +1254,32 @@ function repAdminFilterParams() {
     date_to: document.getElementById('repAdminTo').value || undefined,
   };
 }
+/* M6. The table below shows one page; the export sends every matching row. That
+   difference used to be invisible — a desk saw 100 rows and downloaded 2,600 —
+   so the screen now states the size of the file it is offering, from
+   /api/reports/summary, which is built from the export's own row builders. */
+async function renderAdminReportSummary(type) {
+  const host = document.getElementById('repAdminSummary');
+  host.innerHTML = '';
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/reports/summary`, {
+      headers: authHeaders(), params: { type, ...repAdminFilterParams() },
+    });
+    const value = data.total_value === null ? '' :
+      ` · worth <b>${escapeHtml(moneyStr(data.total_value))}</b>`;
+    host.innerHTML = `<div class="rep-summary">
+      These filters match <b>${data.rows}</b> row${data.rows === 1 ? '' : 's'}${value}.
+      The table shows the first page; an export contains all ${data.rows}.
+      Dates filter on <b>${escapeHtml(data.date_field.replace('_', ' '))}</b>.
+      ${data.truncated ? `<em>At least ${data.row_cap} rows match — the export stops at that
+        limit, so narrow the range for a complete file.</em>` : ''}
+    </div>`;
+  } catch {
+    /* The table is the point of the screen; a missing header must not stop it. */
+    host.innerHTML = '<div class="rep-summary">Row totals are unavailable just now.</div>';
+  }
+}
+
 async function generateAdminReport() {
   const type = document.getElementById('repAdminType').value;
   const thead = document.querySelector('#repAdminTable thead');
@@ -1258,14 +1287,15 @@ async function generateAdminReport() {
   const cols = REP_ADMIN_COLUMNS[type];
   thead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
   tbody.innerHTML = `<tr><td colspan="${cols.length}">${rowsSkeleton(3)}</td></tr>`;
+  renderAdminReportSummary(type);
   try {
     if (type === 'payments') {
       const { data } = await axios.get(`${API_BASE}/api/admin/payments`, { headers: authHeaders(), params: { ...repAdminFilterParams(), page_size: 100 } });
-      tbody.innerHTML = data.items.map(p => `<tr><td>${escapeHtml(p.transaction_id || '—')}</td><td>—</td><td>${money(p.amount)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.paid_date ? fmtDate(p.paid_date) : '—'}</td></tr>`).join('')
+      tbody.innerHTML = data.items.map(p => `<tr><td>${escapeHtml(p.transaction_id || '—')}</td><td>—</td><td>${moneyStr(p.amount)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.paid_date ? fmtDate(p.paid_date) : '—'}</td></tr>`).join('')
         || `<tr><td colspan="5" class="empty-state">No results.</td></tr>`;
     } else if (type === 'bookings') {
       const { data } = await axios.get(`${API_BASE}/api/requests`, { headers: authHeaders(), params: { request_type: 'booking', ...repAdminFilterParams(), page_size: 100 } });
-      tbody.innerHTML = data.items.map(r => `<tr><td>${escapeHtml(r.booking_reference || '—')}</td><td>${escapeHtml(r.request_number)}</td><td>${r.passengers?.map(p => `${p.first_name} ${p.last_name}`).join(', ') || '—'}</td><td>${escapeHtml(r.merchant_name || '—')}</td><td>${money(r.total_amount)}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`).join('')
+      tbody.innerHTML = data.items.map(r => `<tr><td>${escapeHtml(r.booking_reference || '—')}</td><td>${escapeHtml(r.request_number)}</td><td>${r.passengers?.map(p => `${p.first_name} ${p.last_name}`).join(', ') || '—'}</td><td>${escapeHtml(r.merchant_name || '—')}</td><td>${moneyStr(r.total_amount)}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`).join('')
         || `<tr><td colspan="6" class="empty-state">No results.</td></tr>`;
     } else {
       const results = await Promise.all(SERVICE_REQUEST_TYPES.map(t => axios.get(`${API_BASE}/api/requests`, {
@@ -1367,7 +1397,7 @@ async function loadPayments(page = pvPage) {
       <tr>
         <td>${escapeHtml(p.transaction_id || '—')}</td>
         <td style="text-transform:capitalize">${escapeHtml(p.method || '—')}</td>
-        <td>${money(p.amount)}</td>
+        <td>${moneyStr(p.amount)}</td>
         <td>${escapeHtml(p.currency)}</td>
         <td><span class="badge ${p.status}">${escapeHtml(p.status.replace(/_/g, ' '))}</span></td>
         <td>${p.paid_date ? fmtDateTime(p.paid_date) : '—'}</td>

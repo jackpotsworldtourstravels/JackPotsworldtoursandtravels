@@ -2,47 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Merchant Portal (Classic) — JackPots World Tours &amp; Travels</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A2540">
+<meta name="description" content="JackPots World Tours &amp; Travels — merchant portal for booking enquiries, ticketing, wallet and settlement.">
+<title>Merchant Portal — JackPots World Tours &amp; Travels</title>
 <link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
 
 <!-- ===========================================================================
-     CLASSIC MERCHANT PORTAL — the enterprise/form alternative to the Premium
-     travel UI at ../merchant/index.html.
+     JACKPOTS MERCHANT PORTAL
 
-     Both frontends are powered by ONE backend. Nothing here duplicates an API,
-     a model or a business rule; every call goes through shared/merchant-api.js,
-     which is a faithful transcription of the endpoints the Premium screens use.
+     One backend, one frontend. Nothing here duplicates an API, a model or a
+     business rule; every call goes through shared/merchant-api.js, which is the
+     transcribed contract for the merchant-facing endpoints.
 
-     What is SHARED with Premium (loaded from ../assets and ../shared):
-       axios, formatters.js, auth.js, components/*  — and, crucially, the
-       partner_jwt_* localStorage session, so a merchant signed into one portal
-       is already signed into the other.
+     SHARED WITH THE OTHER PORTALS (from ../assets and ../shared):
+       axios, formatters.js, auth.js, travel-locations.js — and the
+       partner_jwt_* localStorage session.
 
-     What is NOT shared, by design:
-       CSS, layout, DOM ids, and every rendering function. This page loads none
-       of merchant-home.css / merchant-booking.css / partner-portal.css and none
-       of the partner-*.js screen files. Premium cannot restyle Classic and
-       Classic cannot break Premium.
+     NOT SHARED, BY DESIGN:
+       CSS, layout, DOM ids, and every rendering function. This page loads only
+       css/classic.css. The Admin Portal cannot restyle this one and this one
+       cannot restyle Admin.
 
-     LOOK AND FEEL: this portal is styled to match the Admin Portal at
-     ../admin/ — same Montserrat, navy gradient rail, coral accent, rounded
-     cards and light/dark theme. It does NOT load ../assets/css/admin.css;
-     css/classic.css holds its own copy of those tokens under `cl-` names, so
-     the two portals look alike without either being able to restyle the other.
+     DESIGN
+     css/classic.css is a self-contained design system — navy structure, a
+     single warm accent, white surfaces on a near-white canvas, Montserrat
+     throughout, light/dark/system. Every screen is built from the same panels,
+     tables, buttons and status badges, so nothing looks borrowed from another
+     product. See the header of that file for the token model.
+
+     ICONS are inline SVG stroked with `currentColor`: no icon font, no sprite
+     request, and they inherit the rail's active/hover colours for free.
      =========================================================================== -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260801merge">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/classic.css?v=20260801ux4">
 </head>
 <body>
 
-<!-- ============================== AUTH ============================== -->
+<!-- ================================ AUTH ================================ -->
 <!-- Same Email -> Password -> OTP order and the same /api/auth/* endpoints as
-     Premium (docs/API_CONTRACT.md §1). Same session keys, so signing in here
-     signs you into Premium too. -->
+     every other portal (docs/API_CONTRACT.md §1). Same session keys.
+
+     These four inputs are the portal's only floating labels, and deliberately
+     so: a sign-in card is short and high-ceremony, which is exactly where a
+     floating label helps. On a filter bar it would hide the field's meaning the
+     moment a value is in it. -->
 <div class="cl-auth" id="clAuth">
   <div class="cl-auth-box">
     <div class="cl-auth-brand">
@@ -51,38 +58,38 @@
     </div>
 
     <div class="cl-auth-step active" id="clAuthStep1">
-      <h1>Sign in</h1>
-      <p class="cl-auth-sub">Classic interface. Use your registered merchant credentials.</p>
+      <h1>Welcome back</h1>
+      <p class="cl-auth-sub">Sign in with your registered merchant credentials.</p>
       <div class="cl-form cl-form-2">
-        <div class="cl-field cl-field-full">
-          <label for="clEmail">Email address<span class="cl-req">*</span></label>
-          <input type="email" id="clEmail" autocomplete="username" placeholder="you@company.com">
+        <div class="cl-field cl-field-full cl-field-float">
+          <input type="email" id="clEmail" autocomplete="username" placeholder=" ">
+          <label for="clEmail">Email address</label>
         </div>
-        <div class="cl-field cl-field-full">
-          <label for="clPassword">Password<span class="cl-req">*</span></label>
-          <input type="password" id="clPassword" autocomplete="current-password">
+        <div class="cl-field cl-field-full cl-field-float">
+          <input type="password" id="clPassword" autocomplete="current-password" placeholder=" ">
+          <label for="clPassword">Password</label>
         </div>
       </div>
       <div class="cl-form-actions">
-        <button type="button" class="cl-btn cl-btn-primary" id="clLoginBtn">Sign in</button>
+        <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clLoginBtn">Sign in</button>
         <a href="../forgot-password.html">Forgot password?</a>
       </div>
       <div class="cl-msg" id="clAuthMsg1"></div>
     </div>
 
     <div class="cl-auth-step" id="clAuthStep2">
-      <h1>Verify OTP</h1>
+      <h1>Verify it&rsquo;s you</h1>
       <p class="cl-auth-sub" id="clOtpSub">Enter the 6-digit code sent to your email.</p>
       <div class="cl-form cl-form-2">
-        <div class="cl-field cl-field-full">
-          <label for="clOtp">One-time code<span class="cl-req">*</span></label>
-          <input type="text" id="clOtp" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+        <div class="cl-field cl-field-full cl-field-float">
+          <input type="text" id="clOtp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder=" ">
+          <label for="clOtp">One-time code</label>
         </div>
       </div>
       <div class="cl-form-actions">
-        <button type="button" class="cl-btn cl-btn-primary" id="clVerifyBtn">Verify</button>
+        <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clVerifyBtn">Verify &amp; continue</button>
         <button type="button" class="cl-btn" id="clResendBtn">Resend code</button>
-        <button type="button" class="cl-btn cl-btn-link" id="clBackBtn">Back</button>
+        <button type="button" class="cl-btn cl-btn-link" id="clBackBtn">Use a different email</button>
       </div>
       <div class="cl-msg" id="clAuthMsg2"></div>
     </div>
@@ -94,108 +101,216 @@
   </div>
 </div>
 
-<!-- ============================== APP =============================== -->
+<!-- ================================= APP ================================= -->
 <div class="cl-app" id="clApp">
 
+  <!-- ------------------------------- topbar ------------------------------
+       Seven things and no more: navigation toggle, where you are, today's
+       date, theme, notifications, who you are, and the way out. There is
+       deliberately no global search box — it duplicated the search on My
+       Requests and Booking History, which reach the server and can filter,
+       sort and page, while it could only ever offer twelve dropdown rows. -->
   <header class="cl-top">
-    <button type="button" class="cl-burger" id="clBurger" aria-label="Toggle navigation">☰</button>
-    <!-- No brand block here. The rail below already carries the JackPots logo,
-         and repeating the name on every page bought nothing but width. -->
+    <button type="button" class="cl-burger" id="clBurger" aria-label="Open navigation" aria-expanded="false" aria-controls="clSide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
 
-    <div class="cl-top-search">
-      <label class="cl-sr" for="clSearch">Search your requests</label>
-      <input type="search" id="clSearch" placeholder="Search request no., PNR, passenger…" autocomplete="off">
-      <div class="cl-gs" id="clSearchResults"></div>
+    <div class="cl-top-title">
+      <b id="clTopTitle">Dashboard</b>
+      <span id="clTopSub">Account overview</span>
     </div>
 
     <div class="cl-top-right">
-      <!-- Name, then the signed-in ROLE — not the company. Every user in this
-           portal belongs to one merchant, so the company name told them
-           nothing; which hat they are wearing decides what they may do. -->
-      <span class="cl-top-user"><b id="clUserName">—</b> · <span id="clUserRole">—</span></span>
+      <span class="cl-top-date" id="clDate" title="Today's business date">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span id="clDateText">—</span>
+      </span>
 
-      <!-- Same light / dark / system control the Admin Portal carries, with the
-           same three choices and the same persistence behaviour. -->
-      <div class="cl-theme" id="clTheme" role="group" aria-label="Theme">
-        <button type="button" class="cl-theme-btn" data-cl-theme="light" title="Light theme" aria-label="Light theme">☀</button>
-        <button type="button" class="cl-theme-btn" data-cl-theme="dark" title="Dark theme" aria-label="Dark theme">☾</button>
-        <button type="button" class="cl-theme-btn" data-cl-theme="system" title="Match system theme" aria-label="Match system theme">◐</button>
+      <div class="cl-theme" id="clTheme" role="group" aria-label="Colour theme">
+        <button type="button" class="cl-theme-btn" data-cl-theme="light" title="Light theme" aria-label="Light theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button type="button" class="cl-theme-btn" data-cl-theme="dark" title="Dark theme" aria-label="Dark theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <button type="button" class="cl-theme-btn" data-cl-theme="system" title="Match system theme" aria-label="Match system theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </button>
       </div>
 
-      <button type="button" class="cl-top-btn cl-bell" id="clBellBtn" aria-label="Notifications">
-        🔔<span class="cl-bell-count" id="clBellCount"></span>
+      <button type="button" class="cl-top-btn cl-top-icon cl-bell" id="clBellBtn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="cl-bell-count" id="clBellCount"></span>
       </button>
-      <!-- The "Premium view" switch was removed with the Premium portal: this
-           is now the merchant UI, and there is no second interface to switch
-           to. Restoring Premium means restoring this link too. -->
-      <button type="button" class="cl-top-btn" id="clSignOutBtn">Sign out</button>
+
+      <!-- Profile menu. Carries the identity, the company, the theme switch at
+           phone width (where the topbar's own is hidden), the link to Profile &
+           Settings, and Sign out. -->
+      <div class="cl-profile" id="clProfile">
+        <button type="button" class="cl-profile-btn" id="clProfileBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="clProfileMenu">
+          <span class="cl-avatar" id="clAvatar" aria-hidden="true">—</span>
+          <span class="cl-profile-id">
+            <b id="clUserName">—</b>
+            <span id="clUserRole">—</span>
+          </span>
+          <svg class="cl-profile-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+
+        <div class="cl-menu" id="clProfileMenu" role="menu" aria-labelledby="clProfileBtn">
+          <div class="cl-menu-head">
+            <span class="cl-avatar cl-avatar-lg" id="clMenuAvatar" aria-hidden="true">—</span>
+            <div>
+              <b id="clMenuName">—</b>
+              <span id="clMenuRole">—</span>
+              <span id="clMenuCompany"></span>
+            </div>
+          </div>
+          <button type="button" class="cl-menu-item" role="menuitem" data-cl-nav="profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile &amp; Settings
+          </button>
+          <button type="button" class="cl-menu-item" role="menuitem" data-cl-nav="support">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M4.9 4.9l4.2 4.2M14.9 14.9l4.2 4.2M14.9 9.1l4.2-4.2M4.9 19.1l4.2-4.2"/></svg>
+            Support Center
+          </button>
+          <div class="cl-menu-sep"></div>
+          <div class="cl-menu-note">Appearance</div>
+          <div class="cl-theme" id="clThemeMenu" role="group" aria-label="Colour theme" style="margin:0 12px 8px;">
+            <button type="button" class="cl-theme-btn" data-cl-theme="light" title="Light theme" aria-label="Light theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </button>
+            <button type="button" class="cl-theme-btn" data-cl-theme="dark" title="Dark theme" aria-label="Dark theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            </button>
+            <button type="button" class="cl-theme-btn" data-cl-theme="system" title="Match system theme" aria-label="Match system theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </button>
+          </div>
+          <div class="cl-menu-sep"></div>
+          <button type="button" class="cl-menu-item danger" role="menuitem" id="clSignOutBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sign out
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
   <div class="cl-body">
-    <nav class="cl-side" id="clSide" aria-label="Main">
-      <!-- Brand block at the head of the rail, the same place the Admin Portal
-           puts it. The full gold logo is on a transparent background, so it
-           sits on the navy gradient without a plate behind it. -->
+    <!-- -------------------------------- rail ------------------------------ -->
+    <nav class="cl-side" id="clSide" aria-label="Main navigation">
       <a class="cl-brand" href="../index.html" title="JackPots World Tours &amp; Travels">
         <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
       </a>
 
       <div class="cl-side-group">Overview</div>
-      <a href="#" data-cl-nav="dashboard" class="active"><span class="cl-side-ico">▦</span>Dashboard</a>
+      <a href="#" data-cl-nav="dashboard" class="active">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+        Dashboard
+      </a>
 
       <div class="cl-side-group">Booking</div>
-      <!-- CR-5 — "Booking Enquiry" here, "Ticket Enquiry" on every staff
-           screen. Deliberate: the merchant is starting a booking, the desk is
-           working an enquiry queue. Same rows, same request_type. -->
-      <a href="#" data-cl-nav="enquiry"><span class="cl-side-ico">✈</span>Booking Enquiry</a>
-      <a href="#" data-cl-nav="booking-request"><span class="cl-side-ico">✎</span>Booking Request</a>
+      <!-- "Booking Enquiry" here, "Ticket Enquiry" on every staff screen.
+           Deliberate: the merchant is starting a booking, the desk is working an
+           enquiry queue. Same rows, same request_type. -->
+      <a href="#" data-cl-nav="enquiry">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.4 3.4-2 2H3.5l-.7 1.4 3 1.6 1.6 3 1.4-.7v-2.2l2-2 3.4 3.4a.5.5 0 0 0 .8-.5z"/></svg></span>
+        Booking Enquiry
+      </a>
+      <a href="#" data-cl-nav="booking-request">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>
+        Booking Request
+      </a>
 
       <div class="cl-side-group">Operations</div>
-      <a href="#" data-cl-nav="requests"><span class="cl-side-ico">☰</span>My Requests</a>
+      <a href="#" data-cl-nav="requests">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        My Requests
+        <span class="cl-side-pill" id="clNavRequestsCount"></span>
+      </a>
       <!-- CR-3 — only the merchant's approvers see this; revealed by
            classic-shell.js once the session's permissions are known. -->
-      <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;"><span class="cl-side-ico">✓</span>Approvals</a>
-      <!-- CR-4c — the running account. Sits above Payments: it is now the main
-           settlement surface for enquiry-led bookings, and Payments covers the
+      <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        Approvals
+      </a>
+      <a href="#" data-cl-nav="booking-history">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
+        Booking History
+      </a>
+      <a href="#" data-cl-nav="service-request">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+        Service Requests
+      </a>
+
+      <div class="cl-side-group">Finance</div>
+      <!-- CR-4c — the running account. Above Payments: it is the main settlement
+           surface for enquiry-led bookings, and Payments covers the
            catalog-led track only. -->
-      <a href="#" data-cl-nav="wallet"><span class="cl-side-ico">◈</span>Wallet</a>
-      <a href="#" data-cl-nav="payments"><span class="cl-side-ico">₹</span>Payments</a>
-      <a href="#" data-cl-nav="service-request"><span class="cl-side-ico">⇄</span>Service Requests</a>
+      <a href="#" data-cl-nav="wallet">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span>
+        Wallet
+      </a>
+      <a href="#" data-cl-nav="payments">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg></span>
+        Payments
+      </a>
 
       <div class="cl-side-group">Insight</div>
-      <a href="#" data-cl-nav="reports"><span class="cl-side-ico">▤</span>Reports</a>
-      <a href="#" data-cl-nav="notifications"><span class="cl-side-ico">✉</span>Notifications</a>
+      <a href="#" data-cl-nav="reports">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg></span>
+        Reports
+      </a>
+      <a href="#" data-cl-nav="notifications">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+        Notifications
+        <span class="cl-side-pill" id="clNavNotesCount"></span>
+      </a>
 
       <div class="cl-side-group">Account</div>
-      <a href="#" data-cl-nav="profile"><span class="cl-side-ico">◉</span>Profile &amp; Settings</a>
-      <a href="#" data-cl-nav="support"><span class="cl-side-ico">☏</span>Support</a>
+      <a href="#" data-cl-nav="profile">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+        Profile &amp; Settings
+      </a>
+      <a href="#" data-cl-nav="support">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>
+        Support Center
+        <span class="cl-side-pill" id="clNavSupportCount"></span>
+      </a>
+
+      <div class="cl-side-foot">
+        <b id="clSideCompany">—</b>
+        <span id="clSideCode">Merchant account</span>
+      </div>
     </nav>
 
-    <main class="cl-main">
-      <div class="cl-crumb">
-        <span>Merchant Portal</span><span>›</span><b id="clCrumb">Dashboard</b>
-        <span class="cl-crumb-date" id="clDate"></span>
-      </div>
+    <!-- -------------------------------- main ------------------------------ -->
+    <main class="cl-main" id="clMain">
+      <nav class="cl-crumb" aria-label="Breadcrumb">
+        <span>Merchant Portal</span>
+        <span aria-hidden="true">›</span>
+        <b id="clCrumb">Dashboard</b>
+      </nav>
 
       <div class="cl-content">
         <!-- Every section is rendered by its module in js/. Markup is
              intentionally thin: the modules own their own DOM. -->
-        <section class="cl-section active" id="cl-dashboard"></section>
-        <section class="cl-section" id="cl-enquiry"></section>
-        <section class="cl-section" id="cl-booking-request"></section>
-        <!-- Booking Request Details. No sidebar entry: opened from a row
-             action on My Requests or from the submit confirmation. -->
-        <section class="cl-section" id="cl-booking-detail"></section>
-        <section class="cl-section" id="cl-requests"></section>
-        <section class="cl-section" id="cl-approvals"></section>
-        <section class="cl-section" id="cl-wallet"></section>
-        <section class="cl-section" id="cl-payments"></section>
-        <section class="cl-section" id="cl-service-request"></section>
-        <section class="cl-section" id="cl-reports"></section>
-        <section class="cl-section" id="cl-notifications"></section>
-        <section class="cl-section" id="cl-profile"></section>
-        <section class="cl-section" id="cl-support"></section>
+        <section class="cl-section active" id="cl-dashboard" aria-label="Dashboard"></section>
+        <section class="cl-section" id="cl-enquiry" aria-label="Booking Enquiry"></section>
+        <section class="cl-section" id="cl-booking-request" aria-label="Booking Request"></section>
+        <!-- Booking Request Details. No sidebar entry: opened from a row action
+             on My Requests, Booking History, or the submit confirmation. -->
+        <section class="cl-section" id="cl-booking-detail" aria-label="Booking Request Details"></section>
+        <section class="cl-section" id="cl-requests" aria-label="My Requests"></section>
+        <section class="cl-section" id="cl-booking-history" aria-label="Booking History"></section>
+        <section class="cl-section" id="cl-approvals" aria-label="Approvals"></section>
+        <section class="cl-section" id="cl-wallet" aria-label="Wallet"></section>
+        <section class="cl-section" id="cl-payments" aria-label="Payments"></section>
+        <section class="cl-section" id="cl-service-request" aria-label="Service Requests"></section>
+        <section class="cl-section" id="cl-reports" aria-label="Reports"></section>
+        <section class="cl-section" id="cl-notifications" aria-label="Notifications"></section>
+        <section class="cl-section" id="cl-profile" aria-label="Profile and Settings"></section>
+        <section class="cl-section" id="cl-support" aria-label="Support Center"></section>
       </div>
     </main>
   </div>
@@ -206,7 +321,7 @@
   <div class="cl-modal" id="clModal" role="dialog" aria-modal="true" aria-labelledby="clModalTitle">
     <div class="cl-modal-head">
       <h2 id="clModalTitle">Details</h2>
-      <button type="button" class="cl-modal-close" id="clModalClose" aria-label="Close">×</button>
+      <button type="button" class="cl-modal-close" id="clModalClose" aria-label="Close dialog">&times;</button>
     </div>
     <div class="cl-modal-body" id="clModalBody"></div>
     <div class="cl-modal-foot" id="clModalFoot"></div>
@@ -214,39 +329,41 @@
 </div>
 
 <div class="cl-drawer-back" id="clDrawerBack"></div>
-<aside class="cl-drawer" id="clDrawer" aria-label="Notifications">
+<aside class="cl-drawer" id="clDrawer" aria-label="Notifications" role="dialog" aria-modal="true">
   <div class="cl-drawer-head">
     <h2>Notifications</h2>
     <button type="button" class="cl-btn cl-btn-sm" id="clMarkAllBtn">Mark all read</button>
-    <button type="button" class="cl-modal-close" id="clDrawerClose" aria-label="Close">×</button>
+    <button type="button" class="cl-modal-close" id="clDrawerClose" aria-label="Close notifications">&times;</button>
   </div>
   <div class="cl-drawer-list" id="clDrawerList"></div>
 </aside>
 
-<!-- ============================== SCRIPTS ==========================
-     Order matters: axios, then formatters + auth (shared with Premium), then
-     API_BASE via classic-shell.js, then merchant-api.js, then the modules. -->
+<!-- ================================ SCRIPTS ==============================
+     Order matters: axios, then formatters + auth (shared), then API_BASE via
+     classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="../shared/formatters.js?v=20260731m4"></script>
 <script src="../assets/js/auth.js?v=20260731cr2"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
-     and To fields. There is no airport endpoint in the v2 API — see the note at
-     the head of the file — so the table lives in the UI layer and is shared,
-     unchanged, with the other frontends. -->
+     and To fields. There is no airport endpoint in the v2 API, so the table
+     lives in the UI layer and is shared, unchanged, with the other frontends. -->
 <script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260801merge"></script>
-<script src="../shared/merchant-api.js?v=20260801merge"></script>
-<script src="js/classic-dashboard.js?v=20260801merge"></script>
-<script src="js/classic-enquiry.js?v=20260801cr5"></script>
-<script src="js/classic-booking.js?v=20260801cr5"></script>
-<script src="js/classic-booking-detail.js?v=20260801cr5"></script>
-<script src="js/classic-requests.js?v=20260801merge"></script>
-<script src="js/classic-approvals.js?v=20260731cr3b"></script>
-<script src="js/classic-wallet.js?v=20260801cr4c"></script>
-<script src="js/classic-payments.js?v=20260801cr5"></script>
-<script src="js/classic-service.js?v=20260801merge"></script>
-<script src="js/classic-reports.js?v=20260731m4"></script>
-<script src="js/classic-account.js?v=20260801merge"></script>
+<script src="js/classic-shell.js?v=20260801ux4"></script>
+<script src="../shared/merchant-api.js?v=20260801ux4"></script>
+<script src="js/classic-icons.js?v=20260801ux4"></script>
+<script src="js/classic-dashboard.js?v=20260801ux4"></script>
+<script src="js/classic-enquiry.js?v=20260801ux4"></script>
+<script src="js/classic-booking.js?v=20260801ux4"></script>
+<script src="js/classic-booking-detail.js?v=20260801ux4"></script>
+<script src="js/classic-requests.js?v=20260801ux4"></script>
+<script src="js/classic-history.js?v=20260801ux4"></script>
+<script src="js/classic-approvals.js?v=20260801ux4"></script>
+<script src="js/classic-wallet.js?v=20260801ux4"></script>
+<script src="js/classic-payments.js?v=20260801ux4"></script>
+<script src="js/classic-service.js?v=20260801ux4"></script>
+<script src="js/classic-reports.js?v=20260801ux4"></script>
+<script src="js/classic-account.js?v=20260801ux4"></script>
+<script src="js/classic-support.js?v=20260801ux4"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

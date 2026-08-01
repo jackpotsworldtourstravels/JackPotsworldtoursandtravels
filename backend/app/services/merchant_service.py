@@ -318,7 +318,7 @@ def global_reports_summary(db: Session) -> list[dict]:
     )
 
     merchants = db.scalars(select(Merchant).order_by(Merchant.company_name)).all()
-    return [
+    rows = [
         {
             "merchant_id": m.merchant_id,
             "merchant_code": m.merchant_code,
@@ -331,3 +331,17 @@ def global_reports_summary(db: Session) -> list[dict]:
         }
         for m in merchants
     ]
+
+    # M6: the totals come back with the rows. They used to be summed in the
+    # browser with ``Number()`` — the last surviving client-side money sum after
+    # M4 removed ten of them — which floats the value and drops the paise. The
+    # arithmetic is the same arithmetic; doing it here is what makes the figure
+    # a query result rather than a rendering artefact.
+    totals = {
+        "merchants": len(rows),
+        "total_requests": sum(r["total_requests"] for r in rows),
+        "completed_requests": sum(r["completed_requests"] for r in rows),
+        "total_revenue": sum((r["total_revenue"] for r in rows), Decimal("0")),
+        "user_count": sum(r["user_count"] for r in rows),
+    }
+    return rows, totals

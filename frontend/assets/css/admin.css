@@ -722,6 +722,18 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 /* CR-4b: the fare the desk paid, captured on an enquiry-led booking that has no
    amount yet. Full width so it sits above the action buttons rather than
    competing with them for the row. */
+/* CR-4d — the wallet desk. A negative balance is the merchant's outstanding
+   position, not an error, but it must be unmistakable at a glance; the minus
+   sign carries the meaning and the colour only reinforces it. */
+.wd-neg{color:var(--danger, #b3261e); font-weight:700;}
+.wd-balance-strip{display:flex; gap:24px; flex-wrap:wrap; margin-top:16px;
+                  padding:14px 16px; border:1px solid var(--border-color);
+                  border-radius:10px; background:var(--surface-muted, rgba(0,0,0,.02));}
+.wd-balance-strip > div{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.ops-check{display:flex; align-items:center; gap:8px; margin:12px 0;
+           font-size:13px; font-weight:600; color:var(--text-primary);}
+.ops-check input{width:16px; height:16px;}
+
 .ops-fare{flex:1 1 100%; min-width:0;}
 .ops-fare label{display:block; font-size:12px; font-weight:700; color:var(--text-primary);
                 margin-bottom:6px;}
@@ -741,4 +753,86 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
      would double the height of a six-passenger booking for nothing. */
   .ops-pax{padding:11px 12px;}
   .ops-pax-grid{grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:9px 12px;}
+}
+
+/* ===================================================================== M6 —
+   Analytics, and the Reports screen's row-count header.
+
+   Colours come from the same custom properties as the rest of the portal, so
+   the light/dark switch re-themes the panels and the inline SVG charts with no
+   redraw. Nothing here sets a fixed height: an operator list of 4 and one of 40
+   both have to fit, and a scrolling inner box on a page that already scrolls is
+   two scrollbars for one list. */
+
+.rep-summary{
+  padding:11px 14px; margin-bottom:14px; border-radius:10px;
+  background:var(--hover-bg); border:1px solid var(--border-color);
+  font-size:13px; line-height:1.55; color:var(--text-primary);
+}
+.rep-summary em{display:block; margin-top:4px; color:var(--gold-dark); font-style:normal;
+                font-weight:700; font-size:12.5px;}
+
+#section-analytics .panel{margin-bottom:18px;}
+.aa-panel-sub{font-size:12.5px; font-weight:700; color:var(--text-muted);}
+
+.aa-stats{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:12px; margin-bottom:20px;
+}
+.aa-stat{
+  padding:13px 15px; border-radius:12px; border:1px solid var(--border-color);
+  background:var(--hover-bg);
+}
+.aa-stat-value{font-size:21px; font-weight:800; color:var(--text-primary); line-height:1.2;
+               overflow-wrap:anywhere;}
+.aa-stat-label{margin-top:3px; font-size:12.5px; font-weight:700; color:var(--text-primary);}
+.aa-stat-sub{margin-top:2px; font-size:11.5px; color:var(--text-muted);}
+/* Colour is never the only carrier — every tile keeps its label and sub-label,
+   and the tone only reinforces what the words already say. */
+.aa-stat-good .aa-stat-value{color:var(--emerald);}
+.aa-stat-bad .aa-stat-value{color:var(--coral-dark);}
+.aa-stat-warn .aa-stat-value{color:var(--gold-dark);}
+
+.aa-sub{font-size:13px; font-weight:800; color:var(--text-primary); margin:18px 0 10px;}
+.aa-split{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px;}
+/* min-width:0 on the children: a grid item defaults to min-content width, and a
+   wide table inside one refuses to shrink and pushes the page sideways. */
+.aa-split > *{min-width:0;}
+
+.aa-barlist{display:flex; flex-direction:column; gap:7px;}
+.aa-barlist-row{display:grid; grid-template-columns:minmax(84px,1.1fr) 2fr auto;
+                align-items:center; gap:10px;}
+.aa-barlist-label{font-size:12.5px; font-weight:700; color:var(--text-primary);
+                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.aa-barlist-track{height:9px; border-radius:5px; background:var(--hover-bg); overflow:hidden;}
+.aa-barlist-fill{display:block; height:100%; border-radius:5px;}
+.aa-barlist-value{font-size:12.5px; font-weight:800; color:var(--text-primary);
+                  font-variant-numeric:tabular-nums;}
+
+/* A table wide enough to need scrolling scrolls inside its own box. Without
+   this the page itself scrolls sideways at 375px, which moves the sidebar and
+   every panel above it — one narrow table dragging the whole screen. */
+.aa-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+.aa-mini{width:100%; min-width:320px; border-collapse:collapse; margin-top:12px; font-size:12.5px;}
+.aa-mini th{
+  text-align:left; padding:7px 9px; font-size:11px; font-weight:800; letter-spacing:.03em;
+  text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border-color);
+}
+.aa-mini td{padding:8px 9px; border-bottom:1px solid var(--border-color);
+            color:var(--text-primary);}
+.aa-mini tr:last-child td{border-bottom:none;}
+.aa-mini .aa-num, .aa-mini th.aa-num{text-align:right; font-variant-numeric:tabular-nums;}
+
+.aa-note{margin:12px 0 0; font-size:12px; line-height:1.6; color:var(--text-muted);}
+.aa-note b{color:var(--text-primary);}
+
+@media (max-width:640px){
+  .aa-stats{grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:9px;}
+  .aa-stat{padding:11px 12px;}
+  .aa-stat-value{font-size:18px;}
+  .aa-split{gap:18px;}
+  /* The label column at 375px would leave the bar a stub; stacking the name
+     above its own bar keeps both legible. */
+  .aa-barlist-row{grid-template-columns:1fr auto; row-gap:3px;}
+  .aa-barlist-track{grid-column:1 / -1;}
 }

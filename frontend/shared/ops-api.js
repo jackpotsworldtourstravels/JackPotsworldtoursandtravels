@@ -155,6 +155,16 @@ const OpsApi = {
     return this._req('get', `/api/requests/${id}`);
   },
 
+  /* M7. The invoice PDF, rendered on demand from the booking and its payments.
+     `ticket.view` and ticketed/completed only — the server allocates the
+     invoice number at issuance, so there is nothing to number before then and
+     it answers 409. This screen used to render a permanently disabled Invoice
+     button whose tooltip said no endpoint produced one; the endpoint has
+     existed since M2. */
+  downloadInvoice(requestId) {
+    return this._req('get', `/api/requests/${requestId}/invoice`, { responseType: 'blob' });
+  },
+
   /* ticket.request. Creates a DRAFT — nothing is reserved and the approvals
      team cannot see it until submit(). Two steps by design.
      `passengers` entries carry the 14 PassengerInput keys; optional fields

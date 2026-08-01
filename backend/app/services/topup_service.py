@@ -37,7 +37,7 @@ from app.models_v2 import (
     WalletTopupStatus,
     WalletTransaction,
 )
-from app.services import document_service, storage, wallet_service
+from app.services import document_service, notification_service, storage, wallet_service
 
 ZERO = Decimal("0.00")
 
@@ -273,6 +273,27 @@ def submit_topup(
     if commit:
         db.commit()
         db.refresh(topup)
+
+    # CR-4d, and the ONLY edit this milestone makes to a frozen CR-4c file.
+    #
+    # Additive, and it changes nothing CR-4c promised: no money moves here, the
+    # returned row is identical, and every CR-4c assertion still holds. What it
+    # closes is that a merchant could tell us it had paid and **no one was
+    # told** — CR-4c had no desk to notify, because the queue that receives this
+    # did not exist until CR-4d. Leaving it out would mean money sitting
+    # unverified until somebody thought to look at a tab, which is not a
+    # payment workflow.
+    #
+    # Deliberately notify_admins, not notify_merchant_managers: verification is
+    # `payment.verify`, which no merchant account holds.
+    notification_service.notify_admins(
+        db,
+        "Wallet top-up awaiting verification",
+        f"{topup.topup_number}: {merchant.company_name} says it has sent "
+        f"{q(amount)} by {method.value.replace('_', ' ')}"
+        + (f" (UTR {utr})" if utr else "")
+        + ". Verify it to credit their wallet.",
+    )
     return topup
 
 

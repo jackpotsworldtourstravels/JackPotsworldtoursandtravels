@@ -308,26 +308,67 @@ One reporting surface shared by all three portals; scope is inferred from the ca
 `ticket_service.list_requests` already uses, no separate merchant-vs-admin endpoint needed.
 
 ```
-GET /api/reports/summary
-  ?type=bookings|revenue|service_requests|payments
-  &date_from=<date>&date_to=<date>
-  &group_by=day|week|month
-  &merchant_id=<int>                    (Admin/Super Admin only — ignored/403 if a merchant passes someone else's id)
-→ {type, date_from, date_to, group_by, series: [{bucket: str, count: int, total_amount: Decimal}]}
+GET /api/reports/summary                                                    (M6)
+  ?type=bookings|service_requests|payments
+  &date_from=<date>&date_to=<date>&search=<str>&status=<RequestStatus>
+  &merchant_id=<int>                    (Admin/Super Admin only — a merchant's own scope is
+                                         never widened or redirected by this parameter)
+→ {type, rows: int, truncated: bool, row_cap: int,
+   total_value: Decimal|null, date_field: "travel_date"|"created_at"}
 Permission: P.REPORT_VIEW
 ```
 
+The header for a report screen: **how many rows the current filters match, and what they are
+worth**. Built from the *same* row builders `/export` uses (`reports._rows_for`), so "showing
+100 of 2,631" and the file the user downloads can never describe different sets — the classic
+reporting bug, and the one M6's verification requirement names. `truncated` is true when the
+`row_cap` bit; a screen that reports a capped figure without saying so is lying about the
+download it is offering. `total_value` is `null` for `service_requests`, which carries no money
+column — **not** `0`, which would read as "nothing was charged". `date_field` names the column
+`date_from`/`date_to` filtered on, and it is **not the same column for every type**: bookings
+and service requests filter on `travel_date`, payments on `created_at`.
+
+*This replaces the `group_by`/`series` shape signed off in 2026-07-29 and never built.* The time
+series it described is a better fit for `/api/analytics/bookings` (§6.9), which groups in SQL and
+also carries the status mix and the busiest routes; splitting the two means neither endpoint has
+to be both a row-counter and an aggregator. `type=revenue` is likewise gone from both routes: it
+was never implemented, and `payments` answers the same question against the ledger.
+
 ```
 GET /api/reports/export
-  ?type=bookings|revenue|service_requests|payments
+  ?type=bookings|service_requests|payments
   &format=csv|xlsx|pdf
-  &date_from=<date>&date_to=<date>&merchant_id=<int>
+  &date_from=<date>&date_to=<date>&search=<str>&status=<RequestStatus>&merchant_id=<int>
 → 200, file stream (Content-Disposition: attachment)
 Permission: P.REPORT_EXPORT
 ```
 
 Each export also writes one `SystemLog(module='reports', action='export')` row (mirrors the
 legacy `report_generation_log` table per `docs/SCHEMA_V2.md:98`).
+
+### 6.2a Merchant paperwork downloads (M2, consumed in M7)
+
+Three routes, built in M2 and given their first callers in M7. All require `ticket.view`, all
+scope through `ticket_service.get_request` — so a cross-tenant read is **404, not 403** — and all
+are served as `Content-Disposition: attachment` with `Cache-Control: private, no-store`. A
+booking confirmation sitting in a shared proxy cache is a passenger manifest sitting in a shared
+proxy cache.
+
+```
+GET /api/requests/{id}/invoice        → 200 application/pdf   (409 unless ticketed/completed)
+GET /api/requests/{id}/confirmation   → 200 application/pdf   (409 unless ticketed/completed)
+GET /api/requests/{id}/tickets        → 200 [DocumentResponse]  — metadata only
+```
+
+Both PDFs are **rendered on demand and never stored**, so a refund recorded a minute ago is
+already in the invoice and there is no stale file to disagree with the ledger. The 409 is not a
+gap: `issue_ticket` is what allocates the invoice number, so before then there is nothing to
+number. The confirmation is explicitly **not an e-ticket** and says so on its face — the airline's
+own file comes from `/tickets`, whose bytes are fetched from `/api/documents/{id}/download`,
+which re-checks merchant scope per file.
+
+**Merchant surfaces consuming these:** Classic → My Requests → a booking → *Paperwork*.
+**Staff:** Operations → Payment History → *Invoice*.
 
 **Sign-off (2026-07-29):** approved. Add `openpyxl` (xlsx) and `reportlab` (pdf) to
 `requirements.txt`; CSV uses the standard library `csv` module. Structure the exporter as one
@@ -572,10 +613,48 @@ POST /api/admin/requests/{request_id}/issue-ticket
      {fare_amount?: Decimal > 0}               → RequestDetailResponse
 Permission: P.TICKET_ISSUE
 
+--- CR-4d — the staff wallet desk. Reads are P.PAYMENT_VERIFY, NOT P.PAYMENT_VIEW ---
+GET    /api/admin/payment-accounts                     → [PaymentAccountAdminOut]
+POST   /api/admin/payment-accounts                     → PaymentAccountAdminOut (201)
+PUT    /api/admin/payment-accounts/{id}                → PaymentAccountAdminOut
+DELETE /api/admin/payment-accounts/{id}                → PaymentAccountAdminOut (deactivates)
+POST   /api/admin/payment-accounts/{id}/qr   multipart → PaymentAccountAdminOut
+GET    /api/admin/payment-accounts/{id}/qr             → image stream
+Permission: P.PAYMENT_MANAGE to write, P.PAYMENT_VERIFY to read
+
+GET    /api/admin/wallet/topups/counts                 → TopupQueueCounts
+GET    /api/admin/wallet/topups   ?bucket&merchant_id&search&page → TopupQueuePage
+GET    /api/admin/wallet/topups/{id}                   → TopupDetail
+GET    /api/admin/wallet/topups/{id}/proof             → attachment, private no-store
+POST   /api/admin/wallet/topups/{id}/verify            → TopupDecisionResult  (CREDITS)
+POST   /api/admin/wallet/topups/{id}/reject  {remarks} → TopupDecisionResult  (moves nothing)
+GET    /api/admin/merchants/{id}/wallet/transactions   → MerchantLedgerPage
+GET    /api/admin/wallet/reconciliation                → ReconciliationReport
+Permission: P.PAYMENT_VERIFY
+
 POST /api/admin/requests/{request_id}/reprice
      {amount: Decimal > 0, reason: str}        → RequestDetailResponse
 Permission: P.TICKET_APPROVE   (no new code — this is the approver's own figure)
 ```
+
+**CR-4d — the permission boundary, and why it is not `payment.view`.** Every merchant role holds
+`payment.view`; it is what lets a merchant read *its own* wallet under `/api/merchant/wallet`,
+where safety comes from no route carrying a merchant id. Every `/api/admin/...` wallet route is
+platform-wide or takes another company's id, so all of them — **including the read-only ones** —
+require `payment.verify` or `payment.manage`, which only the Admin role holds. Gating them on
+`payment.view` let any merchant read every other merchant's ledger; `tests/verify_cr4d.py` asserts
+the boundary from a real merchant token.
+
+**`/wallet/topups/{id}/verify` is the only path that credits a wallet from a top-up.** It writes
+exactly one `wallet_recharge` transaction linked by `topup_id`, guarded by
+`uq_wallet_transactions_topup` (migration 0037) *and* a row lock, and returns the `WTX-…`
+reference with the balance either side. A second verification returns **409**, never a duplicate
+credit and never a 500. Rejection moves nothing, requires remarks, and frees the UTR for a
+corrected resubmission.
+
+**`/wallet/reconciliation`** reports `drift` = cached balance − ledger balance per merchant. It
+must be zero everywhere; a non-zero row is an incident. `pending_topup_amount` sits beside the
+balances and is never part of them.
 
 **The wallet (CR-4, `docs/WALLET_ARCHITECTURE.md` is authoritative).** A merchant holds a running
 account that **may go negative** — a negative balance is its outstanding position, bounded by
@@ -957,6 +1036,82 @@ Two layers, both already partially built — no new concept, just filling the on
   `activity_service.list_activity_logs_paginated`, scoped by `P.SYSTEM_ACTIVITY_VIEW`, which Admin
   already holds. No merchant-portal equivalent — a merchant never sees the platform-wide log,
   only its own requests' timelines.
+
+### 6.9 Analytics (M6)
+
+`app/routers/analytics.py` over `app/services/analytics_service.py`. **Every figure is a SQL
+aggregate.** Nothing is counted in Python over a fetched page and nothing is left for a browser
+to add up — M6's stated requirement is that each tile be reproducible by a direct query, and
+`tests/verify_m6.py` re-derives them from hand-written SQL rather than by calling the service.
+
+Separate from §6.2, which exports *rows*. These endpoints only ever return aggregates.
+
+**Permission codes are reused, not invented.** `report.view` gates the two caller-scoped
+endpoints; the service scopes them through `ticket_service.scoped_query`, the same predicate the
+list endpoints use. The operations endpoint is gated on `ticket.approve` — Admin-only, and
+already meaning "may work a booking" — plus an `is_platform_staff` check in the service. CR-4d
+shipped a staff read on `payment.view`, a code every merchant role holds, and any merchant could
+read every other merchant's position; **a code a merchant holds may only ever gate a
+merchant-scoped read.**
+
+```
+GET /api/analytics/bookings
+  ?date_field=travel_date|created_at        (default travel_date)
+  &date_from=<date>&date_to=<date>&merchant_id=<int>   (merchant_id: platform staff only)
+→ {scope: "merchant"|"platform", date_field, date_from, date_to, merchant_id,
+   totals: {bookings: int, value: Decimal, average_value: Decimal},
+   by_status: [{status, label, count, value}],
+   by_month:  [{month: "YYYY-MM"|"unscheduled", count, value}],
+   top_routes:[{route, count, value}]        (max 10, busiest first)}
+Permission: P.REPORT_VIEW
+```
+
+`date_field` chooses the column the range filter **and** the monthly series run on, and the
+response echoes it back. Two invariants hold and are asserted: `by_status` and `by_month` each
+**partition** the same population as `totals`, so either column adds back up to the headline;
+and a row with no date in the chosen column lands in an explicit `unscheduled` bucket rather
+than being dropped, because a series that silently omits rows stops summing to its own total.
+
+```
+GET /api/analytics/change-requests
+  ?date_from=<date>&date_to=<date>&merchant_id=<int>
+→ {scope, date_field: "created_at", date_from, date_to,
+   totals: {requests, approved, rejected, pending},
+   by_type: [{type, label, total, approved, rejected, pending}],
+   money: {basis, cancellation_charges, refunds_due, refunds_settled,
+           refunds_outstanding, refunds_short_settled, fare_differences}}
+Permission: P.REPORT_VIEW
+```
+
+The money block covers **approved requests only** — a rejected cancellation charged nothing and
+refunded nothing. `refunds_outstanding` is `refunds_due − refunds_settled`: everything still
+owed. It is **not** the sum of M3's `pricing.refund_unsettled`, which is written only when a
+settlement actually ran and fell short, so a cancellation approved and never settled carries
+neither key and would vanish from the debt. That shortfall is reported separately as
+`refunds_short_settled` — a *subset* of `refunds_outstanding`, never a second figure to add.
+
+```
+GET /api/analytics/operations
+→ {queue: {approved, payment_pending, paid, ticket_issued, total, unassigned},
+   waiting: {stages: [...], count, oldest_hours, average_hours, median_hours,
+             buckets: {under_24h, h24_to_72h, over_72h}},
+   sla: {threshold_hours, breached},
+   operators: [{user_id, full_name, active_load, issued_last_30d}],
+   time_to_issue: {window_days, sample, average_hours, median_hours, p90_hours}}
+Permission: P.TICKET_APPROVE — and platform staff
+```
+
+Ageing is measured over **Approved / Payment Pending / Paid only**, named in `waiting.stages`.
+A ticketed booking is in M1's queue because paperwork is still filed against it, but nobody is
+waiting for it to be booked — counting its age makes an idle number grow for ever and drowns the
+bookings that need attention. `time_to_issue` reads the append-only `status_history` entry that
+recorded the move to `ticket_issued`, so the figure is auditable against the Activity Timeline
+the desk already sees; `updated_at` would have been simpler and wrong, because any later edit
+moves it.
+
+`GET /api/super-admin/reports/summary` (§5) gained a `totals` block in M6 for the same reason:
+its four stat cards were summed in the browser with `Number()`, which floats a Decimal and drops
+the paise.
 
 ---
 

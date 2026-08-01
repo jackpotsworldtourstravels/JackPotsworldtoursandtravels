@@ -1,873 +1,2041 @@
 /* ==========================================================================
-   Classic Merchant Portal — styled to match the Admin Portal.
+   JACKPOTS MERCHANT PORTAL — DESIGN SYSTEM
    ==========================================================================
-   This file used to describe a deliberately different look: flat surfaces,
-   3px corners, a slate rail, system fonts, no shadows, no dark mode. That was
-   replaced on request — the Classic portal is now meant to look like the Admin
-   Portal at /admin/, so this stylesheet adopts that portal's visual language:
+   One stylesheet, one visual language, twelve screens.
 
-     - Montserrat, the same weights and sizes
-     - a navy gradient rail (#0B3C6D -> #0A2F55) at 264px, full height
-     - coral (#FF6B35) as the single accent, gold/emerald/sky for status
-     - 16px cards with soft shadows, pill buttons, pill badges
-     - a light/dark/system theme, driven by :root[data-theme]
+   WHAT THIS IS
+   A premium enterprise design system for a B2B travel platform: deep navy as
+   the structural colour, a single warm accent for action, a near-white canvas,
+   and pure white surfaces that float on it. Type is Montserrat throughout, on
+   a fixed scale. Nothing is decorative — colour carries meaning (a status, a
+   direction of money, a call to action) and never anything else.
+
+   HOW IT REPLACED WHAT WAS HERE
+   The previous sheet was a copy of the Admin Portal's tokens under `cl-` names.
+   This is a ground-up rewrite, but it keeps EVERY selector the twelve JS
+   modules already render against — `cl-panel`, `cl-table`, `cl-kpi`, `cl-tag`,
+   `cl-btn` and the rest all still exist and still mean the same thing. That is
+   deliberate and it is what made a portal-wide redesign safe: no module had to
+   change a class name to be restyled. New components (stat cards, status grid,
+   chat, drawer menus, skeletons, timelines) are additive.
 
    HOW IT STAYS INDEPENDENT
-   Everything is still namespaced `cl-`, and this portal loads no other
-   stylesheet. It does NOT import ../assets/css/admin.css: sharing that file
-   would mean any future Admin tweak silently restyles a merchant-facing
-   portal, and Admin's markup uses entirely different class names anyway. The
-   tokens below are a copy of Admin's values under `--cl-` names, so the two
-   look the same without either being able to break the other. If Admin's
-   palette changes and you want Classic to follow, update the token block —
-   that is the only place the values appear.
+   This portal loads no other stylesheet, and no other portal loads this one.
+   Admin at /admin/ and this interface are free to diverge; neither can restyle
+   the other by accident.
 
-   Nothing in the merchant-classic/*.js modules or index.html changed class
-   names for this: every selector here is one those files already used.
+   THEMING
+   Every component reads themeable tokens (`--cl-surface`, `--cl-text`, …) and
+   never a raw palette value. `:root[data-theme="dark"]` re-points those tokens
+   and the whole portal — including the hand-drawn SVG charts, which reference
+   the same custom properties — repaints without a redraw.
+
+   READING ORDER
+     1  tokens          6  buttons        11  modals & drawers
+     2  reset & type    7  tables         12  charts
+     3  auth            8  status         13  chat / support
+     4  app shell       9  stats & KPIs   14  utilities
+     5  forms          10  panels         15  responsive & print
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. TOKENS
    ========================================================================== */
 
 :root{
-  /* ---- brand, copied from admin.css ---- */
-  --cl-navy:#0B3C6D; --cl-navy-2:#0F4A85; --cl-navy-3:#155A9E;
-  --cl-coral:#FF6B35; --cl-coral-dark:#E85A2A; --cl-coral-hover:#FFEFE8;
-  --cl-sky:#1E88E5; --cl-emerald:#12B76A; --cl-gold:#FFB020;
+  /* ---- brand palette -------------------------------------------------- */
+  --cl-navy-900:#061B32;
+  --cl-navy-800:#0A2540;      /* the primary. Rail, headings, structure.     */
+  --cl-navy-700:#123A5E;
+  --cl-navy-600:#1B4E7E;
+  --cl-navy-500:#2C6BA8;
 
-  --cl-bg:#F5F7FA;              /* page behind the cards */
-  --cl-white:#FFFFFF;
-  --cl-ink:#0B3C6D;
-  --cl-muted:#5B6B82;
-  --cl-line:rgba(11,60,109,0.10);
+  /* THE ACCENT COMES IN TWO WEIGHTS, AND THE SPLIT IS AN ACCESSIBILITY ONE.
+     `--cl-orange` is the bright brand tone. It is beautiful and it is only 2.8:1
+     against white, so it may carry a shape — a rule, a dot, a chart bar, an
+     icon on a dark ground — but it may never sit under white TEXT. Anywhere a
+     label sits on the accent (primary button, send button, unread badge, the
+     merchant's own chat bubble) the fill is `--cl-orange-cta`, which is 4.5:1
+     against white and passes WCAG AA at any size. Measured, not guessed: the
+     first build of this sheet used the bright tone on every button and every
+     primary label on the portal failed AA. */
+  --cl-orange:#FF6B2C;        /* brand tone — shapes and accents only         */
+  --cl-orange-cta:#D2470B;    /* 4.53:1 with white — text may sit on this     */
+  --cl-orange-cta-2:#B93B06;  /* 5.76:1 — gradient foot and hover             */
+  --cl-orange-600:#C1400A;
+  --cl-orange-700:#B23A06;    /* 5.54:1 on --cl-orange-50                     */
+  --cl-orange-50:#FFF2EB;
 
-  --cl-shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18);
-  --cl-shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
-  --cl-radius:16px;
-  --cl-radius-sm:14px;
-  --cl-radius-pill:100px;
+  --cl-gold:#E8A317;
+
+  /* ---- semantic palette ----------------------------------------------- */
+  --cl-success:#0E9F6E;   --cl-success-bg:#E7F8F1;   --cl-success-fg:#046C4E;
+  --cl-warning:#D98A00;   --cl-warning-bg:#FEF5E4;   --cl-warning-fg:#8F5A00;
+  --cl-danger:#E0364B;    --cl-danger-bg:#FDECEE;    --cl-danger-fg:#B02233;
+  --cl-info:#2563EB;      --cl-info-bg:#EBF1FE;      --cl-info-fg:#1D4ED8;
+
+  /* ---- themeable surfaces --------------------------------------------- */
+  /* Components reference ONLY these. Dark mode re-points them below.       */
+  --cl-canvas:#F4F6FA;              /* the page behind everything           */
+  --cl-canvas-2:#EDF1F7;            /* recessed areas inside a surface      */
+  --cl-surface:#FFFFFF;             /* cards, panels, menus                 */
+  --cl-surface-2:#FAFBFD;           /* table heads, sub-surfaces            */
+  --cl-text:#0B2545;                /* primary copy — 14.2:1                */
+  --cl-text-2:#41546F;              /* secondary copy — 7.7:1               */
+  /* 5.17:1 on white. It was #6C7F99, which measured 4.09:1 — under AA, and
+     this token carries every KPI label, caption and axis tick in the portal,
+     all of them small and none of them "large text" by WCAG's definition. */
+  --cl-text-muted:#5B6E88;
+  --cl-line:#E3E9F1;                /* the standard hairline                */
+  --cl-line-2:#EEF2F7;              /* the quieter one, inside a card       */
+  --cl-hover:#F3F6FA;               /* row and control hover                */
+  --cl-accent:var(--cl-orange);
+  --cl-accent-soft:var(--cl-orange-50);
+  --cl-focus:rgba(210,71,11,0.30);
+
+  /* rail is a fixed dark surface in both themes — it anchors the layout */
+  --cl-rail-top:#0A2540;
+  --cl-rail-bottom:#061B32;
+  /* 0.66 over the navy is 7.1:1 for a nav item. The group headings and the
+     footer sat at 0.30 and 0.38, which measured 2.6:1 and 3.1:1 — they are
+     still text, so they are raised to a passing weight rather than left as
+     decoration somebody has to squint at. */
+  --cl-rail-text:rgba(233,240,250,0.66);
+  --cl-rail-text-hi:#FFFFFF;
+  --cl-rail-text-dim:rgba(233,240,250,0.55);   /* 5.0:1 at the gradient's lightest end */
+  --cl-rail-text-foot:rgba(233,240,250,0.52);  /* 4.9:1 */
+  --cl-rail-line:rgba(255,255,255,0.08);
+  --cl-rail-w:266px;
+
+  /* ---- elevation ------------------------------------------------------- */
+  --cl-sh-xs:0 1px 2px rgba(10,37,64,0.05);
+  --cl-sh-sm:0 1px 2px rgba(10,37,64,0.05), 0 6px 16px -10px rgba(10,37,64,0.16);
+  --cl-sh-md:0 1px 3px rgba(10,37,64,0.05), 0 14px 34px -16px rgba(10,37,64,0.22);
+  --cl-sh-lg:0 2px 8px rgba(10,37,64,0.06), 0 32px 64px -24px rgba(10,37,64,0.30);
+  --cl-sh-xl:0 40px 90px -28px rgba(6,27,50,0.44);
+  --cl-sh-accent:0 8px 20px -8px rgba(185,59,6,0.5);
+
+  /* ---- geometry -------------------------------------------------------- */
+  --cl-r-xs:8px;  --cl-r-sm:10px; --cl-r-md:14px;
+  --cl-r-lg:18px; --cl-r-xl:24px; --cl-r-pill:999px;
+  --cl-radius:var(--cl-r-lg);          /* legacy alias, still referenced   */
+  --cl-radius-sm:var(--cl-r-md);
+  --cl-radius-pill:var(--cl-r-pill);
+
+  /* ---- type ------------------------------------------------------------ */
   --cl-font:'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --cl-mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --cl-mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --cl-sidebar-bg:#0B3C6D; --cl-sidebar-bg-2:#0A2F55;
-  --cl-sidebar-text:rgba(255,255,255,0.65); --cl-sidebar-text-hover:#fff;
-  --cl-sidebar-w:264px;
+  /* ---- motion ---------------------------------------------------------- */
+  --cl-ease:cubic-bezier(0.22, 1, 0.36, 1);
+  --cl-fast:.16s var(--cl-ease);
+  --cl-base:.24s var(--cl-ease);
+  --cl-slow:.4s var(--cl-ease);
 
-  /* ---- themeable surfaces (these are what components reference) ---- */
-  --cl-card-bg:#fff;
-  --cl-page-bg:var(--cl-bg);
-  --cl-text-primary:var(--cl-ink);
-  --cl-text-muted:var(--cl-muted);
+  /* ---- legacy aliases --------------------------------------------------
+     Kept because JS modules interpolate them into inline styles and into the
+     SVG charts. Removing one silently un-styles a chart axis, so they stay
+     mapped rather than deleted. */
+  --cl-navy:var(--cl-navy-800);
+  --cl-navy-2:var(--cl-navy-700);
+  --cl-navy-3:var(--cl-navy-500);
+  --cl-coral:var(--cl-orange);
+  --cl-coral-dark:var(--cl-orange-700);
+  --cl-coral-hover:var(--cl-orange-50);
+  --cl-sky:var(--cl-info);
+  --cl-emerald:var(--cl-success);
+  --cl-bg:var(--cl-canvas);
+  --cl-white:var(--cl-surface);
+  --cl-ink:var(--cl-text);
+  --cl-ink-soft:var(--cl-text-2);
+  --cl-ink-faint:var(--cl-text-muted);
+  --cl-muted:var(--cl-text-muted);
+  --cl-card-bg:var(--cl-surface);
+  --cl-page-bg:var(--cl-canvas);
+  --cl-text-primary:var(--cl-text);
   --cl-border-color:var(--cl-line);
-  --cl-hover-bg:rgba(11,60,109,0.04);
+  --cl-hover-bg:var(--cl-hover);
+  --cl-shadow-sm:var(--cl-sh-sm);
+  --cl-shadow-lg:var(--cl-sh-lg);
+  --cl-sidebar-w:var(--cl-rail-w);
 }
 
 :root[data-theme="dark"]{
-  --cl-page-bg:#0B1220;
-  --cl-card-bg:#131B2E;
-  --cl-text-primary:#E7ECF5;
-  --cl-text-muted:#93A2BE;
-  --cl-border-color:rgba(255,255,255,0.08);
-  --cl-hover-bg:rgba(255,255,255,0.05);
-  --cl-shadow-sm:0 8px 24px -12px rgba(0,0,0,0.5);
-  --cl-shadow-lg:0 30px 70px -20px rgba(0,0,0,0.65);
+  --cl-canvas:#0A1220;
+  --cl-canvas-2:#0F1A2C;
+  --cl-surface:#111C2F;
+  --cl-surface-2:#16233A;
+  --cl-text:#E8EEF8;
+  --cl-text-2:#B4C2D8;
+  --cl-text-muted:#8496B2;
+  --cl-line:#22314B;
+  --cl-line-2:#1B283E;
+  --cl-hover:#18253C;
+  --cl-accent-soft:rgba(255,107,44,0.14);
+
+  --cl-success-bg:rgba(14,159,110,0.16);  --cl-success-fg:#4ADE9B;
+  --cl-warning-bg:rgba(217,138,0,0.18);   --cl-warning-fg:#F5C04E;
+  --cl-danger-bg:rgba(224,54,75,0.18);    --cl-danger-fg:#FF8D9C;
+  --cl-info-bg:rgba(37,99,235,0.18);      --cl-info-fg:#84AAFF;
+
+  --cl-rail-top:#0C1728;
+  --cl-rail-bottom:#070F1C;
+
+  --cl-sh-xs:0 1px 2px rgba(0,0,0,0.4);
+  --cl-sh-sm:0 1px 2px rgba(0,0,0,0.4), 0 6px 16px -10px rgba(0,0,0,0.7);
+  --cl-sh-md:0 1px 3px rgba(0,0,0,0.4), 0 14px 34px -16px rgba(0,0,0,0.75);
+  --cl-sh-lg:0 2px 8px rgba(0,0,0,0.45), 0 32px 64px -24px rgba(0,0,0,0.8);
+  --cl-sh-xl:0 40px 90px -28px rgba(0,0,0,0.85);
 }
 
-*{box-sizing:border-box;}
+
+/* ==========================================================================
+   2. RESET & TYPOGRAPHY
+   ========================================================================== */
+
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
 html,body{margin:0; padding:0;}
+
 body{
   font-family:var(--cl-font);
-  font-size:13.5px; line-height:1.5;
-  color:var(--cl-text-primary); background:var(--cl-page-bg);
-  -webkit-font-smoothing:antialiased;
-  transition:background .25s ease, color .25s ease;
+  font-size:14px; line-height:1.55; font-weight:500;
+  letter-spacing:-0.005em;
+  color:var(--cl-text); background:var(--cl-canvas);
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums lining-nums;
+  transition:background var(--cl-base), color var(--cl-base);
+  /* A page must never scroll sideways. Any wide content scrolls inside its
+     own container instead — see .cl-table-wrap. */
+  overflow-x:hidden;
 }
-button,input,select,textarea{font-family:var(--cl-font);}
-a{color:var(--cl-sky); text-decoration:none;}
-a:hover{text-decoration:underline;}
-h1,h2,h3,h4{margin:0; font-weight:800; color:var(--cl-text-primary);}
-table{border-collapse:collapse;}
-:focus-visible{outline:2px solid var(--cl-coral); outline-offset:1px;}
 
+button,input,select,textarea{font-family:inherit; font-size:inherit; color:inherit;}
+button{border:none; background:none; padding:0;}
+
+a{color:var(--cl-navy-600); text-decoration:none; transition:color var(--cl-fast);}
+a:hover{color:var(--cl-orange); text-decoration:none;}
+:root[data-theme="dark"] a{color:#7FB3F5;}
+
+h1,h2,h3,h4,h5{margin:0; font-weight:700; color:var(--cl-text); letter-spacing:-0.02em;}
+h1{font-size:26px; line-height:1.2; font-weight:800;}
+h2{font-size:17px; line-height:1.3;}
+h3{font-size:14.5px; line-height:1.35;}
+p{margin:0;}
+table{border-collapse:separate; border-spacing:0;}
+img{max-width:100%;}
+hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
+
+/* Focus. Visible, generous, and the same shape everywhere — this is the
+   keyboard user's cursor and it should never be subtle. */
+:focus{outline:none;}
+:focus-visible{
+  outline:2px solid var(--cl-orange-cta);
+  outline-offset:2px;
+  border-radius:var(--cl-r-xs);
+}
+
+::selection{background:var(--cl-accent-soft); color:var(--cl-orange-700);}
+
+/* Scrollbars, so a long ledger doesn't put a Windows-grey slab down a
+   premium page. */
+*{scrollbar-width:thin; scrollbar-color:var(--cl-line) transparent;}
+*::-webkit-scrollbar{width:9px; height:9px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:var(--cl-line); border-radius:99px; border:2px solid transparent; background-clip:content-box;}
+*::-webkit-scrollbar-thumb:hover{background:var(--cl-text-muted); background-clip:content-box;}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important; scroll-behavior:auto !important;
+  }
+}
+
+/* ---- shared text utilities ---- */
 .cl-hidden{display:none !important;}
 .cl-sr{
   position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
 }
-.cl-mono{font-family:var(--cl-mono); font-size:12.5px;}
+.cl-mono,.cl-ref{
+  font-family:var(--cl-mono); font-size:12.5px; font-weight:600;
+  letter-spacing:0.01em;
+}
 .cl-nowrap{white-space:nowrap;}
 .cl-num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+.cl-muted{color:var(--cl-text-muted); font-weight:500;}
 
-/* ==============================  auth  ==================================
-   Matches admin.css's .partner-auth-shell / .partner-auth-card: a navy
-   radial-plus-linear backdrop with a single light card, gold top rule. */
+/* The micro-label that titles every small block in this system. */
+.cl-eyebrow{
+  font-size:10.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.09em; color:var(--cl-text-muted);
+}
+
+
+/* ==========================================================================
+   3. AUTH
+   ==========================================================================
+   A single card on a deep navy field. The aurora behind it is two radial
+   gradients rather than an image: no asset to load, and it re-scales to any
+   viewport without a seam. */
 
 .cl-auth{
-  min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  min-height:100vh; min-height:100dvh;
+  display:flex; align-items:center; justify-content:center; padding:28px 20px;
+  position:relative; overflow:hidden;
   background:
-    radial-gradient(1200px 700px at 15% -10%, var(--cl-navy-2) 0%, transparent 60%),
-    linear-gradient(165deg, #071B33 0%, var(--cl-navy) 60%, var(--cl-navy-2) 100%);
+    radial-gradient(900px 620px at 12% -8%, rgba(255,107,44,0.20) 0%, transparent 62%),
+    radial-gradient(1000px 700px at 96% 108%, rgba(44,107,168,0.34) 0%, transparent 60%),
+    linear-gradient(160deg, #061B32 0%, #0A2540 52%, #123A5E 100%);
+}
+.cl-auth::after{
+  /* A very fine grid, at 3% — it reads as texture, not as a pattern. */
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(circle at 50% 40%, #000 0%, transparent 78%);
 }
 .cl-auth-box{
-  width:100%; max-width:420px; background:var(--cl-card-bg);
-  border-radius:20px; box-shadow:var(--cl-shadow-lg);
-  padding:38px 36px; border-top:3px solid var(--cl-gold);
+  position:relative; z-index:1;
+  width:100%; max-width:440px;
+  background:var(--cl-surface);
+  border-radius:var(--cl-r-xl);
+  box-shadow:var(--cl-sh-xl);
+  padding:40px 40px 32px;
+  animation:cl-rise .5s var(--cl-ease) both;
 }
-.cl-auth-box h1{font-size:20px; margin-bottom:6px; text-align:center;}
-.cl-auth-sub{font-size:13px; color:var(--cl-text-muted); text-align:center; margin:0 0 22px;}
-/* Logo above the sign-in heading, as the Admin Portal's auth card does. The
-   mark is gold on transparent, so it reads on the white card and on the dark
-   card the dark theme swaps in — no plate or inversion needed. */
-.cl-auth-brand{text-align:center; margin-bottom:22px;}
-.cl-auth-brand img{height:76px; width:auto; object-fit:contain; display:inline-block;}
+.cl-auth-box h1{font-size:23px; margin-bottom:6px; text-align:center;}
+.cl-auth-sub{
+  font-size:13.5px; color:var(--cl-text-muted); text-align:center;
+  margin:0 0 26px; font-weight:500;
+}
+.cl-auth-brand{text-align:center; margin-bottom:24px;}
+.cl-auth-brand img{height:74px; width:auto; object-fit:contain; display:inline-block;}
 .cl-auth-brand span{
-  display:block; margin-top:8px;
-  font-size:12px; font-weight:800; letter-spacing:.12em;
-  text-transform:uppercase; color:var(--cl-gold);
+  display:block; margin-top:10px;
+  font-size:10.5px; font-weight:700; letter-spacing:0.16em;
+  text-transform:uppercase; color:var(--cl-orange);
 }
 .cl-auth-foot{
-  margin-top:22px; padding-top:16px; border-top:1px solid var(--cl-border-color);
+  margin-top:26px; padding-top:18px; border-top:1px solid var(--cl-line);
   font-size:12.5px; color:var(--cl-text-muted); font-weight:600;
   display:flex; justify-content:space-between; gap:10px;
 }
 .cl-auth-step{display:none;}
-.cl-auth-step.active{display:block; animation:cl-fade-up .28s ease;}
-@keyframes cl-fade-up{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+.cl-auth-step.active{display:block; animation:cl-rise .34s var(--cl-ease) both;}
 .cl-auth-box .cl-btn{width:100%;}
-.cl-auth-box .cl-form-actions{border-top:none; padding-top:0; margin-top:16px; display:block;}
+.cl-auth-box .cl-form-actions{border-top:none; padding-top:0; margin-top:20px; display:block;}
 .cl-auth-box .cl-form-actions .cl-btn{margin-bottom:10px;}
-.cl-auth-box .cl-btn-link{width:auto; display:inline-block;}
+.cl-auth-box .cl-form-actions > a{
+  display:block; text-align:center; font-size:12.5px; font-weight:600; margin-top:4px;
+}
+.cl-auth-box .cl-btn-link{width:auto; display:block; margin:0 auto;}
 
-/* ==============================  shell  =================================
-   Admin's layout is a full-height fixed rail with the topbar sitting INSIDE
-   the content column as a floating white card. Classic's markup puts .cl-top
-   as a sibling above .cl-body, so rather than move DOM (which would touch the
-   JS modules' assumptions) the app becomes a 2x2 grid and .cl-body is
-   `display:contents`, letting the rail and main place themselves directly.
-   Same result, no markup change. */
+
+/* ==========================================================================
+   4. APP SHELL
+   ==========================================================================
+   A 2x2 grid: the rail spans both rows in column 1, the topbar is row 1 of
+   column 2, the content is row 2. `.cl-body` is `display:contents` so its two
+   children become grid items of `.cl-app` directly — that is what lets the
+   markup keep the topbar as a sibling ABOVE the rail while the layout renders
+   it beside it. Moving the markup instead would have touched assumptions in
+   all twelve JS modules. */
 
 .cl-app{display:none;}
 .cl-app.active{
   display:grid; min-height:100vh;
-  grid-template-columns:var(--cl-sidebar-w) minmax(0,1fr);
+  grid-template-columns:var(--cl-rail-w) minmax(0,1fr);
   grid-template-rows:auto minmax(0,1fr);
 }
 .cl-body{display:contents;}
 
-/* ---------------------------------------------------------------- rail */
+/* ------------------------------------------------------------------ rail */
 
 .cl-side{
   grid-column:1; grid-row:1 / span 2;
-  background:linear-gradient(180deg, var(--cl-sidebar-bg), var(--cl-sidebar-bg-2));
-  color:#fff; padding:22px 0; overflow-y:auto;
-  position:sticky; top:0; height:100vh; z-index:200;
+  position:sticky; top:0; height:100vh; height:100dvh; z-index:200;
+  display:flex; flex-direction:column;
+  padding:0 0 18px; overflow-y:auto; overscroll-behavior:contain;
+  color:#fff;
+  background:linear-gradient(178deg, var(--cl-rail-top) 0%, var(--cl-rail-bottom) 100%);
+  border-right:1px solid rgba(255,255,255,0.06);
 }
-.cl-side::-webkit-scrollbar{width:6px;}
-.cl-side::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
+.cl-side::-webkit-scrollbar{width:5px;}
+.cl-side::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14); border:none;}
 
-/* Brand block at the head of the rail — same position and same divider the
-   Admin Portal uses. The logo is a tall, near-square emblem-plus-wordmark
-   rather than a wide strip, so it is centred and given real height instead of
-   being squeezed into a 38px line where the wordmark would be unreadable.
-
-   Selector is `.cl-side a.cl-brand`, not `.cl-brand`: this is an <a> inside
-   the rail, so the `.cl-side a` nav-item rule below would otherwise win on
-   specificity and stamp its padding, margin and pill radius onto the logo. */
+/* Brand. `.cl-side a.cl-brand` and not `.cl-brand`: this is an <a> inside the
+   rail, so the nav-item rule below would otherwise win on specificity and
+   stamp its padding and pill radius onto the logo. */
 .cl-side a.cl-brand{
   display:flex; align-items:center; justify-content:center;
-  padding:0 22px 18px; margin:0 0 10px; border-radius:0;
-  border-bottom:1px solid rgba(255,255,255,0.08);
-  background:none;
+  position:sticky; top:0; z-index:2;
+  padding:24px 22px 20px; margin:0 0 6px; border-radius:0;
+  border-bottom:1px solid var(--cl-rail-line);
+  background:linear-gradient(178deg, var(--cl-rail-top) 0%, rgba(10,37,64,0.92) 100%);
+  backdrop-filter:blur(8px);
+  transition:opacity var(--cl-fast);
 }
-.cl-side a.cl-brand:hover{background:none; text-decoration:none; opacity:.88;}
-.cl-side a.cl-brand img{height:78px; width:auto; max-width:100%; object-fit:contain;}
-.cl-side-group{
-  padding:16px 22px 6px; font-size:10.5px; font-weight:700;
-  letter-spacing:.08em; text-transform:uppercase;
-  color:rgba(255,255,255,0.32); white-space:nowrap;
-}
-.cl-side a{
-  display:flex; align-items:center; gap:12px;
-  padding:11px 22px; margin:2px 12px; border-radius:10px;
-  font-size:13.5px; font-weight:600; color:var(--cl-sidebar-text);
-  text-decoration:none; white-space:nowrap; position:relative;
-  transition:background .18s ease, color .18s ease;
-}
-.cl-side a:hover{background:rgba(255,255,255,0.07); color:var(--cl-sidebar-text-hover); text-decoration:none;}
-.cl-side a.active{background:rgba(255,107,53,0.16); color:#fff;}
-.cl-side a.active::before{
-  content:''; position:absolute; left:-12px; top:8px; bottom:8px;
-  width:3px; border-radius:3px; background:var(--cl-coral);
-}
-.cl-side-ico{width:18px; text-align:center; font-size:14px; opacity:.85; flex-shrink:0;}
-.cl-side a.active .cl-side-ico{opacity:1; color:var(--cl-coral);}
+.cl-side a.cl-brand:hover{background:linear-gradient(178deg, var(--cl-rail-top) 0%, rgba(10,37,64,0.92) 100%); opacity:.86;}
+.cl-side a.cl-brand img{height:66px; width:auto; max-width:100%; object-fit:contain;}
 
-/* ------------------------------------------------------------- topbar */
+.cl-side-group{
+  padding:20px 24px 8px;
+  font-size:9.5px; font-weight:700; letter-spacing:0.14em;
+  text-transform:uppercase; color:var(--cl-rail-text-dim);
+  white-space:nowrap;
+}
+.cl-side-group:first-of-type{padding-top:12px;}
+
+.cl-side a{
+  display:flex; align-items:center; gap:13px;
+  padding:10px 16px; margin:1px 14px; border-radius:var(--cl-r-sm);
+  font-size:13.5px; font-weight:600; color:var(--cl-rail-text);
+  text-decoration:none; white-space:nowrap; position:relative;
+  transition:background var(--cl-fast), color var(--cl-fast), transform var(--cl-fast);
+}
+.cl-side a:hover{
+  background:rgba(255,255,255,0.06); color:var(--cl-rail-text-hi);
+  text-decoration:none;
+}
+.cl-side a:active{transform:scale(.985);}
+.cl-side a.active{
+  background:linear-gradient(97deg, rgba(255,107,44,0.20), rgba(255,107,44,0.06));
+  color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,107,44,0.22);
+}
+.cl-side a.active::before{
+  content:''; position:absolute; left:-14px; top:9px; bottom:9px;
+  width:3px; border-radius:0 3px 3px 0; background:var(--cl-orange);
+  box-shadow:0 0 12px rgba(255,107,44,0.7);
+}
+/* Icons are inline SVG, stroked with currentColor, so they take the rail's
+   text colour and the active state's white for free. */
+.cl-side-ico{
+  width:19px; height:19px; flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  opacity:.72; transition:opacity var(--cl-fast), color var(--cl-fast);
+}
+.cl-side-ico svg{width:18px; height:18px; display:block;}
+.cl-side a:hover .cl-side-ico{opacity:1;}
+.cl-side a.active .cl-side-ico{opacity:1; color:var(--cl-orange);}
+
+/* A count riding on a nav item. */
+.cl-side-pill{
+  margin-left:auto; min-width:20px; height:19px; padding:0 6px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:10.5px; font-weight:700; line-height:1;
+  color:#fff; background:var(--cl-orange-cta); border-radius:var(--cl-r-pill);
+}
+.cl-side-pill:empty{display:none;}
+
+/* The rail's footer strip — signed-in company, pinned to the bottom. */
+.cl-side-foot{
+  margin-top:auto; padding:16px 24px 4px;
+  border-top:1px solid var(--cl-rail-line);
+  font-size:11px; font-weight:600; color:var(--cl-rail-text-foot);
+  line-height:1.5;
+}
+.cl-side-foot b{display:block; color:var(--cl-rail-text-hi); font-size:12px; font-weight:700;}
+
+/* ---------------------------------------------------------------- topbar */
 
 .cl-top{
   grid-column:2; grid-row:1;
-  display:flex; align-items:center; gap:16px;
-  margin:16px 40px 0; padding:16px 22px;
-  background:var(--cl-card-bg); border-radius:var(--cl-radius);
-  box-shadow:var(--cl-shadow-sm);
-  position:sticky; top:16px; z-index:150;
+  display:flex; align-items:center; gap:14px;
+  margin:18px 34px 0; padding:12px 18px;
+  background:color-mix(in srgb, var(--cl-surface) 82%, transparent);
+  backdrop-filter:blur(16px) saturate(1.6);
+  -webkit-backdrop-filter:blur(16px) saturate(1.6);
+  border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-lg);
+  box-shadow:var(--cl-sh-sm);
+  position:sticky; top:18px; z-index:150;
 }
-/* No .cl-top-brand rule: the topbar carries no brand block. The rail's logo is
-   the one place the company is named, and the search box takes the width the
-   name used to. */
-.cl-top-search{flex:1; max-width:360px; position:relative;}
-.cl-top-search input{
-  width:100%; height:38px; padding:0 14px; font-size:13.5px;
-  color:var(--cl-text-primary); background:var(--cl-hover-bg);
-  border:1.5px solid transparent; border-radius:12px;
+/* Browsers without color-mix get a solid bar rather than a transparent one. */
+@supports not (background:color-mix(in srgb, red 50%, blue)){
+  .cl-top{background:var(--cl-surface);}
 }
-.cl-top-search input::placeholder{color:var(--cl-text-muted);}
-.cl-top-search input:focus{border-color:var(--cl-coral); background:var(--cl-card-bg); outline:none;}
+
+/* The page title lives in the bar, so the bar is never an empty strip of
+   controls with no subject. */
+.cl-top-title{display:flex; flex-direction:column; gap:1px; min-width:0;}
+.cl-top-title b{
+  font-size:15px; font-weight:700; color:var(--cl-text);
+  letter-spacing:-0.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-top-title span{
+  font-size:11.5px; font-weight:600; color:var(--cl-text-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
 .cl-top-right{margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;}
+
 .cl-top-btn{
-  display:inline-flex; align-items:center; justify-content:center; gap:6px;
-  height:38px; padding:0 14px; font-size:12.5px; font-weight:700; cursor:pointer;
-  color:var(--cl-text-primary); background:var(--cl-hover-bg);
-  border:none; border-radius:12px; text-decoration:none;
-  transition:background .18s ease;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  height:38px; padding:0 14px;
+  font-size:12.5px; font-weight:600; cursor:pointer;
+  color:var(--cl-text-2); background:transparent;
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-sm);
+  text-decoration:none;
+  transition:background var(--cl-fast), color var(--cl-fast), border-color var(--cl-fast);
 }
-.cl-top-btn:hover{background:var(--cl-border-color); text-decoration:none;}
-.cl-top-user{
-  display:flex; align-items:center; gap:10px; padding:6px 14px 6px 6px;
-  border-radius:var(--cl-radius-pill); background:var(--cl-hover-bg);
-  font-size:12.5px; color:var(--cl-text-muted); font-weight:600; white-space:nowrap;
-}
-.cl-top-user b{color:var(--cl-text-primary); font-weight:700;}
-.cl-bell{position:relative; width:38px; padding:0;}
+.cl-top-btn:hover{background:var(--cl-hover); color:var(--cl-text); text-decoration:none;}
+.cl-top-btn svg{width:17px; height:17px;}
+.cl-top-icon{width:38px; padding:0;}
+
+.cl-bell{position:relative;}
 .cl-bell-count{
-  position:absolute; top:2px; right:2px; min-width:16px; height:16px; padding:0 3px;
-  font-size:10px; font-weight:800; line-height:1;
+  position:absolute; top:-5px; right:-5px; min-width:18px; height:18px; padding:0 5px;
+  font-size:10px; font-weight:700; line-height:1;
   display:flex; align-items:center; justify-content:center;
-  color:#fff; background:var(--cl-coral); border:1.5px solid var(--cl-card-bg);
-  border-radius:8px;
+  color:#fff; background:var(--cl-orange-cta);
+  border:2px solid var(--cl-surface); border-radius:var(--cl-r-pill);
+  box-shadow:var(--cl-sh-accent);
 }
 .cl-bell-count:empty{display:none;}
-.cl-burger{display:none;}
+.cl-bell.has-unread svg{color:var(--cl-orange);}
 
-/* Theme selector — same control Admin puts in its topbar. */
-.cl-theme{display:flex; align-items:center; gap:2px; background:var(--cl-hover-bg); border-radius:12px; padding:3px;}
+/* The current date, as a quiet chip. Business date is genuinely useful on an
+   operations screen — a booking cut-off is relative to today. */
+.cl-top-date{
+  display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 14px;
+  font-size:12.5px; font-weight:600; color:var(--cl-text-2);
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-sm); white-space:nowrap;
+}
+.cl-top-date svg{width:15px; height:15px; color:var(--cl-text-muted);}
+
+/* Theme switch — three states, one pill. */
+.cl-theme{
+  display:flex; align-items:center; gap:2px;
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-sm); padding:3px;
+}
 .cl-theme-btn{
   display:flex; align-items:center; justify-content:center;
-  width:32px; height:32px; border-radius:9px; border:none; background:none; cursor:pointer;
-  font-size:14px; line-height:1; color:var(--cl-text-muted);
-  transition:background .18s ease, color .18s ease;
+  width:32px; height:32px; border-radius:calc(var(--cl-r-sm) - 3px);
+  cursor:pointer; color:var(--cl-text-muted);
+  transition:background var(--cl-fast), color var(--cl-fast);
 }
-.cl-theme-btn:hover{color:var(--cl-text-primary);}
-.cl-theme-btn.active{background:var(--cl-card-bg); color:var(--cl-text-primary); box-shadow:var(--cl-shadow-sm);}
+.cl-theme-btn svg{width:16px; height:16px;}
+.cl-theme-btn:hover{color:var(--cl-text);}
+.cl-theme-btn.active{background:var(--cl-surface); color:var(--cl-orange); box-shadow:var(--cl-sh-xs);}
 
-/* --------------------------------------------------------------- main */
+/* ---- profile menu ---- */
+
+.cl-profile{position:relative;}
+.cl-profile-btn{
+  display:flex; align-items:center; gap:10px; height:42px; padding:0 12px 0 4px;
+  cursor:pointer; border-radius:var(--cl-r-pill);
+  background:transparent; border:1px solid transparent;
+  transition:background var(--cl-fast), border-color var(--cl-fast);
+}
+.cl-profile-btn:hover{background:var(--cl-hover); border-color:var(--cl-line);}
+.cl-profile-btn[aria-expanded="true"]{background:var(--cl-hover); border-color:var(--cl-line);}
+.cl-avatar{
+  width:34px; height:34px; flex-shrink:0; border-radius:var(--cl-r-pill);
+  display:flex; align-items:center; justify-content:center;
+  font-size:12.5px; font-weight:700; color:#fff; letter-spacing:0.02em;
+  background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-800));
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,0.16);
+}
+.cl-avatar-lg{width:52px; height:52px; font-size:18px;}
+.cl-profile-id{display:flex; flex-direction:column; gap:0; text-align:left; min-width:0; max-width:150px;}
+.cl-profile-id b{
+  font-size:12.5px; font-weight:700; color:var(--cl-text); line-height:1.3;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-profile-id span{
+  font-size:11px; font-weight:600; color:var(--cl-text-muted); line-height:1.3;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-profile-caret{width:14px; height:14px; color:var(--cl-text-muted); flex-shrink:0; transition:transform var(--cl-fast);}
+.cl-profile-btn[aria-expanded="true"] .cl-profile-caret{transform:rotate(180deg);}
+
+.cl-menu{
+  position:absolute; top:calc(100% + 10px); right:0; z-index:260;
+  min-width:262px; padding:8px;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-lg);
+  opacity:0; visibility:hidden; transform:translateY(-6px) scale(.98);
+  transform-origin:top right;
+  transition:opacity var(--cl-fast), transform var(--cl-fast), visibility var(--cl-fast);
+}
+.cl-menu.open{opacity:1; visibility:visible; transform:none;}
+.cl-menu-head{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 12px 14px; margin-bottom:6px;
+  border-bottom:1px solid var(--cl-line-2);
+}
+.cl-menu-head div{min-width:0;}
+.cl-menu-head b{
+  display:block; font-size:13.5px; font-weight:700; color:var(--cl-text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-menu-head span{
+  display:block; font-size:11.5px; font-weight:600; color:var(--cl-text-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-menu-item{
+  display:flex; align-items:center; gap:11px; width:100%;
+  padding:10px 12px; border-radius:var(--cl-r-xs);
+  font-size:13px; font-weight:600; color:var(--cl-text-2);
+  cursor:pointer; text-align:left; text-decoration:none;
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-menu-item:hover{background:var(--cl-hover); color:var(--cl-text); text-decoration:none;}
+.cl-menu-item svg{width:16px; height:16px; flex-shrink:0; color:var(--cl-text-muted);}
+.cl-menu-item:hover svg{color:var(--cl-orange);}
+.cl-menu-item.danger{color:var(--cl-danger-fg);}
+.cl-menu-item.danger svg,.cl-menu-item.danger:hover svg{color:var(--cl-danger);}
+.cl-menu-item.danger:hover{background:var(--cl-danger-bg);}
+.cl-menu-sep{height:1px; margin:6px 12px; background:var(--cl-line-2);}
+.cl-menu-note{padding:6px 12px 8px; font-size:11px; font-weight:600; color:var(--cl-text-muted);}
+
+/* Burger, phone only. */
+.cl-burger{display:none;}
+
+/* ------------------------------------------------------------------ main */
 
 .cl-main{grid-column:2; grid-row:2; min-width:0; display:flex; flex-direction:column;}
-.cl-crumb{
-  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
-  padding:18px 40px 0; font-size:12.5px; font-weight:600; color:var(--cl-text-muted);
-}
-.cl-crumb b{color:var(--cl-text-primary); font-weight:700;}
-.cl-crumb-date{margin-left:auto;}
-.cl-content{padding:18px 40px 40px; flex:1; max-width:1280px;}
 
-.cl-page-head{display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:20px;}
-.cl-page-head h1{font-size:21px;}
-.cl-page-head p{margin:3px 0 0; font-size:13px; color:var(--cl-text-muted); font-weight:600;}
-.cl-page-actions{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;}
+.cl-crumb{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:20px 34px 0; font-size:12px; font-weight:600; color:var(--cl-text-muted);
+}
+.cl-crumb b{color:var(--cl-text-2); font-weight:700;}
+.cl-crumb-date{margin-left:auto;}
+
+.cl-content{padding:14px 34px 48px; flex:1; width:100%; max-width:1480px;}
 
 .cl-section{display:none;}
-.cl-section.active{display:block;}
+.cl-section.active{display:block; animation:cl-enter .34s var(--cl-ease) both;}
 
-/* ==============================  panels  ================================ */
-
-.cl-panel{
-  background:var(--cl-card-bg); border:1px solid var(--cl-border-color);
-  border-radius:var(--cl-radius); box-shadow:var(--cl-shadow-sm);
-  margin-bottom:22px; overflow:hidden;
+/* Page header — title, subtitle, actions. Every screen opens with one. */
+.cl-page-head{
+  display:flex; align-items:flex-start; gap:18px; flex-wrap:wrap;
+  margin:6px 0 24px;
 }
-.cl-panel-head{
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:18px 24px 0;
+.cl-page-head h1{font-size:26px;}
+.cl-page-head p{
+  margin:6px 0 0; font-size:13.5px; color:var(--cl-text-muted); font-weight:500;
+  max-width:70ch;
 }
-.cl-panel-head h2{font-size:16px; font-weight:800;}
-.cl-panel-head .cl-panel-tools{margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
-.cl-panel-body{padding:18px 24px 24px;}
-.cl-panel-body.cl-flush{padding:14px 0 0;}
-.cl-panel-note{
-  padding:12px 24px; font-size:12.5px; font-weight:600; color:var(--cl-text-muted);
-  background:var(--cl-hover-bg); border-top:1px solid var(--cl-border-color);
-}
+.cl-page-actions{margin-left:auto; display:flex; gap:9px; flex-wrap:wrap; align-items:center;}
 
-/* ==============================  forms  ================================= */
 
-.cl-form{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px 16px;}
+/* ==========================================================================
+   5. FORMS
+   ==========================================================================
+   Labels sit above their control. That is what Stripe, Linear and every
+   serious data-entry product do — a floating label is charming on a four-field
+   sign-up and a liability on a filter bar, where it hides the field's meaning
+   the moment a value is in it.
+
+   The one place a floating label genuinely helps is a short, high-ceremony
+   form, so it is available as an OPT-IN (`.cl-field-float`) and is used on
+   sign-in. It is not forced on the ~120 filter and detail fields this portal
+   already renders, where it would be a regression dressed as a trend. */
+
+.cl-form{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:18px 18px;}
 .cl-form-2{grid-template-columns:repeat(2, minmax(0,1fr));}
 .cl-form-3{grid-template-columns:repeat(3, minmax(0,1fr));}
-.cl-field{display:flex; flex-direction:column; gap:5px; min-width:0;}
+.cl-field{display:flex; flex-direction:column; gap:7px; min-width:0;}
 .cl-field-wide{grid-column:span 2;}
 .cl-field-full{grid-column:1 / -1;}
+
 .cl-field label{
-  font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
   color:var(--cl-text-muted);
+  display:flex; align-items:center; gap:5px;
 }
-.cl-field label .cl-req{color:var(--cl-coral-dark); margin-left:2px;}
-.cl-field small{font-size:11.5px; color:var(--cl-text-muted);}
+.cl-field label .cl-req{color:var(--cl-orange); margin-left:1px; font-size:13px; line-height:1;}
+.cl-field small{
+  font-size:11.5px; color:var(--cl-text-muted); font-weight:500; line-height:1.45;
+}
 
 input[type=text], input[type=email], input[type=password], input[type=number],
-input[type=date], input[type=tel], input[type=search], select, textarea{
-  width:100%; padding:10px 12px;
-  font-family:inherit; font-size:13.5px; color:var(--cl-text-primary);
-  background:var(--cl-card-bg); border:1.5px solid var(--cl-border-color);
-  border-radius:10px;
+input[type=date], input[type=time], input[type=tel], input[type=url],
+input[type=search], select, textarea{
+  width:100%; min-height:42px; padding:10px 14px;
+  font-family:inherit; font-size:13.5px; font-weight:500;
+  color:var(--cl-text);
+  background:var(--cl-surface);
+  border:1.5px solid var(--cl-line); border-radius:var(--cl-r-sm);
+  transition:border-color var(--cl-fast), box-shadow var(--cl-fast), background var(--cl-fast);
+  appearance:none; -webkit-appearance:none;
 }
-textarea{min-height:84px; resize:vertical; line-height:1.5;}
-select{cursor:pointer;}
-input:disabled, select:disabled, textarea:disabled{
-  background:var(--cl-hover-bg); color:var(--cl-text-muted); cursor:not-allowed;
-}
-input:focus, select:focus, textarea:focus{outline:none; border-color:var(--cl-coral);}
-input[readonly]{background:var(--cl-hover-bg);}
+input::placeholder, textarea::placeholder{color:var(--cl-text-muted); opacity:.8; font-weight:500;}
+textarea{min-height:96px; resize:vertical; line-height:1.6; padding-top:12px;}
 
-.cl-check{display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600;}
-.cl-check input{width:auto; padding:0; margin:0;}
+/* A caret we control, so the field looks the same in every browser. */
+select{
+  cursor:pointer; padding-right:38px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236C7F99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 13px center;
+}
+:root[data-theme="dark"] select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238496B2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6);}
+
+input:hover:not(:disabled):not([readonly]),
+select:hover:not(:disabled), textarea:hover:not(:disabled){border-color:#CBD6E4;}
+:root[data-theme="dark"] input:hover:not(:disabled):not([readonly]),
+:root[data-theme="dark"] select:hover:not(:disabled),
+:root[data-theme="dark"] textarea:hover:not(:disabled){border-color:#33455F;}
+
+input:focus, select:focus, textarea:focus{
+  outline:none; border-color:var(--cl-orange);
+  box-shadow:0 0 0 4px var(--cl-focus);
+}
+input:disabled, select:disabled, textarea:disabled{
+  background:var(--cl-canvas-2); color:var(--cl-text-muted); cursor:not-allowed; opacity:.75;
+}
+input[readonly]{background:var(--cl-canvas-2); cursor:default;}
+
+/* Validation. `.cl-invalid` is set by a module; `:user-invalid` catches the
+   browser's own verdict once the user has actually interacted. */
+.cl-field.cl-invalid input, .cl-field.cl-invalid select, .cl-field.cl-invalid textarea,
+input:user-invalid, select:user-invalid, textarea:user-invalid{
+  border-color:var(--cl-danger);
+}
+.cl-field.cl-invalid input:focus, input:user-invalid:focus{box-shadow:0 0 0 4px rgba(224,54,75,0.20);}
+.cl-field-err{
+  display:flex; align-items:center; gap:6px;
+  font-size:11.5px; font-weight:600; color:var(--cl-danger-fg);
+}
+.cl-field-err::before{
+  content:''; width:13px; height:13px; flex-shrink:0;
+  background:currentColor;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 8v4M12 16h.01'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.cl-field.cl-valid input{border-color:var(--cl-success);}
+
+/* ---- opt-in floating label ----
+   The input comes FIRST in the markup and the label second, so `input + label`
+   can react to `:placeholder-shown`. The placeholder is a single space, which
+   is what makes "empty" detectable while showing nothing. */
+.cl-field-float{position:relative; gap:0;}
+.cl-field-float label{
+  display:block; position:absolute; left:15px; top:17px; z-index:1;
+  font-size:13.5px; font-weight:500; text-transform:none; letter-spacing:0;
+  color:var(--cl-text-muted); pointer-events:none;
+  transform-origin:left top;
+  transition:transform var(--cl-fast), color var(--cl-fast);
+}
+.cl-field-float input{height:56px; min-height:56px; padding:23px 15px 8px;}
+.cl-field-float input:focus + label,
+.cl-field-float input:not(:placeholder-shown) + label,
+.cl-field-float.cl-filled label{
+  transform:translateY(-10px) scale(.76);
+}
+.cl-field-float input:focus + label{color:var(--cl-orange);}
+
+/* Checkbox / radio */
+.cl-check{
+  display:flex; align-items:center; gap:10px;
+  font-size:13.5px; font-weight:600; color:var(--cl-text-2); cursor:pointer;
+}
+.cl-check input[type=checkbox], .cl-check input[type=radio]{
+  width:18px; height:18px; min-height:0; flex-shrink:0; margin:0; padding:0;
+  border:1.5px solid var(--cl-line); border-radius:5px; cursor:pointer;
+  background:var(--cl-surface); position:relative;
+  transition:background var(--cl-fast), border-color var(--cl-fast);
+}
+.cl-check input[type=radio]{border-radius:50%;}
+.cl-check input:checked{background:var(--cl-orange); border-color:var(--cl-orange);}
+.cl-check input[type=checkbox]:checked::after{
+  content:''; position:absolute; inset:0;
+  background:#fff;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E") center/11px no-repeat;
+}
+.cl-check input[type=radio]:checked::after{
+  content:''; position:absolute; inset:4px; border-radius:50%; background:#fff;
+}
 
 .cl-form-actions{
   display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-  margin-top:18px; padding-top:16px; border-top:1px solid var(--cl-border-color);
+  margin-top:22px; padding-top:20px; border-top:1px solid var(--cl-line-2);
 }
 
-/* ==============================  buttons  =============================== */
-
-.cl-btn{
-  display:inline-flex; align-items:center; justify-content:center; gap:6px;
-  padding:10px 18px; font-size:13.5px; font-weight:700; cursor:pointer;
-  color:var(--cl-navy); background:rgba(11,60,109,0.06);
-  border:none; border-radius:var(--cl-radius-pill);
-  white-space:nowrap; transition:filter .2s ease, background .2s ease;
-}
-.cl-btn:hover:not(:disabled){filter:brightness(1.06); text-decoration:none;}
-.cl-btn:disabled{opacity:.4; cursor:not-allowed;}
-:root[data-theme="dark"] .cl-btn{background:var(--cl-hover-bg); color:var(--cl-text-primary);}
-.cl-btn-primary{background:var(--cl-coral); color:#fff;}
-.cl-btn-danger{background:rgba(230,57,70,0.12); color:var(--cl-coral-dark);}
-:root[data-theme="dark"] .cl-btn-danger{color:#ff9c8a;}
-.cl-btn-sm{padding:7px 14px; font-size:12.5px;}
-.cl-btn-link{
-  padding:0; background:none; color:var(--cl-sky); font-weight:700;
-  border-radius:0;
-}
-.cl-btn-link:hover:not(:disabled){background:none; text-decoration:underline; filter:none;}
-
-/* ==============================  tables  ================================ */
-
-.cl-table-wrap{overflow-x:auto; border-radius:12px;}
-.cl-table{width:100%; font-size:13.5px;}
-.cl-table th{
-  padding:10px 12px; text-align:left; font-size:11px; font-weight:700;
-  text-transform:uppercase; letter-spacing:.05em; color:var(--cl-text-muted);
-  background:var(--cl-card-bg); border-bottom:2px solid var(--cl-border-color);
-  white-space:nowrap; position:sticky; top:0; z-index:1;
-}
-.cl-table td{
-  padding:12px; border-bottom:1px solid var(--cl-border-color);
-  vertical-align:middle; color:var(--cl-text-primary);
-}
-.cl-table tbody tr{transition:background .15s ease;}
-.cl-table tbody tr:hover{background:var(--cl-hover-bg);}
-.cl-table tbody tr:last-child td{border-bottom:none;}
-.cl-table .cl-actions{white-space:nowrap; text-align:right;}
-.cl-table .cl-actions .cl-btn{margin-left:6px;}
-.cl-table tr.cl-selected{background:var(--cl-coral-hover);}
-:root[data-theme="dark"] .cl-table tr.cl-selected{background:rgba(255,107,53,0.14);}
-.cl-ref{font-family:var(--cl-mono); font-size:12.5px; font-weight:600;}
-
-/* A continuation line under its own row — used by the cancellation/reschedule
-   list to carry the quoted amounts and the reason, which do not fit the
-   columns and must not be truncated into meaninglessness. Its top border is
-   removed so it reads as part of the row above rather than a row of its own. */
-.cl-table tr.cl-subrow td{
-  padding:0 12px 11px; border-bottom:1px solid var(--cl-border-color);
-  color:var(--cl-text-muted);
-}
-.cl-table tr.cl-subrow:hover{background:transparent;}
-.cl-table tr.cl-subrow + tr td{border-top:none;}
-/* "Not applicable", as opposed to a zero — a blank amount on a request nobody
-   has priced yet says something different from "0.00". */
-.cl-muted{color:var(--cl-text-muted); font-weight:600;}
-.cl-empty{
-  padding:26px 12px !important; text-align:center;
-  color:var(--cl-text-muted); font-size:13.5px; font-weight:600;
-}
-
-/* ==============================  status  ================================ */
-
-.cl-tag{
-  display:inline-block; padding:4px 10px; border-radius:var(--cl-radius-pill);
-  font-size:11.5px; font-weight:700; white-space:nowrap;
-  background:rgba(11,60,109,0.06); color:var(--cl-text-muted);
-}
-:root[data-theme="dark"] .cl-tag{background:var(--cl-hover-bg);}
-.cl-tag-ok{background:rgba(18,183,106,0.12); color:var(--cl-emerald);}
-.cl-tag-warn{background:rgba(255,176,32,0.15); color:#8f5c00;}
-:root[data-theme="dark"] .cl-tag-warn{color:var(--cl-gold);}
-.cl-tag-err{background:rgba(230,57,70,0.12); color:var(--cl-coral-dark);}
-:root[data-theme="dark"] .cl-tag-err{color:#ff9c8a;}
-.cl-tag-info{background:rgba(47,128,237,0.12); color:var(--cl-sky);}
-
-/* ==============================  KPIs  ==================================
-   Admin's .stat-grid / .stat-card: separate cards with a hover lift, not the
-   flat joined strip this portal used before. */
-
-.cl-kpis{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr));
-  gap:18px; margin-bottom:24px;
-}
-.cl-kpi{
-  background:var(--cl-card-bg); border:1px solid var(--cl-border-color);
-  border-radius:var(--cl-radius); box-shadow:var(--cl-shadow-sm);
-  padding:20px 22px; text-align:left; font:inherit; color:inherit;
-  transition:transform .2s ease, box-shadow .2s ease;
-}
-button.cl-kpi{cursor:pointer; width:100%; display:block;}
-.cl-kpi:hover{transform:translateY(-3px); box-shadow:var(--cl-shadow-lg);}
-.cl-kpi-label{
-  font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
-  color:var(--cl-text-muted); margin-top:4px;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.cl-kpi-value{
-  font-size:24px; font-weight:800; line-height:1.1;
-  color:var(--cl-text-primary); font-variant-numeric:tabular-nums;
-}
-.cl-kpi-sub{font-size:10.5px; color:var(--cl-text-muted); margin-top:3px; font-weight:600;}
-
-/* ==============================  charts  ================================
-   The dashboard's three SVG figures. Nothing here sets a colour: the charts
-   themselves reference the same --cl- tokens as every other component, which
-   is what lets the theme switch re-paint them without a redraw. */
-
-.cl-charts{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr));
-  gap:18px; margin-bottom:24px;
-}
-/* The panels are already margin-bottom'd on their own; inside the grid the gap
-   does that job, so the extra margin would double the gutter. */
-.cl-charts .cl-panel{margin-bottom:0;}
-.cl-chart .cl-panel-body{padding-top:14px;}
-/* height:auto with a viewBox is what makes the drawing scale with the column
-   instead of needing a resize observer. */
-.cl-chart-svg{display:block; width:100%; height:auto; overflow:visible;}
-
-.cl-donut{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
-.cl-donut svg{width:140px; height:140px; flex-shrink:0;}
-.cl-legend{list-style:none; margin:0; padding:0; flex:1; min-width:130px;}
-.cl-legend li{
-  display:flex; align-items:center; gap:8px;
-  font-size:11.5px; font-weight:600; color:var(--cl-text-muted);
-  padding:3px 0;
-}
-.cl-legend i{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
-.cl-legend span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-.cl-legend b{color:var(--cl-text-primary); font-weight:800; font-variant-numeric:tabular-nums;}
-
-/* ==============================  tabs  ================================== */
-
-.cl-tabs{
-  display:flex; gap:0; flex-wrap:wrap; margin-bottom:18px;
-  border-bottom:1px solid var(--cl-border-color);
-}
-.cl-tab{
-  padding:10px 18px; font:inherit; font-size:13.5px; font-weight:700; cursor:pointer;
-  background:none; border:none; border-bottom:2px solid transparent;
-  color:var(--cl-text-muted); margin-bottom:-1px;
-}
-.cl-tab:hover{color:var(--cl-text-primary);}
-.cl-tab.active{color:var(--cl-coral); border-bottom-color:var(--cl-coral);}
-
-/* ==============================  messages  ============================== */
-
-.cl-msg{
-  padding:11px 14px; border-radius:12px; font-size:13px; font-weight:600;
-  border:1px solid transparent; margin-top:12px;
-}
-.cl-msg:empty{display:none;}
-.cl-msg-ok{background:rgba(18,183,106,0.12); border-color:rgba(18,183,106,0.28); color:var(--cl-emerald);}
-.cl-msg-err{background:rgba(230,57,70,0.12); border-color:rgba(230,57,70,0.28); color:var(--cl-coral-dark);}
-:root[data-theme="dark"] .cl-msg-err{color:#ff9c8a;}
-.cl-msg-info{background:rgba(47,128,237,0.12); border-color:rgba(47,128,237,0.28); color:var(--cl-sky);}
-.cl-msg-muted{background:var(--cl-hover-bg); border-color:var(--cl-border-color); color:var(--cl-text-muted);}
-/* "Your booking came back for a correction" (CR-2). Not an error — nothing
-   failed and nothing is lost — but not neutral either: it is the one message
-   on the page the merchant has to act on. */
-.cl-msg-warn{background:rgba(255,176,32,0.14); border-color:rgba(255,176,32,0.40); color:#8a5a00;}
-:root[data-theme="dark"] .cl-msg-warn{color:#ffc766;}
-
-/* ==============================  modal  ================================= */
-
-.cl-modal-back{
-  position:fixed; inset:0; z-index:300; background:rgba(10,37,64,0.6);
-  display:none; align-items:flex-start; justify-content:center;
-  padding:40px 20px; overflow-y:auto;
-}
-.cl-modal-back.open{display:flex;}
-.cl-modal{
-  width:100%; max-width:660px; background:var(--cl-card-bg);
-  border-radius:var(--cl-radius); box-shadow:var(--cl-shadow-lg); overflow:hidden;
-}
-.cl-modal-wide{max-width:900px;}
-.cl-modal-head{display:flex; align-items:center; gap:10px; padding:24px 28px 0;}
-.cl-modal-head h2{font-size:19px; font-weight:800;}
-.cl-modal-close{
-  margin-left:auto; width:32px; height:32px; font-size:20px; line-height:1; cursor:pointer;
-  background:var(--cl-hover-bg); border:none; border-radius:10px; color:var(--cl-text-muted);
-}
-.cl-modal-close:hover{background:var(--cl-border-color); color:var(--cl-text-primary);}
-.cl-modal-body{padding:20px 28px; max-height:calc(100vh - 220px); overflow-y:auto;}
-.cl-modal-foot{
-  display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;
-  padding:16px 28px 24px; border-top:1px solid var(--cl-border-color);
-}
-
-/* ==============================  detail lists  ========================== */
-
-.cl-dl{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:14px 20px; margin:0;}
-.cl-dl div{min-width:0;}
-.cl-dl dt{
-  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
-  color:var(--cl-text-muted); margin:0;
-}
-.cl-dl dd{margin:3px 0 0; font-size:13.5px; font-weight:600; word-break:break-word;}
-
-/* ==============================  misc  ================================== */
-
-.cl-toolbar{
-  display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;
-  padding:18px 24px; border-bottom:1px solid var(--cl-border-color);
-}
-.cl-toolbar .cl-field{min-width:150px;}
-
-.cl-pager{
-  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-  padding:16px 24px; border-top:1px solid var(--cl-border-color);
-  font-size:13px; font-weight:600; color:var(--cl-text-muted);
-}
-.cl-pager-info{margin-right:auto;}
-
-.cl-spin{
-  display:inline-block; width:13px; height:13px; vertical-align:-2px;
-  border:2px solid var(--cl-border-color); border-top-color:var(--cl-coral);
-  border-radius:50%; animation:cl-spin .6s linear infinite;
-}
-@keyframes cl-spin{to{transform:rotate(360deg);}}
-
-.cl-stepper{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;}
-.cl-step{
-  flex:1; min-width:140px; padding:14px 16px; font-size:12px; font-weight:600;
-  background:var(--cl-card-bg); color:var(--cl-text-muted);
-  border:1px solid var(--cl-border-color); border-radius:var(--cl-radius-sm);
-  box-shadow:var(--cl-shadow-sm);
-}
-.cl-step b{display:block; font-size:13.5px; font-weight:800; color:var(--cl-text-primary); margin-bottom:2px;}
-.cl-step.done b{color:var(--cl-emerald);}
-.cl-step.current{border-color:var(--cl-coral);}
-.cl-step.current b{color:var(--cl-coral);}
-
-/* Notifications drawer. */
-.cl-drawer{
-  position:fixed; top:0; right:0; bottom:0; z-index:310; width:380px; max-width:92vw;
-  background:var(--cl-card-bg); box-shadow:var(--cl-shadow-lg);
-  display:none; flex-direction:column;
-}
-.cl-drawer.open{display:flex;}
-.cl-drawer-head{
-  display:flex; align-items:center; gap:10px;
-  padding:22px 24px 16px; border-bottom:1px solid var(--cl-border-color);
-}
-.cl-drawer-head h2{font-size:17px; font-weight:800;}
-.cl-drawer-list{flex:1; overflow-y:auto; padding:8px;}
-.cl-note{
-  padding:12px 14px; margin-bottom:6px; border-radius:12px;
-  background:var(--cl-hover-bg); cursor:pointer; font-size:13px;
-}
-.cl-note:hover{background:var(--cl-border-color);}
-.cl-note.unread{background:var(--cl-coral-hover);}
-:root[data-theme="dark"] .cl-note.unread{background:rgba(255,107,53,0.14);}
-.cl-note b{display:block; font-size:13.5px; font-weight:700; margin-bottom:2px;}
-.cl-note time{display:block; margin-top:4px; font-size:11.5px; color:var(--cl-text-muted);}
-.cl-drawer-back{position:fixed; inset:0; z-index:305; background:rgba(10,37,64,0.4); display:none;}
-.cl-drawer-back.open{display:block;}
-
-/* Global search results, dropped under the topbar search box. */
-.cl-gs{
-  position:absolute; top:46px; left:0; right:0; z-index:60;
-  background:var(--cl-card-bg); border:1px solid var(--cl-border-color);
-  border-radius:var(--cl-radius-sm); box-shadow:var(--cl-shadow-lg);
-  max-height:360px; overflow-y:auto; display:none;
-}
-.cl-gs.open{display:block;}
-.cl-gs a{
-  display:block; padding:11px 14px; font-size:13px; font-weight:600;
-  color:var(--cl-text-primary); border-bottom:1px solid var(--cl-border-color);
-}
-.cl-gs a:hover{background:var(--cl-hover-bg); text-decoration:none;}
-.cl-gs a:last-child{border-bottom:none;}
-.cl-gs small{display:block; color:var(--cl-text-muted); font-size:11.5px; font-weight:600;}
-
-/* ==============================  enquiry form  ==========================
-   The controls the Enquire Ticket modal is built from. Airline booking sites
-   have settled on the same four: a trip-type segmented control, searchable
-   city fields, an hour + AM/PM time picker, and +/- passenger steppers. They
-   are built from this portal's own tokens rather than a widget library, so
-   they inherit the coral focus ring and both themes for free.
-
-   All `cl-` namespaced and used only by the enquiry and booking screens —
-   nothing above this block changed. */
-
-/* ---- trip type: One Way / Round Trip ---- */
-
-.cl-trip{
-  display:inline-flex; gap:3px; padding:4px;
-  background:var(--cl-hover-bg); border-radius:var(--cl-radius-pill);
-}
-.cl-trip-opt{
-  display:inline-flex; align-items:center; gap:7px;
-  padding:8px 18px; border-radius:var(--cl-radius-pill);
-  font-size:13px; font-weight:700; color:var(--cl-text-muted);
-  cursor:pointer; user-select:none; white-space:nowrap;
-  transition:background .18s ease, color .18s ease;
-}
-.cl-trip-opt:hover{color:var(--cl-text-primary);}
-/* The radio itself stays in the DOM and keeps the label association, so the
-   control is still a real radio group for a screen reader and for arrow keys —
-   it is only visually replaced by the pill. */
-.cl-trip-opt input{position:absolute; opacity:0; width:0; height:0; margin:0;}
-.cl-trip-opt::before{
-  content:''; width:15px; height:15px; flex-shrink:0; border-radius:50%;
-  border:2px solid var(--cl-border-color); background:var(--cl-card-bg);
-  transition:border-color .18s ease, box-shadow .18s ease;
-}
-.cl-trip-opt.checked{background:var(--cl-card-bg); color:var(--cl-text-primary); box-shadow:var(--cl-shadow-sm);}
-.cl-trip-opt.checked::before{border-color:var(--cl-coral); box-shadow:inset 0 0 0 3px var(--cl-coral);}
-.cl-trip-opt:focus-within{outline:2px solid var(--cl-coral); outline-offset:2px;}
-
-/* ---- searchable dropdown ---- */
-
-.cl-combo{position:relative;}
-.cl-combo-list{
-  position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:70;
-  background:var(--cl-card-bg); border:1px solid var(--cl-border-color);
-  border-radius:var(--cl-radius-sm); box-shadow:var(--cl-shadow-lg);
-  max-height:248px; overflow-y:auto; display:none; padding:4px;
-}
-.cl-combo-list.open{display:block;}
-.cl-combo-opt{
-  display:block; width:100%; text-align:left; padding:9px 11px; border:none;
-  background:none; border-radius:10px; cursor:pointer; font:inherit;
-  font-size:13px; font-weight:600; color:var(--cl-text-primary);
-}
-.cl-combo-opt:hover, .cl-combo-opt.cl-active{background:var(--cl-hover-bg);}
-.cl-combo-opt small{display:block; font-size:11.5px; font-weight:600; color:var(--cl-text-muted); margin-top:1px;}
-.cl-combo-opt mark{background:none; color:var(--cl-coral); font-weight:800;}
-.cl-combo-empty{padding:12px 11px; font-size:12.5px; font-weight:600; color:var(--cl-text-muted);}
-
-/* ---- time ----
-   CR-5 replaced the hour-select + AM/PM toggle with a single 24-hour <select>,
-   so `.cl-mer` / `.cl-mer-btn` were deleted here along with their only markup.
-   `.cl-time` is kept: it is a plain flex row, and it is what any future
-   two-part time control would sit in. */
-
-.cl-time{display:flex; gap:8px; align-items:stretch;}
-.cl-time select{flex:1; min-width:0;}
-
-/* ---- passenger steppers ---- */
-
-.cl-pax-grid{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:12px;
-}
-.cl-pax-card{
-  display:flex; align-items:center; gap:12px;
-  padding:13px 15px; border:1.5px solid var(--cl-border-color);
-  border-radius:var(--cl-radius-sm); background:var(--cl-card-bg);
-}
-.cl-pax-card b{display:block; font-size:13.5px; font-weight:700;}
-.cl-pax-card small{display:block; font-size:11px; font-weight:600; color:var(--cl-text-muted); margin-top:1px;}
-.cl-step-ctl{display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0;}
-.cl-step-btn{
-  width:32px; height:32px; flex-shrink:0; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center;
-  font-size:17px; font-weight:700; line-height:1;
-  color:var(--cl-coral); background:var(--cl-hover-bg);
-  border:1.5px solid var(--cl-border-color); border-radius:50%;
-  transition:background .18s ease, border-color .18s ease;
-}
-.cl-step-btn:hover:not(:disabled){background:var(--cl-coral); border-color:var(--cl-coral); color:#fff;}
-.cl-step-btn:disabled{opacity:.35; cursor:not-allowed;}
-.cl-step-val{
-  min-width:26px; text-align:center; font-size:15px; font-weight:800;
-  font-variant-numeric:tabular-nums; color:var(--cl-text-primary);
-}
-
-/* ---- the return-journey block, revealed by Round Trip ---- */
-
-.cl-return{
-  margin-top:6px; padding:16px; border-radius:var(--cl-radius-sm);
-  background:var(--cl-hover-bg); border:1px dashed var(--cl-border-color);
-}
-.cl-return-head{
-  display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:13px;
-  font-size:13.5px; font-weight:800; color:var(--cl-text-primary);
-}
-.cl-route{
-  display:inline-flex; align-items:center; gap:8px;
-  padding:5px 13px; border-radius:var(--cl-radius-pill);
-  background:var(--cl-card-bg); border:1px solid var(--cl-border-color);
-  font-size:13px; font-weight:700; color:var(--cl-text-primary);
-}
-.cl-route span{color:var(--cl-coral); font-weight:800;}
-.cl-route.cl-route-empty{color:var(--cl-text-muted); font-weight:600;}
-
-/* Sub-heading inside a modal form, between field groups. */
+/* A sub-heading between field groups inside a form. */
 .cl-form-legend{
-  margin:20px 0 12px; padding-top:16px; border-top:1px solid var(--cl-border-color);
-  font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+  margin:26px 0 14px; padding-top:20px; border-top:1px solid var(--cl-line-2);
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em;
   color:var(--cl-text-muted);
 }
 .cl-form-legend:first-child{margin-top:0; padding-top:0; border-top:none;}
 
-/* A wider modal for the enquiry form — four field columns need the room. */
-.cl-modal-form{max-width:820px;}
+/* Filter bar. Sits at the head of a panel, above its table. */
+.cl-toolbar{
+  display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;
+  padding:18px 22px; border-bottom:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2);
+}
+.cl-toolbar .cl-field{min-width:158px; flex:0 1 auto;}
+.cl-toolbar .cl-field label{font-size:10px; letter-spacing:0.08em;}
+.cl-toolbar input, .cl-toolbar select{min-height:40px; padding-top:8px; padding-bottom:8px; font-size:13px;}
+.cl-toolbar-actions{display:flex; gap:9px; margin-left:auto; align-items:flex-end;}
 
-/* ==============================  responsive  ============================ */
+
+/* ==========================================================================
+   6. BUTTONS
+   ========================================================================== */
+
+.cl-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  position:relative; overflow:hidden;
+  min-height:40px; padding:0 18px;
+  font-size:13px; font-weight:600; letter-spacing:-0.01em;
+  cursor:pointer; white-space:nowrap; text-decoration:none;
+  color:var(--cl-text); background:var(--cl-surface);
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-sm);
+  transition:background var(--cl-fast), border-color var(--cl-fast),
+             color var(--cl-fast), transform var(--cl-fast), box-shadow var(--cl-fast);
+}
+.cl-btn svg{width:16px; height:16px; flex-shrink:0;}
+.cl-btn:hover:not(:disabled){
+  background:var(--cl-hover); border-color:#CBD6E4;
+  text-decoration:none; transform:translateY(-1px); box-shadow:var(--cl-sh-sm);
+}
+:root[data-theme="dark"] .cl-btn:hover:not(:disabled){border-color:#33455F;}
+.cl-btn:active:not(:disabled){transform:translateY(0); box-shadow:none;}
+.cl-btn:disabled{opacity:.5; cursor:not-allowed; transform:none;}
+
+/* The ripple. One pseudo-element scaled from the centre — no JS, no extra
+   markup, and it inherits the button's own overflow clip. */
+.cl-btn::after{
+  content:''; position:absolute; inset:0; border-radius:inherit;
+  background:radial-gradient(circle at center, currentColor 0%, transparent 62%);
+  opacity:0; transform:scale(.3); pointer-events:none;
+}
+.cl-btn:active:not(:disabled)::after{animation:cl-ripple .5s var(--cl-ease);}
+
+.cl-btn-primary{
+  color:#fff;
+  background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
+  border-color:var(--cl-orange-cta-2);
+  box-shadow:0 1px 2px rgba(120,40,4,0.32), var(--cl-sh-accent);
+}
+.cl-btn-primary:hover:not(:disabled){
+  /* Hover DARKENS. The fill is already at the lightest tone that keeps a
+     white label above 4.5:1, so brightening it would fail AA on hover — the
+     one state a user is definitely looking at. */
+  background:linear-gradient(180deg, var(--cl-orange-600) 0%, #A63304 100%);
+  border-color:#A63304; color:#fff;
+  box-shadow:0 2px 4px rgba(120,40,4,0.36), 0 12px 26px -8px rgba(185,59,6,0.55);
+}
+
+.cl-btn-secondary{
+  color:#fff; background:linear-gradient(180deg, var(--cl-navy-700) 0%, var(--cl-navy-800) 100%);
+  border-color:var(--cl-navy-800);
+  box-shadow:0 1px 2px rgba(6,27,50,0.24), 0 8px 20px -10px rgba(10,37,64,0.5);
+}
+.cl-btn-secondary:hover:not(:disabled){
+  background:linear-gradient(180deg, var(--cl-navy-600) 0%, var(--cl-navy-700) 100%);
+  border-color:var(--cl-navy-700); color:#fff;
+}
+
+.cl-btn-ghost{background:transparent; border-color:transparent; color:var(--cl-text-2);}
+.cl-btn-ghost:hover:not(:disabled){background:var(--cl-hover); border-color:transparent; box-shadow:none;}
+
+.cl-btn-danger{
+  color:var(--cl-danger-fg); background:var(--cl-danger-bg);
+  border-color:transparent;
+}
+.cl-btn-danger:hover:not(:disabled){
+  background:var(--cl-danger); border-color:var(--cl-danger); color:#fff;
+  box-shadow:0 8px 20px -10px rgba(224,54,75,0.7);
+}
+
+.cl-btn-success{color:var(--cl-success-fg); background:var(--cl-success-bg); border-color:transparent;}
+.cl-btn-success:hover:not(:disabled){background:var(--cl-success); border-color:var(--cl-success); color:#fff;}
+
+.cl-btn-sm{min-height:32px; padding:0 12px; font-size:12px; border-radius:var(--cl-r-xs);}
+.cl-btn-sm svg{width:14px; height:14px;}
+.cl-btn-lg{min-height:48px; padding:0 26px; font-size:14.5px; border-radius:var(--cl-r-md);}
+.cl-btn-icon{width:40px; padding:0;}
+.cl-btn-block{width:100%;}
+
+.cl-btn-link{
+  min-height:auto; padding:0; background:none; border:none; border-radius:0;
+  color:var(--cl-navy-600); font-weight:600;
+}
+.cl-btn-link:hover:not(:disabled){
+  background:none; text-decoration:underline; transform:none; box-shadow:none;
+  color:var(--cl-orange);
+}
+.cl-btn-link::after{display:none;}
+
+/* Loading. `.cl-btn.loading` keeps the label in place and dims it, so the
+   button does not change width mid-action and shift the row under the cursor. */
+.cl-btn.loading{color:transparent !important; pointer-events:none;}
+.cl-btn.loading::before{
+  content:''; position:absolute; top:50%; left:50%; width:16px; height:16px;
+  margin:-8px 0 0 -8px; border-radius:50%;
+  border:2px solid currentColor; border-top-color:transparent;
+  color:#fff; animation:cl-spin .6s linear infinite;
+}
+.cl-btn.loading:not(.cl-btn-primary):not(.cl-btn-secondary)::before{color:var(--cl-orange);}
+
+/* A group of buttons that reads as one control. */
+.cl-btn-group{display:inline-flex; gap:0;}
+.cl-btn-group .cl-btn{border-radius:0; margin-left:-1px;}
+.cl-btn-group .cl-btn:first-child{border-radius:var(--cl-r-sm) 0 0 var(--cl-r-sm); margin-left:0;}
+.cl-btn-group .cl-btn:last-child{border-radius:0 var(--cl-r-sm) var(--cl-r-sm) 0;}
+.cl-btn-group .cl-btn:hover{transform:none; z-index:1;}
+
+
+/* ==========================================================================
+   7. TABLES
+   ==========================================================================
+   Rounded container, sticky head, a hover that reads as a row and not as a
+   highlight, and a horizontal scroller that belongs to the table rather than
+   to the page. */
+
+.cl-table-wrap{
+  overflow-x:auto; overflow-y:visible;
+  border-radius:var(--cl-r-md);
+  -webkit-overflow-scrolling:touch;
+}
+.cl-table{width:100%; font-size:13.5px; min-width:min-content;}
+
+.cl-table th{
+  padding:12px 16px; text-align:left;
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--cl-text-muted);
+  background:var(--cl-surface-2);
+  border-bottom:1px solid var(--cl-line);
+  white-space:nowrap; position:sticky; top:0; z-index:2;
+}
+.cl-table th:first-child{border-top-left-radius:var(--cl-r-md);}
+.cl-table th:last-child{border-top-right-radius:var(--cl-r-md);}
+
+.cl-table td{
+  padding:14px 16px; border-bottom:1px solid var(--cl-line-2);
+  vertical-align:middle; color:var(--cl-text-2); font-weight:500;
+}
+.cl-table td b, .cl-table td strong{color:var(--cl-text); font-weight:700;}
+.cl-table tbody tr{transition:background var(--cl-fast);}
+.cl-table tbody tr:hover{background:var(--cl-hover);}
+.cl-table tbody tr:last-child td{border-bottom:none;}
+.cl-table tbody tr:last-child td:first-child{border-bottom-left-radius:var(--cl-r-md);}
+.cl-table tbody tr:last-child td:last-child{border-bottom-right-radius:var(--cl-r-md);}
+
+.cl-table .cl-actions{white-space:nowrap; text-align:right;}
+.cl-table .cl-actions .cl-btn{margin-left:6px;}
+.cl-table tr.cl-selected{background:var(--cl-accent-soft);}
+.cl-table tr.cl-selected:hover{background:var(--cl-accent-soft);}
+
+/* Continuation line under its own row — carries what will not fit the columns
+   and must not be truncated into meaninglessness. */
+.cl-table tr.cl-subrow td{
+  padding:0 16px 13px; border-bottom:1px solid var(--cl-line-2);
+  color:var(--cl-text-muted); font-size:12.5px;
+}
+.cl-table tr.cl-subrow:hover{background:transparent;}
+.cl-table tr.cl-subrow + tr td{border-top:none;}
+
+/* A clickable row. Whole-row targets need to say so. */
+.cl-table tr.cl-clickable{cursor:pointer;}
+.cl-table tr.cl-clickable:hover{background:var(--cl-accent-soft);}
+
+.cl-empty{
+  padding:44px 16px !important; text-align:center;
+  color:var(--cl-text-muted); font-size:13.5px; font-weight:500;
+  background:transparent;
+}
+.cl-empty b{display:block; color:var(--cl-text); font-size:15px; font-weight:700; margin-bottom:5px;}
+
+/* Empty state as a block, outside a table. */
+.cl-blank{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  padding:56px 24px; gap:6px;
+}
+.cl-blank-ico{
+  width:60px; height:60px; margin-bottom:12px; border-radius:var(--cl-r-lg);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-text-muted);
+}
+.cl-blank-ico svg{width:26px; height:26px;}
+.cl-blank b{font-size:16px; font-weight:700; color:var(--cl-text);}
+.cl-blank p{font-size:13.5px; color:var(--cl-text-muted); max-width:46ch; margin:0;}
+.cl-blank .cl-btn{margin-top:14px;}
+
+/* Pager */
+.cl-pager{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; border-top:1px solid var(--cl-line-2);
+  font-size:12.5px; font-weight:600; color:var(--cl-text-muted);
+  background:var(--cl-surface-2);
+}
+.cl-pager-info{margin-right:auto;}
+.cl-pager-actions{display:flex; gap:8px;}
+.cl-pager-actions .cl-btn[disabled]{opacity:.4; cursor:default;}
+
+
+/* ==========================================================================
+   8. STATUS: badges, messages, tabs
+   ========================================================================== */
+
+.cl-tag{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 11px; border-radius:var(--cl-r-pill);
+  font-size:11.5px; font-weight:700; white-space:nowrap; line-height:1.5;
+  background:var(--cl-canvas-2); color:var(--cl-text-2);
+  border:1px solid transparent;
+}
+/* The dot carries the state as SHAPE and POSITION, not only as colour — the
+   badge still reads for a colour-blind user and in a greyscale print. */
+.cl-tag::before{
+  content:''; width:6px; height:6px; border-radius:50%;
+  background:currentColor; opacity:.85; flex-shrink:0;
+}
+.cl-tag-ok{background:var(--cl-success-bg); color:var(--cl-success-fg);}
+.cl-tag-warn{background:var(--cl-warning-bg); color:var(--cl-warning-fg);}
+.cl-tag-err{background:var(--cl-danger-bg); color:var(--cl-danger-fg);}
+.cl-tag-info{background:var(--cl-info-bg); color:var(--cl-info-fg);}
+.cl-tag-accent{background:var(--cl-accent-soft); color:var(--cl-orange-700);}
+:root[data-theme="dark"] .cl-tag-accent{color:#FFB08A;}
+.cl-tag-plain::before{display:none;}
+.cl-tag-lg{padding:6px 14px; font-size:12.5px;}
+
+.cl-msg{
+  display:flex; align-items:flex-start; gap:11px;
+  padding:14px 16px; border-radius:var(--cl-r-md);
+  font-size:13px; font-weight:500; line-height:1.55;
+  border:1px solid transparent; margin-top:14px;
+  animation:cl-enter .26s var(--cl-ease) both;
+}
+.cl-msg:empty{display:none;}
+.cl-msg b{font-weight:700;}
+.cl-msg::before{
+  content:''; width:17px; height:17px; flex-shrink:0; margin-top:1px;
+  background:currentColor; mask-size:contain; mask-repeat:no-repeat; mask-position:center;
+}
+.cl-msg-ok{background:var(--cl-success-bg); border-color:rgba(14,159,110,0.24); color:var(--cl-success-fg);}
+.cl-msg-ok::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/%3E%3Cpolyline points='22 4 12 14.01 9 11.01'/%3E%3C/svg%3E");}
+.cl-msg-err{background:var(--cl-danger-bg); border-color:rgba(224,54,75,0.24); color:var(--cl-danger-fg);}
+.cl-msg-err::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='15' y1='9' x2='9' y2='15'/%3E%3Cline x1='9' y1='9' x2='15' y2='15'/%3E%3C/svg%3E");}
+.cl-msg-info{background:var(--cl-info-bg); border-color:rgba(37,99,235,0.22); color:var(--cl-info-fg);}
+.cl-msg-info::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E");}
+.cl-msg-warn{background:var(--cl-warning-bg); border-color:rgba(217,138,0,0.28); color:var(--cl-warning-fg);}
+.cl-msg-warn::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E");}
+.cl-msg-muted{background:var(--cl-canvas-2); border-color:var(--cl-line); color:var(--cl-text-2);}
+.cl-msg-muted::before{mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='16' x2='12' y2='12'/%3E%3Cline x1='12' y1='8' x2='12.01' y2='8'/%3E%3C/svg%3E"); opacity:.7;}
+
+.cl-tabs{
+  display:flex; gap:4px; flex-wrap:wrap; margin-bottom:22px;
+  border-bottom:1px solid var(--cl-line);
+}
+.cl-tab{
+  padding:11px 16px; font-size:13.5px; font-weight:600; cursor:pointer;
+  background:none; border:none; border-bottom:2px solid transparent;
+  color:var(--cl-text-muted); margin-bottom:-1px;
+  display:inline-flex; align-items:center; gap:8px;
+  transition:color var(--cl-fast), border-color var(--cl-fast);
+}
+.cl-tab:hover{color:var(--cl-text);}
+.cl-tab.active{color:var(--cl-orange); border-bottom-color:var(--cl-orange);}
+.cl-tab-count{
+  min-width:20px; padding:1px 6px; border-radius:var(--cl-r-pill);
+  font-size:10.5px; font-weight:700; background:var(--cl-canvas-2); color:var(--cl-text-muted);
+}
+.cl-tab.active .cl-tab-count{background:var(--cl-accent-soft); color:var(--cl-orange-700);}
+
+/* Segmented control — a filter that is a set of options, not a dropdown. */
+.cl-seg{
+  display:inline-flex; gap:2px; padding:3px;
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-sm);
+  flex-wrap:wrap;
+}
+.cl-seg button{
+  padding:7px 14px; border-radius:calc(var(--cl-r-sm) - 3px);
+  font-size:12.5px; font-weight:600; color:var(--cl-text-muted); cursor:pointer;
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-seg button:hover{color:var(--cl-text);}
+.cl-seg button.active{background:var(--cl-surface); color:var(--cl-text); box-shadow:var(--cl-sh-xs);}
+
+
+/* ==========================================================================
+   9. STATS, KPIs & STATUS CARDS
+   ========================================================================== */
+
+.cl-kpis{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(212px,1fr));
+  gap:16px; margin-bottom:26px;
+}
+.cl-kpi{
+  position:relative; overflow:hidden;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-lg); box-shadow:var(--cl-sh-xs);
+  padding:20px 22px; text-align:left; font:inherit; color:inherit;
+  display:flex; flex-direction:column; gap:2px;
+  transition:transform var(--cl-base), box-shadow var(--cl-base), border-color var(--cl-base);
+}
+/* The wash that lights up on hover. Painted on a pseudo-element so the card's
+   own background stays a flat, readable surface. */
+.cl-kpi::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:0;
+  background:linear-gradient(135deg, var(--cl-accent-soft) 0%, transparent 60%);
+  transition:opacity var(--cl-base);
+}
+button.cl-kpi, a.cl-kpi{cursor:pointer; width:100%; display:flex;}
+button.cl-kpi:hover, a.cl-kpi:hover, .cl-kpi.cl-kpi-hover:hover{
+  transform:translateY(-3px); box-shadow:var(--cl-sh-md); border-color:rgba(255,107,44,0.35);
+}
+button.cl-kpi:hover::before, a.cl-kpi:hover::before{opacity:1;}
+button.cl-kpi:active{transform:translateY(-1px);}
+
+.cl-kpi-head{display:flex; align-items:center; gap:10px; margin-bottom:10px; position:relative;}
+.cl-kpi-ico{
+  width:36px; height:36px; flex-shrink:0; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-navy-600);
+}
+.cl-kpi-ico svg{width:18px; height:18px;}
+.cl-kpi-ico.accent{background:var(--cl-accent-soft); color:var(--cl-orange-600);}
+.cl-kpi-ico.ok{background:var(--cl-success-bg); color:var(--cl-success);}
+.cl-kpi-ico.warn{background:var(--cl-warning-bg); color:var(--cl-warning);}
+.cl-kpi-ico.err{background:var(--cl-danger-bg); color:var(--cl-danger);}
+.cl-kpi-ico.info{background:var(--cl-info-bg); color:var(--cl-info);}
+
+.cl-kpi-label{
+  position:relative;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--cl-text-muted);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cl-kpi-value{
+  position:relative;
+  font-size:27px; font-weight:800; line-height:1.15; letter-spacing:-0.03em;
+  color:var(--cl-text); font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+.cl-kpi-sub{
+  position:relative;
+  font-size:11.5px; color:var(--cl-text-muted); margin-top:3px; font-weight:500;
+  line-height:1.45;
+}
+.cl-kpi-arrow{
+  position:absolute; top:20px; right:20px; width:16px; height:16px;
+  color:var(--cl-text-muted); opacity:0; transform:translateX(-4px);
+  transition:opacity var(--cl-base), transform var(--cl-base);
+}
+button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-orange);}
+
+/* ---- status grid: the lifecycle, one card per stage ---- */
+
+.cl-statuses{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,1fr));
+  gap:14px; margin-bottom:26px;
+}
+.cl-status-card{
+  position:relative; overflow:hidden; text-align:left; font:inherit; cursor:pointer;
+  padding:16px 18px 15px;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-xs);
+  display:flex; flex-direction:column; gap:3px;
+  transition:transform var(--cl-base), box-shadow var(--cl-base), border-color var(--cl-base);
+}
+/* The stage's own colour, as a rule down the leading edge. Set per card with
+   --tone so one class serves all seven stages. */
+.cl-status-card::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:var(--tone, var(--cl-text-muted));
+  transition:width var(--cl-base);
+}
+.cl-status-card:hover{
+  transform:translateY(-3px); box-shadow:var(--cl-sh-md);
+  border-color:color-mix(in srgb, var(--tone, var(--cl-line)) 40%, var(--cl-line));
+}
+.cl-status-card:hover::before{width:5px;}
+.cl-status-card b{
+  font-size:24px; font-weight:800; line-height:1.15; letter-spacing:-0.03em;
+  color:var(--cl-text); font-variant-numeric:tabular-nums;
+}
+.cl-status-card span{
+  font-size:11.5px; font-weight:700; color:var(--cl-text-2);
+  line-height:1.35;
+}
+.cl-status-card small{font-size:10.5px; font-weight:500; color:var(--cl-text-muted);}
+.cl-status-card .cl-dot{
+  position:absolute; top:16px; right:16px;
+  width:8px; height:8px; border-radius:50%; background:var(--tone, var(--cl-text-muted));
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--tone, #999) 18%, transparent);
+}
+
+/* ---- definition lists ---- */
+
+.cl-dl{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr));
+  gap:18px 24px; margin:0;
+}
+.cl-dl div{min-width:0;}
+.cl-dl dt{
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--cl-text-muted); margin:0;
+}
+.cl-dl dd{
+  margin:5px 0 0; font-size:13.5px; font-weight:600; color:var(--cl-text);
+  word-break:break-word;
+}
+
+/* A stat rendered inline in a body of copy. */
+.cl-inline-stat{
+  display:inline-flex; align-items:baseline; gap:6px;
+  padding:5px 12px; border-radius:var(--cl-r-sm);
+  background:var(--cl-canvas-2); font-size:12.5px; font-weight:600; color:var(--cl-text-2);
+}
+.cl-inline-stat b{font-size:15px; font-weight:800; color:var(--cl-text);}
+
+
+/* ==========================================================================
+   10. PANELS
+   ========================================================================== */
+
+.cl-panel{
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-lg); box-shadow:var(--cl-sh-xs);
+  margin-bottom:22px; overflow:hidden;
+  transition:box-shadow var(--cl-base);
+}
+.cl-panel:hover{box-shadow:var(--cl-sh-sm);}
+.cl-panel-head{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:20px 22px 0;
+}
+.cl-panel-head h2{
+  font-size:16px; font-weight:700; letter-spacing:-0.02em;
+  display:flex; align-items:center; gap:9px;
+}
+.cl-panel-head h2 svg{width:18px; height:18px; color:var(--cl-text-muted);}
+.cl-panel-head .cl-panel-tools{
+  margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+.cl-panel-head .cl-panel-tools input[type=date]{min-height:36px; padding:6px 12px; font-size:12.5px;}
+.cl-panel-sub{
+  padding:4px 22px 0; font-size:12.5px; color:var(--cl-text-muted); font-weight:500;
+}
+.cl-panel-body{padding:20px 22px 22px;}
+.cl-panel-body.cl-flush{padding:16px 0 0;}
+.cl-panel-note{
+  padding:14px 22px; font-size:12.5px; font-weight:500; color:var(--cl-text-muted);
+  background:var(--cl-surface-2); border-top:1px solid var(--cl-line-2);
+  line-height:1.6;
+}
+.cl-panel-note b{color:var(--cl-text-2); font-weight:700;}
+.cl-panel-note:empty{display:none;}
+
+/* A panel that carries a stage of its own — used by the Support Center. */
+.cl-panel-accent{border-color:rgba(255,107,44,0.32); box-shadow:0 0 0 3px rgba(255,107,44,0.06), var(--cl-sh-xs);}
+
+/* Two-up and three-up grids of panels. */
+.cl-grid-2{display:grid; grid-template-columns:repeat(auto-fit, minmax(340px,1fr)); gap:20px; margin-bottom:22px;}
+.cl-grid-3{display:grid; grid-template-columns:repeat(auto-fit, minmax(268px,1fr)); gap:18px; margin-bottom:22px;}
+.cl-grid-2 > .cl-panel, .cl-grid-3 > .cl-panel{margin-bottom:0;}
+/* A sidebar-and-body split: the wide column first, a narrower rail beside it. */
+.cl-split{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:20px; align-items:start; margin-bottom:22px;}
+.cl-split > .cl-panel{margin-bottom:0;}
+
+/* ---- stepper ---- */
+
+.cl-stepper{display:flex; gap:12px; flex-wrap:wrap; margin-bottom:22px;}
+.cl-step{
+  flex:1; min-width:158px; padding:15px 17px;
+  font-size:12px; font-weight:500;
+  background:var(--cl-surface); color:var(--cl-text-muted);
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-md);
+  box-shadow:var(--cl-sh-xs); position:relative; overflow:hidden;
+}
+.cl-step b{
+  display:block; font-size:13.5px; font-weight:700; color:var(--cl-text); margin-bottom:3px;
+}
+.cl-step.done{border-color:rgba(14,159,110,0.34);}
+.cl-step.done b{color:var(--cl-success-fg);}
+.cl-step.current{border-color:var(--cl-orange); box-shadow:0 0 0 3px rgba(255,107,44,0.10), var(--cl-sh-xs);}
+.cl-step.current b{color:var(--cl-orange-700);}
+:root[data-theme="dark"] .cl-step.current b{color:#FFB08A;}
+
+/* ---- timeline ---- */
+
+.cl-timeline{list-style:none; margin:0; padding:0 0 0 24px; position:relative;}
+.cl-timeline::before{
+  content:''; position:absolute; left:5px; top:6px; bottom:6px;
+  width:2px; border-radius:2px;
+  background:linear-gradient(180deg, var(--cl-line) 0%, var(--cl-line-2) 100%);
+}
+.cl-timeline-item{position:relative; padding:0 0 20px 6px;}
+.cl-timeline-item:last-child{padding-bottom:0;}
+.cl-timeline-item::before{
+  content:''; position:absolute; left:-24px; top:4px; width:12px; height:12px;
+  border-radius:50%; background:var(--cl-navy-600);
+  border:2.5px solid var(--cl-surface);
+  box-shadow:0 0 0 2px var(--cl-line);
+}
+.cl-timeline-item.done::before{background:var(--cl-success); box-shadow:0 0 0 2px rgba(14,159,110,0.28);}
+.cl-timeline-item.current::before{
+  background:var(--cl-orange); box-shadow:0 0 0 2px rgba(255,107,44,0.32);
+  animation:cl-pulse 2.4s ease-in-out infinite;
+}
+/* A step not yet reached is hollow — the SHAPE carries the meaning, so it
+   survives a greyscale print and a colour-blind reader. */
+.cl-timeline-item.pending::before{background:var(--cl-surface); box-shadow:0 0 0 2px var(--cl-line);}
+.cl-timeline-item.pending{opacity:.6;}
+.cl-timeline-label{font-size:13px; font-weight:700; color:var(--cl-text);}
+.cl-timeline-meta{font-size:11.5px; font-weight:500; color:var(--cl-text-muted); margin-top:2px;}
+.cl-timeline-note{
+  font-size:12px; font-weight:500; color:var(--cl-text-2); margin-top:7px;
+  padding:9px 12px; border-radius:var(--cl-r-xs);
+  background:var(--cl-canvas-2); border:1px solid var(--cl-line-2);
+}
+
+/* ---- skeleton loading ---- */
+
+.cl-skel{
+  border-radius:var(--cl-r-xs);
+  background:linear-gradient(90deg, var(--cl-canvas-2) 25%, var(--cl-hover) 50%, var(--cl-canvas-2) 75%);
+  background-size:200% 100%;
+  animation:cl-shimmer 1.4s ease-in-out infinite;
+}
+.cl-skel-line{height:12px; margin:9px 0;}
+.cl-skel-line.w40{width:40%;} .cl-skel-line.w60{width:60%;} .cl-skel-line.w80{width:80%;}
+.cl-skel-card{height:112px; border-radius:var(--cl-r-lg);}
+.cl-skel-row td{padding:14px 16px;}
+
+.cl-spin{
+  display:inline-block; width:14px; height:14px; vertical-align:-2px;
+  border:2px solid var(--cl-line); border-top-color:var(--cl-orange);
+  border-radius:50%; animation:cl-spin .6s linear infinite;
+}
+.cl-spin-lg{width:26px; height:26px; border-width:3px;}
+
+/* A progress bar. Used by the Support Center's uploader. */
+.cl-progress{
+  height:6px; border-radius:99px; background:var(--cl-canvas-2); overflow:hidden;
+}
+.cl-progress i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg, var(--cl-orange) 0%, #FF9A63 100%);
+  transition:width .28s var(--cl-ease);
+}
+
+
+/* ==========================================================================
+   11. MODALS & DRAWERS
+   ========================================================================== */
+
+.cl-modal-back{
+  position:fixed; inset:0; z-index:300;
+  background:rgba(6,20,38,0.62);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  display:none; align-items:flex-start; justify-content:center;
+  padding:48px 20px; overflow-y:auto;
+}
+.cl-modal-back.open{display:flex; animation:cl-fade .22s ease both;}
+.cl-modal{
+  width:100%; max-width:680px; background:var(--cl-surface);
+  border-radius:var(--cl-r-xl); box-shadow:var(--cl-sh-xl);
+  overflow:hidden; margin:auto 0;
+  animation:cl-modal-in .3s var(--cl-ease) both;
+}
+.cl-modal-wide{max-width:960px;}
+.cl-modal-form{max-width:860px;}
+.cl-modal-head{
+  display:flex; align-items:center; gap:12px;
+  padding:24px 28px 20px; border-bottom:1px solid var(--cl-line-2);
+}
+.cl-modal-head h2{font-size:19px; font-weight:700; letter-spacing:-0.02em;}
+.cl-modal-close{
+  margin-left:auto; width:34px; height:34px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; line-height:1; cursor:pointer;
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-xs); color:var(--cl-text-muted);
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-modal-close:hover{background:var(--cl-danger-bg); color:var(--cl-danger);}
+.cl-modal-body{padding:24px 28px; max-height:calc(100vh - 260px); overflow-y:auto;}
+.cl-modal-foot{
+  display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;
+  padding:18px 28px 22px; border-top:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2);
+}
+
+/* ---- notification drawer ---- */
+
+.cl-drawer{
+  position:fixed; top:0; right:0; bottom:0; z-index:310;
+  width:420px; max-width:94vw;
+  background:var(--cl-surface); box-shadow:var(--cl-sh-xl);
+  display:none; flex-direction:column;
+  border-left:1px solid var(--cl-line);
+}
+.cl-drawer.open{display:flex; animation:cl-slide-in .3s var(--cl-ease) both;}
+.cl-drawer-head{
+  display:flex; align-items:center; gap:10px;
+  padding:22px 22px 18px; border-bottom:1px solid var(--cl-line-2);
+}
+.cl-drawer-head h2{font-size:17px; font-weight:700; margin-right:auto;}
+.cl-drawer-list{flex:1; overflow-y:auto; padding:10px;}
+.cl-drawer-back{
+  position:fixed; inset:0; z-index:305;
+  background:rgba(6,20,38,0.45);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  display:none;
+}
+.cl-drawer-back.open{display:block; animation:cl-fade .22s ease both;}
+
+.cl-note{
+  position:relative;
+  padding:14px 15px 14px 17px; margin-bottom:7px; border-radius:var(--cl-r-md);
+  background:var(--cl-surface); border:1px solid var(--cl-line-2);
+  cursor:pointer; font-size:12.5px; color:var(--cl-text-2); line-height:1.55;
+  transition:background var(--cl-fast), border-color var(--cl-fast), transform var(--cl-fast);
+}
+.cl-note:hover{background:var(--cl-hover); border-color:var(--cl-line); transform:translateX(2px);}
+.cl-note b{display:block; font-size:13px; font-weight:700; color:var(--cl-text); margin-bottom:3px;}
+.cl-note time{display:block; margin-top:7px; font-size:11px; color:var(--cl-text-muted); font-weight:600;}
+.cl-note.unread{background:var(--cl-accent-soft); border-color:rgba(255,107,44,0.24);}
+.cl-note.unread::before{
+  content:''; position:absolute; left:6px; top:50%; margin-top:-3px;
+  width:6px; height:6px; border-radius:50%; background:var(--cl-orange);
+}
+:root[data-theme="dark"] .cl-note.unread{background:rgba(255,107,44,0.10);}
+
+
+/* ==========================================================================
+   12. CHARTS
+   ==========================================================================
+   Nothing here sets a colour: the SVGs reference the same custom properties as
+   every other component, which is what lets a theme switch repaint them
+   without a redraw. */
+
+.cl-charts{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(330px,1fr));
+  gap:20px; margin-bottom:24px;
+}
+.cl-charts .cl-panel{margin-bottom:0;}
+.cl-chart .cl-panel-body{padding-top:16px;}
+/* height:auto against a viewBox is what makes the drawing scale with its
+   column instead of needing a resize observer. */
+.cl-chart-svg{display:block; width:100%; height:auto; overflow:visible;}
+
+.cl-donut{display:flex; align-items:center; gap:22px; flex-wrap:wrap;}
+.cl-donut svg{width:152px; height:152px; flex-shrink:0;}
+.cl-legend{list-style:none; margin:0; padding:0; flex:1; min-width:150px;}
+.cl-legend li{
+  display:flex; align-items:center; gap:10px;
+  font-size:12px; font-weight:600; color:var(--cl-text-2);
+  padding:5px 0;
+}
+.cl-legend i{width:9px; height:9px; border-radius:3px; flex-shrink:0;}
+.cl-legend span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cl-legend b{color:var(--cl-text); font-weight:800; font-variant-numeric:tabular-nums;}
+
+/* Horizontal ranked bars — Top Destinations, Top Airlines. A bar chart of a
+   dozen named things reads far better lying down: the names get real width
+   instead of being rotated 45° under an axis. */
+.cl-rank{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:13px;}
+.cl-rank li{display:flex; flex-direction:column; gap:6px;}
+.cl-rank-top{display:flex; align-items:baseline; gap:10px; font-size:12.5px;}
+.cl-rank-name{
+  font-weight:700; color:var(--cl-text); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cl-rank-val{font-weight:700; color:var(--cl-text-2); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.cl-rank-sub{font-size:11px; font-weight:600; color:var(--cl-text-muted); white-space:nowrap;}
+.cl-rank-bar{height:8px; border-radius:99px; background:var(--cl-canvas-2); overflow:hidden;}
+.cl-rank-bar i{
+  display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg, var(--cl-navy-600) 0%, var(--cl-navy-500) 100%);
+  animation:cl-grow .7s var(--cl-ease) both;
+}
+.cl-rank li:nth-child(1) .cl-rank-bar i{background:linear-gradient(90deg, var(--cl-orange-600) 0%, #FF9A63 100%);}
+
+
+/* ==========================================================================
+   13. SUPPORT CENTER
+   ==========================================================================
+   Live chat, the channel cards, the uploader and the FAQ. */
+
+/* ---- chat ---- */
+
+.cl-chat{
+  display:flex; flex-direction:column;
+  height:min(560px, 68vh); min-height:380px;
+}
+.cl-chat-head{
+  display:flex; align-items:center; gap:12px;
+  padding:16px 20px; border-bottom:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2); flex-shrink:0;
+}
+.cl-chat-head b{font-size:14px; font-weight:700; color:var(--cl-text); display:block;}
+.cl-chat-head span{font-size:11.5px; font-weight:600; color:var(--cl-text-muted);}
+.cl-chat-head .cl-panel-tools{margin-left:auto;}
+
+/* Presence. The ring pulses only when online, so "we are here" is legible at
+   a glance and "we are closed" is legible by its absence. */
+.cl-presence{
+  display:inline-flex; align-items:center; gap:7px;
+  font-size:11.5px; font-weight:700; color:var(--cl-text-muted);
+}
+.cl-presence::before{
+  content:''; width:8px; height:8px; border-radius:50%; background:var(--cl-text-muted);
+}
+.cl-presence.online{color:var(--cl-success-fg);}
+.cl-presence.online::before{background:var(--cl-success); animation:cl-pulse 2.2s ease-in-out infinite;}
+
+.cl-chat-log{
+  flex:1; overflow-y:auto; padding:20px;
+  display:flex; flex-direction:column; gap:4px;
+  background:
+    radial-gradient(620px 320px at 20% 0%, var(--cl-canvas-2) 0%, transparent 70%),
+    var(--cl-surface);
+  scroll-behavior:smooth;
+}
+.cl-chat-day{
+  align-self:center; margin:14px 0 10px;
+  padding:4px 13px; border-radius:var(--cl-r-pill);
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--cl-text-muted); background:var(--cl-canvas-2);
+}
+.cl-bubble{
+  max-width:min(76%, 520px); padding:11px 15px;
+  border-radius:16px; font-size:13.5px; line-height:1.6; font-weight:500;
+  word-break:break-word; white-space:pre-wrap;
+  animation:cl-bubble-in .28s var(--cl-ease) both;
+  position:relative;
+}
+/* Message grouping: consecutive messages from one side tuck together, and only
+   the last of a run keeps the tail corner. */
+.cl-bubble.out{
+  align-self:flex-end;
+  background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
+  color:#fff; border-bottom-right-radius:5px;
+  box-shadow:var(--cl-sh-accent);
+}
+.cl-bubble.in{
+  align-self:flex-start;
+  background:var(--cl-canvas-2); color:var(--cl-text);
+  border-bottom-left-radius:5px;
+}
+.cl-bubble.grouped{margin-top:-2px;}
+.cl-bubble.out.grouped{border-bottom-right-radius:16px; border-top-right-radius:5px;}
+.cl-bubble.in.grouped{border-bottom-left-radius:16px; border-top-left-radius:5px;}
+.cl-bubble-who{
+  font-size:10.5px; font-weight:700; margin-bottom:4px; opacity:.85;
+  text-transform:uppercase; letter-spacing:0.05em;
+}
+.cl-bubble-meta{
+  display:flex; align-items:center; gap:5px; justify-content:flex-end;
+  margin-top:5px; font-size:10px; font-weight:600; opacity:.92;
+}
+.cl-bubble.in .cl-bubble-meta{justify-content:flex-start; color:var(--cl-text-muted);}
+.cl-seen{width:14px; height:14px;}
+
+/* Typing indicator — three dots on the same bubble shape as a real message. */
+.cl-typing{
+  align-self:flex-start; display:inline-flex; align-items:center; gap:4px;
+  padding:13px 16px; border-radius:16px; border-bottom-left-radius:5px;
+  background:var(--cl-canvas-2);
+}
+.cl-typing i{
+  width:6px; height:6px; border-radius:50%; background:var(--cl-text-muted);
+  animation:cl-typing 1.3s ease-in-out infinite;
+}
+.cl-typing i:nth-child(2){animation-delay:.18s;}
+.cl-typing i:nth-child(3){animation-delay:.36s;}
+
+.cl-chat-compose{
+  display:flex; align-items:flex-end; gap:10px;
+  padding:14px 16px; border-top:1px solid var(--cl-line-2);
+  background:var(--cl-surface); flex-shrink:0;
+}
+.cl-chat-compose textarea{
+  flex:1; min-height:44px; max-height:132px; resize:none; padding:12px 14px;
+  border-radius:var(--cl-r-md); line-height:1.5;
+}
+.cl-chat-send{
+  width:44px; height:44px; flex-shrink:0; border-radius:var(--cl-r-md);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  color:#fff;
+  background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
+  box-shadow:var(--cl-sh-accent);
+  transition:transform var(--cl-fast), filter var(--cl-fast);
+}
+.cl-chat-send svg{width:19px; height:19px;}
+.cl-chat-send:hover:not(:disabled){transform:translateY(-1px) scale(1.03);}
+.cl-chat-send:disabled{opacity:.45; cursor:not-allowed; box-shadow:none;}
+
+/* Emoji picker — a plain grid of characters, no library and no web font. */
+.cl-emoji-btn{
+  width:40px; height:40px; flex-shrink:0; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
+  transition:background var(--cl-fast);
+}
+.cl-emoji-btn:hover{background:var(--cl-hover);}
+.cl-emoji-pop{
+  position:absolute; bottom:calc(100% + 10px); right:0; z-index:40;
+  width:270px; padding:10px;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-lg);
+  display:none; grid-template-columns:repeat(8, 1fr); gap:2px;
+}
+.cl-emoji-pop.open{display:grid; animation:cl-enter .18s var(--cl-ease) both;}
+.cl-emoji-pop button{
+  aspect-ratio:1; border-radius:var(--cl-r-xs); font-size:18px; cursor:pointer;
+  transition:background var(--cl-fast), transform var(--cl-fast);
+}
+.cl-emoji-pop button:hover{background:var(--cl-hover); transform:scale(1.18);}
+
+/* ---- channel cards ---- */
+
+.cl-channel{
+  display:flex; flex-direction:column; gap:14px;
+  padding:22px; border-radius:var(--cl-r-lg);
+  border:1px solid var(--cl-line); background:var(--cl-surface);
+  box-shadow:var(--cl-sh-xs); position:relative; overflow:hidden;
+  transition:transform var(--cl-base), box-shadow var(--cl-base);
+}
+.cl-channel:hover{transform:translateY(-2px); box-shadow:var(--cl-sh-md);}
+.cl-channel-head{display:flex; align-items:center; gap:13px;}
+.cl-channel-ico{
+  width:46px; height:46px; flex-shrink:0; border-radius:var(--cl-r-md);
+  display:flex; align-items:center; justify-content:center; color:#fff;
+}
+.cl-channel-ico svg{width:23px; height:23px;}
+.cl-channel-ico.wa{background:linear-gradient(140deg, #17A45B, #0B7A3C); box-shadow:0 8px 20px -10px rgba(11,122,60,0.8);}
+.cl-channel-ico.phone{background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-800));}
+.cl-channel-ico.mail{background:linear-gradient(140deg, #4C7EF3, #2447C9);}
+.cl-channel-head b{display:block; font-size:15px; font-weight:700; color:var(--cl-text);}
+.cl-channel-head span{display:block; font-size:12px; font-weight:600; color:var(--cl-text-muted);}
+.cl-channel-facts{display:flex; flex-direction:column; gap:9px;}
+.cl-channel-fact{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  font-size:12.5px; font-weight:600; color:var(--cl-text-muted);
+}
+.cl-channel-fact b{color:var(--cl-text); font-weight:700; text-align:right;}
+.cl-btn-wa{
+  /* WhatsApp green, deepened to the point a white label clears 4.5:1 —
+     the brand's own tone measures 3.3:1 and fails. */
+  color:#fff; background:linear-gradient(180deg, #0F8044 0%, #0B7A3C 100%);
+  border-color:#0A6C35; box-shadow:0 8px 20px -10px rgba(11,122,60,0.8);
+}
+.cl-btn-wa:hover:not(:disabled){
+  color:#fff; background:linear-gradient(180deg, #12904C 0%, #0C8642 100%); border-color:#0A6C35;
+}
+
+/* ---- dropzone ---- */
+
+.cl-drop{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:36px 24px; text-align:center; cursor:pointer;
+  border:2px dashed var(--cl-line); border-radius:var(--cl-r-lg);
+  background:var(--cl-surface-2); color:var(--cl-text-muted);
+  transition:border-color var(--cl-fast), background var(--cl-fast), transform var(--cl-fast);
+}
+.cl-drop:hover{border-color:var(--cl-orange); background:var(--cl-accent-soft);}
+.cl-drop.dragging{
+  border-color:var(--cl-orange); background:var(--cl-accent-soft); transform:scale(1.01);
+}
+.cl-drop svg{width:30px; height:30px; color:var(--cl-orange);}
+.cl-drop b{font-size:14px; font-weight:700; color:var(--cl-text);}
+.cl-drop small{font-size:11.5px; font-weight:500;}
+
+.cl-files{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:8px;}
+.cl-file{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 13px; border-radius:var(--cl-r-md);
+  background:var(--cl-surface-2); border:1px solid var(--cl-line-2);
+}
+.cl-file-ico{
+  width:34px; height:34px; flex-shrink:0; border-radius:var(--cl-r-xs);
+  display:flex; align-items:center; justify-content:center;
+  font-size:9.5px; font-weight:800; letter-spacing:0.02em;
+  background:var(--cl-canvas-2); color:var(--cl-navy-600);
+}
+.cl-file-meta{flex:1; min-width:0;}
+.cl-file-meta b{
+  display:block; font-size:12.5px; font-weight:700; color:var(--cl-text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-file-meta span{font-size:11px; font-weight:600; color:var(--cl-text-muted);}
+.cl-file-thumb{
+  width:34px; height:34px; border-radius:var(--cl-r-xs); object-fit:cover; flex-shrink:0;
+  border:1px solid var(--cl-line);
+}
+
+/* ---- FAQ ---- */
+
+.cl-faq{display:flex; flex-direction:column; gap:9px;}
+.cl-faq-item{
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-md);
+  background:var(--cl-surface); overflow:hidden;
+  transition:border-color var(--cl-fast), box-shadow var(--cl-fast);
+}
+.cl-faq-item.open{border-color:rgba(255,107,44,0.34); box-shadow:var(--cl-sh-xs);}
+.cl-faq-q{
+  display:flex; align-items:center; gap:12px; width:100%;
+  padding:15px 17px; cursor:pointer; text-align:left;
+  font-size:13.5px; font-weight:600; color:var(--cl-text);
+  transition:background var(--cl-fast);
+}
+.cl-faq-q:hover{background:var(--cl-hover);}
+.cl-faq-q span{flex:1; min-width:0;}
+.cl-faq-chev{
+  width:17px; height:17px; flex-shrink:0; color:var(--cl-text-muted);
+  transition:transform var(--cl-base), color var(--cl-fast);
+}
+.cl-faq-item.open .cl-faq-chev{transform:rotate(180deg); color:var(--cl-orange);}
+.cl-faq-a{
+  display:grid; grid-template-rows:0fr;
+  transition:grid-template-rows var(--cl-base);
+}
+.cl-faq-item.open .cl-faq-a{grid-template-rows:1fr;}
+.cl-faq-a > div{overflow:hidden;}
+.cl-faq-a p{
+  padding:0 17px 17px; margin:0;
+  font-size:13px; line-height:1.7; color:var(--cl-text-2); font-weight:500;
+}
+.cl-faq-cat{
+  display:inline-block; margin:0 0 4px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em;
+  color:var(--cl-orange-700);
+}
+:root[data-theme="dark"] .cl-faq-cat{color:#FFB08A;}
+
+
+/* ==========================================================================
+   14. UTILITY COMPONENTS
+   ==========================================================================
+   The enquiry form's own controls, plus the wallet's oddities. All were here
+   before; all are restyled against the new tokens. */
+
+/* ---- trip type: One Way / Round Trip ---- */
+.cl-trip{
+  display:inline-flex; gap:3px; padding:4px;
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-pill);
+}
+.cl-trip-opt{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 20px; border-radius:var(--cl-r-pill);
+  font-size:13px; font-weight:600; color:var(--cl-text-muted);
+  cursor:pointer; user-select:none; white-space:nowrap;
+  transition:background var(--cl-fast), color var(--cl-fast), box-shadow var(--cl-fast);
+}
+.cl-trip-opt:hover{color:var(--cl-text);}
+/* The radio stays in the DOM and keeps its label association, so the control
+   is still a real radio group for a screen reader and for arrow keys — it is
+   only visually replaced by the pill. */
+.cl-trip-opt input{position:absolute; opacity:0; width:0; height:0; margin:0;}
+.cl-trip-opt::before{
+  content:''; width:15px; height:15px; flex-shrink:0; border-radius:50%;
+  border:2px solid var(--cl-line); background:var(--cl-surface);
+  transition:border-color var(--cl-fast), box-shadow var(--cl-fast);
+}
+.cl-trip-opt.checked{background:var(--cl-surface); color:var(--cl-text); box-shadow:var(--cl-sh-xs);}
+.cl-trip-opt.checked::before{border-color:var(--cl-orange); box-shadow:inset 0 0 0 3.5px var(--cl-orange);}
+.cl-trip-opt:focus-within{outline:2px solid var(--cl-orange); outline-offset:2px;}
+
+/* ---- searchable dropdown ---- */
+.cl-combo{position:relative;}
+.cl-combo-list{
+  position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:70;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-lg);
+  max-height:264px; overflow-y:auto; display:none; padding:6px;
+}
+.cl-combo-list.open{display:block; animation:cl-enter .18s var(--cl-ease) both;}
+.cl-combo-opt{
+  display:block; width:100%; text-align:left; padding:10px 12px;
+  border-radius:var(--cl-r-xs); cursor:pointer;
+  font-size:13px; font-weight:600; color:var(--cl-text);
+  transition:background var(--cl-fast);
+}
+.cl-combo-opt:hover, .cl-combo-opt.cl-active{background:var(--cl-accent-soft); color:var(--cl-orange-700);}
+:root[data-theme="dark"] .cl-combo-opt:hover, :root[data-theme="dark"] .cl-combo-opt.cl-active{color:#FFB08A;}
+.cl-combo-opt small{display:block; font-size:11.5px; font-weight:500; color:var(--cl-text-muted); margin-top:2px;}
+.cl-combo-opt mark{background:none; color:var(--cl-orange); font-weight:800;}
+.cl-combo-empty{padding:14px 12px; font-size:12.5px; font-weight:500; color:var(--cl-text-muted);}
+
+/* ---- time ---- */
+.cl-time{display:flex; gap:8px; align-items:stretch;}
+.cl-time select{flex:1; min-width:0;}
+
+/* ---- passenger steppers ---- */
+.cl-pax-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(196px,1fr)); gap:12px;}
+.cl-pax-card{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; border:1.5px solid var(--cl-line);
+  border-radius:var(--cl-r-md); background:var(--cl-surface);
+  transition:border-color var(--cl-fast);
+}
+.cl-pax-card:hover{border-color:#CBD6E4;}
+.cl-pax-card b{display:block; font-size:13.5px; font-weight:700;}
+.cl-pax-card small{display:block; font-size:11px; font-weight:500; color:var(--cl-text-muted); margin-top:1px;}
+.cl-step-ctl{display:flex; align-items:center; gap:5px; margin-left:auto; flex-shrink:0;}
+.cl-step-btn{
+  width:32px; height:32px; flex-shrink:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:17px; font-weight:700; line-height:1;
+  color:var(--cl-orange); background:var(--cl-surface);
+  border:1.5px solid var(--cl-line); border-radius:50%;
+  transition:background var(--cl-fast), border-color var(--cl-fast), color var(--cl-fast);
+}
+.cl-step-btn:hover:not(:disabled){background:var(--cl-orange); border-color:var(--cl-orange); color:#fff;}
+.cl-step-btn:disabled{opacity:.32; cursor:not-allowed;}
+.cl-step-val{
+  min-width:28px; text-align:center; font-size:15px; font-weight:800;
+  font-variant-numeric:tabular-nums; color:var(--cl-text);
+}
+
+/* ---- return journey block ---- */
+.cl-return{
+  margin-top:8px; padding:18px; border-radius:var(--cl-r-md);
+  background:var(--cl-surface-2); border:1px dashed var(--cl-line);
+}
+.cl-return-head{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+  font-size:13.5px; font-weight:700; color:var(--cl-text);
+}
+.cl-route{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 14px; border-radius:var(--cl-r-pill);
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  font-size:13px; font-weight:700; color:var(--cl-text);
+}
+.cl-route span{color:var(--cl-orange); font-weight:800;}
+.cl-route.cl-route-empty{color:var(--cl-text-muted); font-weight:500;}
+
+/* ---- wallet ---- */
+.cl-wallet-qr{
+  max-width:210px; width:100%; margin-top:12px; border-radius:var(--cl-r-sm);
+  /* A white plate under the code: a QR rendered on a transparent background is
+     unscannable on the dark theme, and this is the one image on the portal a
+     camera has to read. */
+  background:#fff; padding:10px;
+}
+.cl-wallet-acct{cursor:default;}
+.cl-wallet-acct dd{overflow-wrap:anywhere;}
+
+/* A hero balance panel — the one number the Wallet screen exists for. */
+.cl-balance{
+  position:relative; overflow:hidden;
+  padding:28px 30px; border-radius:var(--cl-r-lg); margin-bottom:22px;
+  color:#fff;
+  background:
+    radial-gradient(620px 320px at 88% -30%, rgba(255,107,44,0.42) 0%, transparent 62%),
+    linear-gradient(140deg, var(--cl-navy-700) 0%, var(--cl-navy-900) 100%);
+  box-shadow:var(--cl-sh-md);
+}
+.cl-balance::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(115deg, #000 0%, transparent 66%);
+}
+.cl-balance-row{
+  position:relative; z-index:1;
+  display:flex; align-items:flex-end; gap:22px; flex-wrap:wrap;
+}
+.cl-balance-label{
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em;
+  color:rgba(255,255,255,0.62);
+}
+.cl-balance-value{
+  font-size:38px; font-weight:800; letter-spacing:-0.035em; line-height:1.1;
+  margin-top:4px; overflow-wrap:anywhere;
+}
+.cl-balance-sub{font-size:12.5px; font-weight:500; color:rgba(255,255,255,0.68); margin-top:5px;}
+.cl-balance-side{
+  margin-left:auto; display:flex; gap:26px; flex-wrap:wrap;
+}
+.cl-balance-side div{min-width:0;}
+.cl-balance-side b{
+  display:block; font-size:19px; font-weight:800; letter-spacing:-0.02em; margin-top:3px;
+}
+.cl-balance .cl-btn{margin-left:auto;}
+
+/* ---- misc ---- */
+.cl-chip-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.cl-divider{height:1px; background:var(--cl-line-2); margin:22px 0;}
+
+
+/* ==========================================================================
+   15. ANIMATION KEYFRAMES
+   ========================================================================== */
+
+@keyframes cl-spin{to{transform:rotate(360deg);}}
+@keyframes cl-fade{from{opacity:0;} to{opacity:1;}}
+@keyframes cl-enter{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+@keyframes cl-rise{from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:none;}}
+@keyframes cl-fade-up{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+@keyframes cl-modal-in{from{opacity:0; transform:translateY(22px) scale(.975);} to{opacity:1; transform:none;}}
+@keyframes cl-slide-in{from{transform:translateX(100%);} to{transform:none;}}
+@keyframes cl-bubble-in{from{opacity:0; transform:translateY(8px) scale(.97);} to{opacity:1; transform:none;}}
+@keyframes cl-shimmer{from{background-position:200% 0;} to{background-position:-200% 0;}}
+@keyframes cl-grow{from{width:0 !important;}}
+@keyframes cl-ripple{from{opacity:.24; transform:scale(.3);} to{opacity:0; transform:scale(2.4);}}
+@keyframes cl-typing{
+  0%,60%,100%{transform:translateY(0); opacity:.45;}
+  30%{transform:translateY(-4px); opacity:1;}
+}
+@keyframes cl-pulse{
+  0%,100%{box-shadow:0 0 0 0 currentColor; opacity:1;}
+  50%{box-shadow:0 0 0 4px transparent; opacity:.72;}
+}
+
+
+/* ==========================================================================
+   16. RESPONSIVE
+   ==========================================================================
+   Four breakpoints, and one hard rule at every one of them: the page never
+   scrolls sideways. Wide content scrolls inside its own container. */
+
+@media (max-width:1400px){
+  .cl-split{grid-template-columns:minmax(0,1fr) 310px;}
+}
 
 @media (max-width:1200px){
-  .cl-top{margin:16px 24px 0;}
-  .cl-crumb{padding:18px 24px 0;}
-  .cl-content{padding:18px 24px 40px;}
+  .cl-top{margin:16px 22px 0;}
+  .cl-crumb{padding:18px 22px 0;}
+  .cl-content{padding:12px 22px 40px;}
+  .cl-split{grid-template-columns:minmax(0,1fr);}
 }
+
 @media (max-width:1100px){
   .cl-form{grid-template-columns:repeat(3, minmax(0,1fr));}
+  .cl-kpis{grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:14px;}
 }
+
 @media (max-width:900px){
   /* Rail becomes an off-canvas overlay; the grid collapses to one column. */
   .cl-app.active{grid-template-columns:minmax(0,1fr);}
   .cl-side{
-    position:fixed; top:0; left:0; bottom:0; height:100vh; width:var(--cl-sidebar-w);
-    z-index:400; transform:translateX(-100%); transition:transform .25s ease;
+    position:fixed; top:0; left:0; bottom:0; height:100vh; height:100dvh;
+    width:min(var(--cl-rail-w), 84vw);
+    z-index:400; transform:translateX(-100%);
+    transition:transform var(--cl-base); box-shadow:var(--cl-sh-xl);
   }
   .cl-side.open{transform:none;}
   .cl-top, .cl-main{grid-column:1;}
   .cl-burger{
     display:inline-flex; align-items:center; justify-content:center;
-    width:38px; height:38px; font-size:17px; cursor:pointer;
-    color:var(--cl-text-primary); background:var(--cl-hover-bg);
-    border:none; border-radius:12px;
+    width:40px; height:40px; flex-shrink:0; cursor:pointer;
+    color:var(--cl-text); background:var(--cl-canvas-2);
+    border-radius:var(--cl-r-sm);
+    transition:background var(--cl-fast);
   }
+  .cl-burger:hover{background:var(--cl-hover);}
+  .cl-burger svg{width:19px; height:19px;}
   .cl-form, .cl-form-3{grid-template-columns:repeat(2, minmax(0,1fr));}
-  .cl-top-search{max-width:none;}
-  .cl-top-user{display:none;}
-  /* Admin's topbar controls are 38px pills — a full row of them does not fit a
-     narrow viewport, so the bar is allowed to wrap instead of overflowing. */
-  .cl-top{flex-wrap:wrap; row-gap:10px;}
-  .cl-top-right{flex-wrap:wrap; row-gap:8px;}
+  .cl-top-date{display:none;}
+  .cl-profile-id{display:none;}
+  .cl-profile-btn{padding:0 6px;}
+  .cl-page-head h1{font-size:23px;}
+  .cl-grid-2, .cl-grid-3{gap:16px;}
 }
+
+@media (max-width:760px){
+  .cl-top-title{display:none;}
+  .cl-theme{display:none;}         /* the profile menu carries the theme switch */
+  .cl-statuses{grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px;}
+  .cl-modal-back{padding:20px 14px;}
+  .cl-modal-body{max-height:calc(100vh - 200px);}
+  .cl-chat{height:min(500px, 70vh);}
+  .cl-bubble{max-width:88%;}
+}
+
 @media (max-width:640px){
-  .cl-top{margin:12px 14px 0; padding:12px 14px; gap:10px;}
-  /* Two rows at phone width: the burger and the controls, then the search box
-     across the full width — nothing is dropped, nothing overflows. */
-  .cl-top-right{order:4; flex:1 1 100%; margin-left:0; justify-content:flex-start;}
-  .cl-top-search{order:5; flex:1 1 100%; max-width:none;}
+  .cl-top{margin:12px 12px 0; padding:10px 12px; gap:9px; top:12px;}
   .cl-crumb{padding:14px 14px 0;}
-  .cl-content{padding:14px 14px 32px;}
   .cl-crumb-date{display:none;}
+  .cl-content{padding:10px 14px 36px;}
+  .cl-page-head{margin-bottom:20px;}
+  .cl-page-head h1{font-size:21px;}
+  .cl-page-head p{font-size:12.5px;}
+  .cl-page-actions{margin-left:0; width:100%;}
+  .cl-page-actions .cl-btn{flex:1;}
+
   .cl-form, .cl-form-2, .cl-form-3{grid-template-columns:1fr;}
   .cl-field-wide{grid-column:auto;}
-  .cl-kpis{grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}
-  .cl-panel-head, .cl-toolbar, .cl-pager{padding-left:16px; padding-right:16px;}
-  .cl-panel-body{padding:16px;}
-  .cl-modal-head, .cl-modal-body, .cl-modal-foot{padding-left:18px; padding-right:18px;}
-  .cl-drawer{width:100%;}
+  .cl-toolbar{padding:16px 14px; gap:12px;}
+  .cl-toolbar .cl-field{min-width:0; flex:1 1 100%;}
+  .cl-toolbar-actions{margin-left:0; width:100%;}
+  .cl-toolbar-actions .cl-btn{flex:1;}
 
-  /* Enquiry controls at phone width. The trip-type pills go full width so both
-     options stay tappable, and the stepper cards stack — a 190px minimum would
-     otherwise force a horizontal scroll inside the modal. */
-  .cl-trip{display:flex; width:100%;}
-  .cl-trip-opt{flex:1; justify-content:center; padding:9px 10px;}
-  .cl-pax-grid{grid-template-columns:1fr;}
-  .cl-return{padding:14px;}
+  /* One column, so a lakh-sized figure has the room to render at full size
+     instead of overflowing its tile and widening the page. */
+  .cl-kpis{grid-template-columns:1fr; gap:12px;}
+  .cl-kpi{padding:16px 18px;}
+  .cl-kpi-value{font-size:24px;}
+  .cl-statuses{grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px;}
+  .cl-status-card{padding:13px 14px;}
+  .cl-status-card b{font-size:20px;}
+
+  .cl-panel{border-radius:var(--cl-r-md); margin-bottom:16px;}
+  .cl-panel-head{padding:16px 16px 0;}
+  .cl-panel-head h2{font-size:15px;}
+  .cl-panel-body{padding:16px;}
+  .cl-panel-note, .cl-pager{padding-left:16px; padding-right:16px;}
+  .cl-panel-head .cl-panel-tools{width:100%;}
+
+  .cl-modal{border-radius:var(--cl-r-lg);}
+  .cl-modal-head, .cl-modal-body, .cl-modal-foot{padding-left:18px; padding-right:18px;}
   .cl-modal-foot{justify-content:stretch;}
   .cl-modal-foot .cl-btn{flex:1;}
+  .cl-drawer{width:100%; max-width:none;}
+  .cl-menu{
+    /* A dropdown pinned to a 40px avatar runs off a phone. It becomes a sheet
+       anchored to the bottom of the viewport instead. */
+    position:fixed; top:auto; bottom:0; left:0; right:0;
+    width:auto; min-width:0; border-radius:var(--cl-r-xl) var(--cl-r-xl) 0 0;
+    padding:10px 10px 22px; transform:translateY(12px);
+    box-shadow:0 -20px 60px -20px rgba(6,27,50,0.5);
+  }
+  .cl-menu.open{transform:none;}
+  .cl-menu-item{padding:13px 14px; font-size:14px;}
+
+  .cl-balance{padding:22px 20px;}
+  .cl-balance-value{font-size:30px;}
+  .cl-balance-side{margin-left:0; width:100%; gap:20px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.12);}
+  .cl-balance .cl-btn{margin-left:0; width:100%;}
+
+  .cl-trip{display:flex; width:100%;}
+  .cl-trip-opt{flex:1; justify-content:center; padding:10px 10px;}
+  .cl-pax-grid{grid-template-columns:1fr;}
+  .cl-return{padding:14px;}
+  .cl-donut{justify-content:center;}
+  .cl-charts{grid-template-columns:1fr; gap:16px;}
+  .cl-tabs{gap:0; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none;}
+  .cl-tabs::-webkit-scrollbar{display:none;}
+  .cl-tab{white-space:nowrap; padding:11px 13px;}
+  .cl-table th, .cl-table td{padding:12px 13px;}
 }
 
+@media (max-width:400px){
+  .cl-statuses{grid-template-columns:1fr;}
+  .cl-content{padding:10px 11px 32px;}
+  .cl-top{margin:10px 10px 0;}
+}
+
+/* Print — the rail, the topbar and every control come off; the panels flatten
+   to bordered blocks. What is left is the data. */
 @media print{
-  .cl-top, .cl-side, .cl-page-actions, .cl-toolbar, .cl-pager{display:none !important;}
+  .cl-top, .cl-side, .cl-page-actions, .cl-toolbar, .cl-pager,
+  .cl-drawer, .cl-drawer-back, .cl-modal-back, .cl-burger{display:none !important;}
   .cl-app.active{display:block;}
-  .cl-panel{border:1px solid #999; box-shadow:none;}
-  body{background:#fff;}
-}
-
-/* ---------- Booking Request Details timeline (Phase 3) ----------
-   Built from the same tokens as the rest of the Classic sheet, so it inherits
-   light/dark without a second rule set. */
-.cl-timeline{list-style:none; margin:0; padding:0 0 0 18px; position:relative;}
-.cl-timeline::before{
-  content:''; position:absolute; left:4px; top:4px; bottom:4px;
-  width:2px; background:var(--cl-border-color);
-}
-.cl-timeline-item{position:relative; padding:0 0 14px 4px;}
-.cl-timeline-item:last-child{padding-bottom:0;}
-.cl-timeline-item::before{
-  content:''; position:absolute; left:-18px; top:4px; width:10px; height:10px;
-  border-radius:50%; background:var(--cl-navy); border:2px solid var(--cl-card-bg);
-}
-/* A step not yet reached is hollow — the shape carries the meaning, not just
-   the colour, so it survives a greyscale print or a colour-blind reader. */
-.cl-timeline-item.pending::before{background:var(--cl-card-bg); border-color:var(--cl-border-color);}
-.cl-timeline-item.pending{opacity:.62;}
-.cl-timeline-label{font-size:12.5px; font-weight:700; color:var(--cl-text-primary);}
-.cl-timeline-meta{font-size:11px; font-weight:600; color:var(--cl-text-muted); margin-top:1px;}
-.cl-timeline-note{
-  font-size:11.5px; font-weight:600; color:var(--cl-text-muted); margin-top:4px;
-  padding:6px 8px; border-radius:8px; background:var(--cl-hover-bg);
-}
-
-/* ---------------------------------------------------------------- wallet
-   CR-4c. Almost everything on the Wallet screen reuses the existing panel,
-   table, KPI and form classes — the additions below are only what had no
-   equivalent, so the screen cannot drift away from the rest of the portal.
-
-   The `.cl-note` reuse for a payment account deliberately overrides its
-   default `cursor:pointer`: an account card is something to read and copy
-   from, not something to click, and a pointer cursor on it promises an
-   interaction that does not exist. */
-.cl-wallet-qr{
-  max-width:200px; width:100%; margin-top:10px; border-radius:8px;
-  /* A white plate under the code: a QR rendered with a transparent background
-     is unscannable on the dark theme, and this is the one image on the portal
-     a camera has to read. */
-  background:#fff; padding:8px;
-}
-
-/* The account cards inside the Add Money modal. `overflow-wrap` because an
-   IFSC or a UPI handle has no spaces to break at and will otherwise push the
-   modal wider than the viewport on a phone. */
-.cl-wallet-acct{cursor:default;}
-.cl-wallet-acct dd{overflow-wrap:anywhere;}
-
-/* A lakh does not fit in half a phone.
-
-   `.cl-kpis` drops to two fixed columns under 640px, which leaves ~123px of
-   content inside each tile. A wallet figure like ₹60,43,002.00 needs ~189px at
-   the 24px tile type, so it overflowed its tile and pushed the whole page 31px
-   wider than the viewport — a horizontal scrollbar on every phone.
-
-   Fixed by giving the wallet's tiles the full width below 640px, which leaves
-   ~303px and fits the largest figure at full size. One column is also simply
-   the better reading of a running account on a phone: these are numbers you
-   compare down a list, not across.
-
-   **Scoped to `#cl-wallet` on purpose.** `.cl-kpis` and `.cl-kpi-value` are
-   shared with the Payments screen, which is part of the locked M4 surface and
-   has the same latent problem (measured worse, at 429px). Fixing it there is a
-   change to approved functionality and needs its own approval, so it is
-   reported rather than quietly altered here. */
-@media (max-width:640px){
-  #cl-wallet .cl-kpis{grid-template-columns:1fr;}
+  .cl-panel{border:1px solid #999; box-shadow:none; break-inside:avoid;}
+  .cl-content{padding:0; max-width:none;}
+  .cl-kpi, .cl-status-card{box-shadow:none; border:1px solid #bbb;}
+  body{background:#fff; color:#000; font-size:11pt;}
+  a{color:#000; text-decoration:underline;}
 }

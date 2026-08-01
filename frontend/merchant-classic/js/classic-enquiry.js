@@ -82,6 +82,12 @@ function clInitEnquiry() {
           <label for="clEnqStatus">Status</label>
           <select id="clEnqStatus" data-cl-status-filter>
             <option value="">All statuses</option>
+            <!-- A grouped option, not a status. "No fare yet" is the question a
+                 merchant actually asks, and it spans Pending and Under Review —
+                 the difference between them is which desk has it, which is our
+                 problem and not theirs. Handled in clLoadEnquiries: the API
+                 takes one status at a time, so this one is narrowed here. -->
+            <option value="__awaiting">Awaiting quotation</option>
             ${CL_ENQUIRY_STATUSES.map(s =>
               `<option value="${s}">${clEnquiryStatusLabel(s)}</option>`).join('')}
           </select>
@@ -148,16 +154,44 @@ function clEnquiryTag(status) {
     escapeHtml(clEnquiryStatusLabel(status))}</span>`;
 }
 
+/* The two statuses an enquiry sits in before it has a fare. Grouped because
+   that is the distinction the merchant cares about; see the filter markup. */
+const CL_ENQUIRY_AWAITING = ['pending_approval', 'in_review'];
+
+/* How many enquiries the current filter matches in the DATABASE, as opposed to
+   how many are on screen. Rendered by clRenderEnquiryRows so a capped page
+   cannot read as a complete answer. */
+let clEnquiryTotal = 0;
+
 async function clLoadEnquiries() {
   const body = $('clEnqBody');
   body.innerHTML = clLoadingRow(5, 'Loading enquiries…');
   const status = $('clEnqStatus').value;
-  const params = { page_size: 100 };
-  if (status) params.status = status;
 
   try {
-    const data = await MerchantApi.listEnquiries(params);
-    clEnquiryRows = data.items || [];
+    let rows;
+    let total;
+    if (status === '__awaiting') {
+      /* `__awaiting` is a UI grouping, not an enum member — sending it would be
+         a 422. Fetching a page unfiltered and dropping the answered rows here
+         was the first implementation and it UNDERCOUNTS: this account has 1,633
+         enquiries, so "awaiting a fare" meant "awaiting, among the 100 most
+         recent" and disagreed with the dashboard tile that linked to it. Two
+         server-filtered calls instead, merged, with the totals added. */
+      const [pending, review] = await Promise.all(
+        CL_ENQUIRY_AWAITING.map(s => MerchantApi.listEnquiries({ page_size: 100, status: s })));
+      rows = [...(pending.items || []), ...(review.items || [])]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      total = (pending.total ?? 0) + (review.total ?? 0);
+    } else {
+      const data = await MerchantApi.listEnquiries({
+        page_size: 100, ...(status ? { status } : {}),
+      });
+      rows = data.items || [];
+      total = data.total ?? rows.length;
+    }
+    clEnquiryRows = rows;
+    clEnquiryTotal = total;
     clRenderEnquiryRows();
   } catch (err) {
     body.innerHTML = clEmptyRow(5, clError(err, 'Failed to load enquiries.'));
@@ -181,8 +215,19 @@ function clRenderEnquiryRows() {
       ? 'No enquiries match that search.'
       : 'No enquiries yet. Press “+ New Booking Enquiry” to raise your first one.');
 
-  $('clEnqCount').textContent = `${rows.length} enquir${rows.length === 1 ? 'y' : 'ies'}`
-    + (q && rows.length !== clEnquiryRows.length ? ` (filtered from ${clEnquiryRows.length})` : '');
+  /* What is on screen, then what matches. This screen fetches one page of 100
+     per status and the search narrows it in the browser, so on an account with
+     1,633 enquiries the row count is NOT the answer to "how many are awaiting a
+     fare" — and the dashboard tile that links here quotes the database's own
+     figure. Saying both is what keeps the two screens from appearing to
+     disagree. */
+  const shown = rows.length;
+  const capped = clEnquiryTotal > clEnquiryRows.length;
+  $('clEnqCount').textContent = `${shown} enquir${shown === 1 ? 'y' : 'ies'} shown`
+    + (q && shown !== clEnquiryRows.length ? ` (searched within ${clEnquiryRows.length} loaded)` : '')
+    + (capped
+      ? ` · ${clEnquiryTotal} match this filter — narrow it by status to see older ones`
+      : clEnquiryTotal ? ` of ${clEnquiryTotal}` : '');
 
   body.querySelectorAll('[data-cl-enq-view]').forEach(b =>
     b.addEventListener('click', () => clOpenEnquiryDetail(b.dataset.clEnqView)));

@@ -15,6 +15,7 @@ from app.database.session import SessionLocal, engine
 from app.models_v2 import User
 from app.routers import (
     admin_ops,
+    analytics,
     auth,
     booking_ops,
     change_requests,
@@ -24,6 +25,7 @@ from app.routers import (
     finance,
     manager,
     manager_approvals,
+    messages,
     merchant_approvals,
     merchant_team,
     merchants,
@@ -33,6 +35,7 @@ from app.routers import (
     super_admin,
     support_tickets,
     tickets,
+    payment_admin,
     wallet,
 )
 from app.services import user_service
@@ -73,6 +76,56 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ---------------------------------------------------------------------------
+# Security response headers (M8)
+# ---------------------------------------------------------------------------
+# deploy/Caddyfile already sets these at the edge, and that is the production
+# path. They are set here as well, deliberately, because an edge is not the
+# only way this app is reached: deploy/nginx.conf is a supported alternative
+# that set none of them, a container can be port-mapped directly during an
+# incident, and a staging box behind a plain proxy inherits whatever the proxy
+# forgot. A header that only exists in one deployment's config is a header you
+# cannot rely on. Caddy's `header` directive replaces rather than appends, so
+# nothing is duplicated where both are in play.
+#
+# HSTS is NOT set here. It would be wrong on the plain-HTTP origin the proxy
+# talks to, and telling a browser "never use HTTP for this host" is a decision
+# that belongs where TLS is actually terminated — Caddy sets it there.
+_SECURITY_HEADERS = {
+    # Stop a browser second-guessing Content-Type. Combined with the upload
+    # allowlist and magic-byte sniff, this is what keeps a stored file from
+    # ever being interpreted as script.
+    "X-Content-Type-Options": "nosniff",
+    # No portal here is ever meant to be framed; clickjacking a payment
+    # verification or an approval button is the concrete risk.
+    "X-Frame-Options": "DENY",
+    # Referrer-Policy: request paths carry booking ids. Send the origin only.
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    # None of these portals uses a camera, a microphone or geolocation.
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
+}
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    for header, value in _SECURITY_HEADERS.items():
+        # setdefault semantics: a route that deliberately sets its own value —
+        # the document download's Cache-Control, for instance — keeps it.
+        response.headers.setdefault(header, value)
+    return response
+
+
+# A wildcard origin cannot be combined with credentials: the browser refuses
+# it, so the practical effect is that every authenticated cross-origin call
+# fails in a way that looks like a server bug. Caught at startup rather than
+# discovered from a support ticket.
+if "*" in settings.cors_origins_list:
+    raise RuntimeError(
+        "CORS_ORIGINS contains '*', which cannot be used with allow_credentials=True. "
+        "List the exact origins each portal is served from."
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -89,6 +142,8 @@ PORTED_MODULES = [
     "communication", "notification_broadcast", "support_management", "live_chat",
     "super_admin_dashboard", "role_permission_management", "system_info",
     "audit_logs", "reports_summary",
+    # M6 — analytics: booking mix, ops queue health, change-request money.
+    "analytics",
     "documents",  # ported in Phase 3 — booking-request attachments (migration 0031)
     # Phase 4 — the post-approval operations desk (migration 0032). Distinct
     # from "approval_queue" above, which ends where this begins.
@@ -144,6 +199,20 @@ app.include_router(merchant_approvals.router)
 # and this one is the running account; every route here is implicitly scoped to
 # the caller's merchant, so no path carries a merchant_id to tamper with.
 app.include_router(wallet.router)
+# CR-4d — the staff side of the same wallet: where merchants are told to send
+# money, the queue that decides whether it arrived, and the reconciliation that
+# proves the ledger and the cached balances still agree. Kept out of
+# wallet.router because that one's defining property is that no route in it
+# carries a merchant id; almost every route here does.
+app.include_router(payment_admin.router)
+# M5 — message delivery seen by staff. Gated on notification.send, which only
+# the Admin role holds: notification.view is every merchant's own bell.
+app.include_router(messages.router)
+# M6 — analytics. Separate from reports.py, which exports rows: this one only
+# ever returns aggregates, computed in SQL. Two of its three routes are scoped
+# to the caller and gated on report.view; the operations one is Admin-only,
+# because queue age and operator load have no merchant-scoped meaning.
+app.include_router(analytics.router)
 
 
 @app.on_event("startup")

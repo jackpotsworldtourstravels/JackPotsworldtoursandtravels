@@ -345,9 +345,17 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
     "/reset-password",
     response_model=MessageResponse,
     summary="Complete a password reset",
-    description="Public endpoint. Validates the token from /forgot-password and sets the new password.",
+    description=(
+        "Public endpoint. Validates the token from /forgot-password and sets the new password. "
+        "Rate-limited to 5/minute per IP."
+    ),
 )
-def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+# M8: this was the one **unauthenticated** auth path with no limit. It takes a
+# reset token and reports whether it is valid, which is a guessing game an
+# attacker can play as fast as the server will answer. 5/minute matches
+# /forgot-password, the endpoint that issues the token.
+@limiter.limit("5/minute")
+def reset_password(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     auth_service.complete_password_reset(db, payload.token, payload.new_password)
     return MessageResponse(message="Password has been reset — you can now log in")
 
@@ -356,9 +364,19 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     "/change-password",
     response_model=MessageResponse,
     summary="Change your own password",
-    description="Requires authentication. Verifies the current password before setting the new one.",
+    description=(
+        "Requires authentication. Verifies the current password before setting the new one. "
+        "Rate-limited to 10/minute per IP."
+    ),
 )
+# M8: authentication is not the whole of the protection here — this endpoint
+# checks `current_password`, so a stolen or borrowed session can be used to
+# guess the password that would let the holder change the email, the recovery
+# details and everything else. 10/minute leaves an honest typo-and-retry
+# comfortably alone.
+@limiter.limit("10/minute")
 def change_password(
+    request: Request,
     payload: ChangePasswordRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

@@ -46,6 +46,12 @@ SUITE = [
     ("verify_cr3.py", "CR-3: merchant approves its own bookings, scoping, self-approval, concurrency"),
     ("verify_cr4b.py", "CR-4b: wallet debit at Ticket Issued, credit limit, refunds, credit notes"),
     ("verify_cr4c.py", "CR-4c: merchant wallet screen, ledger, top-ups, payment accounts, proofs"),
+    ("verify_m5.py", "M5: email + in-app delivery, opt-out, msg_logs status, failure surfacing"),
+    ("verify_cr4d.py", "CR-4d: payment accounts, top-up verification, wallet credit, reconciliation"),
+    # Last of the money-and-workflow scripts: M6 re-derives their figures from
+    # its own SQL, so it is only meaningful once they are known good.
+    ("verify_m6.py", "M6: analytics against direct SQL, export/summary parity, ops metrics, scope"),
+    ("verify_m7.py", "M7: booking history filters/pagination/search, downloads, staff-only absence, cross-tenant"),
 ]
 
 

@@ -202,6 +202,26 @@ const MerchantApi = {
     return URL.createObjectURL(blob);
   },
 
+  /* M7. The two PDFs M2 built and nothing ever called.
+
+     Both are generated on demand from the booking, its passengers and its
+     payments — nothing is stored, so a refund recorded a minute ago is already
+     in the invoice and there is no stale file to disagree with the ledger.
+     Both are gated server-side to ticketed/completed bookings (409 otherwise)
+     and re-check merchant scope per request, so a link that leaks is still not
+     a booking that leaks.
+
+     Returned as a Blob, not an object URL: unlike downloadDocument these have
+     no server-supplied filename for the caller to reuse, so the caller names
+     the file and owns the URL's lifetime. */
+  downloadInvoice(requestId) {
+    return this._req('get', `/api/requests/${requestId}/invoice`, { responseType: 'blob' });
+  },
+
+  downloadConfirmation(requestId) {
+    return this._req('get', `/api/requests/${requestId}/confirmation`, { responseType: 'blob' });
+  },
+
   cancelRequest(id, reason) {
     return this._req('post', `/api/requests/${id}/cancel`, { data: { reason } });
   },
@@ -442,6 +462,38 @@ const MerchantApi = {
     return this._req('get', '/api/reports/export', { params, responseType: 'blob' });
   },
 
+  /* M6. How many rows the current filters match and what they are worth, built
+     from the same row builders the export uses — so a screen can state the size
+     of the download it is offering without counting anything itself. Takes the
+     identical param set as `exportReport` minus `format`. */
+  reportSummary(params) {
+    return this._req('get', '/api/reports/summary', { params });
+  },
+
+  /* ------------------------------------------------------------ analytics */
+
+  /* M6. Aggregates, grouped in SQL over the merchant's whole history — not a
+     page of rows to add up here. `dateField` picks the column the range filter
+     AND the monthly series run on: 'travel_date' (when they fly) or
+     'created_at' (when it was raised). The response echoes back which was used,
+     so a chart can label itself from the answer rather than from its caller's
+     memory of what it asked for. */
+  bookingAnalytics({ dateField, dateFrom, dateTo } = {}) {
+    return this._req('get', '/api/analytics/bookings', {
+      params: {
+        date_field: dateField || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      },
+    });
+  },
+
+  changeRequestAnalytics({ dateFrom, dateTo } = {}) {
+    return this._req('get', '/api/analytics/change-requests', {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
+    });
+  },
+
   /* -------------------------------------------------------------- profile */
 
   getProfile() {
@@ -456,6 +508,55 @@ const MerchantApi = {
     return this._req('post', '/api/auth/change-password', {
       data: { current_password: currentPassword, new_password: newPassword },
     });
+  },
+
+  /* --------------------------------------------------- support / live chat
+
+     Backed by app/routers/support_tickets.py. "Support Management" (the admin
+     queue) and "Live Chat" (this side) are ONE feature — chat threads — with
+     two views, which is why there is no separate ticket model to create: a
+     support ticket IS a thread, and its `status` is its lifecycle.
+
+     A merchant holds `chat.create` and `chat.view` (rbac.py), so every call
+     below is available to every merchant role. Each is scoped to the caller's
+     merchant server-side; there is no merchant_id to pass, and a thread
+     belonging to another merchant 404s. */
+
+  /* Opens a thread WITH its first message — there is no empty thread state, so
+     a conversation always has something in it to answer. Returns the thread
+     and its messages, so the screen can render the conversation immediately
+     rather than opening and then fetching. */
+  openSupportThread({ subject, message }) {
+    return this._req('post', '/api/support/threads', { data: { subject, message } });
+  },
+
+  /* `status` takes a request_status_enum value. A thread only ever reaches
+     submitted (labelled "Open"), in_review ("In Progress") and completed
+     ("Resolved") — the response carries `status_label` with that chat-specific
+     wording already applied, so never derive the text from the enum here. */
+  listSupportThreads({ status, page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/support/threads', {
+      params: { status: status || undefined, page, page_size: pageSize },
+    });
+  },
+
+  getSupportThread(threadId) {
+    return this._req('get', `/api/support/threads/${threadId}`);
+  },
+
+  /* Returns the WHOLE thread, not just the new message. That is the endpoint's
+     own shape and it is the right one: the desk may have replied between the
+     merchant's last render and this send, and re-rendering from the response
+     is what stops a message going missing from the log. */
+  sendSupportMessage(threadId, message) {
+    return this._req('post', `/api/support/threads/${threadId}/messages`, { data: { message } });
+  },
+
+  /* Open threads awaiting a response — drives the badge on the Support Center
+     rail item. Claim and resolve are admin-only (`chat.manage`) and are
+     deliberately absent here: a merchant cannot close its own ticket. */
+  supportUnreadCount() {
+    return this._req('get', '/api/support/unread-count');
   },
 
   /* -------------------------------------------------------- notifications */
@@ -481,16 +582,27 @@ const MerchantApi = {
    backend actually stores (request_status_enum). Kept next to the transport
    because a screen that invents its own status string silently filters to
    nothing. */
+/* These are sent to the API as `?status=`, so every one must be a real
+   `RequestStatus` member.
+   M7 FIX: this list said `ticketed`. The enum value is `ticket_issued`, so
+   choosing "Ticketed" in any status filter — My Requests, Reports, Payments —
+   sent a value FastAPI rejects, and the screen answered `[object Object]` from
+   a 422 whose `detail` is a list rather than a string. The whole codebase had
+   been hedging around it (`['ticket_issued', 'ticketed']` appears in the
+   dashboard's stage groups, and the old reports summary added both keys
+   together), which is what a value mismatch looks like from the inside.
+   `in_review` was missing outright and is added: a merchant whose booking is
+   Under Review could not filter for it. */
 const MERCHANT_REQUEST_STATUSES = [
-  'draft', 'pending_approval', 'approved', 'payment_pending',
-  'paid', 'ticketed', 'completed', 'cancelled', 'rejected',
+  'draft', 'pending_approval', 'in_review', 'approved', 'payment_pending',
+  'paid', 'ticket_issued', 'completed', 'cancelled', 'rejected',
 ];
 
 /* The stages where the merchant owes or has just paid money. `payment_pending`
    is the one that means "money is owed" — pending_payments_count on the
    dashboard counts submitted payments AWAITING VERIFICATION, which is the
    opposite thing and is easy to confuse. */
-const MERCHANT_PAYMENT_STATUSES = ['payment_pending', 'paid', 'ticketed'];
+const MERCHANT_PAYMENT_STATUSES = ['payment_pending', 'paid', 'ticket_issued'];
 
 /* Every request_type that is a SERVICE REQUEST — something raised against an
    existing booking rather than the booking itself. Mirrors

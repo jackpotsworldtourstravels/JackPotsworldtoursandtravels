@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260801merge">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260801m6">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -95,9 +95,28 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
       <span class="nav-label">Reports</span>
     </a>
+    <!-- M6. Its own section rather than tiles bolted onto the Dashboard: the
+         Dashboard answers "what needs me right now" in counters, and this
+         answers "how is the desk doing" over a period. Mixing the two puts a
+         six-month average beside a live queue badge, and the pair gets read as
+         one number. Reports (above) exports rows; this only ever aggregates. -->
+    <a href="#" class="nav-item" data-section="analytics">
+      <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
+      <span class="nav-label">Analytics</span>
+    </a>
     <a href="#" class="nav-item" data-section="payments">
       <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
       <span class="nav-label">Payment Management</span>
+    </a>
+    <!-- CR-4d — the wallet desk. Deliberately its own section rather than a tab
+         inside Payment Management: that screen is per-booking payments on the
+         standard track, this one is the running merchant account. Two different
+         settlement models sharing one screen is how a figure ends up read
+         against the wrong one. -->
+    <a href="#" class="nav-item" data-section="wallet-desk">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
+      <span class="nav-label">Wallet &amp; Top-ups</span>
+      <span class="nav-badge" id="wdNavBadge" hidden></span>
     </a>
     <!-- Ticket Enquiries sits above the Approval Queue deliberately: an enquiry
          precedes the booking it may become, and the two are separate workflows
@@ -300,8 +319,13 @@
           <button class="btn btn-navy" id="repAdminExportExcelBtn">Export Excel</button>
           <button class="btn btn-navy" id="repAdminExportCsvBtn">Export CSV</button>
         </div>
+        <div id="repAdminSummary"></div>
         <div class="table-wrap"><table id="repAdminTable"><thead></thead><tbody></tbody></table></div>
       </div>
+    </section>
+
+    <section class="section" id="section-analytics">
+      <div id="analyticsBody"></div>
     </section>
 
     <section class="section" id="section-profile">
@@ -345,6 +369,57 @@
           <th>Transaction ID</th><th>Method</th><th>Amount</th><th>Currency</th><th>Status</th><th>Paid Date</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="pvPagination"></div>
+      </div>
+    </section>
+
+    <!-- CR-4d — the wallet desk: three panels, rendered by admin-wallet-desk.js.
+         1. the verification queue (the work), 2. reconciliation (the proof the
+         ledger and the cached balances still agree), 3. payment accounts (where
+         merchants are told to send money). -->
+    <section class="section" id="section-wallet-desk">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Top-up Verification</h2>
+          <span class="ops-sub" id="wdPendingSummary"></span>
+        </div>
+        <div class="ops-tabs" id="wdTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="wdSearch" placeholder="Search reference or UTR…"
+                 aria-label="Search top-ups by reference or UTR">
+          <select id="wdMerchantFilter" class="status-select" aria-label="Filter by merchant">
+            <option value="">All merchants</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="wdTable"><thead><tr>
+          <th>Reference</th><th>Merchant</th><th>Amount</th><th>Method</th>
+          <th>UTR</th><th>Submitted</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="wdPagination"></div>
+      </div>
+
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <h2>Wallet Reconciliation</h2>
+          <span class="ops-sub" id="wdReconStatus"></span>
+        </div>
+        <div class="table-wrap"><table id="wdReconTable"><thead><tr>
+          <th>Merchant</th><th>Wallet balance</th><th>Ledger balance</th><th>Drift</th>
+          <th>Outstanding</th><th>Credit limit</th><th>Pending top-ups</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+
+      <div class="panel" style="margin-top:20px;">
+        <div class="panel-head">
+          <h2>Payment Accounts</h2>
+          <button type="button" class="btn btn-coral" id="wdAddAccountBtn">Add account</button>
+        </div>
+        <p class="ops-sub" style="margin:0 0 12px;">
+          Where merchants are told to send money. Only <strong>active</strong> accounts appear on
+          the merchant's Add Money screen.
+        </p>
+        <div class="table-wrap"><table id="wdAccountsTable"><thead><tr>
+          <th>Label</th><th>Type</th><th>Details</th><th>Order</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
       </div>
     </section>
 
@@ -535,6 +610,23 @@
         <h2>My Notifications</h2>
         <div class="table-wrap"><table id="notificationsTable"><thead><tr><th>Title</th><th>Message</th><th>Status</th><th>Date</th></tr></thead><tbody></tbody></table></div>
       </div>
+      <!-- M5 — the requirement that a failed send is visible rather than
+           silently swallowed. Before M5 no email send wrote a row at all, so
+           success and failure were equally invisible. -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Delivery Failures</h2>
+          <span class="ops-sub" id="mdFailSummary"></span>
+        </div>
+        <p class="ops-sub" style="margin:0 0 12px;">
+          Messages that did not go out. With SMTP unconfigured every attempt is recorded here
+          rather than being reported as sent — that is the intended behaviour, not an outage.
+        </p>
+        <div class="table-wrap"><table id="mdFailTable"><thead><tr>
+          <th>When</th><th>Type</th><th>Recipient</th><th>Subject</th><th>Why it failed</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="mdFailPagination"></div>
+      </div>
     </section>
 
   </main>
@@ -599,6 +691,18 @@
   <div class="modal-card modal-lg" id="opsWorkBody" role="dialog" aria-modal="true" aria-labelledby="opsWorkTitle"></div>
 </div>
 
+<!-- CR-4d — reviewing one top-up claim, and the payment-account editor. Both
+     rendered by admin-wallet-desk.js and focus-trapped by components/focus-trap.js. -->
+<div class="modal-overlay" id="wdReviewOverlay">
+  <div class="modal-card modal-lg" id="wdReviewBody" role="dialog" aria-modal="true" aria-labelledby="wdReviewTitle"></div>
+</div>
+<div class="modal-overlay" id="wdAccountOverlay">
+  <div class="modal-card modal-lg" id="wdAccountBody" role="dialog" aria-modal="true" aria-labelledby="wdAccountTitle"></div>
+</div>
+<div class="modal-overlay" id="wdLedgerOverlay">
+  <div class="modal-card modal-lg" id="wdLedgerBody" role="dialog" aria-modal="true" aria-labelledby="wdLedgerTitle"></div>
+</div>
+
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
   <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
 </div>
@@ -627,7 +731,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260731m4"></script>
+<script src="../shared/formatters.js?v=20260801m6"></script>
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
@@ -635,7 +739,7 @@
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260801merge"></script>
+<script src="../assets/js/admin.js?v=20260801m6"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260801cr5"></script>
@@ -647,5 +751,14 @@
 <script src="../assets/js/admin-change-requests.js?v=20260801merge"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
 <script src="../assets/js/admin-booking-ops.js?v=20260801cr5c"></script>
+<!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
+     payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
+<script src="../assets/js/admin-wallet-desk.js?v=20260801cr4d"></script>
+<!-- M5 — delivery failures, on the Notifications section. -->
+<script src="../assets/js/admin-message-delivery.js?v=20260801m5"></script>
+<!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
+     authHeaders, escapeHtml and rowsSkeleton, and is reached through its
+     loadSection switch rather than binding its own nav handler. -->
+<script src="../assets/js/admin-analytics.js?v=20260801m6"></script>
 </body>
 </html>

@@ -21,8 +21,23 @@ class MerchantSummaryRow(BaseModel):
     user_count: int
 
 
+class GlobalSummaryTotals(BaseModel):
+    """The four figures the screen's stat cards render.
+
+    Added in M6. The rows are a small bounded dataset and the frontend *could*
+    sum them — it did, with ``Number()``, which turns a Decimal into a float and
+    drops the paise. ``total_revenue`` is money, so it is added up once, here,
+    in ``Decimal``, and crosses the wire as a string.
+    """
+
+    merchants: int
+    total_requests: int
+    completed_requests: int
+    total_revenue: Decimal
+    user_count: int
+
+
 class GlobalSummaryResponse(BaseModel):
-    #: Row-per-merchant. Small, bounded dataset (one row per company) — the
-    #: frontend sums whatever columns it wants rather than this needing a
-    #: separate, differently-shaped "totals" row.
+    #: Row-per-merchant. Small, bounded dataset (one row per company).
     merchants: list[MerchantSummaryRow]
+    totals: GlobalSummaryTotals

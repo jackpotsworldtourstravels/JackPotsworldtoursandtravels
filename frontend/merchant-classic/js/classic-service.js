@@ -85,7 +85,13 @@ function clInitServiceRequest() {
     <div class="cl-page-head">
       <div>
         <h1>Service Requests</h1>
-        <p>Amend a booking after it has been approved. Each request is tracked against the booking.</p>
+        <p>Amend a booking after it has been approved. Each request is tracked against the booking,
+           and goes to a manager at your own company before it reaches our desk.</p>
+      </div>
+      <div class="cl-page-actions">
+        <button type="button" class="cl-btn" id="clSrRefresh">
+          ${clIco('refresh', { size: 15 })} Refresh
+        </button>
       </div>
     </div>
 
@@ -132,6 +138,7 @@ function clInitServiceRequest() {
     e.preventDefault();
     clGo('requests');
   });
+  $('clSrRefresh').addEventListener('click', () => clLoadServiceRequests().then(clLoadSrBookings));
 
   /* Both lists before either renders: the booking table marks the rows that
      already have a cancellation against them, which it can only know from the
@@ -196,6 +203,15 @@ function clRenderServiceRequests() {
     b.addEventListener('click', () => clManagerDecide(b.dataset.clSrApprove, true)));
   body.querySelectorAll('[data-cl-sr-reject]').forEach(b =>
     b.addEventListener('click', () => clManagerDecide(b.dataset.clSrReject, false)));
+  body.querySelectorAll('[data-cl-sr-chat]').forEach(b =>
+    b.addEventListener('click', () => clGo('support', () => {
+      clOpenNewChat();
+      const subject = $('clNewChatSubject');
+      if (subject) {
+        subject.value = `Question about ${b.dataset.clSrChat}`;
+        $('clNewChatMessage')?.focus();
+      }
+    })));
 }
 
 /* The manager stage is not a status — it is a fact about a request that is
@@ -270,6 +286,13 @@ function clSrRowActions(r) {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-approve="${r.id}">Approve</button>`);
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-sr-reject="${r.id}">Reject</button>`);
   }
+  /* Discuss opens a real support conversation with the reference already in the
+     subject, so a question about a service request does not become an email
+     nobody can find later. It does NOT act on the request itself: only
+     `lifecycle.transition` may move a service_requests row, and a chat thread
+     must never look like a fourth way to change one. */
+  out.push(`<button type="button" class="cl-btn cl-btn-sm" data-cl-sr-chat="${escapeHtml(r.request_number || '')}"
+              title="Ask the desk about this request">Discuss</button>`);
   return out.join('');
 }
 
@@ -723,8 +746,9 @@ async function clSubmitSrRequest(run, successVerb) {
     clCloseModal();
     await clLoadServiceRequests();
     await clLoadSrBookings();
-    clInvalidate('dashboard', 'requests', 'payments', 'reports');
-    clSearchCache = null;
+    /* The `clSearchCache = null` that used to sit here went with the topbar's
+       search box — there is no client-side row cache left to invalidate. */
+    clInvalidate('dashboard', 'requests', 'booking-history', 'payments', 'reports');
     clLoadUnreadCount();
 
     clOpenModal(`${successVerb} — ${r.request_number || ''}`,
