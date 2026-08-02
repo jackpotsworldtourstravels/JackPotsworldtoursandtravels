@@ -570,13 +570,22 @@ prefix and the streaming download all agree with each other.
 **Deploying a change**
 
 ```bash
-cd ~/JackPotsworldtoursandtravels && git pull \
-  && DOCKER_BUILDKIT=0 docker build -t deploy-app -f Dockerfile . \
-  && cd deploy && docker compose up -d
+cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
 ```
 
-Migrations run automatically on restart. Expect a few seconds of downtime; this
-is a single instance.
+That is the only supported way to deploy. The script verifies the checkout,
+pulls, rebuilds, restarts, waits for the health check and prints the deployed
+commit; it stops at the first failure rather than continuing past one. See
+[`../deploy/README.md`](../deploy/README.md).
+
+Migrations run automatically on container start. Expect a few seconds of
+downtime; this is a single instance.
+
+> **Do not deploy by typing the compose commands by hand.** `docker compose up -d`
+> **without** `--build` reuses the existing image: the pull succeeds, the
+> container is recreated, the command exits 0, and none of the new code is
+> running. `redeploy.sh` always passes `--build`, which is the main reason it
+> exists.
 
 **Backups.** RDS keeps 7 days of automated backups and supports point-in-time
 restore. S3 versioning covers documents. Neither covers a mistake you notice in

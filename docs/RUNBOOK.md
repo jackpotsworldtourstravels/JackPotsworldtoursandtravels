@@ -62,10 +62,22 @@ cd backend && alembic downgrade 0036_wallet_ledger
 
 ## 3. Deploying
 
-See `docs/AWS_DEPLOYMENT.md` for the environment. The three-step redeploy documented there still
-applies, and the trap it records still bites: **the checkout is not `/opt/jackpots`, and skipping
-the image build ships nothing while exiting 0.** Confirm the image was rebuilt before believing a
-deploy happened.
+```bash
+ssh -i ~/.ssh/jackpotsworld-key.pem ec2-user@<ELASTIC_IP>
+cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
+```
+
+**That is the only supported way to deploy.** The script derives the repository path from its own
+location, checks the environment files exist, pulls, rebuilds, restarts, waits on the container's
+health check and prints the deployed commit. It stops at the first failure.
+
+`docs/AWS_DEPLOYMENT.md` covers first-time infrastructure; `deploy/README.md` covers the deploy
+itself.
+
+> **Why a script rather than typed commands.** `docker compose up -d` **without** `--build` reuses
+> the existing image: the pull succeeds, the container is recreated, the command exits 0, and none
+> of the new code is running — a deploy that reports success and ships nothing. `redeploy.sh` always
+> passes `--build`. Deploying by hand is how that trap gets hit.
 
 ### Frontend cache-busting — the failure that looks like "the change didn't work"
 

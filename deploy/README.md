@@ -1,106 +1,115 @@
-# Deploying to AWS EC2 — SUPERSEDED
+# Deploying
 
-> **Use [../docs/AWS_DEPLOYMENT.md](../docs/AWS_DEPLOYMENT.md) instead.**
->
-> This guide predates the Docker image and the S3 document backend, and it
-> installs PostgreSQL on the web server — where an instance rebuild takes the
-> database with it, and where booking documents live only on that one disk.
-> The current guide uses RDS and S3 so the instance stays disposable.
->
-> Kept because the nginx and systemd files here are still a working reference
-> for a no-Docker deployment. Do not follow both guides: `setup.sh` installs a
-> second PostgreSQL and an nginx that will fight the Caddy container for
-> port 80.
-
-All-in-one setup: one EC2 instance runs nginx (static frontend + reverse proxy),
-the FastAPI backend (gunicorn/uvicorn via systemd), and PostgreSQL.
-
-## 1. Launch the EC2 instance (AWS Console)
-
-1. EC2 → **Launch instance**.
-2. AMI: **Ubuntu Server 24.04 LTS**.
-3. Instance type: **t3.micro** (free-tier eligible; upgrade later if needed).
-4. Key pair: create a new one, download the `.pem` file, keep it safe — you can't
-   re-download it later.
-5. Network settings → **Edit** → security group rules:
-   - SSH (22) — source: **My IP** (not 0.0.0.0/0, to avoid brute-force exposure)
-   - HTTP (80) — source: Anywhere (0.0.0.0/0)
-   - HTTPS (443) — source: Anywhere (0.0.0.0/0)
-   - Do **not** open 8000 or 5432 publicly — nginx proxies to the backend locally,
-     and Postgres should only be reachable from the instance itself.
-6. Storage: 20 GB gp3 is plenty to start.
-7. Launch.
-
-## 2. Allocate an Elastic IP
-
-Instance IPs change if you stop/start the instance. Allocate a static one:
-EC2 → **Elastic IPs** → Allocate → Associate with your new instance.
-(Free while attached to a running instance; small hourly charge if left unattached.)
-
-## 3. Point your domain at it
-
-In your domain registrar / Route 53, add an **A record** for your domain
-(and `www`) pointing at the Elastic IP. DNS propagation can take a few minutes
-to a few hours.
-
-## 4. SSH in and deploy
+**One deployment method. This one.**
 
 ```bash
-chmod 400 your-key.pem
-ssh -i your-key.pem ubuntu@<ELASTIC_IP>
-
-sudo mkdir -p /opt/jackpots && sudo chown ubuntu:ubuntu /opt/jackpots
-git clone <your-repo-url> /opt/jackpots
-cd /opt/jackpots
-sudo bash deploy/setup.sh
+ssh -i ~/.ssh/jackpotsworld-key.pem ec2-user@<ELASTIC_IP>
+cd ~/JackPotsworldtoursandtravels && bash deploy/redeploy.sh
 ```
 
-`setup.sh` installs nginx/PostgreSQL/Python, creates the database, sets up the
-backend venv, generates `backend/.env` with a random DB password and JWT
-secret, runs Alembic migrations, installs the `jackpots-backend` systemd
-service, and copies the static HTML into `/var/www/jackpots`.
+That is the whole procedure for shipping a change. `redeploy.sh` verifies the
+checkout, pulls, rebuilds the image, restarts the stack, waits for the app to
+report healthy, and prints the deployed commit. It stops at the first failure
+and tells you which step failed.
 
-## 5. Set your real domain
+For **first-time infrastructure setup** — RDS, S3, EC2, DNS, TLS — follow
+[`../docs/AWS_DEPLOYMENT.md`](../docs/AWS_DEPLOYMENT.md). This file covers
+deploying to a server that already exists.
 
-Two places still say `YOUR_DOMAIN` — replace both with your actual domain:
+---
+
+## What is running
+
+| Piece | Where |
+| --- | --- |
+| Application | Docker container, API **and** frontend on port 8000, single origin |
+| TLS / public entry | Caddy container, ports 80 and 443 |
+| Database | RDS PostgreSQL — **not** on this instance |
+| Documents | S3, private bucket, via the instance's IAM role |
+| Schema | `alembic upgrade head`, run automatically by `docker-entrypoint.sh` on every container start |
+
+The instance is disposable by design: rebuild it and you lose nothing but
+uptime, because neither the database nor the documents live on it.
+
+## Files in this directory
+
+| File | Purpose |
+| --- | --- |
+| `redeploy.sh` | **The deployment script.** Nothing else deploys this application. |
+| `docker-compose.yml` | The production stack: `app` + `caddy`, three named volumes |
+| `Caddyfile` | Reverse proxy and automatic TLS |
+| `docker-entrypoint.sh` | Container start-up: migrate, then serve |
+
+## Two files that are not in git and must exist on the server
+
+`redeploy.sh` refuses to deploy without both, because each fails in a way that
+is confusing to diagnose after the fact.
+
+| File | Holds | If missing |
+| --- | --- | --- |
+| `../backend/.env` | `DATABASE_URL`, `JWT_SECRET_KEY`, `S3_*`, `CORS_ORIGINS` | The container starts with no database and migrates nothing |
+| `./.env` | `SITE_DOMAIN` | Caddy cannot tell which certificate to request |
+
+See [`../docs/AWS_DEPLOYMENT.md`](../docs/AWS_DEPLOYMENT.md) for how to produce both.
+
+## Before you deploy
+
+1. **`python tests/run_all.py` is green** — 22 scripts. That is the release
+   gate, not a formality.
+2. **Take an RDS snapshot** if the release contains a migration. The console, or
+   `aws rds create-db-snapshot`. Migrations run automatically on container
+   start, so there is no separate moment to catch one going wrong.
+
+## After you deploy
+
+`redeploy.sh` prints the deployed commit and the health verdict. Then:
 
 ```bash
-sudo nano /etc/nginx/sites-available/jackpots     # server_name line
-sudo nano /opt/jackpots/backend/.env               # CORS_ORIGINS line
-sudo nginx -t && sudo systemctl reload nginx
-sudo systemctl restart jackpots-backend
+curl -fsS https://${SITE_DOMAIN}/api/health
 ```
 
-## 6. Enable HTTPS
+Sign in to `/admin/` and open **Wallet & Top-ups → Wallet Reconciliation**.
+**Every merchant's `drift` must read `0.00`.** That single column is the
+difference between a display problem and a money problem — see
+[`../docs/RUNBOOK.md`](../docs/RUNBOOK.md) §4.1 for what to do if it is not zero.
+
+## When something goes wrong
 
 ```bash
-sudo certbot --nginx -d YOUR_DOMAIN -d www.YOUR_DOMAIN
+cd ~/JackPotsworldtoursandtravels/deploy
+docker compose ps                  # what is up, and its health
+docker compose logs -f app         # live application log
+docker compose logs app | grep -i alembic   # what the schema did on boot
+docker compose logs caddy          # TLS and certificate issues
 ```
 
-Certbot edits the nginx config to add the TLS server block and sets up
-auto-renewal. Visit `https://YOUR_DOMAIN` to confirm.
+**Rolling back** is a `git checkout` of the previous commit followed by
+`bash deploy/redeploy.sh` again. **Do not roll a wallet migration back over live
+balances** — `0036` deliberately refuses when any merchant's balance is
+negative, which is a normal operating state. `../docs/RUNBOOK.md` §6 covers this.
 
-## 7. Verify
+## The failure worth knowing about
 
-- `https://YOUR_DOMAIN/api/health` → `{"status":"ok"}`
-- `https://YOUR_DOMAIN/` → the public site loads and can sign up/search/book
-- `https://YOUR_DOMAIN/admin/` → log in with the seeded admin account
-  (check `sudo journalctl -u jackpots-backend | grep -i admin` right after
-  the first migration ran, for the auto-generated password if you didn't set
-  `ADMIN_SEED_PASSWORD`)
+`docker compose up -d` **without** `--build` reuses the existing image. The pull
+succeeds, compose reports the container recreated, the command exits 0, and none
+of the new code is running — a deploy that reports success and ships nothing.
+This has bitten the project before. `redeploy.sh` always passes `--build`, which
+is the main reason to use the script rather than typing the commands by hand.
 
-## Redeploying after code changes
+---
 
-```bash
-ssh -i your-key.pem ubuntu@<ELASTIC_IP>
-cd /opt/jackpots && bash deploy/redeploy.sh
-```
+## What was removed, and why
 
-## Useful commands on the instance
+The pre-Docker deployment tooling — `setup.sh`, `jackpots-backend.service` and
+`nginx.conf` — was deleted along with the old `redeploy.sh` it belonged to. That
+stack installed PostgreSQL on the web server and served the frontend from disk
+behind its own web server, none of which is how this application runs.
 
-```bash
-sudo systemctl status jackpots-backend      # backend health
-sudo journalctl -u jackpots-backend -f      # live backend logs
-sudo systemctl status nginx
-sudo tail -f /var/log/nginx/error.log
-```
+Keeping it was not neutral. `setup.sh` installs a second PostgreSQL and a web
+server that contends with the Caddy container for port 80, and the old
+`redeploy.sh` pointed at an absolute path this repository is not checked out to
+— so on the current server it would either fail immediately or, if a stale
+checkout happened to sit there, migrate the production database from old code.
+
+Anything genuinely needed from those files is recoverable from git history. The
+current deployment is the five files listed above and nothing else.
