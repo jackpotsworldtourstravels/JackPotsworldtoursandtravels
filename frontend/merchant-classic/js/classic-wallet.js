@@ -93,6 +93,8 @@ function clInitWallet() {
         <div class="cl-kpi-sub">Loading…</div></div>
     </div>
 
+    <div id="clWalletTrend"></div>
+
     <div class="cl-panel">
       <div class="cl-panel-head">
         <h2>Money you have added</h2>
@@ -162,7 +164,7 @@ function clInitWallet() {
 
   $('clWalletAddBtn').addEventListener('click', () => clOpenAddMoney());
   $('clWalletRefresh').addEventListener('click', () => {
-    clLoadWalletSummary(); clLoadTopups(); clLoadWalletLedger();
+    clLoadWalletSummary(); clLoadTopups(); clLoadWalletLedger(); clLoadWalletTrend();
   });
   $('clTopupRefresh').addEventListener('click', () => clLoadTopups());
   $('clWalletApply').addEventListener('click', () => {
@@ -184,7 +186,218 @@ function clInitWallet() {
     clWalletState.page += 1; clLoadWalletLedger();
   });
 
-  return Promise.all([clLoadWalletSummary(), clLoadTopups(), clLoadWalletLedger()]);
+  return Promise.all([
+    clLoadWalletSummary(), clLoadTopups(), clLoadWalletLedger(), clLoadWalletTrend(),
+  ]);
+}
+
+/* ----------------------------------------------------------------- trend */
+
+/* THE CLOSING BALANCE AT EACH MONTH END, over the last six months.
+   ---------------------------------------------------------------------------
+   Every point is a `balance_after` the server stored at the moment the balance
+   moved. Nothing here accumulates a running total — rule 3 at the top of this
+   file — so this chart cannot disagree with the statement below it.
+
+   IT ASKS THE LEDGER ONE MONTH AT A TIME, AND ONLY FOR THAT MONTH'S LAST ROW.
+   The endpoint is oldest-first, capped at 100 rows a page, and has no
+   aggregate, so neither end of a whole-window fetch is the answer: page 1 is
+   the oldest 100 movements, and the final pages are all from the most recent
+   day. The first build walked back from the end and, on an account whose 976
+   movements sit in a two-day span, saw only August — it drew one point and
+   reported "one month of history" about a wallet with two.
+
+   So: per month, `page_size: 1` to read `total` (the database's COUNT(*) under
+   that date filter), then `page: total` to fetch exactly the last row. Twelve
+   one-row calls, exact at any volume, and the count in the caption is the
+   server's own rather than a length.
+
+   A month with no movement inherits the previous month's close — not an
+   assumption, but what a balance does when nothing touches it. A month BEFORE
+   the earliest movement is left out rather than drawn at zero, which would show
+   a merchant a wallet it never had. */
+const CL_TREND_MONTHS = 6;
+
+async function clLoadWalletTrend() {
+  const host = $('clWalletTrend');
+  if (!host) return;
+
+  const now = new Date();
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /* The six month windows, oldest first. The last one ends today, not at a
+     month end that has not happened yet. */
+  const windows = [];
+  for (let i = CL_TREND_MONTHS - 1; i >= 0; i--) {
+    const first = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const lastOfMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    windows.push({
+      key: `${first.getFullYear()}-${first.getMonth()}`,
+      label: first.toLocaleDateString('en-IN', { month: 'short' }),
+      from: iso(first),
+      to: iso(lastOfMonth > now ? now : lastOfMonth),
+    });
+  }
+
+  let months;
+  try {
+    months = await Promise.all(windows.map(async win => {
+      const head = await MerchantApi.walletTransactions({
+        dateFrom: win.from, dateTo: win.to, page: 1, pageSize: 1,
+      });
+      const count = head.total ?? 0;
+      if (!count) return { ...win, count: 0, close: null };
+      /* page === total with page_size 1 is the month's LAST movement. */
+      const tail = count === 1 ? head : await MerchantApi.walletTransactions({
+        dateFrom: win.from, dateTo: win.to, page: count, pageSize: 1,
+      });
+      const row = (tail.items || [])[0];
+      return { ...win, count, close: row ? row.balance_after : null };
+    }));
+  } catch {
+    host.innerHTML = '';       /* the statement below is the real record */
+    return;
+  }
+
+  const total = months.reduce((n, m) => n + m.count, 0);
+  if (!total) {
+    host.innerHTML = `<div class="cl-panel cl-chart">
+      <div class="cl-panel-head"><h2>${clIco('trend')}Balance trend</h2></div>
+      <div class="cl-panel-body">
+        <p class="cl-kpi-sub" style="margin:0;">
+          Nothing has moved on your wallet in the last ${CL_TREND_MONTHS} months, so there is no
+          trend to draw yet.</p>
+      </div></div>`;
+    return;
+  }
+
+  const buckets = [];
+  let carried = null;
+  months.forEach(m => {
+    const close = m.close != null ? m.close : carried;
+    if (close == null) return;                /* before the earliest movement */
+    carried = close;
+    buckets.push({
+      label: m.label,
+      value: Number(close) || 0,
+      exact: close,
+      carried: m.close == null,
+    });
+  });
+
+  if (buckets.length < 2) {
+    host.innerHTML = `<div class="cl-panel cl-chart">
+      <div class="cl-panel-head"><h2>${clIco('trend')}Balance trend</h2></div>
+      <div class="cl-panel-body">
+        <p class="cl-kpi-sub" style="margin:0;">
+          Your wallet has one month of history so far. The trend appears once there are two.</p>
+      </div></div>`;
+    return;
+  }
+
+  /* `total` is the sum of six server-side COUNT(*)s, not a length — nothing was
+     truncated to draw this, so there is no coverage caveat to state. */
+  const caption = `Closing balance each month end · ${total} movement${total === 1 ? '' : 's'}`;
+
+  host.innerHTML = `<div class="cl-panel cl-chart">
+    <div class="cl-panel-head">
+      <h2>${clIco('trend')}Balance trend</h2>
+      <div class="cl-panel-tools"><span class="cl-kpi-sub">${escapeHtml(caption)}</span></div>
+    </div>
+    <div class="cl-panel-body">
+      ${clBalanceChart(buckets)}
+      ${buckets.some(b => b.carried) ? `<p class="cl-kpi-sub" style="margin:10px 0 0;">
+        A month with no movement carries the previous month's closing balance forward.</p>` : ''}
+    </div>
+  </div>`;
+}
+
+/* A signed area chart. The portal's other charts all measure counts and money
+   that cannot go below zero, so they scale 0..max and draw up from the floor.
+   A WALLET CAN BE NEGATIVE — that is the whole of CR-4 — so this one finds its
+   own baseline: the zero line sits wherever zero falls in the range, the fill
+   runs from the line to the balance in either direction, and a month in the
+   red is drawn in the danger tone rather than as a point below the frame. */
+/* clShortMoney() is written for figures that cannot go below zero, so a
+   negative lands in none of its branches and renders as a raw "₹-250000".
+   The sign is carried by a real minus glyph, outside the abbreviation. */
+function clSignedShort(n) {
+  const v = Number(n) || 0;
+  return (v < 0 ? '−' : '') + clShortMoney(Math.abs(v));
+}
+
+function clBalanceChart(buckets) {
+  const { w, h, x0, x1, yTop, yBase, yLab } = CL_CH;
+  const values = buckets.map(b => b.value);
+  const rawMax = Math.max(...values, 0);
+  const rawMin = Math.min(...values, 0);
+  /* A flat-zero wallet would give a zero-height range and divide by zero. */
+  const span = (rawMax - rawMin) || 1;
+  const pad = span * 0.12;
+  const top = rawMax + pad;
+  /* An account that has never gone negative gets zero as its floor. Padding
+     below the lowest month would otherwise print a negative axis label under a
+     wallet that has only ever been in credit — a range it never occupied. */
+  const bottom = rawMin < 0 ? rawMin - pad : 0;
+  const y = v => yBase - ((v - bottom) / (top - bottom)) * (yBase - yTop);
+  const band = (x1 - x0) / buckets.length;
+  const gid = `clw${Math.random().toString(36).slice(2, 8)}`;
+  const zeroY = y(0);
+  const negative = rawMin < 0;
+  const colour = negative ? 'var(--cl-danger)' : 'var(--cl-success)';
+
+  const grid = [top, (top + bottom) / 2, bottom].map(v =>
+    `<line x1="${x0}" y1="${y(v).toFixed(1)}" x2="${x1}" y2="${y(v).toFixed(1)}"
+           stroke="var(--cl-line-2)" stroke-width="1"/>
+     <text x="${x0 - 9}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="9.5"
+           font-weight="600" fill="var(--cl-text-muted)">${escapeHtml(clSignedShort(v))}</text>`).join('');
+
+  /* The zero line is drawn only when the range crosses it — on an account that
+     has never gone negative it would just be the axis floor twice. */
+  const zeroLine = negative
+    ? `<line x1="${x0}" y1="${zeroY.toFixed(1)}" x2="${x1}" y2="${zeroY.toFixed(1)}"
+             stroke="var(--cl-text-muted)" stroke-width="1.4" stroke-dasharray="4 4"/>`
+    : '';
+
+  const points = buckets.map((b, i) => [x0 + band * (i + 0.5), y(b.value)]);
+  const line = points.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
+  const area = `${points[0][0].toFixed(1)},${zeroY.toFixed(1)} ${line} `
+    + `${points[points.length - 1][0].toFixed(1)},${zeroY.toFixed(1)}`;
+
+  const labels = buckets.map((b, i) =>
+    `<text x="${(x0 + band * (i + 0.5)).toFixed(1)}" y="${yLab}" text-anchor="middle"
+           font-size="10.5" font-weight="700"
+           fill="var(--cl-text-muted)">${escapeHtml(b.label)}</text>`).join('');
+
+  const dots = points.map(([px, py], i) => {
+    const b = buckets[i];
+    const below = b.value < 0;
+    return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4"
+                    fill="var(--cl-surface)" stroke="${below ? 'var(--cl-danger)' : colour}"
+                    stroke-width="2.5"/>
+      <text x="${px.toFixed(1)}" y="${(below ? py + 15 : py - 11).toFixed(1)}" text-anchor="middle"
+            font-size="9.5" font-weight="800"
+            fill="var(--cl-text)">${escapeHtml(clSignedShort(b.value))}</text>`;
+  }).join('');
+
+  const last = buckets[buckets.length - 1];
+  const label = `Wallet balance at each month end, ${buckets[0].label} to ${last.label}`
+    + `, ending at ${moneyStr(last.exact)}`;
+
+  return `<svg class="cl-chart-svg" viewBox="0 0 ${w} ${h}" role="img"
+               aria-label="${escapeHtml(label)}">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${colour}" stop-opacity=".30"/>
+      <stop offset="100%" stop-color="${colour}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <polygon points="${area}" fill="url(#${gid})"/>
+    <polyline points="${line}" fill="none" stroke="${colour}" stroke-width="2.5"
+              stroke-linejoin="round" stroke-linecap="round"/>
+    ${zeroLine}
+    ${labels}
+    ${dots}
+  </svg>`;
 }
 
 /* --------------------------------------------------------------- summary */

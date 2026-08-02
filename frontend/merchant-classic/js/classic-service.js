@@ -100,6 +100,20 @@ function clInitServiceRequest() {
         <h2>Requests you have raised</h2>
         <span class="cl-kpi-sub" id="clSrCounts"></span>
       </div>
+      <!-- Type is the facet of this table: every row IS one of the seven kinds
+           of change. The filter narrows the rows this screen already holds
+           rather than re-fetching — clLoadServiceRequests pulls every type in
+           one call because the API filters on one request_type at a time. -->
+      <div class="cl-toolbar">
+        <div class="cl-field">
+          <label for="clSrType">Type</label>
+          <select id="clSrType">
+            <option value="">All types</option>
+            ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
+              `<option value="${t}">${clLabel(t)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div class="cl-panel-body cl-flush">
         <div class="cl-table-wrap">
           <table class="cl-table">
@@ -139,6 +153,8 @@ function clInitServiceRequest() {
     clGo('requests');
   });
   $('clSrRefresh').addEventListener('click', () => clLoadServiceRequests().then(clLoadSrBookings));
+  clChips('clSrType', 'Type');
+  $('clSrType').addEventListener('change', clRenderServiceRequests);
 
   /* Both lists before either renders: the booking table marks the rows that
      already have a cancellation against them, which it can only know from the
@@ -170,7 +186,8 @@ async function clLoadServiceRequests() {
 
 function clRenderServiceRequests() {
   const body = $('clSrList');
-  const rows = clSrRequests;
+  const type = $('clSrType')?.value || '';
+  const rows = type ? clSrRequests.filter(r => r.request_type === type) : clSrRequests;
 
   body.innerHTML = rows.length
     ? rows.map(r => `<tr>
@@ -182,11 +199,22 @@ function clRenderServiceRequests() {
         <td class="cl-nowrap">${escapeHtml(fmtDate(r.created_at))}</td>
         <td class="cl-actions">${clSrRowActions(r)}</td>
       </tr>${clSrDetailRow(r)}`).join('')
-    : clEmptyRow(7, 'No service requests raised yet.');
+    /* "None of this type" and "none at all" are different answers, and the
+       second one is wrong when a filter is on. */
+    : clEmptyRow(7, type
+      ? `No ${clLabel(type).toLowerCase()} requests.`
+      : 'No service requests raised yet.',
+      type ? ' Choose “All types” to see everything you have raised.' : '');
 
-  const awaiting = rows.filter(r => r.manager_state === 'pending').length;
-  $('clSrCounts').textContent = rows.length
-    ? `${rows.length} in total${awaiting ? ` · ${awaiting} awaiting a manager` : ''}`
+  /* The count describes what is on screen. `awaiting` stays whole-list: it is
+     the thing a manager has to act on, and a type filter must not hide two
+     approvals behind a narrowed view. */
+  const awaiting = clSrRequests.filter(r => r.manager_state === 'pending').length;
+  const scope = type
+    ? `${rows.length} of ${clSrRequests.length}`
+    : `${rows.length} in total`;
+  $('clSrCounts').textContent = clSrRequests.length
+    ? `${scope}${awaiting ? ` · ${awaiting} awaiting a manager` : ''}`
     : '';
 
   $('clSrListNote').innerHTML = clIsManager()

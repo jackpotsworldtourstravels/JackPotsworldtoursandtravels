@@ -76,7 +76,8 @@ function clInitReports() {
           <label for="clRepStatus">Status</label>
           <select id="clRepStatus" data-cl-status-filter>
             <option value="">All statuses</option>
-            ${MERCHANT_REQUEST_STATUSES.map(s => `<option value="${s}">${clLabel(s)}</option>`).join('')}
+            ${MERCHANT_REQUEST_STATUSES.map(s =>
+              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clLabel(s)}</option>`).join('')}
           </select>
         </div>
         <div class="cl-toolbar-actions">
@@ -112,10 +113,13 @@ function clInitReports() {
 
     <div class="cl-msg" id="clRepMsg"></div>`;
 
+  clChips('clRepStatus', 'Status');
+
   $('clRepRun').addEventListener('click', clRunReport);
   $('clRepReset').addEventListener('click', () => {
     $('clRepBasis').value = 'travel_date';
     ['clRepFrom', 'clRepTo', 'clRepStatus'].forEach(id => { $(id).value = ''; });
+    clSyncChips('clRepStatus');
     clRunReport();
   });
   ['clRepStatus', 'clRepBasis'].forEach(id => $(id).addEventListener('change', clRunReport));

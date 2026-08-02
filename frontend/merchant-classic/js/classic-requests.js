@@ -79,7 +79,8 @@ function clInitRequests() {
           <label for="clReqStatus">Stage</label>
           <select id="clReqStatus" data-cl-status-filter>
             <option value="">All active work</option>
-            ${CL_ACTIVE_STATUSES.map(s => `<option value="${s}">${clStageName(s)}</option>`).join('')}
+            ${CL_ACTIVE_STATUSES.map(s =>
+              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clStageName(s)}</option>`).join('')}
           </select>
         </div>
         <div class="cl-field">
@@ -144,10 +145,16 @@ function clInitRequests() {
   /* Booking starts at the enquiry, not at a search: a request can only be
      raised against an enquiry our team has already answered. */
   $('clReqNew').addEventListener('click', () => clGo('enquiry'));
+  /* Stage is the facet this screen is actually read by, so it is a chip row
+     rather than a dropdown. The <select> above stays as the value holder —
+     see clChips() in classic-shell.js. */
+  clChips('clReqStatus', 'Stage');
+
   $('clReqRefresh').addEventListener('click', () => clLoadRequests());
   $('clReqApply').addEventListener('click', () => clLoadRequests({ resetPage: true }));
   $('clReqReset').addEventListener('click', () => {
     ['clReqStatus', 'clReqType', 'clReqFrom', 'clReqTo', 'clReqSearch'].forEach(id => { $(id).value = ''; });
+    clSyncChips('clReqStatus');     /* a bare .value write fires no change event */
     clLoadRequests({ resetPage: true });
   });
   ['clReqStatus', 'clReqType', 'clReqFrom', 'clReqTo'].forEach(id =>

@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260801ux4">
+<link rel="stylesheet" href="css/classic.css?v=20260802ui1">
 </head>
 <body>
 
@@ -206,7 +206,7 @@
       <div class="cl-side-group">Overview</div>
       <a href="#" data-cl-nav="dashboard" class="active">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
-        Dashboard
+        <span class="cl-side-label">Dashboard</span>
       </a>
 
       <div class="cl-side-group">Booking</div>
@@ -215,32 +215,32 @@
            enquiry queue. Same rows, same request_type. -->
       <a href="#" data-cl-nav="enquiry">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.4 3.4-2 2H3.5l-.7 1.4 3 1.6 1.6 3 1.4-.7v-2.2l2-2 3.4 3.4a.5.5 0 0 0 .8-.5z"/></svg></span>
-        Booking Enquiry
+        <span class="cl-side-label">Booking Enquiry</span>
       </a>
       <a href="#" data-cl-nav="booking-request">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>
-        Booking Request
+        <span class="cl-side-label">Booking Request</span>
       </a>
 
       <div class="cl-side-group">Operations</div>
       <a href="#" data-cl-nav="requests">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-        My Requests
+        <span class="cl-side-label">My Requests</span>
         <span class="cl-side-pill" id="clNavRequestsCount"></span>
       </a>
       <!-- CR-3 — only the merchant's approvers see this; revealed by
            classic-shell.js once the session's permissions are known. -->
       <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-        Approvals
+        <span class="cl-side-label">Approvals</span>
       </a>
       <a href="#" data-cl-nav="booking-history">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
-        Booking History
+        <span class="cl-side-label">Booking History</span>
       </a>
       <a href="#" data-cl-nav="service-request">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
-        Service Requests
+        <span class="cl-side-label">Service Requests</span>
       </a>
 
       <div class="cl-side-group">Finance</div>
@@ -249,39 +249,53 @@
            catalog-led track only. -->
       <a href="#" data-cl-nav="wallet">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span>
-        Wallet
+        <span class="cl-side-label">Wallet</span>
       </a>
       <a href="#" data-cl-nav="payments">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg></span>
-        Payments
+        <span class="cl-side-label">Payments</span>
       </a>
 
       <div class="cl-side-group">Insight</div>
       <a href="#" data-cl-nav="reports">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg></span>
-        Reports
+        <span class="cl-side-label">Reports</span>
       </a>
       <a href="#" data-cl-nav="notifications">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
-        Notifications
+        <span class="cl-side-label">Notifications</span>
         <span class="cl-side-pill" id="clNavNotesCount"></span>
       </a>
 
       <div class="cl-side-group">Account</div>
       <a href="#" data-cl-nav="profile">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-        Profile &amp; Settings
+        <span class="cl-side-label">Profile &amp; Settings</span>
       </a>
       <a href="#" data-cl-nav="support">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></span>
-        Support Center
+        <span class="cl-side-label">Support Center</span>
         <span class="cl-side-pill" id="clNavSupportCount"></span>
       </a>
 
+      <!-- The company. In the collapsed rail the two lines are clipped away and
+           the monogram takes over — same information, 82px of room. -->
       <div class="cl-side-foot">
+        <span class="cl-side-badge" id="clSideBadge" aria-hidden="true">—</span>
         <b id="clSideCompany">—</b>
         <span id="clSideCode">Merchant account</span>
       </div>
+
+      <!-- Collapse. Desktop only: below 900px the rail is already a drawer. -->
+      <button type="button" class="cl-rail-toggle" id="clRailToggle"
+              aria-expanded="true" aria-controls="clSide">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
+          <path d="M16 9l-3 3 3 3"/>
+        </svg>
+        <span class="cl-side-label" id="clRailToggleText">Collapse</span>
+      </button>
     </nav>
 
     <!-- -------------------------------- main ------------------------------ -->
@@ -348,22 +362,22 @@
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
 <script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260801ux4"></script>
-<script src="../shared/merchant-api.js?v=20260801ux4"></script>
-<script src="js/classic-icons.js?v=20260801ux4"></script>
-<script src="js/classic-dashboard.js?v=20260801ux4"></script>
-<script src="js/classic-enquiry.js?v=20260801ux4"></script>
-<script src="js/classic-booking.js?v=20260801ux4"></script>
-<script src="js/classic-booking-detail.js?v=20260801ux4"></script>
-<script src="js/classic-requests.js?v=20260801ux4"></script>
-<script src="js/classic-history.js?v=20260801ux4"></script>
-<script src="js/classic-approvals.js?v=20260801ux4"></script>
-<script src="js/classic-wallet.js?v=20260801ux4"></script>
-<script src="js/classic-payments.js?v=20260801ux4"></script>
-<script src="js/classic-service.js?v=20260801ux4"></script>
-<script src="js/classic-reports.js?v=20260801ux4"></script>
-<script src="js/classic-account.js?v=20260801ux4"></script>
-<script src="js/classic-support.js?v=20260801ux4"></script>
+<script src="js/classic-shell.js?v=20260802ui1"></script>
+<script src="../shared/merchant-api.js?v=20260802ui1"></script>
+<script src="js/classic-icons.js?v=20260802ui1"></script>
+<script src="js/classic-dashboard.js?v=20260802ui1"></script>
+<script src="js/classic-enquiry.js?v=20260802ui1"></script>
+<script src="js/classic-booking.js?v=20260802ui1"></script>
+<script src="js/classic-booking-detail.js?v=20260802ui1"></script>
+<script src="js/classic-requests.js?v=20260802ui1"></script>
+<script src="js/classic-history.js?v=20260802ui1"></script>
+<script src="js/classic-approvals.js?v=20260802ui1"></script>
+<script src="js/classic-wallet.js?v=20260802ui1"></script>
+<script src="js/classic-payments.js?v=20260802ui1"></script>
+<script src="js/classic-service.js?v=20260802ui1"></script>
+<script src="js/classic-reports.js?v=20260802ui1"></script>
+<script src="js/classic-account.js?v=20260802ui1"></script>
+<script src="js/classic-support.js?v=20260802ui1"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

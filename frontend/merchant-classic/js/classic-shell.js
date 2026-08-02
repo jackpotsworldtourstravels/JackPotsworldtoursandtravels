@@ -100,6 +100,120 @@ function clEmptyRow(cols, text, hint) {
     <b>${escapeHtml(text)}</b>${hint ? escapeHtml(hint) : ''}</td></tr>`;
 }
 
+/* ------------------------------------------------------------ filter chips
+   The primary facet of a table, as a row of chips instead of a dropdown.
+
+   THE <select> STAYS. It is moved off-screen and out of the accessibility tree,
+   and it remains the single source of truth for the value — every module still
+   reads `$('clReqStatus').value`, the reset handlers still write `''` to it,
+   and clBindKpiNav still deep-links into it from a dashboard tile. The chips
+   are a second face on one control, not a second control: clicking a chip
+   writes to the select and dispatches `change`, which is the event every screen
+   was already listening for. Nothing downstream of the filter had to learn a
+   new contract, which is the only reason this could be done to six screens at
+   once without re-testing each one's loader.
+
+   `data-cl-chip-tone` on an <option> paints the chip's dot in the same tone the
+   status carries as a table badge. */
+function clChipsHtml(select, label) {
+  const options = [...select.options];
+  return `<div class="cl-chipbar">
+    <span class="cl-chipbar-label" id="${select.id}Lbl">${escapeHtml(label)}</span>
+    <div class="cl-chips" role="radiogroup" aria-labelledby="${select.id}Lbl"
+         data-cl-chips-for="${select.id}">
+      ${options.map(o => {
+        const tone = o.dataset.clChipTone || '';
+        return `<button type="button" class="cl-chip" role="radio"
+                        data-cl-chip="${escapeHtml(o.value)}"
+                        aria-checked="${o.value === select.value ? 'true' : 'false'}"
+                        tabindex="${o.value === select.value ? '0' : '-1'}">
+          ${tone ? `<span class="cl-chip-dot ${escapeHtml(tone)}"></span>` : ''}
+          ${escapeHtml(o.textContent.trim())}
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/* Turns the <select> with this id into a chip row, in place. Call once, after
+   the screen's markup is in the DOM. */
+function clChips(selectId, label) {
+  const select = $(selectId);
+  if (!select || select.dataset.clChipped) return;
+  select.dataset.clChipped = '1';
+
+  const host = document.createElement('div');
+  host.innerHTML = clChipsHtml(select, label);
+  const bar = host.firstElementChild;
+
+  /* The select keeps working and keeps its label association; it is simply not
+     the thing on screen any more. aria-hidden + tabindex=-1 so a keyboard or
+     screen-reader user meets the chips once, not the same filter twice. */
+  const field = select.closest('.cl-field') || select;
+  field.setAttribute('aria-hidden', 'true');
+  field.style.position = 'absolute';
+  field.style.width = '1px';
+  field.style.height = '1px';
+  field.style.overflow = 'hidden';
+  field.style.clipPath = 'inset(50%)';
+  field.style.margin = '-1px';
+  select.tabIndex = -1;
+  field.parentNode.insertBefore(bar, field);
+
+  const chips = () => [...bar.querySelectorAll('[data-cl-chip]')];
+
+  const pick = (value, { focus = false } = {}) => {
+    if (select.value === value) {
+      /* Re-clicking the active chip is not a no-op worth a round trip, but the
+         roving tabindex still has to follow the pointer. */
+      clSyncChips(selectId);
+      return;
+    }
+    select.value = value;
+    clSyncChips(selectId);
+    if (focus) bar.querySelector('[aria-checked="true"]')?.focus();
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  bar.addEventListener('click', e => {
+    const chip = e.target.closest('[data-cl-chip]');
+    if (chip) pick(chip.dataset.clChip);
+  });
+
+  /* Arrow keys move within the group and select as they go — the WAI-ARIA
+     radiogroup pattern, which is what this is. */
+  bar.addEventListener('keydown', e => {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+    if (!keys.includes(e.key)) return;
+    const all = chips();
+    const at = all.findIndex(c => c.getAttribute('aria-checked') === 'true');
+    const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    let next;
+    if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = all.length - 1;
+    else next = ((at < 0 ? 0 : at) + (forward ? 1 : -1) + all.length) % all.length;
+    e.preventDefault();
+    pick(all[next].dataset.clChip, { focus: true });
+  });
+
+  /* Anything that sets the select and dispatches change — clBindKpiNav's
+     deep link from a dashboard tile, most of all — repaints the chips here. */
+  select.addEventListener('change', () => clSyncChips(selectId));
+}
+
+/* Repaint the chips from the select. Needed after code that writes `.value`
+   WITHOUT dispatching change, which is what every "Reset filters" button does. */
+function clSyncChips(selectId) {
+  const select = $(selectId);
+  const bar = document.querySelector(`[data-cl-chips-for="${selectId}"]`);
+  if (!select || !bar) return;
+  bar.querySelectorAll('[data-cl-chip]').forEach(chip => {
+    const on = chip.dataset.clChip === select.value;
+    chip.setAttribute('aria-checked', on ? 'true' : 'false');
+    chip.tabIndex = on ? 0 : -1;
+  });
+}
+
 /* ------------------------------------------------------------------ modal */
 
 let clModalOnClose = null;
@@ -348,6 +462,9 @@ function clPaintIdentity() {
   $('clMenuAvatar').textContent = initials;
   $('clSideCompany').textContent = company || 'Merchant account';
   $('clSideCode').textContent = company ? 'Signed in' : '';
+  /* The collapsed rail's stand-in for the company name. */
+  $('clSideBadge').textContent = company ? clInitials(company) : clInitials(name);
+  $('clSideBadge').title = company || name;
 }
 
 function clShowApp() {
@@ -543,6 +660,46 @@ function clCloseProfileMenu() {
   $('clProfileMenu').classList.remove('open');
   $('clProfileBtn').setAttribute('aria-expanded', 'false');
 }
+
+/* ---- rail width ----
+   Expanded or icon-only, remembered per browser. The choice is a desktop one:
+   the CSS only honours `cl-rail-mini` above 900px, because below that the rail
+   is an off-canvas drawer and a permanently-narrow strip of icons would cover
+   the page it is there to navigate.
+
+   The class goes on `.cl-app`, not on the rail — it re-points `--cl-rail-w`,
+   which is the shell grid's first column, so the main area reflows with it.
+
+   The visible tooltip is `title`, set here and removed on expand. It is not a
+   CSS ::after: the rail scrolls vertically, and a box that scrolls on one axis
+   clips the other, so a pseudo-element tooltip is sliced off at the rail's
+   edge. The label itself is never removed from the DOM — the CSS clips it — so
+   the accessible name survives and this title is not doing that job. */
+const CL_RAIL_KEY = 'classic_rail_mini';
+
+function clApplyRail(mini) {
+  const app = $('clApp');
+  const btn = $('clRailToggle');
+  app.classList.toggle('cl-rail-mini', mini);
+  btn.setAttribute('aria-expanded', mini ? 'false' : 'true');
+  btn.setAttribute('aria-label', mini ? 'Expand navigation' : 'Collapse navigation');
+  $('clRailToggleText').textContent = mini ? 'Expand' : 'Collapse';
+  btn.title = mini ? 'Expand navigation' : '';
+
+  $('clSide').querySelectorAll('a[data-cl-nav]').forEach(a => {
+    const label = a.querySelector('.cl-side-label')?.textContent.trim() || '';
+    if (mini) a.title = label; else a.removeAttribute('title');
+  });
+}
+
+function clInitRail() {
+  clApplyRail(localStorage.getItem(CL_RAIL_KEY) === '1');
+  $('clRailToggle').addEventListener('click', () => {
+    const mini = !$('clApp').classList.contains('cl-rail-mini');
+    localStorage.setItem(CL_RAIL_KEY, mini ? '1' : '0');
+    clApplyRail(mini);
+  });
+}
 function clToggleProfileMenu() {
   const open = $('clProfileMenu').classList.toggle('open');
   $('clProfileBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -589,6 +746,7 @@ function clInitTheme() {
 
 function clBoot() {
   clInitTheme();
+  clInitRail();
 
   /* ---- auth ---- */
   $('clLoginBtn').addEventListener('click', clLogin);

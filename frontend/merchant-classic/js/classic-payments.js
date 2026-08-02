@@ -98,7 +98,8 @@ function clInitPayments() {
           <label for="clPayStatus">Stage</label>
           <select id="clPayStatus" data-cl-status-filter>
             <option value="">All payment stages</option>
-            ${MERCHANT_PAYMENT_STATUSES.map(s => `<option value="${s}">${clLabel(s)}</option>`).join('')}
+            ${MERCHANT_PAYMENT_STATUSES.map(s =>
+              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clLabel(s)}</option>`).join('')}
           </select>
         </div>
         <div class="cl-field" style="min-width:0;">
@@ -131,6 +132,8 @@ function clInitPayments() {
         </ol>
       </div>
     </div>`;
+
+  clChips('clPayStatus', 'Stage');
 
   $('clPayRefresh').addEventListener('click', () => { clLoadPayments(); clLoadFinance(); });
   $('clPayStatus').addEventListener('change', () => clLoadPayments());

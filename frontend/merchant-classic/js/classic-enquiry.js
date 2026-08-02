@@ -87,9 +87,9 @@ function clInitEnquiry() {
                  the difference between them is which desk has it, which is our
                  problem and not theirs. Handled in clLoadEnquiries: the API
                  takes one status at a time, so this one is narrowed here. -->
-            <option value="__awaiting">Awaiting quotation</option>
+            <option value="__awaiting" data-cl-chip-tone="warn">Awaiting quotation</option>
             ${CL_ENQUIRY_STATUSES.map(s =>
-              `<option value="${s}">${clEnquiryStatusLabel(s)}</option>`).join('')}
+              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clEnquiryStatusLabel(s)}</option>`).join('')}
           </select>
         </div>
         <div class="cl-field">
@@ -119,6 +119,8 @@ function clInitEnquiry() {
         <span class="cl-pager-info" id="clEnqCount">—</span>
       </div>
     </div>`;
+
+  clChips('clEnqStatus', 'Status');
 
   $('clEnqNew').addEventListener('click', () => clOpenEnquiryForm());
   $('clEnqRefresh').addEventListener('click', () => clLoadEnquiries());

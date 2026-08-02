@@ -77,7 +77,7 @@ function clInitHistory() {
           <select id="clHistStatus" data-cl-status-filter>
             <option value="">All closed bookings</option>
             ${CL_HISTORY_STATUSES.map(s =>
-              `<option value="${s}">${CL_HISTORY_LABELS[s]}</option>`).join('')}
+              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${CL_HISTORY_LABELS[s]}</option>`).join('')}
           </select>
         </div>
         <div class="cl-field">
@@ -153,10 +153,13 @@ function clInitHistory() {
   $('cl-booking-history').querySelector('[data-cl-to-requests]').addEventListener('click', e => {
     e.preventDefault(); clGo('requests');
   });
+  clChips('clHistStatus', 'Outcome');
+
   $('clHistApply').addEventListener('click', () => clLoadHistory({ resetPage: true }));
   $('clHistReset').addEventListener('click', () => {
     ['clHistStatus', 'clHistFrom', 'clHistTo', 'clHistSearch'].forEach(id => { $(id).value = ''; });
     $('clHistType').value = 'booking';
+    clSyncChips('clHistStatus');
     clLoadHistory({ resetPage: true });
   });
   ['clHistStatus', 'clHistType', 'clHistFrom', 'clHistTo'].forEach(id =>

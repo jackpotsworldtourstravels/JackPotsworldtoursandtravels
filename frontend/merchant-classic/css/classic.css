@@ -90,6 +90,11 @@
   --cl-line:#E3E9F1;                /* the standard hairline                */
   --cl-line-2:#EEF2F7;              /* the quieter one, inside a card       */
   --cl-hover:#F3F6FA;               /* row and control hover                */
+  /* Zebra banding. Deliberately WEAKER than --cl-hover: the stripe helps the
+     eye track a row across eight columns, but the row under the pointer still
+     has to be the most prominent one on the table. Two greys this close only
+     work if the hover is the darker of the pair. */
+  --cl-zebra:#FAFBFD;
   --cl-accent:var(--cl-orange);
   --cl-accent-soft:var(--cl-orange-50);
   --cl-focus:rgba(210,71,11,0.30);
@@ -172,6 +177,8 @@
   --cl-line:#22314B;
   --cl-line-2:#1B283E;
   --cl-hover:#18253C;
+  /* Same rule as in light: quieter than the hover above it. */
+  --cl-zebra:#141F33;
   --cl-accent-soft:rgba(255,107,44,0.14);
 
   --cl-success-bg:rgba(14,159,110,0.16);  --cl-success-fg:#4ADE9B;
@@ -441,6 +448,90 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
   line-height:1.5;
 }
 .cl-side-foot b{display:block; color:var(--cl-rail-text-hi); font-size:12px; font-weight:700;}
+/* The company as a monogram. Only ever visible in the collapsed rail, where
+   the name it abbreviates has no room. */
+.cl-side-badge{
+  display:none;
+  width:34px; height:34px; margin:0 auto; border-radius:var(--cl-r-pill);
+  align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; letter-spacing:0.02em;
+  color:#fff; background:rgba(255,255,255,0.12);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.14);
+}
+
+/* The collapse control, pinned under the footer. */
+.cl-rail-toggle{
+  display:flex; align-items:center; gap:13px;
+  margin:12px 14px 0; padding:10px 16px;
+  border-radius:var(--cl-r-sm); cursor:pointer;
+  font-size:12.5px; font-weight:600; color:var(--cl-rail-text);
+  background:rgba(255,255,255,0.05);
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-rail-toggle:hover{background:rgba(255,255,255,0.11); color:var(--cl-rail-text-hi);}
+.cl-rail-toggle svg{width:17px; height:17px; flex-shrink:0; transition:transform var(--cl-base);}
+
+
+/* ------------------------------------------------------- rail, collapsed
+   An icon-only rail, at desktop widths only. Below 900px the rail is already
+   an off-canvas drawer that is either fully open or fully gone, and a
+   third "narrow" state there would be a strip of icons covering the page it
+   is meant to be navigating.
+
+   Nothing is display:none'd that carries meaning. Labels are moved off-screen
+   with the clip pattern rather than removed, so the accessible name of every
+   nav item survives the collapse and a screen reader still reads "Booking
+   Enquiry" and not "link". The visible tooltip is a `title` attribute added by
+   classic-shell.js, NOT a CSS ::after — the rail scrolls on the y axis, which
+   makes the browser clip the x axis too, and a pseudo-element tooltip would be
+   sliced off at the rail's edge. */
+@media (min-width:901px){
+  .cl-app.cl-rail-mini{--cl-rail-w:82px;}
+
+  .cl-app.cl-rail-mini .cl-side a.cl-brand{padding:18px 8px 16px;}
+  .cl-app.cl-rail-mini .cl-side a.cl-brand img{height:34px;}
+
+  /* Each group heading becomes the hairline it was already implying. */
+  .cl-app.cl-rail-mini .cl-side-group{
+    font-size:0; padding:14px 22px 8px; height:auto;
+  }
+  .cl-app.cl-rail-mini .cl-side-group::after{
+    content:''; display:block; height:1px; background:var(--cl-rail-line);
+  }
+  .cl-app.cl-rail-mini .cl-side-group:first-of-type{padding-top:10px;}
+
+  .cl-app.cl-rail-mini .cl-side a{
+    justify-content:center; gap:0; padding:12px 0; margin:2px 12px;
+  }
+  .cl-app.cl-rail-mini .cl-side a.active::before{left:-12px;}
+  .cl-app.cl-rail-mini .cl-side-label{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;
+  }
+  /* The count stops being a trailing pill and becomes a corner badge, because
+     there is no trailing space left to sit in. */
+  .cl-app.cl-rail-mini .cl-side-pill{
+    position:absolute; top:3px; right:6px; margin:0;
+    min-width:17px; height:17px; padding:0 4px; font-size:9.5px;
+    box-shadow:0 0 0 2px var(--cl-rail-top);
+  }
+
+  .cl-app.cl-rail-mini .cl-side-foot{padding:14px 10px 4px; text-align:center;}
+  .cl-app.cl-rail-mini .cl-side-foot b,
+  .cl-app.cl-rail-mini .cl-side-foot span{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;
+  }
+  .cl-app.cl-rail-mini .cl-side-badge{display:flex;}
+
+  .cl-app.cl-rail-mini .cl-rail-toggle{justify-content:center; padding:11px 0; margin:12px 12px 0;}
+  .cl-app.cl-rail-mini .cl-rail-toggle svg{transform:rotate(180deg);}
+}
+
+/* The collapse control is meaningless where the rail is a drawer. */
+@media (max-width:900px){
+  .cl-rail-toggle{display:none;}
+}
 
 /* ---------------------------------------------------------------- topbar */
 
@@ -921,6 +1012,21 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 .cl-table td b, .cl-table td strong{color:var(--cl-text); font-weight:700;}
 .cl-table tbody tr{transition:background var(--cl-fast);}
+
+/* ---- zebra ----
+   THE SELECTOR ORDER BELOW IS LEAD, NOT STYLE. Four rules want the same
+   property on the same element, and they have to resolve in this priority:
+   selected > clickable-hover > hover > zebra.
+
+   The banding is written with :where() so the two :not()s cost nothing —
+   without it the stripe would score higher than `tr:hover` and a striped row
+   would refuse to light up under the pointer. Excluded: continuation rows,
+   which belong to the row above and must not band away from it, and skeleton
+   rows, which are a loading placeholder and would otherwise flash a stripe
+   pattern that the real data then contradicts. */
+.cl-table tbody tr:nth-of-type(even):where(:not(.cl-subrow):not(.cl-skel-row)){
+  background:var(--cl-zebra);
+}
 .cl-table tbody tr:hover{background:var(--cl-hover);}
 .cl-table tbody tr:last-child td{border-bottom:none;}
 .cl-table tbody tr:last-child td:first-child{border-bottom-left-radius:var(--cl-r-md);}
@@ -928,8 +1034,11 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 
 .cl-table .cl-actions{white-space:nowrap; text-align:right;}
 .cl-table .cl-actions .cl-btn{margin-left:6px;}
-.cl-table tr.cl-selected{background:var(--cl-accent-soft);}
-.cl-table tr.cl-selected:hover{background:var(--cl-accent-soft);}
+/* `tbody` is in these two selectors to out-score the banding above — a
+   selected row stays selected whether it landed on an odd stripe or an even
+   one. */
+.cl-table tbody tr.cl-selected{background:var(--cl-accent-soft);}
+.cl-table tbody tr.cl-selected:hover{background:var(--cl-accent-soft);}
 
 /* Continuation line under its own row — carries what will not fit the columns
    and must not be truncated into meaninglessness. */
@@ -942,7 +1051,7 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 
 /* A clickable row. Whole-row targets need to say so. */
 .cl-table tr.cl-clickable{cursor:pointer;}
-.cl-table tr.cl-clickable:hover{background:var(--cl-accent-soft);}
+.cl-table tbody tr.cl-clickable:hover{background:var(--cl-accent-soft);}
 
 .cl-empty{
   padding:44px 16px !important; text-align:center;
@@ -1060,6 +1169,59 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 .cl-seg button:hover{color:var(--cl-text);}
 .cl-seg button.active{background:var(--cl-surface); color:var(--cl-text); box-shadow:var(--cl-sh-xs);}
+
+/* ---- filter chips ----
+   The primary facet of a table, promoted out of a <select> and onto the
+   surface. A dropdown hides both the options and the current choice behind a
+   click; a chip row shows every stage a booking can be in and which one is
+   being looked at, without opening anything.
+
+   Only the PRIMARY facet gets chips. Date ranges and free text stay as fields
+   — eight chips for a date range would be a worse control, not a more modern
+   one.
+
+   The selected fill is navy, not the accent: this is a filter, not a call to
+   action, and the portal only has one orange. White on --cl-navy-800 is
+   12.9:1. */
+.cl-chipbar{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  flex:1 1 100%; min-width:0;
+}
+.cl-chipbar-label{
+  font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--cl-text-muted); flex-shrink:0;
+}
+.cl-chips{display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;}
+.cl-chip{
+  display:inline-flex; align-items:center; gap:7px;
+  height:34px; padding:0 14px; border-radius:var(--cl-r-pill);
+  font-size:12.5px; font-weight:600; white-space:nowrap; cursor:pointer;
+  color:var(--cl-text-2); background:var(--cl-surface);
+  border:1px solid var(--cl-line);
+  transition:background var(--cl-fast), color var(--cl-fast),
+             border-color var(--cl-fast), box-shadow var(--cl-fast);
+}
+.cl-chip:hover{background:var(--cl-hover); color:var(--cl-text); border-color:var(--cl-text-muted);}
+.cl-chip[aria-checked="true"]{
+  background:var(--cl-navy-800); color:#fff; border-color:var(--cl-navy-800);
+  box-shadow:var(--cl-sh-xs);
+}
+.cl-chip[aria-checked="true"]:hover{background:var(--cl-navy-700); border-color:var(--cl-navy-700);}
+/* The dot repeats the tone the same status carries as a table badge, so the
+   filter and the rows it produces are visibly the same vocabulary. */
+.cl-chip-dot{width:7px; height:7px; border-radius:50%; background:currentColor; opacity:.55; flex-shrink:0;}
+.cl-chip[aria-checked="true"] .cl-chip-dot{opacity:1;}
+.cl-chip-dot.ok{background:var(--cl-success);}
+.cl-chip-dot.warn{background:var(--cl-warning);}
+.cl-chip-dot.err{background:var(--cl-danger);}
+.cl-chip-dot.info{background:var(--cl-info);}
+.cl-chip-dot.accent{background:var(--cl-orange);}
+:root[data-theme="dark"] .cl-chip[aria-checked="true"]{
+  background:var(--cl-navy-500); border-color:var(--cl-navy-500);
+}
+:root[data-theme="dark"] .cl-chip[aria-checked="true"]:hover{
+  background:var(--cl-navy-600); border-color:var(--cl-navy-600);
+}
 
 
 /* ==========================================================================
@@ -1185,6 +1347,18 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   margin:5px 0 0; font-size:13.5px; font-weight:600; color:var(--cl-text);
   word-break:break-word;
 }
+/* Label beside value, one pair per line — for a narrow rail, where the
+   auto-fit grid above would give one column anyway but stack every label on
+   top of its value and run to twice the height. */
+.cl-dl-1{grid-template-columns:1fr; gap:0;}
+.cl-dl-1 > div{
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  padding:9px 0; border-bottom:1px solid var(--cl-line-2);
+}
+.cl-dl-1 > div:last-child{border-bottom:none; padding-bottom:0;}
+.cl-dl-1 > div:first-child{padding-top:0;}
+.cl-dl-1 dt{flex-shrink:0;}
+.cl-dl-1 dd{margin:0; text-align:right; font-size:12.5px; min-width:0;}
 
 /* A stat rendered inline in a body of copy. */
 .cl-inline-stat{
@@ -1261,6 +1435,75 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-step.current{border-color:var(--cl-orange); box-shadow:0 0 0 3px rgba(255,107,44,0.10), var(--cl-sh-xs);}
 .cl-step.current b{color:var(--cl-orange-700);}
 :root[data-theme="dark"] .cl-step.current b{color:#FFB08A;}
+
+/* ---- progress flow ----
+   The booking's lifecycle as one horizontal rail. It answers "how far along
+   is this, and what happens next" at a glance, which the vertical timeline
+   below it cannot — that one is a log, ordered by when things happened and as
+   long as the history is. Both are rendered from the same `timeline` payload,
+   so they can never disagree.
+
+   The connector is drawn per step as a ::before running left from the node,
+   and the first step suppresses it. Drawing one line under the whole rail
+   instead would have to guess where the first and last nodes sit once the
+   steps flex. */
+.cl-flow{
+  display:flex; align-items:flex-start; gap:0;
+  overflow-x:auto; padding:4px 2px 2px;
+  -webkit-overflow-scrolling:touch;
+  counter-reset:cl-flow;
+}
+.cl-flow-step{
+  flex:1 1 0; min-width:96px; position:relative;
+  display:flex; flex-direction:column; align-items:center; text-align:center; gap:7px;
+}
+.cl-flow-step::before{
+  content:''; position:absolute; top:13px; right:50%; left:-50%; height:2px;
+  background:var(--cl-line); border-radius:2px;
+}
+.cl-flow-step:first-child::before{display:none;}
+/* A connector is "reached" when the step on its RIGHT has been reached — it
+   represents the move into that step, not out of the one before. */
+.cl-flow-step.done::before, .cl-flow-step.current::before{background:var(--cl-success);}
+
+.cl-flow-dot{
+  position:relative; z-index:1;
+  width:28px; height:28px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-surface); color:var(--cl-text-muted);
+  box-shadow:0 0 0 2px var(--cl-line) inset;
+  font-size:11px; font-weight:800;
+}
+.cl-flow-dot svg{width:15px; height:15px;}
+.cl-flow-step.done .cl-flow-dot{
+  background:var(--cl-success); color:#fff; box-shadow:none;
+}
+.cl-flow-step.current .cl-flow-dot{
+  background:var(--cl-orange-cta); color:#fff; box-shadow:0 0 0 4px rgba(210,71,11,0.16);
+}
+.cl-flow-step.stopped .cl-flow-dot{
+  background:var(--cl-danger); color:#fff; box-shadow:none;
+}
+.cl-flow-step.stopped::before{background:var(--cl-danger);}
+
+.cl-flow-label{
+  font-size:11.5px; font-weight:700; color:var(--cl-text-muted); line-height:1.35;
+  padding:0 4px; max-width:13ch;
+}
+.cl-flow-step.done .cl-flow-label, .cl-flow-step.stopped .cl-flow-label{color:var(--cl-text);}
+.cl-flow-step.current .cl-flow-label{color:var(--cl-orange-700);}
+:root[data-theme="dark"] .cl-flow-step.current .cl-flow-label{color:#FFB08A;}
+.cl-flow-when{
+  font-size:10px; font-weight:600; color:var(--cl-text-muted); line-height:1.3;
+  margin-top:-3px;
+}
+/* A pending step is dimmed by its MARKER, never by opacity on the whole step.
+   `opacity:.62` here measured 3.06:1 on the label in dark mode — the token is a
+   passing 5.68:1 and the opacity silently spent it. The state is already
+   carried by the hollow dot, the unfilled connector and the absent date, so the
+   text has no work left to do and no contrast left to give. */
+.cl-flow-step.pending .cl-flow-dot{opacity:.55;}
+.cl-flow-step.pending::before{opacity:.55;}
 
 /* ---- timeline ---- */
 
@@ -1969,6 +2212,13 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-field-wide{grid-column:auto;}
   .cl-toolbar{padding:16px 14px; gap:12px;}
   .cl-toolbar .cl-field{min-width:0; flex:1 1 100%;}
+  /* The chip row keeps its own line and its own scroll rather than wrapping to
+     four ragged rows on a phone. */
+  .cl-chipbar{gap:8px;}
+  .cl-chips{flex-wrap:nowrap; overflow-x:auto; padding-bottom:3px; -webkit-overflow-scrolling:touch;}
+  .cl-chip{height:32px; padding:0 12px; font-size:12px;}
+  .cl-flow-step{min-width:84px;}
+  .cl-flow-label{font-size:11px;}
   .cl-toolbar-actions{margin-left:0; width:100%;}
   .cl-toolbar-actions .cl-btn{flex:1;}
 

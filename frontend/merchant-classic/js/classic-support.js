@@ -91,6 +91,9 @@ function clInitSupport() {
       </div>
     </div>
 
+    <!-- ---- how your tickets stand ---- -->
+    <div id="clSupportStats"></div>
+
     <!-- ---- the three channels ---- -->
     <div class="cl-grid-3" id="clSupportChannels">${clChannelCards()}</div>
 
@@ -142,6 +145,10 @@ function clInitSupport() {
             <div id="clChatList"></div>
           </div>
         </div>
+
+        <!-- Everything the payload knows about the open ticket, in one block.
+             Filled in by clRenderTicketInfo when a conversation is opened. -->
+        <div id="clTicketInfo"></div>
 
         ${clAttachmentPanel()}
       </div>
@@ -212,7 +219,11 @@ function clInitSupport() {
   /* Polling must not outlive the screen or the tab's visibility. */
   document.addEventListener('visibilitychange', clChatPollGuard);
 
-  return clLoadChatThreads();
+  /* Stats are loaded ONCE per visit, alongside the list rather than from it.
+     They describe the account, not the current tab, so re-running them every
+     time somebody switches between All and Resolved would be three wasted
+     round trips for an unchanged answer. */
+  return Promise.all([clLoadChatThreads(), clLoadSupportStats()]);
 }
 
 /* Business hours. `getDay()` is 0=Sunday, matching CL_SUPPORT_HOURS.days. */
@@ -317,6 +328,154 @@ async function clLoadChatThreads() {
   }
 }
 
+/* ================================================================= stats */
+
+/* How your tickets stand: raised today, open, in progress, resolved, and how
+   quickly we answer.
+
+   THE THREE STATUS COUNTS ARE THE DATABASE'S, NOT THIS FILE'S. One call per
+   status with `page_size: 1`, reading `total` off the standard Page envelope —
+   a COUNT(*) under that filter. Bucketing one page of threads in the browser
+   would undercount the moment a merchant has more tickets than a page holds,
+   which is the mistake this portal has already made four times.
+
+   TODAY and AVERAGE FIRST REPLY have no server aggregate and are measured
+   here, so both say what they were measured over. THEY FETCH THEIR OWN
+   UNFILTERED LIST rather than reading `clChatThreads`, which holds whatever the
+   status tab is currently showing — reading that would have made "Raised today"
+   fall to zero the moment somebody clicked Resolved, and the tiles describe the
+   account, not the tab.
+
+     * "Raised today" counts the threads in the list it loaded. The endpoint has
+       no created_at filter, so beyond 50 threads this is a floor and the
+       caption says so.
+
+     * "Average first reply" is real elapsed time — the gap between the
+       merchant's opening message and the desk's first answer — measured across
+       the most recent few conversations, whose messages are fetched for the
+       purpose. It is not a service-level promise and is not labelled as one.
+       Threads never answered are excluded rather than counted as instant. */
+const CL_STATS_SAMPLE = 6;
+const CL_STATS_WINDOW = 50;
+
+/* The unfiltered thread list these tiles are measured over. Held separately
+   from `clChatThreads`, which follows the status tabs. */
+let clStatsThreads = [];
+
+async function clLoadSupportStats() {
+  const host = $('clSupportStats');
+  if (!host) return;
+
+  let counts = null;
+  try {
+    const [open, progress, resolved, recent] = await Promise.all([
+      MerchantApi.listSupportThreads({ status: 'submitted', pageSize: 1 }),
+      MerchantApi.listSupportThreads({ status: 'in_review', pageSize: 1 }),
+      MerchantApi.listSupportThreads({ status: 'completed', pageSize: 1 }),
+      MerchantApi.listSupportThreads({ pageSize: CL_STATS_WINDOW }),
+    ]);
+    counts = {
+      open: open.total ?? 0,
+      progress: progress.total ?? 0,
+      resolved: resolved.total ?? 0,
+    };
+    clStatsThreads = recent.items || [];
+  } catch {
+    host.innerHTML = '';        /* the conversation list is the real surface */
+    return;
+  }
+
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const today = clStatsThreads.filter(t => new Date(t.created_at) >= midnight).length;
+  /* True when the list this counted over is itself a window on something
+     bigger, in which case "today" is a floor and has to say so. */
+  const windowed = clStatsThreads.length >= CL_STATS_WINDOW;
+
+  const tiles = [
+    ['Raised today', String(today), windowed
+      ? `Among your ${clStatsThreads.length} most recent`
+      : today === 1 ? 'One conversation started today' : 'Conversations you started today', 'chat', ''],
+    ['Open', String(counts.open), counts.open ? 'Waiting for the desk to pick up' : 'Nothing waiting to be picked up',
+      'inbox', counts.open ? 'warn' : ''],
+    ['In progress', String(counts.progress), counts.progress ? 'An operator is on these' : 'None being worked on',
+      'headset', counts.progress ? 'info' : ''],
+    ['Resolved', String(counts.resolved), 'Closed by our desk', 'checkCircle', 'ok'],
+  ];
+
+  host.innerHTML = `<div class="cl-kpis">${tiles.map(([label, value, sub, icon, tone]) => `
+    <div class="cl-kpi">
+      <div class="cl-kpi-head"><span class="cl-kpi-ico ${tone}">${clIco(icon)}</span></div>
+      <div class="cl-kpi-label">${escapeHtml(label)}</div>
+      <div class="cl-kpi-value">${escapeHtml(value)}</div>
+      <div class="cl-kpi-sub">${escapeHtml(sub)}</div>
+    </div>`).join('')}
+    <div class="cl-kpi" id="clStatReply">
+      <div class="cl-kpi-head"><span class="cl-kpi-ico">${clIco('clock')}</span></div>
+      <div class="cl-kpi-label">Average first reply</div>
+      <div class="cl-kpi-value"><span class="cl-spin"></span></div>
+      <div class="cl-kpi-sub">Measuring your recent conversations…</div>
+    </div>
+  </div>`;
+
+  clMeasureFirstReply();
+}
+
+/* Elapsed time from the merchant's opening message to the desk's first answer,
+   over the most recent CL_STATS_SAMPLE conversations. Their messages are not in
+   the thread list, so each is fetched — deliberately few, deliberately after
+   the page has already rendered, and a failure just leaves the tile blank. */
+async function clMeasureFirstReply() {
+  const tile = $('clStatReply');
+  if (!tile) return;
+  const sample = clStatsThreads.slice(0, CL_STATS_SAMPLE);
+  const say = (value, sub) => {
+    if (!$('clStatReply')) return;      /* the screen re-rendered underneath us */
+    tile.querySelector('.cl-kpi-value').textContent = value;
+    tile.querySelector('.cl-kpi-sub').textContent = sub;
+  };
+
+  if (!sample.length) return say('—', 'No conversations to measure yet');
+
+  let gaps = [];
+  try {
+    const details = await Promise.all(
+      sample.map(t => MerchantApi.getSupportThread(t.id).catch(() => null)));
+    gaps = details.map(d => {
+      const messages = d?.messages || [];
+      const mine = messages.find(m => clIsOutgoing(m));
+      if (!mine) return null;
+      const reply = messages.find(m => !clIsOutgoing(m)
+        && new Date(m.created_at) > new Date(mine.created_at));
+      if (!reply) return null;
+      return new Date(reply.created_at) - new Date(mine.created_at);
+    }).filter(ms => ms != null && ms >= 0);
+  } catch {
+    return say('—', 'Could not be measured just now');
+  }
+
+  if (!gaps.length) {
+    return say('—', sample.length === 1
+      ? 'Your conversation has not been answered yet'
+      : 'None of your recent conversations has been answered yet');
+  }
+
+  const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  say(clDuration(mean),
+    `Across ${gaps.length} answered conversation${gaps.length === 1 ? '' : 's'} of your last ${sample.length}`);
+}
+
+/* Milliseconds as the coarsest unit that still says something useful. */
+function clDuration(ms) {
+  const minutes = Math.round(ms / 60000);
+  if (minutes < 1) return 'Under a minute';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = ms / 3600000;
+  if (hours < 24) return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} hr`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
 /* How long a thread has gone without an answer. This is the closest honest
    thing to a priority: the payload has no priority field, and a made-up
    High/Medium/Low that the desk never set would be worse than nothing. */
@@ -364,6 +523,7 @@ async function clLoadChatThread(id, { quiet = false } = {}) {
     clChatMessages = data.messages || [];
     clRenderChatHead();
     clRenderChatLog();
+    clRenderTicketInfo();
     /* Reflect the selection and any status change in the list without a
        second round trip for the whole page. */
     $('clChatList').querySelectorAll('[data-cl-thread]').forEach(el =>
@@ -391,10 +551,13 @@ function clRenderChatHead() {
     <div class="cl-panel-tools">
       <span class="cl-presence ${online && !resolved ? 'online' : ''}">
         ${resolved ? 'Closed' : online ? 'Desk online' : 'Outside hours'}</span>
+      <button type="button" class="cl-btn cl-btn-sm" id="clChatExport"
+              title="Save this conversation as a PDF">${clIco('download', { size: 14 })} PDF</button>
       <button type="button" class="cl-btn cl-btn-sm" id="clChatRefresh"
               aria-label="Refresh this conversation">${clIco('refresh', { size: 14 })}</button>
     </div>`;
   $('clChatRefresh').addEventListener('click', () => clLoadChatThread(clChatOpenId));
+  $('clChatExport').addEventListener('click', clExportChatPdf);
 
   const box = $('clChatInput');
   const send = $('clChatSend');
@@ -495,6 +658,188 @@ function clReceipt(seen) {
          stroke-linecap="round" stroke-linejoin="round" aria-label="Read"><polyline points="1 13 5 17 13 8"/><polyline points="10 13 14 17 23 6"/></svg>`
     : `<svg class="cl-seen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
          stroke-linecap="round" stroke-linejoin="round" aria-label="Sent"><polyline points="4 13 9 18 20 6"/></svg>`;
+}
+
+/* ========================================================== ticket information */
+
+/* Everything the thread payload actually carries, in one block beside the
+   conversation, so a merchant chasing a ticket can quote it without scrolling
+   the chat for the reference.
+
+   WHAT IS NOT HERE, AND WHY IT IS NOT INVENTED. `ChatThreadResponse` has no
+   priority and no category column — `OpenChatRequest` takes a subject and a
+   message and nothing else — so neither is shown. A High/Medium/Low the desk
+   never set, or a category nobody filed it under, would be a field that reads
+   like a fact and is a guess. What IS real is how long the thread has waited
+   for an answer, which is the row below, and it is labelled as elapsed time
+   rather than dressed up as a priority.
+
+   `request_number` is the thread's own reference. When our desk raised the
+   thread against a booking it is that booking's number, which is why the row is
+   a jump to it rather than plain text — but only when it looks like one, since
+   for a merchant-opened thread it is the thread's own reference. */
+function clRenderTicketInfo() {
+  const host = $('clTicketInfo');
+  if (!host) return;
+  const t = clChatThread;
+  if (!t) { host.innerHTML = ''; return; }
+
+  const waiting = clThreadWaiting(t);
+  const lastAt = t.last_message_at || t.created_at;
+  const booking = /^REQ-/i.test(t.request_number || '') ? t.request_number : '';
+
+  const rows = [
+    ['Reference', `<span class="cl-ref">${escapeHtml(t.request_number || '—')}</span>`],
+    ['Subject', escapeHtml(t.title || 'Conversation')],
+    ['Status', `<span class="cl-tag cl-tag-${CL_CHAT_TONE[t.status] || 'info'}">${
+      escapeHtml(t.status_label || clLabel(t.status))}</span>`],
+    ['Assigned to', t.assigned_admin
+      ? escapeHtml(t.assigned_admin)
+      : '<span class="cl-muted">Not yet picked up</span>'],
+    ['Waiting', `<span class="cl-tag cl-tag-${waiting.tone} cl-tag-plain">${escapeHtml(waiting.text)}</span>`],
+    ['Messages', String(t.message_count ?? clChatMessages.length)],
+    ['Opened', escapeHtml(fmtDateTime(t.created_at))],
+    ['Last activity', escapeHtml(fmtDateTime(lastAt))],
+    ['Account', escapeHtml(localStorage.getItem(PARTNER_KEYS.companyName) || '—')],
+  ];
+
+  host.innerHTML = `
+    <div class="cl-panel">
+      <div class="cl-panel-head"><h2>${clIco('info')}Ticket information</h2></div>
+      <div class="cl-panel-body">
+        <dl class="cl-dl cl-dl-1">
+          ${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${v}</dd></div>`).join('')}
+        </dl>
+        ${booking ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-block"
+          style="margin-top:14px;" id="clTicketBooking">
+          ${clIco('external', { size: 14 })} Open booking ${escapeHtml(booking)}</button>` : ''}
+      </div>
+    </div>`;
+
+  $('clTicketBooking')?.addEventListener('click', () => {
+    /* The list carries the id the detail screen needs; without it there is
+       nothing to open, so the button sends them to the searchable list. */
+    clGo('requests', () => {
+      const search = $('clReqSearch');
+      if (!search) return;
+      search.value = booking;
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+}
+
+/* ============================================================ PDF export */
+
+/* The conversation as a document the merchant can file or forward.
+
+   IT PRINTS RATHER THAN BUILDING A PDF BYTE STREAM. Every browser's print
+   dialog offers "Save as PDF", and the alternative is a PDF library — a second
+   network request in a portal whose whole icon set is inline SVG precisely to
+   avoid one, and a dependency to keep patched for a button.
+
+   It renders into a hidden same-document iframe, not a popup, because a popup
+   is what a blocker eats. The iframe carries its own stylesheet: the portal's
+   own CSS is themeable and screen-shaped, and a transcript printed in dark mode
+   would come out as white text on paper. */
+function clExportChatPdf() {
+  const t = clChatThread;
+  if (!t || !clChatMessages.length) return;
+
+  const company = localStorage.getItem(PARTNER_KEYS.companyName) || '';
+  const me = localStorage.getItem(PARTNER_KEYS.fullName) || 'You';
+  const facts = [
+    ['Reference', t.request_number || '—'],
+    ['Status', t.status_label || clLabel(t.status)],
+    ['Assigned to', t.assigned_admin || 'Not yet picked up'],
+    ['Opened', fmtDateTime(t.created_at)],
+    ['Last activity', fmtDateTime(t.last_message_at || t.created_at)],
+    ['Messages', String(clChatMessages.length)],
+    ['Account', company || '—'],
+    ['Exported', fmtDateTime(new Date().toISOString())],
+  ];
+
+  let lastDay = '';
+  const body = clChatMessages.map(m => {
+    const out = clIsOutgoing(m);
+    const day = new Date(m.created_at).toDateString();
+    let block = '';
+    if (day !== lastDay) {
+      lastDay = day;
+      block += `<p class="day">${escapeHtml(clDayLabel(m.created_at))}</p>`;
+    }
+    block += `<div class="msg ${out ? 'out' : 'in'}">
+      <p class="who">${escapeHtml(out ? me : (m.sender_name || 'Partner desk'))}
+        <span class="when">${escapeHtml(fmtTime(m.created_at))}</span></p>
+      <p class="text">${escapeHtml(m.message || '')}</p>
+    </div>`;
+    return block;
+  }).join('');
+
+  const doc = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+    <title>${escapeHtml(`${t.request_number || 'Conversation'} — ${t.title || 'Support'}`)}</title>
+    <style>
+      @page{margin:16mm;}
+      *{box-sizing:border-box;}
+      body{font:12px/1.6 'Segoe UI',Arial,sans-serif; color:#0B2545; margin:0;}
+      h1{font-size:19px; margin:0 0 2px;}
+      .sub{font-size:12px; color:#5B6E88; margin:0 0 18px;}
+      .brand{font-size:11px; font-weight:700; letter-spacing:.10em;
+             text-transform:uppercase; color:#D2470B; margin:0 0 10px;}
+      table.facts{width:100%; border-collapse:collapse; margin:0 0 22px;}
+      table.facts td{padding:5px 0; vertical-align:top; border-bottom:1px solid #E3E9F1;}
+      table.facts td.k{width:34%; color:#5B6E88; font-weight:600;}
+      table.facts td.v{font-weight:600;}
+      h2{font-size:13px; margin:0 0 10px; padding-bottom:6px; border-bottom:2px solid #0A2540;}
+      .day{text-align:center; font-size:10px; font-weight:700; letter-spacing:.06em;
+           text-transform:uppercase; color:#5B6E88; margin:16px 0 10px;}
+      /* A transcript has to survive being read in black and white, so each side
+         is told apart by its rule and its indent, not only by a tint. */
+      .msg{margin:0 0 10px; padding:8px 12px; border-radius:8px;
+           page-break-inside:avoid; break-inside:avoid;}
+      .msg.in{background:#F4F6FA; border-left:3px solid #0A2540; margin-right:16%;}
+      .msg.out{background:#FFF2EB; border-left:3px solid #D2470B; margin-left:16%;}
+      .who{margin:0 0 3px; font-size:10.5px; font-weight:700; color:#0A2540;}
+      .when{font-weight:600; color:#5B6E88; margin-left:6px;}
+      .text{margin:0; white-space:pre-wrap;}
+      footer{margin-top:24px; padding-top:10px; border-top:1px solid #E3E9F1;
+             font-size:10px; color:#5B6E88;}
+    </style></head><body>
+    <p class="brand">JackPots World Tours &amp; Travels</p>
+    <h1>${escapeHtml(t.title || 'Support conversation')}</h1>
+    <p class="sub">Support conversation transcript${company ? ` · ${escapeHtml(company)}` : ''}</p>
+    <table class="facts">${facts.map(([k, v]) =>
+      `<tr><td class="k">${escapeHtml(k)}</td><td class="v">${escapeHtml(v)}</td></tr>`).join('')}</table>
+    <h2>Conversation</h2>
+    ${body}
+    <footer>Exported from the JackPots Merchant Portal. This transcript is a record of the
+      messages exchanged on this ticket and is not a tax document.</footer>
+  </body></html>`;
+
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  document.body.appendChild(frame);
+
+  /* srcdoc so nothing is fetched and no object URL has to be revoked. The
+     iframe is torn down on the next tick after print() returns — removing it
+     synchronously cancels the dialog in some browsers. */
+  frame.srcdoc = doc;
+  frame.addEventListener('load', () => {
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch {
+      /* Printing blocked (an embedded viewer, a locked-down browser). The
+         transcript is not lost — say where it went instead of failing mute. */
+      clOpenModal('Could not open the print dialog',
+        `<p style="margin:0;font-size:14px;line-height:1.65;color:var(--cl-text-2);">
+          Your browser would not open its print dialog, which is what saves this conversation as a
+          PDF. Printing the page itself (Ctrl&nbsp;+&nbsp;P) produces the same transcript.</p>`,
+        '<button type="button" class="cl-btn cl-btn-primary" id="clPrintFallbackOk">Close</button>');
+      $('clPrintFallbackOk').addEventListener('click', clCloseModal);
+    }
+    setTimeout(() => frame.remove(), 1000);
+  });
 }
 
 function clDayLabel(iso) {
@@ -621,7 +966,11 @@ function clOpenNewChat() {
       clChatMessages = data.messages || [];
       clRenderChatHead();
       clRenderChatLog();
-      await clLoadChatThreads();
+      clRenderTicketInfo();
+      /* A new ticket changes both "Raised today" and "Open", so the tiles are
+         recomputed here — the one place other than opening the screen where
+         they can go stale. */
+      await Promise.all([clLoadChatThreads(), clLoadSupportStats()]);
       clStartChatPoll();
     } catch (err) {
       clMsg(msg, clError(err, 'Could not start the conversation.'), 'err');
