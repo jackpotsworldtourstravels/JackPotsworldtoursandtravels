@@ -113,6 +113,34 @@ const MerchantApi = {
     });
   },
 
+  /* Book Directly: the same DRAFT booking, with no enquiry in front of it.
+     `itinerary` is the identical object createEnquiry() takes — the endpoint's
+     schema subclasses the enquiry's, so From != To, the past-date rule and the
+     party arithmetic are the same validator and fail the same way.
+
+     Two things differ from enquiryToBookingRequest above, both deliberate:
+     the journey is sent (there is no answered enquiry to copy it from), and
+     nothing here names a price. The booking is created unquoted and our desk
+     names the fare when it issues the ticket.
+
+     `submit` is left false on purpose. The endpoint can submit in the same
+     call, but this portal always goes create-then-submitRequest() so that a
+     submit failure still leaves the merchant a saved draft — see the three
+     try blocks in clSubmitBookingRequest. */
+  createDirectBooking(itinerary, { passengers, remarks, contact, international, specialRequests }) {
+    return this._req('post', '/api/bookings/direct', {
+      data: {
+        ...itinerary,
+        passengers,
+        remarks: remarks || undefined,
+        contact: contact || undefined,
+        international: !!international,
+        special_requests: specialRequests || undefined,
+        submit: false,
+      },
+    });
+  },
+
   /* ------------------------------------------------------------- requests */
 
   listRequests(params) {
@@ -143,6 +171,17 @@ const MerchantApi = {
 
   submitRequest(id) {
     return this._req('post', `/api/requests/${id}/submit`, { data: {} });
+  },
+
+  /* A traveller this merchant has sent before, by passport number.
+     Always 200: an unknown passport answers `{ found: false }` rather than 404,
+     so a first-time traveller is not an error in the console. Returns no row
+     id — see PassengerLookupResponse — because the booking being filled in
+     creates its own passenger rows, and nothing here writes anything. */
+  lookupPassenger(passportNumber) {
+    return this._req('get', '/api/passengers/lookup', {
+      params: { passport_number: passportNumber },
+    });
   },
 
   /* Draft-only, both of them. Used when resuming a saved draft: the passenger

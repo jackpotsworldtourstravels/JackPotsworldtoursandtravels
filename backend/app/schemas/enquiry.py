@@ -199,6 +199,48 @@ class EnquiryToBooking(BaseModel):
     special_requests: str | None = Field(default=None, max_length=1000)
 
 
+class DirectBookingCreate(EnquiryCreate):
+    """Raise a booking straight from the form, with no enquiry in front of it.
+
+    **Every field is inherited, deliberately.** Subclassing ``EnquiryCreate``
+    rather than restating the itinerary means the From ≠ To rule, the past-date
+    rule, the round-trip return rule and the adults/children/infants arithmetic
+    are the *same* validator, not a second copy of it that drifts. A merchant
+    describing a journey is describing the same journey whether or not it asked
+    us to price it first, so there is exactly one definition of a valid one.
+
+    What is added is what a booking needs and an enquiry does not: who is
+    travelling, who to contact, and anything special about the party — the same
+    three things ``EnquiryToBooking`` adds on the enquiry-led path.
+
+    THERE IS NO PRICE HERE, AND THAT IS THE POINT.
+    The enquiry-led booking is created at the quotation the desk sent (CR-5).
+    This one has never been quoted, so it is created at ``0`` and the fare is
+    captured where it always was for an unpriced booking — at ticket issuance,
+    by ``ticket_service._capture_fare_for_wallet_billing``. Accepting an amount
+    from the merchant here would let it name the price of its own booking.
+    """
+
+    passengers: list[PassengerInput] = Field(min_length=1)
+    contact: BookingContact | None = None
+    #: Set by the Classic UI from its airport reference data, which is the only
+    #: place country is known. False when it cannot be determined — passports
+    #: then stay optional rather than blocking on a fact nobody recorded.
+    international: bool = False
+    #: Free text for the desk: wheelchair, bassinet, dietary, seating together.
+    special_requests: str | None = Field(default=None, max_length=1000)
+    #: The booking's own remarks. ``notes`` is inherited from the enquiry form
+    #: and is not reused for this: on an enquiry it is "what to consider when
+    #: quoting", which a booking with no quotation stage has no use for.
+    remarks: str | None = Field(default=None, max_length=1000)
+
+    #: Submit it to the approvals desk in the same call. False leaves it as a
+    #: draft, exactly as ``Save as draft`` does on the enquiry-led screen — the
+    #: separate ``POST /api/requests/{id}/submit`` still works either way and is
+    #: still the only thing that moves the status.
+    submit: bool = False
+
+
 class EnquiryResponse(BaseModel):
     id: int
     reference_number: str

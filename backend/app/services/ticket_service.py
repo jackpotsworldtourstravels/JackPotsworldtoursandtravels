@@ -431,13 +431,61 @@ def replace_passengers(
     return request
 
 
-def _validate_enquiry_led_submission(request: ServiceRequest) -> None:
-    """Completeness rules for a booking raised from an answered enquiry.
+def lookup_passenger(db: Session, actor: User, passport_number: str) -> PassengerData | None:
+    """The traveller this merchant last sent on this passport, if any.
 
-    Scoped to enquiry-led bookings on purpose. ``submit_request`` is shared with
-    the catalog-led flow the Premium portal and Operations still use, and those
-    have never collected a contact — applying these rules to every request would
+    A LOOKUP, NOT A DIRECTORY.
+    There is no passenger master table in this schema — a traveller exists as a
+    ``passenger_data`` row per booking, which is what lets the same person fly
+    twice with different seat preferences. So "do we know this passport" is
+    answered by reading the most recent row the merchant itself created, and
+    **nothing is written here**: the caller fills a form with the answer and the
+    booking it eventually saves creates its own row, exactly as before. That is
+    the whole of "do not create duplicate passenger records" — this path cannot
+    create a record at all.
+
+    SCOPED TO THE CALLER'S MERCHANT, AND THAT IS A SECURITY BOUNDARY.
+    A passport number is a plausible thing to guess or to hold from another
+    context. Filtering on ``merchant_id`` means the worst an attacker learns is
+    what its own agency already typed. Staff accounts have no ``merchant_id``
+    and get nothing rather than everything — this endpoint exists to save a
+    merchant typing, and a desk that could sweep it would be a people-search.
+
+    ``is_cancelled`` rows are still eligible: a traveller pulled from one
+    booking is exactly the person likely to be rebooked onto the next.
+    """
+    if actor.merchant_id is None:
+        return None
+    number = (passport_number or "").strip().upper()
+    if len(number) < 4:
+        # Short prefixes match half the table and would leak by enumeration.
+        # The UI does not ask until this many characters either.
+        return None
+    return db.scalars(
+        select(PassengerData)
+        .where(
+            PassengerData.merchant_id == actor.merchant_id,
+            func.upper(PassengerData.passport_number) == number,
+        )
+        # Most recent wins: a renewed passport or a corrected spelling should
+        # not be overwritten by the version this merchant typed two years ago.
+        .order_by(PassengerData.updated_at.desc(), PassengerData.passenger_id.desc())
+        .limit(1)
+    ).first()
+
+
+def _validate_classic_submission(request: ServiceRequest) -> None:
+    """Completeness rules for a booking on the Classic Tours track.
+
+    Scoped to that track on purpose. ``submit_request`` is shared with the
+    catalog-led flow the Premium portal and Operations still use, and those have
+    never collected a contact — applying these rules to every request would
     break both the moment this shipped.
+
+    Both ways onto the track are covered: a booking raised from an answered
+    enquiry, and one the merchant raised directly. They are filled in on the
+    same form, so they are checked by the same rules — the direct path adds a
+    way to *start* a booking, never a way to submit a less complete one.
 
     The international rule follows the same decision: a booking is treated as
     international only when the Classic UI positively said so from its airport
@@ -506,10 +554,15 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
             detail="Add at least one passenger before submitting",
         )
 
-    # Only bookings that came from an answered enquiry carry the extra rules.
-    parent = db.get(ServiceRequest, request.parent_request_id) if request.parent_request_id else None
-    if parent is not None and parent.request_type is RequestType.TICKET_ENQUIRY:
-        _validate_enquiry_led_submission(request)
+    # Only Classic Tours bookings carry the extra rules — enquiry-led ones and
+    # direct ones alike. This used to load the parent row and check its type,
+    # which cannot see a direct booking at all: it has no parent by design. The
+    # track marker is the same thing said without a query, and it is the same
+    # predicate the notification branch below already reads, so a booking cannot
+    # be validated as one kind and routed as the other.
+    classic = lifecycle.is_classic_track(request)
+    if classic:
+        _validate_classic_submission(request)
 
     # CR-4b: a hard credit block, at the first point the merchant commits. On the
     # enquiry-led track the fare is not known until the desk books it, so the
@@ -529,7 +582,8 @@ def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
         if item is not None:
             catalog_service.reserve_units(db, item, request.quantity)
 
-    classic = lifecycle.is_classic_track(request)
+    # `classic` is the value taken above, before the transition. Recomputing it
+    # here would be reading the same predicate twice in one function.
     lifecycle.transition(db, request, S.PENDING_APPROVAL, actor, commit=False)
     if classic:
         # A resubmission after a return-for-correction must not carry the old

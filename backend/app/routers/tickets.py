@@ -37,6 +37,7 @@ from app.schemas.ticket import (
     CreateBookingRequest,
     CreateServiceRequest,
     IssueTicketRequest,
+    PassengerLookupResponse,
     PassengerResponse,
     PayRequest,
     PaymentSummary,
@@ -263,6 +264,33 @@ def replace_passengers(
         db, current_user, request_id, [p.model_dump() for p in payload.passengers]
     )
     return [PassengerResponse.of(p) for p in request.passengers]
+
+
+@router.get(
+    "/passengers/lookup",
+    response_model=PassengerLookupResponse,
+    tags=["merchant · requests"],
+    summary="Find a traveller this merchant has sent before, by passport number",
+    description=(
+        "Requires `ticket.request`. Saves retyping a traveller the merchant has already "
+        "booked: give a passport number, get back the name, gender, date of birth, "
+        "nationality, passport details and preferences last recorded for it.\n\n"
+        "**Scoped to the caller's own merchant.** A passport number is guessable, so this "
+        "only ever reads rows the calling merchant itself created — a staff account, which "
+        "has no merchant, always gets `found: false`.\n\n"
+        "**Reads only.** No passenger record is created, updated or linked; the response "
+        "carries no row id, and the booking being filled in creates its own passenger rows "
+        "as it always has. An unrecognised passport is `200` with `found: false`, not a 404."
+    ),
+)
+def lookup_passenger(
+    passport_number: str = Query(min_length=4, max_length=40),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_REQUEST)),
+):
+    return PassengerLookupResponse.of(
+        ticket_service.lookup_passenger(db, current_user, passport_number)
+    )
 
 
 @router.post(

@@ -26,6 +26,7 @@ from app.auth.rbac import P, has_permission, require
 from app.database.session import get_db
 from app.models_v2 import RequestStatus, User
 from app.schemas.enquiry import (
+    DirectBookingCreate,
     EnquiryCreate,
     EnquiryResponse,
     EnquiryRespond,
@@ -33,7 +34,7 @@ from app.schemas.enquiry import (
 )
 from app.schemas.pagination import Page
 from app.schemas.ticket import RequestResponse
-from app.services import enquiry_service
+from app.services import enquiry_service, ticket_service
 
 router = APIRouter(prefix="/api", tags=["enquiries"])
 
@@ -133,6 +134,52 @@ def enquiry_to_booking_request(
         international=payload.international,
         special_requests=payload.special_requests,
     )
+    return RequestResponse.of(
+        enquiry_service.load_with_passengers(db, current_user, booking.request_id)
+    )
+
+
+@router.post(
+    "/bookings/direct",
+    response_model=RequestResponse,
+    status_code=201,
+    tags=["merchant · requests"],
+    summary="Book Now — raise a booking without an enquiry first",
+    description=(
+        "Requires `ticket.request`, the same code the enquiry-led path uses. Creates the booking "
+        "at **Created** with its itinerary and passengers, and — unlike the enquiry-led path — "
+        "takes the journey from the merchant, because there is no quotation to copy it from. "
+        "It therefore carries **no amount**: the desk names the fare when it issues the ticket, "
+        "which is where an unpriced booking has always been priced. Everything after this call "
+        "is the existing workflow — Manager approval, then ticketing, then the wallet debit. "
+        "Send `submit: true` to put it in front of the Manager in the same call, or leave it "
+        "false and use `POST /api/requests/{id}/submit` later."
+    ),
+)
+def create_direct_booking(
+    payload: DirectBookingCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_REQUEST)),
+):
+    booking = enquiry_service.create_direct_booking(db, current_user, payload)
+    if payload.submit:
+        # The same function the two-step path calls. Its completeness rules —
+        # contact details, passenger names, passports on an international
+        # sector — apply here unchanged, so a booking that would be refused
+        # on the enquiry-led screen is refused here too.
+        #
+        # ALL OR NOTHING, and the cleanup is the reason this is not a bare call.
+        # `create_direct_booking` commits before this runs, so a refusal here
+        # would otherwise answer 400 while leaving a draft the caller was never
+        # told the id of — and a client that reasonably retries the same POST
+        # would raise a second one on every attempt. `submit: true` therefore
+        # means submitted or not created; the two-step path is what a caller
+        # uses when it wants the draft to survive an incomplete form.
+        try:
+            ticket_service.submit_request(db, current_user, booking.request_id)
+        except Exception:
+            enquiry_service.discard_unsubmitted(db, booking.request_id)
+            raise
     return RequestResponse.of(
         enquiry_service.load_with_passengers(db, current_user, booking.request_id)
     )

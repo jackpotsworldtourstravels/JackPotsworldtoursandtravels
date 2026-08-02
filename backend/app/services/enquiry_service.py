@@ -50,6 +50,7 @@ history entry, exactly as ``create_booking_request`` writes its rows at
 ``draft``. Every later move goes through :mod:`app.services.lifecycle`.
 """
 import datetime
+import logging
 from decimal import Decimal
 
 from fastapi import HTTPException, status as http_status
@@ -73,6 +74,8 @@ from app.services import (
     notification_service,
     ticket_service,
 )
+
+logger = logging.getLogger("jackpots.enquiry")
 
 
 #: Enquiry wording for the shared statuses. ``lifecycle.SPEC_LABELS`` says
@@ -146,22 +149,9 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         status=S.PENDING_APPROVAL,
         title=_title(payload),
         remarks=payload.notes,
-        travel_details={
-            "trip_type": payload.trip_type,
-            "origin": payload.origin.strip(),
-            "origin_city": (payload.origin_city or "").strip() or None,
-            "destination": payload.destination.strip(),
-            "destination_city": (payload.destination_city or "").strip() or None,
-            "airline": payload.airline.strip(),
-            "flight_number": payload.flight_number.strip().upper(),
-            "preferred_time": payload.preferred_time,
-            "return_preferred_time": payload.return_preferred_time,
-            "travel_class": payload.travel_class.strip(),
-            "passenger_count": payload.passenger_count,
-            "adults": payload.adults,
-            "children": payload.children,
-            "infants": payload.infants,
-        },
+        # Shared with create_direct_booking — see _itinerary_details for why the
+        # two forms must not each spell these keys out for themselves.
+        travel_details=_itinerary_details(payload),
         quantity=payload.passenger_count,
         # An enquiry asks what a sector costs; it does not owe anything. The
         # amount is set on the booking the Admin approves, not here.
@@ -645,6 +635,175 @@ def to_booking_request(
         reference_id=booking.request_id, merchant_id=booking.merchant_id,
     )
     return booking
+
+
+# ---------------------------------------------------------------------------
+# Direct booking — no enquiry in front of it
+# ---------------------------------------------------------------------------
+def _itinerary_details(payload) -> dict:
+    """The ``travel_details`` itinerary keys, from a form payload.
+
+    Extracted from :func:`create` so the enquiry form and the direct booking
+    form write **the same keys with the same normalisation** — the flight number
+    upper-cased, the city names emptied to ``None`` rather than left as blanks.
+    Every screen in the platform reads an itinerary out of these keys; a second
+    writer spelling one of them differently would render a booking with a hole
+    in it on a screen nobody thought to re-test.
+    """
+    return {
+        "trip_type": payload.trip_type,
+        "origin": payload.origin.strip(),
+        "origin_city": (payload.origin_city or "").strip() or None,
+        "destination": payload.destination.strip(),
+        "destination_city": (payload.destination_city or "").strip() or None,
+        "airline": payload.airline.strip(),
+        "flight_number": payload.flight_number.strip().upper(),
+        "preferred_time": payload.preferred_time,
+        "return_preferred_time": payload.return_preferred_time,
+        "travel_class": payload.travel_class.strip(),
+        "passenger_count": payload.passenger_count,
+        "adults": payload.adults,
+        "children": payload.children,
+        "infants": payload.infants,
+    }
+
+
+def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
+    """Raise a booking with no enquiry in front of it.
+
+    THE SECOND WAY ONTO ONE TRACK, NOT A SECOND TRACK.
+    Everything downstream of this function is the code that already existed:
+    ``ticket_service.submit_request`` submits it, the Manager queue picks it up
+    (``manager_service._classic_bookings_filter`` matches the marker written
+    below), ``lifecycle`` walks it through ``CLASSIC_TRANSITIONS``, and
+    ``ticket_service.issue_ticket`` captures the fare and debits the wallet.
+    Nothing here duplicates any of that; this function only *creates the row*,
+    and it creates the same shape of row :func:`to_booking_request` does.
+
+    THE DIFFERENCES FROM AN ENQUIRY-LED BOOKING, ALL THREE OF THEM:
+
+    1. ``parent_request_id`` is ``None``. There is no enquiry to point at, and
+       inventing one would put a row in the enquiry queue that nobody asked the
+       desk to answer. ``submit_request``'s ``reserve_units`` call is already
+       conditional on a parent, so nothing is reserved and nothing leaks.
+    2. ``total_amount`` is ``0``. It has never been quoted, so the fare is
+       captured at issuance by ``_capture_fare_for_wallet_billing`` — the
+       pre-CR-5 path, still live for exactly this reason, and the one place a
+       booking's price may be set by the platform rather than by the merchant.
+    3. ``travel_details['direct_booking']`` is the track marker in place of
+       ``enquiry_reference``. See ``lifecycle.CLASSIC_MARKER_KEYS``.
+
+    The itinerary is taken from the merchant here, where on the enquiry-led path
+    it is copied from the answered enquiry. That is not a weakening of the rule
+    that "the booking is the journey we quoted" — it is the *absence* of a
+    quotation, which is exactly what the merchant is choosing when it skips the
+    enquiry, and it is why the desk still names the fare at issuance.
+    """
+    if actor.merchant_id is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Only merchant accounts can raise booking requests",
+        )
+    passengers = [p.model_dump() for p in payload.passengers]
+    if not passengers:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="At least one passenger is required",
+        )
+
+    merchant = db.get(Merchant, actor.merchant_id)
+    booking = ServiceRequest(
+        request_number=ticket_service._next_number(db, "REQ"),
+        merchant_id=actor.merchant_id,
+        user_id=actor.user_id,
+        request_type=RequestType.BOOKING,
+        booking_reference=merchant_service.next_booking_reference(db, merchant),
+        travel_type=TravelType.FLIGHT,
+        status=S.DRAFT,
+        # `_title` produces "Enquiry: HYD → DXB · AI 217"; the same route line
+        # without the prefix, matching what to_booking_request strips off.
+        title=_title(payload).replace("Enquiry: ", "", 1),
+        remarks=payload.remarks,
+        client_fare=payload.client_fare,
+        travel_details={
+            **_itinerary_details(payload),
+            "direct_booking": True,
+            "contact": (payload.contact.model_dump() if payload.contact else {}),
+            "international": bool(payload.international),
+            "special_requests": (payload.special_requests or "").strip() or None,
+            # The enquiry form's "notes for our team" still has somewhere to go:
+            # it is the merchant's own note about the journey, and the desk reads
+            # it beside the itinerary rather than in the booking's remarks.
+            "merchant_notes": (payload.notes or "").strip() or None,
+        },
+        pricing={
+            "currency": "INR",
+            # False, and read by every screen instead of `total_amount == 0`.
+            "quoted": False,
+            "source": "direct_booking",
+        },
+        quantity=len(passengers),
+        total_amount=Decimal("0"),
+        travel_date=payload.travel_date,
+        return_date=payload.return_date,
+        status_history=[],
+    )
+    db.add(booking)
+    db.flush()
+
+    for p in passengers:
+        db.add(
+            PassengerData(
+                request_id=booking.request_id,
+                merchant_id=actor.merchant_id,
+                **ticket_service.passenger_columns(p),
+            )
+        )
+
+    db.commit()
+    db.refresh(booking)
+
+    activity_service.log_activity(
+        db, actor.user_id, "Booking request created",
+        activity_type="Booking", module="Booking Request",
+        description=f"{actor.full_name} drafted {booking.request_number} without an enquiry",
+        reference_id=booking.request_id, merchant_id=booking.merchant_id,
+    )
+    return booking
+
+
+def discard_unsubmitted(db: Session, request_id: int) -> None:
+    """Undo a just-created booking whose one-call submit was refused.
+
+    Only reachable from the ``submit: true`` branch of ``POST /api/bookings/direct``.
+    ``create_direct_booking`` has to commit — ``activity_service.log_activity``
+    commits, so there is no honest way to leave the row pending across the
+    submit — which means the refusal has to be undone rather than rolled back.
+
+    THREE GUARDS, BECAUSE THIS DELETES A ROW.
+    It refuses unless the booking is still ``DRAFT`` and its ``status_history``
+    is empty, which together mean nothing has ever moved it and nobody else can
+    have seen it. ``passenger_data.request_id`` is ``ON DELETE CASCADE``, so the
+    travellers go with it and no orphan is left behind.
+
+    IT NEVER RAISES. It runs inside an ``except`` block, and the caller is about
+    to re-raise the real error — the merchant needs to be told what was missing
+    from its form, not that the cleanup afterwards also failed. A booking left
+    behind here is an untidy draft, which is strictly better than a 500 that
+    hides the 400.
+    """
+    try:
+        db.rollback()
+        booking = db.get(ServiceRequest, request_id)
+        if booking is None:
+            return
+        if booking.status is not S.DRAFT or booking.status_history:
+            return
+        db.delete(booking)
+        db.commit()
+    except Exception:  # pragma: no cover - cleanup must not mask the real error
+        logger.exception("Could not discard unsubmitted direct booking %s", request_id)
+        db.rollback()
 
 
 def load_with_passengers(db: Session, actor: User, request_id: int) -> ServiceRequest:

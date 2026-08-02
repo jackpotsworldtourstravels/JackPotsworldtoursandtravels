@@ -110,6 +110,63 @@ class PassengerResponse(PassengerInput):
         )
 
 
+class PassengerLookupResponse(BaseModel):
+    """A traveller this merchant has sent before, found by passport number.
+
+    DELIBERATELY NOT A ``PassengerResponse``, and the missing field is the point:
+    there is **no ``id``**. That id identifies a ``passenger_data`` row on
+    *another booking*, and ``replace_passengers`` reads ``id`` as "keep this
+    traveller's existing row". Handing it to a form that is filling in a
+    different booking would ask the API to move a row between bookings — so the
+    lookup returns the *facts about a person* and never a row identity. The
+    booking being filled in creates its own row, exactly as it always did.
+
+    ``found`` is explicit rather than implied by a 404: "we have not seen this
+    passport" is a normal, successful answer to a lookup, and a 404 would make
+    every unrecognised passport look like an error in the browser console.
+    """
+
+    found: bool = False
+    title: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    gender: Gender | None = None
+    dob: datetime.date | None = None
+    passenger_type: PassengerType | None = None
+    passport_number: str | None = None
+    passport_issue_country: str | None = None
+    passport_issue_date: datetime.date | None = None
+    passport_expiry: datetime.date | None = None
+    nationality: str | None = None
+    seat_preference: SeatPreference | None = None
+    meal_preference: str | None = None
+    #: When this merchant last sent this traveller. Shown beside the fill so the
+    #: merchant can judge whether details from that long ago are still current.
+    last_used: datetime.datetime | None = None
+
+    @classmethod
+    def of(cls, p) -> "PassengerLookupResponse":
+        if p is None:
+            return cls(found=False)
+        return cls(
+            found=True,
+            title=p.title,
+            first_name=p.first_name,
+            last_name=p.last_name,
+            gender=p.gender,
+            dob=p.dob,
+            passenger_type=p.passenger_type,
+            passport_number=p.passport_number,
+            passport_issue_country=p.passport_issue_country,
+            passport_issue_date=p.passport_issue_date,
+            passport_expiry=p.passport_expiry,
+            nationality=p.nationality,
+            seat_preference=p.seat_preference,
+            meal_preference=p.meal_preference,
+            last_used=p.updated_at or p.created_at,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Requests
 # ---------------------------------------------------------------------------

@@ -137,16 +137,23 @@ def _assert_not_self_approval(actor: User, booking: ServiceRequest) -> None:
 def _classic_bookings_filter():
     """Bookings on the Classic Tours track.
 
-    ``enquiry_reference`` is the marker :func:`lifecycle.is_classic_track`
-    reads, and it is expressed here as a SQL term so the queue is one indexed
-    read rather than a full scan filtered in Python. The Python predicate is
-    still applied per row afterwards — it additionally excludes bookings that
-    already entered the payment workflow, which is a history check no cheap
-    WHERE clause can make.
+    ``lifecycle.CLASSIC_MARKER_KEYS`` are the markers
+    :func:`lifecycle.is_classic_track` reads — ``enquiry_reference`` for a
+    booking raised from an answered enquiry, ``direct_booking`` for one the
+    merchant raised straight from the booking form. Expressed here as a SQL term
+    so the queue is one indexed read rather than a full scan filtered in Python,
+    and built *from that tuple* rather than from literals, so a third way onto
+    the track cannot appear in the state machine without appearing in this
+    queue. The Python predicate is still applied per row afterwards — it
+    additionally excludes bookings that already entered the payment workflow,
+    which is a history check no cheap WHERE clause can make.
     """
     return and_(
         ServiceRequest.request_type == RequestType.BOOKING,
-        ServiceRequest.travel_details["enquiry_reference"].astext.isnot(None),
+        or_(*[
+            ServiceRequest.travel_details[key].astext.isnot(None)
+            for key in lifecycle.CLASSIC_MARKER_KEYS
+        ]),
     )
 
 

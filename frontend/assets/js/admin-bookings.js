@@ -146,7 +146,8 @@ function renderBookingReview(data) {
         escapeHtml(r.status_label || r.status)}</span>`)}
       ${cell('Booking reference', escapeHtml(admDash(r.booking_reference)))}
       ${cell('Merchant', escapeHtml(admDash(r.merchant_name)))}
-      ${cell('Enquiry reference', escapeHtml(admDash(d.enquiry_reference)))}
+      ${cell('Enquiry reference', escapeHtml(
+        d.enquiry_reference || (d.direct_booking ? 'Direct booking — not quoted' : '—')))}
       ${cell('Trip type', roundTrip ? 'Round Trip' : 'One Way')}
       ${cell('Route', escapeHtml(admDash(
         [d.origin_city || d.origin, d.destination_city || d.destination].filter(Boolean).join(' → '))))}

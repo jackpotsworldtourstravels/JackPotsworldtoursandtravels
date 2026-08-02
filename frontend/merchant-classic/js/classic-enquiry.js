@@ -74,8 +74,25 @@ function clInitEnquiry() {
         <h1>Booking Enquiry</h1>
         <p>Tell us the sector you need and our team will confirm availability and quote a fare.</p>
       </div>
+      <!-- TWO WAYS TO START, AND THE ORDER IS THE RECOMMENDATION.
+           Enquiry first is the primary button because a quoted booking is
+           settled at a price the merchant agreed before it committed. Book
+           Directly skips the quotation, so the fare is named by our desk at
+           ticket issuance — stated on the button's own title and again on the
+           form, rather than being a surprise on the wallet. -->
+      <!-- Both CTAs are always PRESENT; a role that may not raise work gets them
+           disabled with the reason on hover. The screen behind them is the same
+           for everyone — see the clCan note in classic-shell.js. -->
       <div class="cl-page-actions">
-        <button type="button" class="cl-btn cl-btn-primary" id="clEnqNew">+ New Booking Enquiry</button>
+        <button type="button" class="cl-btn cl-btn-primary" id="clEnqNew"
+          ${clCan('ticket.enquiry') ? '' : `disabled aria-disabled="true"
+          title="${escapeHtml(CL_NO_ENQUIRY)}"`}>+ New Booking Enquiry</button>
+        <button type="button" class="cl-btn cl-btn-cta" id="clEnqDirect"
+          ${clCan('ticket.request')
+            ? 'title="Raise the booking straight away, without asking us to quote it first"'
+            : `disabled aria-disabled="true" title="${escapeHtml(CL_NO_BOOKING)}"`}>
+          ${clIco('plane', { size: 15 })} Book Directly
+        </button>
       </div>
     </div>
 
@@ -136,6 +153,7 @@ function clInitEnquiry() {
   clChips('clEnqStatus', 'Status');
 
   $('clEnqNew').addEventListener('click', () => clOpenEnquiryForm());
+  $('clEnqDirect').addEventListener('click', () => clOpenEnquiryForm(true));
   $('clEnqRefresh').addEventListener('click', () => clLoadEnquiries());
   $('clEnqStatus').addEventListener('change', () => clLoadEnquiries());
   $('clEnqSearch').addEventListener('input', () => clRenderEnquiryRows());
@@ -365,8 +383,13 @@ function clEnquiryActions(r) {
       title="Open ${escapeHtml(r.booking_request_number || 'the booking')}"
       >${clIco('external', { size: 13 })}View Booking</button>`);
   } else if (r.status === 'approved') {
+    /* Quoted and not yet booked — the one state where this is a real action.
+       A role without ticket.request still SEES it, disabled: the enquiry is
+       ready and someone at the company needs to know that. */
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary cl-btn-cta"
-      data-cl-enq-book="${r.id}"
+      data-cl-enq-book="${r.id}"${clCan('ticket.request')
+        ? ''
+        : ` disabled aria-disabled="true" title="${escapeHtml(CL_NO_BOOKING)}"`}
       >${clIco('plane', { size: 14 })}Raise Booking</button>`);
   } else {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-cta" disabled
@@ -431,6 +454,7 @@ async function clOpenEnquiryDetail(id) {
     const foot = [];
     if (r.status === 'approved' && !r.booking_request_id) {
       foot.push(`<button type="button" class="cl-btn cl-btn-primary cl-btn-cta" data-cl-modal-book="${r.id}"
+        ${clActionAttrs('ticket.request', CL_NO_BOOKING)}
         >${clIco('plane', { size: 15 })}Raise Booking</button>`);
     }
     if (r.booking_request_id) {
@@ -498,35 +522,79 @@ function clUpsertEnquiryRow(r) {
   if ($('cl-enquiry')?.classList.contains('active')) clRenderEnquiryRows();
 }
 
-/* CR-5 — the merchant portal is 24-hour throughout.
+/* THE WIRE IS 24-HOUR; THE MERCHANT PORTAL IS 12-HOUR.
    ===========================================================================
-   The API has always stored 24-hour ("14:30"); it was the UI that collected
-   1-12 + AM/PM and rendered it back the same way. Both ends of that conversion
-   are gone here: the form's selector is a 24-hour list, and this returns the
-   stored value essentially as-is.
+   `schemas/enquiry.py` pins `preferred_time` to `^([01]\d|2[0-3]):[0-5]\d$`, so
+   "14:30" is what is stored and what every other portal reads. That is not
+   changing — this is a presentation layer over it, and the pair below is the
+   only place the two clocks meet:
 
-   Kept as a function rather than inlined because it still has work to do —
-   normalising "9:00" to "09:00" so a column of times aligns, and surviving a
-   value the API never wrote. */
-function clTimeLabel(hhmm) {
-  if (!hhmm) return null;
-  const [h, m] = String(hhmm).split(':').map(Number);
-  if (Number.isNaN(h)) return hhmm;
-  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+     cl24To12('14:30')       -> { hour: 2, minute: '30', meridiem: 'PM' }
+     cl12To24(2, '30', 'PM') -> '14:30'
+     clTimeLabel('14:30')    -> '02:30 PM'
+
+   CR-5 had removed a 12-hour control and its comment argued the case: an hour
+   1-12 beside an AM/PM toggle is "three decisions for one value" and "12" is
+   ambiguous. The ambiguity was in the *old* control, which offered no minutes
+   and put the meridiem on a toggle button. It is answered here by making all
+   three parts explicit, labelled selects — and midnight/noon are the two cases
+   the conversion below is written around, because they are the only ones where
+   12-hour and 24-hour disagree about the leading digit. */
+
+/* Minute granularity. Five minutes, not thirty: the business asked for a time
+   the merchant chooses manually, and "09:35" is a real preferred departure. */
+const CL_TIME_MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+
+function cl24To12(hhmm) {
+  const [rawH, rawM] = String(hhmm || '').split(':');
+  let h = Number(rawH);
+  const m = Number(rawM);
+  if (!Number.isFinite(h) || h < 0 || h > 23) return null;
+  const meridiem = h < 12 ? 'AM' : 'PM';
+  // 0 -> 12 AM, 12 -> 12 PM, 13 -> 1 PM. The modulo alone gives 0 for both
+  // midnight and noon, which is not an hour anybody writes on a clock face.
+  h = h % 12 || 12;
+  return {
+    hour: h,
+    minute: String(Number.isFinite(m) ? m : 0).padStart(2, '0'),
+    meridiem,
+  };
 }
 
-/* Timestamps, 24-hour, without touching the shared fmtDateTime().
-   `fmtDateTime` uses en-IN with timeStyle:'short', which is 12-hour, and it is
-   loaded by the Admin, Manager and Super Admin portals too — CR-5 scopes the
-   24-hour clock to the merchant portal, so this is a local override rather than
-   a change to a formatter four portals share. */
+function cl12To24(hour, minute, meridiem) {
+  let h = Number(hour) % 12;           // 12 -> 0, which is right for both halves
+  if (String(meridiem).toUpperCase() === 'PM') h += 12;
+  return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/* "02:30 PM". Survives a value the API never wrote — an unparseable string is
+   returned as-is rather than rendered as "NaN:NaN AM", because a time nobody
+   recognises is still more useful to the desk than a placeholder. */
+function clTimeLabel(hhmm) {
+  if (!hhmm) return null;
+  const t = cl24To12(hhmm);
+  if (!t) return hhmm;
+  return `${String(t.hour).padStart(2, '0')}:${t.minute} ${t.meridiem}`;
+}
+
+/* Timestamps, in the same 12-hour clock as the times above.
+   CR-5 wrote this as a 24-hour override because the portal was 24-hour
+   throughout; it no longer is, and an enquiry detail card reading
+   "Preferred time 02:30 PM" directly above "Created 14:05" states two clocks
+   in one list. The name is kept — every call site says `clDateTime24` and
+   renaming it across four modules would be churn for nothing — but what it
+   formats is now the portal's one clock.
+
+   Still local rather than a change to the shared `fmtDateTime`, which four
+   portals load: this one also pins the date part to `d Mon YYYY`, which
+   `timeStyle:'short'` alone does not give. */
 function clDateTime24(value) {
   if (!value) return '—';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: false,
+    hour: '2-digit', minute: '2-digit', hour12: true,
   });
 }
 
@@ -558,19 +626,39 @@ function clAddDays(iso, days) {
    string rather than looking it up here. */
 const CL_TRAVEL_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First Class'];
 
-function clOpenEnquiryForm() {
+/* ONE FORM, TWO DESTINATIONS.
+   ===========================================================================
+   `direct` is the whole difference between "ask us to quote this" and "book
+   this now". The fields, the validation and the state object are identical —
+   a journey is a journey — so this is a mode on the existing form rather than a
+   second form that would then have to be kept in step with it.
+
+     direct === false   POST /api/enquiries, and the desk quotes it.
+     direct === true    no POST here at all. The itinerary is carried straight
+                        into Booking Request, where the travellers are added and
+                        POST /api/bookings/direct creates the booking.
+
+   The button label and the banner are the only markup that branches. */
+function clOpenEnquiryForm(direct = false) {
   const today = clTodayIso();
   clEnqForm = {
+    direct: !!direct,
     trip_type: 'one_way',
     from: null, to: null,                 // { code, city, label } once picked
     airline: '',
-    /* CR-5 — 24-hour. Was `depHour` 1-12 plus a `depMer` AM/PM toggle. */
+    /* 24-hour "HH:MM" on the wire; the control that collects it is 12-hour. */
     depTime: '09:00',
     retTime: '18:00',
     adults: 1, children: 0, infants: 0,
   };
 
-  clOpenModal('New Booking Enquiry', `
+  clOpenModal(direct ? 'Direct Booking Request' : 'New Booking Enquiry', `
+    ${direct ? `<div class="cl-msg cl-msg-info" style="margin:0 0 16px;">
+      <b>You are booking without a quotation.</b> We will not price this before you
+      commit to it — our team confirms the fare when the ticket is issued, and your
+      wallet is charged that amount then. If you would rather see the fare first,
+      close this and use <b>+ New Booking Enquiry</b> instead.
+    </div>` : ''}
     <div class="cl-trip" id="clEnqTrip" role="radiogroup" aria-label="Trip type">
       <label class="cl-trip-opt checked" data-cl-trip="one_way">
         <input type="radio" name="clEnqTripType" value="one_way" checked>One Way
@@ -627,8 +715,8 @@ function clOpenEnquiryForm() {
         <input type="date" id="clEnqDate" min="${today}" value="${today}">
       </div>
       <div class="cl-field">
-        <label for="clEnqTime">Preferred time (24h)<span class="cl-req">*</span></label>
-        <select id="clEnqTime">${clTimeOptions('09:00')}</select>
+        <label for="clEnqTimeHour">Preferred time<span class="cl-req">*</span></label>
+        ${clTimeField('clEnqTime', '09:00', 'Preferred departure time')}
       </div>
     </div>
 
@@ -643,8 +731,8 @@ function clOpenEnquiryForm() {
           <input type="date" id="clEnqReturnDate" min="${clAddDays(today, 1)}">
         </div>
         <div class="cl-field">
-          <label for="clEnqReturnTime">Return preferred time (24h)<span class="cl-req">*</span></label>
-          <select id="clEnqReturnTime">${clTimeOptions('18:00')}</select>
+          <label for="clEnqReturnTimeHour">Return preferred time<span class="cl-req">*</span></label>
+          ${clTimeField('clEnqReturnTime', '18:00', 'Return preferred time')}
         </div>
       </div>
     </div>
@@ -697,7 +785,8 @@ function clOpenEnquiryForm() {
 
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
-     <button type="button" class="cl-btn cl-btn-primary" id="clEnqSubmit">Send Enquiry</button>`);
+     <button type="button" class="cl-btn cl-btn-primary" id="clEnqSubmit">${
+       direct ? 'Continue to travellers' : 'Send Enquiry'}</button>`);
 
   $('clModal').classList.add('cl-modal-form');
   clModalOnClose = () => { $('clModal').classList.remove('cl-modal-form'); clEnqForm = null; };
@@ -706,23 +795,56 @@ function clOpenEnquiryForm() {
   $('clEnqFrom').focus();
 }
 
-/* 00:00 … 23:30, in half hours (CR-5).
-   The old control was an hour 1-12 beside an AM/PM toggle, which is three
-   decisions for one value and where "12" meant midnight or noon depending on a
-   button beside it. A single 24-hour list has no such ambiguity, sorts the way
-   a day runs, and is already the format the API stores — so the value the
-   <select> carries is submitted verbatim, with no conversion left to get wrong.
-   Half hours because a preferred departure of "around 09:30" is a real answer
-   and the hour-only list forced it to 09:00 or 10:00. */
-function clTimeOptions(selected) {
-  const out = [];
-  for (let h = 0; h < 24; h++) {
-    for (const m of ['00', '30']) {
-      const v = `${String(h).padStart(2, '0')}:${m}`;
-      out.push(`<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`);
-    }
-  }
-  return out.join('');
+/* THE 12-HOUR TIME CONTROL — hour, minute, AM/PM.
+   ===========================================================================
+   Three real <select>s rather than an <input type="time">, for two reasons that
+   both showed up in this portal before: the native picker renders in the
+   *browser's* locale, so the same form reads 24-hour for a merchant whose
+   machine is set that way, and on Firefox/desktop it is a text field that
+   accepts typing the platform then has to police. Three selects cannot be
+   typed wrong, read the same everywhere, and are reachable by Tab.
+
+   `id` is the base — the parts are `<id>Hour`, `<id>Min`, `<id>Mer`, which is
+   what clReadTimeField and clSetTimeField below look for. `value` is 24-hour,
+   because that is what the caller has: a default, or a saved enquiry.
+
+   A minute the stored value does not land on (a legacy "09:07", or a row some
+   other portal wrote) is added to the list for that field only, so opening an
+   old enquiry never silently rounds its time to something nobody chose. */
+function clTimeField(id, value, label) {
+  const t = cl24To12(value) || { hour: 9, minute: '00', meridiem: 'AM' };
+  const minutes = CL_TIME_MINUTES.includes(t.minute)
+    ? CL_TIME_MINUTES
+    : [...CL_TIME_MINUTES, t.minute].sort();
+
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1).map(h =>
+    `<option value="${h}"${h === t.hour ? ' selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('');
+  const mins = minutes.map(m =>
+    `<option value="${m}"${m === t.minute ? ' selected' : ''}>${m}</option>`).join('');
+  const mers = ['AM', 'PM'].map(x =>
+    `<option value="${x}"${x === t.meridiem ? ' selected' : ''}>${x}</option>`).join('');
+
+  return `<div class="cl-timesel" id="${id}">
+    <select id="${id}Hour" class="cl-timesel-h" aria-label="${escapeHtml(label)} — hour">${hours}</select>
+    <span class="cl-timesel-sep" aria-hidden="true">:</span>
+    <select id="${id}Min" class="cl-timesel-m" aria-label="${escapeHtml(label)} — minute">${mins}</select>
+    <select id="${id}Mer" class="cl-timesel-p" aria-label="${escapeHtml(label)} — AM or PM">${mers}</select>
+  </div>`;
+}
+
+/* The three parts, back as the "HH:MM" the API stores. */
+function clReadTimeField(id) {
+  const h = $(`${id}Hour`), m = $(`${id}Min`), p = $(`${id}Mer`);
+  if (!h || !m || !p) return null;
+  return cl12To24(h.value, m.value, p.value);
+}
+
+/* Keeps the form's state object in step with whichever part was just changed,
+   in one handler per field rather than three. */
+function clBindTimeField(id, onChange) {
+  ['Hour', 'Min', 'Mer'].forEach(part => {
+    $(`${id}${part}`)?.addEventListener('change', () => onChange(clReadTimeField(id)));
+  });
 }
 
 function clStepperCard(key, title, sub, value, min) {
@@ -767,9 +889,11 @@ function clWireEnquiryForm() {
     clEnqForm.airline = picked ? picked.value : '';
   });
 
-  /* ---- 24-hour time selects (CR-5) ---- */
-  $('clEnqTime').addEventListener('change', e => { clEnqForm.depTime = e.target.value; });
-  $('clEnqReturnTime').addEventListener('change', e => { clEnqForm.retTime = e.target.value; });
+  /* ---- 12-hour time controls. `depTime` / `retTime` stay 24-hour "HH:MM" —
+     the conversion happens in the control, not at submit, so there is exactly
+     one place a wrong meridiem could come from. ---- */
+  clBindTimeField('clEnqTime', v => { clEnqForm.depTime = v; });
+  clBindTimeField('clEnqReturnTime', v => { clEnqForm.retTime = v; });
 
   /* ---- dates ---- */
   $('clEnqDate').addEventListener('change', clSyncReturnMin);
@@ -1112,7 +1236,7 @@ async function clSubmitEnquiry() {
     returnDate = $('clEnqReturnDate').value;
     if (!returnDate) return fail('Choose the return date.', 'clEnqReturnDate');
     if (returnDate <= date) return fail('The return date must be after the departure date.', 'clEnqReturnDate');
-    returnTime = f.retTime;
+    returnTime = clReadTimeField('clEnqReturnTime') || f.retTime;
   }
 
   const payload = {
@@ -1122,8 +1246,11 @@ async function clSubmitEnquiry() {
     airline,
     flight_number: flight,
     travel_date: date,
-    /* Already "HH:MM" — the <select> holds exactly what the API stores. */
-    preferred_time: f.depTime,
+    /* Read from the control, with the form state as the fallback. Both are
+       24-hour "HH:MM" and cannot disagree — the control's own change handler is
+       what writes the state — but reading the live DOM means an autofilled or
+       programmatically set value cannot be missed. */
+    preferred_time: clReadTimeField('clEnqTime') || f.depTime,
     return_date: returnDate,
     return_preferred_time: returnTime,
     travel_class: travelClass,
@@ -1136,6 +1263,17 @@ async function clSubmitEnquiry() {
        through so an empty string never reaches a Decimal field. */
     client_fare: clParseMoney($('clEnqClientFare').value),
   };
+
+  /* DIRECT MODE STOPS HERE. Nothing is sent: the itinerary is handed to Booking
+     Request, which collects the travellers and then creates the booking in one
+     call. Deliberately not "create a draft now and add passengers later" —
+     abandoning the form halfway would otherwise leave an empty booking in My
+     Requests that the merchant never meant to raise. */
+  if (f.direct) {
+    clCloseModal();
+    clStartDirectBooking(payload);
+    return;
+  }
 
   btn.disabled = true;
   clMsg(msg, 'Sending your enquiry…', 'muted');

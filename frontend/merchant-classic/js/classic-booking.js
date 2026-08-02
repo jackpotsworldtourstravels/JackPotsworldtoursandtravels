@@ -56,10 +56,101 @@ let clBookingEnquiry = null;
 /* The saved draft, once one exists — null until Save as draft (or a resume).
    Its presence is what routes the next save to update rather than create. */
 let clBookingDraft = null;
+/* THE DIRECT-BOOKING ITINERARY, or null on the enquiry-led path.
+   ===========================================================================
+   Set by clStartDirectBooking from the form the merchant just filled in, and
+   read only at the moment the booking is created — it is the body of
+   POST /api/bookings/direct, minus the travellers this screen adds.
+
+   It is a THIRD variable rather than a flag on clBookingEnquiry because the two
+   answer different questions: `clBookingEnquiry` is what the screen RENDERS
+   (and on this path it is a stand-in built from the same fields, so every
+   read-only row above the passenger grid works untouched), while this is what
+   the screen SENDS. Once a draft exists both paths save through the same
+   update endpoints and this is no longer consulted. */
+let clBookingDirect = null;
 
 function clStartBookingRequest(enquiry, draft = null) {
   clBookingEnquiry = enquiry;
   clBookingDraft = draft;
+  clBookingDirect = null;
+}
+
+/* Book Directly: no enquiry, no quotation, no server round trip yet.
+   `itinerary` is exactly the payload the enquiry form built — the same keys
+   POST /api/bookings/direct takes — so nothing is re-derived here. The
+   stand-in below carries the same field names an EnquiryResponse does, which
+   is what lets clRenderBookingForm render it without a single branch. */
+function clStartDirectBooking(itinerary) {
+  clBookingDirect = itinerary;
+  clBookingDraft = null;
+  clBookingEnquiry = {
+    id: null,
+    /* What clRenderBookingForm branches on. Read from the stand-in rather than
+       from `clBookingDirect` so a RESUMED direct draft — which has no pending
+       itinerary, because the server already holds it — renders identically. */
+    direct_booking: true,
+    reference_number: null,          // there is no enquiry to reference
+    quoted_fare: null,               // and therefore no quotation
+    quotation_remarks: null,
+    admin_response: null,
+    trip_type: itinerary.trip_type,
+    origin: itinerary.origin, origin_city: itinerary.origin_city,
+    destination: itinerary.destination, destination_city: itinerary.destination_city,
+    airline: itinerary.airline,
+    flight_number: itinerary.flight_number,
+    travel_date: itinerary.travel_date,
+    preferred_time: itinerary.preferred_time,
+    return_date: itinerary.return_date,
+    return_preferred_time: itinerary.return_preferred_time,
+    travel_class: itinerary.travel_class,
+    passenger_count: itinerary.passenger_count,
+    adults: itinerary.adults, children: itinerary.children, infants: itinerary.infants,
+  };
+  /* DELETE, not add — clGo only runs a section's loader when the section is
+     absent from clLoaded, and a stale "loaded" here lands on the previous
+     booking's form. Same reason as clRequestTicket. */
+  clLoaded.delete('booking-request');
+  clGo('booking-request');
+}
+
+/* Reopen a saved DRAFT booking on this screen, from the booking alone.
+   ===========================================================================
+   The enquiry-led path resumes through Raise Booking on the enquiry row, which
+   has an enquiry to re-read. A direct booking has none — so without this,
+   "Save as draft" on the direct path would be a dead end: the merchant could
+   submit the draft from My Requests but never open it again to fix a passport.
+
+   The itinerary is rebuilt from the booking's own `travel_details`, which is
+   where `_itinerary_details` wrote it, so this needs no enquiry for either
+   path. `total_amount` stands in for the quotation on an enquiry-led draft —
+   CR-5 creates that booking AT the quoted fare, so the row already holds it. */
+function clResumeBookingDraft(booking) {
+  const d = booking.details || {};
+  clBookingDirect = null;               // the server holds it now; nothing to send
+  clBookingDraft = booking;
+  clBookingEnquiry = {
+    id: null,
+    direct_booking: !!d.direct_booking,
+    reference_number: d.enquiry_reference || null,
+    quoted_fare: Number(booking.total_amount) > 0 ? booking.total_amount : null,
+    quotation_remarks: null,
+    admin_response: null,
+    trip_type: d.trip_type,
+    origin: d.origin, origin_city: d.origin_city,
+    destination: d.destination, destination_city: d.destination_city,
+    airline: d.airline,
+    flight_number: d.flight_number,
+    travel_date: booking.travel_date,
+    preferred_time: d.preferred_time,
+    return_date: booking.return_date,
+    return_preferred_time: d.return_preferred_time,
+    travel_class: d.travel_class,
+    passenger_count: d.passenger_count || (booking.passengers || []).length,
+    adults: d.adults, children: d.children, infants: d.infants,
+  };
+  clLoaded.delete('booking-request');
+  clGo('booking-request');
 }
 
 function clInitBookingRequest() {
@@ -79,20 +170,34 @@ function clRenderNoEnquiry() {
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head"><div>
       <h1>Booking Request</h1>
-      <p>Every booking starts from a booking enquiry our team has quoted.</p>
+      <p>A booking starts either from an enquiry we have quoted, or straight from the journey.</p>
     </div></div>
     <div class="cl-panel"><div class="cl-panel-body">
-      <p style="margin:0 0 14px;font-size:13px;color:var(--cl-text-muted);">
-        Nothing selected. Open <b>Booking Enquiry</b>, find an enquiry marked
-        <b>Available</b>, and press <b>Raise Booking</b> — its details are carried
-        over here so you only have to add the travellers.</p>
-      <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
+      <p style="margin:0 0 6px;font-size:13px;color:var(--cl-text-muted);">
+        Nothing selected. There are two ways in:</p>
+      <ul style="margin:0 0 14px 18px;padding:0;font-size:13px;color:var(--cl-text-muted);">
+        <li style="margin-bottom:5px;">Open <b>Booking Enquiry</b>, find an enquiry marked
+          <b>Available</b>, and press <b>Raise Booking</b> — its details are carried over here so
+          you only have to add the travellers, and the fare is the one we quoted.</li>
+        <li>Or press <b>Book Directly</b> to skip the quotation — you enter the journey yourself
+          and our team confirms the fare when the ticket is issued.</li>
+      </ul>
+      <div class="cl-form-actions" style="margin:0;">
+        <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
+        <button type="button" class="cl-btn" id="clBrToDirect">Book Directly</button>
+      </div>
     </div></div>`;
   $('clBrToEnquiry').addEventListener('click', () => clGo('enquiry'));
+  $('clBrToDirect').addEventListener('click', () => clGo('enquiry', () => clOpenEnquiryForm(true)));
 }
 
 function clRenderBookingForm(e) {
   const roundTrip = e.trip_type === 'round_trip';
+  /* No enquiry in front of this booking. Changes what the page SAYS — where the
+     journey came from, what step 1 and 2 were, and when the fare gets named —
+     and nothing about what it COLLECTS. The travellers, the contact and the
+     passport rules are identical, which is the point of reusing this screen. */
+  const direct = !!e.direct_booking;
   const intl = clIsInternational(e);
   const originCountry = typeof travelCountryForCode === 'function' ? travelCountryForCode(e.origin) : null;
   const destCountry = typeof travelCountryForCode === 'function' ? travelCountryForCode(e.destination) : null;
@@ -102,8 +207,11 @@ function clRenderBookingForm(e) {
     <div class="cl-page-head">
       <div>
         <h1>Booking Request</h1>
-        <p>From enquiry <b class="cl-ref">${escapeHtml(e.reference_number)}</b> — review the
-          journey, then enter traveller details. Names must match the travel document exactly.</p>
+        <p>${direct
+          ? 'Direct booking — review the journey you entered, then add traveller details. '
+            + 'Names must match the travel document exactly.'
+          : `From enquiry <b class="cl-ref">${escapeHtml(e.reference_number)}</b> — review the
+             journey, then enter traveller details. Names must match the travel document exactly.`}</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clBrCancel">Discard</button>
@@ -112,11 +220,18 @@ function clRenderBookingForm(e) {
 
     <!-- CR-5: step 2 and step 4 used to say the fare was settled at approval.
          It is settled at the quotation now, so step 2 names the figure and step
-         4 is what it actually is — a sign-off on a booking already priced. -->
+         4 is what it actually is — a sign-off on a booking already priced.
+
+         The direct track has the same five steps and skips none of them; only
+         the first two read differently, because there was no enquiry and
+         therefore no quotation. Step 2 says where the fare WILL come from
+         rather than leaving a step that looks unfinished. -->
     <div class="cl-stepper">
-      <div class="cl-step done"><b>1. Enquiry</b>${escapeHtml(e.reference_number)}</div>
-      <div class="cl-step done"><b>2. Quoted</b>${e.quoted_fare != null
-        ? escapeHtml(moneyStr(e.quoted_fare)) : 'Available to book'}</div>
+      <div class="cl-step done"><b>1. Journey</b>${direct
+        ? 'Entered by you' : escapeHtml(e.reference_number)}</div>
+      <div class="cl-step done"><b>2. ${direct ? 'Fare' : 'Quoted'}</b>${direct
+        ? 'Named at ticketing'
+        : (e.quoted_fare != null ? escapeHtml(moneyStr(e.quoted_fare)) : 'Available to book')}</div>
       <div class="cl-step current"><b>3. Passengers</b>Enter details</div>
       <div class="cl-step"><b>4. Approval</b>Sign-off on this booking</div>
       <div class="cl-step"><b>5. Ticketing</b>Settled from your wallet</div>
@@ -126,7 +241,12 @@ function clRenderBookingForm(e) {
       <div class="cl-panel-head">
         <h2>Journey</h2>
         <div class="cl-panel-tools">
-          <button type="button" class="cl-btn cl-btn-sm" id="clBrViewEnquiry">View enquiry</button>
+          <!-- Only when there is an enquiry to open. Null on the direct path,
+               and also on a draft resumed from My Requests, which is rebuilt
+               from the booking rather than from the enquiry. -->
+          ${e.id != null
+            ? '<button type="button" class="cl-btn cl-btn-sm" id="clBrViewEnquiry">View enquiry</button>'
+            : ''}
         </div>
       </div>
       <div class="cl-panel-body">
@@ -163,8 +283,11 @@ function clRenderBookingForm(e) {
       ${e.admin_response ? `<div class="cl-panel-note">
         <b>Our response:</b> ${escapeHtml(e.admin_response)}</div>` : ''}
       <div class="cl-panel-note">
-        These details come from the enquiry and cannot be changed here — they are what our team
-        quoted. Raise a new enquiry if the journey needs to change.
+        ${direct
+          ? `This is the journey you entered and it cannot be changed here. Discard this booking
+             and start again if it needs to change — nothing has been raised yet.`
+          : `These details come from the enquiry and cannot be changed here — they are what our team
+             quoted. Raise a new enquiry if the journey needs to change.`}
       </div>
     </div>
 
@@ -234,8 +357,10 @@ function clRenderBookingForm(e) {
               escapeHtml(clBookingDraft?.remarks || '')}</textarea>
         </div>
         <div class="cl-form-actions">
-          <button type="button" class="cl-btn cl-btn-primary" id="clBrSubmitBtn">Submit for approval</button>
-          <button type="button" class="cl-btn" id="clBrDraftBtn">Save as draft</button>
+          <button type="button" class="cl-btn cl-btn-primary" id="clBrSubmitBtn"
+            ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Submit for approval</button>
+          <button type="button" class="cl-btn" id="clBrDraftBtn"
+            ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Save as draft</button>
           <span class="cl-kpi-sub">Saving a draft is optional — you can submit straight away.
             A draft stays in My Requests and can be submitted later.</span>
         </div>
@@ -248,12 +373,19 @@ function clRenderBookingForm(e) {
            the merchant is committing to — a note still promising a zero would
            contradict the amount printed directly above it. -->
       <div class="cl-panel-note">
-        ${e.quoted_fare != null
-          ? `Submitting commits you to the quoted <b>${escapeHtml(moneyStr(e.quoted_fare))}</b>.
-             It is checked against your credit limit when you submit and again when it is
-             approved, and settled from your wallet once the ticket is issued.`
-          : `This enquiry was answered before fares were quoted on the enquiry, so it carries no
-             amount yet — our team confirms the payable amount when the ticket is issued.`}
+        ${direct
+          /* Said here as well as on the enquiry-form banner, and deliberately:
+             this is the last screen before the merchant commits, and it is the
+             one difference that costs money if it is a surprise. */
+          ? `You are booking this without a quotation, so it carries no amount yet — our team
+             confirms the payable fare when the ticket is issued, and that amount is settled from
+             your wallet then.`
+          : (e.quoted_fare != null
+            ? `Submitting commits you to the quoted <b>${escapeHtml(moneyStr(e.quoted_fare))}</b>.
+               It is checked against your credit limit when you submit and again when it is
+               approved, and settled from your wallet once the ticket is issued.`
+            : `This enquiry was answered before fares were quoted on the enquiry, so it carries no
+               amount yet — our team confirms the payable amount when the ticket is issued.`)}
       </div>
     </div>`;
 
@@ -274,12 +406,22 @@ function clRenderBookingForm(e) {
     clAddPaxCard(list, list.querySelectorAll('[data-cl-pax]').length);
   });
   $('clBrCopyFirst').addEventListener('click', clFillDown);
-  $('clBrViewEnquiry').addEventListener('click', () => clOpenEnquiryDetail(e.id));
+  $('clBrViewEnquiry')?.addEventListener('click', () => clOpenEnquiryDetail(e.id));
   $('clBrCancel').addEventListener('click', async () => {
-    if (!await clConfirm('Discard this booking request and return to Booking Enquiry?', 'Discard')) return;
+    /* Worth naming what survives. On the direct path nothing has been created
+       yet, so discarding really does throw the typing away; once a draft
+       exists — either path — it stays in My Requests and only this screen is
+       being left. Two different answers to "am I losing this?". */
+    const question = clBookingDraft
+      ? `Leave this booking request? ${clBookingDraft.request_number} stays as a draft in My Requests.`
+      : (direct
+        ? 'Discard this booking? The journey and travellers you entered will be lost — nothing has been raised yet.'
+        : 'Discard this booking request and return to Booking Enquiry?');
+    if (!await clConfirm(question, clBookingDraft ? 'Leave' : 'Discard')) return;
     clBookingEnquiry = null;
+    clBookingDirect = null;
     clLoaded.delete('booking-request');
-    clGo('enquiry');
+    clGo(clBookingDraft ? 'requests' : 'enquiry');
   });
   $('clBrSubmitBtn').addEventListener('click', () => clSubmitBookingRequest(true));
   $('clBrDraftBtn').addEventListener('click', () => clSubmitBookingRequest(false));
@@ -370,6 +512,120 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
     el.remove();
     clRenumberPax(list);
   });
+
+  clBindPassportLookup(el);
+}
+
+/* ============================================ passenger auto-fill by passport */
+
+/* The fields a lookup may fill, and what to call them when asking about one.
+   Spelled out rather than run through clLabel(), which turns `dob` into "Dob"
+   — this map is read out loud in a confirmation the merchant has to answer.
+
+   `passport_number` is NOT among them: it is the key that was just typed, and
+   writing it back would fight the merchant's cursor. */
+const CL_LOOKUP_FIELDS = {
+  title: 'Title',
+  first_name: 'First name',
+  last_name: 'Last name',
+  gender: 'Gender',
+  dob: 'Date of birth',
+  nationality: 'Nationality',
+  passport_issue_country: 'Issuing country',
+  passport_issue_date: 'Passport issue date',
+  passport_expiry: 'Passport expiry',
+  seat_preference: 'Seat preference',
+  meal_preference: 'Meal preference',
+};
+
+/* ON `change`, NOT ON `input`.
+   A passport number is typed or pasted as a whole; firing per keystroke would
+   send a dozen requests for one value and, far worse, would fill the form from
+   a PREFIX match halfway through typing — then have to unfill it. `change`
+   fires once, when the field is left or the paste is committed.
+
+   `passenger_type` is also deliberately not filled: it is seeded from the party
+   breakdown the merchant already gave (2 adults, 1 child), and a child who has
+   since become an adult would otherwise silently re-type the row. */
+function clBindPassportLookup(card) {
+  const field = f => card.querySelector(`[data-field="${f}"]`);
+  const input = field('passport_number');
+  if (!input) return;
+
+  let lastQueried = null;
+  input.addEventListener('change', async () => {
+    const number = (input.value || '').trim().toUpperCase();
+    if (number.length < 4 || number === lastQueried) return;
+    lastQueried = number;
+
+    let found;
+    try {
+      found = await MerchantApi.lookupPassenger(number);
+    } catch (err) {
+      /* Silent by design. This is a convenience over a form that already works
+         — a merchant who is about to type the details anyway must not be shown
+         an error about a shortcut it never asked for. */
+      console.debug('passenger lookup failed', err);
+      return;
+    }
+    if (!found?.found) return clPaxHint(card, '');
+
+    /* THE TWO PILES. Empty fields are filled outright; fields that already hold
+       something DIFFERENT are never touched without an answer, because they are
+       the ones the merchant may have deliberately corrected — a renewed
+       passport expiry, a married name. Same-value fields are neither. */
+    const blanks = [];
+    const clashes = [];
+    Object.entries(CL_LOOKUP_FIELDS).forEach(([f, label]) => {
+      const el = field(f);
+      const value = found[f];
+      if (!el || value === null || value === undefined || value === '') return;
+      const current = (el.value || '').trim();
+      if (!current) blanks.push([el, value]);
+      else if (current !== String(value)) clashes.push([el, value, label]);
+    });
+
+    blanks.forEach(([el, value]) => { el.value = value; });
+
+    if (!blanks.length && !clashes.length) {
+      return clPaxHint(card, `Matches a traveller you booked before${
+        found.last_used ? ` (${fmtDate(found.last_used)})` : ''} — nothing to fill.`);
+    }
+    if (blanks.length) {
+      clPaxHint(card, `Filled ${blanks.length} field${blanks.length === 1 ? '' : 's'} from a `
+        + `previous booking${found.last_used ? ` (${fmtDate(found.last_used)})` : ''}. `
+        + 'Check them before submitting.');
+    }
+
+    if (!clashes.length) return;
+    /* Named one by one rather than counted. "Overwrite 3 fields?" is not a
+       question anybody can answer; "Date of birth, Nationality" is. */
+    const names = clashes.map(([, , label]) => label).join(', ');
+    const ok = await clConfirm(
+      `This passport is on file with different details for: ${names}. `
+      + 'Replace what you have typed with the details from that booking?',
+      'Replace');
+    if (!ok) {
+      return clPaxHint(card, `Kept what you typed. ${names} differ${
+        clashes.length === 1 ? 's' : ''} from the previous booking.`);
+    }
+    clashes.forEach(([el, value]) => { el.value = value; });
+    clPaxHint(card, `Replaced ${names} from the previous booking.`);
+  });
+}
+
+/* One line under a passenger card, replaced rather than appended — a card that
+   is edited three times must not accumulate three notes. */
+function clPaxHint(card, text) {
+  let hint = card.querySelector('[data-cl-pax-hint]');
+  if (!text) return hint?.remove();
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.dataset.clPaxHint = '';
+    hint.style.cssText = 'margin-top:6px;font-size:11.5px;color:var(--cl-text-muted);';
+    card.appendChild(hint);
+  }
+  hint.textContent = text;
 }
 
 function clRenumberPax(list) {
@@ -547,10 +803,15 @@ async function clSubmitBookingRequest(finalize) {
   const passengers = cards.map(clPassengerPayload);
 
   /* The party size the desk answered for is part of what was quoted, so a
-     mismatch is worth confirming rather than silently sending. */
+     mismatch is worth confirming rather than silently sending. Still worth
+     confirming on the direct path, where nothing was quoted: the merchant
+     stated a party size on the form a moment ago and a different number of
+     traveller rows is more likely a slip than a change of mind. */
   if (passengers.length !== enquiry.passenger_count) {
     const ok = await clConfirm(
-      `The enquiry was for ${enquiry.passenger_count} passenger(s) and you have entered `
+      (enquiry.direct_booking
+        ? `You asked for ${enquiry.passenger_count} passenger(s) and have entered `
+        : `The enquiry was for ${enquiry.passenger_count} passenger(s) and you have entered `)
       + `${passengers.length}. Our team will re-check availability for the new party size. Continue?`,
       'Continue');
     if (!ok) return;
@@ -580,6 +841,13 @@ async function clSubmitBookingRequest(finalize) {
         remarks, contact, specialRequests,
       });
       request = request.request || request;
+    } else if (clBookingDirect) {
+      /* First save, direct path: the journey goes up with the travellers,
+         because there is no enquiry holding it. Same two-step shape as below —
+         this creates the draft, /submit is still what reaches the desk. */
+      request = await MerchantApi.createDirectBooking(clBookingDirect, {
+        passengers, remarks, contact, international: intl, specialRequests,
+      });
     } else {
       /* First save: creates the draft against the enquiry. Only /submit puts
          it in front of the approvals team. */
@@ -671,22 +939,35 @@ function clBookingSubmitted(requestNumber, enquiryReference) {
           <!-- CR-5 corrected this line. It promised a move to "Payment Pending
                once it is approved and priced", and neither half has been true
                on this track since CR-2 removed the payment stage from it and
-               CR-5 priced the booking at the quotation. -->
-          Request <b>${escapeHtml(requestNumber)}</b>, raised from enquiry
-          <b>${escapeHtml(enquiryReference)}</b>, has been submitted for approval. Track it in
-          My Requests; the quoted amount is settled from your wallet when the ticket is issued.
+               CR-5 priced the booking at the quotation.
+
+               A direct booking has no enquiry to name and no quoted amount to
+               promise, so it gets its own sentence rather than an empty <b>
+               and a figure that does not exist yet. -->
+          Request <b>${escapeHtml(requestNumber)}</b>${enquiryReference
+            ? `, raised from enquiry <b>${escapeHtml(enquiryReference)}</b>,` : ''}
+          has been submitted for approval. Track it in My Requests; ${enquiryReference
+            ? 'the quoted amount is settled from your wallet when the ticket is issued.'
+            : 'our team confirms the fare when the ticket is issued, and that amount is settled '
+              + 'from your wallet then.'}
         </div>
         <div class="cl-form-actions">
           <button type="button" class="cl-btn cl-btn-primary" id="clBrDoneList">View My Requests</button>
-          <button type="button" class="cl-btn" id="clBrDoneNew">New booking enquiry</button>
+          <!-- Offers back the route just taken. Someone who booked directly is
+               more likely to book directly again than to switch to enquiring. -->
+          <button type="button" class="cl-btn" id="clBrDoneNew">${enquiryReference
+            ? 'New booking enquiry' : 'Book another directly'}</button>
         </div>
       </div>
     </div>`;
+  const again = !enquiryReference;
   $('clBrDoneList').addEventListener('click', () => {
-    clBookingEnquiry = null; clLoaded.delete('booking-request'); clGo('requests');
+    clBookingEnquiry = null; clBookingDirect = null;
+    clLoaded.delete('booking-request'); clGo('requests');
   });
   $('clBrDoneNew').addEventListener('click', () => {
-    clBookingEnquiry = null; clLoaded.delete('booking-request');
-    clGo('enquiry', () => clOpenEnquiryForm());
+    clBookingEnquiry = null; clBookingDirect = null;
+    clLoaded.delete('booking-request');
+    clGo('enquiry', () => clOpenEnquiryForm(again));
   });
 }

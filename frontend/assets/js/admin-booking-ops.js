@@ -123,11 +123,16 @@ const opsDash = v => (v === null || v === undefined || v === '' ? '—' : v);
    is a request the merchant made, and the desk reading a different clock from
    the person who filled the form in is how "09:30" becomes an evening flight.
    Normalised to two digits so a column of times lines up. */
+/* 12-hour, matching admTimeLabel (Bookings) and enqTime (Ticket Enquiries) —
+   this desk was the only one of the three still printing "19:45" for a merchant
+   who chose 7:45 PM. The wire format is unchanged 24-hour "HH:MM"; this reads
+   it, it does not write it. */
 function opsTime(hhmm) {
   if (!hhmm) return '—';
   const [h, m] = String(hhmm).split(':').map(Number);
   if (Number.isNaN(h)) return String(hhmm);
-  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+  return `${String(h % 12 === 0 ? 12 : h % 12).padStart(2, '0')}:${
+    String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
 /* ------------------------------------------------------------------ list */
@@ -387,7 +392,10 @@ function opsRenderWork() {
           <span class="ops-staff-note">as submitted by the merchant</span></h3>
         <div class="detail-grid">
           ${cell('Booking reference', escapeHtml(opsDash(r.booking_reference)))}
-          ${cell('Enquiry reference', escapeHtml(opsDash(d.enquiry_reference)))}
+          <!-- Load-bearing for this desk: a direct booking carries no
+               quotation, so it is this desk that names the fare at issuance. -->
+          ${cell('Enquiry reference', escapeHtml(
+            d.enquiry_reference || (d.direct_booking ? 'Direct booking — not quoted' : '—')))}
           ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
           ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
           ${cell('Submitted', escapeHtml(fmtDateTime(r.created_at)))}

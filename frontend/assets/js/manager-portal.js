@@ -550,7 +550,11 @@ function mgrRenderReview(data) {
         <div><dt>Merchant</dt><dd>${escapeHtml(r.merchant_name || '—')}</dd></div>
         <div><dt>Raised by</dt><dd>${escapeHtml(r.raised_by || '—')}</dd></div>
         <div><dt>Booking reference</dt><dd class="mg-ref">${escapeHtml(r.booking_reference || '—')}</dd></div>
-        <div><dt>From enquiry</dt><dd class="mg-ref">${escapeHtml(d.enquiry_reference || '—')}</dd></div>
+        <!-- A booking on this queue arrived one of two ways. A dash here would
+             read as missing data on a booking that never had an enquiry. -->
+        <div><dt>From enquiry</dt><dd class="mg-ref">${d.enquiry_reference
+          ? escapeHtml(d.enquiry_reference)
+          : (d.direct_booking ? 'Direct booking — not quoted' : '—')}</dd></div>
         <div><dt>Submitted</dt><dd>${escapeHtml(fmtDateTime(r.created_at))}</dd></div>
         <div><dt>Travellers</dt><dd>${(r.passengers || []).length}</dd></div>
       </dl>

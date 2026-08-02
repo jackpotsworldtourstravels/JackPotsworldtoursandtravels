@@ -67,7 +67,8 @@ function clInitRequests() {
         <button type="button" class="cl-btn" id="clReqRefresh">
           ${clIco('refresh', { size: 15 })} Refresh
         </button>
-        <button type="button" class="cl-btn cl-btn-primary" id="clReqNew">
+        <button type="button" class="cl-btn cl-btn-primary" id="clReqNew"
+          ${clActionAttrs('ticket.enquiry', CL_NO_ENQUIRY)}>
           ${clIco('plus', { size: 15 })} New Booking Enquiry
         </button>
       </div>
@@ -424,6 +425,38 @@ function clRenderRequestRows(failedStages = 0) {
       const r = clRequestRows.find(x => String(x.id) === b.dataset.clPay);
       if (r) clOpenPayModal(r);
     }));
+  body.querySelectorAll('[data-cl-continue]').forEach(b =>
+    b.addEventListener('click', () => clContinueBookingDraft(b.dataset.clContinue, b)));
+}
+
+/* Reopen a draft booking on the Booking Request screen.
+   The row only carries a summary, so the full booking is re-read first —
+   clResumeBookingDraft rebuilds the journey from its `details` and needs the
+   passengers, which the list response does not include. */
+async function clContinueBookingDraft(id, btn) {
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  try {
+    const detail = await MerchantApi.getRequest(id);
+    const booking = detail?.request || detail;
+    if (!booking || booking.status !== 'draft') {
+      /* Someone submitted it in another tab. Refuse rather than open an
+         editable form over a booking the API will no longer accept edits to. */
+      await clLoadRequests();
+      return clOpenModal('No longer a draft', `
+        <div class="cl-msg cl-msg-info" style="margin-top:0">
+          This booking has already been submitted. Open it with <b>View</b> to see where it is.
+        </div>`,
+        '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+    }
+    clResumeBookingDraft(booking);
+  } catch (err) {
+    clOpenModal('Could not open this draft',
+      `<div class="cl-msg cl-msg-err" style="margin-top:0">${
+        escapeHtml(clError(err, 'Please try again.'))}</div>`,
+      '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
 }
 
 /* The journey, as a route where there is one and as the title otherwise —
@@ -483,13 +516,25 @@ function clRequestRow(r) {
 function clRequestActions(r) {
   const out = [`<button type="button" class="cl-btn cl-btn-sm" data-cl-view="${r.id}">View</button>`];
   if (r.status === 'draft') {
-    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-submit="${r.id}">Submit</button>`);
+    /* Continue is BOOKINGS only, and only here. A draft's passengers can be
+       edited right up to submit, and until this existed the only way back into
+       one was Raise Booking on its enquiry — which a booking raised directly
+       does not have, so "Save as draft" on that path had no way back at all.
+       Other request types are raised from their own dialogs in one step and
+       never sit in draft, so there is nothing for them to continue. */
+    if (r.request_type === 'booking') {
+      out.push(`<button type="button" class="cl-btn cl-btn-sm" data-cl-continue="${r.id}"
+        ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Continue</button>`);
+    }
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-submit="${r.id}"
+      ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Submit</button>`);
   }
   if (r.status === 'payment_pending') {
     /* record_payment rejects amount <= 0 with a 400, so an unpriced row can only
        fail. Say so instead of offering a button that cannot work. */
     out.push(Number(r.total_amount) > 0
-      ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-pay="${r.id}">Pay</button>`
+      ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-pay="${r.id}"
+         ${clActionAttrs('payment.pay', CL_NO_PAY)}>Pay</button>`
       : `<span class="cl-tag">Awaiting amount</span>`);
   }
   /* Cancel is for BOOKINGS. A service request is not the raiser's to take back:
@@ -498,7 +543,8 @@ function clRequestActions(r) {
      this is the UI half of one rule. */
   const isServiceRequest = MERCHANT_SERVICE_REQUEST_TYPES.includes(r.request_type);
   if (!isServiceRequest && ['draft', 'pending_approval', 'approved', 'payment_pending'].includes(r.status)) {
-    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-cancel="${r.id}">Cancel</button>`);
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-cancel="${r.id}"
+      ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Cancel</button>`);
   }
   return out.join('');
 }
@@ -573,10 +619,12 @@ async function clOpenRequestDetail(id) {
 
     const foot = [];
     if (r.status === 'draft') {
-      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-submit="${r.id}">Submit for approval</button>`);
+      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-submit="${r.id}"
+        ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Submit for approval</button>`);
     }
     if (r.status === 'payment_pending' && Number(r.total_amount) > 0) {
-      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-pay="${r.id}">Record payment</button>`);
+      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-pay="${r.id}"
+        ${clActionAttrs('payment.pay', CL_NO_PAY)}>Record payment</button>`);
     }
     foot.push('<button type="button" class="cl-btn" data-cl-modal-close>Close</button>');
     $('clModalFoot').innerHTML = foot.join('');

@@ -176,14 +176,29 @@ CLASSIC_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
 _PAYMENT_STATUSES: frozenset[S] = frozenset({S.PAYMENT_PENDING, S.PAID})
 
 
-def is_classic_track(request: ServiceRequest) -> bool:
-    """Is this the Classic Tours enquiry-led workflow (CR-2)?
+#: The ``travel_details`` keys that put a booking on the Classic Tours track.
+#:
+#: Two ways in, one workflow:
+#:   ``enquiry_reference``  the booking came from an answered enquiry (CR-2).
+#:   ``direct_booking``     the merchant raised it straight from the booking
+#:                          form, with no enquiry and therefore no quotation.
+#:
+#: Named here rather than written as literals at each call site because
+#: ``manager_service`` has to express the same predicate as a SQL term against
+#: JSONB, and the two drifting apart would mean a queue that lists a booking the
+#: state machine will not let a Manager decide.
+CLASSIC_MARKER_KEYS: tuple[str, ...] = ("enquiry_reference", "direct_booking")
 
-    Decided from ``travel_details['enquiry_reference']``, which
-    ``enquiry_service`` writes on every booking it creates from an answered
-    enquiry. Read from there rather than by loading the parent row and checking
-    its type because this is called on every status read, and a parent lookup
-    would put a query behind :func:`allowed_transitions`.
+
+def is_classic_track(request: ServiceRequest) -> bool:
+    """Is this the Classic Tours workflow (CR-2)?
+
+    Decided from :data:`CLASSIC_MARKER_KEYS` in ``travel_details``, which
+    ``enquiry_service`` writes on every booking it creates. Read from there
+    rather than by loading the parent row and checking its type because this is
+    called on every status read, and a parent lookup would put a query behind
+    :func:`allowed_transitions` — and because a direct booking has no parent to
+    look up at all.
 
     **A booking that has already entered the payment workflow stays on the
     standard track, permanently.** CR-2 changed the rules for new bookings; it
@@ -192,11 +207,14 @@ def is_classic_track(request: ServiceRequest) -> bool:
     Payment Pending on the day this shipped would have been re-read as Classic,
     where that status has no outgoing edge at all — the merchant's money would
     have been owed against a booking nobody could move, in either direction.
-    Once payment is behind it, a booking finishes the way it started.
+    Once payment is behind it, a booking finishes the way it started. That
+    clause is why the marker is read as *evidence of how this row was raised*
+    and never as a switch anything toggles later.
     """
     if request.request_type is not RequestType.BOOKING:
         return False
-    if not (request.travel_details or {}).get("enquiry_reference"):
+    details = request.travel_details or {}
+    if not any(details.get(k) for k in CLASSIC_MARKER_KEYS):
         return False
     if request.status in _PAYMENT_STATUSES:
         return False
