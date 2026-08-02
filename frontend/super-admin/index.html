@@ -11,8 +11,10 @@
 <!-- Reuses the Partner Portal's design system (navy/gold, cards, tables,
      modals) so the Super Admin Portal matches the project's established
      premium-enterprise language rather than inventing a new one. -->
-<link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260725f">
-<link rel="stylesheet" href="../assets/css/super-admin.css?v=20260731cr2">
+<link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260802ui13">
+<link rel="stylesheet" href="../assets/css/super-admin.css?v=20260802ui13">
+<!-- Shared design system — must stay last, see admin/index.html for why. -->
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260802ui13">
 </head>
 <body>
 
@@ -56,7 +58,6 @@
       <div class="msg" id="saAuthStep2Msg"></div>
     </div>
 
-    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
   </div>
 </div>
 
@@ -80,22 +81,18 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="nav-label">Admin Management</span>
     </a>
-    <a href="#" class="nav-item" data-section="roles">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 4 8.5 9 10 5-1.5 9-5 9-10V6l-9-4Z"/><path d="m9 12 2 2 4-4"/></svg>
-      <span class="nav-label">Role &amp; Permissions</span>
-    </a>
-    <a href="#" class="nav-item" data-section="reports">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
-      <span class="nav-label">Global Reports</span>
-    </a>
-    <a href="#" class="nav-item" data-section="audit">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-      <span class="nav-label">Audit Logs</span>
-    </a>
-    <a href="#" class="nav-item" data-section="settings">
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
-      <span class="nav-label">System Configuration</span>
-    </a>
+    <!-- REMOVED FROM THIS RAIL, AND EACH FOR A DIFFERENT REASON:
+         · Role & Permissions  — module removed outright (markup and JS gone).
+         · System Configuration — module removed outright.
+         · Audit Logs           — MOVED to the Admin Portal, alongside the new
+                                  System Logs. Not deleted, relocated.
+         · Global Reports       — HIDDEN only. `#section-reports` and
+                                  super-admin-reports.js are untouched and
+                                  /api/super-admin/reports/* still serves them,
+                                  exactly as asked. saGo('reports') would still
+                                  render it; there is simply no way in from the
+                                  rail. Do not delete the section thinking it
+                                  is dead. -->
     <a href="#" class="nav-item" data-section="profile">
       <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
       <span class="nav-label">Profile &amp; Security</span>
@@ -118,11 +115,11 @@
 
     <!-- ============== Dashboard ============== -->
     <section class="section active" id="section-dashboard">
+      <!-- Two cards, heading and value, and nothing else. The Recent System
+           Activity panel was removed with them; the endpoint still returns
+           `recent_activity` and the Admin Portal's Audit Logs is now where
+           that history is read. -->
       <div class="stat-grid" id="saDashboardStatGrid"></div>
-      <div class="panel">
-        <div class="panel-head"><h2>Recent System Activity</h2></div>
-        <div id="saDashboardActivity" class="empty-state">Loading…</div>
-      </div>
     </section>
 
     <!-- ============== Admin Management ============== -->
@@ -130,17 +127,15 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Admin Management</h2>
-          <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Staff Account</button>
+          <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Admin</button>
         </div>
+        <!-- The All-roles / All-status selects were removed on request. Search
+             stays. `saAdminRoleFilter` is gone from the DOM, so the JS reads it
+             defensively and simply sends no `role` parameter — the endpoint
+             treats that as "every role", which is the same result the default
+             option produced. -->
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="saAdminSearch" placeholder="Search name or email…">
-          <!-- Managers are staff accounts this screen owns too (CR-2), so the
-               list carries both and this narrows it. -->
-          <select id="saAdminRoleFilter" class="status-select" aria-label="Role">
-            <option value="">All roles</option>
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-          </select>
         </div>
         <div class="table-wrap"><table id="saAdminsTable"><thead><tr>
           <th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th><th>Actions</th>
@@ -149,28 +144,10 @@
       </div>
     </section>
 
-    <!-- ============== Role & Permission Management ============== -->
-    <section class="section" id="section-roles">
-      <div class="panel">
-        <div class="panel-head"><h2>Role Permission Matrix</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Fixed by design — role responsibilities (e.g. Super Admin cannot hold ticket permissions) are not
-          reassignable here. This is visibility into the matrix, not an editor for it.
-        </p>
-        <div class="table-wrap"><table id="saMatrixTable"><thead><tr><th>Permission</th><th>Super Admin</th><th>Admin</th><th>Manager</th><th>Merchant Admin</th><th>Merchant User</th></tr></thead><tbody></tbody></table></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><h2>Per-Admin Extra Grants</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Give one specific Admin an extra capability beyond their role default. Additive only — this cannot
-          revoke a role-default permission.
-        </p>
-        <div class="filter-bar" style="margin-bottom:14px;">
-          <select id="saPermAdminPicker" class="status-select"><option value="">Select an admin…</option></select>
-        </div>
-        <div id="saPermEditorBody"></div>
-      </div>
-    </section>
+    <!-- Role & Permissions module removed on request. The permission
+         matrix itself still exists server-side in app/auth/rbac.py and is
+         still enforced on every endpoint; only this read-only viewer and
+         its per-admin extra-grants editor are gone. -->
 
     <!-- ============== Global Reports & Analytics ============== -->
     <section class="section" id="section-reports">
@@ -200,68 +177,43 @@
       </div>
     </section>
 
-    <!-- ============== Audit Logs ============== -->
-    <section class="section" id="section-audit">
-      <div class="panel">
-        <div class="panel-head"><h2>Audit Logs</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Row-level change history, written directly by a database trigger on users, merchants,
-          service requests and payments — the API only reads it. The trigger records <em>what</em>
-          changed, not <em>who</em> changed it, so &ldquo;Changed By&rdquo; reads
-          &ldquo;Not recorded&rdquo;; for the acting user, see Recent System Activity on the Dashboard.
-        </p>
-        <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="saAuditTableFilter" class="status-select"><option value="">All tables</option></select>
-          <select id="saAuditOpFilter" class="status-select">
-            <option value="">All operations</option>
-            <option value="INSERT">Insert</option>
-            <option value="UPDATE">Update</option>
-            <option value="DELETE">Delete</option>
-          </select>
-          <input type="date" id="saAuditDateFrom" title="From date">
-          <input type="date" id="saAuditDateTo" title="To date">
-        </div>
-        <div class="table-wrap"><table id="saAuditTable"><thead><tr>
-          <th>When</th><th>Table</th><th>Record</th><th>Operation</th><th>Changed By</th><th></th>
-        </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="saAuditPagination"></div>
-      </div>
-    </section>
+    <!-- Audit Logs moved to the Admin Portal (with System Logs beside it).
+         The endpoints are unchanged and still live under /api/super-admin/*. -->
 
-    <!-- ============== System Configuration ============== -->
-    <section class="section" id="section-settings">
-      <div class="panel">
-        <div class="panel-head"><h2>System Configuration</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Read-only. Configuration lives in the backend's environment file, not a database table — no
-          secrets (SMTP credentials, signing keys, database URL) are ever returned here.
-        </p>
-        <div id="saSettingsBody" class="empty-state">Loading…</div>
-      </div>
-    </section>
+    <!-- System Configuration module removed on request. -->
 
     <!-- ============== Profile & Security ============== -->
+    <!-- Both panels used to carry an inline `max-width:520px`, which stranded
+         them in a narrow column against a wide viewport and left the rest of
+         the content area empty — the exact layout problem this release is
+         fixing. They now sit side by side and collapse to one column on a
+         tablet. Inline caps removed rather than overridden, because an inline
+         style beats any stylesheet and would have silently won. -->
     <section class="section" id="section-profile">
-      <div class="panel" style="max-width:520px;">
-        <h2 style="margin-bottom:16px;">My Profile</h2>
-        <div class="sa-profile-photo-row">
-          <span class="sa-profile-photo" id="saProfilePhoto">S</span>
+      <div class="sa-profile-layout">
+        <div class="panel">
+          <h2 style="margin-bottom:16px;">My Profile</h2>
+          <div class="sa-profile-photo-row">
+            <span class="sa-profile-photo" id="saProfilePhoto">S</span>
+          </div>
+          <div class="info-grid" style="margin-top:16px;">
+            <div class="info-item"><label>Full Name</label><div id="saProfileName">—</div></div>
+            <div class="info-item"><label>Email</label><div id="saProfileEmail">—</div></div>
+            <div class="info-item"><label>Phone</label><div id="saProfilePhone">—</div></div>
+            <div class="info-item"><label>Role</label><div>Super Administrator</div></div>
+            <div class="info-item"><label>Last Login</label><div id="saProfileLastLogin">—</div></div>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-navy" id="saEditProfileBtn">Edit Profile</button>
+            <button type="button" class="btn btn-ghost" id="saChangePasswordBtn">Change Password</button>
+          </div>
         </div>
-        <div class="info-grid" style="margin-top:16px;">
-          <div class="info-item"><label>Full Name</label><div id="saProfileName">—</div></div>
-          <div class="info-item"><label>Email</label><div id="saProfileEmail">—</div></div>
-          <div class="info-item"><label>Phone</label><div id="saProfilePhone">—</div></div>
-          <div class="info-item"><label>Role</label><div>Super Administrator</div></div>
-          <div class="info-item"><label>Last Login</label><div id="saProfileLastLogin">—</div></div>
+        <div class="panel">
+          <h2 style="margin-bottom:16px;">Security — Recent Sign-Ins</h2>
+          <!-- Seven rows a page, older ones paged in. -->
+          <div class="table-wrap"><table id="saSecurityTable"><thead><tr><th>When</th><th>Action</th><th>IP</th><th>Browser</th></tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="saSecurityPagination"></div>
         </div>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-          <button type="button" class="btn btn-navy" id="saEditProfileBtn">Edit Profile</button>
-          <button type="button" class="btn btn-ghost" id="saChangePasswordBtn">Change Password</button>
-        </div>
-      </div>
-      <div class="panel" style="max-width:520px;">
-        <h2 style="margin-bottom:16px;">Security — Recent Sign-Ins</h2>
-        <div class="table-wrap"><table id="saSecurityTable"><thead><tr><th>When</th><th>Action</th><th>IP</th><th>Browser</th></tr></thead><tbody></tbody></table></div>
       </div>
     </section>
   </main>
@@ -270,15 +222,18 @@
 <!-- ============== Add Admin modal ============== -->
 <div class="modal-overlay" id="saAddAdminModalOverlay">
   <div class="modal-card">
-    <h2>Add Staff Account</h2>
+    <h2>Add Admin</h2>
     <form id="saAddAdminForm">
-      <div class="form-field" style="max-width:none;"><label for="saAddRole">Role</label>
-        <select name="role" id="saAddRole" required>
-          <option value="admin">Admin — merchants, enquiries, payments, ticketing</option>
-          <option value="manager">Manager — approves submitted booking requests</option>
-        </select>
-      </div>
-      <div class="sa-pw-hint" id="saAddRoleHint"></div>
+      <!-- THE ROLE PICKER IS GONE, NOT DEFAULTED. Manager was removed from
+           creation on request, which leaves Admin as the only choice, and a
+           <select> with one option is a control that cannot be used. It is a
+           hidden input rather than a deletion so `form.role.value` — which the
+           submit handler and saShowCredentials both read — still resolves.
+           The EDIT modal below deliberately KEEPS both roles: existing Manager
+           accounts have to stay editable, and a picker that omitted their own
+           role would show "Admin" pre-selected and silently promote them on
+           the next save. -->
+      <input type="hidden" name="role" id="saAddRole" value="admin">
       <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
       <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
       <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone" placeholder="Optional"></div>
@@ -299,6 +254,7 @@
     <h2>Edit Staff Account</h2>
     <form id="saEditAdminForm">
       <input type="hidden" name="admin_id">
+      <!-- Manager is retained HERE only — see the note in the Add modal. -->
       <div class="form-field" style="max-width:none;"><label for="saEditRole">Role</label>
         <select name="role" id="saEditRole">
           <option value="admin">Admin</option>
@@ -368,14 +324,6 @@
 </div>
 
 <!-- ============== Audit entry detail modal ============== -->
-<div class="modal-overlay" id="saAuditDetailModalOverlay">
-  <div class="modal-card modal-lg">
-    <h2 id="saAuditDetailTitle">Audit Entry</h2>
-    <div id="saAuditDetailBody"></div>
-    <div class="modal-actions">
-      <button type="button" class="btn btn-ghost" id="saAuditDetailCloseBtn">Close</button>
-    </div>
-  </div>
 </div>
 
 <!-- ============== Sign Out confirmation ============== -->
@@ -391,21 +339,18 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260801m6"></script>
-<script src="../components/toast.js"></script>
-<script src="../components/spinner.js"></script>
-<script src="../components/confirm-dialog.js"></script>
-<script src="../assets/js/auth.js?v=20260730a"></script>
+<script src="../shared/formatters.js?v=20260802ui13"></script>
+<script src="../components/toast.js?v=20260802ui13"></script>
+<script src="../components/spinner.js?v=20260802ui13"></script>
+<script src="../components/confirm-dialog.js?v=20260802ui13"></script>
+<script src="../assets/js/auth.js?v=20260802ui13"></script>
 <script src="../assets/js/api.js"></script>
-<script src="../assets/js/super-admin-shared.js?v=2"></script>
-<script src="../assets/js/super-admin-auth.js?v=1"></script>
-<script src="../assets/js/super-admin-dashboard.js?v=2"></script>
-<script src="../assets/js/super-admin-admin-management.js?v=20260731cr2"></script>
-<script src="../assets/js/super-admin-permissions.js?v=20260731cr2"></script>
-<script src="../assets/js/super-admin-reports.js?v=20260801m6"></script>
-<script src="../assets/js/super-admin-audit.js?v=1"></script>
-<script src="../assets/js/super-admin-settings.js?v=1"></script>
-<script src="../assets/js/super-admin-profile.js?v=2"></script>
+<script src="../assets/js/super-admin-shared.js?v=20260802ui13"></script>
+<script src="../assets/js/super-admin-auth.js?v=20260802ui13"></script>
+<script src="../assets/js/super-admin-dashboard.js?v=20260802ui13"></script>
+<script src="../assets/js/super-admin-admin-management.js?v=20260802ui13"></script>
+<script src="../assets/js/super-admin-reports.js?v=20260802ui13"></script>
+<script src="../assets/js/super-admin-profile.js?v=20260802ui13"></script>
 <script>
   'use strict';
   if (isSuperAdminLoggedIn()) { showSuperAdminPortal(); } else { showSuperAdminAuthShell(); }

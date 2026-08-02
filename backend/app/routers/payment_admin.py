@@ -39,11 +39,14 @@ from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require
 from app.database.session import get_db
-from app.models_v2 import PaymentAccountType, User
+from app.models_v2 import PaymentAccountType, User, WalletTopupMethod
 from app.schemas.payment_admin import (
+    CancelPaymentRequest,
     CreatePaymentAccount,
     MerchantLedgerPage,
+    MerchantManagerOut,
     PaymentAccountAdminOut,
+    RaisePaymentRequest,
     ReconciliationReport,
     RejectTopupRequest,
     TopupDecisionResult,
@@ -101,6 +104,7 @@ def _queue_row(db: Session, topup, merchant_name: str | None = None) -> TopupQue
         wallet_txn_number=topup_service.txn_number_for(db, topup),
         merchant_id=topup.merchant_id,
         merchant_name=merchant_name,
+        **topup_service.request_fields(db, topup),
     )
 
 
@@ -250,10 +254,15 @@ def retire_account(
     ),
 )
 def queue_counts(
+    initiated: str | None = Query(
+        default=None,
+        description="'admin' for desk-raised requests, 'merchant' for the merchant's own "
+                    "top-ups. Omitted, both — which is what every pre-0041 caller sees.",
+    ),
     db: Session = Depends(get_db),
     _: User = Depends(require(P.PAYMENT_VERIFY)),
 ):
-    return payment_admin_service.queue_counts(db)
+    return payment_admin_service.queue_counts(db, initiated=initiated)
 
 
 @router.get(
@@ -271,6 +280,11 @@ def list_queue(
     bucket: str = Query("pending"),
     merchant_id: int | None = Query(default=None),
     search: str | None = Query(default=None),
+    initiated: str | None = Query(
+        default=None,
+        description="'admin' for desk-raised requests (Payment Management), 'merchant' for "
+                    "the merchant's own top-ups. Omitted, both — the pre-0041 behaviour.",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -278,7 +292,7 @@ def list_queue(
 ):
     items, total = payment_admin_service.list_queue(
         db, bucket=bucket, merchant_id=merchant_id, search=search,
-        page=page, page_size=page_size,
+        initiated=initiated, page=page, page_size=page_size,
     )
     return TopupQueuePage(
         items=[_queue_row(db, topup, name) for topup, name in items],
@@ -386,6 +400,89 @@ def reject_topup(
         db, current_user, topup_id, remarks=payload.remarks,
     )
     return TopupDecisionResult(topup=_queue_row(db, topup))
+
+
+# ---------------------------------------------------------------------------
+# Requests the desk raises (migration 0041)
+# ---------------------------------------------------------------------------
+@router.get(
+    "/merchants/{merchant_id}/managers",
+    response_model=list[MerchantManagerOut],
+    summary="The managers a payment request may be addressed to",
+    description=(
+        "Requires `payment.manage`. One merchant's **own** managers — users whose "
+        "`merchant_role` is manager and whose account is active. Not `UserRole.MANAGER`, "
+        "which is platform staff: the person who settles a merchant's bill works for that "
+        "merchant. Inactive accounts are excluded, because a request addressed to someone "
+        "who cannot sign in is a request nobody can settle."
+    ),
+)
+def list_merchant_managers(
+    merchant_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require(P.PAYMENT_MANAGE)),
+):
+    return [
+        MerchantManagerOut(
+            user_id=u.user_id, full_name=u.full_name, email=u.email, phone=u.phone,
+        )
+        for u in payment_admin_service.merchant_managers(db, merchant_id)
+    ]
+
+
+@router.post(
+    "/wallet/payment-requests",
+    response_model=TopupQueueRow,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ask a merchant's manager to pay — credits nothing",
+    description=(
+        "Requires `payment.manage`. The desk names the company, the manager, the amount and "
+        "how to pay: **bank transfer** (bank name, account number, IFSC, branch), **cash** "
+        "(token details, unique note number) or **crypto** (wallet address, network — TRC20, "
+        "ERC20 or BEP20).\n\n"
+        "The request is created `awaiting_payment`, which is **not** a status the verification "
+        "endpoints will act on. There is therefore no route from raising a request to a wallet "
+        "credit that does not pass through the manager paying and the desk approving — that is "
+        "enforced by the status machine, not by convention."
+    ),
+)
+def raise_payment_request(
+    payload: RaisePaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.PAYMENT_MANAGE)),
+):
+    topup = payment_admin_service.raise_request(
+        db, current_user,
+        merchant_id=payload.merchant_id,
+        manager_id=payload.manager_id,
+        amount=payload.amount,
+        method=WalletTopupMethod(payload.method),
+        instructions=payload.instructions,
+        note=payload.note,
+    )
+    return _queue_row(db, topup)
+
+
+@router.post(
+    "/wallet/payment-requests/{topup_id}/cancel",
+    response_model=TopupQueueRow,
+    summary="Withdraw a request the merchant has not paid yet",
+    description=(
+        "Requires `payment.manage`. Only from `awaiting_payment` — once a manager has paid, "
+        "the money is real and the only honest outcomes are approve or reject. **Remarks are "
+        "mandatory**: the merchant sees them."
+    ),
+)
+def cancel_payment_request(
+    topup_id: int,
+    payload: CancelPaymentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.PAYMENT_MANAGE)),
+):
+    topup = payment_admin_service.cancel_request(
+        db, current_user, topup_id, remarks=payload.remarks,
+    )
+    return _queue_row(db, topup)
 
 
 # ---------------------------------------------------------------------------

@@ -321,6 +321,37 @@ const MerchantApi = {
     return URL.createObjectURL(blob);
   },
 
+  /* ---------------------------------------------- payment requests (0041) */
+
+  /* Requests the payments desk raised against this merchant. The opposite
+     direction to submitTopup above: there, the merchant volunteers that it has
+     paid; here, the desk asks and names the manager who must settle it.
+     Buckets: requests (raised, unpaid), pending (paid, with the desk),
+     approved, rejected, all. */
+  paymentRequests({ bucket = 'all', page = 1, pageSize = 20 } = {}) {
+    return this._req('get', '/api/merchant/payment-requests', {
+      params: { bucket, page, page_size: pageSize },
+    });
+  },
+
+  paymentRequestCounts() {
+    return this._req('get', '/api/merchant/payment-requests/counts');
+  },
+
+  /* Multipart for the same reason submitTopup is, and with the same guarantee:
+     **settling credits nothing.** It attaches the proof and hands the request
+     to the desk; the wallet moves when an admin approves it. Resubmitting a
+     rejected request is this same call. */
+  settlePaymentRequest(topupId, { utr, proof } = {}) {
+    const form = new FormData();
+    if (utr) form.append('utr', utr);
+    if (proof) form.append('proof', proof);
+    return axios.post(
+      `${API_BASE}/api/merchant/payment-requests/${topupId}/settle`,
+      form, { headers: partnerAuthHeaders() },
+    ).then(r => r.data);
+  },
+
   /* ------------------------------------------------------------ approvals */
 
   /* CR-3. The merchant signs off the booking requests its own staff raised,

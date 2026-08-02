@@ -57,11 +57,15 @@ async function clInitDashboard() {
   const name = (localStorage.getItem(PARTNER_KEYS.fullName) || '').split(' ')[0];
 
   root.innerHTML = `
-    <div class="cl-page-head">
-      <div>
-        <h1>${name ? `Good ${clPartOfDay()}, ${escapeHtml(name)}` : 'Dashboard'}</h1>
-        <p>Where your bookings, enquiries and money stand today. Every figure below opens
-           the rows behind it.</p>
+    <!-- THE GREETING IS THE PAGE TITLE NOW. "Dashboard" was a heading that
+         told the merchant where they already knew they were; the greeting plus
+         the current date and time is the only thing on this screen that is not
+         a figure. The standing description below it went with it, along with
+         the rule under the heading. -->
+    <div class="cl-page-head cl-page-head-plain">
+      <div class="jp-greet">
+        <b>${name ? `Good ${clPartOfDay()}, ${escapeHtml(name)} 👋` : 'Welcome back 👋'}</b>
+        <span id="clDashClock">—</span>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clDashRefresh">
@@ -74,22 +78,44 @@ async function clInitDashboard() {
     <div id="clDashCharts"></div>`;
 
   $('clDashRefresh').addEventListener('click', () => { clLoaded.add('dashboard'); clInitDashboard(); });
+  clStartDashClock();
 
   await clLoadDashboard();
 }
 
 function clPartOfDay() {
   const h = new Date().getHours();
-  return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  return h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
 }
 
-/* The shape of the answer, while the answer is on its way. Five boxes, not a
-   spinner, so the page does not grow by 400px when the data lands — and the
-   same five-up class the real band uses, so it does not reflow either. */
+/* Date and time under the greeting, ticking each minute.
+   ONE INTERVAL FOR THE LIFE OF THE PAGE, not one per visit to the Dashboard.
+   `clInitDashboard` re-renders this markup every time the screen is re-entered
+   or Refresh is pressed, so starting a fresh interval here without clearing the
+   last one would leave a growing pile of timers all writing to an element that
+   no longer exists. The handle is module-scoped and cleared first. */
+let clDashClockTimer = null;
+function clStartDashClock() {
+  const paint = () => {
+    const el = $('clDashClock');
+    if (!el) { clearInterval(clDashClockTimer); clDashClockTimer = null; return; }
+    const now = new Date();
+    el.textContent = `${now.toLocaleDateString('en-IN', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    })} · ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+  };
+  clearInterval(clDashClockTimer);
+  paint();
+  clDashClockTimer = setInterval(paint, 30000);
+}
+
+/* The shape of the answer, while the answer is on its way. Eight boxes, not a
+   spinner, so the page does not grow when the data lands — and the same
+   eight-up class the real band uses, so it does not reflow either. Each box is
+   a label and a value only, matching the cards it stands in for. */
 function clDashSkeletonKpis() {
-  return `<div class="cl-kpis cl-kpis-5">${'<div class="cl-kpi"><span class="cl-skel cl-skel-line w40"></span>'
-    + '<span class="cl-skel cl-skel-line w80" style="height:26px"></span>'
-    + '<span class="cl-skel cl-skel-line w60"></span></div>'.repeat(5)}</div>`;
+  return `<div class="cl-kpis cl-kpis-8">${'<div class="cl-kpi"><span class="cl-skel cl-skel-line w40"></span>'
+    + '<span class="cl-skel cl-skel-line w80" style="height:26px"></span></div>'.repeat(8)}</div>`;
 }
 
 /* ---------------------------------------------------------------- loading */
@@ -192,56 +218,93 @@ function clRenderDashKpis(position, enq, analytics, changes) {
   const inProgress = ['draft', 'pending_approval', 'in_review', 'approved', 'payment_pending', 'paid']
     .reduce((n, k) => n + (byStatus.get(k) || 0), 0);
 
-  /* FIVE, and the count is load-bearing: `.cl-kpis-5` lays them out three then
-     two so the band never ends in a half-empty row. Adding a sixth here means
-     revisiting that class. */
+  /* Completed tickets: issued, plus the ones that have since travelled. A
+     booking does not stop having had a ticket because the trip is over, so
+     counting `ticket_issued` alone would make the figure fall over time. */
+  const completedTickets = (byStatus.get('ticket_issued') || 0) + (byStatus.get('completed') || 0);
+
+  /* Date changes, from the change-request analytics' own by_type breakdown
+     rather than counted here — `changes.totals` is every type added up.
+
+     THE KEY IS `type`, NOT `request_type`. /api/analytics/change-requests
+     returns `{type, label, total, approved, rejected, pending}` per row —
+     `request_type` is what the SERVICE REQUEST rows use, and reading it here
+     matched nothing and rendered a confident 0 against a real 152. Found by
+     driving the screen and printing the payload, not by reading the code. */
+  const dateChanges = (changes?.by_type || [])
+    .filter(r => r.type === 'date_change')
+    .reduce((n, r) => n + (r.total || 0), 0);
+
+  /* EIGHT, AND THE COUNT IS LOAD-BEARING: `.cl-kpis-8` is a four-column grid,
+     so eight tiles are exactly two full rows at desktop and two per row on a
+     tablet. It was five (3 + 2) before Completed Tickets, Date Changes and
+     Total Savings were added. Adding a ninth means revisiting that class, or
+     the band ends in a row with three empty cells.
+
+     EVERY TILE IS A LABEL AND A VALUE. The `sub` line each one carried is gone
+     by request — `clKpiCard` no longer renders one at all. */
   const tiles = [
     {
       label: 'Wallet balance', icon: 'wallet', tone: 'accent',
       value: position ? moneyStr(position.wallet_balance) : '—',
-      sub: position ? 'Available on your account' : 'Balance unavailable',
       to: 'wallet',
     },
     {
       label: 'Booking enquiries', icon: 'plane', tone: 'info',
       value: enq ? enq.total : '—',
-      sub: enq ? `${enq.awaiting} awaiting a fare from us` : 'Enquiries unavailable',
       to: 'enquiry',
     },
     {
       label: 'Booking requests', icon: 'file', tone: '',
       value: analytics ? analytics.totals.bookings : '—',
-      sub: analytics ? 'Raised to date' : 'Bookings unavailable',
       to: 'requests',
     },
     {
       label: 'Requests in progress', icon: 'activity', tone: 'warn',
       value: analytics ? inProgress : '—',
-      sub: 'Not yet ticketed or closed',
       to: 'requests',
+    },
+    {
+      label: 'Completed tickets', icon: 'check', tone: 'ok',
+      value: analytics ? completedTickets : '—',
+      to: 'booking-history',
+    },
+    {
+      label: 'Date changes', icon: 'calendar', tone: '',
+      value: changes ? dateChanges : '—',
+      to: 'service-request',
     },
     {
       label: 'Service requests', icon: 'swap', tone: '',
       value: changes ? changes.totals.requests : '—',
-      sub: changes
-        ? `${changes.totals.pending} awaiting a decision`
-        : 'Changes to issued bookings',
       to: 'service-request',
+    },
+    {
+      /* 0040. `totals.saved` is SUM(GREATEST(client_fare - total_amount, 0))
+         computed in Postgres — never derived in the browser, which would only
+         ever see one page of bookings. A merchant that has never entered a
+         client fare sees ₹0.00, which is correct: they have recorded no
+         savings, and the tile says so rather than hiding. */
+      label: 'Total savings', icon: 'wallet', tone: 'ok',
+      value: analytics ? moneyStr(analytics.totals.saved ?? 0) : '—',
+      to: 'reports',
     },
   ];
 
-  $('clDashKpis').innerHTML = `<div class="cl-kpis cl-kpis-5">${tiles.map(clKpiCard).join('')}</div>`;
+  $('clDashKpis').innerHTML = `<div class="cl-kpis cl-kpis-8">${tiles.map(clKpiCard).join('')}</div>`;
   clBindKpiNav($('clDashKpis'));
 }
 
 /* A KPI as a button. A tile with nowhere to go renders as a <div>, so a
    keyboard user never tabs onto a figure that does nothing. */
-function clKpiCard({ label, value, sub, icon, tone, to, filter }) {
+function clKpiCard({ label, value, icon, tone, to, filter }) {
+  /* Heading and value. The `.cl-kpi-sub` line these cards used to carry is
+     gone portal-wide by request — it is not rendered empty and then hidden,
+     it is not rendered. Callers may still pass a `sub`; it is ignored. */
   const inner = `
     ${icon ? `<div class="cl-kpi-head"><span class="cl-kpi-ico ${tone || ''}">${clIco(icon)}</span></div>` : ''}
     <div class="cl-kpi-label">${escapeHtml(label)}</div>
     <div class="cl-kpi-value">${escapeHtml(String(value ?? '—'))}</div>
-    <div class="cl-kpi-sub">${escapeHtml(sub || '')}</div>
     ${to ? `<span class="cl-kpi-arrow">${clIco('arrowRight', { size: 16 })}</span>` : ''}`;
   return to
     ? `<button type="button" class="cl-kpi" data-cl-kpi-to="${escapeHtml(to)}"

@@ -546,16 +546,20 @@ async function clOpenRequestDetail(id) {
 
       ${clDetailFacts(d)}
 
+      <!-- ONE PASSENGER, ONE LINE. Every cell is nowrap and the wrapper
+           scrolls horizontally, so a long name or a passport number can no
+           longer push a traveller onto a second visual row — which made three
+           passengers look like six at narrow widths. -->
       <h3 class="cl-form-legend">Passengers (${passengers.length})</h3>
       <div class="cl-table-wrap"><table class="cl-table">
         <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Passport</th><th>Seat</th><th>Meal</th></tr></thead>
         <tbody>${passengers.length ? passengers.map((p, i) => `<tr>
           <td>${i + 1}</td>
-          <td>${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || '—')}</td>
-          <td>${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
-          <td class="cl-ref">${escapeHtml(p.passport_number || '—')}</td>
-          <td>${escapeHtml(clLabel(p.seat_preference) || '—')}</td>
-          <td>${escapeHtml(clLabel(p.meal_preference) || '—')}</td>
+          <td class="cl-nowrap">${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || '—')}</td>
+          <td class="cl-nowrap">${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
+          <td class="cl-ref cl-nowrap">${escapeHtml(p.passport_number || '—')}</td>
+          <td class="cl-nowrap">${escapeHtml(clLabel(p.seat_preference) || '—')}</td>
+          <td class="cl-nowrap">${escapeHtml(clLabel(p.meal_preference) || '—')}</td>
         </tr>`).join('') : clEmptyRow(6, 'No passengers recorded.')}</tbody>
       </table></div>
 

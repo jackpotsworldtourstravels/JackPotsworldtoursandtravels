@@ -318,6 +318,13 @@ class RequestResponse(BaseModel):
 
     quantity: int
     total_amount: Decimal
+    #: 0040 — what the merchant sold this at to its own customer, and the margin
+    #: that implies against ``total_amount``. Both default to None, so a booking
+    #: made before client fares existed serialises exactly as it did before and
+    #: no client has to know about them. ``saved_amount`` is derived on the
+    #: model (``ServiceRequest.saved_amount``) and is never accepted as input.
+    client_fare: Decimal | None = None
+    saved_amount: Decimal | None = None
     travel_date: datetime.date | None = None
     return_date: datetime.date | None = None
 
@@ -366,6 +373,8 @@ class RequestResponse(BaseModel):
             pricing=r.pricing or {},
             quantity=r.quantity,
             total_amount=r.total_amount,
+            client_fare=r.client_fare,
+            saved_amount=r.saved_amount,
             travel_date=r.travel_date,
             return_date=r.return_date,
             passengers=[PassengerResponse.of(p) for p in r.passengers]

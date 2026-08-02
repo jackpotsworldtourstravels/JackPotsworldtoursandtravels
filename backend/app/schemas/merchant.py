@@ -26,12 +26,25 @@ class MerchantResponse(BaseModel):
     address: str | None = None
     status: MerchantStatus
     user_count: int = 0
+    # Per-merchant rollups for the Admin Merchant Management table. Both DEFAULT
+    # TO ZERO and are only populated by the list endpoint, which computes them
+    # in two grouped queries. Every other producer of this schema (create,
+    # detail, approve, status-change) omits them and still validates — that is
+    # what keeps this addition backward compatible for existing callers.
+    tickets_issued: int = 0
+    awaiting_verification: int = 0
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
 
     @classmethod
-    def of(cls, merchant, user_count: int | None = None) -> "MerchantResponse":
+    def of(
+        cls,
+        merchant,
+        user_count: int | None = None,
+        tickets_issued: int = 0,
+        awaiting_verification: int = 0,
+    ) -> "MerchantResponse":
         return cls(
             id=merchant.merchant_id,
             merchant_code=merchant.merchant_code,
@@ -50,6 +63,8 @@ class MerchantResponse(BaseModel):
             address=merchant.address,
             status=merchant.status,
             user_count=user_count if user_count is not None else len(merchant.users),
+            tickets_issued=tickets_issued,
+            awaiting_verification=awaiting_verification,
             created_at=merchant.created_at,
         )
 

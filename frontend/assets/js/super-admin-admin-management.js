@@ -82,7 +82,7 @@ async function loadSaAdmins(page = saAdminsPage) {
     tbody.innerHTML = data.items.map(saAdminRow).join('')
       || `<tr><td colspan="7" class="empty-state">${saAdminsSearch || saAdminsRole
             ? 'No staff accounts match that filter.'
-            : 'No staff accounts yet — click “+ Add Staff Account” to create one.'}</td></tr>`;
+            : 'No staff accounts yet — click “+ Add Admin” to create one.'}</td></tr>`;
 
     saRenderPagination('saAdminsPagination', data.page, data.total_pages, data.total, loadSaAdmins);
     saWireAdminRowActions(tbody);

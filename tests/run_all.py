@@ -53,6 +53,10 @@ SUITE = [
     ("verify_cr4c.py", "CR-4c: merchant wallet screen, ledger, top-ups, payment accounts, proofs"),
     ("verify_m5.py", "M5: email + in-app delivery, opt-out, msg_logs status, failure surfacing"),
     ("verify_cr4d.py", "CR-4d: payment accounts, top-up verification, wallet credit, reconciliation"),
+    # Immediately after CR-4d: it reuses that desk's approve/reject endpoints
+    # for the other direction (0041), so a failure there explains a failure here.
+    ("verify_payment_requests.py",
+     "Payment requests: admin-initiated bank/cash/crypto, settlement, approval credits once"),
     # Last of the money-and-workflow scripts: M6 re-derives their figures from
     # its own SQL, so it is only meaningful once they are known good.
     ("verify_m6.py", "M6: analytics against direct SQL, export/summary parity, ops metrics, scope"),

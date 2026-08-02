@@ -273,6 +273,20 @@ async function openEnquiryReview(enquiryId) {
       ${enqDetailRow('Travel class', escapeHtml(r.travel_class || '—'))}
       ${enqDetailRow('Passengers', `${r.passenger_count} — ${escapeHtml(enqPaxSummary(r))}`)}
       ${r.booking_request_number ? enqDetailRow('Booking raised', `<span class="mono">${escapeHtml(r.booking_request_number)}</span>`) : ''}
+      ${/* 0040 — what the merchant has already quoted its OWN customer. Shown
+            to the desk BEFORE it prices this enquiry, which is the whole point:
+            a quotation above the client fare wipes out the merchant's margin,
+            and the desk could not previously see that it was about to.
+            Rendered only when recorded — null means "not recorded", and a
+            dash is honest where a zero would be a claim. */ ''}
+      ${r.client_fare != null
+        ? enqDetailRow('Client fare', `<span class="mono">${escapeHtml(moneyStr(r.client_fare))}</span>
+             <span class="cell-sub">what the merchant sold at</span>`)
+        : ''}
+      ${r.saved_amount != null
+        ? enqDetailRow('Merchant saves', `<span class="mono">${escapeHtml(moneyStr(r.saved_amount))}</span>
+             <span class="cell-sub">client fare less our quotation</span>`)
+        : ''}
     </div>
 
     ${r.notes ? `<div class="detail-note"><strong>Merchant's notes</strong><p>${escapeHtml(r.notes)}</p></div>` : ''}

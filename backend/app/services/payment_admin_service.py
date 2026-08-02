@@ -37,10 +37,13 @@ from sqlalchemy.orm import Session
 
 from app.models_v2 import (
     Merchant,
+    MerchantRole,
     PaymentAccount,
     PaymentAccountType,
     User,
+    UserStatus,
     WalletTopup,
+    WalletTopupMethod,
     WalletTopupStatus,
     WalletTransaction,
     WalletTxnType,
@@ -336,6 +339,11 @@ def delete_account(db: Session, actor: User, account_id: int) -> PaymentAccount:
 #: buckets: a client that asked for everything and filtered its own page would
 #: page against the wrong total.
 QUEUE_BUCKETS: dict[str, tuple[WalletTopupStatus, ...]] = {
+    #: Raised by the desk, not yet paid by the merchant's manager (0041).
+    #: Deliberately its own bucket and **not** part of "pending": these are
+    #: waiting on the merchant, not on us, and folding them into the work queue
+    #: would make the desk's backlog look permanently larger than it is.
+    "requests": (WalletTopupStatus.AWAITING_PAYMENT,),
     "pending": (WalletTopupStatus.SUBMITTED,),
     "verified": (WalletTopupStatus.VERIFIED,),
     "rejected": (WalletTopupStatus.REJECTED,),
@@ -343,12 +351,45 @@ QUEUE_BUCKETS: dict[str, tuple[WalletTopupStatus, ...]] = {
 }
 
 
-def queue_counts(db: Session) -> dict:
-    """Every tab's badge in one grouped query, plus the money awaiting a decision."""
-    rows = db.execute(
-        select(WalletTopup.status, func.count(), func.coalesce(func.sum(WalletTopup.amount), 0))
-        .group_by(WalletTopup.status)
-    ).all()
+def _initiated_clause(initiated: str | None):
+    """Restrict to one *direction*: who started the payment.
+
+    ``admin``    — requests the desk raised (0041), the Payment Management screen
+    ``merchant`` — the merchant's own Add Money submissions, the wallet desk
+    ``None``     — both, which is what every pre-0041 caller gets
+
+    Expressed against ``raised_by`` rather than a stored flag, matching
+    ``WalletTopup.admin_initiated``: an Admin raised it exactly when an Admin is
+    recorded as having raised it, so the filter and the property cannot drift.
+    """
+    if initiated == "admin":
+        return WalletTopup.raised_by.is_not(None)
+    if initiated == "merchant":
+        return WalletTopup.raised_by.is_(None)
+    if initiated is None:
+        return None
+    raise HTTPException(
+        status_code=http_status.HTTP_400_BAD_REQUEST,
+        detail="initiated must be 'admin' or 'merchant'.",
+    )
+
+
+def queue_counts(db: Session, *, initiated: str | None = None) -> dict:
+    """Every tab's badge in one grouped query, plus the money awaiting a decision.
+
+    ``initiated`` matters because two screens share this endpoint. Without it,
+    Payment Management showed "Pending 349" — the platform-wide figure — above a
+    table holding three rows, and a badge that can disagree with the table
+    beneath it is worse than no badge at all.
+    """
+    stmt = select(
+        WalletTopup.status, func.count(), func.coalesce(func.sum(WalletTopup.amount), 0)
+    )
+    clause = _initiated_clause(initiated)
+    if clause is not None:
+        stmt = stmt.where(clause)
+
+    rows = db.execute(stmt.group_by(WalletTopup.status)).all()
     by_status = {status: (count, total) for status, count, total in rows}
 
     counts = {
@@ -361,7 +402,8 @@ def queue_counts(db: Session) -> dict:
 
 def list_queue(
     db: Session, *, bucket: str = "pending", merchant_id: int | None = None,
-    search: str | None = None, page: int = 1, page_size: int = 20,
+    search: str | None = None, initiated: str | None = None,
+    page: int = 1, page_size: int = 20,
 ) -> tuple[list[tuple[WalletTopup, str | None]], int]:
     """The verification queue. **Oldest first** — it is a work queue, not a feed.
 
@@ -373,6 +415,11 @@ def list_queue(
     defines the foreign key and nothing more, and that model is frozen — so the
     name is joined here rather than lazily loaded per row, which is also the
     thing that would have made this an N+1.
+
+    ``initiated`` filters here rather than in the browser, and that is a
+    correctness fix, not a tidy-up: a client-side filter shortens the page it is
+    applied to without shortening ``total``, so page 2 of a filtered list can be
+    empty while the pager still offers page 3.
     """
     if bucket not in QUEUE_BUCKETS:
         raise HTTPException(
@@ -381,6 +428,9 @@ def list_queue(
         )
 
     stmt = select(WalletTopup).where(WalletTopup.status.in_(QUEUE_BUCKETS[bucket]))
+    clause = _initiated_clause(initiated)
+    if clause is not None:
+        stmt = stmt.where(clause)
     if merchant_id is not None:
         stmt = stmt.where(WalletTopup.merchant_id == merchant_id)
     if search and search.strip():
@@ -708,3 +758,224 @@ def topup_detail(db: Session, actor: User, topup_id: int) -> dict:
         "transaction_reference": topup_service.txn_number_for(db, topup),
         "wallet_balance": q(merchant.wallet_balance) if merchant else ZERO,
     }
+
+
+# ---------------------------------------------------------------------------
+# Requests the desk raises (migration 0041)
+# ---------------------------------------------------------------------------
+#: What each method must be told before a manager can act on it. The desk is
+#: filling in "where do I send the money" on the merchant's behalf, so a request
+#: missing any of these is not actionable — and an unactionable request
+#: displayed with authority is worse than no request, the same argument
+#: ``create_account`` makes about an active account nobody can pay into.
+REQUEST_METHODS: dict[WalletTopupMethod, tuple[str, ...]] = {
+    WalletTopupMethod.BANK_TRANSFER: ("bank_name", "account_number", "ifsc", "branch"),
+    WalletTopupMethod.CASH: ("token_details", "note_number"),
+    WalletTopupMethod.CRYPTO: ("wallet_address", "network"),
+}
+
+#: The chains the platform accepts. Free text here would produce "TRC-20",
+#: "trc20" and "Tron" for one network, and a manager sending USDT to the wrong
+#: chain does not get it back.
+CRYPTO_NETWORKS: frozenset[str] = frozenset({"TRC20", "ERC20", "BEP20"})
+
+
+def merchant_managers(db: Session, merchant_id: int) -> list[User]:
+    """The managers of one merchant — who a payment request may be addressed to.
+
+    Filtered on ``merchant_role`` and not ``role``: ``UserRole.MANAGER`` is
+    *platform* staff (CR-2's approval role), while the person who settles a
+    merchant's bill is that company's own manager. Confusing the two would let
+    the desk address a merchant's payment to a member of its own staff.
+
+    Inactive accounts are excluded — addressing a request to someone who cannot
+    sign in produces a request nobody can settle.
+    """
+    if db.get(Merchant, merchant_id) is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Merchant not found"
+        )
+    return list(
+        db.scalars(
+            select(User)
+            .where(
+                User.merchant_id == merchant_id,
+                User.merchant_role == MerchantRole.MANAGER,
+                User.status == UserStatus.ACTIVE,
+            )
+            .order_by(User.full_name.asc(), User.user_id.asc())
+        ).all()
+    )
+
+
+def _clean_instructions(
+    method: WalletTopupMethod, instructions: dict | None
+) -> dict[str, str]:
+    """Validate and normalise the method's payment instructions.
+
+    Unknown keys are dropped rather than stored: this object is rendered
+    straight onto the manager's screen, and an arbitrary key/value pair written
+    by a caller is arbitrary text on someone else's page.
+    """
+    required = REQUEST_METHODS.get(method)
+    if required is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Choose bank transfer, cash or crypto.",
+        )
+
+    given = instructions or {}
+    cleaned: dict[str, str] = {}
+    missing: list[str] = []
+    for key in required:
+        value = str(given.get(key) or "").strip()
+        if not value:
+            missing.append(key.replace("_", " "))
+        else:
+            cleaned[key] = value
+
+    if missing:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Fill in {', '.join(missing)} — the manager needs it to pay.",
+        )
+
+    if method is WalletTopupMethod.CRYPTO:
+        network = cleaned["network"].upper().replace("-", "")
+        if network not in CRYPTO_NETWORKS:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"Network must be one of: {', '.join(sorted(CRYPTO_NETWORKS))}.",
+            )
+        cleaned["network"] = network
+
+    return cleaned
+
+
+def raise_request(
+    db: Session, actor: User, *,
+    merchant_id: int,
+    manager_id: int,
+    amount: Decimal,
+    method: WalletTopupMethod,
+    instructions: dict | None = None,
+    note: str | None = None,
+) -> WalletTopup:
+    """Ask a merchant's manager to pay. **Credits nothing.**
+
+    The request is written as a ``wallet_topups`` row in ``awaiting_payment``,
+    which is not a status ``_assert_undecided`` will review — so there is no
+    path from here to a wallet credit that does not go through the manager
+    paying and the desk approving. That is enforced by the status machine
+    rather than by this function remembering to be careful.
+    """
+    amount = q(amount)
+    if amount <= ZERO:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Enter the amount to request — it must be more than zero.",
+        )
+
+    merchant = db.get(Merchant, merchant_id)
+    if merchant is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail="Merchant not found"
+        )
+
+    manager = db.get(User, manager_id)
+    # Re-checked against the merchant rather than trusted from the dropdown: the
+    # id arrives from the browser, and a request addressed to another company's
+    # manager would expose one merchant's balance demand to another.
+    if (
+        manager is None
+        or manager.merchant_id != merchant_id
+        or manager.merchant_role is not MerchantRole.MANAGER
+        or manager.status is not UserStatus.ACTIVE
+    ):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Choose an active manager belonging to the selected company.",
+        )
+
+    cleaned = _clean_instructions(method, instructions)
+    if (note or "").strip():
+        cleaned["note"] = note.strip()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    topup = WalletTopup(
+        topup_number=topup_service.next_number(db),
+        merchant_id=merchant_id,
+        amount=amount,
+        method=method,
+        status=WalletTopupStatus.AWAITING_PAYMENT,
+        raised_by=actor.user_id,
+        assigned_manager_id=manager_id,
+        instructions=cleaned,
+        # submitted_at is NOT NULL and means "when this row was raised" until a
+        # manager settles it, at which point settle_request overwrites it with
+        # the real submission time.
+        submitted_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(topup)
+    db.commit()
+    db.refresh(topup)
+
+    activity_service.log_activity(
+        db, actor.user_id, "Payment request raised",
+        f"{topup.topup_number}: {q(amount)} requested from {merchant.company_name} "
+        f"by {method.value.replace('_', ' ')}",
+    )
+    # Addressed to the named manager alone, not notify_merchant_managers: the
+    # request names one person as responsible for it, and telling every manager
+    # in the company makes it nobody's.
+    notification_service.create_notification(
+        db, manager_id,
+        "Payment requested",
+        f"{topup.topup_number}: the payments desk has asked for {q(amount)} by "
+        f"{method.value.replace('_', ' ')}. Open Payment Management to settle it.",
+    )
+    return topup
+
+
+def cancel_request(db: Session, actor: User, topup_id: int, *, remarks: str) -> WalletTopup:
+    """Withdraw a request the merchant has not paid yet.
+
+    Only from ``awaiting_payment``. Once a manager has paid, the money is real
+    and the only honest outcomes are approve or reject — "cancelled" would
+    leave a merchant out of pocket with the request closed. Reuses the
+    ``rejected`` status rather than adding a fifth: from the merchant's side the
+    request is closed with a reason, which is exactly what rejected means.
+    """
+    if not (remarks or "").strip():
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Say why the request is being withdrawn — the merchant sees this.",
+        )
+
+    topup = _locked(db, topup_id)
+    if topup.status is not WalletTopupStatus.AWAITING_PAYMENT:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=(
+                f"{topup.topup_number} has already been {topup.status.value.replace('_', ' ')} "
+                "and can no longer be withdrawn."
+            ),
+        )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    topup.status = WalletTopupStatus.REJECTED
+    topup.reviewed_by = actor.user_id
+    topup.reviewed_at = now
+    topup.review_remarks = remarks.strip()
+    topup.updated_at = now
+    db.commit()
+    db.refresh(topup)
+
+    notification_service.notify_merchant_managers(
+        db, topup.merchant_id,
+        "Payment request withdrawn",
+        f"{topup.topup_number} for {q(topup.amount)} has been withdrawn: {remarks.strip()}",
+    )
+    return topup

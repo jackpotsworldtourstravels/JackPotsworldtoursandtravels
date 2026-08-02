@@ -8,7 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260801m6">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260802ui13">
+<!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
+     (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
+     :root rules of equal specificity, so source order is what decides them. -->
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260802ui13">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -57,7 +61,6 @@
       <div class="msg" id="adminAuthStep2Msg"></div>
     </div>
 
-    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
   </div>
 </div>
 
@@ -161,6 +164,18 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
       <span class="nav-label">Provider Management</span>
     </a>
+    <!-- Audit Logs moved here from the Super Admin Portal, with System Logs
+         added beside it. Both endpoints are permission-gated (`audit.view` /
+         `system.activity.view`), which `_ADMIN` already holds — see the header
+         of assets/js/admin-logs.js. No backend change was required. -->
+    <a href="#" class="nav-item" data-section="audit">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+      <span class="nav-label">Audit Logs</span>
+    </a>
+    <a href="#" class="nav-item" data-section="system-logs">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m8 10 2 2-2 2"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
+      <span class="nav-label">System Logs</span>
+    </a>
     <a href="#" class="nav-item" data-section="notifications">
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="nav-label">Communication</span>
@@ -236,10 +251,11 @@
         <div class="skeleton-stat-card"><div class="skeleton icon"></div><div class="skeleton-lines"><div class="skeleton line-lg"></div><div class="skeleton line-sm"></div></div></div>
       </div></div>
 
-      <div class="panel">
-        <div class="panel-head"><h2>Recent Activity</h2></div>
-        <div id="dashRecentActivity" class="empty-state">Loading…</div>
-      </div>
+      <!-- The Recent Activity feed was removed on request. It read the same
+           SystemLog rows the new System Logs screen now pages through properly,
+           so nothing was lost — five truncated entries became a searchable,
+           filterable table. `recent_activity` is still in the dashboard
+           payload; this screen just stopped rendering it. -->
     </section>
 
     <section class="section" id="section-users">
@@ -264,15 +280,15 @@
             <option value="inactive">Inactive</option>
           </select>
         </div>
-        <div class="mm-bulk-bar" id="merchantBulkBar">
-          <span id="merchantBulkCount">0 selected</span>
-          <button type="button" class="btn btn-navy btn-sm" id="merchantBulkActivateBtn">Activate</button>
-          <button type="button" class="btn btn-danger btn-sm" id="merchantBulkDeactivateBtn">Deactivate</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="merchantBulkClearBtn">Clear selection</button>
-        </div>
+        <!-- THE ROW CHECKBOXES AND THE BULK BAR WENT TOGETHER. Removing the
+             checkbox column while leaving the bulk bar would have left an
+             Activate/Deactivate control that could never be reached, because
+             nothing could put an id in the selection any more. The bulk
+             endpoints are untouched; only this entry point is gone. -->
         <div class="table-wrap"><table id="merchantsTable"><thead><tr>
-          <th class="mm-checkbox-col"><input type="checkbox" class="mm-row-check" id="merchantSelectAll" title="Select all on this page"></th>
-          <th>Merchant Code</th><th>Merchant Name</th><th>Company Type</th><th>Email</th><th>Phone</th><th>Status</th><th>Users</th><th>Created Date</th><th>Actions</th>
+          <th>Merchant ID</th><th>Merchant Name</th><th>Country Code</th><th>Users</th>
+          <th>Wallet Balance</th><th>Tickets Issued</th><th>Awaiting Verification</th>
+          <th>Status</th><th>Action</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="merchantsPagination"></div>
       </div>
@@ -299,8 +315,17 @@
             <option value="merchant_user">Merchant User</option>
           </select>
         </div>
+        <!-- Status column removed on request — the status FILTER above stays,
+             because it is what makes this "Active Users" rather than "Users",
+             and with it defaulting to Active the column only ever repeated the
+             filter back.
+
+             "Username" is the local part of the sign-in email. THERE IS NO
+             `username` COLUMN on the users table — this platform authenticates
+             by email (see models_v2.User), so that is the username. The full
+             address is kept in the cell's title so nothing is lost. -->
         <div class="table-wrap"><table id="activeUsersTable"><thead><tr>
-          <th>Name</th><th>Email</th><th>Role</th><th>Merchant</th><th>Status</th><th>Last Login</th>
+          <th>Name</th><th>Username</th><th>Role</th><th>Merchant</th><th>Last Login</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="activeUsersPagination"></div>
       </div>
@@ -359,26 +384,29 @@
       </div>
     </section>
 
+    <!-- Payment Management (migration 0041). The per-booking payment table that
+         used to live here is retired at the UI only: /api/admin/payments and its
+         refund endpoint are untouched and still feed Reports and Analytics.
+         Rendered by assets/js/admin-payment-requests.js. -->
     <section class="section" id="section-payments">
       <div class="panel">
-        <div class="panel-head"><h2>Payment Management</h2></div>
-        <div class="filter-bar" style="margin-bottom:16px;">
-          <input type="text" id="pvSearch" placeholder="Search transaction ID or method…">
-          <select id="pvStatusFilter" class="status-select">
-            <option value="">All statuses</option>
-            <option value="pending">Pending Verification</option>
-            <option value="success">Paid</option>
-            <option value="failed">Failed</option>
-            <option value="refunded">Refunded</option>
-            <option value="partially_refunded">Partially Refunded</option>
-          </select>
-          <input type="date" id="pvDateFrom" title="From date">
-          <input type="date" id="pvDateTo" title="To date">
+        <div class="panel-head">
+          <h2>Payment Management</h2>
+          <button class="btn btn-coral" id="prRaiseBtn">Initiate Payment Request</button>
         </div>
-        <div class="table-wrap"><table id="pvTable"><thead><tr>
-          <th>Transaction ID</th><th>Method</th><th>Amount</th><th>Currency</th><th>Status</th><th>Paid Date</th><th>Actions</th>
+        <div class="ops-tabs" id="prTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="prSearch" placeholder="Search reference or UTR…"
+                 aria-label="Search payment requests by reference or UTR">
+          <select id="prMerchantFilter" class="status-select" aria-label="Filter by company">
+            <option value="">All companies</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="prTable"><thead><tr>
+          <th>Reference</th><th>Company</th><th>Manager</th><th>Amount</th>
+          <th>Method</th><th>UTR</th><th>Status</th><th>Action</th>
         </tr></thead><tbody></tbody></table></div>
-        <div class="pagination" id="pvPagination"></div>
+        <div class="pagination" id="prPagination"></div>
       </div>
     </section>
 
@@ -685,7 +713,67 @@
       </div>
     </section>
 
+    <!-- ============== Audit Logs (moved here from Super Admin) ============== -->
+    <section class="section" id="section-audit">
+      <div class="panel">
+        <div class="panel-head"><h2>Audit Logs</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Row-level change history, written directly by a database trigger on users, merchants,
+          service requests and payments — the API only reads it. The trigger records <em>what</em>
+          changed, not <em>who</em> changed it, so &ldquo;Changed By&rdquo; reads
+          &ldquo;Not recorded&rdquo;; for the acting user, see <strong>System Logs</strong>.
+        </p>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <select id="adminAuditTableFilter" class="status-select" aria-label="Table"><option value="">All tables</option></select>
+          <select id="adminAuditOpFilter" class="status-select" aria-label="Operation">
+            <option value="">All operations</option>
+            <option value="INSERT">Insert</option>
+            <option value="UPDATE">Update</option>
+            <option value="DELETE">Delete</option>
+          </select>
+          <input type="date" id="adminAuditDateFrom" title="From date" aria-label="From date">
+          <input type="date" id="adminAuditDateTo" title="To date" aria-label="To date">
+        </div>
+        <div class="table-wrap"><table id="adminAuditTable"><thead><tr>
+          <th>When</th><th>Table</th><th>Record</th><th>Operation</th><th>Changed By</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="adminAuditPagination"></div>
+      </div>
+    </section>
+
+    <!-- ============== System Logs ==============
+         The other half of the pair: application-level actions with the acting
+         user, their IP and their device. Audit Logs above has the field-level
+         diff but no actor; this has the actor but no diff. -->
+    <section class="section" id="section-system-logs">
+      <div class="panel">
+        <div class="panel-head"><h2>System Logs</h2></div>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
+          Every recorded user action across the platform, newest first — who did it, from which
+          address and on what device. This is where attribution lives; Audit Logs is where the
+          before/after values live.
+        </p>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <input type="text" id="adminSysLogSearch" placeholder="Search user, action or description…" aria-label="Search system logs">
+          <select id="adminSysLogActionFilter" class="status-select" aria-label="Action"><option value="">All actions</option></select>
+          <select id="adminSysLogModuleFilter" class="status-select" aria-label="Module"><option value="">All modules</option></select>
+        </div>
+        <div class="table-wrap"><table id="adminSysLogTable"><thead><tr>
+          <th>When</th><th>User</th><th>Module</th><th>Action</th><th>Description</th><th>Origin</th><th>Status</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="adminSysLogPagination"></div>
+      </div>
+    </section>
+
   </main>
+</div>
+
+<div class="modal-overlay" id="adminAuditDetailModalOverlay">
+  <div class="modal-card modal-lg" style="padding:28px;">
+    <div class="panel-head"><h2 id="adminAuditDetailTitle">Audit entry</h2>
+      <button type="button" class="btn btn-ghost btn-sm" id="adminAuditDetailCloseBtn">Close</button></div>
+    <div id="adminAuditDetailBody"></div>
+  </div>
 </div>
 
 
@@ -759,6 +847,15 @@
   <div class="modal-card modal-lg" id="wdLedgerBody" role="dialog" aria-modal="true" aria-labelledby="wdLedgerTitle"></div>
 </div>
 
+<!-- Payment Management (0041) — raising a request, and reviewing one.
+     Rendered by admin-payment-requests.js, focus-trapped by focus-trap.js. -->
+<div class="modal-overlay" id="prRaiseOverlay">
+  <div class="modal-card modal-lg" id="prRaiseBody" role="dialog" aria-modal="true"></div>
+</div>
+<div class="modal-overlay" id="prDetailOverlay">
+  <div class="modal-card modal-lg" id="prDetailBody" role="dialog" aria-modal="true"></div>
+</div>
+
 <!-- Provider Management (0039) — add/edit a provider, and add a person at one.
      One overlay for both: only one of the two is ever open, and a second
      overlay would just be a second thing to remember to close. -->
@@ -794,38 +891,43 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260801m6"></script>
-<script src="../components/toast.js"></script>
-<script src="../components/spinner.js"></script>
-<script src="../components/confirm-dialog.js"></script>
-<script src="../components/focus-trap.js?v=20260731cr2"></script>
-<script src="../assets/js/auth.js?v=20260730a"></script>
+<script src="../shared/formatters.js?v=20260802ui13"></script>
+<script src="../components/toast.js?v=20260802ui13"></script>
+<script src="../components/spinner.js?v=20260802ui13"></script>
+<script src="../components/confirm-dialog.js?v=20260802ui13"></script>
+<script src="../components/focus-trap.js?v=20260802ui13"></script>
+<script src="../assets/js/auth.js?v=20260802ui13"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260802prov"></script>
+<script src="../assets/js/admin.js?v=20260802ui13"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260801cr5"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260802ui13"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260731b"></script>
+<script src="../assets/js/admin-bookings.js?v=20260802ui13"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260801merge"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260802ui13"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260802prov"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260802ui13"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260802ui4"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260802ui13"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260801m5"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260802ui13"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260801m6"></script>
+<script src="../assets/js/admin-analytics.js?v=20260802ui13"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260802prov"></script>
+<script src="../assets/js/admin-providers.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-logs.js?v=20260802ui13"></script>
+<!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
+     desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
+     so there is still exactly one path that credits a merchant wallet. -->
+<script src="../assets/js/admin-payment-requests.js?v=20260802ui13"></script>
 </body>
 </html>

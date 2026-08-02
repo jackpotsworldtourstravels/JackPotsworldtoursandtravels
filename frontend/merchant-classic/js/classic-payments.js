@@ -1,301 +1,324 @@
 'use strict';
-/* Classic — Payments.
+/* Classic — Payment Management (migration 0041).
    ===========================================================================
-   The same /api/requests rows as My Requests, narrowed to the money stages.
-
-   Two things here are deliberate and were wrong in the Premium portal before
-   they were found by driving it:
-
-   1. NO request_type FILTER. ticket_service.record_payment gates on
-      `status is PAYMENT_PENDING` and never checks the type, so service requests
-      (date change, passenger modification) are payable through the very same
-      POST /api/requests/{id}/pay. Filtering to booking rows hid a genuinely
-      payable request and the screen said "nothing to pay" while the dashboard
-      counted one due.
-
-   2. AN UNPRICED ROW IS NOT PAYABLE. record_payment rejects amount <= 0 with a
-      400, so a Payment Pending row with no amount can only ever fail. It shows
-      "Awaiting amount from our team" instead of a button that 400s.
-
-   ACCOUNT POSITION AND STATEMENT (M4)
-   Every figure in the strip and the ledger below comes from
-   GET /api/merchant/finance/position and /statement, which are served by
-   finance_service — the single money computation. Nothing on this screen adds
-   up a column of its own, deliberately: the bug this milestone exists to
-   prevent is four surfaces each computing "outstanding" slightly differently
-   and one of them being wrong. If a number is needed here that the API does not
-   send, the fix is to add it to finance_service, not to sum it in JavaScript.
-
-   That paragraph described an intention for some time before it described the
-   code — the endpoints and the API-client methods existed, and nothing called
-   them. The audit of 2026-07-31 found the screen unbuilt and a dead
-   `clFinancePosition` variable where it should have been. This is that screen.
+   The merchant's side of the payments desk: requests our team has raised, the
+   proof the merchant uploads against them, and where each one got to.
 
    MONEY ARRIVES AS A STRING AND IS NEVER PARSED
    `Decimal` fields serialise as JSON strings precisely so a float cannot get
    near them. `moneyStr` formats the string for display; nothing here calls
    `Number()` on an amount, because the moment anything does, this screen has a
-   second opinion about the merchant's money. */
+   second opinion about the merchant's money.
 
-let clPayRows = [];
+   WHAT THIS SCREEN USED TO BE
+   "Payments": the per-booking payable list for the catalog-led track, with an
+   account-position strip and a statement. It is now Payment Requests / Pending
+   / Approved / Rejected.
+
+   WHAT THAT REPLACED, AND WHAT SURVIVED IT
+   The statement and the account position moved out rather than away: the
+   Wallet screen is the portal's single running-account surface, and this screen
+   showing a second balance beside it was the duplication the redesign removed.
+   Their loaders are gone with the markup they rendered, but the endpoints they
+   called are untouched: finance_service still serves /position and /statement,
+   and Wallet renders the same figures from the same computation. Nothing about
+   how the platform calculates a merchant's money changed here.
+
+   The `Pay` dialog is kept for the same reason: My Requests opens it for a row
+   at Payment Pending, and deleting it would have taken that path with it.
+
+   THE ONE RULE THIS SCREEN STATES OUT LOUD
+   **Settling credits nothing.** Uploading the proof hands the request to the
+   desk; the wallet moves only when an admin approves it. The screen says so
+   where a merchant would otherwise expect its balance to change.
+*/
+
+const CL_PR_TABS = [
+  ['requests', 'Payment Requests'],
+  ['pending', 'Pending Requests'],
+  ['approved', 'Approved Requests'],
+  ['rejected', 'Rejected Requests'],
+];
+
+const CL_PR_METHOD_LABELS = {
+  bank_transfer: 'Bank transfer', cash: 'Cash', crypto: 'Crypto',
+  upi: 'UPI', qr: 'QR', other: 'Other',
+};
+
+/* Which fields the merchant is shown for each method, in the order the desk
+   filled them in. Mirrors payment_admin_service.REQUEST_METHODS — the server is
+   the allowlist; this is only the labelling. */
+const CL_PR_INSTRUCTIONS = {
+  bank_transfer: [['bank_name', 'Bank name'], ['account_number', 'Account number'],
+                  ['ifsc', 'IFSC'], ['branch', 'Branch']],
+  cash: [['token_details', 'Token details'], ['note_number', 'Unique note number']],
+  crypto: [['wallet_address', 'Wallet address'], ['network', 'Network']],
+};
+
+let clPrTab = 'requests';
+let clPrLoaded = new Set();
 
 function clInitPayments() {
   $('cl-payments').innerHTML = `
     <div class="cl-page-head">
       <div>
-        <h1>Payments</h1>
-        <p>Requests at a payment stage. Submitted payments are verified by our team before ticketing.</p>
+        <h1>Payment Management</h1>
+        <p>Payments our team has asked you to make. Your wallet is credited once we approve the proof.</p>
+      </div>
+      <div class="cl-page-actions">
+        <button type="button" class="cl-btn" id="clPrRefresh">
+          ${clIco('refresh', { size: 15 })} Refresh
+        </button>
       </div>
     </div>
 
-    <!-- CR-2 disabled the payment workflow for enquiry-led (Classic Tours)
-         bookings. They never reach a payment stage, so they will never appear
-         on this screen — said here rather than leaving a merchant hunting for
-         a booking that is deliberately absent. -->
-    <div class="cl-msg cl-msg-muted" style="margin:0 0 16px;">
-      Bookings raised from a Booking Enquiry are settled directly with our team and
-      do not appear here. Track them under <b>My Requests</b>.
+    <div class="cl-tabs" id="clPrTabs" role="tablist">
+      ${CL_PR_TABS.map(([key, label]) => `
+        <button type="button" class="cl-tab${key === clPrTab ? ' active' : ''}"
+                data-cl-pr-tab="${key}" role="tab" aria-selected="${key === clPrTab}">
+          ${label} <span class="cl-tab-count" data-cl-pr-count="${key}"></span>
+        </button>`).join('')}
     </div>
 
-    <!-- Account position. Every figure is rendered from the payload of
-         GET /api/merchant/finance/position exactly as sent. -->
-    <div class="cl-kpis" id="clFinKpis">
-      <div class="cl-kpi"><div class="cl-kpi-label">Account position</div>
-        <div class="cl-kpi-value"><span class="cl-spin"></span></div>
-        <div class="cl-kpi-sub">Loading…</div></div>
-    </div>
-
-    <div class="cl-panel">
-      <div class="cl-panel-head">
-        <h2>Statement</h2>
-        <div class="cl-panel-tools">
-          <label class="cl-sr" for="clStmtFrom">From date</label>
-          <input type="date" id="clStmtFrom">
-          <label class="cl-sr" for="clStmtTo">To date</label>
-          <input type="date" id="clStmtTo">
-          <button type="button" class="cl-btn cl-btn-sm" id="clStmtApply">Apply</button>
-          <button type="button" class="cl-btn cl-btn-sm" id="clStmtClear">Clear</button>
+    ${CL_PR_TABS.map(([key, label]) => `
+      <div class="cl-panel" data-cl-pr-pane="${key}"${key === clPrTab ? '' : ' style="display:none;"'}>
+        <div class="cl-panel-head"><h2>${label}</h2></div>
+        <div class="cl-panel-body cl-flush">
+          <div class="cl-table-wrap">
+            <table class="cl-table">
+              <thead><tr>
+                <th>Reference</th><th>Raised</th><th class="cl-num">Amount</th>
+                <th>Method</th><th>Status</th><th class="cl-actions">Action</th>
+              </tr></thead>
+              <tbody data-cl-pr-body="${key}"></tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      <div class="cl-panel-body cl-flush">
-        <div class="cl-table-wrap">
-          <table class="cl-table">
-            <thead><tr>
-              <th>Date</th><th>Reference</th><th>Description</th>
-              <th class="cl-num">Debit</th><th class="cl-num">Credit</th><th class="cl-num">Balance</th>
-            </tr></thead>
-            <tbody id="clStmtBody"></tbody>
-            <tfoot id="clStmtFoot"></tfoot>
-          </table>
-        </div>
-      </div>
-      <div class="cl-panel-note" id="clStmtNote"></div>
-    </div>
+      </div>`).join('')}
 
     <div class="cl-panel">
-      <div class="cl-toolbar">
-        <div class="cl-field">
-          <label for="clPayStatus">Stage</label>
-          <select id="clPayStatus" data-cl-status-filter>
-            <option value="">All payment stages</option>
-            ${MERCHANT_PAYMENT_STATUSES.map(s =>
-              `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clLabel(s)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="cl-field" style="min-width:0;">
-          <label>&nbsp;</label>
-          <button type="button" class="cl-btn" id="clPayRefresh">Refresh</button>
-        </div>
-      </div>
-      <div class="cl-panel-body cl-flush">
-        <div class="cl-table-wrap">
-          <table class="cl-table">
-            <thead><tr>
-              <th>Request no.</th><th>Item</th><th>Type</th><th>Stage</th>
-              <th class="cl-num">Amount</th><th>Travel date</th><th class="cl-actions">Action</th>
-            </tr></thead>
-            <tbody id="clPayBody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="cl-pager"><span class="cl-pager-info" id="clPayCount">—</span></div>
-    </div>
-
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>${clIco('info')}How payment works</h2></div>
+      <div class="cl-panel-head"><h2>${clIco('info')}How a payment request works</h2></div>
       <div class="cl-panel-body">
         <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--cl-text-2);line-height:1.85;">
-          <li>A request is approved by our team and moves to <b>Payment Pending</b>.</li>
-          <li>You record the payment here with the amount, method and your transaction reference.</li>
-          <li>The request stays in Payment Pending while we verify the transfer.</li>
-          <li>Once verified it moves to <b>Paid</b>, then <b>Ticketed</b> when documents are issued.</li>
+          <li>Our payments desk raises a request and tells you where to send the money.</li>
+          <li>You pay, then record it here with your reference and the payment proof.</li>
+          <li>The request moves to <b>Pending</b> while we confirm the money arrived.</li>
+          <li>Once approved, <b>your wallet is credited</b>. Until then nothing is added to your balance.</li>
+          <li>A rejected request tells you what to correct, and can be paid and submitted again.</li>
         </ol>
       </div>
     </div>`;
 
-  clChips('clPayStatus', 'Stage');
-
-  $('clPayRefresh').addEventListener('click', () => { clLoadPayments(); clLoadFinance(); });
-  $('clPayStatus').addEventListener('change', () => clLoadPayments());
-  $('clStmtApply').addEventListener('click', () => clLoadStatement());
-  $('clStmtClear').addEventListener('click', () => {
-    $('clStmtFrom').value = '';
-    $('clStmtTo').value = '';
-    clLoadStatement();
+  $('clPrRefresh').addEventListener('click', () => {
+    /* A refresh must actually re-fetch, so the lazy-load memo is cleared —
+       otherwise the button only ever reloads the tab you are standing on. */
+    clPrLoaded = new Set();
+    clLoadPaymentRequests(clPrTab);
+    clLoadPaymentRequestCounts();
   });
-  return Promise.all([clLoadPayments(), clLoadFinance()]);
-}
 
-/* ------------------------------------------------- account position (M4) */
-
-/* One call, one render. Nothing is derived: `credit_used`, `credit_available`
-   and `spending_power` are all computed by finance_service and sent, precisely
-   so this screen cannot disagree with the admin's view of the same merchant. */
-async function clLoadFinance() {
-  const box = $('clFinKpis');
-  try {
-    const p = await MerchantApi.financePosition();
-
-    /* CREDIT IS GONE FROM THIS STRIP.
-       It used to close with "Credit available" (or "Credit limit — Not set")
-       and "Spending power", which is wallet plus available credit. All three
-       were removed in the redesign: the wallet is now the portal's single
-       finance surface, and a second, larger number sitting beside the balance
-       is read as money the merchant has. `has_credit_limit`, `credit_used`,
-       `credit_available` and `spending_power` all still arrive in this payload
-       and are still what the server gates a booking on — nothing about the
-       business rule changed, only what this screen renders. */
-    const tiles = [
-      ['Balance due', moneyStr(p.outstanding), `across ${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`, 'err'],
-      ['Billed', moneyStr(p.billed), 'total raised to date', ''],
-      ['Paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified payments', 'ok'],
-      ['Wallet', moneyStr(p.wallet_balance), 'available on account', 'accent'],
-    ];
-    if (moneyIsPositive(p.awaiting_verification)) {
-      tiles.push(['Awaiting verification', moneyStr(p.awaiting_verification),
-                  'submitted, not yet confirmed', 'warn']);
-    }
-
-    const icons = { 'Balance due': 'receipt', Billed: 'file', Paid: 'checkCircle',
-      Wallet: 'wallet', 'Awaiting verification': 'clock' };
-    box.innerHTML = tiles.map(([label, value, sub, tone]) => `
-      <div class="cl-kpi">
-        <div class="cl-kpi-head"><span class="cl-kpi-ico ${tone}">${clIco(icons[label] || 'receipt')}</span></div>
-        <div class="cl-kpi-label">${escapeHtml(label)}</div>
-        <div class="cl-kpi-value">${escapeHtml(value)}</div>
-        <div class="cl-kpi-sub">${escapeHtml(sub)}</div>
-      </div>`).join('');
-
-    return clLoadStatement();
-  } catch (err) {
-    box.innerHTML = `<div class="cl-kpi"><div class="cl-kpi-label">Account position</div>
-      <div class="cl-kpi-value">—</div>
-      <div class="cl-kpi-sub">${escapeHtml(clError(err, 'Could not load your position.'))}</div></div>`;
-  }
-}
-
-/* The ledger. `balance` is a running total the server computed per row, and the
-   footer totals are the server's own — this renders them, it does not add up
-   the column. */
-async function clLoadStatement() {
-  const body = $('clStmtBody');
-  const foot = $('clStmtFoot');
-  const note = $('clStmtNote');
-  body.innerHTML = clLoadingRow(6, 'Loading statement…');
-  foot.innerHTML = '';
-
-  try {
-    const s = await MerchantApi.financeStatement({
-      dateFrom: $('clStmtFrom').value || undefined,
-      dateTo: $('clStmtTo').value || undefined,
+  document.querySelectorAll('[data-cl-pr-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      clPrTab = btn.dataset.clPrTab;
+      document.querySelectorAll('[data-cl-pr-tab]').forEach(b => {
+        const on = b.dataset.clPrTab === clPrTab;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+      });
+      document.querySelectorAll('[data-cl-pr-pane]').forEach(p => {
+        p.style.display = p.dataset.clPrPane === clPrTab ? '' : 'none';
+      });
+      /* Lazy: a tab is fetched the first time it is opened, not all four on
+         load. Same rule Service Requests uses. */
+      clLoadPaymentRequests(clPrTab);
     });
-    const entries = s.entries || [];
+  });
 
-    body.innerHTML = entries.length ? entries.map(e => `
-      <tr>
-        <td class="cl-nowrap">${escapeHtml(e.at ? fmtDate(e.at) : '—')}</td>
-        <td class="cl-ref">${escapeHtml(e.reference || '—')}</td>
-        <td>${escapeHtml(e.description || clLabel(e.kind))}
-          ${moneyIsPositive(e.unverified)
-            ? `<div class="cl-kpi-sub">${escapeHtml(moneyStr(e.unverified))} awaiting verification</div>` : ''}</td>
-        <td class="cl-num">${moneyIsPositive(e.debit) ? escapeHtml(moneyStr(e.debit)) : ''}</td>
-        <td class="cl-num">${moneyIsPositive(e.credit) ? escapeHtml(moneyStr(e.credit)) : ''}</td>
-        <td class="cl-num">${escapeHtml(moneyStr(e.balance))}</td>
-      </tr>`).join('')
-      : clEmptyRow(6, 'No entries in this period.');
-
-    foot.innerHTML = entries.length ? `
-      <tr>
-        <td colspan="3"><b>Totals</b>${
-          s.date_from || s.date_to
-            ? ` <span class="cl-kpi-sub">${escapeHtml([s.date_from, s.date_to].filter(Boolean).map(fmtDate).join(' – '))}</span>`
-            : ''}</td>
-        <td class="cl-num"><b>${escapeHtml(moneyStr(s.total_debits))}</b></td>
-        <td class="cl-num"><b>${escapeHtml(moneyStr(s.total_credits))}</b></td>
-        <td class="cl-num"><b>${escapeHtml(moneyStr(s.closing_balance))}</b></td>
-      </tr>` : '';
-
-    note.innerHTML = `Opening balance <b>${escapeHtml(moneyStr(s.opening_balance))}</b>,
-      closing balance <b>${escapeHtml(moneyStr(s.closing_balance))}</b>.
-      A debit is money you owe; a credit is money received or refunded.`;
-  } catch (err) {
-    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load your statement.'));
-    note.textContent = '';
-  }
+  return Promise.all([
+    clLoadPaymentRequests(clPrTab),
+    clLoadPaymentRequestCounts(),
+  ]);
 }
 
-async function clLoadPayments() {
-  const body = $('clPayBody');
-  body.innerHTML = clLoadingRow(7, 'Loading payables…');
-  const chosen = $('clPayStatus').value;
-
-  /* One status can be filtered server-side; "all payment stages" is not
-     expressible as a single status param, so that case fetches and narrows
-     here rather than firing three parallel requests. */
-  const params = { page_size: 100 };
-  if (chosen) params.status = chosen;
-
+async function clLoadPaymentRequestCounts() {
   try {
-    const data = await MerchantApi.listRequests(params);
+    const c = await MerchantApi.paymentRequestCounts();
+    document.querySelectorAll('[data-cl-pr-count]').forEach(el => {
+      const n = c[el.dataset.clPrCount] || 0;
+      el.textContent = n ? String(n) : '';
+    });
+  } catch { /* A missing badge is not worth an error banner over the table. */ }
+}
+
+async function clLoadPaymentRequests(bucket, { force = false } = {}) {
+  const body = document.querySelector(`[data-cl-pr-body="${bucket}"]`);
+  if (!body) return;
+  if (clPrLoaded.has(bucket) && !force) return;
+  clPrLoaded.add(bucket);
+
+  body.innerHTML = clLoadingRow(6, 'Loading…');
+  try {
+    const data = await MerchantApi.paymentRequests({ bucket, pageSize: 50 });
     const items = data.items || [];
-    clPayRows = chosen ? items : items.filter(r => MERCHANT_PAYMENT_STATUSES.includes(r.status));
+    body.innerHTML = items.length
+      ? items.map(clPrRow).join('')
+      : clEmptyRow(6, {
+          requests: 'Nothing to pay right now.',
+          pending: 'Nothing waiting on our approval.',
+          approved: 'No approved payments yet.',
+          rejected: 'No rejected payments.',
+        }[bucket] || 'Nothing here.');
 
-    body.innerHTML = clPayRows.length
-      ? clPayRows.map(clPayRow).join('')
-      : clEmptyRow(7, 'Nothing at a payment stage right now.');
-    $('clPayCount').textContent = `${clPayRows.length} request${clPayRows.length === 1 ? '' : 's'}`;
-
-    body.querySelectorAll('[data-cl-pay-view]').forEach(b =>
-      b.addEventListener('click', () => clOpenRequestDetail(b.dataset.clPayView)));
-    body.querySelectorAll('[data-cl-pay-now]').forEach(b =>
+    body.querySelectorAll('[data-cl-pr-view]').forEach(b =>
       b.addEventListener('click', () => {
-        const r = clPayRows.find(x => String(x.id) === b.dataset.clPayNow);
-        if (r) clOpenPayModal(r);
+        const row = items.find(x => String(x.topup_id) === b.dataset.clPrView);
+        if (row) clOpenPaymentRequestModal(row);
       }));
   } catch (err) {
-    body.innerHTML = clEmptyRow(7, clError(err, 'Failed to load payments.'));
-    $('clPayCount').textContent = '—';
+    clPrLoaded.delete(bucket);
+    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load payment requests.'));
   }
 }
 
-function clPayRow(r) {
-  const payable = r.status === 'payment_pending' && Number(r.total_amount) > 0;
-  const unpriced = r.status === 'payment_pending' && !(Number(r.total_amount) > 0);
+function clPrStatusTag(status) {
+  const tone = { awaiting_payment: '', submitted: 'warn', verified: 'ok', rejected: 'err' }[status] || '';
+  const text = {
+    awaiting_payment: 'Awaiting your payment', submitted: 'Pending approval',
+    verified: 'Approved', rejected: 'Rejected',
+  }[status] || status;
+  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(text)}</span>`;
+}
+
+function clPrRow(r) {
+  /* Settle covers both the first payment and a resubmission after rejection —
+     one server call, so one button. */
+  const settleable = r.status === 'awaiting_payment' || r.status === 'rejected';
   return `<tr>
-    <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
-    <td>${escapeHtml(r.title || '—')}</td>
-    <td class="cl-nowrap">${escapeHtml(clLabel(r.request_type || r.travel_type || '—'))}</td>
-    <td>${clTag(r.status)}</td>
-    <td class="cl-num">${money(r.total_amount)}</td>
-    <td class="cl-nowrap">${escapeHtml(fmtDate(r.travel_date))}</td>
+    <td class="cl-ref">${escapeHtml(r.topup_number || '—')}
+      ${r.resubmission_count
+        ? `<div class="cl-kpi-sub">Resubmitted ×${r.resubmission_count}</div>` : ''}</td>
+    <td class="cl-nowrap">${escapeHtml(fmtDate(r.submitted_at))}</td>
+    <td class="cl-num">${escapeHtml(moneyStr(r.amount))}</td>
+    <td class="cl-nowrap">${escapeHtml(CL_PR_METHOD_LABELS[r.method] || r.method)}</td>
+    <td>${clPrStatusTag(r.status)}</td>
     <td class="cl-actions">
-      <button type="button" class="cl-btn cl-btn-sm" data-cl-pay-view="${r.id}">View</button>
-      ${payable ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-pay-now="${r.id}">Pay</button>` : ''}
-      ${unpriced ? '<span class="cl-tag">Awaiting amount from our team</span>' : ''}
-      ${r.status === 'paid' ? '<span class="cl-tag cl-tag-ok">Verified</span>' : ''}
+      <button type="button" class="cl-btn cl-btn-sm${settleable ? ' cl-btn-primary' : ''}"
+              data-cl-pr-view="${r.topup_id}">${settleable ? 'Pay now' : 'View'}</button>
     </td>
   </tr>`;
 }
+
+function clOpenPaymentRequestModal(r) {
+  const settleable = r.status === 'awaiting_payment' || r.status === 'rejected';
+  /* Mirrors topup_service._PROOF_RULES. A bank transfer is matched against the
+     statement by its UTR; cash and crypto have none, so the image IS the proof.
+     Stated here so the merchant knows what to bring before it starts typing —
+     the server refuses the wrong combination either way. */
+  const needsUtr = r.method === 'bank_transfer';
+  const fields = CL_PR_INSTRUCTIONS[r.method] || [];
+
+  clOpenModal(`Payment request — ${r.topup_number || ''}`, `
+    <dl class="cl-dl" style="margin-bottom:13px;">
+      <div><dt>Amount</dt><dd><b>${escapeHtml(moneyStr(r.amount))}</b></dd></div>
+      <div><dt>Method</dt><dd>${escapeHtml(CL_PR_METHOD_LABELS[r.method] || r.method)}</dd></div>
+      <div><dt>Status</dt><dd>${clPrStatusTag(r.status)}</dd></div>
+      <div><dt>Raised</dt><dd>${escapeHtml(fmtDate(r.submitted_at))}</dd></div>
+    </dl>
+
+    ${fields.length ? `
+      <h3 style="font-size:12px;margin:14px 0 6px;">Where to send it</h3>
+      <dl class="cl-dl" style="margin-bottom:13px;">
+        ${fields.map(([key, label]) => `
+          <div><dt>${label}</dt>
+            <dd class="cl-ref">${escapeHtml(r.instructions?.[key] || '—')}</dd></div>`).join('')}
+        ${r.instructions?.note
+          ? `<div><dt>Note</dt><dd>${escapeHtml(r.instructions.note)}</dd></div>` : ''}
+      </dl>` : ''}
+
+    ${r.status === 'rejected' && r.review_remarks ? `
+      <div class="cl-msg cl-msg-err" style="margin-bottom:13px;">
+        <b>Rejected:</b> ${escapeHtml(r.review_remarks)}
+      </div>` : ''}
+
+    ${r.status === 'verified' ? `
+      <div class="cl-msg cl-msg-ok" style="margin-bottom:13px;">
+        Approved${r.wallet_txn_number ? ` — credited to your wallet as <b>${escapeHtml(r.wallet_txn_number)}</b>` : ''}.
+      </div>` : ''}
+
+    ${r.status === 'submitted' ? `
+      <div class="cl-msg cl-msg-muted" style="margin-bottom:13px;">
+        With our payments desk. Your wallet is credited once it is approved.
+      </div>` : ''}
+
+    ${settleable ? `
+      <h3 style="font-size:12px;margin:14px 0 6px;">Record your payment</h3>
+      <div class="cl-form cl-form-2">
+        ${needsUtr ? `
+          <div class="cl-field cl-field-full">
+            <label for="clPrUtr">UTR / reference number<span class="cl-req">*</span></label>
+            <input type="text" id="clPrUtr" maxlength="64" placeholder="From your bank transfer">
+          </div>` : ''}
+        <div class="cl-field cl-field-full">
+          <label for="clPrProof">Payment proof<span class="cl-req">*</span></label>
+          <input type="file" id="clPrProof" accept="image/png,image/jpeg,application/pdf">
+        </div>
+      </div>
+      <p class="cl-kpi-sub" style="margin:6px 0 0;">
+        Submitting does not credit your wallet — our team approves it first.
+      </p>
+      <div class="cl-msg" id="clPrMsg"></div>` : ''}`,
+    settleable
+      ? `<button type="button" class="cl-btn" data-cl-pr-abort>Cancel</button>
+         <button type="button" class="cl-btn cl-btn-primary" data-cl-pr-go>Submit payment</button>`
+      : '<button type="button" class="cl-btn" data-cl-pr-abort>Close</button>');
+
+  $('clModalFoot').querySelector('[data-cl-pr-abort]').addEventListener('click', clCloseModal);
+
+  const go = $('clModalFoot').querySelector('[data-cl-pr-go]');
+  if (!go) return;
+
+  go.addEventListener('click', async () => {
+    const msg = $('clPrMsg');
+    const utr = needsUtr ? ($('clPrUtr').value || '').trim() : '';
+    const proof = $('clPrProof').files[0];
+
+    /* Checked here as well as server-side so the merchant gets the reason
+       immediately rather than a bare 400 after the upload. */
+    if (needsUtr && !utr) return clMsg(msg, 'Enter the UTR from your bank transfer.', 'err');
+    if (!proof) return clMsg(msg, 'Attach the payment proof.', 'err');
+
+    go.disabled = true;
+    clMsg(msg, 'Submitting…', 'muted');
+    try {
+      await MerchantApi.settlePaymentRequest(r.topup_id, { utr: utr || undefined, proof });
+      clCloseModal();
+      clPrLoaded = new Set();
+      await Promise.all([clLoadPaymentRequests(clPrTab), clLoadPaymentRequestCounts()]);
+      clInvalidate('dashboard', 'wallet');
+      clLoadUnreadCount();
+    } catch (err) {
+      clMsg(msg, clError(err, 'Could not submit that payment.'), 'err');
+      go.disabled = false;
+    }
+  });
+}
+
+/* ------------------------------------------- retired with the redesign (0041)
+
+   `clLoadFinance`, `clLoadStatement`, `clLoadPayments` and `clPayRow` used to
+   live here: the account-position strip, the statement ledger and the
+   per-booking payable table. Payment Management no longer renders any of that
+   markup, so every one of them would now throw on a null element.
+
+   NOTHING WAS REMOVED FROM THE API. GET /api/merchant/finance/position and
+   /statement are untouched and still served by finance_service; the Wallet
+   screen is the portal's single running-account surface and shows the same
+   figures from the same computation. The payable list moved to My Requests,
+   which is where a row at Payment Pending is worked.
+
+   `clOpenPayModal` below is deliberately kept — My Requests opens it for a row
+   at Payment Pending, and deleting it would have taken that path with it.
+   ------------------------------------------------------------------------ */
 
 /* Shared by Payments and My Requests — one payment dialog, one code path, so
    the two screens cannot drift on what gets posted. */

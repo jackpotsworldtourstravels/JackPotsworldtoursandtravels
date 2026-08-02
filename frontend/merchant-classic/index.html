@@ -38,7 +38,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260802sc2">
+<link rel="stylesheet" href="css/classic.css?v=20260802ui13">
+<!-- Shared design system — must stay last. It re-points classic.css's own
+     `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
+     contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
+     text) so every AA measurement in this portal still holds. -->
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260802ui13">
 </head>
 <body>
 
@@ -209,7 +214,12 @@
         <span class="cl-side-label">Dashboard</span>
       </a>
 
-      <div class="cl-side-group">Booking</div>
+      <!-- OPERATIONS — the things a merchant DOES. Booking Enquiry, Booking
+           Request and Service Requests are one continuous flow: ask, book,
+           then change what was booked. They were split across a "Booking" and
+           an "Operations" heading, which put the third step of the flow under
+           a different label from the first two. -->
+      <div class="cl-side-group">Operations</div>
       <!-- "Booking Enquiry" here, "Ticket Enquiry" on every staff screen.
            Deliberate: the merchant is starting a booking, the desk is working an
            enquiry queue. Same rows, same request_type. -->
@@ -222,7 +232,6 @@
         <span class="cl-side-label">Booking Request</span>
       </a>
 
-      <div class="cl-side-group">Operations</div>
       <!-- MY REQUESTS IS NOT IN THIS RAIL, AND THE SCREEN IS STILL THERE.
            Removed from navigation only: `cl-requests`, its loader and
            CL_TITLES['requests'] are untouched, so clGo('requests') still
@@ -244,10 +253,6 @@
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
         <span class="cl-side-label">Approvals</span>
       </a>
-      <a href="#" data-cl-nav="booking-history">
-        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
-        <span class="cl-side-label">Booking History</span>
-      </a>
       <a href="#" data-cl-nav="service-request">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
         <span class="cl-side-label">Service Requests</span>
@@ -263,10 +268,19 @@
       </a>
       <a href="#" data-cl-nav="payments">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg></span>
-        <span class="cl-side-label">Payments</span>
+        <span class="cl-side-label">Payment Management</span>
       </a>
 
-      <div class="cl-side-group">Insight</div>
+      <!-- INSIGHTS — the things a merchant READS. Booking History leads it:
+           it is the closed side of the same table Operations creates, so it
+           belongs with the record-keeping screens rather than the working
+           ones. Profile and Support Center folded in from a separate
+           "Account" heading — a two-item group is a heading doing no work. -->
+      <div class="cl-side-group">Insights</div>
+      <a href="#" data-cl-nav="booking-history">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg></span>
+        <span class="cl-side-label">Booking History</span>
+      </a>
       <a href="#" data-cl-nav="reports">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg></span>
         <span class="cl-side-label">Reports</span>
@@ -277,7 +291,6 @@
         <span class="cl-side-pill" id="clNavNotesCount"></span>
       </a>
 
-      <div class="cl-side-group">Account</div>
       <a href="#" data-cl-nav="profile">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
         <span class="cl-side-label">Profile &amp; Settings</span>
@@ -296,16 +309,12 @@
         <span id="clSideCode">Merchant account</span>
       </div>
 
-      <!-- Collapse. Desktop only: below 900px the rail is already a drawer. -->
-      <button type="button" class="cl-rail-toggle" id="clRailToggle"
-              aria-expanded="true" aria-controls="clSide">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
-          <path d="M16 9l-3 3 3 3"/>
-        </svg>
-        <span class="cl-side-label" id="clRailToggleText">Collapse</span>
-      </button>
+      <!-- The rail collapse control was removed on request. It was NOT safe to
+           delete on its own: clApplyRail/clInitRail in classic-shell.js both
+           dereferenced `#clRailToggle` unguarded and threw on boot without it.
+           Both are now null-tolerant, and clInitRail clears the stored
+           `classic_rail_mini` preference so a merchant who had already
+           collapsed the rail is not left narrow with no way to widen it. -->
     </nav>
 
     <!-- -------------------------------- main ------------------------------ -->
@@ -366,28 +375,28 @@
      Order matters: axios, then formatters + auth (shared), then API_BASE via
      classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260731m4"></script>
-<script src="../assets/js/auth.js?v=20260731cr2"></script>
+<script src="../shared/formatters.js?v=20260802ui13"></script>
+<script src="../assets/js/auth.js?v=20260802ui13"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
-<script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260802ui3"></script>
-<script src="../shared/merchant-api.js?v=20260802ui2"></script>
-<script src="js/classic-icons.js?v=20260802ui3"></script>
-<script src="js/classic-dashboard.js?v=20260802ui3"></script>
-<script src="js/classic-enquiry.js?v=20260802ui3"></script>
-<script src="js/classic-booking.js?v=20260802ui3"></script>
-<script src="js/classic-booking-detail.js?v=20260802ui3"></script>
-<script src="js/classic-requests.js?v=20260802ui3"></script>
-<script src="js/classic-history.js?v=20260802ui5"></script>
-<script src="js/classic-approvals.js?v=20260802ui3"></script>
-<script src="js/classic-wallet.js?v=20260802ui4"></script>
-<script src="js/classic-payments.js?v=20260802ui3"></script>
-<script src="js/classic-service.js?v=20260802ui4"></script>
-<script src="js/classic-reports.js?v=20260802ui3"></script>
-<script src="js/classic-account.js?v=20260802ui3"></script>
-<script src="js/classic-support.js?v=20260802sc2"></script>
+<script src="../assets/js/travel-locations.js?v=20260802ui13"></script>
+<script src="js/classic-shell.js?v=20260802ui13"></script>
+<script src="../shared/merchant-api.js?v=20260802ui13"></script>
+<script src="js/classic-icons.js?v=20260802ui13"></script>
+<script src="js/classic-dashboard.js?v=20260802ui13"></script>
+<script src="js/classic-enquiry.js?v=20260802ui13"></script>
+<script src="js/classic-booking.js?v=20260802ui13"></script>
+<script src="js/classic-booking-detail.js?v=20260802ui13"></script>
+<script src="js/classic-requests.js?v=20260802ui13"></script>
+<script src="js/classic-history.js?v=20260802ui13"></script>
+<script src="js/classic-approvals.js?v=20260802ui13"></script>
+<script src="js/classic-wallet.js?v=20260802ui13"></script>
+<script src="js/classic-payments.js?v=20260802ui13"></script>
+<script src="js/classic-service.js?v=20260802ui13"></script>
+<script src="js/classic-reports.js?v=20260802ui13"></script>
+<script src="js/classic-account.js?v=20260802ui13"></script>
+<script src="js/classic-support.js?v=20260802ui13"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

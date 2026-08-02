@@ -66,6 +66,10 @@ class AdminDashboardResponse(BaseModel):
     merchants: MerchantCounts
     requests_by_status: RequestsByStatus
     enquiries: EnquiryCounts = EnquiryCounts()
+    # Added for the redesigned Admin Dashboard. Defaulted so an older client
+    # reading this payload is unaffected and a partial deploy still validates.
+    total_users: int = 0
+    active_service_requests: int = 0
     payments_pending_count: int
     payments_verified_today: int
     open_support_tickets: int

@@ -217,6 +217,11 @@ class ProviderStatus(str, enum.Enum):
 
 
 class WalletTopupStatus(str, enum.Enum):
+    #: An Admin has raised a payment request and named the manager who must
+    #: settle it, but nobody has paid yet (migration 0041). Nothing here is
+    #: reviewable — ``_assert_undecided`` admits ``submitted`` only — so a
+    #: request in this state can never credit a wallet.
+    AWAITING_PAYMENT = "awaiting_payment"
     SUBMITTED = "submitted"
     VERIFIED = "verified"
     REJECTED = "rejected"
@@ -227,6 +232,10 @@ class WalletTopupMethod(str, enum.Enum):
     UPI = "upi"
     QR = "qr"
     CASH = "cash"
+    #: Admin-initiated only (migration 0041). Carries a wallet address and a
+    #: network (TRC20 / ERC20 / BEP20) in ``instructions``, and is proved by an
+    #: image rather than a UTR — a chain has no bank reference.
+    CRYPTO = "crypto"
     OTHER = "other"
 
 
@@ -642,6 +651,27 @@ class ServiceRequest(Base):
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
     )
+    #: What the merchant quoted its OWN end customer (migration 0040). Never a
+    #: price this platform charges — it does not settle, bill or move a wallet.
+    #: NULL means "not recorded", which is not the same as 0 ("quoted at zero"),
+    #: so every consumer must treat NULL as "no savings figure" rather than as a
+    #: zero saving. See ``saved_amount`` below for the derived margin.
+    client_fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
+
+    @property
+    def saved_amount(self) -> Optional[Decimal]:
+        """``client_fare - total_amount``, or None when no fare was recorded.
+
+        FLOORED AT ZERO ON PURPOSE. If we billed more than the merchant sold
+        at, that is a loss on their side, not a negative saving — and letting it
+        go negative would silently subtract from the "Total Savings" figure on
+        their dashboard, making a bad month look like a smaller good one. A loss
+        is visible from the two numbers themselves, which are both shown.
+        """
+        if self.client_fare is None:
+            return None
+        diff = self.client_fare - (self.total_amount or Decimal("0"))
+        return diff if diff > 0 else Decimal("0")
 
     available_units: Mapped[Optional[int]] = mapped_column(Integer)
     low_stock_threshold: Mapped[Optional[int]] = mapped_column(Integer)
@@ -1398,6 +1428,28 @@ class WalletTopup(Base):
     reviewed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
     review_remarks: Mapped[Optional[str]] = mapped_column(Text)
 
+    # --- Admin-initiated requests (migration 0041) --------------------------
+    #: The Admin who raised the request. NULL on every merchant-initiated
+    #: top-up, which is what distinguishes the two directions.
+    raised_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    #: The merchant's manager who must settle it. Named at creation so the
+    #: request lands in one person's queue rather than the company's.
+    assigned_manager_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    #: Where to send the money, shaped by ``method`` — bank name/number/IFSC/
+    #: branch, cash token/note number, or crypto address/network. Read back
+    #: verbatim; never aggregated.
+    instructions: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    #: How many times a rejected request has been paid again and resubmitted.
+    resubmission_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+
     created_at: Mapped[dt.datetime] = mapped_column(
         _TS, nullable=False, server_default=func.now()
     )
@@ -1408,8 +1460,31 @@ class WalletTopup(Base):
     __table_args__ = (
         UniqueConstraint("topup_number", name="uq_wallet_topups_number"),
         CheckConstraint("amount > 0", name="ck_wallet_topups_amount_positive"),
+        CheckConstraint(
+            "jsonb_typeof(instructions) = 'object'",
+            name="ck_wallet_topups_instructions_object",
+        ),
+        CheckConstraint(
+            "resubmission_count >= 0",
+            name="ck_wallet_topups_resubmissions_non_negative",
+        ),
         Index("ix_wallet_topups_merchant", "merchant_id", "topup_id"),
+        Index(
+            "ix_wallet_topups_assigned",
+            "assigned_manager_id", "topup_id",
+            postgresql_where=text("assigned_manager_id IS NOT NULL"),
+        ),
     )
+
+    @property
+    def admin_initiated(self) -> bool:
+        """Did the desk ask for this, or did the merchant volunteer it?
+
+        Derived from ``raised_by`` rather than stored as a flag, so the two
+        cannot disagree: an Admin raised it exactly when an Admin is recorded
+        as having raised it.
+        """
+        return self.raised_by is not None
 
     def __repr__(self) -> str:
         return f"<WalletTopup {self.topup_number} {self.amount} {self.status.value}>"

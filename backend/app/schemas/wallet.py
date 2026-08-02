@@ -127,12 +127,29 @@ class TopupOut(BaseModel):
     utr: str | None = None
     has_proof: bool = False
     proof_filename: str | None = None
-    status: Literal["submitted", "verified", "rejected"]
+    #: ``awaiting_payment`` was added by migration 0041 for requests the desk
+    #: raises. Widening a response Literal is safe for existing clients — they
+    #: read this as a string — and it is *required*, because Pydantic refuses to
+    #: serialise a value the Literal does not list.
+    status: Literal["awaiting_payment", "submitted", "verified", "rejected"]
     submitted_at: datetime.datetime
     reviewed_at: datetime.datetime | None = None
     review_remarks: str | None = None
     #: Set once verified — the ledger entry this top-up became.
     wallet_txn_number: str | None = None
+
+    # --- Admin-initiated requests (0041). Defaulted, so every existing caller
+    # and every merchant-initiated row is unaffected.
+    #: True when the payments desk raised this, false when the merchant did.
+    admin_initiated: bool = False
+    #: Where to send the money, shaped by ``method``. Empty on a merchant's own
+    #: top-up, which was paid into a listed account instead.
+    instructions: dict[str, Any] = Field(default_factory=dict)
+    assigned_manager_id: int | None = None
+    assigned_manager_name: str | None = None
+    raised_by_name: str | None = None
+    #: How many times a rejected request has been paid again and resubmitted.
+    resubmission_count: int = 0
 
 
 class TopupPage(BaseModel):

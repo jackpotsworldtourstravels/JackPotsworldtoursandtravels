@@ -38,12 +38,18 @@ async function loadSaProfile() {
   loadSaSignIns();
 }
 
-async function loadSaSignIns() {
+/* SEVEN PER PAGE, AND OLDER ONES ARE PAGED IN — not "the last 7 and the rest
+   are gone". The endpoint already pages, so `page_size: 7` plus the portal's
+   standard pager is the whole implementation; nothing is fetched that is not
+   shown, which is the opposite of slicing a larger page in the browser. */
+const SA_SIGNIN_PAGE_SIZE = 7;
+
+async function loadSaSignIns(page = 1) {
   const tbody = document.querySelector('#saSecurityTable tbody');
   saTableError(tbody, 4, 'Loading…');
   try {
     const { data } = await axios.get(`${API_BASE}/api/super-admin/activity`, {
-      params: { module: 'Auth', search: saProfileEmail, page_size: 10 },
+      params: { module: 'Auth', search: saProfileEmail, page, page_size: SA_SIGNIN_PAGE_SIZE },
       headers: saAuthHeaders(),
     });
     tbody.innerHTML = data.items.length ? data.items.map(e => `
@@ -54,6 +60,7 @@ async function loadSaSignIns() {
         <td>${saEscapeHtml(e.browser || '—')}${e.device ? ` · ${saEscapeHtml(e.device)}` : ''}</td>
       </tr>`).join('')
       : '<tr><td colspan="4" class="empty-state">No sign-in activity recorded yet.</td></tr>';
+    saRenderPagination('saSecurityPagination', data.page, data.total_pages, data.total, loadSaSignIns);
   } catch (err) {
     saTableError(tbody, 4, saErrorText(err, 'Failed to load sign-in history.'));
   }

@@ -75,9 +75,21 @@ const WD_TXN_LABELS = {
 };
 
 function wdStatusChip(status) {
-  /* Colour is never the only carrier — every chip carries its word. */
-  const map = { submitted: 'pending', verified: 'ok', rejected: 'danger' };
-  const text = { submitted: 'Awaiting verification', verified: 'Verified', rejected: 'Rejected' };
+  /* Colour is never the only carrier — every chip carries its word.
+     `awaiting_payment` (0041) is here because the All tab shows every row in
+     the table, and a desk-raised request that nobody has paid yet is one of
+     them. Without an entry it fell through to the raw enum, printing
+     "awaiting_payment" at a desk that reads these chips to decide what to
+     work on. Those rows are worked on Payment Management; this screen only
+     has to describe them honestly. */
+  const map = {
+    awaiting_payment: 'pending', submitted: 'pending',
+    verified: 'ok', rejected: 'danger',
+  };
+  const text = {
+    awaiting_payment: 'Awaiting merchant payment',
+    submitted: 'Awaiting verification', verified: 'Verified', rejected: 'Rejected',
+  };
   return `<span class="badge ${map[status] || ''}">${wdEsc(text[status] || status)}</span>`;
 }
 

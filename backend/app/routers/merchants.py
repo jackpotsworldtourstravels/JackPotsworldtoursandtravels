@@ -10,11 +10,21 @@ from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, require
 from app.database.session import get_db
-from app.models_v2 import CompanyType, Merchant, MerchantStatus, User
+from app.models_v2 import (
+    CompanyType,
+    Merchant,
+    MerchantStatus,
+    Payment,
+    PaymentStatus,
+    RequestStatus,
+    ServiceRequest,
+    User,
+)
 from app.schemas.accounts import (
     AccountResponse,
     CreateMerchantUserRequest,
     CredentialsResponse,
+    StatusChangeRequest,
 )
 from app.schemas.merchant import (
     CreateMerchantRequest,
@@ -30,18 +40,62 @@ router = APIRouter(prefix="/api/admin/merchants", tags=["admin · merchants"])
 
 
 def _with_user_counts(db: Session, merchants: list[Merchant]) -> list[MerchantResponse]:
-    """Attach user counts in one query rather than lazy-loading per row."""
+    """Attach the per-merchant rollups the Admin table shows.
+
+    THREE GROUPED QUERIES FOR THE WHOLE PAGE, NOT THREE PER ROW. Each aggregate
+    is a single ``GROUP BY merchant_id`` over the ids already on this page, so
+    the cost is constant in the page size rather than linear in it. Lazy-loading
+    ``merchant.users`` per row (which ``MerchantResponse.of`` falls back to) is
+    what this exists to avoid, and the same reasoning applies to the two counts
+    added for the Merchant Management columns.
+    """
     if not merchants:
         return []
     ids = [m.merchant_id for m in merchants]
-    counts = dict(
-        db.execute(
-            select(User.merchant_id, func.count())
-            .where(User.merchant_id.in_(ids))
-            .group_by(User.merchant_id)
-        ).all()
+
+    def _grouped(stmt) -> dict[int, int]:
+        return dict(db.execute(stmt).all())
+
+    counts = _grouped(
+        select(User.merchant_id, func.count())
+        .where(User.merchant_id.in_(ids))
+        .group_by(User.merchant_id)
     )
-    return [MerchantResponse.of(m, counts.get(m.merchant_id, 0)) for m in merchants]
+    # "Tickets Issued" is the count of bookings that reached TICKET_ISSUED. It
+    # deliberately does NOT include COMPLETED: a completed booking has travelled,
+    # and the column is read as "how much has this merchant got out of us right
+    # now", not lifetime volume. Change this and the Admin's number stops
+    # matching the merchant's own Dashboard tile, which counts the same way.
+    tickets = _grouped(
+        select(ServiceRequest.merchant_id, func.count())
+        .where(
+            ServiceRequest.merchant_id.in_(ids),
+            ServiceRequest.status == RequestStatus.TICKET_ISSUED,
+        )
+        .group_by(ServiceRequest.merchant_id)
+    )
+    # "Awaiting Verification" mirrors the Dashboard's `payments_pending_count`
+    # (dashboard_service.py) exactly — payments sitting at PENDING — but scoped
+    # to one merchant. Same predicate, so the column and the KPI can never
+    # disagree.
+    awaiting = _grouped(
+        select(Payment.merchant_id, func.count())
+        .where(
+            Payment.merchant_id.in_(ids),
+            Payment.payment_status == PaymentStatus.PENDING,
+        )
+        .group_by(Payment.merchant_id)
+    )
+
+    return [
+        MerchantResponse.of(
+            m,
+            counts.get(m.merchant_id, 0),
+            tickets_issued=tickets.get(m.merchant_id, 0),
+            awaiting_verification=awaiting.get(m.merchant_id, 0),
+        )
+        for m in merchants
+    ]
 
 
 @router.get(
@@ -254,3 +308,38 @@ def reset_merchant_user_password(
     return CredentialsResponse(
         account=AccountResponse.of(user), temporary_password=temp_password
     )
+
+
+@router.patch(
+    "/{merchant_id}/users/{user_id}/status",
+    response_model=AccountResponse,
+    summary="Activate or deactivate a merchant user",
+    description=(
+        "Requires `merchant_user.manage`. Deactivating ends that user's sessions and revokes "
+        "their tokens immediately."
+    ),
+)
+def set_merchant_user_status(
+    merchant_id: int,
+    user_id: int,
+    payload: StatusChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.MERCHANT_USER_MANAGE)),
+):
+    """The Admin-side counterpart to ``PATCH /api/merchant/team/{user_id}/status``.
+
+    THE TWO CANNOT BE ONE ROUTE. The merchant-team version derives the company
+    from the CALLER (``_own_merchant_id(current_user)``), which is exactly what
+    stops one merchant touching another's staff — and it is also why an Admin,
+    who belongs to no merchant, cannot use it. Here the company comes from the
+    URL instead, the same asymmetry ``create_merchant_user`` and
+    ``reset_merchant_user_password`` above already have.
+
+    Both call the same ``account_service.set_merchant_user_status``, so the
+    self-suspension guard, the forced logout, the token revocation and the
+    activity-log entry are identical whichever side does it.
+    """
+    user = account_service.set_merchant_user_status(
+        db, current_user, merchant_id, user_id, payload.status
+    )
+    return AccountResponse.of(user)

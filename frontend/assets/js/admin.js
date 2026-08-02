@@ -5,6 +5,13 @@ const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http:
 /* escapeHtml/money/fmtDate/fmtDateTime/fmtTime now live in shared/formatters.js. */
 function statusLabel(s) { return (s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
+/* THE USERS TABLE HAS NO `username` COLUMN — this platform signs in by email
+   (models_v2.User has email + password_hash and nothing else identity-wise), so
+   the username IS the local part of the address. Callers keep the full address
+   on the cell's `title`, because two accounts on different domains can share a
+   local part and the short form alone would not tell them apart. */
+function usernameOf(email) { return (email || '').split('@')[0] || '—'; }
+
 /* authHeaders(), getStoredAuth(), clearStoredAuth() now live in assets/js/auth.js. */
 
 /* A 401 from any API call means the session is gone (expired, revoked, or never valid).
@@ -70,6 +77,8 @@ const sectionTitles = {
   'ticket-enquiries': 'Ticket Enquiries',
   'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
+  /* Moved here from the Super Admin Portal; see assets/js/admin-logs.js. */
+  audit: 'Audit Logs', 'system-logs': 'System Logs',
 };
 const loadedSections = new Set();
 
@@ -102,7 +111,9 @@ function loadSection(name) {
   if (name === 'reports-export') return initReportsExport();
   /* M6. Defined in admin-analytics.js, loaded after this file. */
   if (name === 'analytics') return loadAnalytics();
-  if (name === 'payments') return loadPayments();
+  /* 0041. Defined in admin-payment-requests.js, loaded after this file. The old
+     per-booking loadPayments() is retired — see the note above it. */
+  if (name === 'payments') return initPaymentRequests();
   if (name === 'notifications') return initNotificationForm();
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
@@ -110,6 +121,9 @@ function loadSection(name) {
   if (name === 'booking-ops') return loadBookingOps();
   /* 0039. Defined in admin-providers.js, loaded after this file. */
   if (name === 'providers') return loadProviders();
+  /* Both defined in admin-logs.js, loaded after this file. */
+  if (name === 'audit') return loadAuditLogs();
+  if (name === 'system-logs') return loadSystemLogs();
   /* No 'change-requests' case: cancellations and reschedules are rows on
      Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();
@@ -129,7 +143,14 @@ function rowsSkeleton(count = 5) {
 
 /* ---------- Global search ---------- */
 /* Federates the list endpoints that already support server-side `search` —
-   merchants, requests (bookings + service requests), payments — no new backend endpoint. */
+   merchants, requests (bookings + service requests), payment requests — no new
+   backend endpoint.
+
+   The third group used to search /api/admin/payments and jump to the
+   per-booking payment table. That table no longer exists (0041), so the group
+   now searches the payment requests that replaced it and lands on the screen
+   that can actually show the row. A result that navigates somewhere it cannot
+   be displayed is worse than no result. */
 let globalSearchTimer;
 const gsInput = document.getElementById('globalSearchInput');
 const gsDropdown = document.getElementById('globalSearchDropdown');
@@ -140,7 +161,7 @@ async function runGlobalSearch(q) {
     const [merchants, requests, payments] = await Promise.all([
       axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { search: q, page: 1, page_size: 4 } }).catch(() => null),
       axios.get(`${API_BASE}/api/requests`, { headers: authHeaders(), params: { search: q, page: 1, page_size: 4 } }).catch(() => null),
-      axios.get(`${API_BASE}/api/admin/payments`, { headers: authHeaders(), params: { search: q, page: 1, page_size: 4 } }).catch(() => null),
+      axios.get(`${API_BASE}/api/admin/wallet/topups`, { headers: authHeaders(), params: { search: q, bucket: 'all', page: 1, page_size: 4 } }).catch(() => null),
     ]);
     const groups = [];
     if (merchants?.data?.items?.length) {
@@ -160,9 +181,11 @@ async function runGlobalSearch(q) {
     }
     if (payments?.data?.items?.length) {
       groups.push({ label: 'Payments', rows: payments.data.items.map(p => ({
-        title: p.transaction_id || `Payment #${p.id}`, meta: `${money(p.amount)} · ${p.status}`,
+        title: `${p.topup_number} — ${p.merchant_name || ''}`,
+        meta: `${moneyStr(p.amount)} · ${String(p.status).replace(/_/g, ' ')}`,
         action: () => navigateToSection('payments', () => {
-          document.getElementById('pvSearch').value = p.transaction_id || String(p.id); loadPayments(1);
+          const box = document.getElementById('prSearch');
+          if (box) { box.value = p.topup_number; box.dispatchEvent(new Event('input')); }
         }),
       })) });
     }
@@ -206,6 +229,7 @@ async function loadReports() {
     verify: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/>',
     issued: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>',
     support: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/>',
+    users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>',
     enquiry: '<path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/>',
   };
@@ -216,23 +240,24 @@ async function loadReports() {
        returns no `enquiries` block, and the dashboard should still render. */
     const enq = data.enquiries || { pending: 0, in_review: 0, awaiting_response: 0, answered_today: 0 };
     updateEnquiryNavBadge(enq.awaiting_response);
+    /* FOUR CARDS, HEADING AND VALUE ONLY.
+       Payment Verification, Payments Verified Today, Ticket Issued, Open
+       Support Tickets, Open Chat Threads and the Recent Activity feed were all
+       removed on request, along with every `.stat-sub` breakdown. What is left
+       answers "how big is the platform and what is moving right now".
+
+       "Active Support Chats" is `open_chat_threads` — the same figure the old
+       "Open Chat Threads" card showed, relabelled to the wording asked for
+       rather than recomputed. `/api/admin/dashboard` is unchanged and still
+       returns every field above; Payments Awaiting Verification now lives as a
+       per-merchant column on Merchant Management, and the queue itself is
+       Payment Management. */
     grid.innerHTML = `
-      <div class="stat-card">${statIcon('coral', ICONS.merchant)}<div class="stat-body"><div class="num">${data.merchants.total}</div><div class="label">Total Merchants</div><div class="stat-sub">${data.merchants.active} active · ${data.merchants.pending_approval} pending · ${data.merchants.suspended} suspended</div></div></div>
-      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${s.pending_approval + s.in_review}</div><div class="label">Awaiting Approval</div><div class="stat-sub">Bookings only — enquiries counted separately</div></div></div>
-      <div class="stat-card stat-card-link" data-goto-section="ticket-enquiries" role="button" tabindex="0">${statIcon('coral', ICONS.enquiry)}<div class="stat-body"><div class="num coral">${enq.awaiting_response}</div><div class="label">Enquiries Awaiting Answer</div><div class="stat-sub">${enq.pending} pending · ${enq.in_review} under review · ${enq.answered_today} answered today</div></div></div>
-      <div class="stat-card">${statIcon('sky', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_pending_count}</div><div class="label">Payments Awaiting Verification</div></div></div>
-      <div class="stat-card">${statIcon('emerald', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_verified_today}</div><div class="label">Payments Verified Today</div></div></div>
-      <div class="stat-card">${statIcon('', ICONS.issued)}<div class="stat-body"><div class="num">${s.ticket_issued}</div><div class="label">Ticket Issued</div></div></div>
-      <div class="stat-card">${statIcon('coral', ICONS.support)}<div class="stat-body"><div class="num">${data.open_support_tickets}</div><div class="label">Open Support Tickets</div></div></div>
-      <div class="stat-card">${statIcon('sky', ICONS.chat)}<div class="stat-body"><div class="num">${data.open_chat_threads}</div><div class="label">Open Chat Threads</div></div></div>
+      <div class="stat-card">${statIcon('coral', ICONS.merchant)}<div class="stat-body"><div class="num">${data.merchants.total}</div><div class="label">Total Merchants</div></div></div>
+      <div class="stat-card">${statIcon('sky', ICONS.users)}<div class="stat-body"><div class="num">${data.total_users ?? 0}</div><div class="label">Total Users</div></div></div>
+      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${data.active_service_requests ?? 0}</div><div class="label">Active Service Requests</div></div></div>
+      <div class="stat-card">${statIcon('emerald', ICONS.chat)}<div class="stat-body"><div class="num">${data.open_chat_threads}</div><div class="label">Active Support Chats</div></div></div>
     `;
-    const feed = document.getElementById('dashRecentActivity');
-    feed.innerHTML = data.recent_activity.length ? `<div class="live-feed">${data.recent_activity.map(a => `
-      <div class="live-feed-item">
-        <strong>${escapeHtml(a.user_name || 'System')}</strong> — ${escapeHtml(a.action)}
-        ${a.description ? `<div style="font-size:12px;color:var(--text-muted);">${escapeHtml(a.description)}</div>` : ''}
-        <div style="font-size:11px;color:var(--text-muted);">${fmtDateTime(a.created_at)}</div>
-      </div>`).join('')}</div>` : '<div class="empty-state">No recent activity.</div>';
   } catch (err) {
     grid.innerHTML = `<div class="msg error">Failed to load dashboard.</div>`;
   }
@@ -253,19 +278,9 @@ const MERCHANT_STATUS_BADGE = { active: 'active', pending_approval: 'pending', s
 
 let merchantsPage = 1;
 let merchantSearchTimer = null;
-const merchantSelectedIds = new Set();
-
-function updateMerchantBulkBar() {
-  const bar = document.getElementById('merchantBulkBar');
-  const count = merchantSelectedIds.size;
-  document.getElementById('merchantBulkCount').textContent = `${count} selected`;
-  bar.classList.toggle('open', count > 0);
-}
 
 async function loadMerchants(page = merchantsPage) {
   merchantsPage = page;
-  merchantSelectedIds.clear();
-  updateMerchantBulkBar();
   showMerchantView('list');
   document.getElementById('merchantDetailPanel').innerHTML = '';
   const tbody = document.querySelector('#merchantsTable tbody');
@@ -278,52 +293,36 @@ async function loadMerchants(page = merchantsPage) {
       params: { search: search || undefined, status: status || undefined, page, page_size: PAGE_SIZE },
     });
     renderPagination('merchantsPagination', data.page, data.total_pages, data.total, loadMerchants);
-    document.getElementById('merchantSelectAll').checked = false;
+    /* NINE COLUMNS, AND VIEW IS THE ONLY ACTION.
+       Merchant Code, Company Type, Email, Phone, Created Date and the row
+       checkbox were removed on request; Country Code, Wallet Balance, Tickets
+       Issued and Awaiting Verification took their place. Every removed field is
+       still on the record and still shown inside View — this narrowed the
+       TABLE, not the data.
+
+       Edit / Approve / Suspend / Reactivate moved into the detail view rather
+       than being deleted: those four are still the only way to change a
+       merchant, and they are one click further from a list where the wrong row
+       is easy to hit. `money()` is not used for the balance — it takes a float
+       and drops paise; `moneyStr()` reads the API's decimal string. */
     tbody.innerHTML = data.items.map(m => `
       <tr>
-        <td class="mm-checkbox-col"><input type="checkbox" class="mm-row-check" data-select-merchant="${m.id}" ${merchantSelectedIds.has(m.id) ? 'checked' : ''}></td>
-        <td>${escapeHtml(m.merchant_code)}</td>
+        <td><strong>${escapeHtml(m.merchant_code)}</strong></td>
         <td>${escapeHtml(m.merchant_name)}</td>
-        <td>${escapeHtml(COMPANY_TYPE_LABELS[m.company_type] || '—')}</td>
-        <td>${escapeHtml(m.email)}</td>
-        <td>${escapeHtml(m.phone || '—')}</td>
-        <td><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></td>
+        <td>${escapeHtml(m.country_code || '—')}</td>
         <td>${m.user_count}</td>
-        <td>${fmtDate(m.created_at)}</td>
+        <td>${moneyStr(m.wallet_balance)}</td>
+        <td>${m.tickets_issued ?? 0}</td>
+        <td>${m.awaiting_verification
+              ? `<span class="badge pending">${m.awaiting_verification}</span>`
+              : '0'}</td>
+        <td><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost btn-sm" data-view-merchant="${m.id}">View</button>
-          <button class="btn btn-ghost btn-sm" data-edit-merchant="${m.id}">Edit</button>
-          ${m.status === 'pending_approval' ? `<button class="btn btn-navy btn-sm" data-approve-merchant="${m.id}">Approve</button>` : ''}
-          ${m.status === 'active' ? `<button class="btn btn-danger btn-sm" data-status-merchant="${m.id}" data-next="suspended">Suspend</button>` : ''}
-          ${m.status === 'suspended' ? `<button class="btn btn-navy btn-sm" data-status-merchant="${m.id}" data-next="active">Reactivate</button>` : ''}
         </td>
       </tr>
     `).join('') || `<tr><td colspan="9" class="empty-state">No merchants found.</td></tr>`;
-    tbody.querySelectorAll('[data-select-merchant]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        const id = Number(cb.dataset.selectMerchant);
-        if (cb.checked) merchantSelectedIds.add(id); else merchantSelectedIds.delete(id);
-        updateMerchantBulkBar();
-      });
-    });
     tbody.querySelectorAll('[data-view-merchant]').forEach(btn => btn.addEventListener('click', () => openMerchantDetail(btn.dataset.viewMerchant)));
-    tbody.querySelectorAll('[data-edit-merchant]').forEach(btn => btn.addEventListener('click', () => openOnboardMerchantModal(btn.dataset.editMerchant)));
-    tbody.querySelectorAll('[data-approve-merchant]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        try {
-          await axios.post(`${API_BASE}/api/admin/merchants/${btn.dataset.approveMerchant}/approve`, {}, { headers: authHeaders() });
-          loadMerchants();
-        } catch (err) { alert(err.response?.data?.detail || 'Failed to approve merchant.'); }
-      });
-    });
-    tbody.querySelectorAll('[data-status-merchant]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        try {
-          await axios.patch(`${API_BASE}/api/admin/merchants/${btn.dataset.statusMerchant}/status`, { status: btn.dataset.next }, { headers: authHeaders() });
-          loadMerchants();
-        } catch (err) { alert(err.response?.data?.detail || 'Failed to update merchant.'); }
-      });
-    });
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="9" class="empty-state">Failed to load merchants.</td></tr>`;
   }
@@ -338,25 +337,13 @@ document.getElementById('merchantStatusFilter').addEventListener('change', () =>
 document.getElementById('merchantDateFrom')?.addEventListener('change', () => loadMerchants(1));
 document.getElementById('merchantDateTo')?.addEventListener('change', () => loadMerchants(1));
 document.getElementById('merchantSort')?.addEventListener('change', () => loadMerchants(1));
-document.getElementById('merchantSelectAll').addEventListener('change', e => {
-  document.querySelectorAll('#merchantsTable [data-select-merchant]').forEach(cb => {
-    cb.checked = e.target.checked;
-    const id = Number(cb.dataset.selectMerchant);
-    if (e.target.checked) merchantSelectedIds.add(id); else merchantSelectedIds.delete(id);
-  });
-  updateMerchantBulkBar();
-});
-document.getElementById('merchantBulkClearBtn').addEventListener('click', () => loadMerchants(merchantsPage));
-async function merchantBulkSetStatus(nextStatus) {
-  const ids = [...merchantSelectedIds];
-  if (!ids.length) return;
-  try {
-    await Promise.all(ids.map(id => axios.patch(`${API_BASE}/api/admin/merchants/${id}/status`, { status: nextStatus }, { headers: authHeaders() })));
-  } catch (err) { alert('Some merchants could not be updated.'); }
-  loadMerchants(merchantsPage);
-}
-document.getElementById('merchantBulkActivateBtn').addEventListener('click', () => merchantBulkSetStatus('active'));
-document.getElementById('merchantBulkDeactivateBtn').addEventListener('click', () => merchantBulkSetStatus('suspended'));
+/* The bulk select-all / Activate / Deactivate handlers were removed with the
+   checkbox column and the bulk bar they drove. They were NOT optional-chained
+   and would have thrown on `null.addEventListener` at script load, which in a
+   plain <script> takes every later listener in this file down with it —
+   Merchant Search, the status filter and Onboard included. Deleted rather than
+   guarded: there is no control left to bind to. PATCH /status is unchanged and
+   is still what the per-merchant Suspend/Reactivate in the detail view calls. */
 
 /* ---------- Onboard / Edit Merchant modal ---------- POST/PUT /api/admin/merchants (existing). */
 async function openOnboardMerchantModal(merchantId) {
@@ -437,38 +424,44 @@ async function openMerchantDetail(merchantId) {
   detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Loading…</div></div>`;
   try {
     const { data: m } = await axios.get(`${API_BASE}/api/admin/merchants/${merchantId}`, { headers: authHeaders() });
+    /* EDIT AND SUSPEND LIVE HERE NOW, not on the list row. The list carries a
+       single View action, so a state change is always made from the screen
+       that shows which merchant it is. Approve appears only while the account
+       is pending, and Suspend/Reactivate swap on the current status — the same
+       three endpoints the row buttons used.
+
+       The "Financial position" panel was removed on request. loadMerchantFinance
+       and loadMerchantStatement are still defined and still work; they simply
+       have no caller from this screen, and GET /finance and /statement are
+       untouched. The wallet balance the desk actually needs is now a column on
+       the list, and the full ledger lives on Wallet & Top-ups. */
+    const st = m.status;
     detailPanel.innerHTML = `
       <div class="panel">
         <div class="panel-head">
           <h2>${escapeHtml(m.company_name)}</h2>
-          <button class="btn btn-ghost btn-sm" id="backToMerchantsBtn">← Back to Merchants</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" id="editMerchantBtn">Edit</button>
+            ${st === 'pending_approval' ? `<button class="btn btn-coral btn-sm" id="approveMerchantBtn">Approve</button>` : ''}
+            ${st === 'active' ? `<button class="btn btn-danger btn-sm" id="suspendMerchantBtn" data-next="suspended">Suspend</button>` : ''}
+            ${st === 'suspended' ? `<button class="btn btn-coral btn-sm" id="suspendMerchantBtn" data-next="active">Reactivate</button>` : ''}
+            <button class="btn btn-ghost btn-sm" id="backToMerchantsBtn">← Back to Merchants</button>
+          </div>
         </div>
         <div class="info-grid">
-          <div class="info-item"><label>Merchant Code</label><div>${escapeHtml(m.merchant_code)}</div></div>
+          <div class="info-item"><label>Merchant ID</label><div>${escapeHtml(m.merchant_code)}</div></div>
           <div class="info-item"><label>Merchant Name</label><div>${escapeHtml(m.merchant_name)}</div></div>
           <div class="info-item"><label>Company Type</label><div>${escapeHtml(COMPANY_TYPE_LABELS[m.company_type] || '—')}</div></div>
           <div class="info-item"><label>Email</label><div>${escapeHtml(m.email)}</div></div>
           <div class="info-item"><label>Phone</label><div>${escapeHtml(m.phone || '—')}</div></div>
+          <div class="info-item"><label>Country</label><div>${escapeHtml(m.country || '—')}${m.country_code ? ` (${escapeHtml(m.country_code)})` : ''}</div></div>
+          <div class="info-item"><label>City</label><div>${escapeHtml(m.city || '—')}</div></div>
+          <div class="info-item"><label>Address</label><div>${escapeHtml(m.address || '—')}</div></div>
+          <div class="info-item"><label>Wallet Balance</label><div>${moneyStr(m.wallet_balance)}</div></div>
           <div class="info-item"><label>Status</label><div><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></div></div>
           <div class="info-item"><label>Created Date</label><div>${fmtDate(m.created_at)}</div></div>
           <div class="info-item"><label>Number of Users</label><div>${m.user_count}</div></div>
         </div>
-      </div>
-
-      <!-- M4. Wallet Balance and Credit Limit used to sit in the grid above,
-           read straight off the merchant row and rounded by money(). They are
-           here instead, from GET /api/admin/merchants/{id}/finance — the same
-           finance_service computation the merchant sees on its own Payments
-           screen, so the desk and the customer cannot be looking at two
-           different numbers. A credit limit is shown only beside what is left
-           of it. -->
-      <div class="panel">
-        <div class="panel-head">
-          <h2 style="font-size:14px;">Financial position</h2>
-          <button class="btn btn-ghost btn-sm" id="merchantStmtToggle">Show statement</button>
-        </div>
-        <div id="merchantFinance"><div class="empty-state">Loading…</div></div>
-        <div id="merchantStatement" hidden></div>
       </div>
 
       <div class="panel">
@@ -477,14 +470,27 @@ async function openMerchantDetail(merchantId) {
           <button class="btn btn-coral btn-sm" id="addMerchantUserBtn">+ Add User</button>
         </div>
         <div class="table-wrap"><table id="merchantUsersTable"><thead><tr>
-          <th>Full Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th>
+          <th>Full Name</th><th>Email</th><th>Phone</th><th>Role Type</th><th>Status</th><th>Last Login</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     `;
     document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
     document.getElementById('addMerchantUserBtn').addEventListener('click', () => openMerchantUserModal(merchantId, m.company_name));
+    document.getElementById('editMerchantBtn').addEventListener('click', () => openOnboardMerchantModal(merchantId));
+    document.getElementById('approveMerchantBtn')?.addEventListener('click', async () => {
+      try {
+        await axios.post(`${API_BASE}/api/admin/merchants/${merchantId}/approve`, {}, { headers: authHeaders() });
+        openMerchantDetail(merchantId);
+      } catch (err) { alert(err.response?.data?.detail || 'Failed to approve merchant.'); }
+    });
+    document.getElementById('suspendMerchantBtn')?.addEventListener('click', async e => {
+      try {
+        await axios.patch(`${API_BASE}/api/admin/merchants/${merchantId}/status`,
+                          { status: e.currentTarget.dataset.next }, { headers: authHeaders() });
+        openMerchantDetail(merchantId);
+      } catch (err) { alert(err.response?.data?.detail || 'Failed to update merchant.'); }
+    });
     loadMerchantUsersTable(merchantId);
-    loadMerchantFinance(merchantId);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
   }
@@ -581,12 +587,41 @@ async function loadMerchantFinance(merchantId) {
    role the backend uses to widen a merchant_user's permissions (rbac
    MERCHANT_ROLE_PERMISSIONS); it does not apply to a merchant_admin, who already
    holds the full merchant set, so the field is disabled for that choice. */
-const MERCHANT_USER_ROLES = { merchant_user: 'Merchant User (staff)', merchant_admin: 'Merchant Admin (manages the company)' };
-const MERCHANT_INTERNAL_ROLES = {
-  '': 'None — base permissions only',
-  manager: 'Manager', supervisor: 'Supervisor', operator: 'Operator',
-  finance: 'Finance', data_operator: 'Data Operator',
+/* ROLE TYPE — WHAT CAN BE CREATED VS WHAT CAN BE DISPLAYED, AND WHY THEY DIFFER.
+
+   Creation narrowed on request: Merchant Admin is gone, Operator is merged into
+   Data Operator, and Finance is gone. So a NEW merchant user is always a
+   `merchant_user` at the portal level, and its Role Type is one of three.
+
+   The database enums did NOT change. `UserRole.MERCHANT_ADMIN`,
+   `MerchantRole.OPERATOR` and `MerchantRole.FINANCE` still exist in models_v2.py
+   and existing accounts still hold them — the seeded demo merchant admin is one.
+   Dropping them from the DISPLAY map as well would render those live accounts
+   with a blank Role Type, so the two maps are deliberately separate:
+   `MERCHANT_ROLE_LABELS` names everything that can exist, and
+   `MERCHANT_ROLE_CREATABLE` is the subset a new user may be given. */
+const MERCHANT_ROLE_LABELS = {
+  manager: 'Manager',
+  supervisor: 'Supervisor',
+  data_operator: 'Data Operator',
+  /* Legacy — not creatable, still held by existing accounts. */
+  operator: 'Data Operator',
+  finance: 'Finance',
 };
+const MERCHANT_ROLE_CREATABLE = {
+  data_operator: 'Data Operator',
+  manager: 'Manager',
+  supervisor: 'Supervisor',
+};
+
+/* A merchant user's Role Type is its internal role; the portal-level `role`
+   only distinguishes staff from the company owner. Falls back to the portal
+   role so a `merchant_admin` with no internal role still reads as something. */
+function merchantRoleType(u) {
+  return MERCHANT_ROLE_LABELS[u.merchant_role]
+      || statusLabel(u.role || '')
+      || '—';
+}
 
 function openMerchantUserModal(merchantId, companyName) {
   const overlay = document.getElementById('merchantUserModalOverlay');
@@ -600,19 +635,22 @@ function openMerchantUserModal(merchantId, companyName) {
       <div class="form-grid">
         <div class="form-field"><label>Full Name</label><input name="full_name" required maxlength="150"></div>
         <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
-        <div class="form-field"><label>Phone</label><input name="phone" maxlength="30"></div>
-        <div class="form-field"><label>Account Role</label>
-          <select name="role">
-            ${Object.entries(MERCHANT_USER_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-field"><label>Internal Role</label>
-          <select name="merchant_role">
-            ${Object.entries(MERCHANT_INTERNAL_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+        <div class="form-field"><label>Phone</label><input name="phone" required maxlength="30"></div>
+        <!-- The Account Role picker is gone: Merchant Admin was removed, which
+             leaves merchant_user as the only value. Hidden input so the
+             payload shape is unchanged. (No backticks in this comment: it sits
+             inside a template literal, and one would close the string.) -->
+        <input type="hidden" name="role" value="merchant_user">
+        <div class="form-field"><label>Role Type</label>
+          <select name="merchant_role" required>
+            ${Object.entries(MERCHANT_ROLE_CREATABLE).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
           </select>
         </div>
         <div class="form-field"><label>Password</label>
-          <input name="password" type="text" minlength="8" maxlength="72" placeholder="leave blank to generate one">
+          <input name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password">
+        </div>
+        <div class="form-field"><label>Confirm Password</label>
+          <input name="confirm_password" type="password" required minlength="8" maxlength="72" autocomplete="new-password">
         </div>
       </div>
       <div class="msg" id="merchantUserMsg"></div>
@@ -624,30 +662,33 @@ function openMerchantUserModal(merchantId, companyName) {
   overlay.classList.add('open');
 
   const form = document.getElementById('merchantUserForm');
-  const roleSel = form.elements.role;
-  const internalSel = form.elements.merchant_role;
-  const syncInternal = () => {
-    const isAdmin = roleSel.value === 'merchant_admin';
-    internalSel.disabled = isAdmin;
-    if (isAdmin) internalSel.value = '';
-  };
-  roleSel.addEventListener('change', syncInternal);
-  syncInternal();
-
   document.getElementById('merchantUserCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target.elements;
     const msg = document.getElementById('merchantUserMsg');
     const submit = form.querySelector('button[type=submit]');
+
+    /* EVERY FIELD IS REQUIRED NOW, INCLUDING THE PASSWORD. The auto-generate
+       path is gone with the blank-password placeholder, so `password` is always
+       sent and the "temporary password" the response echoes is simply the one
+       that was typed. Confirm is checked here rather than left to the server:
+       the API takes a single `password` and has no second value to compare. */
+    if (f.password.value !== f.confirm_password.value) {
+      msg.className = 'msg error';
+      msg.textContent = 'The two passwords do not match.';
+      f.confirm_password.focus();
+      return;
+    }
+
     const payload = {
       full_name: f.full_name.value.trim(),
       email: f.email.value.trim(),
-      phone: f.phone.value.trim() || null,
+      phone: f.phone.value.trim(),
       role: f.role.value,
-      merchant_role: f.merchant_role.value || null,
+      merchant_role: f.merchant_role.value,
+      password: f.password.value,
     };
-    if (f.password.value) payload.password = f.password.value;
 
     submit.disabled = true;
     msg.textContent = 'Creating…';
@@ -656,8 +697,7 @@ function openMerchantUserModal(merchantId, companyName) {
       const { data } = await axios.post(
         `${API_BASE}/api/admin/merchants/${merchantId}/users`, payload, { headers: authHeaders() });
       overlay.classList.remove('open');
-      /* Shown once — the backend hashes it and cannot return it again. */
-      alert(`User created.\n\nLogin: ${data.account.email}\nTemporary password: ${data.temporary_password}\n\nShare these credentials securely — this password cannot be retrieved again.`);
+      alert(`User created.\n\nLogin: ${data.account.email}\n\nThe password you set is now active. Share it securely — it cannot be retrieved again.`);
       /* Re-open the whole detail rather than just the table, so the "Number of
          Users" figure in the info grid moves with it. */
       openMerchantDetail(merchantId);
@@ -675,31 +715,94 @@ async function loadMerchantUsersTable(merchantId) {
   tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Loading…</td></tr>`;
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/merchants/${merchantId}/users`, { headers: authHeaders(), params: { page_size: 100 } });
-    tbody.innerHTML = data.items.map(u => `
+    /* Role Type replaces the generic portal Role, and the row gains View plus
+       an Activate/Deactivate that swaps on the user's current status. Reset
+       Password moved inside View — it is the destructive one, and it was
+       sitting a single click away in a table of look-alike rows. */
+    tbody.innerHTML = data.items.map(u => {
+      const isActive = u.status === 'active';
+      return `
       <tr>
         <td>${escapeHtml(u.full_name)}</td>
         <td>${escapeHtml(u.email)}</td>
         <td>${escapeHtml(u.phone || '—')}</td>
-        <td style="text-transform:capitalize">${escapeHtml((u.role || '').replace(/_/g, ' '))}</td>
-        <td><span class="badge ${u.status === 'active' ? 'active' : 'inactive'}">${escapeHtml(statusLabel(u.status))}</span></td>
+        <td>${escapeHtml(merchantRoleType(u))}</td>
+        <td><span class="badge ${isActive ? 'active' : 'inactive'}">${escapeHtml(statusLabel(u.status))}</span></td>
         <td>${u.last_login ? fmtDateTime(u.last_login) : '—'}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-ghost btn-sm" data-reset-mu="${u.id}">Reset Password</button>
+          <button class="btn btn-ghost btn-sm" data-view-mu="${u.id}">View</button>
+          <button class="btn ${isActive ? 'btn-danger' : 'btn-coral'} btn-sm"
+                  data-status-mu="${u.id}" data-next="${isActive ? 'inactive' : 'active'}">
+            ${isActive ? 'Deactivate' : 'Activate'}
+          </button>
         </td>
-      </tr>
-    `).join('') || `<tr><td colspan="7" class="empty-state">No users yet for this merchant.</td></tr>`;
-    tbody.querySelectorAll('[data-reset-mu]').forEach(btn => {
+      </tr>`;
+    }).join('') || `<tr><td colspan="7" class="empty-state">No users yet for this merchant.</td></tr>`;
+
+    const byId = new Map(data.items.map(u => [String(u.id), u]));
+    tbody.querySelectorAll('[data-view-mu]').forEach(btn => {
+      btn.addEventListener('click', () => openMerchantUserDetail(merchantId, byId.get(btn.dataset.viewMu)));
+    });
+    tbody.querySelectorAll('[data-status-mu]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Reset this user\'s password?')) return;
         try {
-          const { data: r } = await axios.post(`${API_BASE}/api/admin/merchants/${merchantId}/users/${btn.dataset.resetMu}/reset-password`, {}, { headers: authHeaders() });
-          alert(`New password: ${r.temporary_password}\n\nShare this with the merchant user securely — it cannot be retrieved again.`);
-        } catch (err) { alert('Failed to reset password.'); }
+          await axios.patch(
+            `${API_BASE}/api/admin/merchants/${merchantId}/users/${btn.dataset.statusMu}/status`,
+            { status: btn.dataset.next }, { headers: authHeaders() });
+          loadMerchantUsersTable(merchantId);
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to update this user.'); }
       });
     });
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load users.</td></tr>`;
   }
+}
+
+/* One merchant user, read-only, plus the two actions that do not belong on a
+   row: Reset Password (destructive, and the new password is shown once) and
+   the status flip. Rendered into the same overlay the Add User form uses. */
+function openMerchantUserDetail(merchantId, u) {
+  if (!u) return;
+  const overlay = document.getElementById('merchantUserModalOverlay');
+  const isActive = u.status === 'active';
+  document.getElementById('merchantUserModalBody').innerHTML = `
+    <h2>${escapeHtml(u.full_name)}</h2>
+    <dl class="jp-kv" style="margin:14px 0 20px;">
+      <div><dt>Email</dt><dd>${escapeHtml(u.email)}</dd></div>
+      <div><dt>Phone</dt><dd>${escapeHtml(u.phone || '—')}</dd></div>
+      <div><dt>Role Type</dt><dd>${escapeHtml(merchantRoleType(u))}</dd></div>
+      <div><dt>Status</dt><dd><span class="badge ${isActive ? 'active' : 'inactive'}">${escapeHtml(statusLabel(u.status))}</span></dd></div>
+      <div><dt>Last Login</dt><dd>${u.last_login ? fmtDateTime(u.last_login) : 'Never'}</dd></div>
+      <div><dt>Created</dt><dd>${u.created_at ? fmtDate(u.created_at) : '—'}</dd></div>
+    </dl>
+    <div class="modal-actions">
+      <button type="button" class="btn ${isActive ? 'btn-danger' : 'btn-coral'}" id="muDetailStatusBtn"
+              data-next="${isActive ? 'inactive' : 'active'}">${isActive ? 'Deactivate' : 'Activate'}</button>
+      <button type="button" class="btn btn-ghost" id="muDetailResetBtn">Reset Password</button>
+      <button type="button" class="btn btn-ghost" id="muDetailCloseBtn">Close</button>
+    </div>`;
+  overlay.classList.add('open');
+
+  const close = () => overlay.classList.remove('open');
+  document.getElementById('muDetailCloseBtn').addEventListener('click', close);
+  document.getElementById('muDetailStatusBtn').addEventListener('click', async e => {
+    try {
+      await axios.patch(
+        `${API_BASE}/api/admin/merchants/${merchantId}/users/${u.id}/status`,
+        { status: e.currentTarget.dataset.next }, { headers: authHeaders() });
+      close();
+      loadMerchantUsersTable(merchantId);
+    } catch (err) { alert(err.response?.data?.detail || 'Failed to update this user.'); }
+  });
+  document.getElementById('muDetailResetBtn').addEventListener('click', async () => {
+    if (!confirm(`Reset the password for ${u.email}?`)) return;
+    try {
+      const { data: r } = await axios.post(
+        `${API_BASE}/api/admin/merchants/${merchantId}/users/${u.id}/reset-password`,
+        {}, { headers: authHeaders() });
+      alert(`New password: ${r.temporary_password}\n\nShare this with the merchant user securely — it cannot be retrieved again.`);
+    } catch (err) { alert('Failed to reset password.'); }
+  });
 }
 
 function showMerchantView(view) {
@@ -724,7 +827,7 @@ async function loadActiveUsers(page = activeUsersPage) {
     document.getElementById('auRoleFilter').addEventListener('change', () => loadActiveUsers(1));
   }
   const tbody = document.querySelector('#activeUsersTable tbody');
-  tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Loading…</td></tr>`;
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/users`, {
       headers: authHeaders(),
@@ -739,15 +842,14 @@ async function loadActiveUsers(page = activeUsersPage) {
     tbody.innerHTML = data.items.map(u => `
       <tr>
         <td>${escapeHtml(u.full_name)} ${u.is_online ? '<span class="status-dot-inline online" title="Online now"></span>' : ''}</td>
-        <td>${escapeHtml(u.email)}</td>
+        <td title="${escapeHtml(u.email)}">${escapeHtml(usernameOf(u.email))}</td>
         <td style="text-transform:capitalize">${escapeHtml((u.role || '').replace(/_/g, ' '))}</td>
         <td>${u.merchant_id ? `MRC-${u.merchant_id}` : '—'}</td>
-        <td><span class="badge ${u.status === 'active' ? 'active' : 'inactive'}">${escapeHtml(statusLabel(u.status))}</span></td>
         <td>${u.last_login ? fmtDateTime(u.last_login) : 'Never'}</td>
       </tr>
-    `).join('') || `<tr><td colspan="6" class="empty-state">No users found.</td></tr>`;
+    `).join('') || `<tr><td colspan="5" class="empty-state">No users found.</td></tr>`;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load users.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load users.</td></tr>`;
   }
 }
 
@@ -1365,87 +1467,17 @@ document.getElementById('adminPasswordForm').addEventListener('submit', async e 
   }
 });
 
-/* ---------- Payment Verification ---------- GET /api/admin/payments (general list),
-   POST .../verify (existing), POST .../refund (new). See API_CONTRACT.md §4.3; "Payment
-   History" is the same endpoint with a terminal-status filter, not a separate screen. */
-let pvPage = 1;
-let pvFiltersWired = false;
-async function loadPayments(page = pvPage) {
-  pvPage = page;
-  if (!pvFiltersWired) {
-    pvFiltersWired = true;
-    ['pvStatusFilter', 'pvDateFrom', 'pvDateTo'].forEach(id => document.getElementById(id).addEventListener('change', () => loadPayments(1)));
-    let pvSearchTimer;
-    document.getElementById('pvSearch').addEventListener('input', () => {
-      clearTimeout(pvSearchTimer);
-      pvSearchTimer = setTimeout(() => loadPayments(1), 350);
-    });
-  }
-  const tbody = document.querySelector('#pvTable tbody');
-  tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Loading…</td></tr>`;
-  try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/payments`, {
-      headers: authHeaders(),
-      params: {
-        search: document.getElementById('pvSearch').value || undefined,
-        status: document.getElementById('pvStatusFilter').value || undefined,
-        date_from: document.getElementById('pvDateFrom').value || undefined,
-        date_to: document.getElementById('pvDateTo').value || undefined,
-        page, page_size: PAGE_SIZE,
-      },
-    });
-    renderPagination('pvPagination', data.page, data.total_pages, data.total, loadPayments);
-    tbody.innerHTML = data.items.map(p => `
-      <tr>
-        <td>${escapeHtml(p.transaction_id || '—')}</td>
-        <td style="text-transform:capitalize">${escapeHtml(p.method || '—')}</td>
-        <td>${moneyStr(p.amount)}</td>
-        <td>${escapeHtml(p.currency)}</td>
-        <td><span class="badge ${p.status}">${escapeHtml(p.status.replace(/_/g, ' '))}</span></td>
-        <td>${p.paid_date ? fmtDateTime(p.paid_date) : '—'}</td>
-        <td style="white-space:nowrap;">
-          ${p.status === 'pending' ? `<button class="btn btn-navy btn-sm" data-verify-payment="${p.id}" data-approve="true">Verify</button>
-            <button class="btn btn-danger btn-sm" data-verify-payment="${p.id}" data-approve="false">Reject</button>` : ''}
-          ${p.status === 'success' ? `<button class="btn btn-danger btn-sm" data-refund-payment="${p.id}" data-amount="${p.amount}">Refund</button>` : ''}
-        </td>
-      </tr>
-    `).join('') || `<tr><td colspan="7" class="empty-state">No payments found.</td></tr>`;
-    tbody.querySelectorAll('[data-verify-payment]').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const approve = btn.dataset.approve === 'true';
-        const note = approve ? undefined : (prompt('Reason for rejecting this payment:') || undefined);
-        try {
-          await axios.post(`${API_BASE}/api/admin/payments/${btn.dataset.verifyPayment}/verify`, { approve, note }, { headers: authHeaders() });
-          loadPayments(pvPage);
-        } catch (err) { alert(err.response?.data?.detail || 'Action failed.'); }
-      });
-    });
-    tbody.querySelectorAll('[data-refund-payment]').forEach(btn => {
-      btn.addEventListener('click', () => openRefundModal(btn.dataset.refundPayment, btn.dataset.amount));
-    });
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load payments.</td></tr>`;
-  }
-}
+/* ---------- Payment Verification — RETIRED (0041) ----------
+   The per-booking payment table, its Verify/Reject buttons and the refund
+   prompt used to live here. Payment Management now hosts the admin-initiated
+   request workflow instead (assets/js/admin-payment-requests.js), so this
+   screen's markup no longer exists and every function that reached into it
+   would throw on a null element.
 
-function openRefundModal(paymentId, maxAmount) {
-  const amount = prompt(`Refund amount (max ${maxAmount}):`, maxAmount);
-  if (!amount) return;
-  const reason = prompt('Reason for this refund:');
-  if (!reason) return;
-
-  /* M4: the amount is sent as the STRING the operator typed, not Number(amount).
-     The endpoint's schema is `Decimal`, and a float on the way in is a rounding
-     error waiting for a value where one shows — the whole point of keeping money
-     out of JavaScript's number type. Validation is the server's: it already
-     refuses <= 0 and anything above what the payment took, and its message says
-     by how much. Re-checking here would be a second opinion about money, which
-     is exactly what this milestone removes. */
-  const trimmed = String(amount).trim();
-  axios.post(`${API_BASE}/api/admin/payments/${paymentId}/refund`, { amount: trimmed, reason }, { headers: authHeaders() })
-    .then(() => loadPayments(pvPage))
-    .catch(err => alert(err.response?.data?.detail || 'Refund failed.'));
-}
+   ONLY THE UI IS GONE. `GET /api/admin/payments`, `POST .../verify` and
+   `POST .../refund` are untouched and still serve Reports, Analytics and the
+   per-booking payment records — nothing was removed from the API, and a
+   payment already taken still settles exactly as before. */
 
 /* ---------- Support Management / Live Chat ---------- GET/POST /api/support/threads,
    /api/support/threads/{id}/messages|claim|resolve, GET /api/support/unread-count

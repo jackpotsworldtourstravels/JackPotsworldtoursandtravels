@@ -622,8 +622,8 @@ POST   /api/admin/payment-accounts/{id}/qr   multipart → PaymentAccountAdminOu
 GET    /api/admin/payment-accounts/{id}/qr             → image stream
 Permission: P.PAYMENT_MANAGE to write, P.PAYMENT_VERIFY to read
 
-GET    /api/admin/wallet/topups/counts                 → TopupQueueCounts
-GET    /api/admin/wallet/topups   ?bucket&merchant_id&search&page → TopupQueuePage
+GET    /api/admin/wallet/topups/counts   ?initiated              → TopupQueueCounts
+GET    /api/admin/wallet/topups   ?bucket&merchant_id&search&initiated&page → TopupQueuePage
 GET    /api/admin/wallet/topups/{id}                   → TopupDetail
 GET    /api/admin/wallet/topups/{id}/proof             → attachment, private no-store
 POST   /api/admin/wallet/topups/{id}/verify            → TopupDecisionResult  (CREDITS)
@@ -631,6 +631,22 @@ POST   /api/admin/wallet/topups/{id}/reject  {remarks} → TopupDecisionResult  
 GET    /api/admin/merchants/{id}/wallet/transactions   → MerchantLedgerPage
 GET    /api/admin/wallet/reconciliation                → ReconciliationReport
 Permission: P.PAYMENT_VERIFY
+```
+
+### Payment requests the desk raises (migration 0041)
+
+```
+GET  /api/admin/merchants/{id}/managers                    → [MerchantManagerOut]
+POST /api/admin/wallet/payment-requests                    → TopupQueueRow (201)
+     {merchant_id, manager_id, amount, method, instructions, note?}
+POST /api/admin/wallet/payment-requests/{id}/cancel {remarks} → TopupQueueRow
+Permission: P.PAYMENT_MANAGE
+
+GET  /api/merchant/payment-requests/counts                 → {requests, pending, approved, rejected}
+GET  /api/merchant/payment-requests  ?bucket&page&page_size → TopupPage
+Permission: P.PAYMENT_VIEW
+POST /api/merchant/payment-requests/{id}/settle multipart {utr?, proof} → TopupOut
+Permission: P.PAYMENT_PAY
 
 POST /api/admin/requests/{request_id}/reprice
      {amount: Decimal > 0, reason: str}        → RequestDetailResponse
@@ -655,6 +671,30 @@ corrected resubmission.
 **`/wallet/reconciliation`** reports `drift` = cached balance − ledger balance per merchant. It
 must be zero everywhere; a non-zero row is an incident. `pending_topup_amount` sits beside the
 balances and is never part of them.
+
+**0041 — admin-initiated payment requests reuse that one credit path.** The desk raises a request
+against a merchant, names the *merchant's own* manager (`merchant_role = manager`, not
+`UserRole.MANAGER`, which is platform staff) and states how to pay: bank transfer (bank name,
+account number, IFSC, branch), cash (token details, unique note number) or crypto (wallet address,
+network ∈ {TRC20, ERC20, BEP20}). The row is a `wallet_topups` row in the new
+`awaiting_payment` status.
+
+That status is the guarantee. `_assert_undecided` admits `submitted` only, so
+`/wallet/topups/{id}/verify` returns **409** for a request nobody has paid — there is no sequence
+of admin calls that credits a wallet without a manager having settled it, and it is the status
+machine that enforces this rather than a hidden button. Approval and rejection are the **same two
+endpoints above, unchanged**: one credit path, one unique index, one lock.
+
+`settle` moves the request to `submitted` and **credits nothing**, exactly like
+`POST /merchant/wallet/topups`. A bank transfer needs its UTR *and* the slip; cash and crypto have
+no UTR and a UTR sent with either is refused, because `uq_wallet_topups_utr` is a bank-reference
+namespace. Resubmitting a rejected request is that same call: the stale verdict is cleared and
+`resubmission_count` records it.
+
+`initiated` (`admin` | `merchant`, omitted = both) filters the queue and its counts. It exists
+because two screens share the endpoint, and a badge counting rows the table does not show is
+worse than no badge — it also keeps `total` consistent with the rows, which a client-side filter
+could not.
 
 **The wallet (CR-4, `docs/WALLET_ARCHITECTURE.md` is authoritative).** A merchant holds a running
 account that **may go negative** — a negative balance is its outstanding position, bounded by

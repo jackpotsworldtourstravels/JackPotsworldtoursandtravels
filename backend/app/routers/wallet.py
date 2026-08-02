@@ -105,6 +105,7 @@ def _topup_out(db: Session, topup) -> TopupOut:
         reviewed_at=topup.reviewed_at,
         review_remarks=topup.review_remarks,
         wallet_txn_number=topup_service.txn_number_for(db, topup),
+        **topup_service.request_fields(db, topup),
     )
 
 
@@ -371,3 +372,96 @@ def topup_proof(
             "Cache-Control": "private, no-store",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Payment Management — settling what the desk has asked for (migration 0041)
+# ---------------------------------------------------------------------------
+@router.get(
+    "/merchant/payment-requests/counts",
+    response_model=dict,
+    summary="Tab badges for Payment Management",
+    description=(
+        "Requires `payment.view`. One grouped query: `requests` (raised, unpaid), `pending` "
+        "(paid, with the desk), `approved`, `rejected`. Counts only requests the **desk** "
+        "raised — a merchant's own Add Money submissions are not part of this screen."
+    ),
+)
+def payment_request_counts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.PAYMENT_VIEW)),
+):
+    merchant = _own_merchant(db, current_user)
+    return topup_service.assigned_counts(db, merchant.merchant_id)
+
+
+@router.get(
+    "/merchant/payment-requests",
+    response_model=TopupPage,
+    summary="Payment requests raised by the desk",
+    description=(
+        "Requires `payment.view`. Scoped to the caller's merchant and to **admin-initiated** "
+        "rows only. Buckets: `requests`, `pending`, `approved`, `rejected`, `all` — the same "
+        "vocabulary the Admin queue uses, so both screens describe one row with one word.\n\n"
+        "Scoped by company rather than by the named manager: the manager is who the request is "
+        "*addressed to*, but a company whose manager is on leave must still be able to see and "
+        "settle what it owes."
+    ),
+)
+def my_payment_requests(
+    bucket: str = Query("all"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.PAYMENT_VIEW)),
+):
+    merchant = _own_merchant(db, current_user)
+    items, total = topup_service.list_assigned(
+        db, merchant.merchant_id, bucket=bucket, page=page, page_size=page_size,
+    )
+    return TopupPage(
+        items=[_topup_out(db, t) for t in items],
+        total=total, page=page, page_size=page_size,
+    )
+
+
+@router.post(
+    "/merchant/payment-requests/{topup_id}/settle",
+    response_model=TopupOut,
+    summary="Record that you have paid — credits nothing",
+    description=(
+        "Requires `payment.pay`. **Moves no money**, exactly like `POST /merchant/wallet/topups`: "
+        "it attaches the proof and hands the request to the desk. The wallet is credited when an "
+        "admin approves it, and nowhere else.\n\n"
+        "What must be attached depends on how the desk asked to be paid. A **bank transfer** "
+        "needs its UTR *and* the payment slip — the UTR is how it is matched against the "
+        "statement. **Cash** and **crypto** have no UTR (a note number is not a bank reference, "
+        "and a chain does not issue one), so for those the uploaded image is the proof and is "
+        "mandatory; sending a UTR with either is refused rather than ignored, because it would "
+        "take a slot in the bank-reference namespace `uq_wallet_topups_utr` protects.\n\n"
+        "**Resubmitting a rejected request is this same call.** The row returns to the queue, the "
+        "stale verdict is cleared so the desk is not shown last week's reason beside this week's "
+        "evidence, and `resubmission_count` records that it happened."
+    ),
+)
+def settle_payment_request(
+    topup_id: int,
+    utr: str | None = Form(default=None),
+    proof: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.PAYMENT_PAY)),
+):
+    merchant = _own_merchant(db, current_user)
+    topup = topup_service.settle_request(
+        db, current_user, topup_id, utr=utr, upload_file=proof,
+    )
+    activity_service.log_activity(
+        db, current_user.user_id, "Payment request settled",
+        activity_type="Payment", module="Payments",
+        description=(
+            f"{topup.topup_number}: {merchant.company_name} paid {topup.amount} "
+            f"by {topup.method.value}, awaiting approval"
+        ),
+        merchant_id=merchant.merchant_id,
+    )
+    return _topup_out(db, topup)

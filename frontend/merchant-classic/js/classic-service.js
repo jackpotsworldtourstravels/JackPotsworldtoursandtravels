@@ -124,7 +124,7 @@ function clInitServiceRequest() {
           <div class="cl-table-wrap">
             <table class="cl-table">
               <thead><tr>
-                <th>Request no.</th><th>Item</th><th>Status</th>
+                <th>Request no.</th><th>Details</th><th>Status</th>
                 <th class="cl-num">Amount</th><th>Travel date</th><th class="cl-actions">Action</th>
               </tr></thead>
               <tbody id="clSrBookings"></tbody>
@@ -480,17 +480,24 @@ async function clLoadSrBookings() {
     const cancelled = clSrCancellations;
 
     body.innerHTML = clSrBookings.length
-      ? clSrBookings.map(r => `<tr data-cl-sr-row="${r.id}">
+      ? clSrBookings.map(r => {
+        /* A booking with a live cancellation on it loses Select entirely
+           rather than keeping a button that only ever produces a 409. The tag
+           takes its place, so the row still says why. */
+        const hasCancellation = cancelled.has(String(r.id));
+        return `<tr data-cl-sr-row="${r.id}">
           <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
           <td>${escapeHtml(r.title || '—')}</td>
           <td>${clTag(r.status)}</td>
           <td class="cl-num">${money(r.total_amount)}</td>
           <td class="cl-nowrap">${escapeHtml(fmtDate(r.travel_date))}</td>
           <td class="cl-actions">
-            <button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-pick="${r.id}">Select</button>
-            ${cancelled.has(String(r.id)) ? '<span class="cl-tag">Cancellation raised</span>' : ''}
+            ${hasCancellation
+              ? '<span class="cl-tag">Cancellation raised</span>'
+              : `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-pick="${r.id}">Select</button>`}
           </td>
-        </tr>`).join('')
+        </tr>`;
+      }).join('')
       : clEmptyRow(6, 'No approved bookings yet — a booking can only be amended once our team has approved it.');
 
     body.querySelectorAll('[data-cl-sr-pick]').forEach(b =>
@@ -608,17 +615,18 @@ function clRenderSrView() {
         <th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
         <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Seat</th><th>Meal</th>
       </tr></thead>
+      <!-- One passenger, one line — every cell nowrap, the wrapper scrolls. -->
       <tbody>${pax.length ? pax.map((p, i) => `<tr>
         <td>${i + 1}</td>
-        <td>${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || '—')}</td>
-        <td>${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
-        <td>${escapeHtml(clLabel(p.gender) || '—')}</td>
+        <td class="cl-nowrap">${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || '—')}</td>
+        <td class="cl-nowrap">${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
+        <td class="cl-nowrap">${escapeHtml(clLabel(p.gender) || '—')}</td>
         <td class="cl-nowrap">${escapeHtml(p.dob ? fmtDate(p.dob) : '—')}</td>
-        <td>${escapeHtml(p.nationality || '—')}</td>
-        <td class="cl-ref">${escapeHtml(p.passport_number || '—')}</td>
+        <td class="cl-nowrap">${escapeHtml(p.nationality || '—')}</td>
+        <td class="cl-ref cl-nowrap">${escapeHtml(p.passport_number || '—')}</td>
         <td class="cl-nowrap">${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
-        <td>${escapeHtml(clLabel(p.seat_preference) || '—')}</td>
-        <td>${escapeHtml(clLabel(p.meal_preference) || '—')}</td>
+        <td class="cl-nowrap">${escapeHtml(clLabel(p.seat_preference) || '—')}</td>
+        <td class="cl-nowrap">${escapeHtml(clLabel(p.meal_preference) || '—')}</td>
       </tr>`).join('') : clEmptyRow(10, 'No passengers recorded.')}</tbody>
     </table></div>
 

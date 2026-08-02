@@ -68,6 +68,9 @@ class TopupQueuePage(BaseModel):
 
 
 class TopupQueueCounts(BaseModel):
+    #: Raised by the desk, not yet paid (0041). Its own badge and never folded
+    #: into ``pending`` — these wait on the merchant, not on us.
+    requests: int = 0
     pending: int = 0
     verified: int = 0
     rejected: int = 0
@@ -150,3 +153,52 @@ class MerchantLedgerPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ---------------------------------------------------------------------------
+# Requests the desk raises (migration 0041)
+# ---------------------------------------------------------------------------
+class MerchantManagerOut(BaseModel):
+    """A merchant's own manager — who a payment request may be addressed to.
+
+    Deliberately thin. This populates one dropdown, and the desk raising a
+    payment request has no business reading a merchant employee's full profile.
+    """
+
+    user_id: int
+    full_name: str
+    email: str
+    phone: str | None = None
+
+
+class RaisePaymentRequest(BaseModel):
+    merchant_id: int
+    #: Re-validated server-side against ``merchant_id``. The browser choosing
+    #: from a filtered dropdown is a convenience, not the security boundary.
+    manager_id: int
+    amount: Decimal = Field(gt=0)
+    method: Literal["bank_transfer", "cash", "crypto"]
+    #: Method-specific, and required — bank: name/account_number/ifsc/branch;
+    #: cash: token_details/note_number; crypto: wallet_address/network.
+    #: ``payment_admin_service.REQUEST_METHODS`` is the allowlist; unknown keys
+    #: are dropped rather than stored, because this is rendered verbatim on the
+    #: manager's screen.
+    instructions: dict[str, Any] = Field(default_factory=dict)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class CancelPaymentRequest(BaseModel):
+    #: Mandatory. The merchant sees this, and a request that vanishes without a
+    #: reason produces the same phone call a bare rejection does.
+    remarks: str = Field(min_length=3, max_length=500)
+
+
+class SettlePaymentRequest(BaseModel):
+    """The manager's side, when no file is attached.
+
+    The real submission is multipart — a payment proof is a file — so this
+    exists for the bank-transfer case where a UTR alone is being corrected on a
+    request that already carries its slip.
+    """
+
+    utr: str | None = Field(default=None, max_length=64)

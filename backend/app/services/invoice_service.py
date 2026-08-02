@@ -216,6 +216,31 @@ def build_invoice(db: Session, actor: User, request_id: int) -> tuple[bytes, str
     story.append(Spacer(1, 6))
     story.append(tt)
 
+    # 0040 — what the merchant made on this booking. Deliberately BELOW the
+    # totals block and outside it: the client fare is what the merchant charged
+    # *its own* customer and is not a line of this invoice, which states what we
+    # billed them. Putting it inside the totals would make it look like a
+    # discount we gave, and "Balance due" must be the last figure the reader
+    # takes from that table.
+    #
+    # Rendered only when a client fare was recorded — `saved_amount` is None
+    # when it was not, and "You saved 0.00" on a booking with no client fare
+    # would be a claim about a number the merchant never entered.
+    if request.saved_amount is not None:
+        saved = Table(
+            [[f"Client fare {request.client_fare:,.2f}",
+              f"You saved {request.saved_amount:,.2f}"]],
+            colWidths=(150 * mm, 45 * mm),
+        )
+        saved.setStyle(TableStyle([
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+            ("TEXTCOLOR", (0, 0), (-1, -1), NAVY),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(saved)
+
     if request.payments:
         story.append(Paragraph("Payments received", styles["h"]))
         story.append(_grid(
@@ -303,6 +328,22 @@ def build_confirmation(db: Session, actor: User, request_id: int) -> tuple[bytes
     if d.get("special_requests"):
         story.append(Paragraph("Special requests", styles["h"]))
         story.append(Paragraph(str(d["special_requests"]), styles["n"]))
+
+    # 0040 — the merchant's own margin on this booking, on the document it is
+    # most likely to keep. Only when a client fare was recorded: `saved_amount`
+    # is None otherwise, and NULL means "not recorded", never "saved nothing".
+    #
+    # Both figures are shown, not just the saving, so a booking we billed MORE
+    # for than the merchant sold at reads honestly — `saved_amount` floors at
+    # zero, and a bare "You saved 0.00" beside no context would hide a loss
+    # rather than state it.
+    if request.saved_amount is not None:
+        story.append(Paragraph("Your fare", styles["h"]))
+        story.append(_kv_table([
+            ("Client fare", f"{request.client_fare:,.2f}"),
+            ("Booked at", f"{request.total_amount:,.2f}"),
+            ("You saved", f"{request.saved_amount:,.2f}"),
+        ], widths=(38 * mm, 120 * mm)))
 
     story.append(Spacer(1, 14))
     story.append(Paragraph(

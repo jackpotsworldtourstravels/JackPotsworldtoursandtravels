@@ -100,7 +100,17 @@ function clInitEnquiry() {
                it still narrows the rows already loaded — but "Find" was the only
                place in the product using that word for it. -->
           <label for="clEnqSearch">Search</label>
-          <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no.">
+          <div style="display:flex; gap:6px; align-items:stretch;">
+            <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no."
+                   style="flex:1 1 auto; min-width:0;">
+            <!-- Copies what is in the box, not the results. A merchant looking a
+                 reference up here is usually about to paste it into an email or
+                 a chat with our desk, and selecting text inside a search input
+                 on a phone is the fiddliest part of that. -->
+            <button type="button" class="cl-btn cl-btn-sm" id="clEnqCopy"
+                    title="Copy the search text" aria-label="Copy the search text"
+                    style="flex:0 0 auto;">${clIco('copy', { size: 15 })}</button>
+          </div>
         </div>
         <div class="cl-field" style="min-width:0;">
           <label>&nbsp;</label>
@@ -129,6 +139,57 @@ function clInitEnquiry() {
   $('clEnqRefresh').addEventListener('click', () => clLoadEnquiries());
   $('clEnqStatus').addEventListener('change', () => clLoadEnquiries());
   $('clEnqSearch').addEventListener('input', () => clRenderEnquiryRows());
+
+  /* Feedback is the button itself, not a toast: Classic deliberately does not
+     load components/toast.js (see classic-approvals.js), and a copy that gives
+     no sign it worked is a copy the merchant does twice. */
+  $('clEnqCopy').addEventListener('click', async () => {
+    const btn = $('clEnqCopy');
+    const box = $('clEnqSearch');
+    const value = box.value.trim();
+
+    const flash = (icon, label) => {
+      btn.innerHTML = clIco(icon, { size: 15 });
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      setTimeout(() => {
+        btn.innerHTML = clIco('copy', { size: 15 });
+        btn.title = 'Copy the search text';
+        btn.setAttribute('aria-label', 'Copy the search text');
+      }, 1400);
+    };
+
+    if (!value) { box.focus(); return flash('alert', 'Type something to copy first'); }
+
+    /* Two paths, and the fallback runs when the modern one REJECTS as well as
+       when it is missing. navigator.clipboard needs a secure context, so it is
+       absent over plain http on a LAN address — which is exactly how this
+       portal is reached in testing — and even where it exists it rejects with
+       NotAllowedError whenever the document is not focused. Treating a
+       rejection as failure meant the button reported "could not copy" in the
+       ordinary case. execCommand is deprecated but works in both. */
+    const viaSelection = () => {
+      box.select();
+      const ok = document.execCommand('copy');
+      box.setSelectionRange(value.length, value.length);
+      return ok;
+    };
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+        } catch {
+          if (!viaSelection()) throw new Error('copy refused');
+        }
+      } else if (!viaSelection()) {
+        throw new Error('copy refused');
+      }
+      flash('check', 'Copied');
+    } catch {
+      flash('alert', 'Could not copy — select the text and copy it manually');
+    }
+  });
 
   return clLoadEnquiries();
 }
@@ -415,6 +476,17 @@ function clQuotationPanel(r) {
         ? `<div style="white-space:pre-wrap;font-size:13px;">${escapeHtml(r.quotation_remarks)}</div>` : ''}
       <div style="font-size:12px;margin-top:6px;">This is the amount your booking will be raised
         at, and what is settled from your wallet once the ticket is issued.</div>
+      ${/* 0040. The server derives saved_amount from the client fare typed on
+            this enquiry and the fare we then quoted; nothing is subtracted
+            here. Absent when no client fare was recorded — null means "not
+            recorded", and "You saved 0" would be a claim the merchant never
+            made. */ ''}
+      ${r.saved_amount != null ? `
+        <div style="font-size:13px;margin-top:8px;font-weight:700;">
+          You saved ${escapeHtml(moneyStr(r.saved_amount))}
+          <span style="font-weight:600;opacity:.85;">against your client fare of
+            ${escapeHtml(moneyStr(r.client_fare))}</span>
+        </div>` : ''}
     </div>`;
 }
 
@@ -511,7 +583,7 @@ function clOpenEnquiryForm() {
     <div class="cl-form-legend">Departure &amp; Arrival</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
-        <label for="clEnqFrom">From city<span class="cl-req">*</span></label>
+        <label for="clEnqFrom">Origin City<span class="cl-req">*</span></label>
         <div class="cl-combo">
           <input type="text" id="clEnqFrom" autocomplete="off" role="combobox"
                  aria-expanded="false" aria-autocomplete="list"
@@ -520,7 +592,7 @@ function clOpenEnquiryForm() {
         </div>
       </div>
       <div class="cl-field">
-        <label for="clEnqTo">To city<span class="cl-req">*</span></label>
+        <label for="clEnqTo">Destination City<span class="cl-req">*</span></label>
         <div class="cl-combo">
           <input type="text" id="clEnqTo" autocomplete="off" role="combobox"
                  aria-expanded="false" aria-autocomplete="list"
@@ -530,7 +602,7 @@ function clOpenEnquiryForm() {
       </div>
     </div>
 
-    <div class="cl-form-legend">Flight</div>
+    <div class="cl-form-legend">Airline Details</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
         <label for="clEnqAirline">Airline<span class="cl-req">*</span></label>
@@ -542,7 +614,7 @@ function clOpenEnquiryForm() {
         </div>
       </div>
       <div class="cl-field">
-        <label for="clEnqFlight">Flight number<span class="cl-req">*</span></label>
+        <label for="clEnqFlight">Airline Number<span class="cl-req">*</span></label>
         <input type="text" id="clEnqFlight" autocomplete="off" placeholder="e.g. AI217, 6E456"
                maxlength="20" style="text-transform:uppercase;">
       </div>
@@ -580,12 +652,12 @@ function clOpenEnquiryForm() {
     <div class="cl-form-legend">Travellers &amp; class</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
-        <label for="clEnqPax">Number of passengers<span class="cl-req">*</span></label>
+        <label for="clEnqPax" class="cl-label-sm">No. of Passengers<span class="cl-req">*</span></label>
         <input type="number" id="clEnqPax" min="1" max="99" value="1" inputmode="numeric">
         <small id="clEnqPaxHint">Type a total, or use the breakdown below — the two stay in step.</small>
       </div>
       <div class="cl-field">
-        <label for="clEnqClass">Class<span class="cl-req">*</span></label>
+        <label for="clEnqClass">Booking Class<span class="cl-req">*</span></label>
         <select id="clEnqClass">
           ${CL_TRAVEL_CLASSES.map((c, i) =>
             `<option value="${escapeHtml(c)}"${i === 0 ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
@@ -604,6 +676,22 @@ function clOpenEnquiryForm() {
         <label for="clEnqNotes">Notes for our team</label>
         <textarea id="clEnqNotes" maxlength="1000"
           placeholder="Anything else we should know — flexible dates, baggage, corporate fare…"></textarea>
+      </div>
+    </div>
+
+    <!-- CLIENT FARE (migration 0040). What the Data Operator has quoted their
+         OWN customer. Optional, never used for settlement, and visible to the
+         Admin answering the enquiry. Once we send a quotation the difference
+         becomes the "You Saved" figure on this enquiry, on the booking, in
+         Reports and on the Dashboard's Total Savings tile. -->
+    <div class="cl-form-legend">Your customer&rsquo;s fare</div>
+    <div class="cl-form cl-form-2">
+      <div class="cl-field">
+        <label for="clEnqClientFare">Client Fare</label>
+        <input type="number" id="clEnqClientFare" min="0" step="0.01"
+               inputmode="decimal" placeholder="e.g. 20000">
+        <small>What you have quoted your customer. We compare our fare against
+               this and show you the saving. Leave blank if not applicable.</small>
       </div>
     </div>
 
@@ -975,6 +1063,17 @@ function clHighlight(text, query) {
 
 /* ================================================================ submit == */
 
+/* An optional money input. Returns null for blank/garbage so the field is
+   omitted rather than sent as 0, and never returns a negative — the column has
+   a CHECK constraint and a 422 on a typo is a worse experience than clamping. */
+function clParseMoney(raw) {
+  const t = String(raw ?? '').trim();
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 async function clSubmitEnquiry() {
   const msg = $('clEnqMsg');
   const btn = $('clEnqSubmit');
@@ -1031,6 +1130,11 @@ async function clSubmitEnquiry() {
     passenger_count: f.adults + f.children + f.infants,
     adults: f.adults, children: f.children, infants: f.infants,
     notes: ($('clEnqNotes').value || '').trim() || null,
+    /* 0040. SENT AS null WHEN BLANK, NOT 0 — the column distinguishes "not
+       recorded" from "quoted at zero", and a 0 here would put a zero-saving
+       booking into the merchant's savings average. Parsed rather than passed
+       through so an empty string never reaches a Decimal field. */
+    client_fare: clParseMoney($('clEnqClientFare').value),
   };
 
   btn.disabled = true;

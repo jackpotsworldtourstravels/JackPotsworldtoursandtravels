@@ -120,6 +120,15 @@ function clRenderBookingDetail() {
         <div class="cl-kpi-value cl-ref">${escapeHtml(r.booking_reference || '—')}</div>
         <div class="cl-kpi-sub">${d.enquiry_reference
           ? `From enquiry ${escapeHtml(d.enquiry_reference)}` : ''}</div></div>
+      ${/* 0040 — the margin the merchant made on THIS booking, carried over
+            from the enquiry it came from. Rendered only when a client fare was
+            recorded: saved_amount is null otherwise, and null means "not
+            recorded", never "saved nothing". */ ''}
+      ${r.saved_amount != null ? `
+        <div class="cl-kpi"><div class="cl-kpi-label">You saved</div>
+          <div class="cl-kpi-value">${escapeHtml(moneyStr(r.saved_amount))}</div>
+          <div class="cl-kpi-sub">against your client fare of ${
+            escapeHtml(moneyStr(r.client_fare))}</div></div>` : ''}
     </div>
 
     <!-- Where this booking has got to, as one rail. Same timeline payload as
@@ -184,16 +193,17 @@ function clRenderBookingDetail() {
         <table class="cl-table">
           <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
             <th>Nationality</th><th>Passport</th><th>Expiry</th></tr></thead>
+          <!-- One passenger, one line — every cell nowrap, the wrapper scrolls. -->
           <tbody>${(r.passengers || []).length ? r.passengers.map((p, i) => `
             <tr>
               <td>${i + 1}</td>
-              <td>${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' '))}</td>
-              <td>${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
-              <td>${escapeHtml(p.gender ? clLabel(p.gender) : '—')}</td>
-              <td>${escapeHtml(p.dob ? fmtDate(p.dob) : '—')}</td>
-              <td>${escapeHtml(p.nationality || '—')}</td>
-              <td>${escapeHtml(p.passport_number || '—')}</td>
-              <td>${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
+              <td class="cl-nowrap">${escapeHtml([p.title, p.first_name, p.last_name].filter(Boolean).join(' '))}</td>
+              <td class="cl-nowrap">${escapeHtml(clLabel(p.passenger_type || 'adult'))}</td>
+              <td class="cl-nowrap">${escapeHtml(p.gender ? clLabel(p.gender) : '—')}</td>
+              <td class="cl-nowrap">${escapeHtml(p.dob ? fmtDate(p.dob) : '—')}</td>
+              <td class="cl-nowrap">${escapeHtml(p.nationality || '—')}</td>
+              <td class="cl-nowrap">${escapeHtml(p.passport_number || '—')}</td>
+              <td class="cl-nowrap">${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
             </tr>`).join('') : clEmptyRow(8, 'No passengers recorded.')}</tbody>
         </table>
       </div>
@@ -236,35 +246,40 @@ function clRenderBookingDetail() {
       <div class="cl-panel-head"><h2>Payments</h2></div>
       <div class="cl-table-wrap">
         <table class="cl-table">
+          <!-- Status is gone from this table. Every row here is a payment that
+               was taken against this booking, and the running account it
+               belongs to is the Wallet screen — a per-row state beside a
+               settled amount was read as "this money might not have arrived".
+               The status field is still returned by the API and still drives
+               the admin's view; it is only not rendered here.
+               (No backticks in this comment: it sits inside a template literal,
+               and one would close the string.) -->
           <thead><tr><th>Reference</th><th>Method</th><th class="cl-num">Amount</th>
-            <th>Status</th><th>Date</th></tr></thead>
+            <th>Date</th></tr></thead>
           <tbody>${data.payments.map(p => `
             <tr>
               <td class="cl-ref">${escapeHtml(p.transaction_id || '—')}</td>
               <td>${escapeHtml(clLabel(p.method || p.payment_method || '—'))}</td>
               <td class="cl-num">${escapeHtml(moneyStr(p.amount))}</td>
-              <td>${clTag(p.status)}</td>
               <td class="cl-nowrap">${escapeHtml(fmtDateTime(p.paid_date || p.created_at))}</td>
             </tr>`).join('')}</tbody>
         </table>
       </div>
       <div class="cl-panel-note">
         What this booking has been charged and paid. Your account-wide position — balance due,
-        wallet and statement — is on <b>Payments</b>.
+        wallet and statement — is on <b>Wallet</b>.
       </div>
     </div>` : ''}
 
-    <!-- What this booking did to the running account. Filled in by
-         clLoadBookingWallet below.
+    <!-- THE WALLET PANEL IS GONE FROM THIS SCREEN.
+         It showed this booking's ledger entries a second time, under a second
+         balance, on a page whose subject is one booking. The Wallet screen is
+         the portal's single running-account surface and already holds every one
+         of those rows, linked to this booking.
 
-         ON BOTH TRACKS, and that is not an oversight. The first build hid this
-         on Classic Tours, reading the KPI above it ("Payment — Not required,
-         settled directly with our team") as meaning the wallet is not involved.
-         The ledger says otherwise: REQ-2026-002835 is a classic_tours booking
-         and it carries a real WTX booking_debit of Rs 12,000. "No payment step
-         in the portal" is not "no money moved", and hiding the panel there
-         would hide the charge from the only person it costs. -->
-    <div id="clBdWalletHost"></div>
+         clLoadBookingWallet and MerchantApi's wallet calls are untouched — only
+         this host element and the call to fill it are removed, so nothing about
+         how the charge is computed or recorded changed. -->
 
     <!-- Cancellations, date changes and ancillaries raised against THIS booking.
          Its own call: /api/requests/{id} describes the booking, and a child
@@ -316,7 +331,9 @@ function clRenderBookingDetail() {
       clDownloadPaperwork('confirmation', r.id, `confirmation-${r.request_number}.pdf`));
   }
   clLoadBookingChangeRequests(r.id);
-  clLoadBookingWallet(r, timeline);
+  /* No clLoadBookingWallet call: the panel it fills was removed from this
+     screen — see the note beside the Payments table. It would find no host
+     element and return, but not calling it is the honest form. */
 }
 
 /* =========================================================== progress rail */
@@ -482,6 +499,13 @@ function clQuotationPanelBd(r, d, classic) {
 const CL_BD_LEDGER_PAGE = 100;      /* the endpoint's own ceiling */
 const CL_BD_LEDGER_PAGES = 4;       /* 400 movements back from the day's end */
 
+/* CURRENTLY UNWIRED. The Wallet panel was removed from this screen — the Wallet
+   page is the portal's single running-account surface and already holds these
+   rows — so nothing calls this and `clBdWalletHost` no longer exists. Kept
+   whole rather than deleted because the walk-back-from-the-last-page technique
+   above is the hard-won part, and it would have to be rediscovered to restore
+   the panel. The null guard below means an accidental call is a no-op, not a
+   crash. */
 async function clLoadBookingWallet(r, timeline) {
   const host = $('clBdWalletHost');
   if (!host) return;
@@ -640,7 +664,7 @@ async function clLoadBookingChangeRequests(bookingId) {
   host.innerHTML = `
     <div class="cl-panel">
       <div class="cl-panel-head">
-        <h2>Change requests against this booking</h2>
+        <h2>Service requests against this booking</h2>
         <span class="cl-kpi-sub">${rows.length} raised</span>
       </div>
       <div class="cl-table-wrap">

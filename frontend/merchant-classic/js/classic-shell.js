@@ -281,7 +281,7 @@ const CL_TITLES = {
   'booking-history': 'Booking History',
   approvals: 'Approvals',
   wallet: 'Wallet',
-  payments: 'Payments',
+  payments: 'Payment Management',
   'service-request': 'Service Requests',
   reports: 'Reports',
   notifications: 'Notifications',
@@ -298,7 +298,7 @@ const CL_SUBTITLES = {
   'booking-history': 'Closed and completed travel',
   approvals: 'Sign off your team’s bookings',
   wallet: 'Your running account',
-  payments: 'Statement and settlement',
+  payments: 'Requests, approvals and settlement',
   'service-request': 'Changes to issued bookings',
   reports: 'Volume, value and mix',
   notifications: 'Everything we have told you',
@@ -677,14 +677,25 @@ function clCloseProfileMenu() {
    the accessible name survives and this title is not doing that job. */
 const CL_RAIL_KEY = 'classic_rail_mini';
 
+/* THE TOGGLE BUTTON IS GONE FROM THE MARKUP; THIS CODE IS NOT.
+   Removing `#clRailToggle` from index.html would have thrown here on the
+   next-to-last line and on the listener below, taking the whole boot with it.
+   Both are now optional. The collapse STATE is kept deliberately rather than
+   deleted: a merchant whose rail was already collapsed has a '1' in
+   localStorage, and if this simply ignored it their rail would stay narrow
+   with no control to widen it. Reading it and forcing false clears that. */
 function clApplyRail(mini) {
   const app = $('clApp');
   const btn = $('clRailToggle');
   app.classList.toggle('cl-rail-mini', mini);
-  btn.setAttribute('aria-expanded', mini ? 'false' : 'true');
-  btn.setAttribute('aria-label', mini ? 'Expand navigation' : 'Collapse navigation');
-  $('clRailToggleText').textContent = mini ? 'Expand' : 'Collapse';
-  btn.title = mini ? 'Expand navigation' : '';
+
+  if (btn) {
+    btn.setAttribute('aria-expanded', mini ? 'false' : 'true');
+    btn.setAttribute('aria-label', mini ? 'Expand navigation' : 'Collapse navigation');
+    btn.title = mini ? 'Expand navigation' : '';
+    const txt = $('clRailToggleText');
+    if (txt) txt.textContent = mini ? 'Expand' : 'Collapse';
+  }
 
   $('clSide').querySelectorAll('a[data-cl-nav]').forEach(a => {
     const label = a.querySelector('.cl-side-label')?.textContent.trim() || '';
@@ -693,8 +704,16 @@ function clApplyRail(mini) {
 }
 
 function clInitRail() {
+  const btn = $('clRailToggle');
+  /* No control => never collapsed, and the stale preference is cleared so it
+     cannot resurrect if the button is ever restored. */
+  if (!btn) {
+    localStorage.removeItem(CL_RAIL_KEY);
+    clApplyRail(false);
+    return;
+  }
   clApplyRail(localStorage.getItem(CL_RAIL_KEY) === '1');
-  $('clRailToggle').addEventListener('click', () => {
+  btn.addEventListener('click', () => {
     const mini = !$('clApp').classList.contains('cl-rail-mini');
     localStorage.setItem(CL_RAIL_KEY, mini ? '1' : '0');
     clApplyRail(mini);

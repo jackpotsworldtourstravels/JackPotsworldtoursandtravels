@@ -161,8 +161,26 @@ def booking_analytics(
     count_col = func.count()
     value_col = func.coalesce(func.sum(ServiceRequest.total_amount), 0)
 
-    total_count, total_value = db.execute(
-        select(count_col, value_col).select_from(ServiceRequest).where(where)
+    # 0040 — TOTAL SAVINGS, SUMMED IN THE DATABASE AND FLOORED PER ROW.
+    # `GREATEST(client_fare - total_amount, 0)` reproduces
+    # ``ServiceRequest.saved_amount`` in SQL: a booking we billed MORE for than
+    # the merchant sold at contributes zero, not a negative. Flooring the SUM
+    # instead of each row would let one bad booking cancel out several good
+    # ones and under-report the total. Rows with no client fare are excluded by
+    # the FILTER rather than coalesced to zero — "not recorded" is not "saved
+    # nothing", and counting them would also make `savings_bookings` wrong.
+    _saved_expr = func.greatest(
+        ServiceRequest.client_fare - func.coalesce(ServiceRequest.total_amount, 0), 0
+    )
+    saved_col = func.coalesce(
+        func.sum(_saved_expr).filter(ServiceRequest.client_fare.isnot(None)), 0
+    )
+    saved_count_col = func.count().filter(ServiceRequest.client_fare.isnot(None))
+
+    total_count, total_value, total_saved, saved_bookings = db.execute(
+        select(count_col, value_col, saved_col, saved_count_col)
+        .select_from(ServiceRequest)
+        .where(where)
     ).one()
 
     status_rows = db.execute(
@@ -228,6 +246,11 @@ def booking_analytics(
             "bookings": total_count,
             "value": _q(total_value),
             "average_value": _q(Decimal(str(total_value)) / total_count) if total_count else _ZERO,
+            # 0040. `saved` is money; `savings_bookings` is how many bookings
+            # carried a client fare at all, so a caller can say "across N
+            # bookings" honestly instead of implying it covers every booking.
+            "saved": _q(total_saved),
+            "savings_bookings": saved_bookings,
         },
         "by_status": by_status,
         "by_month": by_month,

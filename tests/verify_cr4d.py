@@ -333,11 +333,23 @@ print("\n== the queue ==")
 r = requests.get(f"{A}/wallet/topups/counts", headers=H(atok))
 counts = r.json()
 check("counts -> 200", r.status_code == 200, f"{r.status_code} {r.text[:150]}")
+# `requests` joined this list in migration 0041 — the desk can now raise a
+# payment request itself, and one that nobody has paid yet sits in
+# `awaiting_payment`. The assertion below is unchanged in INTENT: the buckets
+# still partition the table exactly. There is simply a fourth part now, and
+# leaving it out would have asserted that `all` equals three quarters of itself.
 check("...covering every bucket",
-      all(k in counts for k in ("pending", "verified", "rejected", "all", "pending_amount")),
+      all(k in counts for k in
+          ("requests", "pending", "verified", "rejected", "all", "pending_amount")),
       str(counts))
-check("...with all = pending + verified + rejected",
-      counts["all"] == counts["pending"] + counts["verified"] + counts["rejected"], str(counts))
+check("...with all = requests + pending + verified + rejected",
+      counts["all"] == (counts["requests"] + counts["pending"]
+                        + counts["verified"] + counts["rejected"]),
+      str(counts))
+# Deliberately NOT widened to include `requests`: pending_amount is the money
+# awaiting a DECISION, and a request nobody has paid yet is waiting on the
+# merchant, not on us. Adding it would inflate the desk's backlog with money
+# that has not moved.
 check("...and pending_amount as a decimal string, never a float",
       isinstance(counts["pending_amount"], str), repr(counts["pending_amount"]))
 

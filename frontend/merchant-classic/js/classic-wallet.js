@@ -61,18 +61,26 @@ const CL_METHOD_LABEL = {
 
 function clInitWallet() {
   $('cl-wallet').innerHTML = `
+    <!-- THE WALLET IS A READ-ONLY LEDGER NOW.
+         "Add money" is gone, and with it the merchant-initiated top-up. Money
+         reaches this account one way only: an Admin raises a payment request on
+         Payment Management, the merchant pays and uploads proof, an Admin
+         approves it, and the wallet is credited at that point. Nothing on this
+         screen writes.
+
+         clOpenAddMoney() and the whole top-up submit path below are LEFT IN
+         PLACE and still work — POST /api/wallet/top-ups is unchanged and the
+         Admin's Wallet & Top-ups desk still processes what is already in
+         flight. Only the way in from this screen is gone. -->
     <div class="cl-page-head">
       <div>
         <h1>Wallet</h1>
         <p>Your running account with us. Tickets are charged to it when they are
-           issued; add money any time to settle what is owed.</p>
+           issued.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clWalletRefresh">
           ${clIco('refresh', { size: 15 })} Refresh
-        </button>
-        <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clWalletAddBtn">
-          ${clIco('plus', { size: 16 })} Add money
         </button>
       </div>
     </div>
@@ -96,31 +104,19 @@ function clInitWallet() {
 
     <div id="clWalletTrend"></div>
 
-    <div class="cl-panel">
-      <div class="cl-panel-head">
-        <h2>Money you have added</h2>
-        <div class="cl-panel-tools">
-          <button type="button" class="cl-btn cl-btn-sm" id="clTopupRefresh">Refresh</button>
-        </div>
-      </div>
-      <div class="cl-panel-body cl-flush">
-        <div class="cl-table-wrap">
-          <table class="cl-table">
-            <thead><tr>
-              <th>Reference</th><th>Sent on</th><th>Method</th><th>Paid into</th>
-              <th>UTR</th><th class="cl-num">Amount</th><th>Status</th>
-              <th class="cl-actions">Proof</th>
-            </tr></thead>
-            <tbody id="clTopupBody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="cl-panel-note" id="clTopupNote"></div>
-    </div>
+    <!-- "Money you have added" MOVED TO PAYMENT MANAGEMENT, not deleted.
+         It listed top-up requests including pending and rejected ones, and this
+         screen is now defined as completed wallet movement only — a pending
+         request is not money on the account, and showing it here is how a
+         balance gets read as larger than it is. Every state of a request now
+         lives on Payment Management, which is the screen about requests.
+         clLoadTopups, clTopupBody and clTopupNote still exist in this module;
+         they simply have no host element on this screen. (No backticks in this
+         comment: it sits inside a template literal and one would close it.) -->
 
     <div class="cl-panel">
       <div class="cl-panel-head">
-        <h2>Transaction history</h2>
+        <h2>Wallet History</h2>
         <div class="cl-panel-tools">
           <label class="cl-sr" for="clWalletFrom">From date</label>
           <input type="date" id="clWalletFrom">
@@ -133,10 +129,15 @@ function clInitWallet() {
       <div class="cl-panel-body cl-flush">
         <div class="cl-table-wrap">
           <table class="cl-table">
+            <!-- Payment Method is the DIRECTION of the money — Credit or
+                 Debit — which is what the brief asks this column to carry. The
+                 separate Debit and Credit amount columns collapsed into one
+                 Amount, signed by that direction, so a row reads left to right
+                 as "on this date, this reference, credited, a top-up, leaving
+                 this balance, of this much". -->
             <thead><tr>
-              <th>Date</th><th>Reference</th><th>Type</th><th>Details</th>
-              <th class="cl-num">Debit</th><th class="cl-num">Credit</th>
-              <th class="cl-num">Balance</th>
+              <th>Date</th><th>Reference</th><th>Payment Method</th><th>Type</th>
+              <th class="cl-num">Balance</th><th class="cl-num">Amount</th>
             </tr></thead>
             <tbody id="clWalletBody"></tbody>
           </table>
@@ -157,17 +158,18 @@ function clInitWallet() {
           <li>When we issue the ticket, its fare is <b>debited from this wallet</b>.</li>
           <li>The balance may go <b>negative</b> — that is simply what you owe. You can keep
               booking while it is, within whatever headroom your account carries.</li>
-          <li>Add money any time. We verify the transfer before it is credited, so a
-              submission shows as <b>awaiting verification</b> until then.</li>
+          <li>Money reaches this account through a payment request our team raises.
+              You settle it and upload proof on <b>Payment Management</b>; the wallet
+              is credited once that payment has been approved.</li>
         </ol>
       </div>
     </div>`;
 
-  $('clWalletAddBtn').addEventListener('click', () => clOpenAddMoney());
+  /* No Add-money and no top-up table on this screen any more, so neither
+     control is bound and clLoadTopups is not called from here. */
   $('clWalletRefresh').addEventListener('click', () => {
-    clLoadWalletSummary(); clLoadTopups(); clLoadWalletLedger(); clLoadWalletTrend();
+    clLoadWalletSummary(); clLoadWalletLedger(); clLoadWalletTrend();
   });
-  $('clTopupRefresh').addEventListener('click', () => clLoadTopups());
   $('clWalletApply').addEventListener('click', () => {
     clWalletState.dateFrom = $('clWalletFrom').value;
     clWalletState.dateTo = $('clWalletTo').value;
@@ -431,9 +433,15 @@ async function clLoadWalletSummary() {
           <div>
             <div class="cl-balance-label">${owes ? 'Outstanding balance' : 'Wallet balance'}</div>
             <div class="cl-balance-value">${escapeHtml(moneyStr(owes ? w.outstanding : w.balance))}</div>
-            <div class="cl-balance-sub">${owes
-              ? 'Owed on your account — add money to settle it'
-              : 'Available to spend on ticketing'}</div>
+            <!-- LAST UPDATED — when the balance last MOVED, not when this page
+                 was loaded. last_transaction_at is the timestamp of the most
+                 recent ledger row; rendering new Date() here would show the
+                 merchant a fresh time on every refresh and tell them nothing.
+                 Falls back to a plain caption when the wallet has never moved,
+                 because "Last updated: never" reads as a fault. -->
+            <div class="cl-balance-sub">${w.last_transaction_at
+              ? `Last updated ${escapeHtml(fmtDate(w.last_transaction_at))} at ${escapeHtml(fmtTime(w.last_transaction_at))}`
+              : 'No movement on this account yet'}</div>
           </div>
           <div class="cl-balance-side">
             <div>
@@ -444,10 +452,12 @@ async function clLoadWalletSummary() {
               <div class="cl-balance-label">Total booked</div>
               <b>${escapeHtml(moneyStr(w.total_debits))}</b>
             </div>
-            ${w.pending_topup_count > 0 ? `<div>
-              <div class="cl-balance-label">Awaiting verification</div>
-              <b>${escapeHtml(moneyStr(w.pending_topups))}</b>
-            </div>` : ''}
+            <!-- The "Awaiting verification" figure was removed with the top-up
+                 table. It is unapproved money and this screen is completed
+                 movement only; it is shown on Payment Management instead, where
+                 a pending request is the subject rather than a footnote on a
+                 balance. pending_topups / pending_topup_count still arrive
+                 in this payload and are still read there. -->
           </div>
         </div>
       </div>`;
@@ -502,7 +512,7 @@ async function clLoadWalletSummary() {
 async function clLoadWalletLedger() {
   const body = $('clWalletBody');
   const count = $('clWalletCount');
-  body.innerHTML = clLoadingRow(7, 'Loading transactions…');
+  body.innerHTML = clLoadingRow(6, 'Loading transactions…');
 
   try {
     const p = await MerchantApi.walletTransactions({
@@ -511,20 +521,31 @@ async function clLoadWalletLedger() {
     });
 
     if (!p.items.length) {
-      body.innerHTML = clEmptyRow(7, clWalletState.page > 1
+      body.innerHTML = clEmptyRow(6, clWalletState.page > 1
         ? 'No more transactions.'
         : 'Nothing has moved on your wallet yet.');
     } else {
-      body.innerHTML = p.items.map(t => `
+      /* THE LEDGER IS ALREADY COMPLETED MOVEMENT ONLY, so no filtering is
+         needed here to satisfy "pending requests must not appear". A row in
+         wallet_transactions is written by wallet_service at the moment the
+         money actually moves — an unapproved top-up has no row at all, which is
+         why the balance and this table can never disagree. What had to change
+         was removing the separate top-up REQUEST table above, not filtering
+         this one. */
+      body.innerHTML = p.items.map(t => {
+        const isCredit = moneyIsPositive(t.credit);
+        const amount = isCredit ? t.credit : t.debit;
+        return `
         <tr>
           <td class="cl-nowrap">${escapeHtml(fmtDate(t.created_at))}</td>
           <td class="cl-nowrap"><code>${escapeHtml(t.txn_number)}</code></td>
-          <td>${escapeHtml(CL_TXN_LABELS[t.txn_type] || clLabel(t.txn_type))}</td>
-          <td>${escapeHtml(clWalletDetail(t))}</td>
-          <td class="cl-num">${moneyIsPositive(t.debit) ? escapeHtml(moneyStr(t.debit)) : '—'}</td>
-          <td class="cl-num">${moneyIsPositive(t.credit) ? escapeHtml(moneyStr(t.credit)) : '—'}</td>
+          <td><span class="cl-tag ${isCredit ? 'cl-tag-ok' : 'cl-tag-warn'}">${isCredit ? 'Credit' : 'Debit'}</span></td>
+          <td>${escapeHtml(CL_TXN_LABELS[t.txn_type] || clLabel(t.txn_type))}
+              <small class="cl-cell-sub">${escapeHtml(clWalletDetail(t))}</small></td>
           <td class="cl-num">${escapeHtml(moneyStr(t.balance_after))}</td>
-        </tr>`).join('');
+          <td class="cl-num">${isCredit ? '+' : '−'}${escapeHtml(moneyStr(amount))}</td>
+        </tr>`;
+      }).join('');
     }
 
     const first = (p.page - 1) * p.page_size + 1;
@@ -535,7 +556,7 @@ async function clLoadWalletLedger() {
     $('clWalletPrev').disabled = p.page <= 1;
     $('clWalletNext').disabled = last >= p.total;
   } catch (err) {
-    body.innerHTML = clEmptyRow(7, clError(err, 'Could not load your transactions.'));
+    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load your transactions.'));
     count.textContent = '—';
   }
 }

@@ -1,0 +1,992 @@
+/* ==========================================================================
+   JACKPOTS — SHARED DESIGN SYSTEM
+   ==========================================================================
+   ONE visual language for the Merchant, Admin and Super Admin portals.
+
+   WHAT THIS FILE IS
+   A premium enterprise SaaS surface in the manner of Linear / Stripe / Vercel:
+   a deep indigo canvas, floating cards with soft elevation and a hairline
+   border, a single violet accent for action, generous radii, and one type
+   scale. It ships light AND dark; the palette in the brief is the dark one.
+
+   HOW IT IS APPLIED — READ THIS BEFORE EDITING
+   The three portals already have mature, independent stylesheets whose class
+   names are consumed by ~40 JS modules. Rewriting them would mean renaming
+   selectors in every module, which is how a redesign breaks a working product.
+   Instead this file does two things, in order:
+
+     1. TOKENS        declares the canonical `--jp-*` palette, once.
+     2. BRIDGES       re-points each portal's OWN token names at the `--jp-*`
+                      values. `--card-bg`, `--navy`, `--cl-surface`,
+                      `--cl-orange` and the rest keep their names and their
+                      meanings; only what they resolve to changes.
+
+   Because every component in all three portals already reads a token and never
+   a raw hex, the bridge alone repaints the entire application — including the
+   hand-drawn SVG charts, which reference the same custom properties. Sections
+   3 onward then upgrade the *shape* of things tokens cannot express: radii on
+   containers that hard-coded them, sticky table heads, focus rings, hover
+   motion, glass, and the Admin width fix.
+
+   LOAD ORDER IS LOAD-BEARING
+   This sheet MUST be linked AFTER the portal's own stylesheet. The bridges are
+   `:root` rules of equal specificity to the ones they replace, so source order
+   is what decides them. Link it first and nothing changes.
+
+   THEMING
+   Both the Merchant and Admin portals resolve "system" to an explicit
+   `data-theme` attribute in JS, so `[data-theme="dark"]` is authoritative
+   there. Super Admin has no switcher and follows the OS, so a
+   prefers-color-scheme block covers it. All three paths set the same tokens.
+
+   ACCESSIBILITY — THE ACCENT COMES IN TWO WEIGHTS, AND IT IS NOT DECORATIVE
+   #6D5DF6 measures 4.62:1 against white, so in LIGHT it may carry text and may
+   sit under white text. Against the dark canvas it measures only 4.10:1, which
+   is under AA, so on dark every accent that is TEXT or an ICON resolves to
+   #A78BFA (6.39:1 on a card). `--jp-accent` is the fill; `--jp-accent-ink` is
+   the readable one. Use the right one or the label fails.
+
+   READING ORDER
+     1  tokens                    7  forms
+     2  portal bridges            8  modals & drawers
+     3  base & type               9  sidebar & topbar
+     4  buttons                  10  badges & pagination
+     5  cards & panels           11  admin layout / width fix
+     6  tables                   12  shared jp-* components
+                                 13  responsive
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. TOKENS
+   ========================================================================== */
+
+:root{
+  /* ---- accent ramp ---------------------------------------------------- */
+  --jp-violet-50:#F1EFFE;
+  --jp-violet-100:#E4E0FD;
+  --jp-violet-200:#C9C2FB;
+  --jp-violet-300:#A78BFA;   /* the readable weight on dark — 6.39:1        */
+  --jp-violet-400:#8B7BF8;
+  --jp-violet-500:#6D5DF6;   /* THE accent. 4.62:1 on white, both ways      */
+  --jp-violet-600:#5B4AE3;
+  --jp-violet-700:#4A39C4;
+  --jp-violet-800:#3A2C9B;
+
+  /* ---- semantic ------------------------------------------------------- */
+  --jp-success:#22C55E;
+  --jp-warning:#F59E0B;
+  --jp-danger:#EF4444;
+  --jp-info:#38BDF8;
+
+  /* Text weights for the semantics. The raw values above are FILLS — they are
+     tuned for a dark ground and several of them drop under AA as small text on
+     white. These are the tones that may carry a label in light mode. */
+  --jp-success-ink:#15803D;
+  --jp-warning-ink:#B45309;
+  --jp-danger-ink:#DC2626;
+  --jp-info-ink:#0369A1;
+
+  /* ---- geometry ------------------------------------------------------- */
+  --jp-r-xs:8px;
+  --jp-r-sm:10px;
+  --jp-r-md:14px;
+  --jp-r-lg:18px;    /* the card radius from the brief                     */
+  --jp-r-xl:20px;
+  --jp-r-2xl:26px;
+  --jp-r-pill:999px;
+
+  /* ---- rhythm --------------------------------------------------------- */
+  --jp-s-1:4px;  --jp-s-2:8px;  --jp-s-3:12px; --jp-s-4:16px;
+  --jp-s-5:20px; --jp-s-6:24px; --jp-s-7:32px; --jp-s-8:40px;
+
+  /* ---- type ----------------------------------------------------------- */
+  --jp-font:'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --jp-mono:ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* ---- motion --------------------------------------------------------- */
+  --jp-ease:cubic-bezier(.22,1,.36,1);
+  --jp-ease-out:cubic-bezier(.4,0,.2,1);
+  --jp-fast:.15s var(--jp-ease);
+  --jp-base:.22s var(--jp-ease);
+  --jp-slow:.36s var(--jp-ease);
+
+  /* ---- LIGHT surfaces (default) --------------------------------------- */
+  /* Derived from the dark palette rather than invented: the ink is the dark
+     canvas colour, and the canvas is the accent's own hue at 2% so the two
+     themes read as one family instead of two products. */
+  --jp-canvas:#F6F7FB;
+  --jp-canvas-2:#EEF0F7;
+  --jp-surface:#FFFFFF;
+  --jp-surface-2:#F9FAFC;
+  --jp-surface-3:#F2F4F9;
+  --jp-border:rgba(11,16,32,.09);
+  --jp-border-strong:rgba(11,16,32,.16);
+  --jp-text:#0B1020;
+  --jp-text-2:#475569;
+  --jp-text-muted:#64748B;      /* 4.76:1 on white                          */
+  --jp-hover:rgba(11,16,32,.04);
+  --jp-zebra:rgba(11,16,32,.018);
+
+  --jp-accent:var(--jp-violet-500);
+  --jp-accent-ink:var(--jp-violet-600);   /* accent as TEXT, on light       */
+  --jp-accent-soft:var(--jp-violet-50);
+  --jp-accent-line:rgba(109,93,246,.28);
+  --jp-on-accent:#FFFFFF;
+
+  --jp-success-fg:var(--jp-success-ink);
+  --jp-warning-fg:var(--jp-warning-ink);
+  --jp-danger-fg:var(--jp-danger-ink);
+  --jp-info-fg:var(--jp-info-ink);
+  --jp-success-bg:rgba(34,197,94,.11);
+  --jp-warning-bg:rgba(245,158,11,.13);
+  --jp-danger-bg:rgba(239,68,68,.10);
+  --jp-info-bg:rgba(56,189,248,.12);
+
+  /* ---- elevation ------------------------------------------------------- */
+  --jp-sh-xs:0 1px 2px rgba(11,16,32,.05);
+  --jp-sh-sm:0 1px 2px rgba(11,16,32,.04), 0 6px 16px -10px rgba(11,16,32,.16);
+  --jp-sh-md:0 1px 3px rgba(11,16,32,.05), 0 14px 34px -16px rgba(11,16,32,.20);
+  --jp-sh-lg:0 2px 8px rgba(11,16,32,.06), 0 32px 64px -24px rgba(11,16,32,.26);
+  --jp-sh-xl:0 40px 90px -28px rgba(11,16,32,.34);
+  --jp-sh-accent:0 8px 22px -10px rgba(109,93,246,.55);
+  --jp-focus:0 0 0 3px rgba(109,93,246,.32);
+
+  /* ---- glass ----------------------------------------------------------- */
+  --jp-glass:rgba(255,255,255,.72);
+  --jp-glass-blur:saturate(180%) blur(14px);
+
+  /* The sidebar is a fixed dark surface in BOTH themes — it is what anchors
+     the layout and it is the one place the brief's #0B1020 always appears. */
+  --jp-rail:#0B1020;
+  --jp-rail-2:#080C18;
+  --jp-rail-text:rgba(226,232,240,.68);
+  --jp-rail-text-hi:#FFFFFF;
+  --jp-rail-text-dim:rgba(226,232,240,.54);
+  --jp-rail-line:rgba(255,255,255,.07);
+  --jp-rail-active:rgba(109,93,246,.20);
+}
+
+/* ---- DARK surfaces — the palette exactly as briefed --------------------- */
+:root[data-theme="dark"]{
+  --jp-canvas:#0B1020;
+  --jp-canvas-2:#0E1424;
+  --jp-surface:#121A2B;
+  --jp-surface-2:#161F33;
+  --jp-surface-3:#1B2438;
+  --jp-border:rgba(255,255,255,.06);
+  --jp-border-strong:rgba(255,255,255,.12);
+  --jp-text:#FFFFFF;
+  --jp-text-2:#CBD5E1;
+  --jp-text-muted:#94A3B8;      /* 6.78:1 on the card                       */
+  --jp-hover:rgba(255,255,255,.045);
+  --jp-zebra:rgba(255,255,255,.02);
+
+  /* The fill stays #6D5DF6; only the READABLE weight moves. */
+  --jp-accent:var(--jp-violet-500);
+  --jp-accent-ink:var(--jp-violet-300);
+  --jp-accent-soft:rgba(109,93,246,.16);
+  --jp-accent-line:rgba(139,123,248,.34);
+
+  --jp-success-fg:#4ADE80;
+  --jp-warning-fg:#FBBF24;
+  --jp-danger-fg:#F87171;
+  --jp-info-fg:#7DD3FC;
+  --jp-success-bg:rgba(34,197,94,.14);
+  --jp-warning-bg:rgba(245,158,11,.15);
+  --jp-danger-bg:rgba(239,68,68,.14);
+  --jp-info-bg:rgba(56,189,248,.14);
+
+  --jp-sh-xs:0 1px 2px rgba(0,0,0,.4);
+  --jp-sh-sm:0 1px 2px rgba(0,0,0,.4), 0 6px 16px -10px rgba(0,0,0,.6);
+  --jp-sh-md:0 1px 3px rgba(0,0,0,.45), 0 14px 34px -16px rgba(0,0,0,.66);
+  --jp-sh-lg:0 2px 8px rgba(0,0,0,.5), 0 32px 64px -24px rgba(0,0,0,.72);
+  --jp-sh-xl:0 40px 90px -28px rgba(0,0,0,.8);
+  --jp-focus:0 0 0 3px rgba(139,123,248,.38);
+
+  --jp-glass:rgba(18,26,43,.72);
+  --jp-rail:#0A0E1C;
+  --jp-rail-2:#070A14;
+}
+
+/* Super Admin has no theme switcher, so it follows the OS. Scoped with :not()
+   so an explicit light choice in another portal is never overridden by it. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --jp-canvas:#0B1020;
+    --jp-canvas-2:#0E1424;
+    --jp-surface:#121A2B;
+    --jp-surface-2:#161F33;
+    --jp-surface-3:#1B2438;
+    --jp-border:rgba(255,255,255,.06);
+    --jp-border-strong:rgba(255,255,255,.12);
+    --jp-text:#FFFFFF;
+    --jp-text-2:#CBD5E1;
+    --jp-text-muted:#94A3B8;
+    --jp-hover:rgba(255,255,255,.045);
+    --jp-zebra:rgba(255,255,255,.02);
+    --jp-accent-ink:var(--jp-violet-300);
+    --jp-accent-soft:rgba(109,93,246,.16);
+    --jp-accent-line:rgba(139,123,248,.34);
+    --jp-success-fg:#4ADE80;
+    --jp-warning-fg:#FBBF24;
+    --jp-danger-fg:#F87171;
+    --jp-info-fg:#7DD3FC;
+    --jp-sh-sm:0 1px 2px rgba(0,0,0,.4), 0 6px 16px -10px rgba(0,0,0,.6);
+    --jp-sh-md:0 1px 3px rgba(0,0,0,.45), 0 14px 34px -16px rgba(0,0,0,.66);
+    --jp-sh-lg:0 2px 8px rgba(0,0,0,.5), 0 32px 64px -24px rgba(0,0,0,.72);
+    --jp-glass:rgba(18,26,43,.72);
+    --jp-rail:#0A0E1C;
+    --jp-rail-2:#070A14;
+  }
+}
+
+
+/* ==========================================================================
+   2. PORTAL BRIDGES
+   ==========================================================================
+   Each portal's own token names, re-pointed. Nothing below renames anything:
+   `--coral` is still "the accent", `--cl-surface` is still "a card". This is
+   the whole of the repaint for every existing component in the application.
+   ========================================================================== */
+
+/* ---- Admin + Partner + Super Admin (admin.css, partner-portal.css) ------ */
+:root{
+  --navy:var(--jp-accent);
+  --navy-2:var(--jp-violet-600);
+  --navy-3:var(--jp-violet-400);
+  --navy-deep:var(--jp-rail);
+
+  --coral:var(--jp-accent);
+  --coral-dark:var(--jp-accent-ink);
+  --coral-hover:var(--jp-accent-soft);
+
+  --gold:var(--jp-warning);
+  --gold-dark:var(--jp-warning-fg);
+  --gold-soft:var(--jp-warning-bg);
+  --gold-line:var(--jp-accent-line);
+
+  --sky:var(--jp-info-fg);
+  --emerald:var(--jp-success-fg);
+  --amber:var(--jp-warning-fg);
+
+  --ink:var(--jp-text);
+  --muted:var(--jp-text-muted);
+  --line:var(--jp-border);
+
+  --bg:var(--jp-canvas);
+  --white:var(--jp-surface);
+  --card-bg:var(--jp-surface);
+  --page-bg:var(--jp-canvas);
+  --text-primary:var(--jp-text);
+  --text-muted:var(--jp-text-muted);
+  --border-color:var(--jp-border);
+  --hover-bg:var(--jp-hover);
+
+  --shadow-xs:var(--jp-sh-xs);
+  --shadow-sm:var(--jp-sh-sm);
+  --shadow-md:var(--jp-sh-md);
+  --shadow-lg:var(--jp-sh-lg);
+
+  --radius:var(--jp-r-lg);
+  --radius-sm:var(--jp-r-md);
+  --radius-lg:var(--jp-r-xl);
+  --radius-pill:var(--jp-r-pill);
+  --ff:var(--jp-font);
+  --ease:var(--jp-ease-out);
+
+  --sidebar-bg:var(--jp-rail);
+  --sidebar-bg-2:var(--jp-rail-2);
+  --sidebar-text:var(--jp-rail-text);
+  --sidebar-text-hover:var(--jp-rail-text-hi);
+  --sidebar-w:270px;
+  --sidebar-w-collapsed:80px;
+}
+
+/* Both dark paths need the same bridge re-stated, because the portal sheets
+   re-declare these names inside their own dark blocks and those blocks carry
+   the higher `[data-theme]` specificity. */
+:root[data-theme="dark"],
+:root[data-theme="light"]{
+  --card-bg:var(--jp-surface);
+  --page-bg:var(--jp-canvas);
+  --text-primary:var(--jp-text);
+  --text-muted:var(--jp-text-muted);
+  --border-color:var(--jp-border);
+  --hover-bg:var(--jp-hover);
+  --gold-dark:var(--jp-warning-fg);
+  --gold-soft:var(--jp-warning-bg);
+  --coral-dark:var(--jp-accent-ink);
+  --sky:var(--jp-info-fg);
+  --emerald:var(--jp-success-fg);
+  --shadow-sm:var(--jp-sh-sm);
+  --shadow-md:var(--jp-sh-md);
+  --shadow-lg:var(--jp-sh-lg);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --card-bg:var(--jp-surface);
+    --page-bg:var(--jp-canvas);
+    --text-primary:var(--jp-text);
+    --text-muted:var(--jp-text-muted);
+    --border-color:var(--jp-border);
+    --hover-bg:var(--jp-hover);
+    --gold-soft:var(--jp-warning-bg);
+    --shadow-sm:var(--jp-sh-sm);
+    --shadow-md:var(--jp-sh-md);
+    --shadow-lg:var(--jp-sh-lg);
+  }
+}
+
+/* ---- Merchant Portal (classic.css) -------------------------------------- */
+/* The `cl-` sheet keeps its two-weight accent contract: `--cl-orange` is the
+   brand tone that may carry a SHAPE, `--cl-orange-cta` is the one text sits
+   on. That contract is why the portal passes AA, so it is preserved exactly —
+   both weights simply become violet. */
+:root{
+  --cl-navy-900:var(--jp-violet-800);
+  --cl-navy-800:var(--jp-rail);
+  --cl-navy-700:var(--jp-violet-700);
+  --cl-navy-600:var(--jp-violet-600);
+  --cl-navy-500:var(--jp-violet-500);
+
+  --cl-orange:var(--jp-accent);          /* shapes, rules, dots, chart bars  */
+  --cl-orange-cta:var(--jp-violet-500);  /* 4.62:1 with white — text may sit */
+  --cl-orange-cta-2:var(--jp-violet-600);
+  --cl-orange-600:var(--jp-violet-600);
+  --cl-orange-700:var(--jp-violet-700);
+  --cl-orange-50:var(--jp-accent-soft);
+  --cl-gold:var(--jp-warning);
+
+  --cl-success:var(--jp-success);   --cl-success-bg:var(--jp-success-bg);  --cl-success-fg:var(--jp-success-fg);
+  --cl-warning:var(--jp-warning);   --cl-warning-bg:var(--jp-warning-bg);  --cl-warning-fg:var(--jp-warning-fg);
+  --cl-danger:var(--jp-danger);     --cl-danger-bg:var(--jp-danger-bg);    --cl-danger-fg:var(--jp-danger-fg);
+  --cl-info:var(--jp-info);         --cl-info-bg:var(--jp-info-bg);        --cl-info-fg:var(--jp-info-fg);
+
+  --cl-canvas:var(--jp-canvas);
+  --cl-canvas-2:var(--jp-canvas-2);
+  --cl-surface:var(--jp-surface);
+  --cl-surface-2:var(--jp-surface-2);
+  --cl-text:var(--jp-text);
+  --cl-text-2:var(--jp-text-2);
+  --cl-text-muted:var(--jp-text-muted);
+  --cl-line:var(--jp-border);
+  --cl-line-2:var(--jp-border);
+  --cl-hover:var(--jp-hover);
+  --cl-zebra:var(--jp-zebra);
+  --cl-accent:var(--jp-accent);
+  --cl-accent-soft:var(--jp-accent-soft);
+  --cl-focus:rgba(109,93,246,.32);
+
+  --cl-rail-top:var(--jp-rail);
+  --cl-rail-bottom:var(--jp-rail-2);
+  --cl-rail-text:var(--jp-rail-text);
+  --cl-rail-text-hi:var(--jp-rail-text-hi);
+  --cl-rail-text-dim:var(--jp-rail-text-dim);
+  --cl-rail-text-foot:var(--jp-rail-text-dim);
+  --cl-rail-line:var(--jp-rail-line);
+  --cl-rail-w:270px;
+
+  --cl-sh-xs:var(--jp-sh-xs);
+  --cl-sh-sm:var(--jp-sh-sm);
+  --cl-sh-md:var(--jp-sh-md);
+  --cl-sh-lg:var(--jp-sh-lg);
+  --cl-sh-xl:var(--jp-sh-xl);
+  --cl-sh-accent:var(--jp-sh-accent);
+
+  --cl-r-xs:var(--jp-r-xs);  --cl-r-sm:var(--jp-r-sm); --cl-r-md:var(--jp-r-md);
+  --cl-r-lg:var(--jp-r-lg);  --cl-r-xl:var(--jp-r-2xl);
+  --cl-font:var(--jp-font);
+  --cl-ease:var(--jp-ease);
+}
+
+:root[data-theme="dark"]{
+  --cl-canvas:var(--jp-canvas);
+  --cl-canvas-2:var(--jp-canvas-2);
+  --cl-surface:var(--jp-surface);
+  --cl-surface-2:var(--jp-surface-2);
+  --cl-text:var(--jp-text);
+  --cl-text-2:var(--jp-text-2);
+  --cl-text-muted:var(--jp-text-muted);
+  --cl-line:var(--jp-border);
+  --cl-line-2:var(--jp-border);
+  --cl-hover:var(--jp-hover);
+  --cl-zebra:var(--jp-zebra);
+  --cl-orange-cta:var(--jp-violet-500);
+  --cl-orange-cta-2:var(--jp-violet-600);
+  --cl-accent-soft:var(--jp-accent-soft);
+  --cl-success-bg:var(--jp-success-bg); --cl-success-fg:var(--jp-success-fg);
+  --cl-warning-bg:var(--jp-warning-bg); --cl-warning-fg:var(--jp-warning-fg);
+  --cl-danger-bg:var(--jp-danger-bg);   --cl-danger-fg:var(--jp-danger-fg);
+  --cl-info-bg:var(--jp-info-bg);       --cl-info-fg:var(--jp-info-fg);
+}
+
+/* The merchant sheet hard-codes a warm tint in ~8 dark-mode rules (`#FFB08A`,
+   `rgba(255,107,44,…)`) which the token bridge cannot reach. Re-pointed here
+   so no orange survives anywhere in dark mode. */
+:root[data-theme="dark"] .cl-btn-quiet:hover:not(:disabled),
+:root[data-theme="dark"] .cl-tag-accent,
+:root[data-theme="dark"] .cl-step.current b,
+:root[data-theme="dark"] .cl-flow-step.current .cl-flow-label{color:var(--jp-accent-ink);}
+:root[data-theme="dark"] .cl-note.unread{background:var(--jp-accent-soft);}
+:root[data-theme="dark"] .cl-sc-conv.active{background:var(--jp-accent-soft);}
+:root[data-theme="dark"] a{color:var(--jp-accent-ink);}
+
+
+/* ==========================================================================
+   3. BASE & TYPE
+   ========================================================================== */
+
+body{
+  background:var(--jp-canvas);
+  color:var(--jp-text);
+  font-family:var(--jp-font);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+h1,h2,h3,h4{letter-spacing:-.015em;}
+
+::selection{background:var(--jp-accent-soft); color:var(--jp-accent-ink);}
+
+/* One focus ring for the whole application. */
+:focus-visible{
+  outline:2px solid var(--jp-accent);
+  outline-offset:2px;
+  border-radius:6px;
+}
+
+/* Scrollbars, so a dark surface does not get a bright system gutter. */
+*{scrollbar-width:thin; scrollbar-color:var(--jp-border-strong) transparent;}
+*::-webkit-scrollbar{width:9px; height:9px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{background:var(--jp-border-strong); border-radius:99px; border:2px solid transparent; background-clip:content-box;}
+*::-webkit-scrollbar-thumb:hover{background:var(--jp-text-muted); background-clip:content-box;}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; transition-duration:.01ms !important;}
+}
+
+
+/* ==========================================================================
+   4. BUTTONS
+   ==========================================================================
+   One system, five intents, every state. Applied through the class names the
+   portals already emit (`.btn-coral` is the primary everywhere) so no caller
+   changes.
+   ========================================================================== */
+
+.btn, .cl-btn{
+  border-radius:var(--jp-r-pill);
+  font-weight:650;
+  letter-spacing:.005em;
+  transition:background var(--jp-fast), color var(--jp-fast),
+             border-color var(--jp-fast), box-shadow var(--jp-fast),
+             transform var(--jp-fast), filter var(--jp-fast);
+}
+.btn:active, .cl-btn:active{transform:translateY(1px);}
+.btn:focus-visible, .cl-btn:focus-visible{outline:none; box-shadow:var(--jp-focus);}
+
+/* primary */
+.btn-coral, .btn-navy, .btn-primary, .cl-btn-primary{
+  background:linear-gradient(180deg, var(--jp-violet-500), var(--jp-violet-600));
+  color:var(--jp-on-accent);
+  border:1px solid transparent;
+  box-shadow:var(--jp-sh-accent);
+}
+.btn-coral:hover, .btn-navy:hover, .btn-primary:hover, .cl-btn-primary:hover:not(:disabled){
+  background:linear-gradient(180deg, var(--jp-violet-400), var(--jp-violet-500));
+  box-shadow:0 10px 26px -10px rgba(109,93,246,.66);
+  transform:translateY(-1px);
+  filter:none;
+}
+
+/* secondary / outline */
+.btn-ghost, .cl-btn{
+  background:var(--jp-surface);
+  color:var(--jp-text);
+  border:1px solid var(--jp-border);
+}
+.btn-ghost:hover, .cl-btn:hover:not(:disabled){
+  background:var(--jp-hover);
+  border-color:var(--jp-border-strong);
+  filter:none;
+}
+
+/* danger */
+.btn-danger, .cl-btn-danger{
+  background:var(--jp-danger-bg);
+  color:var(--jp-danger-fg);
+  border:1px solid transparent;
+}
+.btn-danger:hover, .cl-btn-danger:hover:not(:disabled){
+  background:var(--jp-danger);
+  color:#fff;
+  filter:none;
+}
+
+/* loading + disabled */
+.btn:disabled, .cl-btn:disabled, .btn.is-loading, .cl-btn.is-loading{
+  cursor:not-allowed;
+  box-shadow:none;
+  transform:none;
+}
+.btn.is-loading, .cl-btn.is-loading{position:relative; color:transparent !important;}
+.btn.is-loading::after, .cl-btn.is-loading::after{
+  content:''; position:absolute; top:50%; left:50%; width:15px; height:15px;
+  margin:-7.5px 0 0 -7.5px; border-radius:50%;
+  border:2px solid currentColor; border-top-color:transparent;
+  color:var(--jp-on-accent);
+  animation:jp-spin .6s linear infinite;
+}
+@keyframes jp-spin{to{transform:rotate(360deg);}}
+
+
+/* ==========================================================================
+   5. CARDS & PANELS
+   ==========================================================================
+   The floating card from the brief: 18–20px radius, hairline border, soft
+   shadow, a gradient highlight along the top edge that only shows on hover.
+   ========================================================================== */
+
+.panel, .stat-card, .cl-panel, .cl-kpi, .cl-card{
+  border-radius:var(--jp-r-lg);
+  border:1px solid var(--jp-border);
+  background:var(--jp-surface);
+  box-shadow:var(--jp-sh-sm);
+  transition:transform var(--jp-base), box-shadow var(--jp-base), border-color var(--jp-base);
+}
+
+/* The portal sheets both add a coloured top rule on hover. Kept as a shape,
+   restated in the accent, and moved to a pseudo-element so it cannot shift
+   layout the way a border-top-color transition on the box itself does. */
+.panel{border-top:1px solid var(--jp-border) !important; position:relative; overflow:hidden;}
+.panel::after{
+  content:''; position:absolute; inset:0 0 auto 0; height:1px;
+  background:linear-gradient(90deg, transparent, var(--jp-accent), transparent);
+  opacity:0; transition:opacity var(--jp-base); pointer-events:none;
+}
+.panel:hover::after{opacity:.8;}
+.panel:hover{box-shadow:var(--jp-sh-md); border-color:var(--jp-border-strong);}
+
+.stat-card:hover, .cl-kpi:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--jp-sh-md);
+  border-color:var(--jp-accent-line);
+}
+/* admin.css paints a gold ring on stat-card hover — re-pointed. */
+.stat-card:hover{box-shadow:var(--jp-sh-md), 0 0 0 1px var(--jp-accent-line);}
+.stat-card::before{background:linear-gradient(135deg, var(--jp-accent), transparent 60%) !important;}
+
+.stat-card .stat-icon{
+  border-radius:var(--jp-r-md);
+  background:var(--jp-accent-soft) !important;
+  color:var(--jp-accent-ink) !important;
+}
+.stat-card .stat-icon.coral{background:var(--jp-accent-soft) !important; color:var(--jp-accent-ink) !important;}
+.stat-card .stat-icon.sky{background:var(--jp-info-bg) !important; color:var(--jp-info-fg) !important;}
+.stat-card .stat-icon.emerald{background:var(--jp-success-bg) !important; color:var(--jp-success-fg) !important;}
+.stat-card .stat-icon.gold{background:var(--jp-warning-bg) !important; color:var(--jp-warning-fg) !important;}
+.stat-card .num.emerald{color:var(--jp-success-fg);}
+.stat-card .num.gold{color:var(--jp-warning-fg);}
+.stat-card .num.coral{color:var(--jp-accent-ink);}
+
+/* ---- UNIVERSAL: a dashboard card is a HEADING and a VALUE ---------------
+   The brief removes descriptions, subtitles, active/inactive breakdowns,
+   helper and footer text, and decorative rules from every dashboard card in
+   all three portals. The generators are updated at source; this is the
+   backstop that also catches the ones rendered from inline template strings,
+   and it is scoped to cards so a subtitle elsewhere on a page survives. */
+.stat-card .stat-sub,
+.stat-card .stat-foot,
+.stat-card .stat-desc,
+.stat-card .stat-breakdown,
+.stat-card hr,
+.cl-kpi .cl-kpi-sub,
+.cl-kpi .cl-kpi-foot,
+.cl-kpi .cl-kpi-delta,
+.cl-kpi hr{display:none !important;}
+
+.stat-card, .cl-kpi{position:relative;}
+.stat-card::after, .cl-kpi::after{display:none !important;}  /* decorative dividers */
+
+
+/* ==========================================================================
+   6. TABLES
+   ========================================================================== */
+
+.table-wrap, .cl-table-wrap{
+  border-radius:var(--jp-r-md);
+  border:1px solid var(--jp-border);
+  overflow:auto;
+  background:var(--jp-surface);
+}
+
+table th{
+  position:sticky; top:0; z-index:2;
+  background:var(--jp-surface-2);
+  color:var(--jp-text-muted);
+  font-size:11px;
+  font-weight:750;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  white-space:nowrap;
+  border-bottom:1px solid var(--jp-border);
+  backdrop-filter:var(--jp-glass-blur);
+}
+table tbody tr{transition:background var(--jp-fast);}
+table tbody tr:hover{background:var(--jp-hover);}
+table tbody td{border-bottom:1px solid var(--jp-border);}
+table tbody tr:last-child td{border-bottom:none;}
+
+/* A sticky first column must carry its own background or the scrolled cells
+   show through it. Super Admin's permission matrix already relies on this. */
+#saMatrixTable td:first-child, #saMatrixTable th:first-child{background:var(--jp-surface);}
+
+
+/* ==========================================================================
+   7. FORMS
+   ========================================================================== */
+
+.form-field input, .form-field select, .form-field textarea,
+.cl-field input, .cl-field select, .cl-field textarea,
+input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=date], input[type=search], input[type=tel], select, textarea{
+  background:var(--jp-surface-2);
+  color:var(--jp-text);
+  border:1px solid var(--jp-border);
+  border-radius:var(--jp-r-sm);
+  transition:border-color var(--jp-fast), box-shadow var(--jp-fast), background var(--jp-fast);
+}
+.form-field input:hover, .form-field select:hover, .form-field textarea:hover,
+input:hover:not(:disabled):not([readonly]), select:hover:not(:disabled), textarea:hover:not(:disabled){
+  border-color:var(--jp-border-strong);
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus,
+input:focus, select:focus, textarea:focus{
+  outline:none;
+  background:var(--jp-surface);
+  border-color:var(--jp-accent);
+  box-shadow:var(--jp-focus);
+}
+input::placeholder, textarea::placeholder{color:var(--jp-text-muted); opacity:.72;}
+
+.form-field label{color:var(--jp-text-muted);}
+
+/* A native select's own menu is drawn by the OS, so the only way it reads as
+   part of a dark surface is to say so. */
+select{
+  color-scheme:light dark;
+  appearance:none;
+  background-image:linear-gradient(45deg, transparent 50%, var(--jp-text-muted) 50%),
+                   linear-gradient(135deg, var(--jp-text-muted) 50%, transparent 50%);
+  background-position:calc(100% - 17px) calc(50% + 1px), calc(100% - 12px) calc(50% + 1px);
+  background-size:5px 5px, 5px 5px;
+  background-repeat:no-repeat;
+  padding-right:34px;
+}
+:root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6);}
+
+/* Checkbox / radio pick up the accent instead of the browser blue. */
+input[type=checkbox], input[type=radio]{accent-color:var(--jp-accent);}
+
+
+/* ==========================================================================
+   8. MODALS & DRAWERS
+   ========================================================================== */
+
+.modal-back, .modal-backdrop, .cl-modal-back, .drawer-backdrop{
+  background:rgba(6,9,20,.62);
+  backdrop-filter:blur(3px);
+}
+.modal-card, .cl-modal, .drawer-panel{
+  border-radius:var(--jp-r-xl);
+  border:1px solid var(--jp-border);
+  background:var(--jp-surface);
+  box-shadow:var(--jp-sh-xl);
+}
+
+
+/* ==========================================================================
+   9. SIDEBAR & TOPBAR
+   ========================================================================== */
+
+.sidebar, .cl-side{
+  background:linear-gradient(180deg, var(--jp-rail), var(--jp-rail-2));
+  border-right:1px solid var(--jp-rail-line);
+}
+.nav-item, .cl-side a{border-radius:var(--jp-r-sm); transition:background var(--jp-fast), color var(--jp-fast);}
+.nav-item:hover, .cl-side a:hover{background:rgba(255,255,255,.06);}
+.nav-item.active, .cl-side a.active{background:var(--jp-rail-active); color:#fff;}
+.nav-item.active::before, .cl-side a.active::before{background:var(--jp-accent) !important;}
+.nav-item.active .icon{color:var(--jp-violet-300) !important;}
+.nav-group-label, .cl-side-group{color:var(--jp-rail-text-dim);}
+.nav-badge, .cl-side-pill{background:var(--jp-accent); color:#fff;}
+.sidebar .nav-item.logout{color:#FCA5A5;}
+.sidebar .nav-item.logout:hover{background:rgba(239,68,68,.16); color:#fff;}
+
+/* Glass topbar. It is sticky in both staff portals, so content scrolls under
+   it — a flat fill there reads as a seam, a blurred one reads as depth. */
+.topbar, .cl-top{
+  background:var(--jp-glass);
+  backdrop-filter:var(--jp-glass-blur);
+  -webkit-backdrop-filter:var(--jp-glass-blur);
+  border:1px solid var(--jp-border);
+  border-radius:var(--jp-r-lg);
+  box-shadow:var(--jp-sh-sm);
+}
+.icon-btn, .theme-selector, .admin-chip, .cl-top-btn{border-radius:var(--jp-r-md);}
+.theme-selector-btn.active{background:var(--jp-surface); box-shadow:var(--jp-sh-xs);}
+.icon-btn .dot, .cl-bell-count{background:var(--jp-accent); border-color:var(--jp-surface);}
+.admin-avatar, .cl-avatar{background:linear-gradient(135deg, var(--jp-violet-500), var(--jp-violet-700)); color:#fff;}
+
+.env-banner{
+  background:var(--jp-warning-bg);
+  border:1px solid var(--jp-warning-bg);
+  color:var(--jp-warning-fg);
+  border-radius:var(--jp-r-md);
+}
+
+
+/* ==========================================================================
+   10. BADGES & PAGINATION
+   ========================================================================== */
+
+.badge, .cl-tag{
+  border-radius:var(--jp-r-pill);
+  font-weight:700;
+  font-size:11px;
+  letter-spacing:.03em;
+}
+.badge.active, .badge.INSERT{background:var(--jp-success-bg); color:var(--jp-success-fg);}
+.badge.inactive{background:var(--jp-hover); color:var(--jp-text-muted);}
+.badge.suspended, .badge.blocked, .badge.DELETE{background:var(--jp-danger-bg); color:var(--jp-danger-fg);}
+.badge.UPDATE{background:var(--jp-info-bg); color:var(--jp-info-fg);}
+.badge.role-admin{background:var(--jp-accent-soft); color:var(--jp-accent-ink);}
+.badge.role-manager{background:var(--jp-warning-bg); color:var(--jp-warning-fg);}
+
+.pagination{color:var(--jp-text-muted); font-size:12.5px;}
+.pagination button{
+  border-radius:var(--jp-r-sm);
+  border:1px solid var(--jp-border);
+  background:var(--jp-surface);
+  color:var(--jp-text);
+  padding:7px 13px;
+  font-weight:650;
+  font-size:12.5px;
+  transition:background var(--jp-fast), border-color var(--jp-fast);
+}
+.pagination button:hover:not(:disabled){background:var(--jp-hover); border-color:var(--jp-border-strong);}
+.pagination button:disabled{opacity:.42;}
+
+
+/* ==========================================================================
+   11. ADMIN LAYOUT — THE WIDTH FIX
+   ==========================================================================
+   THE BUG, NAMED: `admin.css` caps `.main` at `max-width:1280px`. With a
+   270px rail that leaves ~370px of dead canvas on a 1920px display and ~640px
+   on a 2560px one, which is exactly the "cards compressed to one side, large
+   empty area" in the brief. Every downstream symptom — narrow tables, KPI
+   cards that never reach the edge, detail panes stranded in a column — is
+   that one declaration.
+
+   The cap is replaced with a fluid width and a generous ceiling, so the
+   content area now tracks the viewport. `min-width:0` is KEPT: `.main` is a
+   flex item, and without it a wide table refuses to shrink and scrolls the
+   whole page sideways instead of scrolling inside its own `.table-wrap`.
+
+   Layout only. No functionality, no business logic, no markup semantics.
+   ========================================================================== */
+
+/* DO NOT ADD `margin-left` HERE. The two staff portals position their rail
+   differently and the offset is not shared:
+     · admin.css       `.sidebar{position:fixed}` — out of flow, so `.main`
+                       carries `margin-left:var(--sidebar-w)` (admin.css:49)
+                       and resets it at ≤900px (admin.css:543).
+     · partner-portal  `.sidebar{position:relative}` — an in-flow flex item, so
+       (super-admin)   `.main{flex:1}` needs NO offset at all.
+   A blanket margin-left here subtracts the rail twice on Super Admin: measured
+   at 1280px it left `.main` 730px inside a 1270px row and squeezed the Profile
+   panels into a single 663px column. Each portal keeps its own offset. */
+.main{
+  max-width:none;
+  width:100%;
+  min-width:0;
+  padding:28px clamp(20px, 2.6vw, 44px) 56px;
+}
+
+/* KPI rows: equal height, equal width, one consistent gutter. `1fr` tracks
+   rather than `auto-fit` minmax, because auto-fit leaves a short final row
+   stranded at the widths these dashboards actually run at. */
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+  gap:18px;
+  align-items:stretch;
+  margin-bottom:24px;
+}
+.stat-card{height:100%; padding:20px 22px;}
+
+/* Tables fill the content area. */
+.panel > .table-wrap, .table-wrap{width:100%;}
+table{width:100%;}
+
+/* Forms use the full width and align on a shared grid. */
+.form-grid{grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:16px;}
+
+/* DETAIL PAGES — multi-column instead of a narrow single column.
+   `.modal-card` is capped at 420px, which is right for a confirm dialog and
+   wrong for Merchant Details, Provider Details and Payment Details. Those all
+   carry `.modal-lg`, so the cap is lifted there only. */
+.modal-card.modal-lg{
+  max-width:min(1180px, 94vw);
+  width:100%;
+}
+.info-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+  gap:16px 28px;
+}
+/* A detail pane inside a panel gets the same treatment. */
+.panel .info-grid{grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));}
+
+@media (min-width:1600px){
+  .stat-grid{grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));}
+}
+
+
+/* ==========================================================================
+   12. SHARED jp-* COMPONENTS
+   ==========================================================================
+   New markup only — nothing existing renders these. Used by the screens this
+   release adds (Admin Payment Management, System Logs, the tabbed Service
+   Requests) so they do not have to invent a third vocabulary.
+   ========================================================================== */
+
+/* ---- section header ----------------------------------------------------- */
+.jp-head{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px;}
+.jp-head h2{font-size:18px; font-weight:750;}
+.jp-head p{font-size:13px; color:var(--jp-text-muted); margin-top:3px;}
+
+/* ---- eight-up KPI band (merchant dashboard) -----------------------------
+   EIGHT TILES NEED A FACTOR OF THE COLUMN COUNT, NOT `auto-fit`.
+   `repeat(auto-fit, minmax(212px,1fr))` — which `.cl-kpis` uses — gives five
+   columns at desktop width, leaving the last row with three empty cells. Four
+   columns is 4 + 4 exactly; two columns is four exact rows. Written
+   mobile-first with two classes in the selector so it outranks the plain
+   `.cl-kpis` rules in classic.css whatever the source order, exactly as
+   `.cl-kpis-5` already does for the five-tile band. */
+.cl-kpis.cl-kpis-8{grid-template-columns:minmax(0,1fr);}
+@media (min-width:560px){
+  .cl-kpis.cl-kpis-8{grid-template-columns:repeat(2, minmax(0,1fr));}
+}
+@media (min-width:1080px){
+  .cl-kpis.cl-kpis-8{grid-template-columns:repeat(4, minmax(0,1fr));}
+}
+
+/* The Dashboard heading no longer carries a rule beneath it, and neither do
+   the cards. `.cl-page-head` draws a bottom border by default. */
+.cl-page-head.cl-page-head-plain{border-bottom:none; padding-bottom:0;}
+
+/* A smaller label, for "No. of Passengers". */
+.cl-field label.cl-label-sm{font-size:11px; letter-spacing:.02em;}
+
+/* ---- greeting (merchant dashboard) -------------------------------------- */
+.jp-greet{margin-bottom:22px;}
+.jp-greet b{display:block; font-size:24px; font-weight:750; letter-spacing:-.02em; color:var(--jp-text);}
+.jp-greet span{display:block; margin-top:6px; font-size:13px; font-weight:600; color:var(--jp-text-muted); font-variant-numeric:tabular-nums;}
+
+/* ---- tabs --------------------------------------------------------------- */
+.jp-tabs{display:flex; gap:4px; padding:4px; background:var(--jp-surface-2); border:1px solid var(--jp-border); border-radius:var(--jp-r-md); margin-bottom:20px; overflow-x:auto;}
+.jp-tab{
+  flex:1 1 auto; min-width:max-content; padding:9px 18px; border-radius:var(--jp-r-sm);
+  font-size:13px; font-weight:650; color:var(--jp-text-muted); background:transparent;
+  border:none; white-space:nowrap; transition:background var(--jp-fast), color var(--jp-fast);
+}
+.jp-tab:hover{color:var(--jp-text);}
+.jp-tab[aria-selected="true"]{background:var(--jp-surface); color:var(--jp-text); box-shadow:var(--jp-sh-xs);}
+
+/* ---- method picker (bank / cash / crypto) -------------------------------- */
+.jp-methods{display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin-bottom:20px;}
+.jp-method{
+  display:flex; align-items:center; gap:12px; padding:16px; text-align:left;
+  border:1px solid var(--jp-border); border-radius:var(--jp-r-md);
+  background:var(--jp-surface); color:var(--jp-text);
+  transition:border-color var(--jp-fast), background var(--jp-fast), box-shadow var(--jp-fast);
+}
+.jp-method:hover{border-color:var(--jp-border-strong); background:var(--jp-hover);}
+.jp-method[aria-pressed="true"]{border-color:var(--jp-accent); background:var(--jp-accent-soft); box-shadow:var(--jp-focus);}
+.jp-method .jp-method-ico{width:38px; height:38px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:var(--jp-r-sm); background:var(--jp-accent-soft); color:var(--jp-accent-ink);}
+.jp-method b{display:block; font-size:13.5px; font-weight:700;}
+.jp-method small{display:block; font-size:11.5px; color:var(--jp-text-muted); margin-top:2px;}
+
+/* ---- key/value read-out -------------------------------------------------- */
+.jp-kv{display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:14px 24px;}
+.jp-kv dt{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--jp-text-muted); margin-bottom:3px;}
+.jp-kv dd{font-size:13.5px; font-weight:650; color:var(--jp-text); margin:0 0 4px; word-break:break-word;}
+
+/* ---- savings callout ----------------------------------------------------- */
+.jp-saved{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:7px 14px; border-radius:var(--jp-r-pill);
+  background:var(--jp-success-bg); color:var(--jp-success-fg);
+  font-size:13px; font-weight:750;
+}
+.jp-saved svg{width:15px; height:15px;}
+
+/* ---- proof thumbnail ----------------------------------------------------- */
+.jp-proof{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--jp-border); border-radius:var(--jp-r-sm); background:var(--jp-surface-2); font-size:12.5px;}
+.jp-proof a{color:var(--jp-accent-ink); font-weight:650;}
+
+/* ---- empty state --------------------------------------------------------- */
+.jp-empty{padding:44px 20px; text-align:center; color:var(--jp-text-muted);}
+.jp-empty b{display:block; font-size:14.5px; font-weight:700; color:var(--jp-text); margin-bottom:5px;}
+.jp-empty p{font-size:12.5px;}
+
+/* ---- copy button --------------------------------------------------------- */
+.jp-copy{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; flex-shrink:0;
+  border:1px solid var(--jp-border); border-radius:var(--jp-r-sm);
+  background:var(--jp-surface); color:var(--jp-text-muted);
+  transition:background var(--jp-fast), color var(--jp-fast), border-color var(--jp-fast);
+}
+.jp-copy:hover{background:var(--jp-hover); color:var(--jp-text); border-color:var(--jp-border-strong);}
+.jp-copy.is-done{color:var(--jp-success-fg); border-color:var(--jp-success-fg);}
+.jp-copy svg{width:16px; height:16px;}
+
+
+/* ==========================================================================
+   13. RESPONSIVE
+   ========================================================================== */
+
+@media (max-width:1200px){
+  .main{padding:24px 26px 48px;}
+  .info-grid{grid-template-columns:repeat(auto-fit, minmax(210px,1fr));}
+}
+
+/* Same reason as above: the ≤900px `margin-left:0` reset belongs to whichever
+   sheet set the offset, and admin.css:543 already does it. */
+@media (max-width:900px){
+  .main{padding:18px 18px 44px;}
+  .stat-grid{grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:14px;}
+  .topbar, .cl-top{border-radius:var(--jp-r-md);}
+}
+
+@media (max-width:640px){
+  .stat-grid{grid-template-columns:1fr;}
+  .info-grid, .jp-kv{grid-template-columns:1fr;}
+  .jp-methods{grid-template-columns:1fr;}
+  .main{padding:14px 14px 40px;}
+}
+
+/* A published table must not scroll the page sideways — it scrolls itself. */
+@media (max-width:900px){
+  .table-wrap, .cl-table-wrap{-webkit-overflow-scrolling:touch;}
+}
+
+@media print{
+  .sidebar, .cl-side, .topbar, .cl-top, .pagination, .btn, .cl-btn{display:none !important;}
+  .main{margin-left:0 !important; padding:0 !important;}
+  .panel, .cl-panel{box-shadow:none !important; border:1px solid #ddd !important;}
+}

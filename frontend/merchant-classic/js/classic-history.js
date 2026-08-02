@@ -71,7 +71,11 @@ function clInitHistory() {
       </div>
     </div>
 
-    <div class="cl-kpis" id="clHistKpis"></div>
+    <!-- The four summary tiles (Ticketed / Travel completed / Cancelled / Not
+         confirmed) are gone. They were four counts of the same four buckets the
+         Outcome dropdown below already selects between, sitting above a table
+         that shows those rows — so the screen answered the same question three
+         times. The dropdown is now the single way to narrow by outcome. -->
 
     <div class="cl-panel">
       <div class="cl-toolbar">
@@ -100,10 +104,16 @@ function clInitHistory() {
           <label for="clHistTo">Travel date to</label>
           <input type="date" id="clHistTo">
         </div>
+        <!-- One box, both keys. ticket_service.list_requests matches the term
+             against the PNR AND against every passenger's first/last name via a
+             subquery, so a passenger name finds the booking and the PNR column
+             beside it answers "which PNR was that on".
+             (No backticks in this comment: it sits inside a template literal,
+             and one would close the string.) -->
         <div class="cl-field" style="flex:1 1 230px;">
-          <label for="clHistSearch">Search</label>
+          <label for="clHistSearch">Search by passenger name or PNR</label>
           <input type="search" id="clHistSearch"
-                 placeholder="PNR, ticket no., reference, route or passenger">
+                 placeholder="Passenger name, PNR, ticket no. or reference">
         </div>
         <div class="cl-toolbar-actions">
           <button type="button" class="cl-btn" id="clHistReset">Reset</button>
@@ -236,7 +246,6 @@ async function clLoadHistory({ resetPage = false } = {}) {
         clHistPage = Math.max(1, Math.ceil(clHistTotal / CL_HIST_PAGE_SIZE));
         return clLoadHistory();
       }
-      clRenderHistoryKpis({ [chosen]: clHistTotal }, chosen);
       return clRenderHistoryRows();
     }
 
@@ -246,15 +255,13 @@ async function clLoadHistory({ resetPage = false } = {}) {
         MerchantApi.listRequests({ ...base, status, page_size: CL_HIST_FETCH })));
 
     const rows = [];
-    const byStatus = {};
     let total = 0;
     let capped = false;
     let failed = 0;
-    results.forEach((res, i) => {
+    results.forEach(res => {
       if (res.status !== 'fulfilled') { failed += 1; return; }
       const items = res.value.items || [];
       const stageTotal = res.value.total ?? items.length;
-      byStatus[CL_HISTORY_STATUSES[i]] = stageTotal;
       rows.push(...items);
       total += stageTotal;
       if (stageTotal > items.length) capped = true;
@@ -281,38 +288,15 @@ async function clLoadHistory({ resetPage = false } = {}) {
     const maxPage = Math.max(1, Math.ceil(rows.length / CL_HIST_PAGE_SIZE));
     if (clHistPage > maxPage) clHistPage = maxPage;
 
-    clRenderHistoryKpis(byStatus, chosen);
     clRenderHistoryRows(failed);
   } catch (err) {
     clHistRows = [];
     body.innerHTML = clEmptyRow(9, clError(err, 'Failed to load your booking history.'));
-    $('clHistKpis').innerHTML = '';
     $('clHistCount').textContent = '—';
     $('clHistPrev').disabled = true;
     $('clHistNext').disabled = true;
     $('clHistNote').textContent = '';
   }
-}
-
-/* Four figures, each of them a server-side total for its own status under the
-   current filters. Nothing here counts rows. */
-function clRenderHistoryKpis(byStatus, chosen) {
-  const tiles = CL_HISTORY_STATUSES.map(s => ({
-    key: s,
-    label: CL_HISTORY_LABELS[s],
-    value: byStatus[s] ?? (chosen && chosen !== s ? '—' : 0),
-    sub: chosen && chosen !== s ? 'not in this filter' : 'matching your filters',
-    icon: s === 'ticket_issued' ? 'ticket' : s === 'completed' ? 'checkCircle' : 'x',
-    tone: s === 'ticket_issued' ? 'ok' : s === 'completed' ? 'info' : 'err',
-  }));
-
-  $('clHistKpis').innerHTML = tiles.map(t => `
-    <div class="cl-kpi">
-      <div class="cl-kpi-head"><span class="cl-kpi-ico ${t.tone}">${clIco(t.icon)}</span></div>
-      <div class="cl-kpi-label">${escapeHtml(t.label)}</div>
-      <div class="cl-kpi-value">${escapeHtml(String(t.value))}</div>
-      <div class="cl-kpi-sub">${escapeHtml(t.sub)}</div>
-    </div>`).join('');
 }
 
 function clRenderHistoryRows(failedStages = 0) {

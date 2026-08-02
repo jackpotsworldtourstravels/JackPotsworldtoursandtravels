@@ -168,6 +168,18 @@ def _next_number(db: Session) -> str:
     return f"PAY-{today}-{int(seq):06d}"
 
 
+def next_number(db: Session) -> str:
+    """The next ``PAY-…`` reference, for callers outside this module.
+
+    A public name for ``_next_number`` so the Admin desk's request-raising path
+    (0041) shares this one series rather than reaching past the underscore or —
+    worse — starting a second sequence. One reference namespace means a
+    ``PAY-…`` a merchant quotes on the phone identifies exactly one row,
+    whichever side raised it.
+    """
+    return _next_number(db)
+
+
 def submit_topup(
     db: Session, actor: User, merchant: Merchant, *,
     amount: Decimal,
@@ -393,6 +405,34 @@ def open_proof(db: Session, actor: User, topup_id: int):
     return stream, topup
 
 
+def request_fields(db: Session, topup: WalletTopup) -> dict:
+    """The 0041 fields, resolved once for both serialisers.
+
+    ``wallet.py`` and ``payment_admin.py`` each build a ``TopupOut``, and the
+    merchant and the desk must read one row the same way — two constructions
+    is how a field ends up meaning different things on two screens, which the
+    schema module's own docstring warns about. So the additions are computed
+    here and spread into both.
+
+    Costs nothing on the common row: a merchant-initiated top-up has no
+    ``raised_by``, so neither lookup happens.
+    """
+    if not topup.admin_initiated:
+        return {}
+    manager = (
+        db.get(User, topup.assigned_manager_id) if topup.assigned_manager_id else None
+    )
+    raiser = db.get(User, topup.raised_by) if topup.raised_by else None
+    return {
+        "admin_initiated": True,
+        "instructions": topup.instructions or {},
+        "assigned_manager_id": topup.assigned_manager_id,
+        "assigned_manager_name": manager.full_name if manager else None,
+        "raised_by_name": raiser.full_name if raiser else None,
+        "resubmission_count": topup.resubmission_count or 0,
+    }
+
+
 def txn_number_for(db: Session, topup: WalletTopup) -> str | None:
     """The ledger reference a verified top-up became, if it has become one.
 
@@ -457,3 +497,241 @@ def summary(db: Session, merchant: Merchant) -> dict:
             and ZERO < available <= wallet_service.q(limit * LOW_BALANCE_FRACTION)
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Settling a request the desk raised (migration 0041)
+# ---------------------------------------------------------------------------
+#: Which proof each method demands. A bank transfer has a UTR and that is how
+#: it is matched against the statement; cash and crypto have none — a note
+#: number is not a bank reference and a chain does not issue one — so for those
+#: the uploaded image *is* the proof and is therefore mandatory.
+_PROOF_RULES: dict[WalletTopupMethod, tuple[bool, bool]] = {
+    # method: (utr required, proof file required)
+    WalletTopupMethod.BANK_TRANSFER: (True, True),
+    WalletTopupMethod.CASH: (False, True),
+    WalletTopupMethod.CRYPTO: (False, True),
+}
+
+
+def _locked_request(db: Session, topup_id: int) -> WalletTopup:
+    """Re-read the request under a row lock before settling it.
+
+    ``populate_existing=True`` for the same reason ``payment_admin_service``
+    uses it: without it the lock is taken but the ORM hands back the status the
+    session already had, so the state check below reads a stale value and two
+    concurrent submissions both proceed.
+    """
+    topup = db.execute(
+        select(WalletTopup)
+        .where(WalletTopup.topup_id == topup_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if topup is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found")
+    return topup
+
+
+def list_assigned(
+    db: Session, merchant_id: int, *,
+    bucket: str = "all",
+    page: int = 1, page_size: int = 20,
+) -> tuple[list[WalletTopup], int]:
+    """The merchant's Payment Management list — requests the desk raised.
+
+    Scoped by ``merchant_id`` and not by ``assigned_manager_id``: the named
+    manager is who the request is *addressed to*, but a company with one
+    manager on leave still has to be able to see and settle what it owes.
+    Buckets mirror the Admin queue's vocabulary so the two screens describe the
+    same row with the same word.
+    """
+    buckets = {
+        "requests": (WalletTopupStatus.AWAITING_PAYMENT,),
+        "pending": (WalletTopupStatus.SUBMITTED,),
+        "approved": (WalletTopupStatus.VERIFIED,),
+        "rejected": (WalletTopupStatus.REJECTED,),
+        "all": tuple(WalletTopupStatus),
+    }
+    if bucket not in buckets:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown bucket '{bucket}'. Use one of: {', '.join(buckets)}",
+        )
+
+    where = [
+        WalletTopup.merchant_id == merchant_id,
+        WalletTopup.raised_by.is_not(None),
+        WalletTopup.status.in_(buckets[bucket]),
+    ]
+    total = db.scalar(select(func.count()).select_from(WalletTopup).where(*where)) or 0
+    items = list(
+        db.scalars(
+            select(WalletTopup)
+            .where(*where)
+            .order_by(WalletTopup.topup_id.desc())
+            .limit(page_size)
+            .offset(max(page - 1, 0) * page_size)
+        ).all()
+    )
+    return items, total
+
+
+def assigned_counts(db: Session, merchant_id: int) -> dict:
+    """Tab badges for the merchant's Payment Management screen, in one query."""
+    rows = db.execute(
+        select(WalletTopup.status, func.count())
+        .where(
+            WalletTopup.merchant_id == merchant_id,
+            WalletTopup.raised_by.is_not(None),
+        )
+        .group_by(WalletTopup.status)
+    ).all()
+    by_status = {status: count for status, count in rows}
+    return {
+        "requests": by_status.get(WalletTopupStatus.AWAITING_PAYMENT, 0),
+        "pending": by_status.get(WalletTopupStatus.SUBMITTED, 0),
+        "approved": by_status.get(WalletTopupStatus.VERIFIED, 0),
+        "rejected": by_status.get(WalletTopupStatus.REJECTED, 0),
+    }
+
+
+def settle_request(
+    db: Session, actor: User, topup_id: int, *,
+    utr: str | None = None,
+    upload_file: UploadFile | None = None,
+    commit: bool = True,
+) -> WalletTopup:
+    """The manager has paid: attach the proof and hand it to the desk.
+
+    **Credits nothing** — the same rule that governs ``submit_topup``, and for
+    the same reason. This only moves the request from ``awaiting_payment`` (or
+    back from ``rejected``) to ``submitted``, which is the one status
+    ``payment_admin_service._assert_undecided`` will review. The wallet is
+    credited by ``verify_topup`` and nowhere else.
+
+    Resubmission after a rejection is the same call. The row returns to
+    ``submitted``, the previous review is cleared so the desk is not shown a
+    stale verdict beside fresh evidence, and ``resubmission_count`` records that
+    it happened. Clearing the verdict is safe because ``reject_topup`` moved no
+    money, so there is nothing to unwind.
+    """
+    topup = _locked_request(db, topup_id)
+
+    if actor.merchant_id and topup.merchant_id != actor.merchant_id:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not topup.admin_initiated:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "This payment was submitted from the wallet screen, not requested by "
+                "the payments desk. Use Add Money to correct it."
+            ),
+        )
+    if topup.status is WalletTopupStatus.VERIFIED:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"{topup.topup_number} has already been approved and credited.",
+        )
+    if topup.status is WalletTopupStatus.SUBMITTED:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=(
+                f"{topup.topup_number} is already with the payments desk. "
+                "Wait for it to be approved or rejected."
+            ),
+        )
+
+    needs_utr, needs_proof = _PROOF_RULES.get(topup.method, (False, True))
+    utr = (utr or "").strip() or None
+
+    if needs_utr and not utr:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Enter the UTR or reference number from your bank transfer — "
+                "it is how we match your payment to your account."
+            ),
+        )
+    if not needs_utr and utr:
+        # Not merely tidiness: a cash token or a transaction hash typed into the
+        # UTR box would take a slot in `uq_wallet_topups_utr`, which is a
+        # bank-reference namespace, and could block the genuine transfer that
+        # carries that reference.
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"A {topup.method.value.replace('_', ' ')} payment has no UTR — "
+                "attach the payment proof instead."
+            ),
+        )
+    if needs_proof and upload_file is None and not topup.proof_path:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Attach the payment proof so the desk can confirm it.",
+        )
+
+    # Checked before the file is stored, so an ordinary duplicate leaves no
+    # orphaned upload behind. The row's own id is excluded: a resubmission of
+    # the same corrected transfer must not clash with itself.
+    if utr:
+        clash = db.scalar(
+            select(WalletTopup.topup_id).where(
+                WalletTopup.utr == utr,
+                WalletTopup.status != WalletTopupStatus.REJECTED,
+                WalletTopup.topup_id != topup.topup_id,
+            ).limit(1)
+        )
+        if clash is not None:
+            raise _duplicate_utr(utr)
+
+    stored = None
+    if upload_file is not None:
+        stored = document_service.store_upload(
+            upload_file, prefix=f"topups/{topup.merchant_id}"
+        )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    was_rejected = topup.status is WalletTopupStatus.REJECTED
+
+    topup.utr = utr
+    if stored is not None:
+        topup.proof_path = stored.relative_path
+        topup.proof_filename = stored.display_filename
+        topup.proof_content_type = stored.content_type
+        topup.proof_size_bytes = stored.size_bytes
+    topup.status = WalletTopupStatus.SUBMITTED
+    topup.submitted_by = actor.user_id
+    topup.submitted_at = now
+    topup.updated_at = now
+    if was_rejected:
+        topup.resubmission_count = (topup.resubmission_count or 0) + 1
+        topup.reviewed_by = None
+        topup.reviewed_at = None
+        topup.review_remarks = None
+
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        # The race-safe half of the check above — see submit_topup for why both
+        # exist. Rollback first: the session is unusable after an IntegrityError.
+        db.rollback()
+        if "uq_wallet_topups_utr" in str(getattr(exc, "orig", exc)):
+            raise _duplicate_utr(utr) from None
+        raise
+
+    if commit:
+        db.commit()
+        db.refresh(topup)
+
+    merchant = db.get(Merchant, topup.merchant_id)
+    notification_service.notify_admins(
+        db,
+        "Payment settled — awaiting approval",
+        f"{topup.topup_number}: {merchant.company_name if merchant else 'A merchant'} has paid "
+        f"{q(topup.amount)} by {topup.method.value.replace('_', ' ')}"
+        + (f" (UTR {utr})" if utr else "")
+        + (" — resubmitted after rejection" if was_rejected else "")
+        + ". Approve it to credit their wallet.",
+    )
+    return topup

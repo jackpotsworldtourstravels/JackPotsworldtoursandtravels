@@ -213,10 +213,52 @@ def admin_dashboard(db: Session, actor: User) -> dict:
         ) or 0,
     }
 
+    # ---- Two figures the redesigned Admin Dashboard shows -------------------
+    # Both are computed here rather than derived in the browser. The Service
+    # Request Management screen counts "active" by firing seven paged calls and
+    # merging them client-side, which caps at 100 rows per type and would have
+    # quietly under-reported the KPI the moment a queue got busy — the same
+    # capped-page trap the merchant dashboards already hit.
+    total_users = db.scalar(select(func.count()).select_from(User)) or 0
+
+    # A *service request* is a change raised against an existing booking. It is
+    # deliberately none of: BOOKING (that is the booking itself), TICKET_ENQUIRY
+    # (its own queue, counted above), SUPPORT_TICKET / LIVE_CHAT (support, also
+    # counted above), or the non-request rows (CATALOG_ITEM, REVIEW, WISHLIST,
+    # DOCUMENT, ATTACHMENT). This list mirrors SERVICE_REQUEST_TYPES in
+    # assets/js/admin.js — keep the two in step.
+    _SERVICE_REQUEST_TYPES = (
+        RequestType.CANCELLATION,
+        RequestType.DATE_CHANGE,
+        RequestType.REFUND,
+        RequestType.PASSENGER_MODIFICATION,
+        RequestType.EXTRA_BAGGAGE,
+        RequestType.MEAL,
+        RequestType.SEAT,
+    )
+    # "Active" is anything not yet finished. COMPLETED, REJECTED and CANCELLED
+    # are the terminal three; everything else is still somebody's problem.
+    _SR_CLOSED = (
+        RequestStatus.COMPLETED,
+        RequestStatus.REJECTED,
+        RequestStatus.CANCELLED,
+    )
+    active_service_requests = db.scalar(
+        select(func.count())
+        .select_from(ServiceRequest)
+        .where(
+            ticket_service.scoped_query(actor),
+            ServiceRequest.request_type.in_(_SERVICE_REQUEST_TYPES),
+            ServiceRequest.status.notin_(_SR_CLOSED),
+        )
+    ) or 0
+
     return {
         "merchants": merchants,
         "requests_by_status": requests_by_status,
         "enquiries": enquiries,
+        "total_users": total_users,
+        "active_service_requests": active_service_requests,
         "payments_pending_count": payments_pending_count,
         "payments_verified_today": payments_verified_today,
         "open_support_tickets": open_support_tickets,

@@ -20,6 +20,12 @@ class BookingTotals(BaseModel):
     bookings: int
     value: Decimal
     average_value: Decimal
+    #: 0040 — client-fare savings. Defaulted so an older caller reading this
+    #: payload is unaffected and a partial deploy still validates.
+    #: ``savings_bookings`` counts only the bookings that carried a client fare,
+    #: so "you saved X across N bookings" never implies it covers all of them.
+    saved: Decimal = Decimal("0")
+    savings_bookings: int = 0
 
 
 class StatusSlice(BaseModel):

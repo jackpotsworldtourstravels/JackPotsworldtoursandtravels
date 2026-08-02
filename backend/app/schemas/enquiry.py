@@ -63,6 +63,13 @@ class EnquiryCreate(BaseModel):
 
     notes: str | None = Field(default=None, max_length=1000)
 
+    #: What the merchant's Data Operator has quoted their OWN end customer
+    #: (migration 0040). Optional — a merchant that does not resell at a markup
+    #: has nothing to record here, and NULL means exactly that. Never used for
+    #: settlement; it only produces the "You Saved" figure once we have quoted.
+    #: ``le`` guards the Numeric(14, 2) column: 12 digits before the point.
+    client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
+
     @model_validator(mode="after")
     def _check(self) -> "EnquiryCreate":
         if self.origin.strip().casefold() == self.destination.strip().casefold():
@@ -230,6 +237,16 @@ class EnquiryResponse(BaseModel):
     #: The breakdown shown beside the amount — the whole point of quoting.
     quotation_remarks: str | None = None
 
+    #: 0040 — the merchant's own sell price, and the margin it implies. Both are
+    #: visible to the Admin as well as the merchant: the Admin needs to see what
+    #: the merchant has committed to before quoting under or over it.
+    #: ``saved_amount`` is DERIVED, never stored and never accepted from a
+    #: client — it is ``client_fare - quoted_fare`` floored at zero, computed
+    #: here so the merchant portal, the Admin screen, Reports and the invoice
+    #: can never disagree about it.
+    client_fare: Decimal | None = None
+    saved_amount: Decimal | None = None
+
     #: Set once the merchant has turned this enquiry into a booking, so the
     #: listing can show the booking instead of offering Request Ticket twice.
     booking_request_id: int | None = None
@@ -252,6 +269,19 @@ class EnquiryResponse(BaseModel):
         from app.services.lifecycle import SPEC_LABELS
 
         d: dict[str, Any] = r.travel_details or {}
+
+        # THE SAVING IS AGAINST THE QUOTED FARE, NOT ``total_amount``.
+        # On an enquiry `total_amount` is still 0 — it only becomes the billed
+        # figure on the BOOKING that the enquiry turns into. Subtracting from it
+        # here would report the entire client fare as "saved" on every open
+        # enquiry. The comparable number at this stage is what we quoted, so
+        # there is no saving to show until we have answered.
+        _quoted = Decimal(d["quoted_fare"]) if d.get("quoted_fare") is not None else None
+        _saved = None
+        if r.client_fare is not None and _quoted is not None:
+            _diff = r.client_fare - _quoted
+            _saved = _diff if _diff > 0 else Decimal("0")
+
         return cls(
             id=r.request_id,
             reference_number=r.request_number,
@@ -283,6 +313,8 @@ class EnquiryResponse(BaseModel):
                 Decimal(d["quoted_fare"]) if d.get("quoted_fare") is not None else None
             ),
             quotation_remarks=d.get("quotation_remarks"),
+            client_fare=r.client_fare,
+            saved_amount=_saved,
             booking_request_id=d.get("booking_request_id"),
             booking_request_number=d.get("booking_request_number"),
             review_claimed_by=d.get("review_claimed_by"),

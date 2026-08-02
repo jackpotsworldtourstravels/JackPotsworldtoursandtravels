@@ -231,6 +231,18 @@ function clRenderRepKpis(summary, analytics, changes) {
     { label: 'Completed', icon: 'checkCircle', tone: 'ok',
       value: analytics ? (byStatus.get('completed') || 0) : '—',
       sub: analytics ? `${byStatus.get('ticket_issued') || 0} ticketed and yet to travel` : 'travel finished' },
+    /* 0040. The server's own SUM of GREATEST(client_fare - total_amount, 0),
+       over the bookings that actually carry a client fare. `savings_bookings`
+       is quoted beside it precisely because that is usually FEWER than
+       `Bookings` above — without it, "You saved X" reads as if it covered
+       every booking in the period. Nothing here subtracts two amounts; the
+       aggregate arrives computed. */
+    { label: 'Total savings', icon: 'rupee', tone: 'ok',
+      value: analytics ? moneyStr(analytics.totals.saved) : '—',
+      sub: analytics
+        ? `across ${analytics.totals.savings_bookings || 0} booking${
+            analytics.totals.savings_bookings === 1 ? '' : 's'} with a client fare`
+        : 'client fare less what we billed' },
   ];
 
   $('clRepKpis').innerHTML = tiles.map(t => `

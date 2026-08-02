@@ -166,6 +166,11 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         # An enquiry asks what a sector costs; it does not owe anything. The
         # amount is set on the booking the Admin approves, not here.
         total_amount=Decimal("0"),
+        # 0040 — the merchant's own sell price. A real column, not a
+        # travel_details key, because "Total Savings" is a SUM() across every
+        # booking on the Dashboard and in Reports. None when not supplied,
+        # which is different from zero; see the migration for why.
+        client_fare=payload.client_fare,
         travel_date=payload.travel_date,
         return_date=payload.return_date,
         # An enquiry has no draft stage, so the row is born submitted. Writing
@@ -550,6 +555,14 @@ def to_booking_request(
         status=S.DRAFT,
         title=(enquiry.title or "").replace("Enquiry: ", "", 1) or enquiry.title,
         remarks=remarks,
+        # 0040 — CARRIED ONTO THE BOOKING, NOT LEFT BEHIND ON THE ENQUIRY.
+        # The savings figure has to survive conversion: Reports, the invoice and
+        # the Dashboard's "Total Savings" all aggregate over BOOKINGS, and an
+        # enquiry that has become a booking is no longer counted by them. If
+        # this were not copied, every merchant's savings would reset to zero the
+        # moment they actually booked. On the booking the comparison is against
+        # `total_amount` (the billed figure), which is `fare` below.
+        client_fare=enquiry.client_fare,
         # The enquiry's own details are spread first so the itinerary is
         # verbatim what was answered; only the booking-specific additions are
         # layered on. The review claim is dropped — it belongs to the enquiry's
