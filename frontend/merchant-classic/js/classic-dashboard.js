@@ -1,14 +1,21 @@
 'use strict';
 /* Merchant Portal — Dashboard.
    ===========================================================================
-   Three bands, in the order a merchant actually reads them:
+   Two bands, in the order a merchant actually reads them:
 
-     1. BOOKING OVERVIEW — seven figures about the account right now. Every one
+     1. BOOKING OVERVIEW — five figures about the account right now. Every one
         is a button that opens the screen listing the rows behind it. A number
         a merchant cannot reach is a number they have to go looking for.
-     2. BOOKING STATUS — the lifecycle, one card per stage, each of which lands
-        on the matching screen with that stage's filter already applied.
-     3. CHARTS — volume, value, mix, and where they fly.
+     2. CHARTS — volume, value and where they fly.
+
+   THE LIFECYCLE BAND IS GONE, AND SO IS THE STATUS RING.
+   Both said the same thing twice — a row of seven stage cards and a donut
+   splitting the same statuses — and both said it a third time on screens that
+   own it: Booking History filters by outcome and My Requests by working state,
+   each with the rows attached. A dashboard that restates another screen's
+   filter is a second place to keep correct, so the stages now live only where
+   the rows do. `analytics.by_status` is still read here, but only to total the
+   "Requests in progress" tile.
 
    WHERE EACH FIGURE COMES FROM, AND WHY IT IS NOT THE OBVIOUS ONE
    ---------------------------------------------------------------------------
@@ -60,18 +67,13 @@ async function clInitDashboard() {
         <button type="button" class="cl-btn" id="clDashRefresh">
           ${clIco('refresh', { size: 15 })} Refresh
         </button>
-        <button type="button" class="cl-btn cl-btn-primary" id="clDashEnquire">
-          ${clIco('plus', { size: 15 })} New Booking Enquiry
-        </button>
       </div>
     </div>
 
     <div id="clDashKpis">${clDashSkeletonKpis()}</div>
-    <div id="clDashStatus"></div>
     <div id="clDashCharts"></div>`;
 
   $('clDashRefresh').addEventListener('click', () => { clLoaded.add('dashboard'); clInitDashboard(); });
-  $('clDashEnquire').addEventListener('click', () => clGo('enquiry'));
 
   await clLoadDashboard();
 }
@@ -81,12 +83,13 @@ function clPartOfDay() {
   return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
 }
 
-/* The shape of the answer, while the answer is on its way. Seven boxes, not a
-   spinner, so the page does not grow by 400px when the data lands. */
+/* The shape of the answer, while the answer is on its way. Five boxes, not a
+   spinner, so the page does not grow by 400px when the data lands — and the
+   same five-up class the real band uses, so it does not reflow either. */
 function clDashSkeletonKpis() {
-  return `<div class="cl-kpis">${'<div class="cl-kpi"><span class="cl-skel cl-skel-line w40"></span>'
+  return `<div class="cl-kpis cl-kpis-5">${'<div class="cl-kpi"><span class="cl-skel cl-skel-line w40"></span>'
     + '<span class="cl-skel cl-skel-line w80" style="height:26px"></span>'
-    + '<span class="cl-skel cl-skel-line w60"></span></div>'.repeat(7)}</div>`;
+    + '<span class="cl-skel cl-skel-line w60"></span></div>'.repeat(5)}</div>`;
 }
 
 /* ---------------------------------------------------------------- loading */
@@ -169,23 +172,19 @@ async function clLoadDashboard() {
     ]);
     clDashData = data;
 
-    clRenderDashKpis(data, position, enq, analytics, changes);
-    clRenderDashStatus(enq, analytics);
+    clRenderDashKpis(position, enq, analytics, changes);
     clRenderDashCharts(analytics, airlines);
   } catch (err) {
     host.innerHTML = `<div class="cl-panel"><div class="cl-panel-body">
       <div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Failed to load the dashboard.'))}</div>
     </div></div>`;
-    $('clDashStatus').innerHTML = '';
     $('clDashCharts').innerHTML = '';
   }
 }
 
 /* =============================================================== overview */
 
-function clRenderDashKpis(data, position, enq, analytics, changes) {
-  const s = data.requests_by_status || {};
-
+function clRenderDashKpis(position, enq, analytics, changes) {
   /* Bookings still moving: raised, approved, awaiting payment or paid but not
      yet ticketed. Drawn from the analytics status slices so it counts bookings
      and not enquiries — see the head of this file. */
@@ -193,8 +192,9 @@ function clRenderDashKpis(data, position, enq, analytics, changes) {
   const inProgress = ['draft', 'pending_approval', 'in_review', 'approved', 'payment_pending', 'paid']
     .reduce((n, k) => n + (byStatus.get(k) || 0), 0);
 
-  const unread = Number(data.unread_notifications_count || 0);
-
+  /* FIVE, and the count is load-bearing: `.cl-kpis-5` lays them out three then
+     two so the band never ends in a half-empty row. Adding a sixth here means
+     revisiting that class. */
   const tiles = [
     {
       label: 'Wallet balance', icon: 'wallet', tone: 'accent',
@@ -221,18 +221,6 @@ function clRenderDashKpis(data, position, enq, analytics, changes) {
       to: 'requests',
     },
     {
-      /* `payment_pending` is MONEY OWED — bookings waiting for the merchant to
-         pay. `pending_payments_count` is the opposite thing: money already sent
-         and awaiting our verification. Both are shown, because confusing them
-         costs the merchant money in one direction or the other. */
-      label: 'Pending payments', icon: 'receipt', tone: 'err',
-      value: s.payment_pending || 0,
-      sub: data.pending_payments_count
-        ? `${data.pending_payments_count} payment${data.pending_payments_count === 1 ? '' : 's'} awaiting our verification`
-        : 'Awaiting payment from you',
-      to: 'payments',
-    },
-    {
       label: 'Service requests', icon: 'swap', tone: '',
       value: changes ? changes.totals.requests : '—',
       sub: changes
@@ -240,15 +228,9 @@ function clRenderDashKpis(data, position, enq, analytics, changes) {
         : 'Changes to issued bookings',
       to: 'service-request',
     },
-    {
-      label: 'Notifications', icon: 'bell', tone: unread ? 'accent' : '',
-      value: unread,
-      sub: unread ? 'Unread — open the centre' : 'You are all caught up',
-      to: 'notifications',
-    },
   ];
 
-  $('clDashKpis').innerHTML = `<div class="cl-kpis">${tiles.map(clKpiCard).join('')}</div>`;
+  $('clDashKpis').innerHTML = `<div class="cl-kpis cl-kpis-5">${tiles.map(clKpiCard).join('')}</div>`;
   clBindKpiNav($('clDashKpis'));
 }
 
@@ -288,76 +270,6 @@ function clBindKpiNav(scope) {
       });
     });
   });
-}
-
-/* ========================================================= booking status */
-
-/* The seven stages a merchant distinguishes, in lifecycle order. Each carries
-   its own colour (as `--tone`, read by the card's leading rule) and the screen
-   plus filter it opens.
-
-   The first two are ENQUIRY stages and the last five are BOOKING stages,
-   because that is the actual shape of this product's funnel: you ask for a
-   fare, we answer it, and only then does a booking exist. Showing them as one
-   row is the point — it is one journey to the merchant. */
-const CL_STAGE_CARDS = [
-  { key: 'awaiting', label: 'Awaiting quotation', note: 'We are pricing it',
-    tone: 'var(--cl-warning)', to: 'enquiry', filter: '__awaiting', from: 'enquiry' },
-  { key: 'quoted', label: 'Quoted', note: 'Fare confirmed — book it',
-    tone: 'var(--cl-orange)', to: 'enquiry', filter: 'approved', from: 'enquiry' },
-  { key: 'pending_approval', label: 'Pending approval', note: 'With an approver',
-    tone: 'var(--cl-gold)', to: 'requests', filter: 'pending_approval', from: 'booking' },
-  { key: 'approved', label: 'Approved', note: 'Cleared to ticket',
-    tone: 'var(--cl-info)', to: 'requests', filter: 'approved', from: 'booking' },
-  { key: 'ticket_issued', label: 'Ticket issued', note: 'Documents released',
-    tone: 'var(--cl-success)', to: 'booking-history', filter: 'ticket_issued', from: 'booking' },
-  { key: 'completed', label: 'Completed', note: 'Travel finished',
-    tone: 'var(--cl-navy-500)', to: 'booking-history', filter: 'completed', from: 'booking' },
-  { key: 'cancelled', label: 'Cancelled', note: 'Closed without travel',
-    tone: 'var(--cl-danger)', to: 'booking-history', filter: 'cancelled', from: 'booking' },
-];
-
-function clRenderDashStatus(enq, analytics) {
-  const host = $('clDashStatus');
-  const byStatus = new Map((analytics?.by_status || []).map(r => [r.status, r.count]));
-
-  const value = card => {
-    if (card.from === 'enquiry') {
-      if (!enq) return null;
-      return card.key === 'awaiting' ? enq.awaiting : enq.quoted;
-    }
-    if (!analytics) return null;
-    /* `cancelled` folds in `rejected`: to a merchant, a booking we turned down
-       and one they withdrew are both "did not travel", and two cards saying so
-       separately is a distinction only the database cares about. */
-    if (card.key === 'cancelled') return (byStatus.get('cancelled') || 0) + (byStatus.get('rejected') || 0);
-    if (card.key === 'pending_approval') {
-      return (byStatus.get('pending_approval') || 0) + (byStatus.get('in_review') || 0);
-    }
-    return byStatus.get(card.key) || 0;
-  };
-
-  host.innerHTML = `
-    <div class="cl-page-head" style="margin:30px 0 16px;">
-      <div><h2 style="font-size:18px;">Booking status</h2>
-        <p style="font-size:12.5px;margin-top:3px;color:var(--cl-text-muted);font-weight:500;">
-          Every stage of the journey. Select one to see the requests sitting in it.</p></div>
-    </div>
-    <div class="cl-statuses">
-      ${CL_STAGE_CARDS.map(card => {
-        const n = value(card);
-        return `<button type="button" class="cl-status-card" style="--tone:${card.tone}"
-                  data-cl-kpi-to="${card.to}" data-cl-kpi-filter="${escapeHtml(card.filter)}"
-                  aria-label="${escapeHtml(`${card.label}: ${n ?? 'unavailable'}. Open ${CL_TITLES[card.to]}`)}">
-          <span class="cl-dot" aria-hidden="true"></span>
-          <b>${n === null ? '—' : n}</b>
-          <span>${escapeHtml(card.label)}</span>
-          <small>${escapeHtml(card.note)}</small>
-        </button>`;
-      }).join('')}
-    </div>`;
-
-  clBindKpiNav(host);
 }
 
 /* ================================================================ charts */
@@ -513,7 +425,12 @@ function clAreaChart(buckets, pick, fmt, colour, title) {
    Grouped rather than one slice per status because several of the raw values
    mean the same thing to whoever is reading — "approved" and "payment_pending"
    are both "you owe us money" — and a ring with two identically-coloured slices
-   explains nothing. Every status this portal can see is in exactly one group. */
+   explains nothing. Every status this portal can see is in exactly one group.
+
+   THE DASHBOARD NO LONGER DRAWS THIS RING; **REPORTS DOES** ("Status mix", over
+   the date range and filters that screen is holding). The three helpers below
+   stay here because this file is the chart toolkit the whole portal draws from
+   and it loads first — moving them would only mean loading them earlier. */
 const CL_STAGE_GROUPS = [
   { label: 'With our team', colour: 'var(--cl-gold)',
     of: ['draft', 'submitted', 'pending_approval', 'in_review'] },
@@ -628,10 +545,6 @@ function clRenderDashCharts(analytics, airlines) {
 
   const buckets = clBucketAnalytics(analytics.by_month);
   const span = `${buckets[0].label} – ${buckets[buckets.length - 1].label}`;
-  /* The ring covers every booking; the two series cover the charted window.
-     Said out loud, because a donut reading 300 beside a bar chart totalling 40
-     otherwise looks like one of them is wrong. */
-  const charted = buckets.reduce((n, b) => n + b.count, 0);
 
   const routes = (analytics.top_routes || []).slice(0, 6)
     .map(r => ({ name: r.route, count: r.count }));
@@ -640,7 +553,7 @@ function clRenderDashCharts(analytics, airlines) {
     <div class="cl-page-head" style="margin:30px 0 16px;">
       <div><h2 style="font-size:18px;">Your activity</h2>
         <p style="font-size:12.5px;margin-top:3px;color:var(--cl-text-muted);font-weight:500;">
-          Volume, value and mix across every booking you have raised.</p></div>
+          Volume, value and where you fly, across every booking you have raised.</p></div>
     </div>
 
     <div class="cl-charts">
@@ -653,11 +566,6 @@ function clRenderDashCharts(analytics, airlines) {
     </div>
 
     <div class="cl-charts">
-      ${clChartPanel('Booking status distribution',
-        `All ${total} booking${total === 1 ? '' : 's'}`
-          + (charted < total ? ` · ${charted} raised in the charted months` : ''),
-        clDonut(clStageMix(analytics.by_status), total, 'bookings'), { icon: 'pie' })}
-
       ${clChartPanel('Top destinations', 'Routes you book most, across your whole history',
         routes.length
           ? clRankList(routes, { valueLabel: n => `${n} booking${n === 1 ? '' : 's'}` })

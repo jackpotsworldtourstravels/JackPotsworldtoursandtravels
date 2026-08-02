@@ -84,7 +84,7 @@ function clRenderNoEnquiry() {
     <div class="cl-panel"><div class="cl-panel-body">
       <p style="margin:0 0 14px;font-size:13px;color:var(--cl-text-muted);">
         Nothing selected. Open <b>Booking Enquiry</b>, find an enquiry marked
-        <b>Available</b>, and press <b>Request Ticket</b> — its details are carried
+        <b>Available</b>, and press <b>Raise Booking</b> — its details are carried
         over here so you only have to add the travellers.</p>
       <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
     </div></div>`;

@@ -973,6 +973,48 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 .cl-btn.loading:not(.cl-btn-primary):not(.cl-btn-secondary)::before{color:var(--cl-orange);}
 
+/* ---- the two row-action weights ----------------------------------------
+   A table row can hold a decision and a destination side by side, and they
+   must not look alike. `.cl-btn-cta` is the decision — one per row, pill, the
+   primary fill. `.cl-btn-quiet` is the destination — a link's weight with a
+   button's hit area and focus ring. */
+
+.cl-btn-cta{
+  border-radius:var(--cl-r-pill); font-weight:700; padding:0 17px;
+  letter-spacing:0;
+}
+.cl-btn-cta.cl-btn-sm{padding:0 14px;}
+/* The icon leads into the label. Kept off the button itself: lifting the whole
+   control AND sliding the glyph is two animations for one hover. */
+.cl-btn-cta svg{transition:transform var(--cl-base);}
+.cl-btn-cta:hover:not(:disabled) svg{transform:translateX(2px);}
+
+/* DISABLED IS NOT A FADED ORANGE. `.cl-btn:disabled` drops the opacity to .5,
+   which on the primary gradient produces a washed-out CTA that reads as a
+   broken button rather than as one that has not been earned yet — and the
+   white label lands at 2.4:1 doing it. The not-yet state leaves the accent
+   alone entirely and says so with a dashed edge; the copy that explains WHY
+   lives in the control's `title`. */
+.cl-btn-cta:disabled{
+  opacity:1; cursor:not-allowed; transform:none;
+  color:var(--cl-text-muted);
+  background:var(--cl-canvas-2);
+  border:1px dashed var(--cl-line);
+  box-shadow:none;
+}
+.cl-btn-cta:disabled svg{opacity:.7;}
+
+.cl-btn-quiet{
+  background:transparent; border-color:transparent;
+  color:var(--cl-navy-600); font-weight:700;      /* 8.6:1 on white */
+}
+.cl-btn-quiet:hover:not(:disabled){
+  background:var(--cl-accent-soft); border-color:transparent;
+  color:var(--cl-orange-700); box-shadow:none;    /* 5.5:1 on --cl-orange-50 */
+}
+:root[data-theme="dark"] .cl-btn-quiet{color:var(--cl-text-2);}
+:root[data-theme="dark"] .cl-btn-quiet:hover:not(:disabled){color:#FFB08A;}
+
 /* A group of buttons that reads as one control. */
 .cl-btn-group{display:inline-flex; gap:0;}
 .cl-btn-group .cl-btn{border-radius:0; margin-left:-1px;}
@@ -1231,6 +1273,40 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 .cl-kpis{
   display:grid; grid-template-columns:repeat(auto-fit, minmax(212px,1fr));
   gap:16px; margin-bottom:26px;
+}
+
+/* FIVE TILES, AND NEVER A RAGGED LAST ROW.
+   ==========================================================================
+   `auto-fit` above is right for a band whose count divides into the width —
+   Booking History's four outcomes do. Five do not: at four columns the fifth
+   tile sits alone with three empty cells beside it, which reads as a card that
+   failed to load rather than as a layout.
+
+   So the count is laid out deliberately instead of discovered. Below 1360px
+   the band is a six-track grid carrying 3 + 2 — three tiles of two tracks,
+   then two of three — which fills both rows exactly. Above it, five real
+   columns and one row. Written mobile-first, and the spans are reset at each
+   step: a `span 2` left behind in a one-column grid silently invents a second
+   column and the band goes off the side of the page.
+
+   The class is on the skeleton as well as on the loaded band, so the page does
+   not reflow when the figures arrive. `.cl-kpis.cl-kpis-5` (two classes) beats
+   the plain `.cl-kpis` overrides further down this sheet whatever their order. */
+.cl-kpis.cl-kpis-5{grid-template-columns:minmax(0,1fr);}
+.cl-kpis.cl-kpis-5 > *{grid-column:auto;}
+
+@media (min-width:641px){
+  .cl-kpis.cl-kpis-5{grid-template-columns:repeat(6, minmax(0,1fr));}
+  .cl-kpis.cl-kpis-5 > *{grid-column:span 2;}
+  .cl-kpis.cl-kpis-5 > :nth-child(4),
+  .cl-kpis.cl-kpis-5 > :nth-child(5){grid-column:span 3;}
+}
+
+@media (min-width:1360px){
+  .cl-kpis.cl-kpis-5{grid-template-columns:repeat(5, minmax(0,1fr));}
+  .cl-kpis.cl-kpis-5 > *,
+  .cl-kpis.cl-kpis-5 > :nth-child(4),
+  .cl-kpis.cl-kpis-5 > :nth-child(5){grid-column:auto;}
 }
 .cl-kpi{
   position:relative; overflow:hidden;
@@ -1720,86 +1796,378 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 /* ==========================================================================
    13. SUPPORT CENTER
    ==========================================================================
-   Live chat, the channel cards, the uploader and the FAQ. */
+   A full-page messaging workspace, not a panel with a chat box in it.
 
-/* ---- chat ---- */
+   THE SHAPE: a banner, a header, then a three-column grid that behaves like a
+   desktop mail or chat client — conversations, the conversation, the details.
+   The grid owns its own height and each column scrolls INSIDE itself, so the
+   page behind never scrolls and the composer is always where the hand expects.
 
-.cl-chat{
-  display:flex; flex-direction:column;
-  height:min(560px, 68vh); min-height:380px;
+   THE NAMESPACE is `cl-sc-`. The one exception is `.cl-bubble` and the file
+   card / FAQ / presence classes below it: bubbles are the same object they
+   always were, `.cl-file*` is shared with Booking History, and renaming them
+   would have been churn for its own sake.
+
+   CONTRAST, restated because this screen is where it is easiest to lose:
+   `--cl-orange` may carry a shape and never sit under white text. The send
+   button, the unread badge, the merchant's own bubble and every primary button
+   here use `--cl-orange-cta` (4.53:1) or darker. */
+
+/* THIS SCREEN'S SECTION MUST NOT CARRY A TRANSFORM, AND THIS IS THE ONLY
+   REASON THIS RULE EXISTS. `.cl-section.active` animates with `cl-enter`, whose
+   last keyframe is `transform:none` — but `animation-fill-mode:both` RETAINS
+   that declaration, and a retained `transform:none` computes to the identity
+   matrix, which is a transform value and therefore establishes a containing
+   block for `position:fixed` descendants. Every other screen gets away with it
+   because the shell's own modal and drawer are children of <body>. This one is
+   not: the new-conversation drawer, its backdrop, the floating WhatsApp card
+   and the details slide-over all live inside #cl-support, and every one of
+   them was anchored to the section instead of the viewport — the drawer opened
+   24px short of the right edge and 68px down.
+   `cl-fade` is the same entrance without the translate, so the screen still
+   fades in and nothing here is measured against the wrong box. */
+#cl-support.cl-section.active{animation-name:cl-fade;}
+
+.cl-sc{display:flex; flex-direction:column; gap:18px; min-width:0;}
+
+/* ---- the immediate-help banner ---- */
+
+/* Navy, not orange: it is the loudest thing on the screen and it is not the
+   primary action — the conversation below it is. The accent arrives as a glow
+   behind the icon and on one button, which is enough. */
+.cl-sc-banner{
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:18px 22px; border-radius:var(--cl-r-lg);
+  background:
+    radial-gradient(680px 220px at 88% 0%, rgba(255,107,44,0.30) 0%, transparent 62%),
+    linear-gradient(135deg, var(--cl-navy-800) 0%, var(--cl-navy-700) 52%, var(--cl-navy-900) 100%);
+  box-shadow:var(--cl-sh-md); color:#fff;
 }
-.cl-chat-head{
-  display:flex; align-items:center; gap:12px;
-  padding:16px 20px; border-bottom:1px solid var(--cl-line-2);
-  background:var(--cl-surface-2); flex-shrink:0;
+/* A quiet sheen across the top edge. Decorative only — nothing reads it. */
+.cl-sc-banner::after{
+  content:''; position:absolute; inset:0 0 auto; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.34), transparent);
 }
-.cl-chat-head b{font-size:14px; font-weight:700; color:var(--cl-text); display:block;}
-.cl-chat-head span{font-size:11.5px; font-weight:600; color:var(--cl-text-muted);}
-.cl-chat-head .cl-panel-tools{margin-left:auto;}
+.cl-sc-banner-ico{
+  width:56px; height:56px; flex-shrink:0; border-radius:var(--cl-r-md);
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  background:linear-gradient(140deg, #17A45B, #0B7A3C);
+  box-shadow:0 12px 26px -12px rgba(11,122,60,0.95);
+}
+.cl-sc-banner-copy{flex:1 1 300px; min-width:0;}
+.cl-sc-banner-copy b{display:block; font-size:18px; font-weight:800; letter-spacing:-0.01em;}
+.cl-sc-banner-copy p{
+  margin:3px 0 0; font-size:13px; font-weight:500; line-height:1.55;
+  color:rgba(233,240,250,0.82);          /* 8.9:1 on the navy ground */
+}
+.cl-sc-banner-num{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:11px;
+  font-size:12.5px; font-weight:600; color:rgba(233,240,250,0.78);
+}
+.cl-sc-banner-num svg{width:14px; height:14px; color:var(--cl-orange);}
+.cl-sc-banner-num b{display:inline; font-size:12.5px; font-weight:800; color:#fff;}
+.cl-sc-banner-actions{display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;}
+/* A second action on a dark ground: outlined white rather than a filled
+   button, so the WhatsApp green stays the only call to action in the card. */
+.cl-sc-btn-ghost{
+  color:#fff; background:rgba(255,255,255,0.10); border-color:rgba(255,255,255,0.30);
+}
+.cl-sc-btn-ghost:hover:not(:disabled){
+  color:#fff; background:rgba(255,255,255,0.19); border-color:rgba(255,255,255,0.46);
+}
 
-/* Presence. The ring pulses only when online, so "we are here" is legible at
-   a glance and "we are closed" is legible by its absence. */
-.cl-presence{
+/* ---- header ---- */
+
+.cl-sc-head{display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap;}
+.cl-sc-head-copy{flex:1 1 300px; min-width:0;}
+.cl-sc-head h1{
+  font-size:26px; font-weight:800; letter-spacing:-0.022em;
+  color:var(--cl-text); margin:0;
+}
+.cl-sc-head p{margin:4px 0 0; font-size:13.5px; font-weight:500; color:var(--cl-text-2);}
+
+.cl-sc-badges{display:flex; gap:9px; flex-wrap:wrap;}
+.cl-sc-badge{
   display:inline-flex; align-items:center; gap:7px;
-  font-size:11.5px; font-weight:700; color:var(--cl-text-muted);
+  padding:8px 14px; border-radius:var(--cl-r-pill);
+  border:1px solid var(--cl-line); background:var(--cl-surface);
+  box-shadow:var(--cl-sh-xs);
+  font-size:11.5px; font-weight:600; color:var(--cl-text-muted); white-space:nowrap;
 }
-.cl-presence::before{
-  content:''; width:8px; height:8px; border-radius:50%; background:var(--cl-text-muted);
+.cl-sc-badge b{font-size:12.5px; font-weight:800; color:var(--cl-text);}
+.cl-sc-badge-k{text-transform:uppercase; letter-spacing:0.06em; font-size:10px; font-weight:700;}
+.cl-sc-badge i{
+  width:8px; height:8px; border-radius:50%; background:var(--cl-text-muted); flex-shrink:0;
 }
-.cl-presence.online{color:var(--cl-success-fg);}
-.cl-presence.online::before{background:var(--cl-success); animation:cl-pulse 2.2s ease-in-out infinite;}
+.cl-sc-badge.online{color:var(--cl-success-fg); border-color:rgba(14,159,110,0.34);}
+.cl-sc-badge.online i{background:var(--cl-success); animation:cl-pulse 2.2s ease-in-out infinite;}
 
-.cl-chat-log{
-  flex:1; overflow-y:auto; padding:20px;
-  display:flex; flex-direction:column; gap:4px;
+/* ---- the three-column workspace ---- */
+
+/* It owns a viewport-relative height so each column scrolls in its own box and
+   the page itself never does. Below 1200px the details column leaves the flow
+   and becomes a slide-over; below 900px the list and the chat swap. */
+/* THE SIDE COLUMNS ARE DELIBERATELY NARROW. The rail already takes 266px, so
+   on a 1440px screen the content area is ~1160px — at 322px a side, the
+   conversation was left with 415px and both the chat header and the composer
+   hint wrapped to double height, costing the transcript 60px of the little it
+   had. The middle column is the product; the other two get what is left. */
+.cl-sc-grid{
+  display:grid; grid-template-columns:300px minmax(0,1fr) 304px; gap:14px;
+  height:clamp(560px, calc(100vh - 306px), 860px);
+  min-width:0;
+}
+.cl-sc-col{
+  display:flex; flex-direction:column; min-width:0; min-height:0;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-lg); box-shadow:var(--cl-sh-sm); overflow:hidden;
+}
+
+/* ---- left: the conversation list ---- */
+
+.cl-sc-side-head{
+  display:flex; align-items:center; gap:10px;
+  padding:15px 16px 12px; flex-shrink:0;
+}
+.cl-sc-side-head b{display:block; font-size:14.5px; font-weight:800; color:var(--cl-text);}
+.cl-sc-side-head span{
+  display:block; font-size:11px; font-weight:600; color:var(--cl-text-muted); margin-top:1px;
+}
+.cl-sc-side-head .cl-btn{margin-left:auto; flex-shrink:0;}
+.cl-sc-side-tools{padding:0 16px 12px; flex-shrink:0;}
+
+.cl-sc-search{position:relative; display:flex; align-items:center;}
+.cl-sc-search svg{
+  position:absolute; left:12px; width:15px; height:15px;
+  color:var(--cl-text-muted); pointer-events:none;
+}
+.cl-sc-search input{padding-left:35px; height:38px; font-size:13px;}
+/* Chrome paints its own clear affordance on a search input; the portal has its
+   own visual language for that and two of them read as a bug. */
+.cl-sc-search input::-webkit-search-cancel-button{-webkit-appearance:none;}
+
+.cl-sc-tabs{
+  display:flex; gap:3px; margin-top:10px; padding:3px;
+  background:var(--cl-canvas-2); border-radius:var(--cl-r-sm);
+}
+.cl-sc-tabs button{
+  flex:1; padding:7px 4px; border-radius:var(--cl-r-xs); cursor:pointer;
+  font-size:11.5px; font-weight:700; color:var(--cl-text-muted);
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-sc-tabs button:hover{color:var(--cl-text);}
+/* Navy, not orange. A filter is not a call to action, and this portal has one
+   accent — spending it here would leave nothing to mark the send button with. */
+.cl-sc-tabs button.active{
+  background:var(--cl-navy-800); color:#fff; box-shadow:var(--cl-sh-xs);
+}
+:root[data-theme="dark"] .cl-sc-tabs button.active{background:var(--cl-navy-500);}
+
+.cl-sc-convs{flex:1; overflow-y:auto; padding:0 10px 12px; min-height:0;}
+
+.cl-sc-conv{
+  display:flex; gap:11px; align-items:flex-start;
+  padding:12px; margin-bottom:4px; border-radius:var(--cl-r-md);
+  cursor:pointer; border:1px solid transparent; min-width:0;
+  transition:background var(--cl-fast), border-color var(--cl-fast);
+}
+.cl-sc-conv:hover{background:var(--cl-hover);}
+.cl-sc-conv:focus-visible{outline:2px solid var(--cl-orange-cta); outline-offset:-2px;}
+/* The open conversation. A left rule in the accent plus a tinted ground — the
+   rule is a shape, so the bright tone is allowed to carry it. */
+.cl-sc-conv.active{
+  background:var(--cl-accent-soft); border-color:rgba(255,107,44,0.30);
+  box-shadow:inset 3px 0 0 var(--cl-orange);
+}
+:root[data-theme="dark"] .cl-sc-conv.active{background:rgba(255,107,44,0.13);}
+.cl-sc-conv-av{
+  width:36px; height:36px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-800));
+}
+.cl-sc-conv-main{flex:1; min-width:0;}
+.cl-sc-conv-top{display:flex; align-items:baseline; gap:8px; min-width:0;}
+.cl-sc-conv-top b{
+  flex:1; min-width:0; font-size:13px; font-weight:700; color:var(--cl-text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-sc-conv.unread .cl-sc-conv-top b{font-weight:800;}
+.cl-sc-conv-top time{
+  flex-shrink:0; font-size:10.5px; font-weight:600; color:var(--cl-text-muted);
+}
+.cl-sc-conv-ref{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:3px;
+  font-size:10.5px; font-weight:600; color:var(--cl-text-muted);
+}
+.cl-sc-book{display:inline-flex; align-items:center; gap:3px;}
+.cl-sc-book svg{width:11px; height:11px;}
+.cl-sc-conv-last{
+  margin:5px 0 0; font-size:11.5px; font-weight:500; line-height:1.45;
+  color:var(--cl-text-muted);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.cl-sc-conv.unread .cl-sc-conv-last{color:var(--cl-text-2); font-weight:600;}
+.cl-sc-conv-foot{display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:7px;}
+.cl-sc-clip{
+  display:inline-flex; align-items:center; gap:2px;
+  font-size:10.5px; font-weight:700; color:var(--cl-text-muted);
+}
+.cl-sc-clip svg{width:11px; height:11px;}
+/* The unread counter. White on the CTA weight, never the bright tone. */
+.cl-sc-unread{
+  margin-left:auto; flex-shrink:0;
+  min-width:19px; height:19px; padding:0 6px; border-radius:var(--cl-r-pill);
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:10.5px; font-weight:800; color:#fff;
+  background:var(--cl-orange-cta); box-shadow:var(--cl-sh-accent);
+}
+/* A separator between two facts on one line. */
+.cl-sc-dot{
+  width:3px; height:3px; border-radius:50%; flex-shrink:0;
+  background:currentColor; opacity:.5; display:inline-block;
+}
+.cl-sc-searching{
+  display:flex; align-items:center; gap:8px; padding:8px 12px;
+  font-size:11px; font-weight:600; color:var(--cl-text-muted);
+}
+
+/* ---- centre: the conversation ---- */
+
+.cl-sc-chat{background:var(--cl-surface);}
+/* `nowrap` throughout, and every text node truncates. The header carries four
+   facts and four controls in a 450px column: let any of it wrap and the
+   transcript below loses a message-and-a-half of height to a header nobody was
+   reading twice. */
+.cl-sc-chat-head{
+  display:flex; align-items:center; gap:10px; flex-shrink:0; flex-wrap:nowrap;
+  padding:11px 14px; border-bottom:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2); min-height:62px;
+}
+.cl-sc-chat-id{display:flex; align-items:center; gap:10px; min-width:0; flex:1; overflow:hidden;}
+.cl-sc-chat-id > div{min-width:0;}
+.cl-sc-chat-id b{
+  display:block; font-size:13.5px; font-weight:700; color:var(--cl-text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-sc-chat-id > div > span{
+  display:flex; align-items:center; gap:5px; flex-wrap:nowrap; margin-top:2px;
+  font-size:11px; font-weight:600; color:var(--cl-text-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-sc-chat-id .cl-presence{flex-shrink:0;}
+.cl-sc-chat-tools{display:flex; align-items:center; gap:6px; flex-shrink:0;}
+/* Back to the list. Only exists on the one-column layout. */
+.cl-sc-back{
+  display:none; width:34px; height:34px; flex-shrink:0; cursor:pointer;
+  align-items:center; justify-content:center; border-radius:var(--cl-r-sm);
+  color:var(--cl-text); background:var(--cl-canvas-2);
+  transition:background var(--cl-fast);
+}
+.cl-sc-back:hover{background:var(--cl-hover);}
+.cl-sc-back svg{width:17px; height:17px; transform:rotate(180deg);}
+/* The details toggle only exists where the details column has left the flow. */
+.cl-sc-info-btn{display:none;}
+
+/* Avatars. The desk carries the mark, the merchant carries their initials. */
+.cl-sc-av{
+  width:32px; height:32px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:800; letter-spacing:0.02em; color:#fff;
+}
+.cl-sc-av.desk{background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-900));}
+.cl-sc-av.me{background:linear-gradient(140deg, var(--cl-orange-cta), var(--cl-orange-cta-2));}
+
+.cl-sc-log-wrap{position:relative; flex:1; min-height:0; display:flex;}
+.cl-sc-log{
+  flex:1; overflow-y:auto; padding:18px 20px;
+  display:flex; flex-direction:column; min-height:0;
   background:
     radial-gradient(620px 320px at 20% 0%, var(--cl-canvas-2) 0%, transparent 70%),
     var(--cl-surface);
-  scroll-behavior:smooth;
 }
-.cl-chat-day{
-  align-self:center; margin:14px 0 10px;
+.cl-sc-loading{margin:auto;}
+
+/* Jump to the newest message. Appears only when the log is scrolled away from
+   the bottom — which is also the only time auto-scroll is suppressed. */
+.cl-sc-jump{
+  position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:5;
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  padding:7px 14px; border-radius:var(--cl-r-pill);
+  font-size:11.5px; font-weight:700; color:#fff;
+  background:var(--cl-navy-800); box-shadow:var(--cl-sh-md);
+  animation:cl-enter .2s var(--cl-ease) both;
+}
+.cl-sc-jump svg{width:15px; height:15px;}
+.cl-sc-jump[hidden]{display:none;}
+:root[data-theme="dark"] .cl-sc-jump{background:var(--cl-navy-500);}
+
+.cl-sc-day{
+  align-self:center; margin:12px 0 10px;
   padding:4px 13px; border-radius:var(--cl-r-pill);
   font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
   color:var(--cl-text-muted); background:var(--cl-canvas-2);
 }
-.cl-bubble{
-  max-width:min(76%, 520px); padding:11px 15px;
-  border-radius:16px; font-size:13.5px; line-height:1.6; font-weight:500;
-  word-break:break-word; white-space:pre-wrap;
-  animation:cl-bubble-in .28s var(--cl-ease) both;
-  position:relative;
+/* The unread divider. A rule the width of the log with the label sitting in it,
+   in the accent — it is a shape carrying a word, and the word is on the canvas
+   rather than on the accent, so the bright tone is correct here. */
+.cl-sc-newline{
+  display:flex; align-items:center; gap:11px; margin:14px 0 10px;
+  font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em;
+  color:var(--cl-orange-700);
 }
-/* Message grouping: consecutive messages from one side tuck together, and only
-   the last of a run keeps the tail corner. */
+.cl-sc-newline::before, .cl-sc-newline::after{
+  content:''; flex:1; height:1px; background:rgba(255,107,44,0.42);
+}
+:root[data-theme="dark"] .cl-sc-newline{color:#FFB08A;}
+
+/* A message: avatar, then the bubble stack. Reversed for the merchant's own. */
+.cl-sc-row{display:flex; align-items:flex-end; gap:9px; margin-top:8px; min-width:0;}
+.cl-sc-row.out{flex-direction:row-reverse;}
+.cl-sc-row.grouped{margin-top:2px;}
+/* A grouped run keeps the indent but drops the repeated avatar. */
+.cl-sc-row.grouped .cl-sc-av{visibility:hidden;}
+.cl-sc-bub-wrap{display:flex; flex-direction:column; min-width:0; max-width:min(78%, 560px);}
+.cl-sc-row.out .cl-sc-bub-wrap{align-items:flex-end;}
+.cl-sc-who{
+  font-size:10px; font-weight:800; margin:0 0 3px 3px;
+  text-transform:uppercase; letter-spacing:0.06em; color:var(--cl-text-muted);
+}
+
+.cl-bubble{
+  max-width:100%; padding:10px 14px;
+  border-radius:16px; font-size:13.5px; line-height:1.6; font-weight:500;
+  word-break:break-word; overflow-wrap:anywhere; white-space:pre-wrap;
+  animation:cl-bubble-in .26s var(--cl-ease) both;
+}
 .cl-bubble.out{
-  align-self:flex-end;
   background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
-  color:#fff; border-bottom-right-radius:5px;
-  box-shadow:var(--cl-sh-accent);
+  color:#fff; border-bottom-right-radius:5px; box-shadow:var(--cl-sh-accent);
 }
 .cl-bubble.in{
-  align-self:flex-start;
-  background:var(--cl-canvas-2); color:var(--cl-text);
-  border-bottom-left-radius:5px;
+  background:var(--cl-canvas-2); color:var(--cl-text); border-bottom-left-radius:5px;
 }
-.cl-bubble.grouped{margin-top:-2px;}
-.cl-bubble.out.grouped{border-bottom-right-radius:16px; border-top-right-radius:5px;}
-.cl-bubble.in.grouped{border-bottom-left-radius:16px; border-top-left-radius:5px;}
-.cl-bubble-who{
-  font-size:10.5px; font-weight:700; margin-bottom:4px; opacity:.85;
-  text-transform:uppercase; letter-spacing:0.05em;
-}
+.cl-sc-row.grouped .cl-bubble.out{border-top-right-radius:6px;}
+.cl-sc-row.grouped .cl-bubble.in{border-top-left-radius:6px;}
 .cl-bubble-meta{
   display:flex; align-items:center; gap:5px; justify-content:flex-end;
-  margin-top:5px; font-size:10px; font-weight:600; opacity:.92;
+  margin-top:4px; font-size:10px; font-weight:600; opacity:.92;
 }
 .cl-bubble.in .cl-bubble-meta{justify-content:flex-start; color:var(--cl-text-muted);}
 .cl-seen{width:14px; height:14px;}
+/* Delivered is the same tick at reading weight; read brightens it. On the
+   orange bubble both are white, so the DIFFERENCE is the second tick and the
+   opacity — never colour alone. */
+.cl-seen.read{opacity:1;}
+.cl-seen-wait{
+  width:11px; height:11px; border-radius:50%;
+  border:1.6px solid currentColor; border-top-color:transparent;
+  animation:cl-spin .7s linear infinite;
+}
 
-/* Typing indicator — three dots on the same bubble shape as a real message. */
+/* Typing indicator — three dots on the same shape as a real bubble. */
 .cl-typing{
-  align-self:flex-start; display:inline-flex; align-items:center; gap:4px;
+  display:inline-flex; align-items:center; gap:4px;
   padding:13px 16px; border-radius:16px; border-bottom-left-radius:5px;
   background:var(--cl-canvas-2);
 }
@@ -1810,37 +2178,144 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-typing i:nth-child(2){animation-delay:.18s;}
 .cl-typing i:nth-child(3){animation-delay:.36s;}
 
-.cl-chat-compose{
-  display:flex; align-items:flex-end; gap:10px;
-  padding:14px 16px; border-top:1px solid var(--cl-line-2);
-  background:var(--cl-surface); flex-shrink:0;
+/* A message that did not send. It keeps the words and offers the trip again. */
+.cl-sc-retry{
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:5px;
+  font-size:10.5px; font-weight:600; color:var(--cl-danger-fg);
 }
-.cl-chat-compose textarea{
-  flex:1; min-height:44px; max-height:132px; resize:none; padding:12px 14px;
-  border-radius:var(--cl-r-md); line-height:1.5;
+.cl-sc-retry svg{width:13px; height:13px; flex-shrink:0;}
+.cl-sc-retry button{
+  cursor:pointer; padding:3px 9px; border-radius:var(--cl-r-pill);
+  font-size:10.5px; font-weight:700;
+  color:var(--cl-danger-fg); background:var(--cl-danger-bg);
+  border:1px solid rgba(224,54,75,0.32);
 }
-.cl-chat-send{
-  width:44px; height:44px; flex-shrink:0; border-radius:var(--cl-r-md);
-  display:flex; align-items:center; justify-content:center; cursor:pointer;
-  color:#fff;
+.cl-sc-retry button:hover{background:#fff;}
+:root[data-theme="dark"] .cl-sc-retry button:hover{background:rgba(255,255,255,0.10);}
+.cl-sc-row.failed .cl-bubble.out{
+  background:var(--cl-danger-bg); color:var(--cl-danger-fg); box-shadow:none;
+  border:1px solid rgba(224,54,75,0.32);
+}
+
+/* ---- an attachment, in a bubble or in the details column ---- */
+
+.cl-sc-att{
+  display:flex; align-items:center; gap:10px; min-width:0;
+  margin:2px 0; padding:8px 10px; border-radius:var(--cl-r-sm);
+  background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.24);
+}
+.cl-bubble.in .cl-sc-att, .cl-sc-card .cl-sc-att{
+  background:var(--cl-surface-2); border-color:var(--cl-line-2);
+}
+.cl-sc-att-thumb{
+  width:38px; height:38px; flex-shrink:0; border-radius:var(--cl-r-xs); overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-navy-600);
+}
+.cl-sc-att-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+.cl-sc-att-do{display:flex; gap:5px; flex-shrink:0;}
+.cl-bubble.out .cl-sc-att .cl-file-meta b,
+.cl-bubble.out .cl-sc-att .cl-file-meta span{color:#fff;}
+.cl-bubble.out .cl-sc-att .cl-file-meta span{opacity:.84;}
+.cl-bubble.out .cl-sc-att .cl-btn{
+  background:rgba(255,255,255,0.20); border-color:rgba(255,255,255,0.30); color:#fff;
+}
+.cl-bubble.out .cl-sc-att .cl-btn:hover{background:rgba(255,255,255,0.34);}
+.cl-sc-atts{display:flex; flex-direction:column; gap:7px;}
+
+/* ---- the composer ---- */
+
+.cl-sc-foot{flex-shrink:0; border-top:1px solid var(--cl-line-2); background:var(--cl-surface);}
+
+.cl-sc-quick{display:flex; align-items:center; gap:10px; padding:10px 14px 0; min-width:0;}
+.cl-sc-quick-k{
+  flex-shrink:0; font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.07em; color:var(--cl-text-muted);
+}
+/* The chips scroll on their own line rather than wrapping to three ragged rows
+   above a composer that then jumps down the screen. */
+.cl-sc-quick-row{
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; min-width:0;
+  scrollbar-width:none;
+}
+.cl-sc-quick-row::-webkit-scrollbar{display:none;}
+.cl-sc-chip{
+  flex-shrink:0; cursor:pointer;
+  padding:6px 13px; border-radius:var(--cl-r-pill);
+  font-size:11.5px; font-weight:700; white-space:nowrap;
+  color:var(--cl-text-2); background:var(--cl-canvas-2);
+  border:1px solid transparent;
+  transition:background var(--cl-fast), color var(--cl-fast), border-color var(--cl-fast);
+}
+.cl-sc-chip:hover{
+  color:var(--cl-orange-700); background:var(--cl-accent-soft);
+  border-color:rgba(255,107,44,0.34);
+}
+:root[data-theme="dark"] .cl-sc-chip:hover{color:#FFB08A; background:rgba(255,107,44,0.15);}
+
+.cl-sc-compose{
+  position:relative;
+  display:flex; align-items:flex-end; gap:8px; padding:12px 14px 10px;
+  transition:background var(--cl-fast);
+}
+.cl-sc-compose.dragging{background:var(--cl-accent-soft); box-shadow:inset 0 0 0 2px var(--cl-orange);}
+.cl-sc-compose textarea{
+  flex:1; min-height:46px; max-height:150px; resize:none;
+  padding:13px 15px; border-radius:var(--cl-r-lg); line-height:1.5; font-size:13.5px;
+}
+.cl-sc-cbtn{
+  width:38px; height:38px; flex-shrink:0; margin-bottom:4px; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-sc-cbtn:hover{background:var(--cl-hover); color:var(--cl-text);}
+/* `relative` is scoped to this state rather than added to every composer
+   button — the emoji popover is absolute to .cl-sc-compose, and making each
+   button a containing block would reparent it onto the button. */
+.cl-sc-cbtn.has-files{color:var(--cl-orange-cta); position:relative;}
+.cl-sc-cbtn.has-files::after{
+  content:''; position:absolute; top:4px; right:4px;
+  width:7px; height:7px; border-radius:50%; background:var(--cl-orange);
+}
+.cl-sc-send{
+  width:46px; height:46px; flex-shrink:0; border-radius:var(--cl-r-lg);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff;
   background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
   box-shadow:var(--cl-sh-accent);
   transition:transform var(--cl-fast), filter var(--cl-fast);
 }
-.cl-chat-send svg{width:19px; height:19px;}
-.cl-chat-send:hover:not(:disabled){transform:translateY(-1px) scale(1.03);}
-.cl-chat-send:disabled{opacity:.45; cursor:not-allowed; box-shadow:none;}
+.cl-sc-send svg{width:18px; height:18px;}
+.cl-sc-send:hover:not(:disabled){transform:translateY(-1px) scale(1.04);}
+.cl-sc-send:disabled{opacity:.42; cursor:not-allowed; box-shadow:none;}
+
+/* One line, always. The keyboard hint is the half that matters, so the file
+   rules are the half that truncates. */
+.cl-sc-hint{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:nowrap;
+  padding:0 16px 10px; font-size:10.5px; font-weight:500; color:var(--cl-text-muted);
+}
+.cl-sc-hint span{white-space:nowrap;}
+.cl-sc-hint span:last-child{overflow:hidden; text-overflow:ellipsis; min-width:0;}
+.cl-sc-hint b{font-weight:700; color:var(--cl-text-2);}
+
+.cl-sc-foot .cl-files{padding:0 14px; margin:10px 0 0;}
+.cl-sc-foot .cl-msg{margin:8px 14px 0;}
+
+/* A resolved conversation replaces the composer entirely — a disabled text box
+   is an invitation the screen cannot honour. */
+.cl-sc-closed{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:16px;
+  background:var(--cl-surface-2);
+}
+.cl-sc-closed svg{width:17px; height:17px; flex-shrink:0; color:var(--cl-success);}
+.cl-sc-closed > div{flex:1; min-width:160px;}
+.cl-sc-closed b{display:block; font-size:13px; font-weight:700; color:var(--cl-text);}
+.cl-sc-closed span{display:block; font-size:11.5px; font-weight:500; color:var(--cl-text-muted);}
 
 /* Emoji picker — a plain grid of characters, no library and no web font. */
-.cl-emoji-btn{
-  width:40px; height:40px; flex-shrink:0; border-radius:var(--cl-r-sm);
-  display:flex; align-items:center; justify-content:center;
-  font-size:19px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
-  transition:background var(--cl-fast);
-}
-.cl-emoji-btn:hover{background:var(--cl-hover);}
 .cl-emoji-pop{
-  position:absolute; bottom:calc(100% + 10px); right:0; z-index:40;
+  position:absolute; bottom:calc(100% - 4px); left:10px; z-index:40;
   width:270px; padding:10px;
   background:var(--cl-surface); border:1px solid var(--cl-line);
   border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-lg);
@@ -1853,64 +2328,265 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 .cl-emoji-pop button:hover{background:var(--cl-hover); transform:scale(1.18);}
 
-/* ---- channel cards ---- */
+/* ---- empty states ---- */
 
-.cl-channel{
-  display:flex; flex-direction:column; gap:14px;
-  padding:22px; border-radius:var(--cl-r-lg);
-  border:1px solid var(--cl-line); background:var(--cl-surface);
-  box-shadow:var(--cl-sh-xs); position:relative; overflow:hidden;
+.cl-sc-empty{
+  margin:auto; padding:30px 24px; text-align:center; max-width:400px;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+}
+/* The illustration: the desk's mark inside two expanding rings. Drawn rather
+   than shipped, because this portal carries no image assets. */
+.cl-sc-empty-art{
+  position:relative; width:96px; height:96px; margin-bottom:14px;
+  display:flex; align-items:center; justify-content:center; color:#fff;
+  border-radius:50%;
+  background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-900));
+  box-shadow:0 20px 40px -20px rgba(10,37,64,0.7);
+}
+.cl-sc-empty-art i{
+  position:absolute; inset:-1px; border-radius:50%;
+  border:2px solid var(--cl-orange); opacity:0;
+  animation:cl-ring 3.4s var(--cl-ease) infinite;
+}
+.cl-sc-empty-art i:nth-child(3){animation-delay:1.7s;}
+.cl-sc-empty b{font-size:18px; font-weight:800; color:var(--cl-text);}
+.cl-sc-empty p{
+  margin:0 0 8px; font-size:13px; font-weight:500; line-height:1.6; color:var(--cl-text-2);
+}
+.cl-sc-empty-note{margin-top:11px; font-size:11px; font-weight:600; color:var(--cl-text-muted);}
+
+@keyframes cl-ring{
+  0%{transform:scale(1); opacity:.55;}
+  70%{transform:scale(1.42); opacity:0;}
+  100%{transform:scale(1.42); opacity:0;}
+}
+
+.cl-sc-blank{
+  padding:34px 16px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+}
+.cl-sc-blank-ico{
+  width:46px; height:46px; margin-bottom:6px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-text-muted);
+}
+.cl-sc-blank b{font-size:13.5px; font-weight:700; color:var(--cl-text);}
+.cl-sc-blank p{margin:0; font-size:11.5px; font-weight:500; line-height:1.6; color:var(--cl-text-muted);}
+
+/* ---- right: the details column ---- */
+
+.cl-sc-info-head{
+  display:none; align-items:center; gap:10px; flex-shrink:0;
+  padding:14px 16px; border-bottom:1px solid var(--cl-line-2); background:var(--cl-surface-2);
+}
+.cl-sc-info-head b{font-size:14px; font-weight:800; color:var(--cl-text); margin-right:auto;}
+.cl-sc-x{
+  width:32px; height:32px; flex-shrink:0; cursor:pointer; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--cl-text-muted); transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-sc-x:hover{background:var(--cl-hover); color:var(--cl-text);}
+.cl-sc-info-body{flex:1; overflow-y:auto; padding:14px; min-height:0;}
+
+.cl-sc-card{
+  padding:15px; margin-bottom:12px; border-radius:var(--cl-r-md);
+  border:1px solid var(--cl-line-2); background:var(--cl-surface-2);
+}
+.cl-sc-card:last-child{margin-bottom:0;}
+.cl-sc-card h3{
+  display:flex; align-items:center; gap:8px; margin:0 0 12px;
+  font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em;
+  color:var(--cl-text);
+}
+.cl-sc-card h3 svg{width:15px; height:15px; color:var(--cl-orange);}
+.cl-sc-card .cl-dl-1 dt{font-size:11px;}
+.cl-sc-card .cl-dl-1 dd{font-size:12px;}
+.cl-sc-card .cl-btn-block{margin-top:12px;}
+.cl-sc-note{
+  margin:12px 0 0; padding-top:11px; border-top:1px dashed var(--cl-line);
+  font-size:11px; font-weight:500; line-height:1.6; color:var(--cl-text-muted);
+}
+.cl-sc-note a{font-weight:700;}
+.cl-sc-card .cl-faq-item{background:var(--cl-surface);}
+
+/* ---- the floating WhatsApp card ---- */
+
+/* It coexists with the chat rather than replacing it. Bottom-left, because
+   bottom-right is where the composer's send button lives and a floating card
+   over it would be a mis-tap waiting to happen. */
+.cl-sc-fab{
+  position:fixed; left:calc(var(--cl-rail-w) + 22px); bottom:22px; z-index:300;
+  display:inline-flex; align-items:center; gap:10px;
+  padding:11px 17px 11px 13px; border-radius:var(--cl-r-pill);
+  color:#fff; font-size:13px; font-weight:700;
+  background:linear-gradient(180deg, #0F8044 0%, #0B7A3C 100%);
+  box-shadow:0 14px 34px -14px rgba(11,122,60,0.95), var(--cl-sh-md);
   transition:transform var(--cl-base), box-shadow var(--cl-base);
 }
-.cl-channel:hover{transform:translateY(-2px); box-shadow:var(--cl-sh-md);}
-.cl-channel-head{display:flex; align-items:center; gap:13px;}
-.cl-channel-ico{
-  width:46px; height:46px; flex-shrink:0; border-radius:var(--cl-r-md);
-  display:flex; align-items:center; justify-content:center; color:#fff;
+.cl-sc-fab:hover{
+  color:#fff; transform:translateY(-2px);
+  box-shadow:0 20px 42px -14px rgba(11,122,60,1), var(--cl-sh-lg);
 }
-.cl-channel-ico svg{width:23px; height:23px;}
-.cl-channel-ico.wa{background:linear-gradient(140deg, #17A45B, #0B7A3C); box-shadow:0 8px 20px -10px rgba(11,122,60,0.8);}
-.cl-channel-ico.phone{background:linear-gradient(140deg, var(--cl-navy-600), var(--cl-navy-800));}
-.cl-channel-ico.mail{background:linear-gradient(140deg, #4C7EF3, #2447C9);}
-.cl-channel-head b{display:block; font-size:15px; font-weight:700; color:var(--cl-text);}
-.cl-channel-head span{display:block; font-size:12px; font-weight:600; color:var(--cl-text-muted);}
-.cl-channel-facts{display:flex; flex-direction:column; gap:9px;}
-.cl-channel-fact{
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  font-size:12.5px; font-weight:600; color:var(--cl-text-muted);
-}
-.cl-channel-fact b{color:var(--cl-text); font-weight:700; text-align:right;}
-.cl-btn-wa{
-  /* WhatsApp green, deepened to the point a white label clears 4.5:1 —
-     the brand's own tone measures 3.3:1 and fails. */
-  color:#fff; background:linear-gradient(180deg, #0F8044 0%, #0B7A3C 100%);
-  border-color:#0A6C35; box-shadow:0 8px 20px -10px rgba(11,122,60,0.8);
-}
-.cl-btn-wa:hover:not(:disabled){
-  color:#fff; background:linear-gradient(180deg, #12904C 0%, #0C8642 100%); border-color:#0A6C35;
-}
+.cl-sc-fab svg{width:25px; height:25px;}
+/* It needs no show/hide rule of its own: it is rendered inside #cl-support,
+   and `.cl-section` is display:none until that screen is the active one. */
 
-/* ---- dropzone ---- */
+/* ---- the new-conversation drawer ---- */
 
-.cl-drop{
-  display:flex; flex-direction:column; align-items:center; gap:8px;
-  padding:36px 24px; text-align:center; cursor:pointer;
-  border:2px dashed var(--cl-line); border-radius:var(--cl-r-lg);
-  background:var(--cl-surface-2); color:var(--cl-text-muted);
-  transition:border-color var(--cl-fast), background var(--cl-fast), transform var(--cl-fast);
+.cl-sc-drawer-back{
+  position:fixed; inset:0; z-index:500; display:none;
+  background:rgba(6,27,50,0.52); backdrop-filter:blur(2px);
 }
-.cl-drop:hover{border-color:var(--cl-orange); background:var(--cl-accent-soft);}
-.cl-drop.dragging{
-  border-color:var(--cl-orange); background:var(--cl-accent-soft); transform:scale(1.01);
+.cl-sc-drawer-back.open{display:block; animation:cl-fade .22s ease both;}
+.cl-sc-drawer{
+  position:fixed; top:0; right:0; bottom:0; z-index:510;
+  width:min(460px, 100vw);
+  display:flex; flex-direction:column;
+  background:var(--cl-surface); box-shadow:var(--cl-sh-xl);
+  transform:translateX(100%); transition:transform .24s var(--cl-ease);
 }
-.cl-drop svg{width:30px; height:30px; color:var(--cl-orange);}
-.cl-drop b{font-size:14px; font-weight:700; color:var(--cl-text);}
-.cl-drop small{font-size:11.5px; font-weight:500;}
+.cl-sc-drawer.open{transform:none;}
+.cl-sc-drawer[hidden]{display:none;}
+.cl-sc-drawer-head{
+  display:flex; align-items:flex-start; gap:12px; flex-shrink:0;
+  padding:20px 20px 16px; border-bottom:1px solid var(--cl-line-2);
+}
+.cl-sc-drawer-head h2{font-size:18px; font-weight:800; color:var(--cl-text); margin:0;}
+.cl-sc-drawer-head p{
+  margin:4px 0 0; font-size:12.5px; font-weight:500; line-height:1.55; color:var(--cl-text-2);
+}
+.cl-sc-drawer-head > div{flex:1; min-width:0;}
+.cl-sc-drawer-body{flex:1; overflow-y:auto; padding:18px 20px; min-height:0;}
+.cl-sc-drawer-foot{
+  display:flex; gap:10px; justify-content:flex-end; flex-shrink:0;
+  padding:14px 20px; border-top:1px solid var(--cl-line-2); background:var(--cl-surface-2);
+}
+.cl-sc-drawer-foot .cl-btn{flex:1;}
+
+.cl-sc-topics{display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 14px;}
+
+/* What the screen worked out, printed with the control that changes it. */
+.cl-sc-auto{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:11px 13px; border-radius:var(--cl-r-md);
+  background:var(--cl-accent-soft); border:1px solid rgba(255,107,44,0.28);
+}
+:root[data-theme="dark"] .cl-sc-auto{background:rgba(255,107,44,0.12);}
+.cl-sc-auto-k{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em;
+  color:var(--cl-orange-700);
+}
+:root[data-theme="dark"] .cl-sc-auto-k{color:#FFB08A;}
+.cl-sc-auto-k svg{width:13px; height:13px;}
+.cl-sc-auto select{flex:1 1 130px; min-width:0; height:34px; font-size:12px; padding:0 30px 0 10px;}
+
+.cl-sc-more{margin-top:16px;}
+.cl-sc-more summary{
+  cursor:pointer; padding:11px 13px; border-radius:var(--cl-r-md);
+  font-size:12.5px; font-weight:700; color:var(--cl-text-2);
+  background:var(--cl-canvas-2); list-style:none;
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-sc-more summary::-webkit-details-marker{display:none;}
+.cl-sc-more summary::after{content:'+'; float:right; font-weight:800; font-size:15px; line-height:1.2;}
+.cl-sc-more[open] summary::after{content:'–';}
+.cl-sc-more summary:hover{background:var(--cl-hover); color:var(--cl-text);}
+.cl-sc-more summary span{font-weight:500; color:var(--cl-text-muted);}
+.cl-sc-more .cl-field{margin-top:14px;}
+
+/* ---- presence ---- */
+
+.cl-presence{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:700; color:var(--cl-text-muted);
+}
+.cl-presence::before{
+  content:''; width:7px; height:7px; border-radius:50%; background:var(--cl-text-muted);
+}
+.cl-presence.online{color:var(--cl-success-fg);}
+.cl-presence.online::before{background:var(--cl-success); animation:cl-pulse 2.2s ease-in-out infinite;}
+
+/* ---- shared file rows (also used by Booking History) ---- */
+
+/* ---- the document tray -------------------------------------------------
+   Booking History's "View Documents". One row per DOCUMENT KIND rather than
+   per file, because a merchant asks for "the invoice", not for a filename —
+   and each kind carries the same pair of verbs, View and Download, in the same
+   place down the column. Ticket is the one kind that can be several files;
+   when it is, they are listed under it in `.cl-doc-sub` and the pair moves on
+   to each file. Everything else keeps a single row.
+
+   An unavailable document STAYS IN THE LIST. Dropping it would leave a
+   merchant wondering whether we forgot it or it does not exist yet; the row
+   goes dashed and recessed and says "Not Available" where its buttons were. */
+.cl-docs{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+.cl-doc{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 16px; border-radius:var(--cl-r-md);
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  transition:border-color var(--cl-fast), box-shadow var(--cl-fast),
+             background var(--cl-fast);
+}
+.cl-doc:hover{border-color:#CBD6E4; box-shadow:var(--cl-sh-sm);}
+:root[data-theme="dark"] .cl-doc:hover{border-color:#33455F;}
+/* Unavailable. Dashed and recessed, and it does not respond to the pointer —
+   a hover on a row you cannot act on is a promise the row cannot keep. */
+.cl-doc.cl-doc-off{
+  background:var(--cl-surface-2); border-style:dashed; border-color:var(--cl-line);
+}
+.cl-doc.cl-doc-off:hover{border-color:var(--cl-line); box-shadow:none;}
+
+.cl-doc-ico{
+  width:42px; height:42px; flex-shrink:0; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-navy-600);
+}
+:root[data-theme="dark"] .cl-doc-ico{color:var(--cl-text-2);}
+.cl-doc.cl-doc-off .cl-doc-ico{color:var(--cl-text-muted);}
+.cl-doc-ico svg{width:20px; height:20px;}
+
+.cl-doc-meta{flex:1 1 200px; min-width:0;}
+.cl-doc-meta b{display:block; font-size:13.5px; font-weight:700; color:var(--cl-text);}
+.cl-doc-meta span{
+  display:block; margin-top:2px; font-size:11.5px; font-weight:500;
+  line-height:1.5; color:var(--cl-text-muted);
+}
+.cl-doc-actions{display:flex; gap:8px; margin-left:auto; flex-shrink:0;}
+
+/* "Not Available" is a statement, not a control: no tabindex, no hover, and
+   it sits exactly where the buttons would have been so the column still
+   scans straight down. */
+.cl-doc-na{
+  display:inline-flex; align-items:center; gap:6px; margin-left:auto;
+  padding:7px 13px; border-radius:var(--cl-r-pill);
+  font-size:11.5px; font-weight:700; white-space:nowrap;
+  color:var(--cl-text-muted); background:var(--cl-canvas-2);
+  border:1px dashed var(--cl-line);
+}
+.cl-doc-na svg{width:13px; height:13px;}
+
+/* The airline's own files, when there is more than one of them. */
+.cl-doc-sub{
+  list-style:none; margin:0; padding:0; flex:1 1 100%;
+  display:flex; flex-direction:column; gap:6px;
+  border-top:1px solid var(--cl-line-2); padding-top:11px;
+}
+.cl-doc-sub li{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 11px; border-radius:var(--cl-r-sm);
+  background:var(--cl-surface-2); border:1px solid var(--cl-line-2);
+}
+.cl-doc-sub .cl-doc-name{
+  flex:1 1 150px; min-width:0; font-size:12.5px; font-weight:600; color:var(--cl-text-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cl-doc-sub .cl-doc-actions{gap:6px;}
 
 .cl-files{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:8px;}
 .cl-file{
   display:flex; align-items:center; gap:12px;
-  padding:11px 13px; border-radius:var(--cl-r-md);
+  padding:10px 12px; border-radius:var(--cl-r-md);
   background:var(--cl-surface-2); border:1px solid var(--cl-line-2);
 }
 .cl-file-ico{
@@ -1930,46 +2606,25 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   border:1px solid var(--cl-line);
 }
 /* An upload the server refused. Kept in the tray rather than dropped, so the
-   merchant can retry it without re-selecting — the reason is printed under the
-   list, not on the row, because a filename plus a sentence does not fit here. */
+   merchant can retry it without re-selecting. */
 .cl-file.failed{border-color:var(--cl-danger); background:var(--cl-danger-bg);}
 .cl-file.failed .cl-file-meta span{color:var(--cl-danger-fg);}
 
-/* A file INSIDE a chat bubble. The bubble already carries the sender's colour,
-   so this sits on a translucent white rather than a fixed surface token —
-   otherwise the outgoing (orange) bubble would show a grey card that looks
-   pasted on. */
-.cl-bubble-file{
-  display:flex; align-items:center; gap:10px;
-  margin:2px 0; padding:9px 11px; border-radius:var(--cl-r-sm);
-  background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.24);
-}
-.cl-bubble.in .cl-bubble-file{
-  background:var(--cl-surface); border-color:var(--cl-line-2);
-}
-.cl-bubble-file .cl-file-ico{width:30px; height:30px;}
-.cl-bubble-file .cl-file-meta b{font-size:12px;}
-.cl-bubble.out .cl-bubble-file .cl-file-meta b,
-.cl-bubble.out .cl-bubble-file .cl-file-meta span{color:#fff;}
-.cl-bubble.out .cl-bubble-file .cl-file-meta span{opacity:.82;}
-.cl-bubble.out .cl-bubble-file .cl-btn{
-  background:rgba(255,255,255,0.2); border-color:rgba(255,255,255,0.28); color:#fff;
-}
-.cl-bubble.out .cl-bubble-file .cl-btn:hover{background:rgba(255,255,255,0.32);}
+/* ---- WhatsApp button ---- */
 
-/* The composer's paperclip, once something is queued behind it. `relative` is
-   scoped to this state rather than added to .cl-emoji-btn, which the emoji
-   popover positions against — the popover is absolute to .cl-chat-compose and
-   making every button a containing block would reparent it onto the button. */
-.cl-emoji-btn.has-files{color:var(--cl-orange); position:relative;}
-.cl-emoji-btn.has-files::after{
-  content:''; position:absolute; top:5px; right:5px;
-  width:7px; height:7px; border-radius:50%; background:var(--cl-orange);
+.cl-btn-wa{
+  /* WhatsApp green, deepened to the point a white label clears 4.5:1 —
+     the brand's own tone measures 3.3:1 and fails. */
+  color:#fff; background:linear-gradient(180deg, #0F8044 0%, #0B7A3C 100%);
+  border-color:#0A6C35; box-shadow:0 8px 20px -10px rgba(11,122,60,0.8);
+}
+.cl-btn-wa:hover:not(:disabled){
+  color:#fff; background:linear-gradient(180deg, #12904C 0%, #0C8642 100%); border-color:#0A6C35;
 }
 
 /* ---- FAQ ---- */
 
-.cl-faq{display:flex; flex-direction:column; gap:9px;}
+.cl-faq{display:flex; flex-direction:column; gap:7px;}
 .cl-faq-item{
   border:1px solid var(--cl-line); border-radius:var(--cl-r-md);
   background:var(--cl-surface); overflow:hidden;
@@ -1977,34 +2632,99 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 .cl-faq-item.open{border-color:rgba(255,107,44,0.34); box-shadow:var(--cl-sh-xs);}
 .cl-faq-q{
-  display:flex; align-items:center; gap:12px; width:100%;
-  padding:15px 17px; cursor:pointer; text-align:left;
-  font-size:13.5px; font-weight:600; color:var(--cl-text);
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:11px 13px; cursor:pointer; text-align:left;
+  font-size:12.5px; font-weight:600; color:var(--cl-text);
   transition:background var(--cl-fast);
 }
 .cl-faq-q:hover{background:var(--cl-hover);}
 .cl-faq-q span{flex:1; min-width:0;}
 .cl-faq-chev{
-  width:17px; height:17px; flex-shrink:0; color:var(--cl-text-muted);
+  width:16px; height:16px; flex-shrink:0; color:var(--cl-text-muted);
   transition:transform var(--cl-base), color var(--cl-fast);
 }
 .cl-faq-item.open .cl-faq-chev{transform:rotate(180deg); color:var(--cl-orange);}
-.cl-faq-a{
-  display:grid; grid-template-rows:0fr;
-  transition:grid-template-rows var(--cl-base);
-}
+.cl-faq-a{display:grid; grid-template-rows:0fr; transition:grid-template-rows var(--cl-base);}
 .cl-faq-item.open .cl-faq-a{grid-template-rows:1fr;}
 .cl-faq-a > div{overflow:hidden;}
 .cl-faq-a p{
-  padding:0 17px 17px; margin:0;
-  font-size:13px; line-height:1.7; color:var(--cl-text-2); font-weight:500;
+  padding:0 13px 13px; margin:0;
+  font-size:12px; line-height:1.7; color:var(--cl-text-2); font-weight:500;
 }
 .cl-faq-cat{
-  display:inline-block; margin:0 0 4px;
+  display:block; margin:12px 0 5px;
   font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em;
   color:var(--cl-orange-700);
 }
+.cl-faq-cat:first-child{margin-top:0;}
 :root[data-theme="dark"] .cl-faq-cat{color:#FFB08A;}
+
+/* ---- responsive: the three columns collapse in two steps ---- */
+
+/* THREE COLUMNS NEED 1360px, NOT 1200. The rail takes 266px and the content
+   area another 44px of padding, so at 1280 — an ordinary laptop — the two side
+   columns and the gaps left the CONVERSATION 303px, narrower than either of
+   them. The middle column is the product; if it cannot be the widest, there
+   are only two columns and the details open over the top.
+
+   This is a viewport query rather than a container query on purpose: a
+   container query needs `container-type`, which establishes a containing block
+   for `position:fixed` descendants — the exact trap the note at the top of this
+   section exists to document, and this screen has four fixed children. */
+@media (max-width:1360px){
+  .cl-sc-grid{grid-template-columns:290px minmax(0,1fr);}
+  .cl-sc-info{
+    position:fixed; top:0; right:0; bottom:0; z-index:420;
+    width:min(360px, 92vw); border-radius:0; border-width:0 0 0 1px;
+    transform:translateX(100%); transition:transform var(--cl-base);
+    box-shadow:var(--cl-sh-xl);
+  }
+  .cl-sc-info.open{transform:none;}
+  .cl-sc-info-head{display:flex;}
+  .cl-sc-info-btn{display:inline-flex;}
+}
+
+/* Below 900px it is one column at a time — the list, or the conversation. This
+   is the phone pattern every messaging app uses, and the back control in the
+   chat header is what returns. */
+@media (max-width:900px){
+  .cl-sc-grid{
+    grid-template-columns:minmax(0,1fr);
+    height:clamp(520px, calc(100vh - 300px), 760px);
+  }
+  .cl-sc-grid .cl-sc-chat{display:none;}
+  .cl-sc-grid.chatting .cl-sc-side{display:none;}
+  .cl-sc-grid.chatting .cl-sc-chat{display:flex;}
+  .cl-sc-back{display:inline-flex;}
+  /* The floating card would sit over the composer once the rail is an overlay
+     and the chat is full width. */
+  .cl-sc-fab{left:auto; right:16px; bottom:16px; padding:13px;}
+  .cl-sc-fab span{display:none;}
+}
+
+@media (max-width:640px){
+  .cl-sc-banner{padding:16px; gap:13px;}
+  .cl-sc-banner-actions{width:100%;}
+  .cl-sc-banner-actions .cl-btn{flex:1;}
+  /* On a phone the banner was 310px tall — half a screen of preamble in front
+     of the conversation. The prose goes; the heading, both numbers and both
+     buttons, which are the reason the banner exists, all stay. */
+  .cl-sc-banner-copy p{display:none;}
+  .cl-sc-banner-num{margin-top:7px;}
+  /* The chat header's presence chip is the same fact as the "Online" badge at
+     the top of the page, and at this width it was being sliced mid-word by the
+     header's own truncation rather than dropped cleanly. */
+  .cl-sc-chat-id .cl-presence{display:none;}
+  .cl-sc-head h1{font-size:21px;}
+  .cl-sc-badges{width:100%;}
+  .cl-sc-badge{flex:1 1 auto; justify-content:center;}
+  .cl-sc-grid{height:clamp(480px, calc(100vh - 260px), 720px);}
+  .cl-sc-log{padding:14px;}
+  .cl-sc-bub-wrap{max-width:88%;}
+  .cl-sc-quick-k{display:none;}
+  .cl-sc-drawer{width:100vw;}
+  .cl-sc-hint span:last-child{display:none;}
+}
 
 
 /* ==========================================================================
@@ -2246,8 +2966,9 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-statuses{grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px;}
   .cl-modal-back{padding:20px 14px;}
   .cl-modal-body{max-height:calc(100vh - 200px);}
-  .cl-chat{height:min(500px, 70vh);}
-  .cl-bubble{max-width:88%;}
+  /* The Support Center carries its own breakpoints — see section 13, which
+     collapses three columns to two and then to one rather than reflowing a
+     single chat box. */
 }
 
 @media (max-width:640px){
@@ -2295,6 +3016,18 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-modal-head, .cl-modal-body, .cl-modal-foot{padding-left:18px; padding-right:18px;}
   .cl-modal-foot{justify-content:stretch;}
   .cl-modal-foot .cl-btn{flex:1;}
+
+  /* Document tray. `margin-left:auto` has nothing left to push against once
+     the row wraps, so the verbs go full width under the name rather than
+     hanging off the right edge of a 375px card. */
+  .cl-doc{padding:13px 14px; gap:12px;}
+  .cl-doc-actions, .cl-doc-na{margin-left:0; width:100%;}
+  .cl-doc-actions{flex:1 1 100%;}
+  .cl-doc-actions .cl-btn{flex:1;}
+  .cl-doc-na{justify-content:center;}
+  .cl-doc-sub li{gap:8px;}
+  .cl-doc-sub .cl-doc-name{flex:1 1 100%;}
+
   .cl-drawer{width:100%; max-width:none;}
   .cl-menu{
     /* A dropdown pinned to a 40px avatar runs off a phone. It becomes a sheet

@@ -531,11 +531,17 @@ const MerchantApi = {
      wallet, refund, ticket_issue, account, technical, other) — anything else
      is a 400, so drive the picker from that list and not from free text.
      `priority` is the merchant's OPENING assessment only: the desk re-files it
-     through /triage, which this client deliberately does not expose. */
+     through /triage, which this client deliberately does not expose.
+
+     `subject` is OPTIONAL — only `message` is required. Leave it out and the
+     server titles the thread from the opening of the first message, so a
+     merchant can say what is wrong without composing a headline for it first.
+     Sent as undefined rather than "" when blank, so the field is absent from
+     the payload instead of present and empty. */
   openSupportThread({ subject, message, category, priority, relatedRequestId } = {}) {
     return this._req('post', '/api/support/threads', {
       data: {
-        subject,
+        subject: subject || undefined,
         message,
         category: category || undefined,
         priority: priority || undefined,

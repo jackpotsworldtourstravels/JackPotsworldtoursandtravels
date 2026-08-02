@@ -8,8 +8,11 @@
      New Booking Enquiry  the form, as a modal
      Listing              reference / status / created / actions
      View Details         everything the enquiry captured, plus our quotation
-     Request Ticket       appears once the enquiry is Available — carries the
-                          whole enquiry over to Booking Request, pre-filled
+     Raise Booking        enabled once the enquiry is Available — carries the
+                          whole enquiry over to Booking Request, pre-filled.
+                          Was labelled "Request Ticket"; the row's own function
+                          is still called clRequestTicket.
+     View Booking         replaces it once a booking exists, and only opens it
 
    NAMING (CR-5). This is **Booking Enquiry** here and **Ticket Enquiry** on
    every staff screen; the stored `request_type` is `ticket_enquiry` either way.
@@ -53,7 +56,7 @@ const CL_AIRLINES = [
   { name: 'Turkish Airlines', code: 'TK' },
 ];
 
-/* The rows currently on screen, so View Details and Request Ticket can work
+/* The rows currently on screen, so View Details and Raise Booking can work
    from what was already fetched rather than re-querying per click. */
 let clEnquiryRows = [];
 
@@ -234,7 +237,7 @@ function clRenderEnquiryRows() {
   body.querySelectorAll('[data-cl-enq-view]').forEach(b =>
     b.addEventListener('click', () => clOpenEnquiryDetail(b.dataset.clEnqView)));
   body.querySelectorAll('[data-cl-enq-book]').forEach(b =>
-    b.addEventListener('click', () => clRequestTicket(b.dataset.clEnqBook)));
+    b.addEventListener('click', () => clRequestTicket(b.dataset.clEnqBook, b)));
   body.querySelectorAll('[data-cl-enq-booking]').forEach(b =>
     b.addEventListener('click', () => clGo('requests', () => clOpenRequestDetail(b.dataset.clEnqBooking))));
 }
@@ -274,19 +277,40 @@ function clEnquiryRow(r) {
   </tr>`;
 }
 
-/* Request Ticket appears only on an Approved enquiry that has not already been
-   booked — the backend enforces both (400 and 409), so offering the button
-   anywhere else would be offering a call that can only fail. Once it has been
-   booked the button is replaced by a link to the booking itself. */
+/* CREATING a booking and VIEWING one are two different jobs, so they are two
+   different controls and never share a label.
+   ===========================================================================
+   Raise Booking is the call to action: the one orange thing in the row, with
+   the plane the rest of the portal uses for a booking. It is offered ONLY on an
+   Approved enquiry that has not already been booked — the backend enforces both
+   (400 and 409), so an enabled button anywhere else would be a call that can
+   only fail.
+
+   On an enquiry we have not quoted yet it is still rendered, DISABLED, rather
+   than left out: a merchant who cannot see the action cannot tell whether it is
+   missing or not-yet-earned, and the `title` says which. It carries no
+   `data-cl-enq-book`, so it is inert even if something re-enables it.
+
+   Once a booking exists the CTA is gone and a quiet View Booking takes its
+   place — same behaviour as before, opening that booking, but it no longer
+   dresses a past-tense fact ("Booking raised") as though it were an action. */
 function clEnquiryActions(r) {
   const out = [
     `<button type="button" class="cl-btn cl-btn-sm" data-cl-enq-view="${r.id}">View Details</button>`,
   ];
   if (r.booking_request_id) {
-    out.push(`<button type="button" class="cl-btn cl-btn-sm" data-cl-enq-booking="${r.booking_request_id}"
-      title="Open ${escapeHtml(r.booking_request_number || 'the booking')}">Booking raised</button>`);
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-quiet"
+      data-cl-enq-booking="${r.booking_request_id}"
+      title="Open ${escapeHtml(r.booking_request_number || 'the booking')}"
+      >${clIco('external', { size: 13 })}View Booking</button>`);
   } else if (r.status === 'approved') {
-    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-enq-book="${r.id}">Request Ticket</button>`);
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary cl-btn-cta"
+      data-cl-enq-book="${r.id}"
+      >${clIco('plane', { size: 14 })}Raise Booking</button>`);
+  } else {
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-cta" disabled
+      title="A booking can be raised once our team has quoted this enquiry"
+      >${clIco('plane', { size: 14 })}Raise Booking</button>`);
   }
   return out.join('');
 }
@@ -339,20 +363,27 @@ async function clOpenEnquiryDetail(id) {
         <div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(r.rejection_reason)}</div>` : ''}
       ${r.status === 'pending_approval' || r.status === 'in_review' ? `
         <div class="cl-msg cl-msg-muted">Our team is checking this sector. You will be notified
-          the moment it is quoted, and Request Ticket appears here once it is available.</div>` : ''}`;
+          the moment it is quoted, and Raise Booking becomes available here.</div>` : ''}`;
 
+    /* Same two controls as the row, same words. A merchant who opens Details to
+       decide should meet the action they saw in the table, not a synonym. */
     const foot = [];
     if (r.status === 'approved' && !r.booking_request_id) {
-      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-book="${r.id}">Request Ticket</button>`);
+      foot.push(`<button type="button" class="cl-btn cl-btn-primary cl-btn-cta" data-cl-modal-book="${r.id}"
+        >${clIco('plane', { size: 15 })}Raise Booking</button>`);
     }
     if (r.booking_request_id) {
-      foot.push(`<button type="button" class="cl-btn" data-cl-modal-booking="${r.booking_request_id}">Open ${
-        escapeHtml(r.booking_request_number || 'booking')}</button>`);
+      foot.push(`<button type="button" class="cl-btn" data-cl-modal-booking="${r.booking_request_id}"
+        >${clIco('external', { size: 14 })}View Booking ${
+        escapeHtml(r.booking_request_number || '')}</button>`);
     }
     foot.push('<button type="button" class="cl-btn" data-cl-modal-close>Close</button>');
     $('clModalFoot').innerHTML = foot.join('');
 
     $('clModalFoot').querySelector('[data-cl-modal-close]')?.addEventListener('click', clCloseModal);
+    /* No button handed over: clCloseModal empties the footer, so a spinner set
+       on this control would be spinning on a node that is already detached. The
+       row's own Raise Booking is where the loading state is worth having. */
     $('clModalFoot').querySelector('[data-cl-modal-book]')?.addEventListener('click', () => {
       clCloseModal(); clRequestTicket(r.id);
     });
@@ -1018,7 +1049,7 @@ async function clSubmitEnquiry() {
       <p style="font-size:13px;">We will confirm availability and quote a total fare for
         <b>${escapeHtml(clEnquiryRoute(enquiry))}</b> on
         <b>${escapeHtml(fmtDate(enquiry.travel_date))}</b>. You will be notified when it is
-        quoted — <b>Request Ticket</b> then appears on this row and carries everything you
+        quoted — <b>Raise Booking</b> then lights up on this row and carries everything you
         have just entered, and the quoted amount, straight into the booking.</p>`,
       '<button type="button" class="cl-btn cl-btn-primary" onclick="clCloseModal()">Done</button>');
   } catch (err) {
@@ -1054,7 +1085,15 @@ function clFreeTextPlace(text) {
 /* The spec's Request Ticket: navigate to Booking Request and open it already
    filled in. The enquiry is re-read first so a merchant who left the tab open
    cannot carry a stale "available" into a booking the desk has since pulled. */
-async function clRequestTicket(enquiryId) {
+/* `btn`, when given, is the Raise Booking control that started this. It spins
+   for the whole round trip — two GETs and, on the Classic track, a form that is
+   then built and navigated to — because on a table of twenty-five rows a
+   page-level "working…" tells you nothing about which one you pressed. The
+   restore is in a `finally` and is deliberately unconditional: on the happy
+   path the row has usually been re-rendered underneath us by
+   clUpsertEnquiryRow, so this touches a detached node and no longer matters. */
+async function clRequestTicket(enquiryId, btn) {
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
   try {
     const enquiry = await MerchantApi.getEnquiry(enquiryId);
     clUpsertEnquiryRow(enquiry);
@@ -1097,5 +1136,7 @@ async function clRequestTicket(enquiryId) {
     clOpenModal('Could not open the booking',
       `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Please try again.'))}</div>`,
       '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
   }
 }

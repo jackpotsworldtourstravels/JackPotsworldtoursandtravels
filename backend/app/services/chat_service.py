@@ -196,10 +196,44 @@ def _linked_booking(db: Session, actor: User, request_id: int | None) -> Service
     return booking
 
 
+#: How much of a first message becomes the thread title when the merchant did
+#: not write a subject. Long enough for the desk to tell two threads apart in a
+#: queue, short enough to sit in a table cell without wrapping.
+_DERIVED_TITLE_CHARS = 80
+
+
+def derive_thread_title(subject: str | None, message: str) -> str:
+    """The thread's title: the subject if there is one, otherwise the message.
+
+    A subject is optional because demanding one is friction in front of someone
+    who already has a problem. But the desk triages from a list of titles, so
+    falling back to a constant would render every untitled thread identical in
+    the queue — trading the merchant's friction for the operator's. Taking the
+    opening of the first message keeps that list scannable while asking the
+    merchant for nothing.
+    """
+    subject = (subject or "").strip()
+    if subject:
+        return subject[:200]
+
+    # Collapse whitespace first: a message pasted from an email arrives full of
+    # newlines, and a title containing them breaks the queue's row height.
+    text = " ".join((message or "").split())
+    if not text:
+        return "Support chat"
+    if len(text) <= _DERIVED_TITLE_CHARS:
+        return text
+    # Cut on a word boundary so the queue never shows half a word. rsplit can
+    # return the whole slice when the first 80 characters hold no space at all.
+    head = text[:_DERIVED_TITLE_CHARS]
+    cut = head.rsplit(" ", 1)[0] if " " in head else head
+    return cut + "…"
+
+
 def open_thread(
     db: Session,
     actor: User,
-    subject: str,
+    subject: str | None,
     message: str,
     *,
     category: str | None = None,
@@ -221,7 +255,7 @@ def open_thread(
         request_type=RequestType.LIVE_CHAT,
         status=S.SUBMITTED,
         priority=priority,
-        title=subject or "Support chat",
+        title=derive_thread_title(subject, message),
         # The booking this ticket is about, so an operator can jump straight to
         # it instead of asking the merchant for a reference they already gave.
         parent_request_id=booking.request_id if booking else None,

@@ -29,8 +29,11 @@
    `GET /api/requests/{id}/invoice` and `/confirmation` generate a PDF on demand
    from the booking, its passengers and its payments — nothing is stored, so a
    refund recorded a minute ago is already in the invoice. Both 409 on a booking
-   that is not ticketed or completed, which is why those buttons appear on those
-   rows only. `/tickets` lists the airline's own files, attached by our desk. */
+   that is not ticketed or completed, which is what the row's `generated` flag
+   mirrors. `/tickets` lists the airline's own files, attached by our desk.
+
+   Every one of them is reached through a single **View Documents** dialog —
+   see the document tray at the foot of this file. */
 
 const CL_HISTORY_STATUSES = ['ticket_issued', 'completed', 'cancelled', 'rejected'];
 
@@ -138,10 +141,14 @@ function clInitHistory() {
       <div class="cl-panel-head"><h2>${clIco('info')}About this archive</h2></div>
       <div class="cl-panel-body">
         <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:var(--cl-text-2);">
+          <li><b>View Documents</b> on any row opens everything that booking can produce —
+              e-ticket, invoice and confirmation — each with a <b>View</b> and a
+              <b>Download</b>. Anything not yet available is listed and marked, rather than
+              left out.</li>
           <li><b>Invoice</b> and <b>Confirmation</b> are generated fresh each time from the
               booking, its passengers and its payments — there is no stored file to fall out of
-              step with the ledger.</li>
-          <li><b>Ticket</b> opens the airline's own documents, attached by our desk.</li>
+              step with the ledger. Both become available once the booking is ticketed.</li>
+          <li>The <b>e-ticket</b> is the airline's own document, attached by our desk.</li>
           <li>A <b>refunded</b> booking appears here as <b>Cancelled</b>. Refunds are settled on
               the cancellation that earned them — see Service Requests, and the credit on your
               wallet ledger.</li>
@@ -351,12 +358,10 @@ function clRenderHistoryRows(failedStages = 0) {
 
   body.querySelectorAll('[data-cl-hist-view]').forEach(b =>
     b.addEventListener('click', () => clOpenRequestDetail(b.dataset.clHistView)));
-  body.querySelectorAll('[data-cl-hist-invoice]').forEach(b =>
-    b.addEventListener('click', () => clHistDownload(b, 'invoice', b.dataset.clHistInvoice, b.dataset.clRef)));
-  body.querySelectorAll('[data-cl-hist-confirm]').forEach(b =>
-    b.addEventListener('click', () => clHistDownload(b, 'confirmation', b.dataset.clHistConfirm, b.dataset.clRef)));
-  body.querySelectorAll('[data-cl-hist-ticket]').forEach(b =>
-    b.addEventListener('click', () => clHistTickets(b.dataset.clHistTicket, b.dataset.clRef)));
+  body.querySelectorAll('[data-cl-hist-docs]').forEach(b =>
+    b.addEventListener('click', () => clHistDocuments(
+      b.dataset.clHistDocs, b.dataset.clRef,
+      b.dataset.clGenerated === '1', b.dataset.clOutcome)));
 }
 
 function clHistoryRow(r) {
@@ -389,14 +394,12 @@ function clHistoryRow(r) {
       <div class="cl-kpi-sub">${escapeHtml(clHistPaymentNote(r))}</div></td>
     <td>${clTag(r.status, CL_HISTORY_LABELS[r.status] || r.status_label)}</td>
     <td class="cl-actions">
-      <button type="button" class="cl-btn cl-btn-sm" data-cl-hist-view="${r.id}">View</button>
-      ${ticketable ? `
-        <button type="button" class="cl-btn cl-btn-sm" data-cl-hist-ticket="${r.id}"
-          data-cl-ref="${escapeHtml(r.request_number || '')}">Ticket</button>
-        <button type="button" class="cl-btn cl-btn-sm" data-cl-hist-invoice="${r.id}"
-          data-cl-ref="${escapeHtml(r.request_number || '')}">Invoice</button>
-        <button type="button" class="cl-btn cl-btn-sm" data-cl-hist-confirm="${r.id}"
-          data-cl-ref="${escapeHtml(r.request_number || '')}">Confirmation</button>` : ''}
+      <button type="button" class="cl-btn cl-btn-sm cl-btn-quiet" data-cl-hist-view="${r.id}">View Booking</button>
+      <button type="button" class="cl-btn cl-btn-sm" data-cl-hist-docs="${r.id}"
+        data-cl-ref="${escapeHtml(r.request_number || '')}"
+        data-cl-generated="${ticketable ? '1' : ''}"
+        data-cl-outcome="${escapeHtml(r.status || '')}"
+        >${clIco('file', { size: 14 })}View Documents</button>
     </td>
   </tr>`;
 }
@@ -411,81 +414,259 @@ function clHistPaymentNote(r) {
   return 'settled';
 }
 
-/* ------------------------------------------------------------- downloads */
+/* ------------------------------------------------------------- documents */
 
-/* One code path for both PDFs. The button reports its own progress rather than
-   a page-level message: on a table of 25 rows a global "downloading…" tells you
-   nothing about which row you pressed. */
-async function clHistDownload(btn, kind, id, reference) {
-  const label = btn.textContent;
-  btn.disabled = true;
-  btn.classList.add('loading');
+/* THE DOCUMENT TRAY.
+   ===========================================================================
+   One button on the row — View Documents — opening one dialog that holds every
+   paper this booking can produce. It replaced three separate row buttons
+   (Ticket / Invoice / Confirmation) which put nine controls in a 25-row table
+   and still could not say whether any of them would work: the ticket buttons
+   appeared on every ticketed booking whether or not our desk had attached a
+   file, so a merchant found out by pressing one and reading an empty list.
+
+   NOTHING ABOUT THE DOWNLOADS CHANGED. Invoice and Confirmation are the same
+   two calls as before — generated on demand from the booking, its passengers
+   and its payments, so a refund recorded a minute ago is already in them — and
+   both 409 on a booking that is not ticketed or completed, which is exactly the
+   `generated` flag the row passes in. The ticket files are still
+   `GET /api/requests/{id}/tickets`. What is new is presentation: the two verbs
+   a merchant actually wants are now BOTH offered, and an unavailable document
+   says so instead of being silently missing.
+
+   VIEW AND DOWNLOAD ARE THE SAME BYTES. Every one of these is fetched with the
+   bearer token and handed to the browser as an object URL — a plain href cannot
+   authenticate. The only difference between the two verbs is whether the
+   anchor carries `download`.
+
+   AVAILABILITY IS RESOLVED IN TWO SPEEDS. Invoice and Confirmation are known
+   from the row's status before the dialog opens. The ticket is not knowable
+   without asking, so its row opens in a checking state and settles when
+   /tickets answers — the dialog is useful immediately either way. */
+
+const CL_DOC_KINDS = [
+  {
+    key: 'ticket', label: 'E-ticket', icon: 'ticket',
+    note: 'The airline’s own document, attached by our desk once the ticket is issued.',
+    /* Not "this booking is not ticketed": the desk may simply not have
+       attached the airline's file yet on a booking that IS ticketed. */
+    absent: 'Our desk has not attached the airline’s file to this booking yet.',
+  },
+  {
+    key: 'invoice', label: 'Invoice', icon: 'receipt',
+    note: 'Generated fresh from this booking, its passengers and its payments.',
+    absent: 'Available once the booking has been ticketed.',
+  },
+  {
+    key: 'confirmation', label: 'Booking confirmation', icon: 'file',
+    note: 'The itinerary and travellers exactly as we hold them.',
+    absent: 'Available once the booking has been ticketed.',
+  },
+];
+
+/* One row of the tray. `inner` is whatever sits on the right — the pair of
+   verbs, the Not Available badge, or a spinner while we find out. */
+function clDocRow(kind, inner, { off = false, note = null, sub = '' } = {}) {
+  return `<li class="cl-doc${off ? ' cl-doc-off' : ''}" data-cl-doc-row="${kind.key}">
+    <span class="cl-doc-ico">${clIco(kind.icon, { size: 20 })}</span>
+    <span class="cl-doc-meta">
+      <b>${escapeHtml(kind.label)}</b>
+      <span>${escapeHtml(note ?? kind.note)}</span>
+    </span>
+    ${inner}
+    ${sub}
+  </li>`;
+}
+
+/* The two verbs. `docId` names a specific ticket file — Invoice and
+   Confirmation are generated and have neither an id nor a server-side name, so
+   those two fall back to `<reference>-<kind>.pdf` at save time. */
+function clDocVerbs(kindKey, docId = '', fileName = '') {
+  const attrs = `data-cl-doc-kind="${kindKey}" data-cl-doc-id="${escapeHtml(String(docId))}"`
+    + ` data-cl-doc-name="${escapeHtml(fileName)}"`;
+  return `<span class="cl-doc-actions">
+    <button type="button" class="cl-btn cl-btn-sm" data-cl-doc-act="view" ${attrs}
+      >${clIco('eye', { size: 14 })}View</button>
+    <button type="button" class="cl-btn cl-btn-sm" data-cl-doc-act="download" ${attrs}
+      >${clIco('download', { size: 14 })}Download</button>
+  </span>`;
+}
+
+const clDocNa = () =>
+  `<span class="cl-doc-na">${clIco('x', { size: 13 })}Not Available</span>`;
+
+const clDocChecking = () =>
+  `<span class="cl-doc-na"><span class="cl-spin"></span>Checking…</span>`;
+
+async function clHistDocuments(id, reference, generated, outcome) {
+  const kinds = Object.fromEntries(CL_DOC_KINDS.map(k => [k.key, k]));
+
+  /* "Available once the booking has been ticketed" is true of a booking that
+     still might be, and a lie to one that never will. A cancelled or refused
+     booking is told the ending it actually reached. */
+  const closed = outcome === 'cancelled' || outcome === 'rejected';
+  const absent = closed
+    ? `Not generated for a booking that ${outcome === 'cancelled' ? 'was cancelled' : 'was not confirmed'}.`
+    : null;
+
+  clOpenModal(`Documents — ${reference || 'booking'}`, `
+    <p class="cl-muted" style="margin:0 0 14px;font-size:12.5px;line-height:1.6;">
+      Everything this booking can produce. <b>View</b> opens the PDF in a new tab;
+      <b>Download</b> saves it.
+    </p>
+    <ul class="cl-docs" id="clDocList">
+      ${clDocRow(kinds.ticket, clDocChecking())}
+      ${generated
+        ? clDocRow(kinds.invoice, clDocVerbs('invoice'))
+        : clDocRow(kinds.invoice, clDocNa(), { off: true, note: absent ?? kinds.invoice.absent })}
+      ${generated
+        ? clDocRow(kinds.confirmation, clDocVerbs('confirmation'))
+        : clDocRow(kinds.confirmation, clDocNa(), { off: true, note: absent ?? kinds.confirmation.absent })}
+    </ul>
+    <div class="cl-msg" id="clDocMsg"></div>`,
+    '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+
+  clDocBind(id, reference);
+
+  /* The ticket row, once we know. Guarded on the dialog still being open: a
+     merchant who closed it before /tickets answered must not have a stale row
+     written into whatever dialog is there now. */
+  let ticketRowHtml;
   try {
-    const blob = kind === 'invoice'
-      ? await MerchantApi.downloadInvoice(id)
-      : await MerchantApi.downloadConfirmation(id);
-    const url = URL.createObjectURL(blob);
+    const data = await MerchantApi.listTicketDocuments(id);
+    const docs = (data.items || data || []).filter(Boolean);
+    ticketRowHtml = !docs.length
+      ? clDocRow(kinds.ticket, clDocNa(), { off: true, note: kinds.ticket.absent })
+      : docs.length === 1
+        ? clDocRow(kinds.ticket,
+          clDocVerbs('ticket', docs[0].id ?? docs[0].document_id, clDocFileName(docs[0])), {
+            note: clDocFileNote(docs[0], kinds.ticket),
+          })
+        /* More than one file: the verbs cannot mean "the ticket" any more, so
+           they move down on to each file and the row above just counts them. */
+        : clDocRow(kinds.ticket, '', {
+          note: `${docs.length} files attached by our desk.`,
+          sub: `<ul class="cl-doc-sub">${docs.map(doc => {
+            const name = clDocFileName(doc) || clLabel(doc.doc_type || 'Document');
+            return `<li>
+              <span class="cl-doc-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+              ${clDocVerbs('ticket', doc.id ?? doc.document_id, clDocFileName(doc))}
+            </li>`;
+          }).join('')}</ul>`,
+        });
+  } catch (err) {
+    ticketRowHtml = clDocRow(kinds.ticket, clDocNa(), {
+      off: true, note: clError(err, 'The ticket documents could not be listed.'),
+    });
+  }
+
+  const row = $('clDocList')?.querySelector('[data-cl-doc-row="ticket"]');
+  if (!row) return;                              /* dialog closed, or replaced */
+  row.outerHTML = ticketRowHtml;
+  clDocBind(id, reference);
+}
+
+/* THE FIELD IS `original_filename`, NOT `file_name`.
+   ===========================================================================
+   `GET /api/requests/{id}/tickets` returns a bare ARRAY (no `Page` envelope) of
+   documents shaped `{id, doc_type, original_filename, created_at, size_bytes,
+   content_type, …}`. The screen this replaced read `file_name` and
+   `uploaded_at`, neither of which exists on that payload — so every attachment
+   rendered as the bare word "Ticket" with no date. Both spellings are accepted
+   here because `listDocuments` is a different endpoint and this helper is one
+   rename away from being pointed at it. */
+function clDocFileName(doc) {
+  return doc.original_filename || doc.file_name || '';
+}
+
+/* The desk's own filename, when it told us one, plus how big it is and when it
+   landed. Falls back to the kind's standing description rather than to a
+   restatement of the row's own title. */
+function clDocFileNote(doc, kind) {
+  const name = clDocFileName(doc);
+  if (!name) return kind.note;
+  const when = doc.created_at || doc.uploaded_at;
+  return [name, clDocSize(doc.size_bytes), when ? `attached ${fmtDate(when)}` : null]
+    .filter(Boolean).join(' · ');
+}
+
+function clDocSize(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* Re-bound after the ticket row settles. Cheap and idempotent — the handler is
+   attached per element and every element it finds is freshly rendered. */
+function clDocBind(id, reference) {
+  $('clDocList')?.querySelectorAll('[data-cl-doc-act]').forEach(b => {
+    if (b.dataset.clDocBound) return;
+    b.dataset.clDocBound = '1';
+    b.addEventListener('click', () => clDocFetch(b, {
+      id, reference,
+      kind: b.dataset.clDocKind,
+      docId: b.dataset.clDocId,
+      fileName: b.dataset.clDocName,
+      mode: b.dataset.clDocAct,
+    }));
+  });
+}
+
+/* Hand the bytes to the browser. Returns false only when a pop-up blocker ate
+   the new tab, which is the one failure that leaves no trace on screen. */
+function clDocPresent(url, filename, mode) {
+  if (mode === 'download') {
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${reference || 'booking'}-${kind}.pdf`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    /* Revoked on the next tick — revoking synchronously can cancel the download
-       in some browsers before they have read the blob. */
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    clMsg($('clHistMsg'), `${clLabel(kind)} for ${reference} downloaded.`, 'ok');
+    return true;
+  }
+  return !!window.open(url, '_blank', 'noopener');
+}
+
+/* One code path for all three kinds and both verbs. The button reports its own
+   progress: on a tray of three rows a dialog-level "working…" does not say
+   which one you pressed. */
+async function clDocFetch(btn, { id, reference, kind, docId, fileName, mode }) {
+  const msg = $('clDocMsg');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  clMsg(msg, '');
+  try {
+    /* downloadDocument hands back an object URL (the server names the file);
+       the two generated PDFs hand back a Blob and we name them. */
+    const url = kind === 'ticket'
+      ? await MerchantApi.downloadDocument(docId)
+      : URL.createObjectURL(kind === 'invoice'
+        ? await MerchantApi.downloadInvoice(id)
+        : await MerchantApi.downloadConfirmation(id));
+
+    /* The desk's own filename when there is one, so a saved e-ticket keeps the
+       name the airline gave it; the generated pair are named after the row. */
+    const ok = clDocPresent(url, fileName || `${reference || 'booking'}-${kind}.pdf`, mode);
+
+    /* Revoked late, not on the next tick: a tab opened on this URL is still
+       reading from it, and revoking underneath a PDF viewer blanks it. The
+       download path is finished with it immediately but shares the timer —
+       one minute of a held blob is not worth a second code path. */
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+    clMsg(msg, ok
+      ? (mode === 'download'
+        ? `${clLabel(kind)} for ${reference} downloaded.`
+        : `${clLabel(kind)} opened in a new tab.`)
+      : 'Your browser blocked the new tab. Use Download instead, or allow pop-ups for this site.',
+      ok ? 'ok' : 'warn');
   } catch (err) {
-    clMsg($('clHistMsg'), clError(err, `Could not generate the ${kind}.`), 'err');
+    clMsg(msg, clError(err, `Could not fetch the ${kind}.`), 'err');
   } finally {
     btn.disabled = false;
     btn.classList.remove('loading');
-    btn.textContent = label;
-  }
-}
-
-/* The airline's own files. A narrower list than every document on the booking:
-   the merchant should only ever be offered the paperwork it is meant to have. */
-async function clHistTickets(id, reference) {
-  clOpenModal(`Ticket documents — ${reference}`,
-    `<div style="text-align:center;padding:30px 0;"><span class="cl-spin cl-spin-lg"></span></div>`,
-    '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
-  try {
-    const data = await MerchantApi.listTicketDocuments(id);
-    const docs = data.items || data || [];
-    $('clModalBody').innerHTML = docs.length
-      ? `<ul class="cl-files">${docs.map(doc => `<li class="cl-file">
-          <span class="cl-file-ico">${escapeHtml((doc.file_name || 'PDF').split('.').pop().slice(0, 4).toUpperCase())}</span>
-          <span class="cl-file-meta">
-            <b>${escapeHtml(doc.file_name || doc.doc_type || 'Document')}</b>
-            <span>${escapeHtml(clLabel(doc.doc_type || ''))}${doc.uploaded_at ? ` · ${fmtDate(doc.uploaded_at)}` : ''}</span>
-          </span>
-          <button type="button" class="cl-btn cl-btn-sm" data-cl-doc="${doc.id ?? doc.document_id}">
-            ${clIco('download', { size: 14 })} Download</button>
-        </li>`).join('')}</ul>`
-      : `<div class="cl-blank"><span class="cl-blank-ico">${clIco('file', { size: 26 })}</span>
-          <b>No ticket documents yet</b>
-          <p>Our desk attaches the airline's files once the ticket is issued. The Confirmation PDF
-             above is always available and is generated from the booking itself.</p></div>`;
-
-    $('clModalBody').querySelectorAll('[data-cl-doc]').forEach(b =>
-      b.addEventListener('click', async () => {
-        b.disabled = true;
-        try {
-          const url = await MerchantApi.downloadDocument(b.dataset.clDoc);
-          window.open(url, '_blank', 'noopener');
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
-        } catch (err) {
-          clOpenModal('Download failed',
-            `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Could not download that file.'))}</div>`,
-            '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
-        } finally {
-          b.disabled = false;
-        }
-      }));
-  } catch (err) {
-    $('clModalBody').innerHTML = `<div class="cl-msg cl-msg-err" style="margin-top:0">${
-      escapeHtml(clError(err, 'Could not load the ticket documents.'))}</div>`;
   }
 }
 

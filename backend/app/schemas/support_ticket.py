@@ -31,7 +31,12 @@ Category = Literal[
 
 
 class OpenChatRequest(BaseModel):
-    subject: str = Field(min_length=1, max_length=200)
+    #: OPTIONAL, deliberately. Requiring a subject put a form in front of a
+    #: merchant who only wanted to say what had gone wrong — the wrong thing to
+    #: ask for on the one screen where someone is already having a bad day.
+    #: When it is blank the service derives a title from the first message, so
+    #: the desk's queue stays scannable; see chat_service.derive_thread_title.
+    subject: str | None = Field(default=None, max_length=200)
     message: str = Field(min_length=1, max_length=4000)
     category: Category | None = None
     #: A merchant's opening assessment. The desk can overrule it through

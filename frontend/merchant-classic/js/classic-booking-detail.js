@@ -92,7 +92,7 @@ function clRenderBookingDetail() {
     ${returned ? `<div class="cl-msg cl-msg-warn" style="margin:0 0 16px;">
       <b>Returned for correction${d.manager_returned_by ? ` by ${escapeHtml(d.manager_returned_by)}` : ''}:</b>
       ${escapeHtml(d.manager_remarks)}
-      <div style="margin-top:6px;">Open <b>Request Ticket</b> to correct the traveller details, then resubmit.</div>
+      <div style="margin-top:6px;">Open <b>Raise Booking</b> on the enquiry to correct the traveller details, then resubmit.</div>
     </div>` : ''}
 
     <div class="cl-kpis">

@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260802ui1">
+<link rel="stylesheet" href="css/classic.css?v=20260802sc2">
 </head>
 <body>
 
@@ -223,11 +223,21 @@
       </a>
 
       <div class="cl-side-group">Operations</div>
-      <a href="#" data-cl-nav="requests">
-        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-        <span class="cl-side-label">My Requests</span>
-        <span class="cl-side-pill" id="clNavRequestsCount"></span>
-      </a>
+      <!-- MY REQUESTS IS NOT IN THIS RAIL, AND THE SCREEN IS STILL THERE.
+           Removed from navigation only: `cl-requests`, its loader and
+           CL_TITLES['requests'] are untouched, so clGo('requests') still
+           works and every existing route into it still lands. The routes
+           that remain are the Dashboard's "Booking requests" and "Requests
+           in progress" tiles, the "Anything still moving is on My Requests"
+           link on Booking History, the same link on Service Requests, and
+           every row action that opens a booking's detail.
+
+           No replacement entry was added: Booking History already carries
+           the closed side of the same table, and a second rail item leading
+           to a filtered view of it is the duplication this removal was
+           asking us to avoid. clGo simply finds no rail link to mark
+           active, which it already tolerates — booking-detail has been in
+           that position since it was built. -->
       <!-- CR-3 — only the merchant's approvers see this; revealed by
            classic-shell.js once the session's permissions are known. -->
       <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;">
@@ -362,22 +372,22 @@
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
 <script src="../assets/js/travel-locations.js?v=20260730b"></script>
-<script src="js/classic-shell.js?v=20260802ui1"></script>
-<script src="../shared/merchant-api.js?v=20260802ui1"></script>
-<script src="js/classic-icons.js?v=20260802ui1"></script>
-<script src="js/classic-dashboard.js?v=20260802ui1"></script>
-<script src="js/classic-enquiry.js?v=20260802ui1"></script>
-<script src="js/classic-booking.js?v=20260802ui1"></script>
-<script src="js/classic-booking-detail.js?v=20260802ui1"></script>
-<script src="js/classic-requests.js?v=20260802ui1"></script>
-<script src="js/classic-history.js?v=20260802ui1"></script>
-<script src="js/classic-approvals.js?v=20260802ui1"></script>
-<script src="js/classic-wallet.js?v=20260802ui1"></script>
-<script src="js/classic-payments.js?v=20260802ui1"></script>
-<script src="js/classic-service.js?v=20260802ui1"></script>
-<script src="js/classic-reports.js?v=20260802ui1"></script>
-<script src="js/classic-account.js?v=20260802ui1"></script>
-<script src="js/classic-support.js?v=20260802ui1"></script>
+<script src="js/classic-shell.js?v=20260802ui3"></script>
+<script src="../shared/merchant-api.js?v=20260802ui2"></script>
+<script src="js/classic-icons.js?v=20260802ui3"></script>
+<script src="js/classic-dashboard.js?v=20260802ui3"></script>
+<script src="js/classic-enquiry.js?v=20260802ui3"></script>
+<script src="js/classic-booking.js?v=20260802ui3"></script>
+<script src="js/classic-booking-detail.js?v=20260802ui3"></script>
+<script src="js/classic-requests.js?v=20260802ui3"></script>
+<script src="js/classic-history.js?v=20260802ui5"></script>
+<script src="js/classic-approvals.js?v=20260802ui3"></script>
+<script src="js/classic-wallet.js?v=20260802ui3"></script>
+<script src="js/classic-payments.js?v=20260802ui3"></script>
+<script src="js/classic-service.js?v=20260802ui3"></script>
+<script src="js/classic-reports.js?v=20260802ui3"></script>
+<script src="js/classic-account.js?v=20260802ui3"></script>
+<script src="js/classic-support.js?v=20260802sc2"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();
