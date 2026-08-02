@@ -47,6 +47,14 @@ readonly REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly COMPOSE_DIR="${REPO_DIR}/deploy"
 readonly HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"
 
+# Exported once, for *every* compose call below rather than per-command.
+# Amazon Linux 2023 ships the docker engine alone — no buildx — so any compose
+# invocation that builds dies with "compose build requires buildx 0.17.0 or
+# later" unless this selects the classic builder. Setting it on the `build`
+# step only is what broke the first run of this script: `up -d --build` builds
+# too, missed the prefix, and failed after the image had already been built.
+export DOCKER_BUILDKIT=0
+
 printf '%s\n' "${BOLD}JackPots World — production redeploy${OFF}"
 info "repository: ${REPO_DIR}"
 
@@ -107,13 +115,14 @@ fi
 # --------------------------------------------------------------------------
 # 3. Build the image
 # --------------------------------------------------------------------------
-# DOCKER_BUILDKIT=0 matches docs/AWS_DEPLOYMENT.md: BuildKit needs more memory
-# than a t3.micro reliably has, and it fails in a way that reads like a broken
+# The classic builder comes from the DOCKER_BUILDKIT=0 exported at the top,
+# which also matches docs/AWS_DEPLOYMENT.md: BuildKit needs more memory than a
+# small instance reliably has, and it fails in a way that reads like a broken
 # Dockerfile rather than an out-of-memory kill.
 step "3/6  Building the image"
 info "this takes a few minutes on a small instance"
 
-DOCKER_BUILDKIT=0 docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" build app \
+docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --project-directory "${COMPOSE_DIR}" build app \
   || fail "The image build failed. Nothing was restarted — the previous version is still serving."
 ok "image built"
 
