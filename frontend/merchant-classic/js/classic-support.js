@@ -19,23 +19,37 @@
 
    - REAL, from the API: the threads, every message and its direction and
      sender name, `status` with its chat-specific label (Open / In Progress /
-     Resolved), `assigned_admin`, `message_count`, `last_message_at`, and the
-     count of threads awaiting a response.
-   - DERIVED, and labelled as such: the read receipt (a single tick when the
-     server has the message; a double tick once the thread has been claimed or
-     an agent has replied after it — both are evidence someone has read it, not
-     a `seen_at` column); the "agent is responding" indicator (shown when the
-     thread is In Progress, an admin holds it, and the last message is the
-     merchant's); and online/offline, which is the published business-hours
+     Resolved), `assigned_admin` and the operator's name, `priority`,
+     `category`, the linked booking, `message_count`, `attachment_count`,
+     `last_message_at`, `can_reopen`, the count of threads awaiting a response,
+     the FILES shared on the thread, and the READ RECEIPT — `is_read` per
+     message, set when the other side actually opens the conversation.
+   - DERIVED, and labelled as such: the "agent is responding" indicator (shown
+     when the thread is In Progress, an admin holds it, and the last message is
+     the merchant's); and online/offline, which is the published business-hours
      window and nothing more.
-   - NOT AVAILABLE, and therefore not faked: a per-thread PRIORITY field (the
-     open-chat payload takes a subject and a message only) and FILE UPLOAD on
-     this channel — `POST /api/requests/{id}/documents` accepts a merchant's
-     upload only while the request is a DRAFT BOOKING (409 otherwise), and a
-     chat thread is neither. The attachment tray below is therefore a real,
-     working staging area — validation, preview, progress, removal — that hands
-     the file list to the desk in the message and points at the two channels
-     that genuinely accept a file. It does not pretend to upload.
+
+   TWO THINGS THIS FILE USED TO SAY WERE IMPOSSIBLE, AND NO LONGER ARE.
+   It previously documented PRIORITY and FILE UPLOAD as unavailable, and it was
+   right at the time: the open-chat payload took a subject and a message only,
+   and `POST /api/requests/{id}/documents` accepts a merchant's upload just
+   while the request is a DRAFT BOOKING (409 otherwise), which a chat thread
+   never is. Both are now first-class:
+
+     * `priority` was always a column on the row a thread is — it was simply
+       never set. The merchant gives an opening assessment; the desk re-files it
+       through /triage, which is why the value here is not editable after the
+       fact by the person who raised it.
+     * files go to `POST /api/support/threads/{id}/documents`, which runs the
+       same allowlist, magic-byte sniff and streaming size cap as a passport
+       scan, and posts its own line into the transcript. Downloads come back
+       through `/api/documents/{id}/download` with the bearer token, so an
+       attachment is never a plain href.
+
+   The old tray staged files and listed their NAMES to the desk. Anything it
+   validated, this still validates — the difference is that the file now
+   actually arrives, so the copy no longer points at WhatsApp as the only
+   channel that can carry one.
 
    THERE IS NO WEBSOCKET, so "live" is a poll: every CL_CHAT_POLL_MS while a
    conversation is open and the tab is visible. Polling stops when the screen is
@@ -54,21 +68,60 @@ const CL_SUPPORT_ADDRESS = 'JackPots World Tours & Travels, Road No. 36, Jubilee
 const CL_SUPPORT_HOURS = { days: [1, 2, 3, 4, 5, 6], from: 9, to: 19, text: '09:00 – 19:00 IST, Mon–Sat' };
 
 const CL_CHAT_POLL_MS = 9000;
-/* Client-side ceiling on a staged attachment. The desk's own limits apply on
-   whichever channel actually carries the file; this stops a 200 MB video being
-   read into memory for a preview. */
+/* Client-side ceiling, checked before a file is read into memory for a preview.
+   The server enforces its own cap while streaming and is the real authority —
+   this exists so a 200 MB video fails instantly instead of after an upload. */
 const CL_FILE_MAX_MB = 15;
-const CL_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'application/zip',
-  'application/x-zip-compressed', 'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+/* EXACTLY what document_service.ALLOWED_CONTENT_TYPES accepts. This list used
+   to be wider (zip, doc, docx) because nothing was ever uploaded and the tray
+   was a staging area. Now that the file really goes, anything outside these
+   four is a 415 from the server — so it is refused here, with a sentence that
+   explains it, rather than after the upload. */
+const CL_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+/* The server's eight categories (chat_service.CATEGORIES). Anything else is a
+   400, so this list drives the picker rather than free text. */
+const CL_CATEGORIES = [
+  ['booking', 'Booking'],
+  ['payment', 'Payment'],
+  ['wallet', 'Wallet'],
+  ['refund', 'Refund'],
+  ['ticket_issue', 'Ticket Issue'],
+  ['account', 'Account'],
+  ['technical', 'Technical'],
+  ['other', 'Other'],
+];
+
+/* An opening assessment, not a promise. The desk re-files priority through
+   /triage — see the note in the new-conversation modal, which says so plainly
+   rather than letting a merchant think "Urgent" jumps the queue. */
+const CL_PRIORITIES = [
+  ['low', 'Low', 'ok'],
+  ['normal', 'Normal', 'info'],
+  ['high', 'High', 'warn'],
+  ['urgent', 'Urgent', 'err'],
+];
+const CL_PRIORITY_TONE = { low: 'ok', normal: 'info', high: 'warn', urgent: 'err' };
+
+/* The line chat_service.attach_document posts for every upload. Matching it is
+   what lets an attachment render as a file card inside the conversation
+   instead of as the words "Shared a file: invoice.pdf". Kept in step with the
+   server string — if that message ever changes, the bubbles quietly fall back
+   to plain text rather than breaking, which is the right failure. */
+const CL_FILE_MSG = /^Shared a file:\s*(.+)$/;
 
 let clChatThreads = [];
 let clChatOpenId = null;
 let clChatMessages = [];
+let clChatDocs = [];           /* files shared on the open thread */
 let clChatThread = null;
 let clChatTimer = null;
 let clChatFilter = '';
-let clChatFiles = [];          /* staged attachments; object URLs revoked on clear */
+let clChatCategory = '';
+let clChatPriority = '';
+let clChatSearch = '';
+let clChatSearchTimer = null;
+let clChatFiles = [];          /* queued attachments; object URLs revoked on clear */
 let clFaqQuery = '';
 
 /* ===================================================================== page */
@@ -116,6 +169,9 @@ function clInitSupport() {
             <button type="button" class="cl-emoji-btn" id="clEmojiBtn" aria-label="Insert an emoji"
                     aria-haspopup="true" aria-expanded="false">☺</button>
             <div class="cl-emoji-pop" id="clEmojiPop" role="menu" aria-label="Emoji"></div>
+            <button type="button" class="cl-emoji-btn" id="clChatClip" aria-label="Attach a file">
+              ${clIco('paperclip', { size: 17 })}
+            </button>
             <label class="cl-sr" for="clChatInput">Your message</label>
             <textarea id="clChatInput" rows="1" placeholder="Write a message…" disabled></textarea>
             <button type="button" class="cl-chat-send" id="clChatSend" disabled aria-label="Send message">
@@ -139,6 +195,29 @@ function clInitSupport() {
               <button type="button" data-cl-chat-tab="submitted" role="tab" aria-selected="false">Open</button>
               <button type="button" data-cl-chat-tab="in_review" role="tab" aria-selected="false">In progress</button>
               <button type="button" data-cl-chat-tab="completed" role="tab" aria-selected="false">Resolved</button>
+            </div>
+
+            <!-- Search runs on the SERVER, which also matches message bodies —
+                 filtering the page already in hand would only ever find the
+                 subjects of the fifty threads currently loaded. -->
+            <label class="cl-sr" for="clChatSearch">Search your tickets</label>
+            <input type="search" id="clChatSearch" style="margin-top:10px;"
+                   placeholder="Search subject, reference, or anything said…">
+            <div class="cl-form cl-form-2" style="margin-top:10px;">
+              <div class="cl-field">
+                <label class="cl-sr" for="clChatCatFilter">Category</label>
+                <select id="clChatCatFilter">
+                  <option value="">All categories</option>
+                  ${CL_CATEGORIES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                </select>
+              </div>
+              <div class="cl-field">
+                <label class="cl-sr" for="clChatPriFilter">Priority</label>
+                <select id="clChatPriFilter">
+                  <option value="">Any priority</option>
+                  ${CL_PRIORITIES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                </select>
+              </div>
             </div>
           </div>
           <div class="cl-panel-body cl-flush" style="padding:0 12px 12px;">
@@ -208,6 +287,26 @@ function clInitSupport() {
       });
       clLoadChatThreads();
     }));
+
+  /* Debounced: every keystroke is a round trip that also scans message bodies,
+     and firing one per character would have the server matching "r", "re",
+     "ref"… before the merchant has finished typing "refund". */
+  $('clChatSearch').addEventListener('input', e => {
+    const value = e.target.value.trim();
+    clearTimeout(clChatSearchTimer);
+    clChatSearchTimer = setTimeout(() => {
+      clChatSearch = value;
+      clLoadChatThreads();
+    }, 300);
+  });
+  $('clChatCatFilter').addEventListener('change', e => {
+    clChatCategory = e.target.value;
+    clLoadChatThreads();
+  });
+  $('clChatPriFilter').addEventListener('change', e => {
+    clChatPriority = e.target.value;
+    clLoadChatThreads();
+  });
 
   clBindComposer();
   clBindEmoji();
@@ -302,19 +401,29 @@ async function clLoadChatThreads() {
 
   try {
     const data = await MerchantApi.listSupportThreads({
-      status: clChatFilter || undefined, pageSize: 50,
+      status: clChatFilter || undefined,
+      category: clChatCategory || undefined,
+      priority: clChatPriority || undefined,
+      q: clChatSearch || undefined,
+      pageSize: 50,
     });
     clChatThreads = data.items || [];
     $('clChatCount').textContent = `${data.total ?? clChatThreads.length} total`;
 
+    /* Any of the four narrows the list, so the empty state has to speak to
+       whichever one is actually responsible — "try another tab" is unhelpful
+       advice when what is hiding everything is a search term. */
+    const narrowed = clChatFilter || clChatCategory || clChatPriority || clChatSearch;
     host.innerHTML = clChatThreads.length
       ? clChatThreads.map(clThreadCard).join('')
       : `<div class="cl-blank" style="padding:34px 12px;">
           <span class="cl-blank-ico">${clIco('chat', { size: 24 })}</span>
-          <b>${clChatFilter ? 'Nothing here' : 'No conversations yet'}</b>
-          <p>${clChatFilter
-            ? 'Try another tab — your other tickets are still there.'
-            : 'Start one and it becomes a tracked ticket you can come back to.'}</p></div>`;
+          <b>${narrowed ? 'Nothing matches' : 'No conversations yet'}</b>
+          <p>${clChatSearch
+            ? `No ticket mentions “${escapeHtml(clChatSearch)}” — the search covers subjects, references and everything said in a conversation.`
+            : narrowed
+              ? 'Clear a filter — your other tickets are still there.'
+              : 'Start one and it becomes a tracked ticket you can come back to.'}</p></div>`;
 
     host.querySelectorAll('[data-cl-thread]').forEach(el =>
       el.addEventListener('click', () => clLoadChatThread(el.dataset.clThread)));
@@ -439,8 +548,12 @@ async function clMeasureFirstReply() {
 
   let gaps = [];
   try {
+    /* `markRead: false` — this is a measurement, not the merchant opening
+       anything. Without it, loading the Support Center would mark the desk's
+       messages read on the six most recent threads and hand the operator a
+       receipt nobody earned. */
     const details = await Promise.all(
-      sample.map(t => MerchantApi.getSupportThread(t.id).catch(() => null)));
+      sample.map(t => MerchantApi.getSupportThread(t.id, { markRead: false }).catch(() => null)));
     gaps = details.map(d => {
       const messages = d?.messages || [];
       const mine = messages.find(m => clIsOutgoing(m));
@@ -476,9 +589,11 @@ function clDuration(ms) {
   return `${days} day${days === 1 ? '' : 's'}`;
 }
 
-/* How long a thread has gone without an answer. This is the closest honest
-   thing to a priority: the payload has no priority field, and a made-up
-   High/Medium/Low that the desk never set would be worse than nothing. */
+/* How long a thread has gone without an answer. It sits BESIDE priority rather
+   than standing in for it, which is what it used to do when the payload had no
+   priority field: priority is what the ticket was filed as, this is what has
+   actually happened to it since, and a merchant chasing an answer cares about
+   the second one. */
 function clThreadWaiting(t) {
   const since = t.last_message_at || t.created_at;
   if (t.status === 'completed') return { text: 'Resolved', tone: 'ok' };
@@ -493,15 +608,24 @@ const CL_CHAT_TONE = { submitted: 'warn', in_review: 'info', completed: 'ok' };
 function clThreadCard(t) {
   const waiting = clThreadWaiting(t);
   const active = String(t.id) === String(clChatOpenId);
+  /* Normal is the default the server applies when nobody chose, so showing it
+     would put a chip reading "Normal" on almost every card and turn the one
+     that says Urgent into just more grey. Only a deviation is worth the ink. */
+  const priority = t.priority && t.priority !== 'normal' ? t.priority : '';
+  const files = t.attachment_count || 0;
+
   return `<div class="cl-note${active ? ' unread' : ''}" data-cl-thread="${t.id}" role="button" tabindex="0"
                aria-label="${escapeHtml(`${t.title || 'Conversation'}, ${t.status_label}`)}">
     <b>${escapeHtml(t.title || 'Conversation')}</b>
     <div class="cl-chip-row" style="margin:6px 0 4px;">
       <span class="cl-tag cl-tag-${CL_CHAT_TONE[t.status] || 'info'}">${escapeHtml(t.status_label || clLabel(t.status))}</span>
+      ${priority ? `<span class="cl-tag cl-tag-${CL_PRIORITY_TONE[priority] || 'info'}">${escapeHtml(clLabel(priority))}</span>` : ''}
+      ${t.category_label ? `<span class="cl-tag cl-tag-plain">${escapeHtml(t.category_label)}</span>` : ''}
       <span class="cl-tag cl-tag-${waiting.tone} cl-tag-plain">${escapeHtml(waiting.text)}</span>
     </div>
     <span class="cl-ref">${escapeHtml(t.request_number || '')}</span>
     · ${t.message_count} message${t.message_count === 1 ? '' : 's'}
+    ${files ? ` · ${files} file${files === 1 ? '' : 's'}` : ''}
     ${t.assigned_admin ? ' · assigned' : ''}
     <time>${escapeHtml(fmtDateTime(t.last_message_at || t.created_at))}</time>
   </div>`;
@@ -521,6 +645,7 @@ async function clLoadChatThread(id, { quiet = false } = {}) {
 
     clChatThread = data.thread;
     clChatMessages = data.messages || [];
+    clChatDocs = data.documents || [];
     clRenderChatHead();
     clRenderChatLog();
     clRenderTicketInfo();
@@ -551,6 +676,9 @@ function clRenderChatHead() {
     <div class="cl-panel-tools">
       <span class="cl-presence ${online && !resolved ? 'online' : ''}">
         ${resolved ? 'Closed' : online ? 'Desk online' : 'Outside hours'}</span>
+      ${resolved && t.can_reopen
+        ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" id="clChatReopen">
+             ${clIco('refresh', { size: 14 })} Reopen</button>` : ''}
       <button type="button" class="cl-btn cl-btn-sm" id="clChatExport"
               title="Save this conversation as a PDF">${clIco('download', { size: 14 })} PDF</button>
       <button type="button" class="cl-btn cl-btn-sm" id="clChatRefresh"
@@ -558,14 +686,45 @@ function clRenderChatHead() {
     </div>`;
   $('clChatRefresh').addEventListener('click', () => clLoadChatThread(clChatOpenId));
   $('clChatExport').addEventListener('click', clExportChatPdf);
+  $('clChatReopen')?.addEventListener('click', clReopenChat);
 
   const box = $('clChatInput');
   const send = $('clChatSend');
   box.disabled = resolved;
   send.disabled = resolved || !box.value.trim();
+  /* `can_reopen` is the SERVER's answer, so the placeholder and the button
+     agree with the endpoint instead of the window rule being reimplemented
+     here and drifting the first time somebody changes it. */
   box.placeholder = resolved
-    ? 'This ticket is resolved — start a new conversation to continue.'
+    ? (t.can_reopen
+      ? 'This ticket is resolved — reopen it to keep talking, or start a new conversation.'
+      : 'This ticket is resolved and past the reopening window — start a new conversation.')
     : 'Write a message…';
+  clRenderUploadState();
+}
+
+/* Put a resolved ticket back in the desk's queue. The button only exists when
+   the server said `can_reopen`, so this is not expected to 409 — but it still
+   surfaces the message if it does, because the window can lapse between the
+   render and the click. */
+async function clReopenChat() {
+  const btn = $('clChatReopen');
+  if (!btn || !clChatOpenId) return;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  try {
+    await MerchantApi.reopenSupportThread(clChatOpenId);
+    await clLoadChatThread(clChatOpenId);
+    await Promise.all([clLoadChatThreads(), clLoadSupportStats()]);
+    clStartChatPoll();
+  } catch (err) {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    clOpenModal('Could not reopen this ticket',
+      `<div class="cl-msg cl-msg-err" style="margin-top:0">${
+        escapeHtml(clError(err, 'This ticket could not be reopened.'))}</div>`,
+      '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+  }
 }
 
 /* The conversation. Consecutive messages from one side are grouped, day
@@ -595,10 +754,24 @@ function clRenderChatLog() {
   /* The index of the last OUTGOING message decides where the receipt goes. */
   let lastOutIndex = -1;
   clChatMessages.forEach((m, i) => { if (clIsOutgoing(m)) lastOutIndex = i; });
-  /* Evidence the desk has read it: an operator holds the thread, or a reply
-     landed after the merchant's last message. */
-  const repliedAfter = clChatMessages.slice(lastOutIndex + 1).some(m => !clIsOutgoing(m));
-  const seen = repliedAfter || !!clChatThread?.assigned_admin;
+
+  /* Each upload posts its own "Shared a file: NAME" line, and the documents
+     arrive as a separate list. Pairing them by name and consuming each match
+     means two uploads of the same filename still land on their own bubbles in
+     order, rather than both pointing at the first document. */
+  const unclaimed = [...clChatDocs];
+  const claimDoc = (text, out) => {
+    const match = CL_FILE_MSG.exec(text || '');
+    if (!match) return null;
+    const name = match[1].trim();
+    /* `is_staff` is the uploader's side; `out` is the merchant's. They are
+       opposites, and matching on both stops a merchant's upload binding to an
+       identically named file the desk sent back. */
+    let i = unclaimed.findIndex(d => d.filename === name && d.is_staff === !out);
+    if (i < 0) i = unclaimed.findIndex(d => d.filename === name);
+    if (i < 0) return null;
+    return unclaimed.splice(i, 1)[0];
+  };
 
   let lastDay = '';
   let lastSide = '';
@@ -613,13 +786,14 @@ function clRenderChatLog() {
     }
     const grouped = lastSide === (out ? 'out' : 'in');
     lastSide = out ? 'out' : 'in';
+    const doc = claimDoc(m.message, out);
 
     block += `<div class="cl-bubble ${out ? 'out' : 'in'}${grouped ? ' grouped' : ''}">
       ${!grouped && !out ? `<div class="cl-bubble-who">${escapeHtml(m.sender_name || 'Partner desk')}</div>` : ''}
-      ${escapeHtml(m.message || '')}
+      ${doc ? clBubbleFile(doc) : escapeHtml(m.message || '')}
       <div class="cl-bubble-meta">
         ${escapeHtml(fmtTime(m.created_at))}
-        ${out && i === lastOutIndex ? clReceipt(seen) : ''}
+        ${out && i === lastOutIndex ? clReceipt(!!m.is_read) : ''}
       </div>
     </div>`;
     return block;
@@ -635,7 +809,83 @@ function clRenderChatLog() {
 
   log.innerHTML = html + (awaitingReply
     ? `<div class="cl-typing" aria-label="An operator is working on your message"><i></i><i></i><i></i></div>` : '');
+  clBindBubbleFiles(log);
   log.scrollTop = log.scrollHeight;
+}
+
+/* A shared file, rendered inside the bubble that announced it. */
+function clBubbleFile(doc) {
+  const image = (doc.content_type || '').startsWith('image/');
+  const ext = (doc.filename.split('.').pop() || 'FILE').slice(0, 4).toUpperCase();
+  return `<div class="cl-bubble-file">
+    <span class="cl-file-ico">${escapeHtml(image ? 'IMG' : ext)}</span>
+    <span class="cl-file-meta">
+      <b>${escapeHtml(doc.filename)}</b>
+      <span>${escapeHtml(clFileSize(doc.size_bytes))}</span>
+    </span>
+    ${image ? `<button type="button" class="cl-btn cl-btn-sm" data-cl-doc-view="${doc.id}"
+        aria-label="Preview ${escapeHtml(doc.filename)}">${clIco('eye', { size: 14 })}</button>` : ''}
+    <button type="button" class="cl-btn cl-btn-sm" data-cl-doc-get="${doc.id}"
+            aria-label="Download ${escapeHtml(doc.filename)}">${clIco('download', { size: 14 })}</button>
+  </div>`;
+}
+
+/* Downloads are authenticated, so an attachment can never be a plain href —
+   the bytes are fetched with the bearer token and handed to the browser as an
+   object URL, which is revoked as soon as it has been used. */
+function clBindBubbleFiles(root) {
+  const find = id => clChatDocs.find(d => String(d.id) === String(id));
+
+  root.querySelectorAll('[data-cl-doc-get]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const doc = find(b.dataset.clDocGet);
+      if (!doc) return;
+      b.disabled = true;
+      try {
+        const url = await MerchantApi.downloadDocument(doc.id);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        /* Revoked on the next tick — synchronously would cancel the download
+           in some browsers before it has read the blob. */
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch (err) {
+        clOpenModal('Could not download that file',
+          `<div class="cl-msg cl-msg-err" style="margin-top:0">${
+            escapeHtml(clError(err, 'The file could not be fetched.'))}</div>`,
+          '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+      } finally {
+        b.disabled = false;
+      }
+    }));
+
+  root.querySelectorAll('[data-cl-doc-view]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const doc = find(b.dataset.clDocView);
+      if (!doc) return;
+      b.disabled = true;
+      try {
+        const url = await MerchantApi.downloadDocument(doc.id);
+        clOpenModal(doc.filename,
+          `<img src="${url}" alt="${escapeHtml(doc.filename)}"
+                style="width:100%;border-radius:var(--cl-r-md);display:block;">`,
+          '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+        /* The modal holds the only reference; revoking when it closes is the
+           correct life-cycle, and the timeout is the backstop for a merchant
+           who navigates away instead. */
+        setTimeout(() => URL.revokeObjectURL(url), 120000);
+      } catch (err) {
+        clOpenModal('Could not open that file',
+          `<div class="cl-msg cl-msg-err" style="margin-top:0">${
+            escapeHtml(clError(err, 'The file could not be fetched.'))}</div>`,
+          '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+      } finally {
+        b.disabled = false;
+      }
+    }));
 }
 
 /* Whose message is this — mine, or the desk's?
@@ -666,18 +916,20 @@ function clReceipt(seen) {
    conversation, so a merchant chasing a ticket can quote it without scrolling
    the chat for the reference.
 
-   WHAT IS NOT HERE, AND WHY IT IS NOT INVENTED. `ChatThreadResponse` has no
-   priority and no category column — `OpenChatRequest` takes a subject and a
-   message and nothing else — so neither is shown. A High/Medium/Low the desk
-   never set, or a category nobody filed it under, would be a field that reads
-   like a fact and is a guess. What IS real is how long the thread has waited
-   for an answer, which is the row below, and it is labelled as elapsed time
-   rather than dressed up as a priority.
+   PRIORITY AND CATEGORY ARE REAL HERE NOW. This block used to carry a note
+   explaining why neither was shown: the payload had no such fields, and a
+   High/Medium/Low the desk never set would read like a fact and be a guess.
+   Both are now set when the ticket is raised and re-filed by the desk through
+   /triage, so they are shown as what they are — and priority says who last set
+   it, because "Urgent" means something different when the desk agreed with it
+   than when only the merchant asked for it.
 
-   `request_number` is the thread's own reference. When our desk raised the
-   thread against a booking it is that booking's number, which is why the row is
-   a jump to it rather than plain text — but only when it looks like one, since
-   for a merchant-opened thread it is the thread's own reference. */
+   Elapsed waiting time stays, beside them rather than instead of them: it is
+   what has happened to the ticket, not what it was filed as.
+
+   `related_request_number` is the booking the ticket was raised against, which
+   is a real link — unlike the old heuristic here, which sniffed the thread's
+   OWN reference for a REQ- prefix and offered to "open" it. */
 function clRenderTicketInfo() {
   const host = $('clTicketInfo');
   if (!host) return;
@@ -686,18 +938,31 @@ function clRenderTicketInfo() {
 
   const waiting = clThreadWaiting(t);
   const lastAt = t.last_message_at || t.created_at;
-  const booking = /^REQ-/i.test(t.request_number || '') ? t.request_number : '';
+  const booking = t.related_request_number || '';
+  const priority = t.priority || 'normal';
+  const files = clChatDocs.length;
 
   const rows = [
     ['Reference', `<span class="cl-ref">${escapeHtml(t.request_number || '—')}</span>`],
     ['Subject', escapeHtml(t.title || 'Conversation')],
+    ['Category', t.category_label
+      ? `<span class="cl-tag cl-tag-plain">${escapeHtml(t.category_label)}</span>`
+      : '<span class="cl-muted">Not categorised</span>'],
+    ['Priority', `<span class="cl-tag cl-tag-${CL_PRIORITY_TONE[priority] || 'info'}">${
+      escapeHtml(clLabel(priority))}</span>`],
     ['Status', `<span class="cl-tag cl-tag-${CL_CHAT_TONE[t.status] || 'info'}">${
       escapeHtml(t.status_label || clLabel(t.status))}</span>`],
-    ['Assigned to', t.assigned_admin
-      ? escapeHtml(t.assigned_admin)
-      : '<span class="cl-muted">Not yet picked up</span>'],
+    ['Assigned to', t.assigned_admin_name
+      ? escapeHtml(t.assigned_admin_name)
+      : t.assigned_admin
+        ? 'An operator'
+        : '<span class="cl-muted">Not yet picked up</span>'],
     ['Waiting', `<span class="cl-tag cl-tag-${waiting.tone} cl-tag-plain">${escapeHtml(waiting.text)}</span>`],
     ['Messages', String(t.message_count ?? clChatMessages.length)],
+    ['Files shared', files ? String(files) : '<span class="cl-muted">None</span>'],
+    ['About booking', booking
+      ? `<span class="cl-ref">${escapeHtml(booking)}</span>`
+      : '<span class="cl-muted">Not linked to a booking</span>'],
     ['Opened', escapeHtml(fmtDateTime(t.created_at))],
     ['Last activity', escapeHtml(fmtDateTime(lastAt))],
     ['Account', escapeHtml(localStorage.getItem(PARTNER_KEYS.companyName) || '—')],
@@ -713,6 +978,11 @@ function clRenderTicketInfo() {
         ${booking ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-block"
           style="margin-top:14px;" id="clTicketBooking">
           ${clIco('external', { size: 14 })} Open booking ${escapeHtml(booking)}</button>` : ''}
+      </div>
+      <div class="cl-panel-note">
+        Priority is triaged by our desk. Setting it when you raise a ticket tells us how it looks
+        from your side — it does not by itself move you up the queue, and anything with a passenger
+        travelling inside 24 hours should go to the emergency line below rather than wait here.
       </div>
     </div>`;
 
@@ -862,27 +1132,42 @@ function clBindComposer() {
   box.addEventListener('input', () => {
     box.style.height = 'auto';
     box.style.height = `${Math.min(box.scrollHeight, 132)}px`;
-    send.disabled = !box.value.trim() || box.disabled;
+    /* A queued file is worth sending on its own, so an empty box no longer
+       means there is nothing to send. */
+    send.disabled = box.disabled || (!box.value.trim() && !clChatFiles.length);
   });
   /* Enter sends, Shift+Enter is a newline — the convention every chat uses. */
   box.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); clSendChat(); }
   });
   send.addEventListener('click', clSendChat);
+  /* The paperclip opens the same picker as the tray below — one queue, two
+     ways in, so a merchant who never scrolls to the panel can still attach. */
+  $('clChatClip').addEventListener('click', () => $('clDropInput').click());
 }
 
+/* Send: the queued files first, then the typed message.
+
+   THAT ORDER IS DELIBERATE. Each upload posts its own line into the transcript,
+   so uploading first puts "Shared a file: proof.jpg" above the message that
+   explains it, which is the order a person would have sent them in. Text last
+   also means the merchant's own words are the most recent thing the operator
+   sees when the notification arrives.
+
+   Files upload ONE AT A TIME rather than through Promise.all: they share a
+   thread whose transcript order is decided by insert order, and firing four
+   concurrent uploads makes that order arbitrary. A support ticket where the
+   files arrive shuffled is worse than one that takes an extra second.
+
+   A file that fails does not take the message with it — it is left in the tray
+   marked "not sent" with the server's reason, so the merchant can retry it
+   without retyping anything. */
 async function clSendChat() {
   const box = $('clChatInput');
   const send = $('clChatSend');
-  let text = box.value.trim();
-  if (!text || !clChatOpenId) return;
-
-  /* Staged attachments travel as a list in the message. The tray says plainly
-     that the file itself goes by WhatsApp or email — see the header. */
-  if (clChatFiles.length) {
-    text += `\n\nAttachments I have ready (${clChatFiles.length}):\n`
-      + clChatFiles.map(f => `• ${f.file.name} (${clFileSize(f.file.size)})`).join('\n');
-  }
+  const text = box.value.trim();
+  const queued = clChatFiles.filter(f => f.state !== 'done');
+  if ((!text && !queued.length) || !clChatOpenId) return;
 
   const original = box.value;
   box.value = '';
@@ -893,33 +1178,69 @@ async function clSendChat() {
   /* Optimistic: the bubble appears immediately with a single tick, and the
      server's answer replaces the whole list a moment later. A support chat that
      pauses for a round trip before showing your own words feels broken. */
-  clChatMessages = [...clChatMessages, {
-    /* `inbound` is the merchant side — see clIsOutgoing. The optimistic bubble
-       must carry the same value the server will send back, or it would jump
-       from one side of the conversation to the other when the reply lands. */
-    id: `pending-${Date.now()}`, direction: 'inbound',
-    message: text, created_at: new Date().toISOString(),
-  }];
-  clRenderChatLog();
+  if (text) {
+    clChatMessages = [...clChatMessages, {
+      /* `inbound` is the merchant side — see clIsOutgoing. The optimistic bubble
+         must carry the same value the server will send back, or it would jump
+         from one side of the conversation to the other when the reply lands. */
+      id: `pending-${Date.now()}`, direction: 'inbound',
+      message: text, created_at: new Date().toISOString(),
+    }];
+    clRenderChatLog();
+  }
+
+  const failures = [];
+  let latest = null;
+
+  for (const entry of queued) {
+    entry.state = 'uploading';
+    clRenderFiles();
+    try {
+      latest = await MerchantApi.uploadSupportDocument(clChatOpenId, entry.file);
+      entry.state = 'done';
+    } catch (err) {
+      entry.state = 'failed';
+      failures.push(`${entry.file.name}: ${clError(err, 'could not be sent')}`);
+    }
+    clRenderFiles();
+  }
 
   try {
-    const data = await MerchantApi.sendSupportMessage(clChatOpenId, text);
-    clChatThread = data.thread;
-    clChatMessages = data.messages || [];
-    clClearFiles();
+    if (text) latest = await MerchantApi.sendSupportMessage(clChatOpenId, text);
+
+    if (latest) {
+      clChatThread = latest.thread;
+      clChatMessages = latest.messages || [];
+      clChatDocs = latest.documents || [];
+    }
+    /* Only the files that actually landed leave the tray. Anything that failed
+       stays, so retrying is one click and not a re-selection. */
+    clChatFiles.filter(f => f.state === 'done').forEach(f => {
+      if (f.url) URL.revokeObjectURL(f.url);
+    });
+    clChatFiles = clChatFiles.filter(f => f.state !== 'done');
+
     clRenderChatHead();
     clRenderChatLog();
+    clRenderTicketInfo();
+    clRenderFiles();
+    clMsg($('clFileMsg'), failures.join('. '), failures.length ? 'err' : '');
     clLoadChatThreads();
   } catch (err) {
     box.value = original;
     clChatMessages = clChatMessages.filter(m => !String(m.id).startsWith('pending-'));
     clRenderChatLog();
     clOpenModal('Message not sent',
-      `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Your message could not be sent.'))}</div>`,
+      `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Your message could not be sent.'))}</div>`
+      /* Files that DID upload are already in the conversation, and saying so
+         stops a merchant re-sending them after a failed message. */
+      + (queued.some(f => f.state === 'done')
+        ? `<p style="margin:12px 0 0;font-size:13px;color:var(--cl-text-2);">Your files were
+             attached to the conversation — only the message failed.</p>` : ''),
       '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
   } finally {
     box.disabled = clChatThread?.status === 'completed';
-    send.disabled = !box.value.trim() || box.disabled;
+    clRenderUploadState();
     box.focus();
   }
 }
@@ -937,6 +1258,29 @@ function clOpenNewChat() {
                placeholder="e.g. PNR not received on REQ-2026-000042">
         <small>Include a reference number if the question is about one — it saves a round trip.</small>
       </div>
+      <div class="cl-field">
+        <label for="clNewChatCategory">Category</label>
+        <select id="clNewChatCategory">
+          <option value="">Choose one…</option>
+          ${CL_CATEGORIES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+        </select>
+        <small>It decides which of our desks picks this up first.</small>
+      </div>
+      <div class="cl-field">
+        <label for="clNewChatPriority">Priority</label>
+        <select id="clNewChatPriority">
+          ${CL_PRIORITIES.map(([v, l]) =>
+            `<option value="${v}"${v === 'normal' ? ' selected' : ''}>${l}</option>`).join('')}
+        </select>
+        <small>How it looks from your side. Our desk triages it.</small>
+      </div>
+      <div class="cl-field cl-field-full">
+        <label for="clNewChatBooking">About a booking</label>
+        <select id="clNewChatBooking" disabled>
+          <option value="">Loading your bookings…</option>
+        </select>
+        <small>Linking it means whoever answers can open the booking instead of asking you for it.</small>
+      </div>
       <div class="cl-field cl-field-full">
         <label for="clNewChatMessage">Message<span class="cl-req">*</span></label>
         <textarea id="clNewChatMessage" maxlength="4000" style="min-height:130px;"
@@ -947,10 +1291,19 @@ function clOpenNewChat() {
     `<button type="button" class="cl-btn" data-cl-newchat-cancel>Cancel</button>
      <button type="button" class="cl-btn cl-btn-primary" data-cl-newchat-go>Start conversation</button>`);
 
+  /* Loaded after the modal is already on screen and never awaited by the submit
+     path: linking a booking is optional, and a merchant with a problem should
+     not be kept waiting on a list they may not need. If it fails, the field
+     says so and the ticket is still raisable. */
+  clLoadBookingOptions();
+
   $('clModalFoot').querySelector('[data-cl-newchat-cancel]').addEventListener('click', clCloseModal);
   $('clModalFoot').querySelector('[data-cl-newchat-go]').addEventListener('click', async () => {
     const subject = $('clNewChatSubject').value.trim();
     const message = $('clNewChatMessage').value.trim();
+    const category = $('clNewChatCategory').value || undefined;
+    const priority = $('clNewChatPriority').value || undefined;
+    const bookingId = $('clNewChatBooking').value;
     const msg = $('clNewChatMsg');
     if (!subject) return clMsg(msg, 'Give the conversation a subject.', 'err');
     if (!message) return clMsg(msg, 'Write your first message.', 'err');
@@ -959,11 +1312,15 @@ function clOpenNewChat() {
     btn.disabled = true;
     btn.classList.add('loading');
     try {
-      const data = await MerchantApi.openSupportThread({ subject, message });
+      const data = await MerchantApi.openSupportThread({
+        subject, message, category, priority,
+        relatedRequestId: bookingId ? Number(bookingId) : undefined,
+      });
       clCloseModal();
       clChatOpenId = data.thread.id;
       clChatThread = data.thread;
       clChatMessages = data.messages || [];
+      clChatDocs = data.documents || [];
       clRenderChatHead();
       clRenderChatLog();
       clRenderTicketInfo();
@@ -978,6 +1335,32 @@ function clOpenNewChat() {
       btn.classList.remove('loading');
     }
   });
+}
+
+/* The merchant's bookings, for the optional "About a booking" link. Failure is
+   not fatal and is not reported as an error: the ticket can still be raised, so
+   the field just says the list is unavailable and stays empty. */
+async function clLoadBookingOptions() {
+  const select = $('clNewChatBooking');
+  if (!select) return;
+  try {
+    const data = await MerchantApi.listRequests({ page_size: 50 });
+    const rows = data.items || [];
+    /* The modal may have been closed while this was in flight. */
+    if (!$('clNewChatBooking')) return;
+
+    if (!rows.length) {
+      select.innerHTML = '<option value="">You have no bookings yet</option>';
+      return;
+    }
+    select.innerHTML = '<option value="">Not about a specific booking</option>'
+      + rows.map(r => `<option value="${r.id}">${
+        escapeHtml(`${r.request_number}${r.status_label ? ` — ${r.status_label}` : ''}`)}</option>`).join('');
+    select.disabled = false;
+  } catch {
+    if (!$('clNewChatBooking')) return;
+    select.innerHTML = '<option value="">Your bookings could not be loaded</option>';
+  }
 }
 
 /* ---------------------------------------------------------------- polling */
@@ -1045,24 +1428,27 @@ function clBindEmoji() {
 function clAttachmentPanel() {
   return `
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>${clIco('paperclip')}Attachments</h2></div>
+      <div class="cl-panel-head">
+        <h2>${clIco('paperclip')}Attachments</h2>
+        <div class="cl-panel-tools"><span class="cl-kpi-sub" id="clFileCount"></span></div>
+      </div>
       <div class="cl-panel-body">
         <div class="cl-drop" id="clDrop" role="button" tabindex="0"
              aria-label="Choose files, or drop them here">
           ${clIco('upload', { size: 30 })}
           <b>Drop files here</b>
-          <small>or click to choose · PDF, JPG, PNG, WebP, DOCX, ZIP · up to ${CL_FILE_MAX_MB} MB each</small>
+          <small>or click to choose · PDF, JPG, PNG, WebP · up to ${CL_FILE_MAX_MB} MB each</small>
         </div>
         <input type="file" id="clDropInput" multiple class="cl-sr"
-               accept=".pdf,.jpg,.jpeg,.png,.webp,.zip,.doc,.docx">
+               accept=".pdf,.jpg,.jpeg,.png,.webp">
         <ul class="cl-files" id="clFileList"></ul>
         <div class="cl-msg" id="clFileMsg"></div>
       </div>
       <div class="cl-panel-note">
-        Files you stage here are <b>listed to the desk with your message</b> so the operator knows
-        exactly what you have. This channel cannot carry the file itself — send it on
-        <b>WhatsApp</b> or by <b>email</b>, both of which accept attachments and are one tap away
-        above. Passport and visa copies for a booking are not needed here at all.
+        Files are attached to the conversation when you send, and stay in its history for both
+        sides. Only <b>PDF, JPG, PNG and WebP</b> are accepted — the file's actual contents are
+        checked against its type, so a renamed file is refused. Passport and visa copies for a
+        booking are not needed here: those go on the booking itself while it is still a draft.
       </div>
     </div>`;
 }
@@ -1095,7 +1481,15 @@ function clFileSize(bytes) {
 }
 
 /* Validation happens here rather than only on `accept`, which is a hint a user
-   can walk straight past in the file dialog. */
+   can walk straight past in the file dialog.
+
+   THE TYPE CHECK IS NOW LOAD-BEARING. While this tray only staged files it was
+   a courtesy; now the file really is uploaded, and anything outside the four
+   types document_service accepts comes back a 415. Refusing it here, with a
+   sentence saying which types work, is a better answer than an error after the
+   upload — but the server still checks the BYTES, so a .exe renamed to .pdf
+   passes this and is refused there. That is the check that matters and it is
+   deliberately not duplicated here, where it could only be a weaker guess. */
 function clAddFiles(files) {
   const rejected = [];
   files.forEach(file => {
@@ -1104,7 +1498,7 @@ function clAddFiles(files) {
       return;
     }
     if (file.type && !CL_FILE_TYPES.includes(file.type)) {
-      rejected.push(`${file.name} is not a supported type`);
+      rejected.push(`${file.name} is not a PDF, JPG, PNG or WebP`);
       return;
     }
     if (clChatFiles.some(f => f.file.name === file.name && f.file.size === file.size)) return;
@@ -1114,53 +1508,62 @@ function clAddFiles(files) {
     clChatFiles.push({
       file,
       url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-      progress: 0,
+      state: 'queued',
     });
   });
 
-  clMsg($('clFileMsg'), rejected.join('. '), rejected.length ? 'err' : 'info');
+  clMsg($('clFileMsg'), rejected.join('. '), rejected.length ? 'err' : '');
   clRenderFiles();
-  /* A short progress animation on each newly staged file: the read IS
-     instantaneous for a local file, and a bar that never appears makes the
-     staging look like it did not happen. */
-  clChatFiles.filter(f => f.progress < 100).forEach(f => clAnimateFile(f));
+  clRenderUploadState();
 }
 
-function clAnimateFile(entry) {
-  const step = () => {
-    entry.progress = Math.min(100, entry.progress + 20 + Math.random() * 25);
-    const bar = document.querySelector(`[data-cl-file-bar="${CSS.escape(entry.file.name)}"] i`);
-    if (bar) bar.style.width = `${entry.progress}%`;
-    if (entry.progress < 100) setTimeout(step, 90);
-    else clRenderFiles();
-  };
-  setTimeout(step, 60);
+/* What the queue looks like, and what the composer says about it. Split out
+   because the send button's label depends on both the typed message and the
+   queue, and three call sites were otherwise each deciding it themselves. */
+function clRenderUploadState() {
+  const count = $('clFileCount');
+  if (count) {
+    count.textContent = clChatFiles.length
+      ? `${clChatFiles.length} to send` : '';
+  }
+  const clip = $('clChatClip');
+  if (clip) {
+    clip.classList.toggle('has-files', clChatFiles.length > 0);
+    clip.setAttribute('aria-label', clChatFiles.length
+      ? `Attach files — ${clChatFiles.length} queued`
+      : 'Attach a file');
+  }
+  /* Files alone are worth sending, so the button stops depending on there
+     being text once something is queued. */
+  const box = $('clChatInput');
+  const send = $('clChatSend');
+  if (box && send && !box.disabled) {
+    send.disabled = !box.value.trim() && !clChatFiles.length;
+  }
 }
 
 function clRenderFiles() {
   const list = $('clFileList');
+  if (!list) return;
   if (!clChatFiles.length) { list.innerHTML = ''; return; }
 
+  const STATE = { queued: 'ready to send', uploading: 'sending…', done: 'sent', failed: 'not sent' };
   list.innerHTML = clChatFiles.map(f => {
     const ext = (f.file.name.split('.').pop() || 'FILE').slice(0, 4).toUpperCase();
-    return `<li class="cl-file">
+    const busy = f.state === 'uploading';
+    return `<li class="cl-file${f.state === 'failed' ? ' failed' : ''}">
       ${f.url
         ? `<img class="cl-file-thumb" src="${f.url}" alt="Preview of ${escapeHtml(f.file.name)}">`
         : `<span class="cl-file-ico">${escapeHtml(ext)}</span>`}
       <span class="cl-file-meta">
         <b>${escapeHtml(f.file.name)}</b>
-        <span>${escapeHtml(clFileSize(f.file.size))}${f.progress >= 100 ? ' · ready' : ' · staging…'}</span>
-        ${f.progress < 100
-          ? `<span class="cl-progress" data-cl-file-bar="${escapeHtml(f.file.name)}" style="margin-top:6px;">
-               <i style="width:${f.progress}%"></i></span>` : ''}
+        <span>${escapeHtml(clFileSize(f.file.size))} · ${escapeHtml(STATE[f.state] || 'ready to send')}</span>
+        ${busy ? '<span class="cl-progress cl-progress-idle" style="margin-top:6px;"><i></i></span>' : ''}
       </span>
-      ${f.url ? `<button type="button" class="cl-btn cl-btn-sm" data-cl-file-view="${escapeHtml(f.file.name)}"
+      ${f.url && !busy ? `<button type="button" class="cl-btn cl-btn-sm" data-cl-file-view="${escapeHtml(f.file.name)}"
             aria-label="Preview ${escapeHtml(f.file.name)}">${clIco('eye', { size: 14 })}</button>` : ''}
-      <a class="cl-btn cl-btn-sm" download="${escapeHtml(f.file.name)}"
-         href="${f.url || URL.createObjectURL(f.file)}"
-         aria-label="Download ${escapeHtml(f.file.name)}">${clIco('download', { size: 14 })}</a>
-      <button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-file-remove="${escapeHtml(f.file.name)}"
-              aria-label="Remove ${escapeHtml(f.file.name)}">${clIco('x', { size: 14 })}</button>
+      ${busy ? '' : `<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-file-remove="${escapeHtml(f.file.name)}"
+              aria-label="Remove ${escapeHtml(f.file.name)}">${clIco('x', { size: 14 })}</button>`}
     </li>`;
   }).join('');
 
@@ -1183,12 +1586,14 @@ function clRemoveFile(name) {
   if (clChatFiles[i].url) URL.revokeObjectURL(clChatFiles[i].url);
   clChatFiles.splice(i, 1);
   clRenderFiles();
+  clRenderUploadState();
 }
 
 function clClearFiles() {
   clChatFiles.forEach(f => { if (f.url) URL.revokeObjectURL(f.url); });
   clChatFiles = [];
   clRenderFiles();
+  clRenderUploadState();
   clMsg($('clFileMsg'), '');
 }
 

@@ -399,6 +399,10 @@ input,select,textarea,button{font-family:inherit;font-size:inherit;color:inherit
    ========================================================================== */
 .ops-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px 10px;}
 .ops-form-2{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+/* Three fixed tracks, for a row that is genuinely three controls — the
+   auto-fill variants reflow to one column in a narrow panel, which turns the
+   support triage row into a stack. */
+.ops-form-3{grid-template-columns:repeat(3,minmax(0,1fr));}
 .ops-form-wide{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));}
 .ops-field{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .ops-field-full{grid-column:1/-1;}
@@ -728,6 +732,40 @@ dl.ops-dl-rows{grid-template-columns:1fr;gap:0;}
   flex:1 1 auto;min-height:30px;max-height:96px;padding:5px 6px;font-size:12px;
   border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);resize:vertical;
 }
+
+/* Quick replies and the attach button, on the row above the composer so they
+   do not compete with Send for the operator's eye. */
+.ops-chat-tools{
+  display:flex;gap:6px;align-items:center;
+  padding:6px 8px 0;border-top:1px solid var(--ops-line);
+}
+.ops-chat-tools select{
+  flex:1 1 auto;min-width:0;max-width:340px;
+  padding:4px 6px;font-size:11.5px;
+  border:1px solid var(--ops-line-strong);border-radius:var(--ops-radius);
+}
+
+/* A shared file inside a bubble. */
+.ops-chat-file{display:flex;align-items:center;gap:8px;}
+.ops-chat-file b{
+  flex-shrink:0;padding:3px 5px;border-radius:3px;
+  font-size:9px;font-weight:800;letter-spacing:.02em;
+  background:var(--ops-band);color:var(--ops-ink-soft);
+}
+.ops-chat-file > span{
+  flex:1 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* An INTERNAL note. Distinct from .ops-note, which is the portal's clickable
+   list row — a note is read, not opened, so it gets no pointer or hover. */
+.ops-inote{
+  padding:7px 9px;margin-bottom:6px;
+  border:1px solid var(--ops-line);border-left:3px solid var(--ops-warn);
+  border-radius:var(--ops-radius);background:var(--ops-band);
+}
+.ops-inote p{margin:0;font-size:11.5px;white-space:pre-wrap;}
+.ops-inote small{display:block;margin-top:3px;color:var(--ops-ink-faint);font-size:10px;}
 
 /* ==========================================================================
    SPINNER — the one piece of motion

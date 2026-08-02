@@ -1567,6 +1567,22 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   background:linear-gradient(90deg, var(--cl-orange) 0%, #FF9A63 100%);
   transition:width .28s var(--cl-ease);
 }
+/* An INDETERMINATE bar, for work whose duration is genuinely unknown.
+   The Support Center's uploader posts a multipart request and gets one answer
+   back — there are no byte-level progress events to read, so a bar that filled
+   to a percentage would be inventing the number. This one says "still working"
+   and claims nothing about how far along it is. */
+.cl-progress-idle i{
+  width:40%; border-radius:99px;
+  animation:cl-progress-slide 1.1s var(--cl-ease) infinite;
+}
+@keyframes cl-progress-slide{
+  0%{transform:translateX(-100%);}
+  100%{transform:translateX(250%);}
+}
+@media (prefers-reduced-motion: reduce){
+  .cl-progress-idle i{animation:none; width:100%; opacity:.5;}
+}
 
 
 /* ==========================================================================
@@ -1912,6 +1928,43 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-file-thumb{
   width:34px; height:34px; border-radius:var(--cl-r-xs); object-fit:cover; flex-shrink:0;
   border:1px solid var(--cl-line);
+}
+/* An upload the server refused. Kept in the tray rather than dropped, so the
+   merchant can retry it without re-selecting — the reason is printed under the
+   list, not on the row, because a filename plus a sentence does not fit here. */
+.cl-file.failed{border-color:var(--cl-danger); background:var(--cl-danger-bg);}
+.cl-file.failed .cl-file-meta span{color:var(--cl-danger-fg);}
+
+/* A file INSIDE a chat bubble. The bubble already carries the sender's colour,
+   so this sits on a translucent white rather than a fixed surface token —
+   otherwise the outgoing (orange) bubble would show a grey card that looks
+   pasted on. */
+.cl-bubble-file{
+  display:flex; align-items:center; gap:10px;
+  margin:2px 0; padding:9px 11px; border-radius:var(--cl-r-sm);
+  background:rgba(255,255,255,0.16); border:1px solid rgba(255,255,255,0.24);
+}
+.cl-bubble.in .cl-bubble-file{
+  background:var(--cl-surface); border-color:var(--cl-line-2);
+}
+.cl-bubble-file .cl-file-ico{width:30px; height:30px;}
+.cl-bubble-file .cl-file-meta b{font-size:12px;}
+.cl-bubble.out .cl-bubble-file .cl-file-meta b,
+.cl-bubble.out .cl-bubble-file .cl-file-meta span{color:#fff;}
+.cl-bubble.out .cl-bubble-file .cl-file-meta span{opacity:.82;}
+.cl-bubble.out .cl-bubble-file .cl-btn{
+  background:rgba(255,255,255,0.2); border-color:rgba(255,255,255,0.28); color:#fff;
+}
+.cl-bubble.out .cl-bubble-file .cl-btn:hover{background:rgba(255,255,255,0.32);}
+
+/* The composer's paperclip, once something is queued behind it. `relative` is
+   scoped to this state rather than added to .cl-emoji-btn, which the emoji
+   popover positions against — the popover is absolute to .cl-chat-compose and
+   making every button a containing block would reparent it onto the button. */
+.cl-emoji-btn.has-files{color:var(--cl-orange); position:relative;}
+.cl-emoji-btn.has-files::after{
+  content:''; position:absolute; top:5px; right:5px;
+  width:7px; height:7px; border-radius:50%; background:var(--cl-orange);
 }
 
 /* ---- FAQ ---- */

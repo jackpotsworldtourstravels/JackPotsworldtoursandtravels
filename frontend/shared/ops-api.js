@@ -566,6 +566,51 @@ const OpsApi = {
   resolveThread(id) {
     return this._req('post', `/api/support/threads/${id}/resolve`, { data: {} });
   },
+
+  /* chat.manage. Re-files a thread's priority and category — the desk's
+     judgement, not the raiser's. Omitted fields are left alone server-side, so
+     sending only a priority cannot clear a category. */
+  triageThread(id, { priority, category } = {}) {
+    return this._req('patch', `/api/support/threads/${id}/triage`, {
+      data: { priority: priority || undefined, category: category || undefined },
+    });
+  },
+
+  /* chat.manage AND a platform-staff account. INTERNAL NOTES ARE NEVER SHOWN
+     TO THE MERCHANT — nothing merchant-facing calls these, and the server
+     refuses them for a merchant account regardless of what a client asks. */
+  listThreadNotes(id) {
+    return this._req('get', `/api/support/threads/${id}/notes`);
+  },
+  addThreadNote(id, body) {
+    return this._req('post', `/api/support/threads/${id}/notes`, { data: { body } });
+  },
+
+  /* Files shared on a conversation. Metadata only — bytes come from
+     downloadDocument, which re-checks scope on every read. */
+  listThreadDocuments(id) {
+    return this._req('get', `/api/support/threads/${id}/documents`);
+  },
+  /* `ticket.view`, plus a server-side re-check that the document belongs to a
+     merchant this caller may see. Downloads are authenticated, so an
+     attachment can never be a plain href — the blob is pulled with the bearer
+     token and handed over as an object URL. CALLERS MUST REVOKE IT. */
+  async downloadDocument(documentId) {
+    const blob = await this._req('get', `/api/documents/${documentId}/download`, {
+      responseType: 'blob',
+    });
+    return URL.createObjectURL(blob);
+  },
+  /* Multipart, so this bypasses _req's JSON shape — the browser must set its
+     own boundary. Returns the whole thread, like sendThreadMessage. */
+  uploadThreadDocument(id, file) {
+    const form = new FormData();
+    form.append('file', file);
+    return axios.post(`${OPS_API_BASE}/api/support/threads/${id}/documents`, form, {
+      headers: opsAuthHeaders(),
+    }).then(r => r.data);
+  },
+
   chatUnreadCount() {
     return this._req('get', '/api/support/unread-count');
   },

@@ -525,23 +525,80 @@ const MerchantApi = {
   /* Opens a thread WITH its first message — there is no empty thread state, so
      a conversation always has something in it to answer. Returns the thread
      and its messages, so the screen can render the conversation immediately
-     rather than opening and then fetching. */
-  openSupportThread({ subject, message }) {
-    return this._req('post', '/api/support/threads', { data: { subject, message } });
+     rather than opening and then fetching.
+
+     `category` is one of the eight the server accepts (booking, payment,
+     wallet, refund, ticket_issue, account, technical, other) — anything else
+     is a 400, so drive the picker from that list and not from free text.
+     `priority` is the merchant's OPENING assessment only: the desk re-files it
+     through /triage, which this client deliberately does not expose. */
+  openSupportThread({ subject, message, category, priority, relatedRequestId } = {}) {
+    return this._req('post', '/api/support/threads', {
+      data: {
+        subject,
+        message,
+        category: category || undefined,
+        priority: priority || undefined,
+        related_request_id: relatedRequestId ?? undefined,
+      },
+    });
   },
 
   /* `status` takes a request_status_enum value. A thread only ever reaches
      submitted (labelled "Open"), in_review ("In Progress") and completed
      ("Resolved") — the response carries `status_label` with that chat-specific
-     wording already applied, so never derive the text from the enum here. */
-  listSupportThreads({ status, page = 1, pageSize = 20 } = {}) {
+     wording already applied, so never derive the text from the enum here.
+
+     `q` searches the subject, the reference AND the text of every message in
+     the thread, which is why searching is a server round trip rather than a
+     filter over the page already in hand. */
+  listSupportThreads({ status, category, priority, q, page = 1, pageSize = 20 } = {}) {
     return this._req('get', '/api/support/threads', {
-      params: { status: status || undefined, page, page_size: pageSize },
+      params: {
+        status: status || undefined,
+        category: category || undefined,
+        priority: priority || undefined,
+        q: q || undefined,
+        page,
+        page_size: pageSize,
+      },
     });
   },
 
-  getSupportThread(threadId) {
-    return this._req('get', `/api/support/threads/${threadId}`);
+  /* Opening a thread marks the DESK's messages as read, which is what gives the
+     operator a truthful receipt. Pass `markRead: false` for a fetch the
+     merchant did not ask for — the stats tile samples recent conversations in
+     the background, and letting that count as "seen" would tell the desk a
+     merchant read something they never opened. */
+  getSupportThread(threadId, { markRead = true } = {}) {
+    return this._req('get', `/api/support/threads/${threadId}`, {
+      params: markRead ? undefined : { mark_read: false },
+    });
+  },
+
+  /* Shares a real file on the thread. Multipart, so like uploadDocument this
+     bypasses _req's JSON shape and lets the browser set its own boundary.
+
+     The server posts a line into the transcript for the file, and returns the
+     WHOLE thread — same reasoning as sendSupportMessage. Accepted types are
+     PDF, JPEG, PNG and WebP: the bytes are sniffed against the declared type
+     server-side, so a renamed file is a 400 rather than a stored surprise.
+     There is no delete counterpart by design — a file sent to the desk is part
+     of the support record. */
+  uploadSupportDocument(threadId, file) {
+    const form = new FormData();
+    form.append('file', file);
+    return axios.post(`${API_BASE}/api/support/threads/${threadId}/documents`, form, {
+      headers: partnerAuthHeaders(),
+    }).then(r => r.data);
+  },
+
+  /* Returns a resolved thread to the desk's queue. Only inside the server's
+     reopening window — read `can_reopen` off the thread payload rather than
+     working the window out here, or the button and the endpoint will disagree
+     and the merchant will meet a 409 they could not have predicted. */
+  reopenSupportThread(threadId) {
+    return this._req('post', `/api/support/threads/${threadId}/reopen`, { data: {} });
   },
 
   /* Returns the WHOLE thread, not just the new message. That is the endpoint's

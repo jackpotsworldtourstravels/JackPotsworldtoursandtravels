@@ -57,6 +57,10 @@ SUITE = [
     # its own SQL, so it is only meaningful once they are known good.
     ("verify_m6.py", "M6: analytics against direct SQL, export/summary parity, ops metrics, scope"),
     ("verify_m7.py", "M7: booking history filters/pagination/search, downloads, staff-only absence, cross-tenant"),
+    # After the document scripts: the Support Center reuses document_service's
+    # upload path, so a failure there explains an attachment failure here.
+    ("verify_support_center.py",
+     "Support Center: categories, priority, attachments, search, receipts, notes, triage, reopen"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.
