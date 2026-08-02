@@ -182,6 +182,24 @@ class IssueTicketRequest(BaseModel):
 
     fare_amount: Decimal | None = Field(default=None, gt=0)
 
+    #: WHO THE TICKET WAS BOUGHT FROM (0039), and the person at that supplier
+    #: who booked it.
+    #:
+    #: **Optional here, required by the Booking Operations screen.** The
+    #: business asked for two required fields; making them required *in the
+    #: schema* would reject every existing caller — the whole regression suite,
+    #: any integration, and any booking mid-flight when this shipped — which the
+    #: same brief forbids ("preserve backward compatibility", "existing ticket
+    #: issuance continues to work"). The two requirements only conflict at this
+    #: layer, so the enforcement lives where the humans are: the desk cannot
+    #: submit the form without choosing both.
+    #:
+    #: Optional does not mean unvalidated. ``provider_service.resolve_for_issuance``
+    #: refuses an unknown or inactive provider, a person who works somewhere
+    #: else, and a person named without a provider.
+    provider_id: int | None = Field(default=None, gt=0)
+    provider_user_id: int | None = Field(default=None, gt=0)
+
 
 class VerifyPaymentRequest(BaseModel):
     approve: bool = True
@@ -304,6 +322,13 @@ class RequestResponse(BaseModel):
     return_date: datetime.date | None = None
 
     passengers: list[PassengerResponse] = []
+    #: 0039 — who this was bought from, once a ticket has been issued. Both
+    #: default to None, so every response for a booking issued before providers
+    #: existed is byte-for-byte what it was; no client has to know about them.
+    provider_id: int | None = None
+    provider_name: str | None = None
+    provider_user_id: int | None = None
+    provider_user_name: str | None = None
     created_at: datetime.datetime
     approved_at: datetime.datetime | None = None
     completed_at: datetime.datetime | None = None
@@ -346,6 +371,16 @@ class RequestResponse(BaseModel):
             passengers=[PassengerResponse.of(p) for p in r.passengers]
             if include_passengers
             else [],
+            provider_id=r.provider_id,
+            # Guarded on the id rather than reached for unconditionally: these
+            # are lazy relationships, and touching them on a booking with no
+            # provider would emit a query per row on every list that serialises
+            # through here. Null id, null name, no SQL.
+            provider_name=r.provider.provider_name if r.provider_id and r.provider else None,
+            provider_user_id=r.provider_user_id,
+            provider_user_name=(
+                r.provider_user.user_name if r.provider_user_id and r.provider_user else None
+            ),
             created_at=r.created_at,
             approved_at=r.approved_at,
             completed_at=r.completed_at,

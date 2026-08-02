@@ -100,6 +100,17 @@ class P:
     PAYMENT_MANAGE = "payment.manage"
     PAYMENT_VIEW = "payment.view"
 
+    # Providers — the external suppliers the desk buys tickets FROM (0039).
+    #
+    # WHY THESE ARE NOT THE MERCHANT CODES
+    # A merchant is a customer that signs in and owes money; a provider is a
+    # supplier that does neither. Reusing ``merchant.view`` / ``merchant.edit``
+    # would hand every merchant-facing role the supplier list, and would make
+    # "who may see our purchase costs" inseparable from "who may see our
+    # customers". Two codes, held only by Admin.
+    PROVIDER_VIEW = "provider.view"
+    PROVIDER_MANAGE = "provider.manage"
+
     # Reports
     REPORT_VIEW = "report.view"
     REPORT_EXPORT = "report.export"
@@ -150,6 +161,11 @@ _ADMIN: frozenset[str] = frozenset({
     # rather than by holding it.
     P.MERCHANT_USER_MANAGE,
     P.TICKET_VIEW, P.TICKET_APPROVE, P.TICKET_REJECT, P.TICKET_ISSUE,
+    # Provider Management is an Admin module. Deliberately not granted to the
+    # Super Admin (which holds merchant.view for visibility): what a supplier
+    # costs is operations' business, and the Super Admin's role here is account
+    # administration rather than procurement.
+    P.PROVIDER_VIEW, P.PROVIDER_MANAGE,
     P.SERVICE_REQUEST_MANAGE,
     P.PAYMENT_MANAGE, P.PAYMENT_VERIFY, P.PAYMENT_VIEW,
     P.REPORT_VIEW, P.REPORT_EXPORT,

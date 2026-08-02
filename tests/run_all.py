@@ -61,6 +61,11 @@ SUITE = [
     # upload path, so a failure there explains an attachment failure here.
     ("verify_support_center.py",
      "Support Center: categories, priority, attachments, search, receipts, notes, triage, reopen"),
+    # After the booking scripts: this issues real tickets to build its totals,
+    # so a broken issuance path explains a provider failure rather than the
+    # other way round.
+    ("verify_providers.py",
+     "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.

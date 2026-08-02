@@ -204,6 +204,18 @@ class WalletTxnType(str, enum.Enum):
     RESCHEDULE_FEE = "reschedule_fee"
 
 
+class ProviderStatus(str, enum.Enum):
+    """Whether a provider (or a person at one) is still used (migration 0039).
+
+    There is no ``deleted`` member and no delete path: a provider with bookings
+    against it is a purchase record, so it is retired by going ``INACTIVE``
+    rather than removed.
+    """
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 class WalletTopupStatus(str, enum.Enum):
     SUBMITTED = "submitted"
     VERIFIED = "verified"
@@ -645,6 +657,16 @@ class ServiceRequest(Base):
     assigned_admin: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
     )
+    #: Who this booking was actually BOUGHT FROM, recorded at ticket issuance
+    #: (migration 0039). Nullable because every booking issued before providers
+    #: existed has no honest value — the analytics skip those rather than
+    #: attributing them to a supplier that was never asked.
+    provider_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("providers.provider_id", ondelete="RESTRICT")
+    )
+    provider_user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("provider_users.provider_user_id", ondelete="RESTRICT")
+    )
     approved_by: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
     )
@@ -674,6 +696,16 @@ class ServiceRequest(Base):
     merchant: Mapped[Optional["Merchant"]] = relationship(back_populates="requests")
     user: Mapped[Optional["User"]] = relationship(
         back_populates="requests", foreign_keys=[user_id]
+    )
+    #: The supplier this was bought from, and the person there who booked it.
+    #: Read-only conveniences for rendering — nothing writes through these; the
+    #: foreign keys above are what ticket issuance sets. Ordinary lazy loading,
+    #: not ``raise_on_sql``: these hang off ServiceRequest, which is serialised
+    #: by a dozen existing responses, and a stricter default would turn any of
+    #: them that happens to touch the attribute into a 500.
+    provider: Mapped[Optional["Provider"]] = relationship(foreign_keys=[provider_id])
+    provider_user: Mapped[Optional["ProviderUser"]] = relationship(
+        foreign_keys=[provider_user_id]
     )
     # Ordered explicitly: an UPDATE writes a new tuple in Postgres, so an
     # unordered read can return an edited passenger last and silently reshuffle
@@ -1468,6 +1500,112 @@ class WalletTransaction(Base):
         )
 
 
+class Provider(Base):
+    """An external supplier the operations desk buys tickets FROM (0039).
+
+    An airline consolidator, a booking portal, a cruise wholesaler. **Not a user
+    of this application** — a provider never signs in, and this class carries no
+    password, role, permission or session for exactly that reason. The only
+    ``users`` references on it are ``created_by`` / ``updated_by``, which record
+    which *admin* maintained the row.
+
+    Deliberately NOT a ``Merchant``: a merchant is a customer who signs in and
+    owes us money, a provider is a supplier who does neither, and
+    ``ServiceRequest.merchant_id`` already means "the customer".
+
+    There is no delete path. A provider that has bookings against it is a
+    purchase record; it is retired with ``status = INACTIVE``, and the schema
+    backs that up with ``ON DELETE RESTRICT`` from ``service_requests``.
+    """
+
+    __tablename__ = "providers"
+
+    provider_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: ``PRD001``. Allocated from ``seq_provider_code`` — never typed by hand.
+    provider_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[ProviderStatus] = mapped_column(
+        _pg_enum(ProviderStatus, "provider_status_enum"),
+        nullable=False,
+        server_default=text("'active'"),
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    created_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    updated_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+
+    users: Mapped[list["ProviderUser"]] = relationship(
+        back_populates="provider",
+        cascade="all, delete-orphan",
+        order_by="ProviderUser.provider_user_id",
+    )
+
+    __table_args__ = (
+        Index("uq_providers_code", "provider_code", unique=True),
+        Index("ix_providers_status", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Provider {self.provider_code} {self.provider_name}>"
+
+
+class ProviderUser(Base):
+    """A named person AT a provider who actually books the tickets (0039).
+
+    "John at Sky Travels". Exists so a booking can record who on the supplier's
+    side handled it, and so the desk can see volume per contact.
+
+    **Not an application user.** No password, no username, no role, no
+    permission, no session, no OTP — and no foreign key to ``users``. Anything
+    that would make this loggable-in is absent on purpose, and adding it would
+    take a migration somebody has to justify.
+
+    ``email`` is stored to identify and contact the person, not to authenticate
+    them; it is unique per provider rather than globally, because one person may
+    legitimately appear under two suppliers.
+    """
+
+    __tablename__ = "provider_users"
+
+    provider_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("providers.provider_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(30))
+    status: Mapped[ProviderStatus] = mapped_column(
+        _pg_enum(ProviderStatus, "provider_status_enum"),
+        nullable=False,
+        server_default=text("'active'"),
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    provider: Mapped["Provider"] = relationship(back_populates="users")
+
+    __table_args__ = (
+        Index("ix_provider_users_provider", "provider_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ProviderUser {self.user_name} @{self.provider_id}>"
+
+
 __all__ = [
     "Base",
     "User",
@@ -1508,4 +1646,7 @@ __all__ = [
     "WalletTopupStatus",
     "WalletTopupMethod",
     "PaymentAccountType",
+    "Provider",
+    "ProviderUser",
+    "ProviderStatus",
 ]

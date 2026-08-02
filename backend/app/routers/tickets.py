@@ -384,7 +384,12 @@ def reject_request(
         "amount, this is **required**: it is the fare the desk paid the airline, it becomes the "
         "booking's `total_amount`, and it is what the merchant's wallet is debited. Issuing "
         "such a booking without it returns 400. On any booking that already has an amount the "
-        "field is ignored, so the standard track is unchanged."
+        "field is ignored, so the standard track is unchanged.\n\n"
+        "**0039 — `provider_id` / `provider_user_id`.** Who the ticket was bought from, and the "
+        "person at that supplier who booked it. Both are **optional in this API** so every "
+        "pre-existing caller keeps working; the Booking Operations screen requires them before it "
+        "will submit. When supplied they are validated — an unknown or inactive provider, or a "
+        "person belonging to a different provider, returns 400 and the booking is left untouched."
     ),
 )
 def issue_ticket(
@@ -396,6 +401,8 @@ def issue_ticket(
     request = ticket_service.issue_ticket(
         db, current_user, request_id,
         fare_amount=payload.fare_amount if payload else None,
+        provider_id=payload.provider_id if payload else None,
+        provider_user_id=payload.provider_user_id if payload else None,
     )
     return _detail(db, request, current_user)
 

@@ -31,6 +31,7 @@ from app.routers import (
     merchants,
     notifications_v2,
     profile,
+    providers,
     reports,
     super_admin,
     support_tickets,
@@ -213,6 +214,11 @@ app.include_router(messages.router)
 # to the caller and gated on report.view; the operations one is Admin-only,
 # because queue age and operator load have no merchant-scoped meaning.
 app.include_router(analytics.router)
+# Provider Management (0039) — the external suppliers the desk buys tickets
+# FROM. Admin-only and entirely read/write over its own two tables; it shares no
+# service with the merchant, wallet or payment modules, which is what keeps
+# recording a purchase source from being able to move money.
+app.include_router(providers.router)
 
 
 @app.on_event("startup")

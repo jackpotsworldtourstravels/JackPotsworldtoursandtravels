@@ -264,12 +264,20 @@ async function opsOpenWork(id) {
        round trips of latency on every open. The detail carries the booking and
        its passengers, which is why the read-only information below needs no
        call of its own. */
-    const [detail, docs, notes] = await Promise.all([
+    /* 0039 adds a fourth: the providers this ticket may be booked through, with
+       their people already attached, so choosing a provider needs no second
+       round trip. `.catch` for the same reason the other two have one — a desk
+       that cannot reach the provider list must still be able to read the
+       booking, and the field below degrades to a note rather than a broken
+       control. */
+    const [detail, docs, notes, providers] = await Promise.all([
       axios.get(`${API_BASE}/api/requests/${id}`, { headers: authHeaders() }).then(r => r.data),
       axios.get(`${API_BASE}/api/requests/${id}/documents`, { headers: authHeaders() }).then(r => r.data).catch(() => []),
       axios.get(`${API_BASE}/api/admin/bookings/${id}/notes`, { headers: authHeaders() }).then(r => r.data).catch(() => []),
+      axios.get(`${API_BASE}/api/admin/providers/options`, { headers: authHeaders() })
+        .then(r => r.data.items).catch(() => null),
     ]);
-    opsCurrent = { id, detail, docs, notes };
+    opsCurrent = { id, detail, docs, notes, providers };
     opsRenderWork();
   } catch (err) {
     document.getElementById('opsWorkBody').innerHTML = `
@@ -330,7 +338,7 @@ function opsPassengerCard(p, i) {
 }
 
 function opsRenderWork() {
-  const { id, detail, docs, notes } = opsCurrent;
+  const { id, detail, docs, notes, providers } = opsCurrent;
   const r = detail.request;
   const d = r.details || {};
   const contact = d.contact || {};
@@ -476,6 +484,10 @@ function opsRenderWork() {
             <input id="opsAirlineRef" value="${escapeHtml(d.airline_reference || '')}"></div>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" id="opsRefsBtn">Save references</button>
+        ${r.provider_name ? `<p class="ops-sub" style="margin-top:10px;">
+          Bought from <b>${escapeHtml(r.provider_name)}</b>${
+            r.provider_user_name ? ` via ${escapeHtml(r.provider_user_name)}` : ''}.
+          Recorded when the ticket was issued and not editable here.</p>` : ''}
       </div>
 
       <div class="ops-section">
@@ -529,6 +541,7 @@ function opsRenderWork() {
               when the ticket is issued.
             </p>
           </div>` : ''}
+        ${canIssue ? opsProviderFields(providers) : ''}
         ${canIssue ? `<button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>` : ''}
         ${canComplete ? `<button type="button" class="btn btn-coral" id="opsCompleteBtn">Mark Completed</button>` : ''}
         ${!canIssue && !canComplete
@@ -555,6 +568,7 @@ function opsRenderWork() {
   document.getElementById('opsRefsBtn').addEventListener('click', () => opsSaveReferences(id));
   document.getElementById('opsUploadBtn').addEventListener('click', () => opsUploadTickets(id));
   document.getElementById('opsNoteBtn').addEventListener('click', () => opsAddNote(id));
+  opsWireProviderFields();
   document.getElementById('opsIssueBtn')?.addEventListener('click', () => opsLifecycle(id, 'issue-ticket'));
   document.getElementById('opsCompleteBtn')?.addEventListener('click', () => opsLifecycle(id, 'complete'));
   document.querySelectorAll('[data-ops-deldoc]').forEach(b => {
@@ -656,6 +670,70 @@ async function opsAddNote(id) {
   }
 }
 
+/* 0039 — WHO THE TICKET IS BEING BOUGHT FROM.
+   ---------------------------------------------------------------------------
+   Two dependent dropdowns, and both are REQUIRED before this screen will issue.
+   The API accepts them as optional so every pre-0039 caller keeps working (see
+   IssueTicketRequest); the desk is where the business rule "always record the
+   provider" is actually enforced, because the desk is who knows the answer.
+
+   `providers === null` means the lookup failed rather than "there are none" —
+   the two need different wording, because one is a broken request and the other
+   is an empty Provider Management screen. Neither offers a control that cannot
+   be filled in. */
+function opsProviderFields(providers) {
+  if (providers === null) {
+    return `<div class="ops-fare">
+      <div class="msg error" style="margin:0;">Could not load the provider list, so this ticket
+      cannot be attributed yet. Reopen this booking to try again.</div>
+    </div>`;
+  }
+  if (!providers.length) {
+    return `<div class="ops-fare">
+      <div class="msg info" style="margin:0;">No active providers are set up yet. Add the supplier
+      you booked through in <b>Provider Management</b>, then issue this ticket.</div>
+    </div>`;
+  }
+
+  return `<div class="ops-fare">
+    <label for="opsProviderSelect">Provider</label>
+    <select id="opsProviderSelect" aria-describedby="opsProviderHelp">
+      <option value="">— Select the supplier —</option>
+      ${providers.map(p => `<option value="${p.id}">${escapeHtml(p.provider_name)} (${escapeHtml(p.provider_code)})</option>`).join('')}
+    </select>
+    <p class="ops-sub" id="opsProviderHelp">Who this ticket was bought from.</p>
+
+    <label for="opsProviderUserSelect" style="margin-top:10px;display:block;">Provider User</label>
+    <select id="opsProviderUserSelect" disabled aria-describedby="opsProviderUserHelp">
+      <option value="">— Choose a provider first —</option>
+    </select>
+    <p class="ops-sub" id="opsProviderUserHelp">The person there who made the booking.</p>
+  </div>`;
+}
+
+/* The dependent half. Repopulated from the provider's own `users`, which came
+   down with the options call — so switching provider cannot leave a person from
+   the previous one selected, which is exactly what the server would refuse. */
+function opsWireProviderFields() {
+  const provider = document.getElementById('opsProviderSelect');
+  const person = document.getElementById('opsProviderUserSelect');
+  if (!provider || !person) return;
+
+  provider.addEventListener('change', () => {
+    const chosen = (opsCurrent?.providers || []).find(p => String(p.id) === provider.value);
+    if (!chosen) {
+      person.innerHTML = '<option value="">— Choose a provider first —</option>';
+      person.disabled = true;
+      return;
+    }
+    person.disabled = !chosen.users.length;
+    person.innerHTML = chosen.users.length
+      ? '<option value="">— Select the person —</option>'
+        + chosen.users.map(u => `<option value="${u.id}">${escapeHtml(u.user_name)}</option>`).join('')
+      : '<option value="">No active people listed for this provider</option>';
+  });
+}
+
 async function opsLifecycle(id, action) {
   const msg = document.getElementById('opsActionMsg');
   const fareInput = document.getElementById('opsFareInput');
@@ -672,6 +750,34 @@ async function opsLifecycle(id, action) {
     /* Sent as typed, not as a Number: the schema is Decimal and M4's rule is
        that money never becomes a float on its way to the server. */
     body.fare_amount = fareInput.value.trim();
+  }
+
+  /* 0039 — both required here, whatever the API will tolerate. Checked before
+     the confirmation rather than after it, so an operator is not asked to
+     confirm an action that is about to be refused. */
+  if (action === 'issue-ticket') {
+    const providerSelect = document.getElementById('opsProviderSelect');
+    const personSelect = document.getElementById('opsProviderUserSelect');
+    if (!providerSelect) {
+      msg.className = 'msg error';
+      msg.textContent = 'A provider must be recorded before a ticket can be issued. '
+        + 'Add one in Provider Management, then reopen this booking.';
+      return;
+    }
+    if (!providerSelect.value) {
+      msg.className = 'msg error';
+      msg.textContent = 'Choose the provider this ticket was bought from.';
+      providerSelect.focus();
+      return;
+    }
+    if (!personSelect?.value) {
+      msg.className = 'msg error';
+      msg.textContent = 'Choose the person at that provider who made the booking.';
+      personSelect?.focus();
+      return;
+    }
+    body.provider_id = Number(providerSelect.value);
+    body.provider_user_id = Number(personSelect.value);
   }
 
   /* CR-5. The fare used to be typed here on every Classic booking, so naming it

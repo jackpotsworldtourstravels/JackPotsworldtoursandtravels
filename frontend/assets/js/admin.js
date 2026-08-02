@@ -108,6 +108,8 @@ function loadSection(name) {
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
   if (name === 'ticket-enquiries') return loadTicketEnquiries();
   if (name === 'booking-ops') return loadBookingOps();
+  /* 0039. Defined in admin-providers.js, loaded after this file. */
+  if (name === 'providers') return loadProviders();
   /* No 'change-requests' case: cancellations and reschedules are rows on
      Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();

@@ -151,6 +151,16 @@
       <span class="nav-label">Service Request Management</span>
       <span class="nav-badge" id="srmNavBadge" hidden></span>
     </a>
+    <!-- 0039 — the external suppliers the desk buys tickets FROM. Placed with
+         the other management modules and directly under Booking Operations,
+         because a provider is chosen on that screen at ticket issuance and this
+         is where the resulting purchase history is read. Deliberately NOT near
+         Merchant Management: a merchant is a customer, a provider is a
+         supplier, and the two lists must not read as variations of one thing. -->
+    <a href="#" class="nav-item" data-section="providers">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
+      <span class="nav-label">Provider Management</span>
+    </a>
     <a href="#" class="nav-item" data-section="notifications">
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="nav-label">Communication</span>
@@ -569,6 +579,52 @@
       </div>
     </section>
 
+    <!-- Provider Management (0039). Two panes in one section: the list, and the
+         detail for whichever provider was opened from it. Both are rendered by
+         admin-providers.js — the detail is not a modal because it carries four
+         statistics, a users table and a bookings table, which is a page's worth
+         of content rather than a dialog's. -->
+    <section class="section" id="section-providers">
+      <div id="provListPane">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Provider Management</h2>
+            <span class="panel-sub" id="provSummary"></span>
+          </div>
+          <p class="ops-sub" style="margin:0 0 14px;">
+            The external suppliers our operations team buys tickets from — consolidators, booking
+            portals and travel suppliers. Providers never sign in; this is an internal record, and
+            the people listed against each one are contacts, not user accounts.
+          </p>
+          <div class="filter-bar" style="margin-bottom:16px;">
+            <input type="search" id="provSearch" aria-label="Search providers"
+                   placeholder="Provider code, name, or a person there">
+            <select id="provStatusFilter" class="status-select" aria-label="Filter by status">
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <input type="date" id="provDateFrom" title="Created from">
+            <input type="date" id="provDateTo" title="Created to">
+            <button class="btn btn-ghost btn-sm" id="provRefreshBtn" type="button">Refresh</button>
+            <button class="btn btn-ghost btn-sm" id="provExportBtn" type="button">Export</button>
+            <button class="btn btn-coral btn-sm" id="provAddBtn" type="button">+ Add Provider</button>
+          </div>
+          <div class="table-wrap"><table id="provTable"><thead><tr>
+            <th data-prov-sort="provider_code" class="prov-sortable">Provider Code</th>
+            <th data-prov-sort="provider_name" class="prov-sortable">Provider Name</th>
+            <th class="num">Total Tickets</th>
+            <th class="num">Total Booking Amount</th>
+            <th data-prov-sort="status" class="prov-sortable">Status</th>
+            <th>Action</th>
+          </tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="provPagination"></div>
+        </div>
+      </div>
+
+      <div id="provDetailPane" style="display:none;"></div>
+    </section>
+
     <section class="section" id="section-support">
       <div class="panel">
         <div class="panel-head"><h2>Support Management — Live Chat</h2></div>
@@ -703,6 +759,13 @@
   <div class="modal-card modal-lg" id="wdLedgerBody" role="dialog" aria-modal="true" aria-labelledby="wdLedgerTitle"></div>
 </div>
 
+<!-- Provider Management (0039) — add/edit a provider, and add a person at one.
+     One overlay for both: only one of the two is ever open, and a second
+     overlay would just be a second thing to remember to close. -->
+<div class="modal-overlay" id="provModalOverlay">
+  <div class="modal-card" id="provModalBody" role="dialog" aria-modal="true" aria-labelledby="provModalTitle"></div>
+</div>
+
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
   <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
 </div>
@@ -739,7 +802,7 @@
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260801m6"></script>
+<script src="../assets/js/admin.js?v=20260802prov"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260801cr5"></script>
@@ -750,7 +813,7 @@
      screen opens for those two types. Also after admin.js. -->
 <script src="../assets/js/admin-change-requests.js?v=20260801merge"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260801cr5c"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260802prov"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
 <script src="../assets/js/admin-wallet-desk.js?v=20260802ui4"></script>
@@ -760,5 +823,9 @@
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
 <script src="../assets/js/admin-analytics.js?v=20260801m6"></script>
+<!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
+     authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
+     navigateToSection rather than restating any of them. -->
+<script src="../assets/js/admin-providers.js?v=20260802prov"></script>
 </body>
 </html>

@@ -1117,6 +1117,7 @@ def refund_payment(
 
 def issue_ticket(
     db: Session, actor: User, request_id: int, *, fare_amount: Decimal | None = None,
+    provider_id: int | None = None, provider_user_id: int | None = None,
 ) -> ServiceRequest:
     """Issue the ticket: allocate PNR, ticket and invoice numbers, bill the wallet.
 
@@ -1188,6 +1189,21 @@ def issue_ticket(
     # moved and without burning a ticket number.
     _capture_fare_for_wallet_billing(request, fare_amount)
 
+    # 0039 — who this was bought from. Resolved before the transition for the
+    # same reason as the fare above: an unknown provider, or a person who works
+    # at a different one, must refuse the issuance without having moved the
+    # booking or burned a ticket number. A caller that sends neither is left
+    # exactly as it was, which is what keeps every pre-provider caller working.
+    from app.services import provider_service  # local: avoids an import cycle
+
+    provider, provider_person = provider_service.resolve_for_issuance(
+        db, provider_id, provider_user_id
+    )
+    if provider is not None:
+        request.provider_id = provider.provider_id
+    if provider_person is not None:
+        request.provider_user_id = provider_person.provider_user_id
+
     lifecycle.transition(db, request, S.TICKET_ISSUED, actor, commit=False)
 
     if not request.pnr:
@@ -1211,8 +1227,17 @@ def issue_ticket(
     activity_service.log_activity(
         db, actor.user_id, "Ticket issued",
         activity_type="Booking", module="Ticket Issuance",
-        description=f"{actor.full_name} issued {request.ticket_number} for {request.request_number}",
+        description=(
+            f"{actor.full_name} issued {request.ticket_number} for {request.request_number}"
+            + (f", bought from {provider.provider_name}"
+               + (f" via {provider_person.user_name}" if provider_person else "")
+               if provider else "")
+        ),
         reference_id=request.request_id, merchant_id=request.merchant_id,
+        details={
+            "provider_code": provider.provider_code if provider else None,
+            "provider_user": provider_person.user_name if provider_person else None,
+        } if provider else None,
     )
     if debit is not None:
         # Quoted by txn_number, never txn_id — the reference is what appears in
