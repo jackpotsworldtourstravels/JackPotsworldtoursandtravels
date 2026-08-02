@@ -22,7 +22,9 @@ import time
 import minihttp as requests
 # Re-exported so a script can `import flows` and reach the accounts without a
 # second import; config.py is the one definition of both.
-from config import ADMIN, ADMIN2, BASE, MANAGER, MERCHANT, PDF, SUPER, H, login  # noqa: F401
+from config import (  # noqa: F401
+    ADMIN, ADMIN2, BASE, MANAGER, MERCHANT, PDF, SUPER, H, forget_login, login,
+)
 
 #: Stage order, so a caller can ask for "at least paid" and the flow knows how
 #: far to walk.
@@ -76,6 +78,10 @@ def rival_merchant(atok):
         # *before* the sub-second reset timestamp and comes back as "session
         # ended". One second of clock is the whole fix.
         time.sleep(1.2)
+        # ...and the *cached* token for this account was minted before the reset,
+        # so `login` below would hand back a token the server has already
+        # revoked. Calling this flow twice in one script is what exposes it.
+        forget_login(candidate["email"], "merchant")
         return {
             "token": login(candidate["email"], password, "merchant"),
             "merchant_id": merchant["id"],

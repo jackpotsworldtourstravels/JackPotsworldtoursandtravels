@@ -32,7 +32,17 @@ def operator_token(mtok):
     work off. Recreated with a fresh password each run: the account survives
     between runs and its password is returned only once, at creation.
     """
-    team = requests.get(f"{BASE}/api/merchant/team?page_size=100", headers=H(mtok)).json()
+    # LOOK IT UP, DO NOT PAGE FOR IT. This used to read the first 100 team
+    # members and create the account when it was not among them. Every run of
+    # verify_cr3 and verify_merchant_ui_parity leaves its throwaway colleagues
+    # behind, so the demo merchant's team grows a few rows per suite run; the
+    # day it passed 100, this account sat at position 101, the lookup missed it,
+    # the create branch ran and the API answered "400 Email already registered".
+    # `page_size` is capped at 100 by the endpoint, so a bigger page is not the
+    # fix — `search` is.
+    team = requests.get(
+        f"{BASE}/api/merchant/team?page_size=100&search={OPERATOR_EMAIL}", headers=H(mtok)
+    ).json()
     existing = next((u for u in team.get("items", []) if u["email"] == OPERATOR_EMAIL), None)
 
     if existing:

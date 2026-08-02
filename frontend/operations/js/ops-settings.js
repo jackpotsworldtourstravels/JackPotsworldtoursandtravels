@@ -379,9 +379,17 @@ async function opsMatrixPanel(host) {
         grant is added to <b>that person</b> under Users → Administrators → Permissions, which
         leaves the role boundaries intact.`)
       + table('Merchant sub-roles', merchantRoles, `
-        A merchant user's effective permissions are the <b>union</b> of their account role and their
-        merchant sub-role, so a merchant_user with the Finance sub-role can pay and report without
-        being able to raise a booking.`);
+        <b>Read this table as "what this sub-role may DO", not as everything it holds.</b> A merchant
+        user's effective permissions are the <b>union</b> of their account role and their sub-role,
+        and the account role already carries the whole read floor —
+        <span class="ops-mono">ticket.view</span>, <span class="ops-mono">payment.view</span>,
+        <span class="ops-mono">report.view</span>, <span class="ops-mono">chat.view</span>,
+        <span class="ops-mono">notification.view</span> and
+        <span class="ops-mono">profile.manage</span> — for <b>every</b> merchant account. That is
+        deliberate: the Merchant Portal is one interface for the whole company, so a sub-role changes
+        which buttons work, never which screens exist. What differs below is therefore the actions
+        only: Finance can pay and export without being able to raise a booking; a Data Operator can
+        raise one without being able to pay for it. Both still see the same eleven screens.`);
   } catch (err) {
     host.innerHTML = `<div class="ops-panel"><div class="ops-panel-body">
       <div class="ops-msg ops-msg-err" style="margin:0">${escapeHtml(opsError(err, 'Could not load the matrix.'))}</div>

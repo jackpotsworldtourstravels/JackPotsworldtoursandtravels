@@ -18,6 +18,12 @@ A user's effective permissions are the union of:
 3. any explicit codes in ``users.permissions`` (the JSONB array that
    replaced the ``permissions``/``role_permissions`` tables).
 
+On the merchant side that union has a floor: ``_MERCHANT_READ`` is held by every
+merchant account, and a :class:`MerchantRole` only ever adds *action* codes on
+top. The Merchant Portal is one interface for the whole company — a sub-role
+changes which buttons work, never which screens exist. See the block comment
+above ``_MERCHANT_READ``.
+
 ``super_admin`` short-circuits to "everything in its own role set" — note
 that this is *not* a wildcard: the spec deliberately denies super admins
 ticket creation, and :func:`has_permission` honours that.
@@ -192,9 +198,44 @@ _MANAGER: frozenset[str] = frozenset({
     P.NOTIFICATION_VIEW,
 })
 
-_MERCHANT_ADMIN: frozenset[str] = frozenset({
+# ---------------------------------------------------------------------------
+# The merchant read floor
+# ---------------------------------------------------------------------------
+# THE MERCHANT PORTAL IS ONE INTERFACE. Every merchant staff login sees the same
+# screens, the same cards and the same charts; what differs between a Manager and
+# a Data Operator is what they may *do* on them. These are therefore the codes
+# that open a screen, and every merchant account holds all of them.
+#
+# WHY THIS IS A SET AND NOT SIX LINES REPEATED PER ROLE
+# It used to be per-role, and the roles drifted — which is not a tidiness
+# complaint, it is where the portal split in two:
+#
+#   * `report.view` was missing from Operator / Data Operator, so
+#     /api/analytics/bookings 403'd for them. The Dashboard catches that to
+#     `null` and renders "your booking history could not be loaded" instead of
+#     the charts, with six of its eight KPI tiles showing "—". Two roles, two
+#     visibly different dashboards, from one branch of one permission.
+#   * `payment.view` was missing from the same two, taking Wallet, Payment
+#     Management and the wallet balance tile with it.
+#   * `chat.view` was held by NO merchant sub-role at all — only by
+#     ``merchant_admin`` — so the Support Center 403'd for every Manager,
+#     Supervisor, Operator and Finance user in the product.
+#
+# Reading is scoped, not open: ``assert_same_merchant`` still confines every one
+# of these to the caller's own company, and every ``require()`` on every endpoint
+# is untouched. What changed is which codes a role holds, not who checks them.
+_MERCHANT_READ: frozenset[str] = frozenset({
+    P.TICKET_VIEW,          # bookings, enquiries, history, service requests
+    P.PAYMENT_VIEW,         # wallet balance, Payment Management, finance position
+    P.REPORT_VIEW,          # the Dashboard's analytics AND the Reports screen
+    P.CHAT_VIEW,            # Support Center threads
+    P.NOTIFICATION_VIEW,
+    P.PROFILE_MANAGE,
+})
+
+_MERCHANT_ADMIN: frozenset[str] = _MERCHANT_READ | frozenset({
     P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
-    P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
+    P.TICKET_ENQUIRY, P.TICKET_REQUEST,
     # Raise, and — as the account the company was onboarded with — sign off
     # what the rest of the company raises.
     P.SERVICE_REQUEST_CREATE, P.SERVICE_REQUEST_APPROVE,
@@ -203,21 +244,17 @@ _MERCHANT_ADMIN: frozenset[str] = frozenset({
     # construction, but not every merchant has a manager sub-role, and a single
     # manager being away must not stop the merchant submitting work.
     P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
-    P.PAYMENT_PAY, P.PAYMENT_VIEW,
-    P.REPORT_VIEW, P.REPORT_EXPORT,
-    P.CHAT_CREATE, P.CHAT_VIEW,
+    P.PAYMENT_PAY,
+    P.REPORT_EXPORT,
+    P.CHAT_CREATE,
     P.DOCUMENT_UPLOAD,
-    P.PROFILE_MANAGE,
-    P.NOTIFICATION_VIEW,
 })
 
-# A plain merchant user gets nothing beyond profile/notifications until a
-# merchant sub-role grants more — least privilege by default.
-_MERCHANT_USER: frozenset[str] = frozenset({
-    P.PROFILE_MANAGE,
-    P.NOTIFICATION_VIEW,
-    P.TICKET_VIEW,
-})
+# Every merchant staff login carries ``role == merchant_user``, so this is the
+# floor the whole company stands on and the sub-role below only ever adds
+# actions. A user with no sub-role can therefore open the portal and read their
+# own company's account — and can change nothing until a sub-role says so.
+_MERCHANT_USER: frozenset[str] = _MERCHANT_READ
 
 ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
     UserRole.SUPER_ADMIN: _SUPER_ADMIN,
@@ -229,7 +266,15 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
 }
 
 
-# Merchant sub-roles refine what a merchant_user may do inside their company.
+# Merchant sub-roles refine what a merchant_user may DO inside their company.
+#
+# THESE ARE ACTION CODES ONLY. Everything needed to *open* a screen is in
+# ``_MERCHANT_READ`` above and is already held by every merchant account, so a
+# sub-role can no longer take a page away from someone — only a button. That is
+# the invariant that keeps the portal one interface, and it only holds while
+# these sets stay free of ``*_VIEW`` codes. Adding ``P.REPORT_VIEW`` to one role
+# here would not grant anything (it is in the floor), but it would re-open the
+# door to someone later removing it from another and splitting the UI again.
 #
 # Operator and Data Operator are the SAME ROLE, by the business's decision
 # (2026-07-31). They used to differ by ``ticket.request``: a Data Operator could
@@ -242,7 +287,7 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset[str]] = {
 # stored in ``users.merchant_role`` on live rows and named in migration 0025,
 # so removing either means a data migration, not an edit here.
 _MERCHANT_OPERATOR: frozenset[str] = frozenset({
-    P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
+    P.TICKET_ENQUIRY, P.TICKET_REQUEST,
     P.SERVICE_REQUEST_CREATE,
     P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
 })
@@ -250,28 +295,30 @@ _MERCHANT_OPERATOR: frozenset[str] = frozenset({
 MERCHANT_ROLE_PERMISSIONS: dict[MerchantRole, frozenset[str]] = {
     MerchantRole.MANAGER: frozenset({
         P.MERCHANT_USER_CREATE, P.MERCHANT_USER_MANAGE,
-        P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
+        P.TICKET_ENQUIRY, P.TICKET_REQUEST,
         # The sign-off stage in front of ours — the manager is the only
-        # merchant role that holds it.
+        # merchant sub-role that holds it.
         P.SERVICE_REQUEST_CREATE, P.SERVICE_REQUEST_APPROVE,
-        P.PAYMENT_PAY, P.PAYMENT_VIEW,
-        P.REPORT_VIEW, P.REPORT_EXPORT,
+        P.PAYMENT_PAY,
+        P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
         # CR-3 — this sub-role is the approver for its own merchant.
         P.BOOKING_MERCHANT_APPROVE, P.BOOKING_MERCHANT_RETURN,
     }),
     MerchantRole.SUPERVISOR: frozenset({
-        P.TICKET_ENQUIRY, P.TICKET_REQUEST, P.TICKET_VIEW,
+        P.TICKET_ENQUIRY, P.TICKET_REQUEST,
         P.SERVICE_REQUEST_CREATE,
-        P.PAYMENT_VIEW,
-        P.REPORT_VIEW, P.REPORT_EXPORT,
+        P.REPORT_EXPORT,
         P.CHAT_CREATE, P.DOCUMENT_UPLOAD,
     }),
     MerchantRole.OPERATOR: _MERCHANT_OPERATOR,
+    # Finance settles money and reads the books; it does not raise travel. It
+    # still SEES every screen — including the ones it cannot act on — because
+    # that is what makes this one portal.
     MerchantRole.FINANCE: frozenset({
-        P.TICKET_VIEW,
-        P.PAYMENT_PAY, P.PAYMENT_VIEW,
-        P.REPORT_VIEW, P.REPORT_EXPORT,
+        P.PAYMENT_PAY,
+        P.REPORT_EXPORT,
+        P.CHAT_CREATE,
     }),
     MerchantRole.DATA_OPERATOR: _MERCHANT_OPERATOR,
 }

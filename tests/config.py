@@ -55,6 +55,19 @@ JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 200
 #: logins the rate limiter allows per minute.
 _TOKENS: dict[tuple[str, str], tuple[str, dict]] = {}
 
+def forget_login(email, portal="merchant"):
+    """Drop a cached token so the next :func:`login` really signs in again.
+
+    WHY THIS EXISTS — a cached token can be revoked behind the cache's back.
+    Resetting a password moves that user's ``force_logout_at`` to now, and
+    ``auth/deps.py::is_token_revoked`` then refuses every token issued before
+    it. The cache has no way to know that happened, so it keeps handing back a
+    token the server has already invalidated and the caller sees **401 where it
+    asserted 404** — which reads like a broken scoping rule and is nothing of
+    the sort. Anything that changes an account's credentials must call this.
+    """
+    _TOKENS.pop((email, portal), None)
+
 
 def login(email, password, portal, *, with_user=False):
     """Sign in through the real two-step OTP flow and return an access token.
