@@ -46,6 +46,7 @@ const CL_TXN_LABELS = {
   manual_adjustment: 'Adjustment',
   credit_note: 'Credit note',
   cancellation_charge: 'Cancellation charge',
+  reschedule_fee: 'Reschedule fee',
 };
 
 const CL_TOPUP_TONE = { submitted: 'warn', verified: 'ok', rejected: 'err' };

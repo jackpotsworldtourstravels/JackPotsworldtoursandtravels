@@ -99,6 +99,7 @@ a storage key, never a URL — served through an authenticated endpoint, never s
 | `wallet_recharge` | credit | a verified `wallet_topups` row |
 | `refund_credit` | credit | a cancellation or downward re-price settling |
 | `cancellation_charge` | debit | the charge retained on a cancellation |
+| `reschedule_fee` | debit | the fare difference + change fee on an approved reschedule |
 | `credit_note` | credit | a commercial or goodwill credit that is not a refund |
 | `manual_adjustment` | either | staff correcting a balance, always with a reason |
 

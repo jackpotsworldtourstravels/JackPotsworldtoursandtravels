@@ -80,7 +80,24 @@ let clSrRequests = [];
 /* Modal mode: the form, or the read-only look at what was booked. */
 let clSrViewing = false;
 
+/* The two top-level tabs on this screen. Choose a Booking is the default and
+   loads eagerly; Previously Raised Requests is lazy — nothing is fetched for
+   it until the merchant actually opens it, and once loaded it stays cached
+   (clSrRaisedLoaded) so tabbing back and forth costs no extra call. Only
+   Refresh forces a re-fetch. */
+let clSrPageTab = 'booking';
+let clSrRaisedLoaded = false;
+
+/* Which bookings already have a live cancellation against them. Choose a
+   Booking needs this for its "Cancellation raised" tag and the modal's
+   duplicate guard, but must not pull the whole (heavier) Previously Raised
+   Requests list just to get it — see clLoadCancellationGuard(). */
+let clSrCancellations = new Set();
+
 function clInitServiceRequest() {
+  clSrPageTab = 'booking';
+  clSrRaisedLoaded = false;
+
   $('cl-service-request').innerHTML = `
     <div class="cl-page-head">
       <div>
@@ -95,56 +112,65 @@ function clInitServiceRequest() {
       </div>
     </div>
 
-    <div class="cl-panel">
-      <div class="cl-panel-head">
-        <h2>Requests you have raised</h2>
-        <span class="cl-kpi-sub" id="clSrCounts"></span>
-      </div>
-      <!-- Type is the facet of this table: every row IS one of the seven kinds
-           of change. The filter narrows the rows this screen already holds
-           rather than re-fetching — clLoadServiceRequests pulls every type in
-           one call because the API filters on one request_type at a time. -->
-      <div class="cl-toolbar">
-        <div class="cl-field">
-          <label for="clSrType">Type</label>
-          <select id="clSrType">
-            <option value="">All types</option>
-            ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
-              `<option value="${t}">${clLabel(t)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="cl-panel-body cl-flush">
-        <div class="cl-table-wrap">
-          <table class="cl-table">
-            <thead><tr>
-              <th>Request no.</th><th>Type</th><th>Booking</th><th>Status</th>
-              <th class="cl-num">Amount</th><th>Raised</th><th class="cl-actions">Action</th>
-            </tr></thead>
-            <tbody id="clSrList"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="cl-panel-note" id="clSrListNote"></div>
+    <div class="cl-tabs" id="clSrPageTabs">
+      <button type="button" class="cl-tab active" data-cl-sr-page-tab="booking">Choose a Booking</button>
+      <button type="button" class="cl-tab" data-cl-sr-page-tab="raised">Previously Raised Requests</button>
     </div>
 
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Choose a booking</h2></div>
-      <div class="cl-panel-body cl-flush">
-        <div class="cl-table-wrap">
-          <table class="cl-table">
-            <thead><tr>
-              <th>Request no.</th><th>Item</th><th>Status</th>
-              <th class="cl-num">Amount</th><th>Travel date</th><th class="cl-actions">Action</th>
-            </tr></thead>
-            <tbody id="clSrBookings"></tbody>
-          </table>
+    <div id="clSrBookingPane">
+      <div class="cl-panel">
+        <div class="cl-panel-head"><h2>Choose a booking</h2></div>
+        <div class="cl-panel-body cl-flush">
+          <div class="cl-table-wrap">
+            <table class="cl-table">
+              <thead><tr>
+                <th>Request no.</th><th>Item</th><th>Status</th>
+                <th class="cl-num">Amount</th><th>Travel date</th><th class="cl-actions">Action</th>
+              </tr></thead>
+              <tbody id="clSrBookings"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="cl-panel-note">
+          Only bookings that are approved or beyond can be amended. Drafts and requests still
+          awaiting approval are not listed — those are withdrawn from
+          <a href="#" data-cl-nav-requests>My Requests</a> instead, free of charge.
         </div>
       </div>
-      <div class="cl-panel-note">
-        Only bookings that are approved or beyond can be amended. Drafts and requests still
-        awaiting approval are not listed — those are withdrawn from
-        <a href="#" data-cl-nav-requests>My Requests</a> instead, free of charge.
+    </div>
+
+    <div id="clSrRaisedPane" style="display:none;">
+      <div class="cl-panel">
+        <div class="cl-panel-head">
+          <h2>Requests you have raised</h2>
+          <span class="cl-kpi-sub" id="clSrCounts"></span>
+        </div>
+        <!-- Type is the facet of this table: every row IS one of the seven kinds
+             of change. The filter narrows the rows this screen already holds
+             rather than re-fetching — clLoadServiceRequests pulls every type in
+             one call because the API filters on one request_type at a time. -->
+        <div class="cl-toolbar">
+          <div class="cl-field">
+            <label for="clSrType">Type</label>
+            <select id="clSrType">
+              <option value="">All types</option>
+              ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
+                `<option value="${t}">${clLabel(t)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="cl-panel-body cl-flush">
+          <div class="cl-table-wrap">
+            <table class="cl-table">
+              <thead><tr>
+                <th>Request no.</th><th>Type</th><th>Booking</th><th>Status</th>
+                <th class="cl-num">Amount</th><th>Raised</th><th class="cl-actions">Action</th>
+              </tr></thead>
+              <tbody id="clSrList"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="cl-panel-note" id="clSrListNote"></div>
       </div>
     </div>`;
 
@@ -152,14 +178,39 @@ function clInitServiceRequest() {
     e.preventDefault();
     clGo('requests');
   });
-  $('clSrRefresh').addEventListener('click', () => clLoadServiceRequests().then(clLoadSrBookings));
+  $('cl-service-request').querySelectorAll('[data-cl-sr-page-tab]').forEach(b =>
+    b.addEventListener('click', () => clSwitchSrPageTab(b.dataset.clSrPageTab)));
+
+  /* Refresh acts on whichever tab is open: Choose a Booking re-pulls the
+     booking list (and its lightweight cancellation guard); Previously Raised
+     Requests re-pulls the full list, bypassing the cache. */
+  $('clSrRefresh').addEventListener('click', () => {
+    if (clSrPageTab === 'raised') {
+      clLoadServiceRequests();
+    } else {
+      clLoadSrBookings();
+    }
+  });
   clChips('clSrType', 'Type');
   $('clSrType').addEventListener('change', clRenderServiceRequests);
 
-  /* Both lists before either renders: the booking table marks the rows that
-     already have a cancellation against them, which it can only know from the
-     request list. */
-  return clLoadServiceRequests().then(clLoadSrBookings);
+  /* Only the default tab's data is fetched on open. Previously Raised
+     Requests waits for its own tab click — see clSwitchSrPageTab(). */
+  return clLoadSrBookings();
+}
+
+function clSwitchSrPageTab(tab) {
+  if (tab === clSrPageTab) return;
+  clSrPageTab = tab;
+  $('clSrPageTabs').querySelectorAll('[data-cl-sr-page-tab]').forEach(b =>
+    b.classList.toggle('active', b.dataset.clSrPageTab === tab));
+  $('clSrBookingPane').style.display = tab === 'booking' ? '' : 'none';
+  $('clSrRaisedPane').style.display = tab === 'raised' ? '' : 'none';
+
+  if (tab === 'raised' && !clSrRaisedLoaded) {
+    clSrRaisedLoaded = true;
+    clLoadServiceRequests();
+  }
 }
 
 /* ============================================================ the list */
@@ -177,6 +228,9 @@ async function clLoadServiceRequests() {
     const data = await MerchantApi.listRequests({ page_size: 100 });
     clSrRequests = (data.items || []).filter(
       r => MERCHANT_SERVICE_REQUEST_TYPES.includes(r.request_type));
+    // The fuller list is now local — refresh the cancellation guard from it
+    // rather than firing the narrower query clLoadSrBookings() otherwise uses.
+    clSrCancellations = clDeriveCancellations(clSrRequests);
     clRenderServiceRequests();
   } catch (err) {
     clSrRequests = [];
@@ -379,25 +433,51 @@ async function clManagerDecide(id, approve) {
 
 /* ======================================================= choose a booking */
 
-/* Bookings that already have a live cancellation against them. One cancellation
-   per booking is a server rule; knowing it here is what lets the row say so
+/* Bookings that already have a live cancellation against them, from whatever
+   rows are already in hand — clSrRequests once Previously Raised Requests has
+   been opened, or nothing yet on a fresh page load. One cancellation per
+   booking is a server rule; knowing it here is what lets the row say so
    instead of the merchant finding out from a 409. */
-function clBookingsWithCancellation() {
+function clDeriveCancellations(rows) {
   return new Set(
-    clSrRequests
+    (rows || [])
       .filter(r => r.request_type === 'cancellation'
         && !['rejected', 'cancelled'].includes(r.status))
       .map(r => String(r.parent_request_id))
   );
 }
 
+/* Choose a Booking needs to know which bookings already have a cancellation
+   raised, but Part 1 keeps Previously Raised Requests (all six types, up to
+   100 rows) unloaded until its own tab is opened. Rather than pulling that
+   heavier list just for this guard, this asks for cancellations alone — a
+   single narrowly-filtered query — unless the fuller list is already local,
+   in which case it is the better (and free) answer. */
+async function clLoadCancellationGuard() {
+  if (clSrRaisedLoaded) {
+    clSrCancellations = clDeriveCancellations(clSrRequests);
+    return;
+  }
+  try {
+    const data = await MerchantApi.listRequests({ request_type: 'cancellation', page_size: 100 });
+    clSrCancellations = clDeriveCancellations(data.items || []);
+  } catch {
+    // Non-fatal: worst case the "Cancellation raised" tag is missing this
+    // load and the server's own guard catches a duplicate attempt instead.
+    clSrCancellations = new Set();
+  }
+}
+
 async function clLoadSrBookings() {
   const body = $('clSrBookings');
   body.innerHTML = clLoadingRow(6, 'Loading eligible bookings…');
   try {
-    const data = await MerchantApi.listRequests({ request_type: 'booking', page_size: 100 });
+    const [data] = await Promise.all([
+      MerchantApi.listRequests({ request_type: 'booking', page_size: 100 }),
+      clLoadCancellationGuard(),
+    ]);
     clSrBookings = (data.items || []).filter(r => CL_SR_ELIGIBLE.includes(r.status));
-    const cancelled = clBookingsWithCancellation();
+    const cancelled = clSrCancellations;
 
     body.innerHTML = clSrBookings.length
       ? clSrBookings.map(r => `<tr data-cl-sr-row="${r.id}">
@@ -596,7 +676,7 @@ function clRenderSrTabBody(pax) {
     if (!CL_CANCEL_ELIGIBLE.includes(clSrBooking.status)) {
       return clSrLockSubmit(clSrIneligibleNote('cancelled'));
     }
-    if (clBookingsWithCancellation().has(String(clSrBooking.id))) {
+    if (clSrCancellations.has(String(clSrBooking.id))) {
       return clSrLockSubmit(`<div class="cl-msg cl-msg-info" style="margin-top:0">
         A cancellation has already been raised against ${escapeHtml(clSrBooking.request_number || 'this booking')}.
         A booking is only cancelled once — track that request in the list above.</div>`);
@@ -772,8 +852,12 @@ async function clSubmitSrRequest(run, successVerb) {
     const data = await run();
     const r = data.request || data;
     clCloseModal();
-    await clLoadServiceRequests();
+    /* Choose a Booking always refreshes — its guard needs the new request.
+       Previously Raised Requests only refreshes if it was already loaded this
+       visit; otherwise it stays lazy and picks up the new row whenever it is
+       next opened. */
     await clLoadSrBookings();
+    if (clSrRaisedLoaded) await clLoadServiceRequests();
     /* The `clSearchCache = null` that used to sit here went with the topbar's
        search box — there is no client-side row cache left to invalidate. */
     clInvalidate('dashboard', 'requests', 'booking-history', 'payments', 'reports');

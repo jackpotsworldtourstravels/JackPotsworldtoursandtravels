@@ -526,6 +526,44 @@ def refund_booking_to_wallet(
     )
 
 
+def charge_reschedule_fee_to_wallet(
+    db: Session, booking: ServiceRequest, amount: Decimal, *,
+    actor_id: int | None, reason: str, commit: bool = False,
+) -> WalletTransaction | None:
+    """Bill an approved reschedule's fare difference + change fee (M3's
+    ``total_payable``) to the wallet.
+
+    Unlike :func:`refund_booking_to_wallet` this does not require an existing
+    booking debit: a reschedule fee is a new charge in its own right, not a
+    reversal of one already posted, so it is billed the moment it is approved
+    even on a booking that has not reached Ticket Issued yet.
+
+    Only a wallet-billed (Classic/enquiry-led) booking has anywhere for this
+    charge to go; a catalog-led booking's reschedule fee is left exactly as M3
+    shipped it — quoted, not billed — rather than inventing a new payment path
+    here. ``enforce_limit`` stays at its default (True): approving the
+    reschedule is the moment this commitment is taken on, not something
+    already irreversibly spent, so the same credit-limit gate applies as any
+    other new charge.
+    """
+    from app.services import wallet_service
+
+    amount = q(amount)
+    if amount <= ZERO or not is_wallet_billed(booking) or booking.merchant_id is None:
+        return None
+
+    merchant = db.get(Merchant, booking.merchant_id)
+    return wallet_service.post(
+        db, merchant,
+        txn_type=WalletTxnType.RESCHEDULE_FEE,
+        amount=-amount,
+        actor_id=actor_id,
+        reason=reason,
+        request_id=booking.request_id,
+        commit=commit,
+    )
+
+
 def assert_credit_available(
     db: Session, merchant: Merchant, amount: Decimal | None = None, *,
     request_number: str | None = None,

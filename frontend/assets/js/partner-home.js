@@ -992,8 +992,10 @@ async function mhLoadQuickRow() {
     const due = s.payment_pending || 0;
     const verifying = data.pending_payments_count || 0;
     const items = [
+      /* wallet_balance is a Decimal string (M4) — moneyStr(), not money(),
+         which mishandles a negative CR-4 balance (see partner-dashboard.js). */
       `<button type="button" class="mh-quick-item" data-mh-goto="dashboard">${
-        mhQuickIcon('wallet')}Wallet <b>${money(data.wallet_balance)}</b></button>`,
+        mhQuickIcon('wallet')}Wallet <b>${moneyStr(data.wallet_balance)}</b></button>`,
       `<button type="button" class="mh-quick-item" data-mh-goto="request-history">${
         mhQuickIcon('clock')}<b>${awaiting}</b> awaiting approval</button>`,
     ];

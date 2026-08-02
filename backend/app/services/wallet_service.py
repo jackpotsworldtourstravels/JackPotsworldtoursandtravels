@@ -60,6 +60,7 @@ _CENTS = Decimal("0.01")
 _DEBIT_TYPES = frozenset({
     WalletTxnType.BOOKING_DEBIT,
     WalletTxnType.CANCELLATION_CHARGE,
+    WalletTxnType.RESCHEDULE_FEE,
 })
 
 

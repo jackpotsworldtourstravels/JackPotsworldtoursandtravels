@@ -24,8 +24,10 @@ async function loadAccountSummary(merchantName) {
     const { data } = await axios.get(`${API_BASE}/api/merchant/dashboard`, { headers: partnerAuthHeaders() });
     host.innerHTML = [
       card('Company', escapeHtml(merchantName || '—'), 'Registered partner account'),
-      card('Wallet balance', money(data.wallet_balance), 'Available to settle requests', 'money'),
-      card('Credit limit', money(data.credit_limit), 'Agreed with our team', 'money'),
+      // Decimal strings off finance_service (M4) — moneyStr(), not money(),
+      // which mishandles a negative CR-4 wallet balance.
+      card('Wallet balance', moneyStr(data.wallet_balance), 'Available to settle requests', 'money'),
+      card('Credit limit', moneyStr(data.credit_limit), 'Agreed with our team', 'money'),
       card('Support', '24×7 partner desk',
         'Open Live Chat Support from the account menu for a threaded reply'),
     ].join('');

@@ -199,6 +199,9 @@ class WalletTxnType(str, enum.Enum):
     CREDIT_NOTE = "credit_note"
     #: The charge retained when a booking is cancelled (M3 computes it).
     CANCELLATION_CHARGE = "cancellation_charge"
+    #: The fare difference + change fee billed when an approved reschedule is
+    #: settled against a wallet-billed booking (M3/M4).
+    RESCHEDULE_FEE = "reschedule_fee"
 
 
 class WalletTopupStatus(str, enum.Enum):

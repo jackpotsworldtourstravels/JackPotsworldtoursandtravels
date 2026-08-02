@@ -853,6 +853,29 @@ def approve(
             "previous_travel_date": previous["travel_date"],
         }
 
+        # ---- bill the reschedule fee against the wallet (M4) ------------
+        # M3 computed `total_payable` and stopped there — nothing ever
+        # charged it anywhere, so a merchant's fare difference and change fee
+        # were tracked on the request and never actually billed. Mirrors the
+        # cancellation branch's refund settlement above: only a wallet-billed
+        # (Classic/enquiry-led) booking has anywhere for this charge to go —
+        # see charge_reschedule_fee_to_wallet.
+        wallet_charge = finance_service.charge_reschedule_fee_to_wallet(
+            db, booking, amount, actor_id=actor.user_id,
+            reason=f"{request.request_number}: reschedule fee on {booking.request_number}",
+            commit=False,
+        )
+        if wallet_charge is not None:
+            # A COPY, same reason as the cancellation branch above: mutating
+            # `pricing` in place after `request.pricing` was already assigned
+            # once (and after a query — wallet_service.post's row lock — has
+            # autoflushed it) would compare equal to its own committed
+            # baseline and SQLAlchemy would emit no UPDATE.
+            pricing["wallet_charge_reference"] = wallet_charge.txn_number
+            pricing["wallet_balance_after"] = str(wallet_charge.balance_after)
+            request.pricing = dict(pricing)
+        applied["fee_billed"] = str(amount) if wallet_charge is not None else "0.00"
+
     db.commit()
     db.refresh(request)
     db.refresh(booking)

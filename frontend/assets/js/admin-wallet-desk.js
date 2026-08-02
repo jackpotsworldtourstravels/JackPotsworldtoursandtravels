@@ -71,6 +71,7 @@ const WD_TXN_LABELS = {
   booking_debit: 'Ticket booking', wallet_recharge: 'Wallet recharge',
   refund_credit: 'Refund', cancellation_charge: 'Cancellation charge',
   credit_note: 'Credit note', manual_adjustment: 'Manual adjustment',
+  reschedule_fee: 'Reschedule fee',
 };
 
 function wdStatusChip(status) {

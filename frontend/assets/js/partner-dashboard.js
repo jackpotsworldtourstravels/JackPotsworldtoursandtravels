@@ -69,11 +69,18 @@ async function loadDashboard() {
     const { data } = await axios.get(`${API_BASE}/api/merchant/dashboard`, { headers: partnerAuthHeaders() });
     const s = data.requests_by_status;
     grid.innerHTML = [
-      dashCard(DASH_ICONS.wallet, 'sky', money(data.wallet_balance), 'Wallet Balance',
+      /* wallet_balance/credit_limit are Decimal fields off finance_service and
+         cross the wire as decimal STRINGS (M4) — money() does Math.round() and
+         puts the currency symbol before a negative sign ("₹-1,00,000"), which
+         is wrong twice over for a wallet that can legitimately be negative
+         (CR-4). moneyStr() is the formatter built for exactly this class of
+         field, and is already how the Admin portal and the Classic wallet
+         screen render the same numbers. */
+      dashCard(DASH_ICONS.wallet, 'sky', moneyStr(data.wallet_balance), 'Wallet Balance',
         'payments', '', 'Open Payments'),
       /* Credit limit is a standing account term, not a queue — there is nothing to
          open, so it stays a plain card. */
-      dashCard(DASH_ICONS.credit, 'gold', money(data.credit_limit), 'Credit Limit'),
+      dashCard(DASH_ICONS.credit, 'gold', moneyStr(data.credit_limit), 'Credit Limit'),
       dashCard(DASH_ICONS.pending, 'gold', s.pending_approval + s.in_review, 'Pending Approval',
         'request-history', 'pending_approval', 'See requests awaiting approval'),
       dashCard(DASH_ICONS.paymentPending, 'coral', s.payment_pending, 'Payment Pending',
