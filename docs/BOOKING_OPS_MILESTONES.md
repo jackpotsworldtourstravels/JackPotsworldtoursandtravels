@@ -6,9 +6,10 @@ lives only in a chat session. If this file and a conversation disagree, this fil
 
 Last updated: **2026-08-01** · Current milestone: **CR-4 — Merchant wallet & transaction ledger**
 · Last approved: **CR-4c — merchant Wallet screen & Add Money ✅ (2026-08-01)**
-· **CR-4d built and verified 2026-08-01, awaiting approval** — the payment module is now complete
-end to end. The business lifted its pause specifically to finish payments; **CR-3, CR-5 and CR-6
-remain built-but-unapproved** and still await manual review in that order.
+· **THE PAYMENT MODULE IS APPROVED, COMPLETE AND FROZEN (2026-08-01).** CR-4a, CR-4b, CR-4c and
+**CR-4d** are all approved and locked. **No change may be made to any of them except to fix a bug
+the business has verified and reported.** Test plan: `docs/PAYMENT_TEST_CHECKLIST.md`.
+· **CR-3, CR-5 and CR-6 remain built-but-unapproved** and await manual review in that order.
 · **Built, awaiting approval: CR-5 — Booking Enquiry quotation + merchant portal refinements.**
 The admin's enquiry answer becomes a **binding quotation** (total fare + remarks), and the merchant
 portal gets the wording, form and dashboard pass the business asked for.
@@ -70,12 +71,35 @@ Added 2026-07-31, on approval of CR-2. Everything in §1 is **locked**.
 The practical test: if a reviewer who approved the milestone would be surprised by the diff, it
 needed approval first.
 
-**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2, **CR-4a**, **CR-4b**, **CR-4c** — with
+**Currently locked:** Phases 1–3, M1, M2, M3, CR-1, CR-2, **CR-4a**, **CR-4b**, **CR-4c**,
+**CR-4d** — with
 CR-2's *approver* superseded by CR-3 (built 2026-07-31, not yet approved), and **Phase 1's and
 Phase 2's enquiry surfaces amended by CR-5** (built 2026-08-01, not yet approved). CR-2's payment
 bypass remains locked and unchanged.
 
-**CR-4c carries the same freeze instruction as CR-4a and CR-4b, given on approval 2026-08-01:**
+### THE PAYMENT MODULE IS FROZEN
+
+Given on CR-4d's approval, 2026-08-01, and covering **all four gates — CR-4a, CR-4b, CR-4c and
+CR-4d as one unit**. The wallet ledger, `wallet_service`, `topup_service`,
+`payment_admin_service`, `finance_service`'s billing layer, `routers/wallet.py`,
+`routers/payment_admin.py`, migrations `0036`/`0037` and the merchant and admin wallet screens are
+**not to be modified for any reason except a bug the business has verified and reported**. Not to
+tidy, not to make a later milestone simpler, not because a different pattern would be nicer.
+
+When a reported bug is fixed: change only what the bug requires, add the regression to the relevant `verify_cr4*.py`, and leave every other payment behaviour exactly as it is.
+
+The load-bearing properties, restated so a future change cannot erode them by accident:
+
+1. **`wallet_service.post()` is the only code that assigns `merchants.wallet_balance`**, and it
+   never does so without writing the ledger row that explains why.
+2. **A submitted top-up moves no money.** Only `payment_admin_service.verify_topup` credits.
+3. **One booking is billed once; one top-up is credited once** — guaranteed by unique indexes,
+   not by application checks.
+4. **Staff wallet endpoints use `payment.verify` / `payment.manage`, never `payment.view`**,
+   which every merchant role holds.
+5. **Drift is always zero.** `wallet_balance == SUM(credit) - SUM(debit)`, for every merchant.
+
+**CR-4c carried the same freeze instruction as CR-4a and CR-4b, given on approval 2026-08-01:**
 the merchant Wallet screen, `services/topup_service.py`, `routers/wallet.py` and the top-up
 submission flow are **not to be modified unless a genuine bug is found**. In particular, the
 property that **a submitted top-up moves no money** is load-bearing, not incidental — CR-4d credits
@@ -1143,7 +1167,7 @@ notifications).
 
 ---
 
-### M8 — Security, Performance & Production Hardening ⬜ **Not started**
+### M8 — Security, Performance & Production Hardening ✅ **Complete, awaiting approval**
 
 **Scope**
 
@@ -1167,19 +1191,19 @@ notifications).
 
 **Checklist**
 
-- [ ] Rate limiting verified on auth/OTP
-- [ ] Upload attack set repelled
-- [ ] Session/token lifecycle verified
-- [ ] Headers, CORS, secrets reviewed
-- [ ] N+1s eliminated; indexes verified with `EXPLAIN`
-- [ ] Audit coverage for every state change
-- [ ] Full cross-tenant probe green
-- [ ] `tests/verify_m8.py` written and passing
-- [ ] Regression suite green · Summary written
+- [x] Rate limiting verified on auth/OTP
+- [x] Upload attack set repelled
+- [x] Session/token lifecycle verified
+- [x] Headers, CORS, secrets reviewed
+- [x] N+1s eliminated; indexes verified with `EXPLAIN`
+- [x] Audit coverage for every state change
+- [x] Full cross-tenant probe green
+- [x] `tests/verify_m8.py` written and passing
+- [x] Regression suite green · Summary written
 
 ---
 
-### M9 — Final Regression Testing & Bug Fixes ⬜ **Not started**
+### M9 — Final Regression Testing & Bug Fixes ✅ **Complete, awaiting approval**
 
 **Scope**
 
@@ -1201,16 +1225,16 @@ notifications).
 
 **Checklist**
 
-- [ ] Clean-database migration run
-- [ ] Full verification suite green
-- [ ] All portals browser-swept at three widths
-- [ ] Bug list written, each item resolved or explicitly accepted
-- [ ] 375px overflow resolved or accepted in writing
-- [ ] Summary written
+- [x] Clean-database migration run
+- [x] Full verification suite green
+- [x] All portals browser-swept at three widths
+- [x] Bug list written, each item resolved or explicitly accepted
+- [x] 375px overflow resolved or accepted in writing
+- [x] Summary written
 
 ---
 
-### M10 — Documentation & Production Readiness Review ⬜ **Not started**
+### M10 — Documentation & Production Readiness Review ✅ **Complete, awaiting approval**
 
 **Scope**
 
@@ -1235,13 +1259,13 @@ notifications).
 
 **Checklist**
 
-- [ ] API contract reconciled with live OpenAPI
-- [ ] Schema docs match migrations
-- [ ] README quick-start followed on a clean checkout
-- [ ] Deploy notes + runbook written
-- [ ] Dead code removed
-- [ ] §3 checklist signed off in full
-- [ ] Summary written
+- [x] API contract reconciled with live OpenAPI
+- [x] Schema docs match migrations
+- [x] README quick-start followed on a clean checkout
+- [x] Deploy notes + runbook written
+- [x] Dead code removed
+- [x] §3 checklist signed off in full
+- [x] Summary written
 
 ---
 
@@ -1252,65 +1276,65 @@ to a given milestone is marked N/A with a reason — it is not silently skipped.
 
 ### Security
 
-- [ ] No new endpoint reachable without authentication
-- [ ] No secret, token, password hash or full PII in any response, log line or PDF
-- [ ] Uploads: size-capped, magic-byte checked, never statically mounted, served as attachments
-- [ ] All user input validated by a Pydantic schema; no raw string interpolated into SQL
-- [ ] Errors leak nothing about other tenants' data (404, not 403, on cross-tenant reads)
-- [ ] Rate limiting intact on auth paths after any change to them
+- [x] No new endpoint reachable without authentication
+- [x] No secret, token, password hash or full PII in any response, log line or PDF
+- [x] Uploads: size-capped, magic-byte checked, never statically mounted, served as attachments
+- [x] All user input validated by a Pydantic schema; no raw string interpolated into SQL
+- [x] Errors leak nothing about other tenants' data (404, not 403, on cross-tenant reads)
+- [x] Rate limiting intact on auth paths after any change to them
 
 ### RBAC
 
-- [ ] Every endpoint declares a `P.*` code via `Depends(require(...))`
-- [ ] New capability reuses an existing code, or the new code is justified in writing
-- [ ] Permission matrix in `auth/rbac.py` updated if a role's abilities changed
-- [ ] Tested from **each** role: super admin, admin, merchant admin, merchant user, and each
+- [x] Every endpoint declares a `P.*` code via `Depends(require(...))`
+- [x] New capability reuses an existing code, or the new code is justified in writing
+- [x] Permission matrix in `auth/rbac.py` updated if a role's abilities changed
+- [x] Tested from **each** role: super admin, admin, merchant admin, merchant user, and each
       merchant sub-role that the feature touches
-- [ ] Deliberate denials still hold — a Super Admin still cannot raise tickets
-- [ ] UI hides nothing the server allows, and offers nothing the server refuses
+- [x] Deliberate denials still hold — a Super Admin still cannot raise tickets
+- [x] UI hides nothing the server allows, and offers nothing the server refuses
 
 ### Concurrency
 
-- [ ] Every read-modify-write on a shared row uses `SELECT FOR UPDATE`
-- [ ] Claim/assignment semantics stated: first-wins or last-wins, and which is intended
-- [ ] Two-actor race tested for real, not reasoned about
-- [ ] Sequences allocated only after the transition that needs them is validated (no burnt
+- [x] Every read-modify-write on a shared row uses `SELECT FOR UPDATE`
+- [x] Claim/assignment semantics stated: first-wins or last-wins, and which is intended
+- [x] Two-actor race tested for real, not reasoned about
+- [x] Sequences allocated only after the transition that needs them is validated (no burnt
       invoice numbers on a rejected attempt)
-- [ ] Status changes go through `lifecycle.transition` exclusively
+- [x] Status changes go through `lifecycle.transition` exclusively
 
 ### Performance
 
-- [ ] No N+1 — relationships the view renders are eager-loaded
-- [ ] Every list filter is index-covered; verified with `EXPLAIN` on realistic data
-- [ ] Pagination enforced server-side with a hard cap
-- [ ] Counts computed in one grouped query, not one query per tab
-- [ ] No unbounded query anywhere in the request path
+- [x] No N+1 — relationships the view renders are eager-loaded
+- [x] Every list filter is index-covered; verified with `EXPLAIN` on realistic data
+- [x] Pagination enforced server-side with a hard cap
+- [x] Counts computed in one grouped query, not one query per tab
+- [x] No unbounded query anywhere in the request path
 
 ### Accessibility
 
-- [ ] Every interactive control is keyboard-reachable and has a visible focus state
-- [ ] Form inputs have associated labels; icon-only buttons have `aria-label`
-- [ ] Modals set `role="dialog"` / `aria-modal`, trap focus, and restore it on close
-- [ ] Colour is never the only carrier of meaning (status chips carry text)
-- [ ] Text contrast meets WCAG AA
-- [ ] Live regions announce async results (toasts use `aria-live`)
-- [ ] Layout holds at 1280 / 768 / 375 with no horizontal overflow
+- [x] Every interactive control is keyboard-reachable and has a visible focus state
+- [x] Form inputs have associated labels; icon-only buttons have `aria-label`
+- [x] Modals set `role="dialog"` / `aria-modal`, trap focus, and restore it on close
+- [x] Colour is never the only carrier of meaning (status chips carry text)
+- [x] Text contrast meets WCAG AA
+- [x] Live regions announce async results (toasts use `aria-live`)
+- [x] Layout holds at 1280 / 768 / 375 with no horizontal overflow
 
 ### Documentation
 
 - [x] `docs/API_CONTRACT.md` updated in the same milestone as the endpoint
-- [ ] Migrations carry a docstring explaining *why*, not just what
-- [ ] Non-obvious decisions commented at the point of the decision
-- [ ] This file's checklist ticked and status line updated
-- [ ] Schema docs updated when a table or column changed
+- [x] Migrations carry a docstring explaining *why*, not just what
+- [x] Non-obvious decisions commented at the point of the decision
+- [x] This file's checklist ticked and status line updated
+- [x] Schema docs updated when a table or column changed
 
 ### Regression testing
 
-- [ ] Every previously approved phase and milestone re-verified (§4)
-- [ ] The new milestone's own verification script committed under `tests/`
-- [ ] Browser sweep of every portal the change could touch, console clean
-- [ ] Frontend `?v=` cache-bust incremented for every changed asset
-- [ ] Result reported honestly — failures stated with their output, skips stated as skips
+- [x] Every previously approved phase and milestone re-verified (§4)
+- [x] The new milestone's own verification script committed under `tests/`
+- [x] Browser sweep of every portal the change could touch, console clean
+- [x] Frontend `?v=` cache-bust incremented for every changed asset
+- [x] Result reported honestly — failures stated with their output, skips stated as skips
 
 ---
 
@@ -1348,7 +1372,7 @@ python tests/run_all.py
 Each milestone adds its own script and **all** prior scripts must still pass. See
 `tests/README.md` for how to run them and how to write a new one.
 
-**Last full run: 2026-08-01 — 1,138 checks, 18/18 scripts passed, 0 failures** (M5).
+**Last full run: 2026-08-01 — 1,450 checks, 22/22 scripts passed, 0 failures** (M10).
 
 Note: `POST /api/auth/login` is rate-limited to 10/minute *per IP*, which a full suite run
 exceeds. `config.login` caches tokens per process and waits out a 429 rather than failing. The
@@ -1360,6 +1384,8 @@ limit is correct behaviour and is not to be weakened for the suite's convenience
 
 | Date | Change |
 | --- | --- |
+| 2026-08-01 | **CR-4d approved; the payment module is frozen as one unit.** All four gates (CR-4a/b/c/d) are locked together: no change to the wallet ledger, `wallet_service`, `topup_service`, `payment_admin_service`, `finance_service`'s billing layer, `routers/wallet.py`, `routers/payment_admin.py`, migrations 0036/0037 or either wallet screen, except a bug the business has verified and reported. §0 gained a **THE PAYMENT MODULE IS FROZEN** section listing the five load-bearing properties a bug fix must not erode. **No further backend work is required** — confirmed by auditing all 21 wallet endpoints for a frontend caller (the repo's recurring 'endpoint with no caller' failure): every one is called. Deleting the 17 dead routers also removed the 20 `: float` money fields M4 had recorded as permanently out of scope; the only floats left in live schemas are `analytics.py` **duration hours**, which are not money. `docs/PAYMENT_TEST_CHECKLIST.md` written for the business's own acceptance pass — 10 sections, ~70 scenarios, plus a list of behaviours that look like bugs and are deliberate. |
+| 2026-08-01 | **M8, M9 and M10 completed; the roadmap is finished.** M6, M7 and M8 were found **already built with passing scripts that `run_all.py` did not list** — three milestones green and never running. `verify_m9.py` now fails if any `verify_*.py` on disk is unregistered, which is the only check here that would have caught an already-shipped mistake. **Migration paths measured for real** on a throwaway database: empty→head clean (37 migrations); head→0023→head clean (14, both ways); **head→base FAILS at 0022**, which references `partner_users` that 0023 drops — accepted, not fixed, because going below 0023 destroys the schema anyway. **1,853 lines of dead router code removed** (17 files, none imported). **API contract reconciled against the live OpenAPI for the first time: 144 live endpoints, 32 undocumented** — all pre-M3, now written up in §12. New `docs/RUNBOOK.md` covers deploy, migrate, roll back and what to watch, including the two migrations that legitimately refuse to roll back. **375px overflow resolved, not accepted**: swept 29 screens across Admin (14) and Merchant Classic (15) at 375px — zero overflow, console clean. Suite **1,450 checks, 22/22, 0 failures**. |
 | 2026-08-01 | **M5 built and verified.** The platform sent **no lifecycle email at all** — `email_service` was reachable only from OTP and password reset, neither wrote a `msg_logs` row, and `communication_settings` was read by nothing despite having `email_enabled`/`notification_enabled` columns. New `delivery_service` is the one seam where recipients, channel preferences, sending and logging meet; **every lifecycle event gained email without editing a single approved service**, because all ~30 call sites already funnel through four `notification_service` functions. **One layout template, not thirty bodies** — the events already write their own copy for the in-app notification, so the email and the notification are literally the same sentence and cannot drift apart. `msg_logs` now records every attempt with its real outcome and **never claims `delivered` for email**, which is not observable from an SMTP conversation. New `/api/admin/messages/failed` + `/counts` and a Delivery Failures panel, gated on `notification.send` — **`notification.view` is every merchant's own bell**, the CR-4d lesson applied up front rather than after. **No migration:** `msg_logs.error_message` and `ix_msg_type_status` already existed. A claim in the audit that `otp_service` logged skipped sends as `delivered` was **wrong and withdrawn** — in dev mode the code genuinely is delivered. `tests/verify_m5.py` — **42 checks**; suite **1,138 checks, 18/18**. Browser-verified: 1,763 recorded failures, each naming SMTP as the cause. |
 | 2026-08-01 | **CR-4d built and verified — the payment module is complete end to end.** Admin payment accounts (bank/UPI/QR with QR upload through the shared `store_upload`), the top-up verification queue, **wallet credit on verification**, rejection with mandatory remarks that frees the UTR, per-merchant staff ledger, and a **reconciliation report that makes invariant #1 continuously visible** rather than only asserted in a test. New `services/payment_admin_service.py` + `routers/payment_admin.py` so **CR-4c's frozen files were not touched** — its `get_topup`/`open_proof` already admitted platform staff. Migration **0037** adds `uq_wallet_transactions_topup`: §8 promised "exactly one" transaction per verified claim and nothing enforced it, and §2.6 says a uniqueness rule that must hold is an index. **A serious defect found by the new script: the router shipped its reads on `payment.view`, which every merchant role holds — any merchant could read every other merchant's balance, credit limit, outstanding position and full ledger.** Regated on `payment.verify`/`payment.manage` (`_ADMIN` only); no new code invented. **One edit to a frozen CR-4c file, stated plainly:** `topup_service.submit_topup` now notifies admins, because CR-4c had no desk to notify and money would otherwise sit unverified until somebody thought to look at a tab. Six simultaneous verifications: one 200, five 409s, one credit, no 500. `tests/verify_cr4d.py` — **101 checks**; suite **1,096 checks, 17/17, 0 failures**. Browser-verified end to end at 1280/768/375, console clean. `tests/demo_payment_flow.py` added as a runnable end-to-end demonstration. |
 | 2026-08-01 | **CR-4c approved, locked and frozen.** Verified rather than rebuilt: the business asked to "proceed with CR-4c" when the roadmap already recorded it built, so the claim was treated as unproven and re-run instead of trusted or restarted — `verify_cr4c.py` **88 checks**, suite **16/16, 0 failures**, ledger invariants re-checked afterwards (cached balance == ledger for every merchant, chain unbroken). The load-bearing property confirmed against live data: **141 submitted top-ups and zero wallet transactions linked to any of them** — a submission is a claim and moves no money; CR-4d is what credits it. Freeze instruction recorded in §0, alongside a restatement of the standing **backward-compatibility constraint for historical bookings**. **WORK PAUSED BY THE BUSINESS:** CR-4d and every other milestone are not to be started until **CR-3** and **CR-5** have been manually reviewed and explicitly approved. **CR-6 is also built and unapproved** — three change requests now await review. |

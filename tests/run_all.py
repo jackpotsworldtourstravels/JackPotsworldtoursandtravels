@@ -32,6 +32,11 @@ SUITE = [
     # because a wallet whose ledger does not reconcile explains every money
     # failure downstream.
     ("verify_cr4a.py", "CR-4a: wallet ledger, locking, credit limit, backfill"),
+    # Also serverless. Runs early because it guards the suite itself: it fails
+    # if any verify_*.py on disk is missing from this list, which is how M6, M7
+    # and M8 sat green and unrun. It also asserts the schema guarantees the
+    # money paths rest on, so a dropped index is caught before anything spends.
+    ("verify_m9.py", "M9: suite completeness, migration chain, schema guarantees, no money drift"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
@@ -52,6 +57,10 @@ SUITE = [
     # its own SQL, so it is only meaningful once they are known good.
     ("verify_m6.py", "M6: analytics against direct SQL, export/summary parity, ops metrics, scope"),
     ("verify_m7.py", "M7: booking history filters/pagination/search, downloads, staff-only absence, cross-tenant"),
+    # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
+    # so any script running after it would fail on login rather than on its
+    # own subject — the failure would look like a regression and would not be one.
+    ("verify_m8.py", "M8: headers, uploads, sessions, cross-tenant probe, EXPLAIN, rate limits"),
 ]
 
 

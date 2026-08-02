@@ -1,7 +1,9 @@
 # Wallet architecture
 
-**Status: AUTHORITATIVE for money movement.** Established by CR-4a and extended by CR-4b, both
-approved and locked 2026-08-01. Every milestone that moves, displays or reports a merchant's
+**Status: AUTHORITATIVE for money movement. THE MODULE IS FROZEN.** Established by CR-4a and
+extended by CR-4b, CR-4c and CR-4d — all four approved and locked 2026-08-01. **Nothing described
+in this document may change except to fix a bug the business has verified and reported.** The six
+rules in §2 and the invariants in §7 are the properties a bug fix must not erode. Every milestone that moves, displays or reports a merchant's
 balance follows this document. If a plan, a screen or another document disagrees with this file,
 this file wins.
 
@@ -215,7 +217,7 @@ Consequences that every later surface must respect:
   what a passport scan gets. They cannot live in `request_documents` — its `request_id` is NOT NULL
   and a top-up belongs to no booking.
 
-## 8a. Crediting the claim, and the boundary that protects it (CR-4d)
+## 8a. Crediting the claim, and the boundary that protects it (CR-4d — approved and frozen 2026-08-01)
 
 `services/payment_admin_service.verify_topup` is **the only code that credits a
 wallet from a top-up**, and it does it by calling `wallet_service.post` — no

@@ -1169,3 +1169,103 @@ Standing rules for every phase: reuse existing endpoints wherever this contract 
 EXISTING; don't modify working auth/RBAC/schema unless a phase genuinely requires it; every new
 endpoint enforces a `P.*` permission code; UI must be responsive (desktop/tablet/mobile),
 consistent across portals, and cover loading/empty/error states.
+
+---
+
+## §12. M10 — reconciliation against the live OpenAPI document (2026-08-01)
+
+**Status: reconciled.** This section closes the gap M10 exists to find. Every path was taken from
+`GET /openapi.json` on a running server and compared with what this document names, rather than
+from anyone's memory of what was built.
+
+**Result: 144 live endpoints, 126 documented, 32 undocumented** (some paths appear under more than
+one method). Every one of the 32 is listed below with its gate. **None was undocumented because it
+was secret** — they are M1/M2-era operations endpoints, the support desk, the super-admin tools and
+the two M5 additions, all shipped before or alongside the convention that a contract entry lands in
+the same milestone as the endpoint.
+
+### Booking Operations (M1/M2) — `ticket.view` / `ticket.issue`
+
+```
+GET    /api/admin/bookings/queue              the post-approval work queue, oldest first
+GET    /api/admin/bookings/queue/counts       tab badges, one grouped query
+GET    /api/admin/bookings/operators          operators with their current load
+POST   /api/admin/bookings/{id}/assign        row-locked; reassignment allowed and logged
+PUT    /api/admin/bookings/{id}/references    airline PNR / ticket no / airline ref
+GET    /api/admin/bookings/{id}/notes         staff-only internal notes
+POST   /api/admin/bookings/{id}/notes
+PUT    /api/admin/bookings/notes/{note_id}    author only
+DELETE /api/admin/bookings/notes/{note_id}    author only
+POST   /api/admin/requests/{id}/complete      Ticket Issued -> Completed
+```
+
+**`request_notes` is staff-only at the service layer, not merely absent from a schema.** It is
+never carried on any merchant-facing response, in any shape. `verify_m7.py` asserts this on the raw
+JSON of every merchant endpoint rather than on a rendered screen.
+
+### Ticket enquiries (Phase 1/2) — `ticket.enquiry` / `ticket.view`
+
+```
+GET  /api/enquiries                           merchant's own; staff see every merchant
+GET  /api/enquiries/{id}
+POST /api/admin/enquiries/{id}/review         the claim, taken under SELECT ... FOR UPDATE
+```
+
+### Documents (Phase 3) — `document.upload` / `document.verify`
+
+```
+POST /api/requests/{id}/documents             multipart; magic-byte checked, size-capped
+GET  /api/documents/{id}                      attachment, private no-store, merchant-scoped
+```
+
+### Support desk (Phase 3) — `support.manage` / `chat.create` / `chat.view`
+
+```
+GET  /api/support/threads                     GET/POST
+GET  /api/support/threads/{id}
+GET  /api/support/threads/{id}/messages       GET/POST
+POST /api/support/threads/{id}/claim
+POST /api/support/threads/{id}/resolve
+GET  /api/support/unread-count
+```
+
+### Merchant team (existing) — `merchant_user.create` / `merchant_user.manage`
+
+```
+PUT    /api/merchant/team/{id}
+POST   /api/merchant/team/{id}/reset-password
+PATCH  /api/merchant/team/{id}/status
+```
+
+### Super Admin (Phase 4) — `admin.view` / `audit.view` / `system.activity.view`
+
+```
+GET /api/super-admin/admins/{id}/permissions
+GET /api/super-admin/audit-logs
+GET /api/super-admin/audit-logs/tables
+GET /api/super-admin/permissions/matrix
+GET /api/super-admin/system-info
+```
+
+### Delivery failures (M5) — `notification.send`
+
+```
+GET /api/admin/messages/failed                sends that did not go out, newest first
+GET /api/admin/messages/counts                how much delivery is failing
+```
+
+### Unauthenticated by design
+
+```
+GET /api/health                               liveness; no data
+GET /api/status                               which modules are ported; no data
+GET /api/profile/heartbeat                    authenticated; drives the Active Users screen
+```
+
+### The rule this reconciliation restores
+
+**No new endpoint without a contract entry, in the same milestone that adds it.** The 32 above are
+the accumulated cost of that rule being applied from M3 onwards but not retrospectively. Every
+endpoint added by M3–M10 and CR-1–CR-5 *was* documented in its own milestone; the backlog is
+entirely pre-M3. A future audit should find this number at zero, and `verify_m9.py` is where a
+check for it belongs if it ever drifts again.

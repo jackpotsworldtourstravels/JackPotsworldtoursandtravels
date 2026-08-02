@@ -3,12 +3,16 @@
 Raised 2026-08-01 by the business. §0 of `docs/BOOKING_OPS_MILESTONES.md` requires written
 sign-off before approved behaviour moves, and this change request moves several pieces of it.
 
+**THE WHOLE MODULE IS APPROVED AND FROZEN (2026-08-01).** All four gates are locked as one
+unit: no change to any of them except a bug the business has verified and reported.
+Test plan: `docs/PAYMENT_TEST_CHECKLIST.md`.
+
 | Gate | Status |
 | --- | --- |
 | **CR-4a — ledger foundation** | ✅ **Approved and locked** (2026-08-01). Architecture: `docs/WALLET_ARCHITECTURE.md` |
 | **CR-4b — the money moves** | ✅ **Approved, completed, verified and FROZEN** (2026-08-01) |
 | **CR-4c — merchant surfaces** | ✅ **Approved, verified and FROZEN** (2026-08-01) |
-| **CR-4d — admin surfaces** | ⏳ **Built and verified, awaiting approval** (2026-08-01) — completes the payment module |
+| **CR-4d — admin surfaces** | ✅ **Approved, verified and FROZEN** (2026-08-01) |
 
 ---
 
