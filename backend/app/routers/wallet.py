@@ -37,6 +37,7 @@ from app.models_v2 import (
     Merchant,
     ServiceRequest,
     User,
+    WalletTopup,
     WalletTopupMethod,
     WalletTopupStatus,
 )
@@ -174,6 +175,20 @@ def my_transactions(
             ).all()
         )
 
+    # The same one-query rule for the payment request behind a credit. Kept
+    # separate from the block above rather than folded into a join because a
+    # ledger row references at most one of the two and usually neither.
+    topup_ids = {r.topup_id for r in rows if r.topup_id}
+    topup_numbers: dict[int, str] = {}
+    if topup_ids:
+        topup_numbers = dict(
+            db.execute(
+                WalletTopup.__table__.select()
+                .with_only_columns(WalletTopup.topup_id, WalletTopup.topup_number)
+                .where(WalletTopup.topup_id.in_(topup_ids))
+            ).all()
+        )
+
     return WalletTransactionPage(
         items=[
             WalletTransactionOut(
@@ -188,6 +203,7 @@ def my_transactions(
                 request_id=r.request_id,
                 request_number=numbers.get(r.request_id) if r.request_id else None,
                 topup_id=r.topup_id,
+                topup_number=topup_numbers.get(r.topup_id) if r.topup_id else None,
                 created_at=r.created_at,
             )
             for r in rows

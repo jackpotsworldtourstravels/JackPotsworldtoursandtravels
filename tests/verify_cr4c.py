@@ -176,6 +176,59 @@ if page["items"] and p2["items"]:
           "overlapping ids")
 
 # ===========================================================================
+print("\n== every line names what settled it ==")
+# ===========================================================================
+# Wallet History has to show the payment request behind a credit, and it must
+# show the REFERENCE the merchant can quote back to us — `topup_id` is an
+# internal key that appears on nobody's screen. This asserts the join is wired,
+# against a merchant that really has such a row, rather than against a page that
+# happens to hold none and would pass on an empty set.
+db = SessionLocal()
+linked_id = db.execute(text(
+    "SELECT t.txn_id FROM wallet_transactions t "
+    "WHERE t.merchant_id = :m AND t.topup_id IS NOT NULL "
+    "ORDER BY t.txn_id DESC LIMIT 1"), {"m": MID}).scalar()
+expected_ref = position = None
+if linked_id:
+    expected_ref = db.execute(text(
+        "SELECT u.topup_number FROM wallet_transactions t "
+        "JOIN wallet_topups u ON u.topup_id = t.topup_id WHERE t.txn_id = :t"),
+        {"t": linked_id}).scalar()
+    # THE PAGE IS COMPUTED, NOT SCANNED FOR. The ledger is served OLDEST FIRST
+    # (a statement is read downwards), so the most recent linked row is at the
+    # END — on this database, row ~1,836 of 1,836. A bounded scan from page 1
+    # walked the oldest rows and concluded the join was broken. Counting the
+    # rows at or before it gives its 1-based position directly.
+    position = db.execute(text(
+        "SELECT COUNT(*) FROM wallet_transactions "
+        "WHERE merchant_id = :m AND txn_id <= :t"), {"m": MID, "t": linked_id}).scalar_one()
+db.close()
+
+if linked_id:
+    size = 100
+    pg = (position + size - 1) // size
+    body = requests.get(f"{WALLET}/transactions?page={pg}&page_size={size}",
+                        headers=H(mtok)).json()
+    found = next((t for t in body["items"] if t["txn_id"] == linked_id), None)
+    if check("a credit raised by a payment request is on the ledger", found is not None,
+             f"txn {linked_id} (row {position}) not on page {pg}"):
+        check("...and names the payment request by its reference",
+              found.get("topup_number") == expected_ref,
+              f'{found.get("topup_number")!r} != {expected_ref!r}')
+        check("...which is a PAY reference, not an internal id",
+              str(found.get("topup_number") or "").startswith("PAY-"),
+              str(found.get("topup_number")))
+else:
+    check("a credit raised by a payment request is on the ledger", True,
+          "no payment-request credit on this merchant — nothing to assert")
+
+# Movement that came from somewhere else must NOT invent one.
+unlinked = next((t for t in page["items"] if not t.get("topup_id")), None)
+if unlinked:
+    check("...while movement with no payment request behind it names none",
+          unlinked.get("topup_number") is None, str(unlinked.get("topup_number")))
+
+# ===========================================================================
 print("\n== payment accounts are read-only here ==")
 # ===========================================================================
 db = SessionLocal()

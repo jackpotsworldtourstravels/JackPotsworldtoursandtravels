@@ -129,15 +129,29 @@ function clInitWallet() {
       <div class="cl-panel-body cl-flush">
         <div class="cl-table-wrap">
           <table class="cl-table">
-            <!-- Payment Method is the DIRECTION of the money — Credit or
-                 Debit — which is what the brief asks this column to carry. The
-                 separate Debit and Credit amount columns collapsed into one
-                 Amount, signed by that direction, so a row reads left to right
-                 as "on this date, this reference, credited, a top-up, leaving
-                 this balance, of this much". -->
+            <!-- A FULL STATEMENT LINE, in the order a statement is read:
+                 when, what it is called, what kind of movement, which
+                 direction, what it stood at, how much moved, what it stands at
+                 now, whether it settled, and what it settled.
+
+                 Opening and Closing are BOTH shown, and both are the server's
+                 stored balance_before / balance_after — never a running total
+                 accumulated in the browser, which would disagree with the
+                 wallet the moment a page boundary fell mid-day.
+
+                 Status is on every row and is always Completed, because
+                 wallet_transactions only ever holds money that has actually
+                 moved. It is stated rather than assumed so the column means the
+                 same thing here as on Payment Management, where a request can
+                 genuinely still be pending.
+                 (No backticks in this comment: it sits inside a template
+                 literal and one would close it.) -->
             <thead><tr>
-              <th>Date</th><th>Reference</th><th>Payment Method</th><th>Type</th>
-              <th class="cl-num">Balance</th><th class="cl-num">Amount</th>
+              <th>Date &amp; time</th><th>Reference</th><th>Transaction type</th>
+              <th>Debit / credit</th>
+              <th class="cl-num">Opening</th><th class="cl-num">Amount</th>
+              <th class="cl-num">Closing</th>
+              <th>Status</th><th>Payment request</th>
             </tr></thead>
             <tbody id="clWalletBody"></tbody>
           </table>
@@ -411,11 +425,6 @@ async function clLoadWalletSummary() {
   try {
     const w = await MerchantApi.wallet();
 
-    /* `moneyIsPositive` on the outstanding rather than a sign test on the
-       balance: outstanding is the server's own floored-at-zero figure, so the
-       two cannot disagree about whether anything is owed. */
-    const owes = moneyIsPositive(w.outstanding);
-
     /* THE HERO IS ONE NUMBER, because the wallet answers one question: how do I
        stand. Everything else on this screen explains how it got there.
 
@@ -427,12 +436,37 @@ async function clLoadWalletSummary() {
        `credit_available` and `credit_limit` fields still arrive in this payload
        and are still what the server gates a booking on — nothing about the
        business rule changed, only what this screen puts on the glass. */
+    /* THE SIGN IS TAKEN FROM `balance`, ALWAYS — never from `outstanding`.
+       `outstanding` is floored at zero by the server (a merchant in credit owes
+       nothing), so it is positive in exactly the state the merchant is worst
+       off. Colouring from it would paint a debt green. */
+    const sign = moneySign(w.balance);
+    const tone = sign < 0 ? 'is-neg' : sign > 0 ? 'is-pos' : 'is-zero';
+    const stateWord = sign < 0 ? 'You owe' : sign > 0 ? 'In credit' : 'Nil balance';
+
     box.innerHTML = `
       <div class="cl-balance" style="grid-column:1/-1;">
         <div class="cl-balance-row">
           <div>
-            <div class="cl-balance-label">${owes ? 'Outstanding balance' : 'Wallet balance'}</div>
-            <div class="cl-balance-value">${escapeHtml(moneyStr(owes ? w.outstanding : w.balance))}</div>
+            <!-- ONE LABEL AND ONE SIGNED NUMBER, in every state.
+                 This used to swap to "Outstanding balance" and print the
+                 outstanding figure when the merchant was overdrawn — and
+                 because the server floors outstanding at zero, that figure is
+                 POSITIVE exactly when the money is owed. A merchant ₹1,00,000
+                 down read "₹1,00,000", the same glyphs as ₹1,00,000 in hand,
+                 with only a word and a colour to tell the two apart.
+
+                 A wallet that goes below zero now says so with a minus sign:
+                 ₹2,00,000 spent against a ₹3,00,000 booking reads -₹1,00,000.
+                 The balance field is the signed figure, and moneyStr keeps the
+                 sign in front of the symbol (-₹1,00,000, not ₹-1,00,000). -->
+            <div class="cl-balance-label">Wallet balance</div>
+            <div>
+              <span class="cl-balance-value ${tone}">${escapeHtml(moneyStr(w.balance))}</span>
+              <!-- The state in WORDS as well as in colour. A red number alone
+                   is nothing to a colour-blind reader or a printed page. -->
+              <span class="cl-balance-state ${tone}">${stateWord}</span>
+            </div>
             <!-- LAST UPDATED — when the balance last MOVED, not when this page
                  was loaded. last_transaction_at is the timestamp of the most
                  recent ledger row; rendering new Date() here would show the
@@ -512,7 +546,7 @@ async function clLoadWalletSummary() {
 async function clLoadWalletLedger() {
   const body = $('clWalletBody');
   const count = $('clWalletCount');
-  body.innerHTML = clLoadingRow(6, 'Loading transactions…');
+  body.innerHTML = clLoadingRow(9, 'Loading transactions…');
 
   try {
     const p = await MerchantApi.walletTransactions({
@@ -521,7 +555,7 @@ async function clLoadWalletLedger() {
     });
 
     if (!p.items.length) {
-      body.innerHTML = clEmptyRow(6, clWalletState.page > 1
+      body.innerHTML = clEmptyRow(9, clWalletState.page > 1
         ? 'No more transactions.'
         : 'Nothing has moved on your wallet yet.');
     } else {
@@ -537,13 +571,23 @@ async function clLoadWalletLedger() {
         const amount = isCredit ? t.credit : t.debit;
         return `
         <tr>
-          <td class="cl-nowrap">${escapeHtml(fmtDate(t.created_at))}</td>
+          <td class="cl-nowrap">${escapeHtml(fmtDate(t.created_at))}
+              <small class="cl-cell-sub">${escapeHtml(fmtTime(t.created_at))}</small></td>
           <td class="cl-nowrap"><code>${escapeHtml(t.txn_number)}</code></td>
-          <td><span class="cl-tag ${isCredit ? 'cl-tag-ok' : 'cl-tag-warn'}">${isCredit ? 'Credit' : 'Debit'}</span></td>
           <td>${escapeHtml(CL_TXN_LABELS[t.txn_type] || clLabel(t.txn_type))}
               <small class="cl-cell-sub">${escapeHtml(clWalletDetail(t))}</small></td>
-          <td class="cl-num">${escapeHtml(moneyStr(t.balance_after))}</td>
+          <td><span class="cl-tag ${isCredit ? 'cl-tag-ok' : 'cl-tag-warn'}">${isCredit ? 'Credit' : 'Debit'}</span></td>
+          <!-- Opening and closing are coloured by SIGN, so a statement that
+               crosses zero shows where it crossed. The amount is not: its
+               direction is already the Debit/Credit tag beside it, and a second
+               red/green on the same row would compete with the balance. -->
+          <td class="cl-num ${moneyToneClass(t.balance_before)}">${escapeHtml(moneyStr(t.balance_before))}</td>
           <td class="cl-num">${isCredit ? '+' : '−'}${escapeHtml(moneyStr(amount))}</td>
+          <td class="cl-num ${moneyToneClass(t.balance_after)}">${escapeHtml(moneyStr(t.balance_after))}</td>
+          <td><span class="cl-tag cl-tag-ok">Completed</span></td>
+          <td class="cl-nowrap">${t.topup_number
+            ? `<code>${escapeHtml(t.topup_number)}</code>`
+            : '<span class="cl-cell-sub">—</span>'}</td>
         </tr>`;
       }).join('');
     }
@@ -556,7 +600,7 @@ async function clLoadWalletLedger() {
     $('clWalletPrev').disabled = p.page <= 1;
     $('clWalletNext').disabled = last >= p.total;
   } catch (err) {
-    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load your transactions.'));
+    body.innerHTML = clEmptyRow(9, clError(err, 'Could not load your transactions.'));
     count.textContent = '—';
   }
 }

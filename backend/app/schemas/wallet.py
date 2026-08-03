@@ -77,6 +77,12 @@ class WalletTransactionOut(BaseModel):
     request_id: int | None = None
     request_number: str | None = None
     topup_id: int | None = None
+    #: The payment request this movement settled, as its **reference**, not its
+    #: id — the same rule ``request_number`` follows above and for the same
+    #: reason: a merchant asking us about a credit quotes what is printed on its
+    #: own screen, and an internal id is not that. Null on movement that came
+    #: from somewhere else (a booking debit, a credit note, an adjustment).
+    topup_number: str | None = None
     created_at: datetime.datetime
 
 

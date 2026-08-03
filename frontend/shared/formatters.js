@@ -54,6 +54,34 @@ function moneyIsPositive(value) {
   return /[1-9]/.test(raw);
 }
 
+/* The SIGN of a decimal string: -1, 0 or 1 — again without parsing it.
+   ===========================================================================
+   `Number("-0.00")` is `-0`, and `-0 < 0` is false, so a float round trip gets
+   the one case this exists for exactly wrong. Reading the characters cannot:
+   a leading "-" with any non-zero digit after it is negative, any non-zero
+   digit without one is positive, and everything else — "0", "0.00", "-0.00",
+   "" — is zero.
+
+   Every screen that colours money by sign asks this, so red/green/neutral means
+   the same thing in the merchant portal, the admin desk and the wallet ledger
+   rather than three files each having a slightly different idea of zero. */
+function moneySign(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || !/[1-9]/.test(raw)) return 0;
+  return raw.startsWith('-') ? -1 : 1;
+}
+
+/* The class name for that sign. Defined here beside moneySign so a caller
+   cannot pick the colour and the sign from two different rules.
+
+   `zero` deliberately gets the neutral weight, never green: a merchant whose
+   wallet has just hit exactly nothing is not in a good state, and a green zero
+   says it is. */
+function moneyToneClass(value, prefix = 'cl-money') {
+  const s = moneySign(value);
+  return `${prefix}-${s < 0 ? 'neg' : s > 0 ? 'pos' : 'zero'}`;
+}
+
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
 function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
 function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }
