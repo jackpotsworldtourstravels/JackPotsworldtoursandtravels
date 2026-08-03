@@ -48,6 +48,12 @@ SUITE = [
     ("verify_m4.py", "M4: ledger arithmetic, wallet, credit limit, refunds, payment concurrency"),
     ("verify_cr5.py", "CR-5: binding quotation on the enquiry answer, form rules, credit gates"),
     ("verify_cr2.py", "CR-2: manager approval, payment bypass, ticket delivery, RBAC, concurrency"),
+    # Directly after CR-2, because it changes where the track CR-2 defines
+    # STOPS: issuance now ends at Ticket Issued and Completed arrives on a timer
+    # once the journey is behind us. It runs before the analytics and history
+    # scripts, which read the status counts this decides.
+    ("verify_booking_completion.py",
+     "Completion: Ticket Issued is not Completed, the travel-date sweep, no manual completion"),
     # Straight after CR-2 and CR-5, because it is the second way onto the track
     # those two define: a booking raised with no enquiry in front of it. It
     # fails for a different reason than either of them — the completeness rules

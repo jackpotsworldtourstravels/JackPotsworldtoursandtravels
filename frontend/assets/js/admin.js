@@ -23,8 +23,14 @@ axios.interceptors.response.use(
     if (err.response?.status === 401) {
       const retried = await handlePortalUnauthorized('admin', err);
       if (retried) return retried;
-      clearStoredAuth();
-      showAdminAuthShell();
+      /* An expired or revoked session is a sign-out nobody asked for, and ends
+         where Sign Out ends — the public partner login. The Admin sign-in card
+         below is still what a deliberate visit to /admin/ gets, and a rejected
+         password must leave them on it (auth.js::isSessionEndingUnauthorized). */
+      if (isSessionEndingUnauthorized(err)) {
+        clearStoredAuth();
+        redirectToPortalLogin();
+      }
     }
     return Promise.reject(err);
   }
@@ -64,9 +70,15 @@ const PAGE_SIZE = 10;
 
 document.getElementById('logoutBtn').addEventListener('click', async e => {
   e.preventDefault();
+  // Clears the session and leaves for the public partner login; nothing to
+  // draw afterwards, so the auth shell is no longer shown here.
   await logoutPortalSession('admin');
-  showAdminAuthShell();
 });
+
+/* Back after signing out must not restore this portal. A deliberate visit to
+   /admin/ with no session still gets the Admin sign-in card — see
+   auth.js::guardPortalSession. */
+guardPortalSession(isAdminLoggedIn);
 
 /* ---------- Section navigation ---------- */
 const sectionTitles = {

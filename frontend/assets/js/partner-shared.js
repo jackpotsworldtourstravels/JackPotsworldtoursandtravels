@@ -25,8 +25,13 @@ axios.interceptors.response.use(
     if (err.response?.status === 401) {
       const retried = await handlePortalUnauthorized('merchant', err);
       if (retried) return retried;
-      clearPartnerSession();
-      showPartnerAuthShell();
+      /* An expired session ends where Sign Out ends — the public partner
+         login. A rejected password does not: it leaves them on this card.
+         See auth.js::redirectToPortalLogin / isSessionEndingUnauthorized. */
+      if (isSessionEndingUnauthorized(err)) {
+        clearPartnerSession();
+        redirectToPortalLogin();
+      }
     }
     return Promise.reject(err);
   }
@@ -146,13 +151,15 @@ document.getElementById('mhSignOutLink')?.addEventListener('click', e => {
 });
 document.getElementById('cancelSignOutBtn').addEventListener('click', () => signOutModalOverlay.classList.remove('open'));
 document.getElementById('confirmSignOutBtn').addEventListener('click', async () => {
-  await logoutPortalSession('merchant');
+  await logoutPortalSession('merchant', { redirect: false });
   loadedSections.clear();
   if (typeof notifPollTimer !== 'undefined' && notifPollTimer) { clearInterval(notifPollTimer); notifPollTimer = null; }
   signOutModalOverlay.classList.remove('open');
-  showPartnerAuthShell();
-  resetAuthFlow();
+  redirectToPortalLogin();
 });
+
+/* Back after signing out must not restore this portal — auth.js. */
+guardPortalSession(isPartnerLoggedIn);
 
 /* ---------- Theme: light / dark / system, persisted ---------- */
 const THEME_KEY = 'partner_theme_pref';

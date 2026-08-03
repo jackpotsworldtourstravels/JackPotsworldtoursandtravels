@@ -88,7 +88,7 @@ function updateEnquiryNavBadge(count) {
 function enqRoute(r) {
   const from = r.origin_city || r.origin || '—';
   const to = r.destination_city || r.destination || '—';
-  const arrow = r.trip_type === 'round_trip' ? '⇄' : '→';
+  const arrow = tripTypeArrow(r.trip_type);
   const flight = [r.airline, r.flight_number].filter(Boolean).join(' ');
   return `<div>${escapeHtml(from)} ${arrow} ${escapeHtml(to)}</div>
           <div class="cell-sub">${escapeHtml(flight)}${r.travel_class ? ` · ${escapeHtml(r.travel_class)}` : ''}</div>`;
@@ -263,7 +263,7 @@ async function openEnquiryReview(enquiryId) {
 
     <div class="detail-grid">
       ${enqDetailRow('Status', `<span class="badge ${ENQ_BADGE[r.status] || 'pending'}">${escapeHtml(enqLabel(r.status))}</span>`)}
-      ${enqDetailRow('Trip type', r.trip_type === 'round_trip' ? 'Round Trip' : 'One Way')}
+      ${enqDetailRow('Trip type', tripTypeLabel(r.trip_type))}
       ${enqDetailRow('From', escapeHtml([r.origin_city, r.origin].filter(Boolean).join(' · ')))}
       ${enqDetailRow('To', escapeHtml([r.destination_city, r.destination].filter(Boolean).join(' · ')))}
       ${enqDetailRow('Airline', escapeHtml(r.airline || '—'))}

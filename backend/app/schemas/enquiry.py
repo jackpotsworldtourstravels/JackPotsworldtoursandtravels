@@ -17,7 +17,20 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.ticket import PassengerInput
 
-TripType = Literal["one_way", "round_trip"]
+#: ``group_trip`` is a MARKER, not a fourth workflow. It says "this booking is a
+#: large party travelling together" — a corporate group, a tour, a pilgrimage —
+#: and nothing else about it differs: same validation, same approval path, same
+#: issuance, same wallet rules. It is stored in ``travel_details`` like the other
+#: two, so adding it needed no migration (the real ``trip_type_enum`` in
+#: PostgreSQL belongs to the retired partner_portal tables, which no live router
+#: touches).
+#:
+#: **Only the Direct Booking Request form offers it.** The enquiry form still
+#: shows One Way / Round Trip, because a group fare is not what the quotation
+#: stage is for. This literal is shared by both schemas anyway — the UI offering
+#: less than the server accepts is the safe direction, exactly as with
+#: ``travel_class`` below.
+TripType = Literal["one_way", "round_trip", "group_trip"]
 
 
 class EnquiryCreate(BaseModel):
@@ -87,6 +100,14 @@ class EnquiryCreate(BaseModel):
             # A one-way enquiry that carries return details would store a
             # return leg nobody asked for, and ck_sr_date_order would then
             # judge dates the merchant never entered.
+            #
+            # ``group_trip`` lands here DELIBERATELY, not by omission. The
+            # return-leg rule is the only thing ``trip_type`` has ever decided,
+            # and a group booking was asked for as a marker on the existing
+            # form — so it keeps the existing rule rather than introducing a
+            # third one. A group that also needs a return leg raises the outward
+            # and return as two bookings, which is what it does today for any
+            # itinerary the single return field cannot express.
             self.return_date = None
             self.return_preferred_time = None
 

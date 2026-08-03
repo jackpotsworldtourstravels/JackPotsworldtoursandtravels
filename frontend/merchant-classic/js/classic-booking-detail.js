@@ -152,7 +152,7 @@ function clRenderBookingDetail() {
       <div class="cl-panel-head"><h2>Journey</h2></div>
       <div class="cl-panel-body">
         <dl class="cl-dl">
-          <div><dt>Trip type</dt><dd>${roundTrip ? 'Round Trip' : 'One Way'}</dd></div>
+          <div><dt>Trip type</dt><dd>${tripTypeLabel(d.trip_type)}</dd></div>
           <div><dt>From</dt><dd>${escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
           <div><dt>To</dt><dd>${escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—')}</dd></div>
           <div><dt>Airline</dt><dd>${escapeHtml(d.airline || '—')}</dd></div>

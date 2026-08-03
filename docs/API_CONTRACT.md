@@ -1236,8 +1236,22 @@ GET    /api/admin/bookings/{id}/notes         staff-only internal notes
 POST   /api/admin/bookings/{id}/notes
 PUT    /api/admin/bookings/notes/{note_id}    author only
 DELETE /api/admin/bookings/notes/{note_id}    author only
-POST   /api/admin/requests/{id}/complete      Ticket Issued -> Completed
 ```
+
+**`POST /api/admin/requests/{id}/complete` was REMOVED. Ticket Issued -> Completed is not an API
+call any more.** Issuing a ticket ends at **Ticket Issued** — the documents exist, the merchant has
+been notified and its wallet has been debited — and the booking becomes **Completed** on its own
+once the scheduled journey has finished. That is decided from `travel_date` / `preferred_time`, or
+from `return_date` / `return_preferred_time` when there is a return leg, and applied by a sweep the
+API runs on a timer (`booking_completion_service`, `lifecycle.AUTO_TRANSITIONS`). The edge is
+absent from every `actions[]` array, so no client can offer it and none should try.
+
+Nothing replaced it. To close a booking early, raise a cancellation change request — that path
+computes the charge and the refund.
+
+**Completed therefore means *travelled*, not *ticketed*.** Any count of `status == "completed"` is
+now a count of finished journeys; a booking awaiting travel sits in `ticket_issued`, and both are
+returned separately by every status breakdown (`requests_by_status`, analytics `by_status`).
 
 **`request_notes` is staff-only at the service layer, not merely absent from a schema.** It is
 never carried on any merchant-facing response, in any shape. `verify_m7.py` asserts this on the raw

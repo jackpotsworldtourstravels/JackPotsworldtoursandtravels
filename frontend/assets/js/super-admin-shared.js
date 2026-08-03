@@ -57,8 +57,13 @@ axios.interceptors.response.use(
     if (err.response?.status === 401) {
       const retried = await handlePortalUnauthorized('super_admin', err);
       if (retried) return retried;
-      clearSuperAdminSession();
-      showSuperAdminAuthShell();
+      /* An expired or revoked session ends where Sign Out ends. A deliberate
+         visit to /super-admin/ with no session still gets the card — and so
+         does a rejected password (auth.js::isSessionEndingUnauthorized). */
+      if (isSessionEndingUnauthorized(err)) {
+        clearSuperAdminSession();
+        redirectToPortalLogin();
+      }
     }
     return Promise.reject(err);
   }
@@ -129,8 +134,11 @@ document.getElementById('saSignOutBtn').addEventListener('click', e => {
 });
 document.getElementById('saCancelSignOutBtn').addEventListener('click', () => saSignOutModalOverlay.classList.remove('open'));
 document.getElementById('saConfirmSignOutBtn').addEventListener('click', async () => {
-  await logoutPortalSession('super_admin');
+  await logoutPortalSession('super_admin', { redirect: false });
   saLoadedSections.clear();
   saSignOutModalOverlay.classList.remove('open');
-  showSuperAdminAuthShell();
+  redirectToPortalLogin();
 });
+
+/* Back after signing out must not restore this portal — auth.js. */
+guardPortalSession(isSuperAdminLoggedIn);

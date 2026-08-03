@@ -243,10 +243,9 @@ const OpsApi = {
   issueTicket(id) {
     return this._req('post', `/api/admin/requests/${id}/issue-ticket`, { data: {} });
   },
-  /* ticket.issue. Only from `ticket_issued`. */
-  completeRequest(id) {
-    return this._req('post', `/api/admin/requests/${id}/complete`, { data: {} });
-  },
+  /* `completeRequest` was removed with POST /api/admin/requests/{id}/complete.
+     A booking is completed by the backend once its scheduled travel has
+     finished, never by a caller — see backend booking_completion_service. */
 
   /* merchant.view OR ticket.view. Merged queue of pending merchants and
      pending requests in one discriminated list: `kind` is 'merchant' or
@@ -679,14 +678,22 @@ const OPS_CABINS = ['economy', 'premium_economy', 'business', 'first'];
                        itself before approving, so there is nothing to call.
      payment_pending — the same call continues approved -> payment_pending.
    Rendering a button for either would produce a 404, so both map to null and
-   the drawer skips them. */
+   the drawer skips them.
+
+   `completed` is now a third one, for a different reason: it is no longer an
+   action at all. A booking completes when its scheduled travel has finished,
+   swept by the backend, so the edge never appears in `actions` and nothing can
+   walk it. It is mapped to null rather than deleted from this table so that a
+   stale `actions` payload from a cached page cannot fall through to
+   `OpsApi[undefined]` — the drawer skips a null, and would throw on a missing
+   key. */
 const OPS_TRANSITION_ENDPOINT = {
   pending_approval: { fn: 'submitRequest', label: 'Submit for approval', permission: 'ticket.request' },
   cancelled: { fn: 'cancelRequest', label: 'Cancel request', permission: 'ticket.request', reason: true },
   approved: { fn: 'approveRequest', label: 'Approve', permission: 'ticket.approve' },
   rejected: { fn: 'rejectRequest', label: 'Reject', permission: 'ticket.reject', reason: true },
   ticket_issued: { fn: 'issueTicket', label: 'Issue ticket', permission: 'ticket.issue' },
-  completed: { fn: 'completeRequest', label: 'Mark completed', permission: 'ticket.issue' },
+  completed: null,
   in_review: null,
   payment_pending: null,
   /* `paid` is reached by VERIFYING A PAYMENT, which is keyed by payment_id,

@@ -435,20 +435,16 @@ def issue_ticket(
     return _detail(db, request, current_user)
 
 
-@router.post(
-    "/admin/requests/{request_id}/complete",
-    response_model=RequestDetailResponse,
-    tags=["admin · approvals"],
-    summary="Mark a request completed",
-    description="Requires `ticket.issue`. Terminal state after travel.",
-)
-def complete_request(
-    request_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_ISSUE)),
-):
-    request = ticket_service.complete_request(db, current_user, request_id)
-    return _detail(db, request, current_user)
+# POST /admin/requests/{id}/complete IS GONE ON PURPOSE.
+# Completion is no longer an action anybody takes: a booking becomes Completed
+# once its scheduled journey has finished, swept on a timer by
+# `booking_completion_service`. Removing the route rather than hiding its button
+# is what makes that true of API clients as well as of the portals — there is no
+# longer any way to declare a trip finished before it has happened.
+#
+# Nothing replaced it. If a booking has to be closed early, that is a
+# cancellation and it goes through the change-request workflow, which computes
+# the charge and the refund (`lifecycle.SETTLEMENT_TRANSITIONS`).
 
 
 # ---------------------------------------------------------------------------

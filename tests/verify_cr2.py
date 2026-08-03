@@ -257,8 +257,12 @@ def main():
     check("the booking is Ticket Issued", d["status"] == "ticket_issued", d["status"])
     check("a PNR was allocated", bool(d.get("pnr")), str(d.get("pnr")))
 
+    # Completion is no longer an action anyone takes — the booking has to travel.
+    # `complete_by_travelling` backdates the itinerary and runs the real sweep.
     r = requests.post(f"{BASE}/api/admin/requests/{rid}/complete", headers=H(atok), json={})
-    check("and then Completed -> 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+    check("the manual complete endpoint is gone -> 404/405", r.status_code in (404, 405),
+          f"{r.status_code} {r.text[:200]}")
+    flows.complete_by_travelling(rid)
     final = detail(mtok, rid)
     check("final status is Completed", final["request"]["status"] == "completed", final["request"]["status"])
     check("its whole history is on the timeline, with no payment step",

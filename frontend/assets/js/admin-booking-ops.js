@@ -59,7 +59,12 @@
      POST   /api/requests/{id}/documents               attach a ticket file
      GET    /api/requests/{id}/documents               what is attached
      POST   /api/admin/requests/{id}/issue-ticket      mark Ticket Issued
+
+   REMOVED, ENDPOINT AND ALL:
      POST   /api/admin/requests/{id}/complete          mark Completed
+   Completion is no longer an action. A ticketed booking completes when its
+   scheduled journey has finished, swept on a timer by the backend, so this
+   screen's job ends at Ticket Issued.
 
    LIVE, BUT NO LONGER CALLED FROM HERE — its form was removed, not its
    endpoint (see above):
@@ -133,6 +138,18 @@ function opsTime(hhmm) {
   if (Number.isNaN(h)) return String(hhmm);
   return `${String(h % 12 === 0 ? 12 : h % 12).padStart(2, '0')}:${
     String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/* When this booking's travel is scheduled to finish, for the "it completes on
+   its own" note. Mirrors booking_completion_service.journey_end on the server:
+   the RETURN leg decides when there is one, because a round trip is not over
+   when the outbound lands. Returns "" rather than a guess when there is no
+   date — the sentence it appends to has to read correctly without it. */
+function opsJourneyEndLabel(r, d) {
+  const date = r.return_date || r.travel_date;
+  if (!date) return '';
+  const time = r.return_date ? d.return_preferred_time : d.preferred_time;
+  return ` (${fmtDate(date)}${time ? `, ${opsTime(time)}` : ''})`;
 }
 
 /* ------------------------------------------------------------------ list */
@@ -359,7 +376,11 @@ function opsRenderWork() {
      action the server will refuse. A booking that already carries an amount
      (every catalog-led one) never sees this. */
   const needsFare = classic && Number(r.total_amount || 0) <= 0;
-  const canComplete = r.status === 'ticket_issued';
+  /* There is no `canComplete` any more. A booking completes when its journey
+     has finished, swept on a timer by the backend — the desk's job ends at
+     Ticket Issued. The panel below says so rather than going blank, because a
+     ticketed booking with no buttons and no explanation reads as broken. */
+  const ticketed = r.status === 'ticket_issued';
 
   const cell = (label, value) => `
     <div class="detail-item"><span class="detail-label">${label}</span>
@@ -399,7 +420,7 @@ function opsRenderWork() {
           ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
           ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
           ${cell('Submitted', escapeHtml(fmtDateTime(r.created_at)))}
-          ${cell('Journey type', roundTrip ? 'Round trip' : 'One way')}
+          ${cell('Journey type', tripTypeLabel(d.trip_type))}
           ${cell('Route', d.international ? 'International' : 'Domestic')}
           ${cell('From', escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—'))}
           ${cell('To', escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—'))}
@@ -551,8 +572,11 @@ function opsRenderWork() {
           </div>` : ''}
         ${canIssue ? opsProviderFields(providers) : ''}
         ${canIssue ? `<button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>` : ''}
-        ${canComplete ? `<button type="button" class="btn btn-coral" id="opsCompleteBtn">Mark Completed</button>` : ''}
-        ${!canIssue && !canComplete
+        ${ticketed ? `<span class="ops-sub">
+            Ticketed. This booking completes on its own once the scheduled travel
+            has finished${opsJourneyEndLabel(r, d)} — there is nothing further to do here.
+          </span>` : ''}
+        ${!canIssue && !ticketed
           ? `<span class="ops-sub">${classic
               ? 'Nothing to do here until a manager approves this booking.'
               : 'This booking is waiting on payment before a ticket can be issued.'}</span>`
@@ -578,7 +602,6 @@ function opsRenderWork() {
   document.getElementById('opsNoteBtn').addEventListener('click', () => opsAddNote(id));
   opsWireProviderFields();
   document.getElementById('opsIssueBtn')?.addEventListener('click', () => opsLifecycle(id, 'issue-ticket'));
-  document.getElementById('opsCompleteBtn')?.addEventListener('click', () => opsLifecycle(id, 'complete'));
   document.querySelectorAll('[data-ops-deldoc]').forEach(b => {
     b.addEventListener('click', () => opsDeleteDoc(id, Number(b.dataset.opsDeldoc)));
   });
@@ -800,19 +823,26 @@ async function opsLifecycle(id, action) {
     ? `₹${body.fare_amount}`
     : (walletBilled && moneyIsPositive(req.total_amount) ? moneyStr(req.total_amount) : null);
 
-  const label = action === 'issue-ticket' ? 'Mark this booking as Ticket Issued?' : 'Mark this booking Completed?';
-  const detail = action === 'issue-ticket'
-    ? (debit
-        ? `The merchant is notified, can download the attached ticket documents, and its wallet is debited ${debit}.`
-        : 'The merchant is notified and can download the attached ticket documents.')
-    : 'This closes the booking.';
-  if (!await confirmDialog({ title: label, message: detail, confirmText: 'Confirm' })) return;
+  /* `action` is only ever 'issue-ticket' now — /complete was removed with the
+     Mark Completed button. Left as a parameter rather than inlined because this
+     is still the one place that confirms, posts and reports a lifecycle move,
+     and the next one to arrive should land here too. */
+  const detail = debit
+    ? `The merchant is notified, can download the attached ticket documents, and its wallet is debited ${debit}.`
+    : 'The merchant is notified and can download the attached ticket documents.';
+  if (!await confirmDialog({
+    title: 'Mark this booking as Ticket Issued?',
+    // Naming what does NOT happen matters here: an operator who expects the old
+    // behaviour would otherwise read the booking staying open as a failure.
+    message: `${detail} It stays Ticket Issued until the travel date has passed, then completes on its own.`,
+    confirmText: 'Confirm',
+  })) return;
 
   msg.className = 'msg';
   msg.textContent = 'Working…';
   try {
     await axios.post(`${API_BASE}/api/admin/requests/${id}/${action}`, body, { headers: authHeaders() });
-    showToast(action === 'issue-ticket' ? 'Ticket issued.' : 'Booking completed.');
+    showToast('Ticket issued.');
     opsCloseWork();
     loadBookingOps();
   } catch (err) {

@@ -215,13 +215,25 @@ function clRenderDashKpis(position, enq, analytics, changes) {
      yet ticketed. Drawn from the analytics status slices so it counts bookings
      and not enquiries — see the head of this file. */
   const byStatus = new Map((analytics?.by_status || []).map(r => [r.status, r.count]));
-  const inProgress = ['draft', 'pending_approval', 'in_review', 'approved', 'payment_pending', 'paid']
+
+  /* TICKET_ISSUED MOVED FROM "COMPLETED" TO "IN PROGRESS", AND THAT IS THE
+     WHOLE POINT OF THE STATUS SPLIT.
+     Issuing a ticket used to complete the booking, so "Completed tickets"
+     counted `ticket_issued + completed` and the two buckets between them
+     covered every live booking. Now a ticket is issued long before anyone
+     travels: counting a ticketed booking as completed would tell a merchant a
+     trip was over while its passengers had not left, which is exactly what this
+     change exists to stop.
+
+     A ticketed booking is therefore still IN PROGRESS — the journey is ahead of
+     it — and "Completed tickets" means trips actually taken. The two remain
+     exhaustive over the live statuses, so no booking has stopped being counted;
+     one has moved tile. The donut below still shows Ticketed and Completed as
+     separate slices for anyone who wants the split. */
+  const inProgress = ['draft', 'pending_approval', 'in_review', 'approved', 'payment_pending', 'paid', 'ticket_issued']
     .reduce((n, k) => n + (byStatus.get(k) || 0), 0);
 
-  /* Completed tickets: issued, plus the ones that have since travelled. A
-     booking does not stop having had a ticket because the trip is over, so
-     counting `ticket_issued` alone would make the figure fall over time. */
-  const completedTickets = (byStatus.get('ticket_issued') || 0) + (byStatus.get('completed') || 0);
+  const completedTickets = byStatus.get('completed') || 0;
 
   /* Date changes, from the change-request analytics' own by_type breakdown
      rather than counted here — `changes.totals` is every type added up.

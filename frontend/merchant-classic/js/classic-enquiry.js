@@ -331,7 +331,7 @@ function clEnquiryHaystack(r) {
 function clEnquiryRoute(r) {
   const from = r.origin_city || r.origin || '—';
   const to = r.destination_city || r.destination || '—';
-  return r.trip_type === 'round_trip' ? `${from} ⇄ ${to}` : `${from} → ${to}`;
+  return `${from} ${tripTypeArrow(r.trip_type)} ${to}`;
 }
 
 function clEnquiryRow(r) {
@@ -412,7 +412,7 @@ async function clOpenEnquiryDetail(id) {
     const rows = [
       ['Reference number', r.reference_number],
       ['Status', null],                                  // rendered as a tag below
-      ['Trip type', r.trip_type === 'round_trip' ? 'Round Trip' : 'One Way'],
+      ['Trip type', tripTypeLabel(r.trip_type)],
       ['From', [r.origin_city, r.origin].filter(Boolean).join(' · ')],
       ['To', [r.destination_city, r.destination].filter(Boolean).join(' · ')],
       ['Airline', r.airline],
@@ -659,6 +659,14 @@ function clOpenEnquiryForm(direct = false) {
       wallet is charged that amount then. If you would rather see the fare first,
       close this and use <b>+ New Booking Enquiry</b> instead.
     </div>` : ''}
+    <!-- GROUP TRIP IS DIRECT-ONLY, AND THAT IS A PRODUCT DECISION.
+         A group fare is negotiated once the party is known, not at the
+         quotation stage — so the enquiry form keeps the two options it has
+         always had and only "Direct Booking Request" offers the third. The
+         server accepts group_trip on both schemas (they share one TripType);
+         the UI offering less than the API allows is the direction this form
+         already takes with cabin class.
+         (No backticks in this comment — it is inside a template literal.) -->
     <div class="cl-trip" id="clEnqTrip" role="radiogroup" aria-label="Trip type">
       <label class="cl-trip-opt checked" data-cl-trip="one_way">
         <input type="radio" name="clEnqTripType" value="one_way" checked>One Way
@@ -666,6 +674,9 @@ function clOpenEnquiryForm(direct = false) {
       <label class="cl-trip-opt" data-cl-trip="round_trip">
         <input type="radio" name="clEnqTripType" value="round_trip">Round Trip
       </label>
+      ${direct ? `<label class="cl-trip-opt" data-cl-trip="group_trip">
+        <input type="radio" name="clEnqTripType" value="group_trip">Group Trip
+      </label>` : ''}
     </div>
 
     <div class="cl-form-legend">Departure &amp; Arrival</div>

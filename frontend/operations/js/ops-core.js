@@ -625,33 +625,32 @@ function opsAfterWrite() {
    could be: it was a public directory of the internal portals, and it now just
    redirects here.                                                           */
 
-const OPS_SIGNIN = {
-  /* The merchant's canonical sign-in is now its own page rather than the public
-     site's modal. That modal became the CUSTOMER (B2C) login when the two
-     audiences were split, so sending a merchant to ../index.html#login would
-     land them on a login their credentials do not open. */
-  merchant: '../partner-login.html',
-  admin: '../admin/index.html',
-  super_admin: '../super-admin/index.html',
-  unknown: '../partner-login.html',
-};
+/* ONE DESTINATION, FOR EVERY ROLE THIS WORKSPACE SERVES.
+   ===========================================================================
+   This used to route each role back to its own sign-in — merchants to the
+   partner page, Admin and Super Admin to their portals. Sign-out now has a
+   single answer across the whole platform.
+
+   BORROWED FROM auth.js RATHER THAN RESTATED. index.html loads auth.js before
+   this file, so PORTAL_LOGIN_URL is in scope. Writing the URL out again here
+   would put two copies of the one address every portal must agree on in two
+   files — and the failure mode of that is silent: change one, and Operations
+   keeps signing people out to a page that no longer exists. */
+const OPS_SIGNIN_URL = PORTAL_LOGIN_URL;
 
 /* Leaves the workspace for the existing login. `reason` is carried in the URL
    so the destination can explain itself rather than the operator wondering why
    they were bounced. */
-function opsRequireSignIn(portal, reason) {
+function opsRequireSignIn(reason) {
   OpsSession.user = null;
   OpsSession.perms = new Set();
   $('opsApp').classList.remove('active');
   opsStopHeartbeat();
   opsLoaded.clear();
 
-  const target = OPS_SIGNIN[portal] || OPS_SIGNIN.unknown;
   const url = reason
-    ? (target.includes('#')
-        ? target.replace('#', `?ops_reason=${encodeURIComponent(reason)}#`)
-        : `${target}?ops_reason=${encodeURIComponent(reason)}`)
-    : target;
+    ? `${OPS_SIGNIN_URL}?ops_reason=${encodeURIComponent(reason)}`
+    : OPS_SIGNIN_URL;
   location.replace(url);
 }
 
@@ -745,12 +744,13 @@ async function opsSignOut() {
   /* Revokes the session server-side and clears that portal's keys — which
      also signs this browser out of the matching Version 1 portal, because it
      is genuinely the same session. */
-  await logoutPortalSession(portal).catch(() => {});
+  await logoutPortalSession(portal, { redirect: false }).catch(() => {});
   localStorage.removeItem(OPS_ACTIVE_KEY);
   /* Back to the public site rather than a local sign-in box: after a
      deliberate sign-out the session is gone everywhere, so the front door is
-     the honest destination. */
-  opsRequireSignIn(portal, 'signed-out');
+     the honest destination. `redirect: false` above because this call is the
+     one that leaves — it carries the reason with it. */
+  opsRequireSignIn('signed-out');
 }
 
 /* One silent refresh before giving up, then out to the existing login — the
@@ -762,7 +762,7 @@ axios.interceptors.response.use(
     if (err.response?.status === 401 && OpsSession.portal) {
       const retried = await handlePortalUnauthorized(OpsSession.portal, err);
       if (retried) return retried;
-      opsRequireSignIn(OpsSession.portal, 'session-expired');
+      opsRequireSignIn('session-expired');
     }
     return Promise.reject(err);
   }
@@ -1254,12 +1254,19 @@ function opsBoot() {
      with /api/auth/me before showing the workspace — a token in localStorage
      is not evidence of a valid session. No token at all means whoever this is
      has not signed in yet, and signing in happens on the public site. */
+  /* Back after signing out must not restore this workspace from the bfcache,
+     which hands the page back with its chrome intact and runs none of this
+     again. auth.js::guardPortalSession watches for that. Unconditional here,
+     unlike the other portals: /operations/ has no sign-in of its own, so there
+     is no "deliberate visit to my own login page" case to preserve. */
+  guardPortalSession(() => !!opsDetectPortal());
+
   const portal = opsDetectPortal();
-  if (!portal) return opsRequireSignIn(null, 'sign-in-required');
+  if (!portal) return opsRequireSignIn('sign-in-required');
   opsStartSession(portal).catch(() => {
     /* Expired or revoked: for a 401 the interceptor has already started the
        redirect, and location.replace twice is harmless. Anything else
        (network, CORS) lands here too and deserves the same exit. */
-    opsRequireSignIn(portal, 'session-expired');
+    opsRequireSignIn('session-expired');
   });
 }

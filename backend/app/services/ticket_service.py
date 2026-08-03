@@ -1368,12 +1368,15 @@ def _capture_fare_for_wallet_billing(
     }
 
 
-def complete_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
-    request = get_request(db, actor, request_id)
-    lifecycle.transition(db, request, S.COMPLETED, actor, commit=False)
-    db.commit()
-    db.refresh(request)
-    return request
+# `complete_request` USED TO BE HERE, AND ITS ABSENCE IS THE FEATURE.
+# An Admin could mark a booking Completed the moment the ticket was uploaded,
+# which said the journey was over while the passenger had not yet left. A
+# booking now completes when its scheduled travel has actually finished, on a
+# timer — see `booking_completion_service`, and `lifecycle.AUTO_TRANSITIONS` for
+# why no portal can draw that button any more.
+#
+# Issuance itself is unchanged and still ends at Ticket Issued with the wallet
+# debited, the documents generated and the merchant notified.
 
 
 # ---------------------------------------------------------------------------

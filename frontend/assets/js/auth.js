@@ -195,8 +195,102 @@ async function tryRefreshPortalSession(portal) {
   return _refreshInFlight[portal];
 }
 
-/** Server-side logout (revokes the session) plus clearing whichever portal's local keys. */
-async function logoutPortalSession(portal) {
+/* ---------------------------------------------------------------------
+   SIGNING OUT — one destination for every portal.
+   ---------------------------------------------------------------------
+   Merchant, Data Operator, Manager, Admin and Super Admin all land on the
+   public partner login. Each portal used to drop the user on its OWN
+   in-page sign-in card, which meant five different answers to "where am I
+   now?" and left staff sitting on an internal screen after asking to leave
+   it.
+
+   ABSOLUTE, AND NOT DERIVED FROM location.origin. The internal portals are
+   served from the same host in production but from :8000, :5500 and file://
+   during development, and a relative path would send a signed-out user to
+   whichever of those they happened to be on. There is one live front door.
+   --------------------------------------------------------------------- */
+const PORTAL_LOGIN_URL = 'https://jackpotsworldtours.com/partner-login.html';
+
+/** Leave for the public login, without leaving this page behind in history.
+ *
+ *  `replace`, never `assign`: the portal page is overwritten in the history
+ *  stack rather than pushed past, so Back from the login does not return to a
+ *  screen the user has just signed out of. */
+function redirectToPortalLogin() {
+  location.replace(PORTAL_LOGIN_URL);
+}
+
+/** Was this page reached by Back/Forward rather than by a fresh navigation?
+ *
+ *  This is the whole distinction the auth guard rests on. A member of staff who
+ *  deliberately opens /admin/ with no session should get the Admin sign-in card
+ *  — bouncing them to the merchant login would leave them no way in at all.
+ *  Someone pressing Back after signing out is a different event entirely, and
+ *  is the one this guard exists to catch. */
+function isBackForwardNavigation() {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0];
+    return !!nav && nav.type === 'back_forward';
+  } catch {
+    return false;
+  }
+}
+
+/** Send the user to the public login if they arrive back on a protected page
+ *  with no session. Call once per portal, passing that portal's own
+ *  "am I signed in?" predicate.
+ *
+ *  `pageshow` rather than `load`, because a page restored from the back/forward
+ *  cache does not run its scripts again — it is handed back exactly as it was,
+ *  signed-in-looking chrome and all, and `persisted` is the only signal that it
+ *  happened. The navigation-type check covers the browsers that reload instead. */
+function guardPortalSession(isLoggedIn) {
+  window.addEventListener('pageshow', event => {
+    if (isLoggedIn()) return;
+    if (event.persisted || isBackForwardNavigation()) redirectToPortalLogin();
+  });
+}
+
+/* Endpoints where a 401 means "those credentials are wrong", NOT "your session
+   has ended". Someone mistyping a password is *on the sign-in screen already*
+   and must stay there.
+
+   THIS LIST IS WHAT STOPS A BAD PASSWORD FROM EJECTING STAFF FROM THEIR OWN
+   PORTAL. `/api/auth/login` answers 401 for a wrong password exactly as an
+   expired token does elsewhere, so without it the interceptor below would read
+   a typo as a dead session and bounce an Admin off /admin/ to the merchant
+   login — leaving them no way in, which is the one outcome this whole change
+   was designed to avoid.
+
+   `/api/auth/me` and `/api/auth/refresh` are deliberately ABSENT: a 401 from
+   either really does mean the session is gone, and should end it. */
+const CREDENTIAL_ENDPOINTS = [
+  '/api/auth/login', '/api/auth/verify-otp', '/api/auth/resend-otp',
+  '/api/auth/forgot-password', '/api/auth/reset-password', '/api/auth/change-password',
+];
+
+/** Does this 401 mean the session is over (rather than a rejected credential)? */
+function isSessionEndingUnauthorized(err) {
+  const url = (err && err.config && err.config.url) || '';
+  return !CREDENTIAL_ENDPOINTS.some(path => url.includes(path));
+}
+
+/** Everything held about the person who was signed in, beyond their tokens.
+ *
+ *  Theme and sidebar preferences are deliberately NOT cleared: those describe
+ *  the device, not the account, and wiping them would make signing out silently
+ *  reset an unrelated setting. */
+function clearCachedUserData(portal) {
+  localStorage.removeItem(`${portal}_user_json`);
+  localStorage.removeItem('mh_recent_searches');
+}
+
+/** Server-side logout (revokes the session), clearing whichever portal's local
+ *  keys, then out to the public login.
+ *
+ *  Pass `{ redirect: false }` only where the caller genuinely owns what happens
+ *  next. Everything that is a user pressing Sign Out wants the default. */
+async function logoutPortalSession(portal, { redirect = true } = {}) {
   const token = localStorage.getItem(portalAccessKey(portal));
   try {
     await axios.post(`${authApiBase()}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${token}` } });
@@ -205,7 +299,10 @@ async function logoutPortalSession(portal) {
   else if (portal === 'merchant') clearPartnerSession();
   else if (portal === 'manager') clearManagerSession();
   else if (portal === 'super_admin') clearSuperAdminSession();
-  localStorage.removeItem(`${portal}_user_json`);
+  clearCachedUserData(portal);
+  // AFTER the keys are gone, never before: a redirect that raced the clearing
+  // would leave a live token in a browser the user believes they have left.
+  if (redirect) redirectToPortalLogin();
 }
 
 /** Shared axios 401 handler: try one silent refresh before giving up. Each portal page wires

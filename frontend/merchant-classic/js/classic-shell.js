@@ -647,9 +647,19 @@ axios.interceptors.response.use(
     if (err.response?.status === 401) {
       const retried = await handlePortalUnauthorized('merchant', err);
       if (retried) return retried;
-      clearPartnerSession();
-      clLoaded.clear();
-      clShowAuth();
+      /* The session is genuinely gone — expired or revoked — so this is a
+         sign-out the user did not ask for, and it ends where sign-out ends.
+         Showing the in-page card here used to strand them on a screen that
+         still had the portal chrome behind it.
+
+         A REJECTED PASSWORD IS NOT THAT. `/api/auth/login` also answers 401,
+         and someone mistyping one is already on the sign-in card and must stay
+         there — see auth.js::isSessionEndingUnauthorized. */
+      if (isSessionEndingUnauthorized(err)) {
+        clearPartnerSession();
+        clLoaded.clear();
+        redirectToPortalLogin();
+      }
     }
     return Promise.reject(err);
   }
@@ -886,10 +896,13 @@ function clBoot() {
   $('clSignOutBtn').addEventListener('click', async () => {
     clCloseProfileMenu();
     if (!await clConfirm('Sign out of the merchant portal?', 'Sign out', { danger: true })) return;
-    await logoutPortalSession('merchant').catch(() => {});
+    /* logoutPortalSession revokes the session, clears the keys and leaves for
+       the public partner login. `clearPartnerSession` stays as a belt-and-braces
+       local clear in case the network call throws before it gets that far. */
+    await logoutPortalSession('merchant', { redirect: false }).catch(() => {});
     clearPartnerSession();
     clLoaded.clear();
-    clShowAuth();
+    redirectToPortalLogin();
   });
 
   /* ---- modal ---- */
@@ -930,6 +943,11 @@ function clBoot() {
     const s = (location.hash || '').replace('#', '');
     if (s && CL_LOADERS[s] && !$(`cl-${s}`).classList.contains('active')) clGo(s);
   });
+
+  /* Back after signing out must not restore this portal — see
+     auth.js::guardPortalSession. A deliberate visit with no session still gets
+     the sign-in card below. */
+  guardPortalSession(isPartnerLoggedIn);
 
   if (isPartnerLoggedIn()) clShowApp(); else clShowAuth();
 }

@@ -82,6 +82,35 @@ function moneyToneClass(value, prefix = 'cl-money') {
   return `${prefix}-${s < 0 ? 'neg' : s > 0 ? 'pos' : 'zero'}`;
 }
 
+/* ---------------------------------------------------------------------------
+   tripTypeLabel / tripTypeArrow — the itinerary's trip type, spelled once.
+
+   THIS EXISTS BECAUSE ADDING A THIRD VALUE BROKE SEVEN SCREENS AT ONCE.
+   Every surface that showed a trip type wrote it as a binary ternary —
+   `d.trip_type === 'round_trip' ? 'Round Trip' : 'One Way'` — in the merchant
+   portal, the booking detail, the Admin bookings table, the Admin enquiry
+   drawer, Booking Operations and the Manager queue. That is correct for exactly
+   two values and silently mislabels every later one: `group_trip` would have
+   rendered as "One Way" on all six, with nothing failing to announce it.
+
+   A trip type is now named in one place, so a seventh screen cannot disagree
+   and an eighth value only has to be added here. Unknown values fall back to
+   the raw string rather than to a wrong label — a booking that reads
+   "charter_trip" is a bug report; one that reads "One Way" is a wrong booking.
+   --------------------------------------------------------------------------- */
+const TRIP_TYPE_LABELS = {
+  one_way: 'One Way',
+  round_trip: 'Round Trip',
+  group_trip: 'Group Trip',
+};
+function tripTypeLabel(t) {
+  return TRIP_TYPE_LABELS[t] || (t ? String(t).replace(/_/g, ' ') : '—');
+}
+
+/* The route glyph. Only a round trip comes back, so only it gets the two-way
+   arrow — a group trip is one-way in the only sense this symbol reports. */
+function tripTypeArrow(t) { return t === 'round_trip' ? '⇄' : '→'; }
+
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
 function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
 function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }

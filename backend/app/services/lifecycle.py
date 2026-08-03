@@ -6,7 +6,7 @@ request, not of the caller.
 The standard track (catalog-led bookings, Premium portal, Operations)::
 
     Created -> Pending -> Under Review -> Approved
-            -> Payment Pending -> Paid -> Ticket Issued -> Completed
+            -> Payment Pending -> Paid -> Ticket Issued ~> Completed
 
     Created -> Pending -> Rejected
 
@@ -14,10 +14,19 @@ The Classic Tours track (CR-2) — a booking raised from an answered Ticket
 Enquiry::
 
     Created -> Pending Manager Approval -> Under Manager Review
-            -> Manager Approved -> Ticket Issued -> Completed
+            -> Manager Approved -> Ticket Issued ~> Completed
 
     Pending Manager Approval / Under Manager Review -> Created
         ("returned for correction", with the Manager's remarks)
+
+``~>`` IS NOT A TYPO, AND IT IS THE ONE EDGE NOBODY WALKS.
+Every other arrow above is somebody pressing a button. **Ticket Issued ->
+Completed is the clock**: a booking completes when its scheduled journey has
+finished, which is a fact about the travel date, not a decision the desk takes.
+Issuing the ticket therefore ends at *Ticket Issued* — the ticket exists, the
+documents are generated, the merchant has been notified and **the wallet has
+already been debited**, none of which this change touched. Only the trip itself
+is still ahead. See :data:`AUTO_TRANSITIONS` and ``booking_completion_service``.
 
 Two differences carry the whole change request. **The approver is the
 Manager**, not the Admin who answered the enquiry, so those edges name the
@@ -100,9 +109,8 @@ TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.PAID: (
         Transition(S.TICKET_ISSUED, P.TICKET_ISSUE, "Ticket issued"),
     ),
-    S.TICKET_ISSUED: (
-        Transition(S.COMPLETED, P.TICKET_ISSUE, "Completed"),
-    ),
+    # NOBODY WALKS THIS EDGE BY HAND ANY MORE — see AUTO_TRANSITIONS.
+    S.TICKET_ISSUED: (),
     # Terminal.
     S.COMPLETED: (),
     S.REJECTED: (),
@@ -161,13 +169,38 @@ CLASSIC_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
         Transition(S.TICKET_ISSUED, P.TICKET_ISSUE, "Ticket issued"),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
-    S.TICKET_ISSUED: (
-        Transition(S.COMPLETED, P.TICKET_ISSUE, "Completed"),
-    ),
+    # As on the standard track: completion is the scheduler's, not the desk's.
+    S.TICKET_ISSUED: (),
     # Terminal.
     S.COMPLETED: (),
     S.REJECTED: (),
     S.CANCELLED: (),
+}
+
+
+#: The edge no human may walk: **Ticket Issued -> Completed**.
+#:
+#: WHY IT MOVED OUT OF BOTH TABLES
+#: Issuing a ticket used to complete the booking, and an Admin could also press
+#: "Mark Completed" the moment the ticket was uploaded. Both said the journey was
+#: over while the passenger had not yet left — so "Completed Tickets" on every
+#: dashboard counted *tickets sold*, not *trips taken*, and a booking for next
+#: March read as finished in August.
+#:
+#: Completion is now a fact about the calendar, not a decision anyone takes:
+#: ``booking_completion_service`` walks this edge once the scheduled journey has
+#: actually finished. Keeping the edge here rather than deleting it means the
+#: state machine is still the only thing that knows Completed is reachable, and
+#: ``status_history`` still records the step — exactly the arrangement
+#: :data:`SETTLEMENT_TRANSITIONS` uses for the cancellation edges.
+#:
+#: It is deliberately absent from :func:`allowed_transitions`, which drives every
+#: action menu in every portal. That absence *is* the removal of the manual
+#: "Mark as Complete" button — no screen has to remember not to draw it.
+AUTO_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
+    S.TICKET_ISSUED: (
+        Transition(S.COMPLETED, P.TICKET_ISSUE, "Travel completed"),
+    ),
 }
 
 
@@ -350,8 +383,16 @@ def allowed_transitions(request: ServiceRequest, actor: User) -> list[Transition
     ]
 
 
-def _find(request: ServiceRequest, target: S, *, settlement: bool = False) -> Transition:
+def _find(
+    request: ServiceRequest, target: S, *,
+    settlement: bool = False, automatic: bool = False,
+) -> Transition:
     edges = _table(request).get(request.status, ())
+    if automatic:
+        # Same "tried first" reasoning as settlement below, and the same reason
+        # it is opt-in: an edge nobody can reach through the action menu is only
+        # reachable by a caller that names it.
+        edges = AUTO_TRANSITIONS.get(request.status, ()) + edges
     if settlement:
         # Settlement edges are tried FIRST, not appended. Approved and Payment
         # Pending already have a Cancelled edge in TRANSITIONS — the merchant's
@@ -379,12 +420,13 @@ def transition(
     db: Session,
     request: ServiceRequest,
     target: S,
-    actor: User,
+    actor: User | None,
     *,
     reason: str | None = None,
     note: str | None = None,
     commit: bool = True,
     settlement: bool = False,
+    automatic: bool = False,
 ) -> ServiceRequest:
     """Move a request to ``target``, enforcing the edge and its permission.
 
@@ -395,10 +437,25 @@ def transition(
     ``settlement=True`` additionally allows the edges in
     :data:`SETTLEMENT_TRANSITIONS`. Only the change-request service passes it;
     see that constant for why those edges are not offered to everyone.
-    """
-    edge = _find(request, target, settlement=settlement)
 
-    if not any(has_permission(actor, code) for code in edge.codes):
+    ``automatic=True`` additionally allows :data:`AUTO_TRANSITIONS`, and is the
+    **only** case where ``actor`` may be ``None`` — the scheduled completion
+    sweep runs on a timer with no user behind it, and inventing a service
+    account to satisfy a permission check would put a login in the database that
+    exists solely to be never used. The permission check is skipped rather than
+    faked: an edge no human can reach has nobody to authorise. The history entry
+    records the actor as absent, which is what makes an automatic step legible
+    as automatic on the timeline instead of appearing to be somebody's click.
+    """
+    edge = _find(request, target, settlement=settlement, automatic=automatic)
+
+    if actor is None:
+        if not automatic:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="An actor is required for this action",
+            )
+    elif not any(has_permission(actor, code) for code in edge.codes):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Missing required permission: " + " or ".join(edge.codes),
@@ -428,8 +485,10 @@ def transition(
         "from": previous.value,
         "to": target.value,
         "label": edge.label,
-        "by": actor.user_id,
-        "by_name": actor.full_name,
+        "by": actor.user_id if actor else None,
+        # Read straight onto the timeline, where every other row names a person.
+        # "System" is the honest answer and the merchant-visible one.
+        "by_name": actor.full_name if actor else "System",
         "at": now.isoformat(),
     }
     if reason:

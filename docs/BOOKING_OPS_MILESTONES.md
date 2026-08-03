@@ -326,6 +326,46 @@ merchant-facing half of Phase 3** while leaving that milestone's backend entirel
   touches a document endpoint at all)
 
 
+### CR-7 — Booking status lifecycle: Ticket Issued ≠ Completed ⏳ **Built, awaiting approval**
+
+An out-of-band change request, 2026-08-03, delivered with three unrelated UI items (Group Trip,
+the logout destination, the Dashboard title). **Workflow only.** Approval, ticket generation,
+document generation, notifications and every wallet movement are untouched and were re-verified
+as untouched.
+
+- **Issuing a ticket now ends at `ticket_issued`.** It used to walk the booking to `completed`,
+  and an Admin could also press **Mark Completed** the moment the ticket was uploaded — so a
+  booking for next March read as finished in August, and "Completed Tickets" on every dashboard
+  counted *tickets sold* rather than *trips taken*.
+- **`completed` is now reached only by the clock.** `booking_completion_service` sweeps ticketed
+  bookings whose scheduled journey has finished and walks the one edge in
+  `lifecycle.AUTO_TRANSITIONS` — the only edge in this state machine no human can walk. It is
+  absent from `allowed_transitions`, which is what removes the button from every portal at once
+  rather than screen by screen.
+- **The journey ends at the RETURN leg** when there is one (`return_date` /
+  `return_preferred_time`), otherwise at the outbound. A round trip is not over when the outbound
+  lands.
+- **Local time, not UTC.** `travel_date` and `preferred_time` are bare values written against an
+  Indian departure board; reading them as UTC would complete every booking 5½ hours late.
+  `booking_local_utc_offset_minutes` (default 330) turns them into an instant. A missing or
+  unparseable time falls back to 23:59 so a booking can never complete *early*.
+- **`POST /api/admin/requests/{id}/complete` was removed**, endpoint and all — see
+  `docs/API_CONTRACT.md`. Removing the route, not just the button, is what makes this true of
+  API clients too.
+- **The scheduler is a bare asyncio task in `main.py`**, not a new dependency: one job, one
+  UPDATE. It holds a PostgreSQL advisory lock so several gunicorn workers cannot sweep at once,
+  commits per booking, and is idempotent — a booking whose travel passed while it was switched
+  off completes on the next tick.
+- **Wallet unchanged, and asserted.** `verify_booking_completion.py` checks the debit happens at
+  issuance for the full fare *before* any sweep runs; that assertion is what fails if anyone
+  relocates the debit to completion.
+- **Merchant Dashboard:** "Completed tickets" counts `completed` only. `ticket_issued` moved into
+  "Requests in progress" — the journey is still ahead of it — so the two tiles remain exhaustive
+  and no booking stopped being counted. Reports already read `completed` alone and needed nothing.
+- **Verification:** `tests/verify_booking_completion.py`, 37 checks; full suite 30/30 scripts.
+  Browser-verified on the Admin Booking Operations work modal (no Mark Completed; the panel names
+  the date the booking will complete on).
+
 ### CR-6 — Merchant manager sign-off on service requests ✅ **Built, awaiting approval**
 
 An out-of-band change request, 2026-08-01. Not a numbered milestone: it is a batch of
@@ -559,7 +599,8 @@ and every other workflow keep their payment path intact.
 - **M1's Booking Operations queue finally has a frontend.** It had none — the entire M1/M2
   backend was unrendered by any portal. CR-2 required it, so `frontend/assets/js/admin-booking-ops.js`
   now surfaces the queue, airline references, internal notes, multi-file ticket
-  upload, Mark Ticket Issued and Mark Completed. The work modal's **Assignment** form was later
+  upload, Mark Ticket Issued and Mark Completed. (**Mark Completed has since been removed** — see
+  "Booking status lifecycle" below; the desk's job now ends at Ticket Issued.) The work modal's **Assignment** form was later
   dropped — the queue's own assignment filter and column already cover who is working what — and
   replaced by the booking's journey and passenger details, read-only, off the payload the modal
   already loads. The assignment *endpoint* is untouched and still live.

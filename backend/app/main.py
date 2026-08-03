@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 
@@ -39,7 +40,7 @@ from app.routers import (
     payment_admin,
     wallet,
 )
-from app.services import user_service
+from app.services import booking_completion_service, user_service
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("jackpots.startup")
@@ -239,6 +240,74 @@ def ensure_default_admin_exists():
             )
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Automatic booking completion
+# ---------------------------------------------------------------------------
+# A ticketed booking becomes Completed once its journey has actually finished.
+# Nobody presses anything; this timer is what makes that true.
+#
+# WHY A BARE ASYNCIO TASK AND NOT A SCHEDULER LIBRARY
+# There is exactly one periodic job on this platform and it does one UPDATE. A
+# scheduler dependency would add a process to deploy, a store to configure and a
+# failure mode to learn, to run a loop that fits on a screen. If a second and
+# third job ever appear, that is the moment to reach for APScheduler or Celery —
+# not before.
+#
+# The sweep is synchronous SQLAlchemy, so it runs in a worker thread: doing it
+# inline would block the event loop, and this API serves requests on it.
+_completion_task: "asyncio.Task | None" = None
+
+
+async def _completion_loop() -> None:
+    interval = max(60, settings.booking_completion_interval_minutes * 60)
+    while True:
+        # SLEEP FIRST, DELIBERATELY. Every worker starts within a second of its
+        # siblings, and the advisory lock would then have all of them contend on
+        # the same tick forever. It also keeps the sweep off the critical path
+        # of a deploy, when the database is busiest.
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(_run_completion_sweep)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A failed tick must never kill the loop — the next one is a
+            # quarter of an hour away and the work is idempotent.
+            logger.exception("Booking completion sweep failed; will retry next tick.")
+
+
+def _run_completion_sweep() -> None:
+    db = SessionLocal()
+    try:
+        booking_completion_service.sweep_once_locked(db)
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+async def start_booking_completion() -> None:
+    global _completion_task
+    if not settings.booking_completion_enabled:
+        logger.info("Automatic booking completion is disabled by configuration.")
+        return
+    _completion_task = asyncio.create_task(_completion_loop())
+    logger.info(
+        "Automatic booking completion is on: sweeping every %d minute(s).",
+        settings.booking_completion_interval_minutes,
+    )
+
+
+@app.on_event("shutdown")
+async def stop_booking_completion() -> None:
+    if _completion_task is None:
+        return
+    _completion_task.cancel()
+    try:
+        await _completion_task
+    except asyncio.CancelledError:
+        pass
 
 
 @app.get("/api/health", tags=["health"])

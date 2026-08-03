@@ -36,6 +36,54 @@ ORDER = ["draft", "pending_approval", "approved", "payment_pending", "paid", "ti
 CLASSIC_ORDER = ["draft", "pending_approval", "approved", "ticket_issued", "completed"]
 
 
+def complete_by_travelling(rid):
+    """Walk a ticketed booking to **Completed** the only way that now exists.
+
+    THERE IS NO "MARK COMPLETE" ENDPOINT ANY MORE.
+    ``POST /api/admin/requests/{id}/complete`` was removed: a booking completes
+    when its scheduled journey has finished, swept on a timer by
+    ``booking_completion_service``. So a test cannot ask for a completed booking
+    — it has to make one *travel*.
+
+    Which is what this does: it moves the itinerary into the past directly in
+    the database (the API refuses to create or reschedule into the past, and
+    rightly so), then runs the real sweep. Nothing here reimplements the rule —
+    ``sweep`` is the production function, judging the production columns — so a
+    test that gets a completed booking has just proved the mechanism works
+    rather than routed around it.
+
+    Imported lazily: every script imports this module, but only three ask for a
+    completed booking, and only those three should need the backend importable.
+    """
+    import sys
+    from pathlib import Path
+
+    backend = Path(__file__).resolve().parent.parent / "backend"
+    if str(backend) not in sys.path:
+        sys.path.insert(0, str(backend))
+
+    from app.database.session import SessionLocal
+    from app.models_v2 import ServiceRequest
+    from app.services import booking_completion_service
+
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    db = SessionLocal()
+    try:
+        booking = db.get(ServiceRequest, rid)
+        assert booking is not None, f"booking {rid} vanished"
+        booking.travel_date = yesterday
+        # A return leg still in the future would keep the journey open — which
+        # is the correct behaviour, and not what this helper is asking for.
+        if booking.return_date is not None:
+            booking.return_date = yesterday
+        db.commit()
+
+        completed = booking_completion_service.sweep(db)
+        assert completed >= 1, "the completion sweep completed nothing"
+    finally:
+        db.close()
+
+
 def rival_merchant(atok):
     """A signed-in user belonging to a **different** company than ``MERCHANT``.
 
@@ -211,8 +259,7 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
         assert r.status_code == 200, f"issue: {r.status_code} {r.text[:300]}"
 
     if want >= CLASSIC_ORDER.index("completed"):
-        r = requests.post(f"{BASE}/api/admin/requests/{rid}/complete", headers=H(atok), json={})
-        assert r.status_code == 200, f"complete: {r.status_code} {r.text[:300]}"
+        complete_by_travelling(rid)
 
     final = requests.get(f"{BASE}/api/requests/{rid}", headers=H(mtok)).json()["request"]
     return {
@@ -290,8 +337,7 @@ def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
         assert r.status_code == 200, f"issue: {r.status_code} {r.text[:300]}"
 
     if want >= ORDER.index("completed"):
-        r = requests.post(f"{BASE}/api/admin/requests/{rid}/complete", headers=H(atok), json={})
-        assert r.status_code == 200, f"complete: {r.status_code} {r.text[:300]}"
+        complete_by_travelling(rid)
 
     final = requests.get(f"{BASE}/api/requests/{rid}", headers=H(mtok)).json()["request"]
     return {

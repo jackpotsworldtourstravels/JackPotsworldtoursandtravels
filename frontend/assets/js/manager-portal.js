@@ -181,24 +181,32 @@ $mg('mgrBackToCredsBtn').addEventListener('click', () => {
 
 $mg('mgrSignOutBtn').addEventListener('click', async e => {
   e.preventDefault();
-  await logoutPortalSession('manager').catch(() => {});
+  await logoutPortalSession('manager', { redirect: false }).catch(() => {});
   clearManagerSession();
-  mgrShowAuth();
+  redirectToPortalLogin();
 });
 
-/* Same policy as every other portal: one silent refresh, then back to sign-in. */
+/* Same policy as every other portal: one silent refresh, and then out to the
+   public partner login — an expired session is a sign-out nobody asked for. A
+   deliberate visit to /manager/ with no session still gets the card below. */
 axios.interceptors.response.use(
   res => res,
   async err => {
     if (err.response?.status === 401) {
       const retried = await handlePortalUnauthorized('manager', err);
       if (retried) return retried;
-      clearManagerSession();
-      mgrShowAuth();
+      // Not on a rejected password — that leaves them on this portal's card.
+      if (isSessionEndingUnauthorized(err)) {
+        clearManagerSession();
+        redirectToPortalLogin();
+      }
     }
     return Promise.reject(err);
   }
 );
+
+/* Back after signing out must not restore this portal — auth.js. */
+guardPortalSession(isManagerLoggedIn);
 
 /* ----------------------------------------------------------------- queue */
 
@@ -563,7 +571,7 @@ function mgrRenderReview(data) {
     <div class="mg-section">
       <h3>Itinerary <span style="font-weight:600;text-transform:none;letter-spacing:0;">— locked from the answered enquiry</span></h3>
       <dl class="mg-dl">
-        <div><dt>Trip type</dt><dd>${roundTrip ? 'Round trip' : 'One way'}</dd></div>
+        <div><dt>Trip type</dt><dd>${tripTypeLabel(d.trip_type)}</dd></div>
         <div><dt>From</dt><dd>${escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
         <div><dt>To</dt><dd>${escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—')}</dd></div>
         <div><dt>Airline</dt><dd>${escapeHtml(d.airline || '—')}</dd></div>

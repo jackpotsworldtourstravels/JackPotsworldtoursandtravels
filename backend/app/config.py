@@ -55,6 +55,37 @@ class Settings(BaseSettings):
     #: only alongside a key policy that the instance role can actually use.
     s3_sse: str = "AES256"
 
+    # -----------------------------------------------------------------------
+    # Automatic booking completion (booking_completion_service).
+    # -----------------------------------------------------------------------
+    # A ticketed booking becomes Completed once its scheduled journey is over,
+    # on a timer rather than by an Admin pressing a button. All four knobs have
+    # working defaults; none needs to be set for the feature to run.
+    booking_completion_enabled: bool = True
+    #: How often the sweep runs. Completion is never urgent to the minute — the
+    #: journey ended whenever it ended — so this trades promptness for load, and
+    #: a quarter of an hour is well inside the resolution anyone reads a booking
+    #: status at.
+    booking_completion_interval_minutes: int = 15
+    #: Extra hours after the scheduled departure before a booking is considered
+    #: finished. Zero implements the rule as specified — travel time has passed,
+    #: so the booking is complete — and is the honest default, because the
+    #: platform records a *departure* time and has never been told a flight
+    #: duration or an arrival time. Raise it if the desk would rather a booking
+    #: stayed Ticket Issued until the aircraft has plausibly landed.
+    booking_completion_buffer_hours: int = 0
+    #: Most a single sweep will complete. Only ever reached on the first run
+    #: after this shipped (every booking ticketed for a journey already behind
+    #: us completes at once); after that a tick has a handful at most. Bounded
+    #: so that first run cannot become one enormous transaction.
+    booking_completion_batch_size: int = 500
+    #: Minutes east of UTC that bare travel dates and "HH:MM" departure times
+    #: are written in. 330 is IST, which is where this business and every
+    #: departure board it quotes actually are. It is NOT the server's timezone —
+    #: every real timestamp in this database is UTC and stays UTC; this exists
+    #: only to turn "10 Aug, 09:30" into an instant.
+    booking_local_utc_offset_minutes: int = 330
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
