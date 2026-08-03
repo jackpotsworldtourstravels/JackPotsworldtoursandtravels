@@ -826,6 +826,26 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 .cl-field-float input:focus + label{color:var(--cl-orange);}
 
+/* ---- 12-hour time control (hour : minute AM/PM) ----
+   Three selects that have to read as ONE field, so the row gets the same 42px
+   height as any other control and the parts are sized by content rather than
+   split evenly: the hour and minute lists hold two characters, the meridiem
+   holds two letters plus its caret. `min-width:0` on each is what stops a
+   select's intrinsic width (which is the widest option, plus padding) from
+   pushing the group past its grid column on a narrow screen.
+
+   The colon is decorative and `aria-hidden`; each select carries its own label
+   so a screen reader hears "Preferred departure time — hour" and not "combo
+   box" three times. */
+.cl-timesel{display:flex; align-items:center; gap:6px; min-width:0;}
+.cl-timesel select{min-width:0; padding-right:30px; background-position:right 9px center;}
+.cl-timesel-h, .cl-timesel-m{flex:1 1 62px; text-align:center;}
+.cl-timesel-p{flex:1 1 76px;}
+.cl-timesel-sep{
+  flex:0 0 auto; font-weight:800; font-size:15px; color:var(--cl-text-muted);
+  padding-bottom:1px; user-select:none;
+}
+
 /* Checkbox / radio */
 .cl-check{
   display:flex; align-items:center; gap:10px;
@@ -1308,6 +1328,27 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
   .cl-kpis.cl-kpis-5 > :nth-child(4),
   .cl-kpis.cl-kpis-5 > :nth-child(5){grid-column:auto;}
 }
+
+/* EIGHT TILES — THE DASHBOARD BAND.
+   ==========================================================================
+   `classic-dashboard.js` documents this class as "a four-column grid, so eight
+   tiles are exactly two full rows at desktop and two per row on a tablet", but
+   the rule itself was never written, so the band fell through to the plain
+   `.cl-kpis` `auto-fit` above. That fits as many 212px columns as it can: at a
+   1280px window it lands on five, leaving a last row of three beside two empty
+   cells, and squeezes each card so hard that `₹55,500.00` wraps *between its
+   own digits* — which then makes the first row taller than the second.
+
+   Fixed counts, not `auto-fit`, because 8 only divides evenly by 4, 2 and 1.
+   `minmax(0,1fr)` keeps a long value clipped inside its card instead of pushing
+   the grid wider than the page. */
+.cl-kpis.cl-kpis-8{grid-template-columns:minmax(0,1fr);}
+@media (min-width:641px){
+  .cl-kpis.cl-kpis-8{grid-template-columns:repeat(2, minmax(0,1fr));}
+}
+@media (min-width:1180px){
+  .cl-kpis.cl-kpis-8{grid-template-columns:repeat(4, minmax(0,1fr));}
+}
 .cl-kpi{
   position:relative; overflow:hidden;
   background:var(--cl-surface); border:1px solid var(--cl-line);
@@ -1353,7 +1394,12 @@ button.cl-kpi:active{transform:translateY(-1px);}
   position:relative;
   font-size:27px; font-weight:800; line-height:1.15; letter-spacing:-0.03em;
   color:var(--cl-text); font-variant-numeric:tabular-nums;
-  overflow-wrap:anywhere;
+  /* NOT `anywhere`: a KPI value is one number, and `anywhere` breaks it between
+     its own digits — `₹55,500.0` / `0` on two lines, which reads as two figures
+     and makes the card taller than its neighbours. A figure either fits on one
+     line or is clipped by `.cl-kpi`'s `overflow:hidden`; it is never split. */
+  overflow-wrap:normal; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
 }
 .cl-kpi-sub{
   position:relative;
@@ -1877,6 +1923,15 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   color:#fff; background:rgba(255,255,255,0.19); border-color:rgba(255,255,255,0.46);
 }
 
+/* The optional attachment in the start-a-conversation drawer. Quiet by
+   default — a bordered dropzone would compete with the message box, which is
+   the only thing actually required to open a ticket. */
+.cl-sc-newfiles{margin-top:14px;}
+.cl-sc-newfiles small{
+  display:block; margin-top:7px; font-size:11.5px; color:var(--cl-text-muted);
+}
+.cl-sc-newfiles .cl-files{margin-top:10px;}
+
 /* ---- header ---- */
 
 .cl-sc-head{display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap;}
@@ -1886,6 +1941,10 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   color:var(--cl-text); margin:0;
 }
 .cl-sc-head p{margin:4px 0 0; font-size:13.5px; font-weight:500; color:var(--cl-text-2);}
+
+/* The two live channels, inline in the header — what is left of the full-width
+   banner that used to sit above the whole screen. */
+.cl-sc-head-live{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 
 .cl-sc-badges{display:flex; gap:9px; flex-wrap:wrap;}
 .cl-sc-badge{
@@ -2716,6 +2775,8 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
      header's own truncation rather than dropped cleanly. */
   .cl-sc-chat-id .cl-presence{display:none;}
   .cl-sc-head h1{font-size:21px;}
+  .cl-sc-head-live{width:100%;}
+  .cl-sc-head-live .cl-btn{flex:1 1 auto; justify-content:center;}
   .cl-sc-badges{width:100%;}
   .cl-sc-badge{flex:1 1 auto; justify-content:center;}
   .cl-sc-grid{height:clamp(480px, calc(100vh - 260px), 720px);}
@@ -2866,7 +2927,10 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em;
   color:rgba(255,255,255,0.62);
 }
+/* inline-block, not block: the state pill sits on the same baseline as the
+   figure. `margin-top` stays so the gap under the label is unchanged. */
 .cl-balance-value{
+  display:inline-block;
   font-size:38px; font-weight:800; letter-spacing:-0.035em; line-height:1.1;
   margin-top:4px; overflow-wrap:anywhere;
 }
@@ -2879,6 +2943,44 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   display:block; font-size:19px; font-weight:800; letter-spacing:-0.02em; margin-top:3px;
 }
 .cl-balance .cl-btn{margin-left:auto;}
+
+/* ---- BALANCE SIGN COLOURS ------------------------------------------------
+   Red below zero, green above it, neutral at exactly zero.
+
+   TWO SETS, BECAUSE THERE ARE TWO BACKGROUNDS.
+   `--cl-success`/`--cl-danger` are the mid-weight brand colours: they carry
+   shapes (a tag's background, a border) and they FAIL AA as text on white.
+   `--cl-success-fg`/`--cl-danger-fg` are the text weights. The hero balance
+   sits on navy and needs the opposite — a colour light enough to read on a
+   dark panel — so it gets its own pair rather than reusing the table one at a
+   lower opacity, which is how a figure ends up unreadable in exactly the state
+   the merchant most needs to read it.
+
+   ZERO IS NOT GREEN. A zero balance is neither good nor bad, and painting it
+   green tells a merchant with nothing left that it is fine. It takes the muted
+   text colour, which is the "no signal" weight everywhere else in this portal. */
+.cl-money-pos{color:var(--cl-success-fg); font-weight:700;}
+.cl-money-neg{color:var(--cl-danger-fg);  font-weight:700;}
+.cl-money-zero{color:var(--cl-text-muted); font-weight:700;}
+
+/* On the navy hero. #4ADE9B / #FF8D9C are the light-on-dark weights already
+   defined for dark mode, reused here for a panel that is dark in both themes. */
+.cl-balance-value.is-pos{color:#4ADE9B;}
+.cl-balance-value.is-neg{color:#FF8D9C;}
+.cl-balance-value.is-zero{color:rgba(255,255,255,0.88);}
+
+/* The word beside the number. A colour alone is not an indicator — it is
+   invisible to a red/green colour-blind reader and to anyone printing the
+   screen — so the state is always ALSO said in text. */
+.cl-balance-state{
+  display:inline-flex; align-items:center; gap:6px; vertical-align:middle;
+  margin-left:12px; padding:4px 11px; border-radius:999px;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.10);
+}
+.cl-balance-state.is-neg{color:#FFC2CB; border-color:rgba(255,141,156,0.45); background:rgba(224,54,75,0.22);}
+.cl-balance-state.is-pos{color:#B4F0D3; border-color:rgba(74,222,155,0.40); background:rgba(14,159,110,0.20);}
+.cl-balance-state.is-zero{color:rgba(255,255,255,0.82);}
 
 /* ---- misc ---- */
 .cl-chip-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}

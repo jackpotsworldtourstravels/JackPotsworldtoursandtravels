@@ -42,10 +42,17 @@ function clInitReports() {
         <p>Volume, value and mix across your account. Every figure and every export below
            describes the same filtered set.</p>
       </div>
+      <!-- Reading the report is report.view, which every merchant account
+           holds; taking a FILE away is report.export, which not every role
+           does. So the figures, the charts and the filters below are the same
+           screen for everyone and only these three buttons change state. -->
       <div class="cl-page-actions">
-        <button type="button" class="cl-btn" id="clRepCsv">${clIco('download', { size: 15 })} CSV</button>
-        <button type="button" class="cl-btn" id="clRepXlsx">${clIco('download', { size: 15 })} XLSX</button>
-        <button type="button" class="cl-btn cl-btn-secondary" id="clRepPdf">${clIco('download', { size: 15 })} PDF</button>
+        <button type="button" class="cl-btn" id="clRepCsv"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} CSV</button>
+        <button type="button" class="cl-btn" id="clRepXlsx"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} XLSX</button>
+        <button type="button" class="cl-btn cl-btn-secondary" id="clRepPdf"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} PDF</button>
       </div>
     </div>
 

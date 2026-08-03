@@ -247,6 +247,9 @@ function clRenderDashKpis(position, enq, analytics, changes) {
     {
       label: 'Wallet balance', icon: 'wallet', tone: 'accent',
       value: position ? moneyStr(position.wallet_balance) : '—',
+      /* The raw decimal, for the sign colour. Not `value` — that has already
+         been through moneyStr and carries a currency symbol and separators. */
+      money: position ? position.wallet_balance : null,
       to: 'wallet',
     },
     {
@@ -297,14 +300,22 @@ function clRenderDashKpis(position, enq, analytics, changes) {
 
 /* A KPI as a button. A tile with nowhere to go renders as a <div>, so a
    keyboard user never tabs onto a figure that does nothing. */
-function clKpiCard({ label, value, icon, tone, to, filter }) {
+function clKpiCard({ label, value, icon, tone, to, filter, money }) {
   /* Heading and value. The `.cl-kpi-sub` line these cards used to carry is
      gone portal-wide by request — it is not rendered empty and then hidden,
-     it is not rendered. Callers may still pass a `sub`; it is ignored. */
+     it is not rendered. Callers may still pass a `sub`; it is ignored.
+
+     `money` is the RAW decimal string behind an already-formatted `value`, and
+     it is passed only by tiles whose figure can go below zero. It colours the
+     number red / neutral / green by sign — the same rule the Wallet screen
+     uses — so a merchant reading "Wallet balance" here sees the same state it
+     will see when it opens Wallet. Count tiles never pass it: a red "0
+     enquiries" would be a warning about nothing. */
   const inner = `
     ${icon ? `<div class="cl-kpi-head"><span class="cl-kpi-ico ${tone || ''}">${clIco(icon)}</span></div>` : ''}
     <div class="cl-kpi-label">${escapeHtml(label)}</div>
-    <div class="cl-kpi-value">${escapeHtml(String(value ?? '—'))}</div>
+    <div class="cl-kpi-value${money != null ? ` ${moneyToneClass(money)}` : ''}">${
+      escapeHtml(String(value ?? '—'))}</div>
     ${to ? `<span class="cl-kpi-arrow">${clIco('arrowRight', { size: 16 })}</span>` : ''}`;
   return to
     ? `<button type="button" class="cl-kpi" data-cl-kpi-to="${escapeHtml(to)}"

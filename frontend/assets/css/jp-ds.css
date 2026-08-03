@@ -990,3 +990,125 @@ table{width:100%;}
   .main{margin-left:0 !important; padding:0 !important;}
   .panel, .cl-panel{box-shadow:none !important; border:1px solid #ddd !important;}
 }
+
+
+/* ==========================================================================
+   14. CONSISTENCY LAYER — tables, layout rhythm, glass
+   ==========================================================================
+   Everything above styles a component. This section makes the SAME component
+   behave the same way in all three portals, which is a different problem: the
+   Merchant, Admin and Super Admin sheets each grew their own table padding,
+   their own grid gaps and their own idea of where an action button sits, and
+   the difference is visible the moment two screens are opened side by side.
+
+   IT IS LAST ON PURPOSE. These are cross-cutting rules that must win over the
+   per-portal defaults they are unifying, and source order — not `!important` —
+   is what does that. `!important` appears exactly twice below, both times
+   against an inline style a JS module writes.
+   ========================================================================== */
+
+/* ---- tables -------------------------------------------------------------
+   One row rhythm everywhere. `vertical-align:middle` is the load-bearing one:
+   the default is `baseline`, so any row mixing a badge or a button with plain
+   text had its text sitting high against the control beside it, and that is
+   most of the rows in this product. */
+table th,
+table td{
+  vertical-align:middle;
+  padding:12px 14px;
+}
+/* A consistent row height without pinning it: content taller than this (a
+   two-line address, a stacked reference) still grows the row, but a row of
+   short values can no longer be shorter than its neighbours. */
+table tbody td{ height:52px; }
+table th{ height:42px; }
+
+/* Long free text truncates rather than forcing the table wider than its
+   container — the usual cause of a page that scrolls sideways. Cells opt in
+   with `.jp-truncate`, because blanket truncation would clip references and
+   amounts that must be read in full. */
+.jp-truncate{
+  max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* Money and counts read right-aligned, and tabular figures stop digits
+   shifting column to column as values change. Opt-in for the same reason. */
+.jp-num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ACTIONS SIT IN THE SAME PLACE IN EVERY TABLE.
+   `:has()` finds the cell that actually holds the controls instead of assuming
+   it is the last column — several tables here put a status badge last. Where
+   `:has()` is unsupported the cell simply keeps its previous layout, so this
+   degrades to exactly what shipped before. */
+table td:has(> .btn, > .cl-btn, > button){
+  white-space:nowrap;
+}
+table td:has(> .btn + .btn, > .cl-btn + .cl-btn, > button + button){
+  display:flex; align-items:center; gap:8px; justify-content:flex-end;
+}
+
+/* A table narrower than its panel leaves a strip of dead surface down one
+   side — the "excessive empty whitespace" in the brief. */
+table{ width:100%; }
+
+
+/* ---- layout rhythm ------------------------------------------------------
+   One gap value for card grids in all three portals. These grids were written
+   independently at 14px, 16px, 18px and 20px, which is why two dashboards
+   never quite matched. */
+.stat-grid, .cl-kpis, .info-grid, .jp-kv, .card-grid{
+  gap:16px;
+}
+/* Cards fill the track they are given. Several were `max-width`-capped from
+   an earlier fixed-width layout and left a gap at the end of a wide row. */
+.stat-card, .cl-kpi, .panel, .cl-panel{
+  width:100%; max-width:none;
+}
+
+
+/* ---- glass --------------------------------------------------------------
+   Subtle, and only on surfaces that sit ABOVE the canvas — summary cards,
+   dialogs, side panels, banners. Never on a table or a form: those are dense
+   reading surfaces where a translucent background costs contrast and buys
+   nothing.
+
+   `--jp-glass` is .72 alpha and is right for chrome like the sticky topbar,
+   where whatever shows through is already out of the reading path. Content
+   cards need more, so this declares its own token at .93: enough for the blur
+   and the canvas tint to register at the edges, while body text still sits on
+   a near-solid surface and keeps the AA measurements taken in the header of
+   this file. */
+:root{
+  --jp-glass-card:rgba(255,255,255,.93);
+  --jp-glass-card-blur:saturate(140%) blur(16px);
+}
+:root[data-theme="dark"]{ --jp-glass-card:rgba(18,26,43,.93); }
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){ --jp-glass-card:rgba(18,26,43,.93); }
+}
+
+/* THE WALLET HERO IS DELIBERATELY NOT IN THIS LIST. `.cl-balance` carries its
+   own dark gradient, and the balance colours on it — red for overdrawn, green
+   for in credit, neutral for nil — were contrast-checked against that
+   gradient. Frosting it would change the background those three measurements
+   were taken against, which is the one place in this product where a colour
+   IS the information. */
+.stat-card, .cl-kpi,
+.modal-card, .cl-modal, .drawer-panel,
+.jp-callout{
+  background:var(--jp-glass-card);
+  -webkit-backdrop-filter:var(--jp-glass-card-blur);
+  backdrop-filter:var(--jp-glass-card-blur);
+}
+
+/* CAUTION FOR ANYONE ADDING TO THE LIST ABOVE: backdrop-filter creates a
+   containing block, so a `position:fixed` descendant is positioned against the
+   frosted element instead of the viewport. That is what broke the Merchant
+   Home overlays once already. None of the surfaces above has a fixed child
+   today; check before adding one that does. */
+
+
+/* ---- reduced motion ------------------------------------------------------ */
+@media (prefers-reduced-motion:reduce){
+  table tbody tr, .stat-card, .cl-kpi, .btn, .cl-btn{ transition:none !important; }
+}

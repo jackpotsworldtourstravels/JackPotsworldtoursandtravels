@@ -9,8 +9,17 @@ Visitors can search and book flights, hotels, cruises, and tour packages; keep a
 reviews; and manage bookings/payments from an Account Center. Admins get a separate console
 (`admin/index.html`) for catalog, users, bookings, payments, pricing/coupons, support tickets, and
 reports. Registered B2B partner companies (gaming companies, corporate travel desks, agencies) get
-their own portal (`merchant/index.html`) to raise and track ticket requests and service requests
-against their own bookings only.
+their own portal (`merchant-classic/index.html`) to raise and track ticket requests and service
+requests against their own bookings only. `merchant/index.html` is the retired Premium portal and
+now only redirects there.
+
+**Where each audience signs in (2026-08-03).** The public site's **Login** is the CUSTOMER (B2C)
+door; **My Partner** opens `partner-login.html`, the merchant (B2B) login. Admin, Manager and Super
+Admin are reachable only at `admin/`, `manager/` and `super-admin/` and are named nowhere on the
+public site — `portal-login.html`, which used to list all four, now redirects to the partner login.
+The customer login is UI ahead of its backend: there is no customer endpoint (the `Portal` literal
+accepts `super_admin|admin|manager|merchant` only), so the form is gated behind
+`CUSTOMER_AUTH.enabled` in `assets/js/app.js` and declines clearly until one ships.
 
 ## Contents
 
@@ -276,7 +285,7 @@ Both route to the same real inbox via Gmail "+" sub-addressing (mail to `local+t
 delivers to `local@gmail.com`, while staying a distinct string for the `email` UNIQUE constraint) —
 swap in different real addresses per company if you want separate inboxes.
 
-Sign in at `merchant/index.html`; the OTP step requires `SMTP_HOST`/`SMTP_FROM_EMAIL` (and the rest
+Sign in at `partner-login.html`; the OTP step requires `SMTP_HOST`/`SMTP_FROM_EMAIL` (and the rest
 of the SMTP variables) to be set in `backend/.env` — there is no server-side log fallback. If SMTP
 isn't configured, OTP requests fail with a `503` rather than ever printing the code anywhere.
 
@@ -317,7 +326,8 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
   tickets, and activity logs
 - Send notifications to one user or broadcast to all users
 
-**Partner Portal (`merchant/index.html`)** — separate B2B surface, own JWT scope, own login
+**Partner Portal (`merchant-classic/index.html`, sign-in at `partner-login.html`)** — separate B2B
+surface, own JWT scope, own login
 - 3-step OTP + password sign-in (email → OTP → password), plus forgot-password
 - Dashboard KPIs, Ticket Enquiry (searches the same live flight catalog as the public site)
 - Request Ticket: flights/hotels/cruises, multi-passenger, draft-then-submit-for-approval workflow

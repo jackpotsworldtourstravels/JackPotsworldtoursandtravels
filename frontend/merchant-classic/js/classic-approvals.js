@@ -27,14 +27,14 @@ let clApprovalSearch = '';
 let clApprovalPage = 1;
 
 /** True when this account may approve at all — drives the sidebar entry.
- *  Read from the session snapshot auth.js stores at login. */
+ *
+ *  Approvals is the ONE destination in this portal that is permission-shaped
+ *  rather than universal: it is not one of the eleven screens every merchant
+ *  user shares, it is the approver's own queue, and a Data Operator has nothing
+ *  to see in it. Every *other* screen renders identically for every role and
+ *  gates its buttons with clCan() — see the note above clCan in classic-shell.js. */
 function clCanApprove() {
-  try {
-    const u = JSON.parse(localStorage.getItem('merchant_user_json') || '{}');
-    return (u.permissions || []).includes('booking.merchant_approve');
-  } catch {
-    return false;
-  }
+  return clCan('booking.merchant_approve');
 }
 
 function clInitApprovals() {
@@ -193,7 +193,9 @@ async function clOpenApproval(requestId) {
     <dl class="cl-dl">
       <div><dt>Raised by</dt><dd>${escapeHtml(r.raised_by || '—')}</dd></div>
       <div><dt>Booking reference</dt><dd class="cl-ref">${escapeHtml(r.booking_reference || '—')}</dd></div>
-      <div><dt>From enquiry</dt><dd class="cl-ref">${escapeHtml(d.enquiry_reference || '—')}</dd></div>
+      <div><dt>From enquiry</dt><dd class="cl-ref">${d.enquiry_reference
+        ? escapeHtml(d.enquiry_reference)
+        : (d.direct_booking ? 'Direct booking' : '—')}</dd></div>
       <div><dt>Submitted</dt><dd>${escapeHtml(r.created_at ? fmtDateTime(r.created_at) : '—')}</dd></div>
       <div><dt>Travellers</dt><dd>${(r.passengers || []).length}</dd></div>
       <div><dt>Status</dt><dd>${clTag(r.status, r.status_label)}</dd></div>

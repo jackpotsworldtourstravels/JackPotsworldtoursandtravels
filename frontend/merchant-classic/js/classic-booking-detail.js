@@ -85,7 +85,8 @@ function clRenderBookingDetail() {
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clBdBack">Back to My Requests</button>
         <button type="button" class="cl-btn cl-btn-sm" id="clBdRefresh">Refresh</button>
-        ${returned ? '<button type="button" class="cl-btn cl-btn-primary" id="clBdResubmit">Resubmit for approval</button>' : ''}
+        ${returned ? `<button type="button" class="cl-btn cl-btn-primary" id="clBdResubmit"
+          ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Resubmit for approval</button>` : ''}
       </div>
     </div>
 

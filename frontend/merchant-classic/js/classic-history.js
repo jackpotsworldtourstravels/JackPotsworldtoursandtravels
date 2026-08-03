@@ -65,9 +65,12 @@ function clInitHistory() {
            Anything still moving is on <a href="#" data-cl-to-requests>My Requests</a>.</p>
       </div>
       <div class="cl-page-actions">
-        <button type="button" class="cl-btn" id="clHistCsv">${clIco('download', { size: 15 })} CSV</button>
-        <button type="button" class="cl-btn" id="clHistXlsx">${clIco('download', { size: 15 })} XLSX</button>
-        <button type="button" class="cl-btn cl-btn-secondary" id="clHistPdf">${clIco('download', { size: 15 })} PDF</button>
+        <button type="button" class="cl-btn" id="clHistCsv"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} CSV</button>
+        <button type="button" class="cl-btn" id="clHistXlsx"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} XLSX</button>
+        <button type="button" class="cl-btn cl-btn-secondary" id="clHistPdf"
+          ${clActionAttrs('report.export', CL_NO_EXPORT)}>${clIco('download', { size: 15 })} PDF</button>
       </div>
     </div>
 

@@ -494,7 +494,8 @@ async function clLoadSrBookings() {
           <td class="cl-actions">
             ${hasCancellation
               ? '<span class="cl-tag">Cancellation raised</span>'
-              : `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-pick="${r.id}">Select</button>`}
+              : `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-pick="${r.id}"
+                   ${clActionAttrs('servicerequest.create', CL_NO_SERVICE)}>Select</button>`}
           </td>
         </tr>`;
       }).join('')
@@ -562,7 +563,8 @@ function clRenderSrModal() {
   $('clModalFoot').innerHTML = `
     <button type="button" class="cl-btn" data-cl-sr-view>View booking details</button>
     <button type="button" class="cl-btn" data-cl-sr-close>Cancel</button>
-    <button type="button" class="cl-btn cl-btn-primary" id="clSrSubmit">Submit request</button>`;
+    <button type="button" class="cl-btn cl-btn-primary" id="clSrSubmit"
+      ${clActionAttrs('servicerequest.create', CL_NO_SERVICE)}>Submit request</button>`;
 
   $('clModalFoot').querySelector('[data-cl-sr-view]').addEventListener('click', () => {
     clSrViewing = true;

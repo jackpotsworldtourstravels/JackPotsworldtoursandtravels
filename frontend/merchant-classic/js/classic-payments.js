@@ -269,7 +269,8 @@ function clOpenPaymentRequestModal(r) {
       <div class="cl-msg" id="clPrMsg"></div>` : ''}`,
     settleable
       ? `<button type="button" class="cl-btn" data-cl-pr-abort>Cancel</button>
-         <button type="button" class="cl-btn cl-btn-primary" data-cl-pr-go>Submit payment</button>`
+         <button type="button" class="cl-btn cl-btn-primary" data-cl-pr-go
+           ${clActionAttrs('payment.pay', CL_NO_PAY)}>Submit payment</button>`
       : '<button type="button" class="cl-btn" data-cl-pr-abort>Close</button>');
 
   $('clModalFoot').querySelector('[data-cl-pr-abort]').addEventListener('click', clCloseModal);
@@ -350,7 +351,8 @@ function clOpenPayModal(request) {
     </div>
     <div class="cl-msg" id="clPayMsg"></div>`,
     `<button type="button" class="cl-btn" data-cl-pay-abort>Cancel</button>
-     <button type="button" class="cl-btn cl-btn-primary" data-cl-pay-go>Submit payment</button>`);
+     <button type="button" class="cl-btn cl-btn-primary" data-cl-pay-go
+       ${clActionAttrs('payment.pay', CL_NO_PAY)}>Submit payment</button>`);
 
   $('clModalFoot').querySelector('[data-cl-pay-abort]').addEventListener('click', clCloseModal);
   $('clModalFoot').querySelector('[data-cl-pay-go]').addEventListener('click', async () => {

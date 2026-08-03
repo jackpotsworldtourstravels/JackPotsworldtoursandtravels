@@ -48,6 +48,19 @@ SUITE = [
     ("verify_m4.py", "M4: ledger arithmetic, wallet, credit limit, refunds, payment concurrency"),
     ("verify_cr5.py", "CR-5: binding quotation on the enquiry answer, form rules, credit gates"),
     ("verify_cr2.py", "CR-2: manager approval, payment bypass, ticket delivery, RBAC, concurrency"),
+    # Straight after CR-2 and CR-5, because it is the second way onto the track
+    # those two define: a booking raised with no enquiry in front of it. It
+    # fails for a different reason than either of them — the completeness rules
+    # and the Manager queue now key off a track marker rather than a parent row,
+    # and a direct booking has no parent at all.
+    ("verify_direct_booking.py",
+     "Book Directly: unquoted booking, inherited validators, submit rules, manager queue, fare at issuance"),
+    # Immediately after it, because it builds its fixtures with direct bookings.
+    # Mostly a tenant-isolation script: the lookup answers a guessable key with
+    # a named person's date of birth, so "scoped to the caller's merchant" is
+    # the whole endpoint and is asserted against a second real merchant.
+    ("verify_passenger_lookup.py",
+     "Passenger auto-fill: passport lookup, newest record wins, writes nothing, cross-tenant scope"),
     ("verify_cr3.py", "CR-3: merchant approves its own bookings, scoping, self-approval, concurrency"),
     ("verify_cr4b.py", "CR-4b: wallet debit at Ticket Issued, credit limit, refunds, credit notes"),
     ("verify_cr4c.py", "CR-4c: merchant wallet screen, ledger, top-ups, payment accounts, proofs"),
@@ -65,6 +78,12 @@ SUITE = [
     # upload path, so a failure there explains an attachment failure here.
     ("verify_support_center.py",
      "Support Center: categories, priority, attachments, search, receipts, notes, triage, reopen"),
+    # After every screen it probes. This one asserts that a Manager and a Data
+    # Operator get the SAME answer from all of them, so it can only be read as
+    # "the portal is one UI" once each of those endpoints is independently known
+    # good — otherwise a matched pair of failures would pass as parity.
+    ("verify_merchant_ui_parity.py",
+     "Merchant Portal: one UI for every role — read floor, action-only sub-roles, screen parity"),
     # After the booking scripts: this issues real tickets to build its totals,
     # so a broken issuance path explains a provider failure rather than the
     # other way round.

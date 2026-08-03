@@ -417,10 +417,76 @@ function clRoleLabel(user) {
     || clLabel(user.merchant_role || user.role || '');
 }
 
+/* ---------------------------------------------------------------------------
+   ONE PORTAL, ONE LAYOUT — PERMISSIONS MOVE BUTTONS, NOT PAGES.
+
+   Every merchant account holds the same READ codes (`_MERCHANT_READ` in
+   backend/app/auth/rbac.py), so every screen in this portal renders the same
+   way for a Data Operator as for a Manager: same greeting, same eight KPI
+   cards, same charts, same tables and filters. What a sub-role changes is which
+   ACTIONS are available, and that is what this helper is for.
+
+   `clCan` is the only thing any screen should ask. Two rules for callers:
+
+   1. Gate the CONTROL, never the container. Disabling "Top up" is right;
+      hiding the Wallet panel it sits in is what split this portal in two.
+   2. Prefer `clActionAttrs()` (below) to hiding. A disabled control with a
+      reason still tells the user the feature exists and who to ask; a control
+      that vanishes reads as a broken build.
+
+   This is presentation only. Every endpoint behind every one of these keeps its
+   own `require()` server-side — a button that is merely hidden has never been
+   what stops anyone.
+   --------------------------------------------------------------------------- */
+function clCan(code) {
+  const user = clSessionUser();
+  return Array.isArray(user?.permissions) && user.permissions.includes(code);
+}
+
+/* Attributes for an action control the session may not use: disabled, plus the
+   reason on hover and for a screen reader. Spread into a <button> tag.
+
+   `aria-disabled` as well as `disabled`, because a plain `disabled` button is
+   skipped by the tab order and a keyboard user then never learns the control is
+   there — which is the same disappearance this whole change is undoing.
+
+   CALLERS MUST NOT ALSO WRITE `title` ON THE SAME TAG. Two `title` attributes on
+   one element is not an error the browser reports; it silently keeps the FIRST
+   and drops the second, so whichever the author wrote second is the one that
+   goes missing. Where a control already explains itself on hover, branch on
+   clCan() in the template and write one title or the other. */
+function clActionAttrs(code, why) {
+  if (clCan(code)) return '';
+  return ` disabled aria-disabled="true" title="${escapeHtml(why || CL_NO_PERMISSION)}"`;
+}
+
+/* One wording per action, so the same refusal does not appear as three
+   different sentences on three screens. They name the job that does hold the
+   permission — "ask a Manager" is actionable, "permission denied" is not. */
+const CL_NO_PERMISSION = 'Your role does not allow this action.';
+const CL_NO_ENQUIRY = 'Your role cannot raise booking enquiries. Ask a Manager or Supervisor.';
+const CL_NO_BOOKING = 'Your role cannot raise or change bookings. Ask a Manager or Supervisor.';
+const CL_NO_PAY = 'Your role cannot make payments. Ask a Manager or your Finance team.';
+const CL_NO_EXPORT = 'Your role cannot export reports. Ask a Manager or Supervisor.';
+const CL_NO_SERVICE = 'Your role cannot raise service requests. Ask a Manager or Supervisor.';
+const CL_NO_CHAT = 'Your role cannot write to the partner desk. Ask a Manager or Supervisor.';
+/* There is deliberately no constant for the manager sign-off. Approve / Reject
+   are ROW actions on a table that can run to fifty pending requests, and a
+   disabled pair on every row is noise rather than information — so
+   clSrRowActions omits them for a non-approver, and the note above the table
+   says who the request goes to instead. Hiding is the right answer when the
+   control would repeat per row; disabling is the right answer for the one
+   button at the top of a screen. */
+
 /* Whether this account may sign off its own company's service requests.
-   Mirrors the server's rule in change_request_service._is_manager. */
+   Mirrors the server's rule in change_request_service._is_manager, which reads
+   the PERMISSION rather than the role name — so this asks for the permission
+   too. It used to test `merchant_role === 'manager' || role === 'merchant_admin'`
+   and that answered a different question: a merchant_admin whose sub-role was
+   Finance was offered a sign-off the server then refused. */
 function clIsManager(user = clSessionUser()) {
-  return !!user && (user.merchant_role === 'manager' || user.role === 'merchant_admin');
+  return !!user && Array.isArray(user.permissions)
+    && user.permissions.includes('servicerequest.approve');
 }
 
 /* Two letters from the name, for the avatar. A single-word name gives its
@@ -435,9 +501,16 @@ function clInitials(name) {
 /* A session stored before the role was needed carries no role at all, and the
    header would sit on a dash forever. /api/profile returns the same shape the
    login did, so one call repairs it — and it is the same call Profile &
-   Settings already makes, so nothing new is being asked of the backend. */
+   Settings already makes, so nothing new is being asked of the backend.
+
+   IT NOW REPAIRS A MISSING `permissions` ARRAY TOO, and that second condition
+   is the load-bearing one. clCan() answers false for a code it cannot find, so
+   a snapshot without the array does not degrade — it disables every action in
+   the portal at once, on an account that is entitled to all of them. Refetching
+   is the difference between a stale session and an unusable one. */
 async function clRefreshRole() {
-  if (clRoleLabel(clSessionUser())) return;
+  const user = clSessionUser();
+  if (clRoleLabel(user) && Array.isArray(user?.permissions)) return;
   try {
     const me = await MerchantApi.getProfile();
     localStorage.setItem('merchant_user_json', JSON.stringify(me));
@@ -467,12 +540,20 @@ function clPaintIdentity() {
   $('clSideBadge').title = company || name;
 }
 
-function clShowApp() {
+/* AWAITS THE ROLE REFRESH, and the order is the point. Every permission-driven
+   decision below this line — the Approvals rail item, and then every button the
+   first screen renders — reads the session snapshot synchronously. Firing the
+   repair off and routing anyway would paint the whole portal from the snapshot
+   this function was called to fix. For a healthy session clRefreshRole returns
+   on its first line and this costs a microtask; only a snapshot that is
+   actually missing something waits for the network, which is the one case where
+   waiting is right. */
+async function clShowApp() {
   $('clAuth').style.display = 'none';
   $('clApp').classList.add('active');
 
   clPaintIdentity();
-  clRefreshRole();
+  await clRefreshRole();
   $('clDateText').textContent = new Date().toLocaleDateString('en-IN', {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   });
