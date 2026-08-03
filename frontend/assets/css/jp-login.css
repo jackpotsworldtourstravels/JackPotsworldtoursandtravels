@@ -233,16 +233,30 @@ html,body{margin:0;}
     0 54px 96px -38px rgba(4,18,35,0.42);
 }
 
+/* EVERY VERTICAL VALUE FROM HERE DOWN IS `clamp(floor, vh, design)`.
+   The card carries ~724px of content, so on a short viewport it is the card —
+   not the shell — that overflows. There was already a `@media (max-width:1400px)`
+   block compressing for NARROW screens and nothing at all for SHORT ones, which
+   is the case that actually bites: Windows display scaling at 125% turns a
+   1920×1080 monitor into a 1536×736 CSS viewport, and 736px is where a login
+   form stops fitting.
+
+   Ornament gives way before content. The avatar, the diamond rule and the two
+   divider margins shed the most; inputs stop at 46px (still a comfortable
+   target) and the type never drops below 26px. Above ~1000px tall every value
+   is back at its design number, so the roomy look is unchanged where there is
+   room for it. */
 .jpl-avatar{
-  width:82px; height:82px; margin:0 auto 24px; border-radius:50%;
+  width:clamp(52px,7.6vh,82px); height:clamp(52px,7.6vh,82px);
+  margin:0 auto clamp(12px,2.1vh,24px); border-radius:50%;
   display:flex; align-items:center; justify-content:center;
   background:#fff; border:1px solid #EDF1F6;
   box-shadow:0 4px 14px -4px rgba(18,38,63,0.14);
 }
-.jpl-avatar svg{width:36px; height:36px; fill:none; stroke:var(--jpl-gold); stroke-width:1.6;}
+.jpl-avatar svg{width:clamp(24px,3.4vh,36px); height:clamp(24px,3.4vh,36px); fill:none; stroke:var(--jpl-gold); stroke-width:1.6;}
 
 .jpl-title{
-  font-size:34px; font-weight:700; text-align:center; letter-spacing:-0.02em;
+  font-size:clamp(26px,3.6vh,34px); font-weight:700; text-align:center; letter-spacing:-0.02em;
   color:var(--jpl-navy); margin:0; line-height:1.15;
 }
 .jpl-sub{
@@ -251,7 +265,7 @@ html,body{margin:0;}
 }
 
 /* Hairline with a gold diamond — the one ornament on the card. */
-.jpl-div{display:flex; align-items:center; gap:14px; margin:26px 0 30px;}
+.jpl-div{display:flex; align-items:center; gap:14px; margin:clamp(10px,2.2vh,26px) 0 clamp(12px,2.5vh,30px);}
 .jpl-div::before, .jpl-div::after{
   content:''; flex:1; height:1px;
   background:linear-gradient(90deg, transparent, rgba(224,163,46,0.55), transparent);
@@ -262,9 +276,9 @@ html,body{margin:0;}
 }
 
 /* ------------------------------------------------------------------ fields */
-.jpl-field{margin-bottom:20px;}
+.jpl-field{margin-bottom:clamp(11px,1.8vh,20px);}
 .jpl-field > label{
-  display:block; font-size:14px; font-weight:600; color:#334155; margin-bottom:9px;
+  display:block; font-size:14px; font-weight:600; color:#334155; margin-bottom:clamp(5px,1.1vh,9px);
 }
 .jpl-input{position:relative; display:flex; align-items:center;}
 .jpl-input > svg{
@@ -272,7 +286,7 @@ html,body{margin:0;}
   fill:none; stroke:#94A3B8; stroke-width:1.7; transition:stroke .18s var(--jpl-ease);
 }
 .jpl-field input{
-  width:100%; height:56px; padding:0 18px 0 52px;
+  width:100%; height:clamp(46px,5.9vh,56px); padding:0 18px 0 52px;
   border:1px solid var(--jpl-line); border-radius:12px;
   background:#fff; color:var(--jpl-ink); font-size:15px; font-family:inherit;
   transition:border-color .18s var(--jpl-ease), box-shadow .18s var(--jpl-ease);
@@ -301,7 +315,7 @@ html,body{margin:0;}
 
 .jpl-row{
   display:flex; align-items:center; justify-content:space-between;
-  gap:12px; flex-wrap:wrap; margin:6px 0 26px;
+  gap:12px; flex-wrap:wrap; margin:6px 0 clamp(13px,2.6vh,26px);
 }
 .jpl-remember{
   display:flex; align-items:center; gap:10px;
@@ -315,7 +329,7 @@ html,body{margin:0;}
 
 /* ------------------------------------------------------------------ button */
 .jpl-btn{
-  width:100%; height:60px;
+  width:100%; height:clamp(50px,6.4vh,60px);
   display:flex; align-items:center; justify-content:center; gap:12px;
   border:0; border-radius:12px;
   font-size:18px; font-weight:600; letter-spacing:.005em; color:#fff;
@@ -354,7 +368,7 @@ html,body{margin:0;}
 .jpl .msg.success{color:#0F7B4F;}
 
 .jpl-or{
-  display:flex; align-items:center; gap:18px; margin:28px 0 22px;
+  display:flex; align-items:center; gap:18px; margin:clamp(13px,2.4vh,28px) 0 clamp(11px,1.9vh,22px);
   font-size:13.5px; font-weight:500; color:#94A3B8;
 }
 .jpl-or::before, .jpl-or::after{content:''; flex:1; height:1px; background:var(--jpl-line);}
@@ -362,7 +376,7 @@ html,body{margin:0;}
 /* ----------------------------------------------------------------- support */
 .jpl-support{
   display:flex; align-items:center; gap:16px;
-  padding:20px 22px; border-radius:14px;
+  padding:clamp(13px,2.2vh,20px) 22px; border-radius:14px;
   background:#FBFCFE; border:1px solid #EDF1F6;
 }
 .jpl-support-ico{
@@ -404,20 +418,29 @@ html,body{margin:0;}
 .jpl-avatar.is-done svg{stroke:#0F7B4F;}
 
 /* -------------------------------------------------------------- responsive */
+/* THE WIDTH QUERIES MUST STAY CLAMPED TOO, or they cancel the height work.
+   These re-declare the very properties compressed above, and a media query that
+   matches wins on source order — so plain `padding:38px` here would restore the
+   full height on every window under 1400px wide and undo the fit at, say,
+   1366×768. Each keeps its own narrower maximum and compresses on the same vh
+   ramp, so the two axes compose instead of fighting. */
 @media (max-width:1400px){
-  .jpl-card{padding:38px 40px 34px;}
-  .jpl-title{font-size:30px;}
-  .jpl-avatar{width:72px; height:72px; margin-bottom:20px;}
+  .jpl-card{padding:clamp(26px,4.2vh,38px) 40px clamp(24px,3.9vh,34px);}
+  .jpl-title{font-size:clamp(25px,3.6vh,30px);}
+  .jpl-avatar{
+    width:clamp(50px,7.6vh,72px); height:clamp(50px,7.6vh,72px);
+    margin-bottom:clamp(11px,2.1vh,20px);
+  }
   .jpl-side-inner{max-width:560px;}
 }
 @media (max-width:1180px){
   .jpl-art{flex-basis:52%; padding:30px 30px 26px;}
-  .jpl-side{flex-basis:48%; padding:26px 28px 22px;}
+  .jpl-side{flex-basis:48%; padding:clamp(14px,2.7vh,26px) 28px clamp(11px,2vh,22px);}
   .jpl-logo{height:64px;}
   .jpl-service{padding:14px 15px; min-width:80px; font-size:11.5px;}
-  .jpl-card{padding:32px 32px 30px;}
-  .jpl-field input{height:52px;}
-  .jpl-btn{height:56px; font-size:17px;}
+  .jpl-card{padding:clamp(22px,4.2vh,32px) 32px clamp(21px,3.9vh,30px);}
+  .jpl-field input{height:clamp(44px,5.9vh,52px);}
+  .jpl-btn{height:clamp(48px,6.2vh,56px); font-size:17px;}
 }
 @media (max-width:900px){
   .jpl{flex-direction:column; overflow:auto;}
