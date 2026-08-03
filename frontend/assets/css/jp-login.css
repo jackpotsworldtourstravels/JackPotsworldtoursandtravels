@@ -16,12 +16,18 @@
    wrong is the difference between "looks like the reference" and "looks like a
    different page with the same words".
 
-   THE ARTWORK IS A PHOTOGRAPH, AND IT IS NOT IN THIS REPOSITORY.
-   `--jpl-bg` points at assets/images/login-collage.jpg. That file must be added
-   — assets/images/ ships only the logo and two favicons, and nothing here can
-   generate a photograph. Until it exists the page falls back to the navy
-   gradient below: deliberately plain, because a wrong picture is worse than no
-   picture and vector artwork was explicitly ruled out.
+   THE ARTWORK IS A PHOTOGRAPH AND IT SHIPS AT ITS FULL FRAME.
+   `--jpl-bg` points at assets/images/login-collage.jpg — 1536×1024, the whole
+   collage: Burj Al Arab, Burj Khalifa, Eiffel Tower, Taj Mahal, the cruise
+   liner, the cliffside village, the mountains and the resort. It is 3:2, which
+   is close enough to a desktop viewport that `cover` crops a few dozen pixels
+   instead of magnifying one building.
+
+   An earlier release had to crop a 350px band out of a flattened mockup,
+   because the only file available had the logo, heading and login card baked
+   into its pixels — everything below that band was unusable. If this file is
+   ever replaced again, replace it with a plate that has NO interface painted
+   on it, or that crop-and-magnify problem comes straight back.
 
    HOW IT COEXISTS WITH THE PORTAL SHEETS
    Admin and Super Admin already load admin.css / super-admin.css and then
@@ -41,7 +47,7 @@
      better plate, a seasonal shot — at a URL that never changes, and a browser
      (or Caddy) holding the old bytes shows the previous artwork with no way for
      anyone to tell why. Bump this whenever the file is swapped. */
-  --jpl-bg:url('../images/login-collage.jpg?v=20260803a');
+  --jpl-bg:url('../images/login-collage.jpg?v=20260803b');
   --jpl-navy-deep:#04162B;
   --jpl-navy:#0A2540;
   --jpl-gold:#E0A32E;
