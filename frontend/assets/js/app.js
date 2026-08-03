@@ -561,34 +561,11 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
   detailsModalOverlay.classList.remove('open');
 });
 
-/* Featured tour packages: replace hardcoded cards with live data from the API */
-async function loadFeaturedPackages() {
-  const grid = document.querySelector('.packages-section .pkg-grid');
-  if (!grid) return;
-  try {
-    const { data: packages } = await axios.get(`${API_BASE}/api/packages`, { params: { limit: 4 } });
-    if (!packages.length) return;
-    grid.innerHTML = packages.map((pkg, i) => `
-      <article class="pkg-card reveal${i ? ' delay-' + Math.min(i, 3) : ''}">
-        <div class="pkg-img"><img src="${pkg.image_url || ''}" alt="${pkg.title} package" loading="lazy"><span class="pkg-duration">${pkg.duration_days} Days</span></div>
-        <div class="pkg-body">
-          <h3>${pkg.title}</h3>
-          <div class="pkg-stars"><span class="stars">★★★★★</span> ${pkg.rating.toFixed(1)}</div>
-          <div class="pkg-foot">
-            <div class="pkg-price">Starting from<b>₹${Math.round(pkg.price).toLocaleString('en-IN')}</b></div>
-            <a href="#" class="btn btn-coral pkg-book" data-book-type="package" data-book-id="${pkg.id}" data-book-price="${pkg.price}" data-book-label="${pkg.title}">Book Now</a>
-          </div>
-          ${cardActionsHtml('package', pkg, pkg.title)}
-        </div>
-      </article>
-    `).join('');
-    grid.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-    applyWishlistState(grid);
-  } catch (err) {
-    /* API unreachable — keep the existing hardcoded cards visible */
-  }
-}
-loadFeaturedPackages();
+/* Featured tour packages are static marketing content in index.html.
+   They used to be replaced with live data from GET /api/packages, but the public
+   catalog API (flights/hotels/cruises/packages) was retired in the V2 nine-table
+   redesign — tour_packages no longer exists — so that call only ever 404'd and fell
+   through to the hardcoded cards. Removed rather than left firing on every load. */
 
 /* Search results: wire each tab's Search button to the matching content API */
 /* Parse a count out of select text like "3 Passengers" or "5+ Guests" */
