@@ -15,51 +15,25 @@
 <link rel="stylesheet" href="../assets/css/super-admin.css?v=20260803ui5">
 <!-- Shared design system — must stay last, see admin/index.html for why. -->
 <link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui5">
+<!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
+     rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
+     source order is what decides them. -->
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui6">
 </head>
 <body>
 
 <!-- ============== AUTH VIEW ==============
      Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live
      /api/auth/login|verify-otp|resend-otp endpoints with portal="super_admin". -->
-<div class="partner-auth-shell" id="saAuthShell">
-  <div class="partner-auth-card">
-    <div class="partner-auth-brand">
-      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-      <div class="pab-sub">Super Admin Portal</div>
-    </div>
+<!-- EMPTY ON PURPOSE — rendered by jpLoginShell() in ../assets/js/jp-login.js,
+     the same builder the Merchant and Admin portals use. The mount call sits at
+     the foot of this page immediately before super-admin-auth.js, which binds
+     its element ids at parse time.
 
-    <div class="auth-stepper" id="saAuthStepper">
-      <div class="auth-step-dot active" data-step-dot="1">1</div>
-      <div class="auth-step-line"></div>
-      <div class="auth-step-dot" data-step-dot="2">2</div>
-    </div>
-
-    <!-- Step 1: credentials -->
-    <div class="auth-step active" id="saAuthStep1">
-      <h1>Super Admin Sign In</h1>
-      <p class="auth-step-sub">Platform-level access for onboarding and managing Admins.</p>
-      <form id="saLoginForm">
-        <div class="form-field"><label>Email</label><input id="saUsername" type="email" autocomplete="username" placeholder="superadmin@jackpotsworld.com"></div>
-        <div class="form-field"><label>Password</label><input id="saPassword" type="password" autocomplete="current-password"></div>
-        <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
-        <button type="submit" class="btn btn-coral btn-block">Continue</button>
-        <div class="msg" id="saLoginMsg"></div>
-      </form>
-    </div>
-
-    <!-- Step 2: OTP -->
-    <div class="auth-step" id="saAuthStep2">
-      <h1>Verify OTP</h1>
-      <p class="auth-step-sub" id="saAuthStep2Sub">Enter the 6-digit code sent to your email.</p>
-      <div class="form-field"><label>OTP</label><input id="saOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
-      <button type="button" class="btn btn-coral btn-block" id="saVerifyOtpBtn">Verify OTP</button>
-      <button type="button" class="btn btn-ghost btn-block" id="saResendOtpBtn">Resend OTP</button>
-      <button type="button" class="btn btn-ghost btn-block" id="saBackToCredsBtn">← Back</button>
-      <div class="msg" id="saAuthStep2Msg"></div>
-    </div>
-
-  </div>
-</div>
+     Note the id here is saUsername, not saEmail: super-admin-auth.js has always
+     called it that. The builder takes an ids map precisely so neither auth
+     module had to be renamed to share a layout. -->
+<div class="partner-auth-shell jpl" id="saAuthShell"></div>
 
 <!-- ============== PORTAL VIEW ============== -->
 <div class="mobile-topbar">
@@ -346,6 +320,27 @@
 <script src="../assets/js/auth.js?v=20260803ui5"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/super-admin-shared.js?v=20260803ui5"></script>
+<!-- Renders the shared login into #saAuthShell. Ordered BEFORE
+     super-admin-auth.js deliberately: that module calls getElementById at parse
+     time, so every id it binds must already be in the document. -->
+<script src="../assets/js/jp-login.js?v=20260803ui6"></script>
+<script>
+  jpLoginMount('saAuthShell', {
+    title: 'Super Admin Login',
+    subtitle: 'Access the super administration dashboard',
+    portalName: 'Super Admin Portal',
+    base: '../',
+    rememberKey: 'super_admin_login_remember',
+    emailPlaceholder: 'superadmin@jackpotsworldtours.com',
+    ids: {
+      stepper: 'saAuthStepper', step1: 'saAuthStep1', step2: 'saAuthStep2',
+      form: 'saLoginForm', email: 'saUsername', password: 'saPassword',
+      remember: 'saRemember', msg: 'saLoginMsg',
+      otp: 'saOtp', otpSub: 'saAuthStep2Sub', otpMsg: 'saAuthStep2Msg',
+      verify: 'saVerifyOtpBtn', resend: 'saResendOtpBtn', back: 'saBackToCredsBtn',
+    },
+  });
+</script>
 <script src="../assets/js/super-admin-auth.js?v=20260803ui5"></script>
 <script src="../assets/js/super-admin-dashboard.js?v=20260803ui5"></script>
 <script src="../assets/js/super-admin-admin-management.js?v=20260803ui5"></script>

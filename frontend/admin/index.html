@@ -13,6 +13,10 @@
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
 <link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui5">
+<!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
+     rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
+     source order is what decides them. -->
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui6">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -24,45 +28,23 @@
 <!-- ============== AUTH VIEW (shown when there's no valid admin session) ==============
      Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live
      /api/auth/login|verify-otp|resend-otp endpoints with portal="admin". -->
-<div class="partner-auth-shell" id="adminAuthShell">
-  <div class="partner-auth-card">
-    <div class="partner-auth-brand">
-      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-      <div class="pab-sub">Admin Portal</div>
-    </div>
+<!-- EMPTY ON PURPOSE. The sign-in inside it is rendered by jpLoginShell() in
+     ../assets/js/jp-login.js — the same builder the Merchant and Super Admin
+     portals use, so all three are one design by construction rather than three
+     files kept in step by hand. The mount call is at the foot of this page,
+     immediately before admin-auth.js, because that module binds its element ids
+     at parse time and they have to exist first.
 
-    <div class="auth-stepper" id="adminAuthStepper">
-      <div class="auth-step-dot active" data-step-dot="1">1</div>
-      <div class="auth-step-line"></div>
-      <div class="auth-step-dot" data-step-dot="2">2</div>
-    </div>
+     admin.js shows this element with `style.display = 'flex'`, which is why
+     `.jpl` is a flex row and not a grid — an inline style beats the sheet.
 
-    <!-- Step 1: credentials -->
-    <div class="auth-step active" id="adminAuthStep1">
-      <h1>Admin Sign In</h1>
-      <p class="auth-step-sub">Sign in with your registered email and password.</p>
-      <form id="adminLoginForm">
-        <div class="form-field"><label>Email</label><input id="adminEmail" type="email" autocomplete="username" placeholder="you@jackpotsworldtours.com"></div>
-        <div class="form-field"><label>Password</label><input id="adminPassword" type="password" autocomplete="current-password"></div>
-        <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
-        <button type="submit" class="btn btn-coral btn-block">Continue</button>
-        <div class="msg" id="adminLoginMsg"></div>
-      </form>
-    </div>
-
-    <!-- Step 2: OTP -->
-    <div class="auth-step" id="adminAuthStep2">
-      <h1>Verify OTP</h1>
-      <p class="auth-step-sub" id="adminAuthStep2Sub">Enter the 6-digit code sent to your email.</p>
-      <div class="form-field"><label>OTP</label><input id="adminOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
-      <button type="button" class="btn btn-coral btn-block" id="adminVerifyOtpBtn">Verify OTP</button>
-      <button type="button" class="btn btn-ghost btn-block" id="adminResendOtpBtn">Resend OTP</button>
-      <button type="button" class="btn btn-ghost btn-block" id="adminBackToCredsBtn">← Back</button>
-      <div class="msg" id="adminAuthStep2Msg"></div>
-    </div>
-
-  </div>
-</div>
+     NOTHING ABOUT AUTHENTICATION MOVED. admin-auth.js still owns the flow, still
+     posts portal="admin", and still binds adminEmail / adminPassword /
+     adminLoginForm / adminOtp / adminAuthStep2Sub / adminVerifyOtpBtn /
+     adminResendOtpBtn / adminBackToCredsBtn and the .auth-step + .auth-step-dot
+     classes. The builder stamps exactly those names, which is what made this a
+     UI change only. -->
+<div class="partner-auth-shell jpl" id="adminAuthShell"></div>
 
 <div class="layout" id="layoutRoot" style="display:none;">
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
@@ -950,6 +932,27 @@
 <script src="../components/focus-trap.js?v=20260803ui5"></script>
 <script src="../assets/js/auth.js?v=20260803ui5"></script>
 <script src="../assets/js/api.js"></script>
+<!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
+     deliberately: that module calls getElementById at parse time, so every id it
+     binds must already be in the document. -->
+<script src="../assets/js/jp-login.js?v=20260803ui6"></script>
+<script>
+  jpLoginMount('adminAuthShell', {
+    title: 'Admin Login',
+    subtitle: 'Access the administration dashboard',
+    portalName: 'Admin Portal',
+    base: '../',
+    rememberKey: 'admin_login_remember',
+    emailPlaceholder: 'you@jackpotsworldtours.com',
+    ids: {
+      stepper: 'adminAuthStepper', step1: 'adminAuthStep1', step2: 'adminAuthStep2',
+      form: 'adminLoginForm', email: 'adminEmail', password: 'adminPassword',
+      remember: 'adminRemember', msg: 'adminLoginMsg',
+      otp: 'adminOtp', otpSub: 'adminAuthStep2Sub', otpMsg: 'adminAuthStep2Msg',
+      verify: 'adminVerifyOtpBtn', resend: 'adminResendOtpBtn', back: 'adminBackToCredsBtn',
+    },
+  });
+</script>
 <script src="../assets/js/admin-auth.js"></script>
 <script src="../assets/js/admin.js?v=20260803ui5"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,

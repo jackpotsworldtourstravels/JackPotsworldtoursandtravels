@@ -1,0 +1,351 @@
+/* ==========================================================================
+   JACKPOTS — INTERNAL PORTAL LOGIN
+   ==========================================================================
+   ONE login design for Merchant, Admin and Super Admin.
+
+   Before this file each portal drew its own sign-in: the Merchant had a
+   split-panel page, Admin and Super Admin had a narrow centred card with a
+   numbered stepper. Three different first impressions of one product. They now
+   share this stylesheet and the markup builder in assets/js/jp-login.js, so a
+   change to the login is a change to the login — not three of them.
+
+   WHAT DIFFERS PER PORTAL: the title, the subtitle, and which `portal` value
+   goes to /api/auth/login. Nothing else. There is deliberately no per-role
+   accent override in here; the brief allows one and the product reads as one
+   platform without it.
+
+   HOW IT COEXISTS WITH THE PORTAL SHEETS
+   Admin and Super Admin already load admin.css / super-admin.css and then
+   jp-ds.css, all of which style bare `input`, `.btn` and friends. Everything
+   here is namespaced `jpl-` and the link tag MUST come after jp-ds.css: several
+   rules tie on specificity with it (`.jpl-field input` vs `input[type=email]`),
+   so source order is what decides them. Same rule as jp-ds.css itself.
+
+   THE SHELL IS FLEX, NOT GRID, AND THAT IS LOAD-BEARING.
+   admin.js shows the login with `adminAuthShell.style.display = 'flex'` (and
+   hides it with 'none'). An inline style beats any stylesheet, so a grid shell
+   would be silently overridden to flex and collapse. `.jpl` is therefore a flex
+   row and the two panels are flex children.
+   ========================================================================== */
+
+.jpl{
+  --jpl-navy-deep:#04162B;
+  --jpl-navy:#0A2540;
+  --jpl-gold:#E8A317;
+  --jpl-gold-lt:#FFC24D;
+  --jpl-gold-dk:#B87908;
+  --jpl-ink:#0A2540;
+  --jpl-muted:#5B6B82;
+  --jpl-line:rgba(10,37,64,0.12);
+  --jpl-ease:cubic-bezier(.4,0,.2,1);
+
+  display:flex;
+  align-items:stretch;
+  min-height:100vh;
+  width:100%;
+  font-family:'Montserrat', system-ui, -apple-system, sans-serif;
+  color:var(--jpl-ink);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.jpl *{box-sizing:border-box;}
+.jpl img{max-width:100%;}
+.jpl button{cursor:pointer; font-family:inherit;}
+.jpl a{text-decoration:none;}
+
+/* ============================================================== left panel */
+.jpl-art{
+  position:relative; overflow:hidden; isolation:isolate;
+  flex:1 1 56%; min-width:0;
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:34px 42px 26px;
+  background:var(--jpl-navy-deep);
+}
+.jpl-scene{
+  position:absolute; inset:0; width:100%; height:100%; z-index:0;
+}
+/* Soft dark overlay + colour grading. The vertical pass keeps the logo and the
+   footer legible whatever the art does behind them; the warm pass pulls the
+   whole scene toward the brand navy so it reads as one image. */
+.jpl-art::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:
+    linear-gradient(180deg, rgba(4,22,43,0.70) 0%, rgba(4,22,43,0.22) 32%, rgba(4,22,43,0.40) 58%, rgba(4,22,43,0.88) 100%),
+    radial-gradient(120% 90% at 76% 24%, rgba(232,163,23,0.15) 0%, transparent 58%),
+    linear-gradient(115deg, rgba(10,37,64,0.52) 0%, rgba(10,37,64,0.08) 52%, rgba(4,22,43,0.52) 100%);
+}
+.jpl-art > *{position:relative; z-index:2;}
+
+.jpl-logo{height:64px; width:auto; object-fit:contain; align-self:flex-start;}
+
+.jpl-copy{max-width:560px;}
+.jpl-welcome{
+  font-size:clamp(30px,3.3vw,44px); font-weight:800; line-height:1.12;
+  letter-spacing:-0.02em; color:#fff; margin:0;
+}
+.jpl-welcome span{display:block; color:var(--jpl-gold-lt);}
+.jpl-rule{
+  width:74px; height:3px; border-radius:2px; margin:18px 0 16px;
+  background:linear-gradient(90deg, var(--jpl-gold), rgba(232,163,23,0));
+}
+.jpl-tag{font-size:15px; font-weight:600; color:rgba(255,255,255,0.90); margin:0;}
+.jpl-tag-sub{font-size:13.5px; color:rgba(255,255,255,0.66); margin:5px 0 0;}
+
+/* The service strip — a dark glass bar, so it sits ON the photograph rather
+   than punching a hole in it. */
+.jpl-services{
+  display:flex; flex-wrap:wrap; gap:2px; margin-top:26px; align-self:flex-start;
+  padding:6px; border-radius:14px;
+  background:rgba(6,18,34,0.52);
+  -webkit-backdrop-filter:blur(10px) saturate(140%);
+  backdrop-filter:blur(10px) saturate(140%);
+  border:1px solid rgba(255,255,255,0.10);
+}
+.jpl-service{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:10px 18px; border-radius:10px; min-width:74px;
+  font-size:11.5px; font-weight:600; color:rgba(255,255,255,0.80);
+}
+.jpl-service + .jpl-service{box-shadow:inset 1px 0 0 rgba(255,255,255,0.08);}
+.jpl-service svg{width:20px; height:20px; fill:none; stroke:var(--jpl-gold-lt); stroke-width:1.7;}
+
+.jpl-trust{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
+  font-size:11.5px; color:rgba(255,255,255,0.52); margin:0;
+}
+.jpl-trust span{display:inline-flex; align-items:center; gap:6px;}
+.jpl-trust svg{width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:1.7;}
+.jpl-trust i{width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,0.35);}
+
+/* ============================================================= right panel */
+.jpl-side{
+  flex:1 1 44%; min-width:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:40px 38px; position:relative; overflow:hidden;
+  background:
+    radial-gradient(900px 520px at 84% -6%, rgba(232,163,23,0.09) 0%, transparent 62%),
+    radial-gradient(760px 620px at -12% 108%, rgba(27,69,119,0.11) 0%, transparent 60%),
+    linear-gradient(168deg, #FAFCFF 0%, #EEF3FA 58%, #E6EDF7 100%);
+}
+.jpl-side-inner{width:100%; max-width:430px; position:relative; z-index:1;}
+
+/* ---------------------------------------------------------------- the card
+   White and premium rather than glassy. The brief for the Merchant page asked
+   for roughly 10% glass and the same restraint applies to all three: the blur
+   and the tint register at the edges, while every label and value sits on a
+   near-solid surface and keeps its contrast. */
+.jpl-card{
+  background:rgba(255,255,255,0.94);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid rgba(255,255,255,0.80);
+  border-radius:24px;
+  padding:34px 34px 30px;
+  box-shadow:
+    0 1px 2px rgba(10,37,64,0.04),
+    0 12px 28px -8px rgba(10,37,64,0.12),
+    0 40px 70px -26px rgba(10,37,64,0.20);
+}
+
+.jpl-avatar{
+  width:66px; height:66px; margin:0 auto 18px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:#fff; border:1px solid rgba(10,37,64,0.09);
+  box-shadow:0 6px 18px -6px rgba(10,37,64,0.20);
+}
+.jpl-avatar svg{width:30px; height:30px; fill:none; stroke:var(--jpl-gold); stroke-width:1.7;}
+
+.jpl-title{
+  font-size:28px; font-weight:800; text-align:center; letter-spacing:-0.02em;
+  color:var(--jpl-navy); margin:0;
+}
+.jpl-sub{
+  font-size:14px; color:var(--jpl-muted); text-align:center; margin:8px 0 0;
+}
+
+/* Gold hairline with a diamond, the one ornament on the card. */
+.jpl-div{display:flex; align-items:center; gap:12px; margin:20px 0 22px;}
+.jpl-div::before, .jpl-div::after{
+  content:''; flex:1; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(232,163,23,0.45), transparent);
+}
+.jpl-div i{
+  width:7px; height:7px; flex:none; background:var(--jpl-gold);
+  transform:rotate(45deg); border-radius:1px;
+}
+
+/* ------------------------------------------------------------------ fields */
+.jpl-field{margin-bottom:16px;}
+.jpl-field > label{
+  display:block; font-size:12.5px; font-weight:700; color:#33465F;
+  margin-bottom:8px;
+}
+.jpl-input{position:relative; display:flex; align-items:center;}
+.jpl-input > svg{
+  position:absolute; left:15px; width:19px; height:19px; pointer-events:none;
+  fill:none; stroke:#8D9CB2; stroke-width:1.7;
+}
+.jpl-field input{
+  width:100%; padding:14px 15px 14px 46px;
+  border:1px solid var(--jpl-line); border-radius:12px;
+  background:#fff; color:var(--jpl-ink); font-size:14.5px; font-family:inherit;
+  transition:border-color .18s var(--jpl-ease), box-shadow .18s var(--jpl-ease);
+}
+.jpl-field input::placeholder{color:#9DAABE;}
+.jpl-field input:focus{
+  outline:none; border-color:var(--jpl-gold);
+  box-shadow:0 0 0 3.5px rgba(232,163,23,0.16);
+}
+.jpl-field input:focus + svg,
+.jpl-input:focus-within > svg{stroke:var(--jpl-gold);}
+.jpl-has-eye input{padding-right:48px;}
+.jpl-eye{
+  position:absolute; right:8px; background:none; border:0; padding:9px;
+  display:flex; border-radius:9px; color:#8D9CB2;
+}
+.jpl-eye:hover{color:var(--jpl-navy);}
+.jpl-eye svg{width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.7;}
+
+/* OTP is the second factor of this same flow, so it is the same field with a
+   wider tracking rather than a different-looking screen. */
+.jpl-otp input{
+  padding-left:15px; text-align:center;
+  font-size:20px; font-weight:700; letter-spacing:.42em;
+}
+.jpl-otp input::placeholder{letter-spacing:.3em;}
+
+.jpl-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; flex-wrap:wrap; margin:4px 0 20px;
+}
+.jpl-remember{
+  display:flex; align-items:center; gap:9px;
+  font-size:13.5px; color:#33465F; cursor:pointer; user-select:none;
+}
+.jpl-remember input{width:16px; height:16px; accent-color:var(--jpl-gold); cursor:pointer;}
+.jpl-forgot{font-size:13.5px; font-weight:600; color:#2563C9;}
+.jpl-forgot:hover{color:var(--jpl-gold-dk); text-decoration:underline;}
+
+/* ------------------------------------------------------------------ button */
+.jpl-btn{
+  width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:15px 20px; border:0; border-radius:12px;
+  font-size:16px; font-weight:700; letter-spacing:.01em; color:#3A2600;
+  background:linear-gradient(135deg, var(--jpl-gold-lt) 0%, var(--jpl-gold) 52%, var(--jpl-gold-dk) 100%);
+  box-shadow:
+    0 1px 1px rgba(255,255,255,0.45) inset,
+    0 10px 22px -8px rgba(232,163,23,0.60),
+    0 2px 6px rgba(10,37,64,0.10);
+  transition:transform .18s var(--jpl-ease), box-shadow .22s var(--jpl-ease), filter .18s var(--jpl-ease);
+}
+.jpl-btn svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2.2;}
+.jpl-btn:hover:not(:disabled){
+  transform:translateY(-1.5px); filter:saturate(112%);
+  box-shadow:
+    0 1px 1px rgba(255,255,255,0.5) inset,
+    0 16px 32px -10px rgba(232,163,23,0.66),
+    0 4px 12px rgba(10,37,64,0.12);
+}
+.jpl-btn:active:not(:disabled){transform:translateY(0);}
+.jpl-btn:disabled{opacity:.62; cursor:not-allowed;}
+.jpl-btn-ghost{
+  background:none; box-shadow:none; color:var(--jpl-muted);
+  font-size:13.5px; font-weight:600; padding:11px 16px;
+}
+.jpl-btn-ghost:hover:not(:disabled){
+  transform:none; filter:none; box-shadow:none; color:var(--jpl-navy);
+}
+
+.jpl-msg{margin-top:14px; font-size:13px; line-height:1.55; text-align:center;}
+.jpl-msg:empty{display:none;}
+.jpl-msg.err{color:#B3261E;}
+.jpl-msg.ok{color:#0F7B4F;}
+.jpl-msg.info{color:var(--jpl-muted);}
+
+/* `.msg` is styled too, and that is not belt-and-braces — it is required.
+   admin-auth.js and super-admin-auth.js write `msg.className = 'msg error'`,
+   which REPLACES the class list, so any jpl- class put on those elements in the
+   markup is gone the first time a login fails. The portal-side names are what
+   must carry the styling. */
+.jpl .msg{margin-top:14px; font-size:13px; line-height:1.55; text-align:center; color:var(--jpl-muted);}
+.jpl .msg:empty{display:none;}
+.jpl .msg.error{color:#B3261E;}
+.jpl .msg.success{color:#0F7B4F;}
+
+.jpl-or{
+  display:flex; align-items:center; gap:14px; margin:22px 0 18px;
+  font-size:11.5px; font-weight:700; letter-spacing:.1em; color:#9DAABE;
+}
+.jpl-or::before, .jpl-or::after{content:''; flex:1; height:1px; background:var(--jpl-line);}
+
+/* ----------------------------------------------------------------- support */
+.jpl-support{
+  display:flex; align-items:center; gap:14px;
+  padding:15px 18px; border-radius:16px;
+  background:rgba(255,255,255,0.66);
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border:1px solid rgba(10,37,64,0.07);
+}
+.jpl-support-ico{
+  width:40px; height:40px; flex:none; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg, rgba(232,163,23,0.20), rgba(232,163,23,0.08));
+  color:var(--jpl-gold-dk);
+}
+.jpl-support-ico svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.7;}
+.jpl-support-txt{flex:1; min-width:0;}
+.jpl-support-txt b{display:block; font-size:13.5px; font-weight:700; color:var(--jpl-navy);}
+.jpl-support-txt span{font-size:12.5px; color:var(--jpl-muted);}
+.jpl-support a{
+  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+  font-size:13px; font-weight:700; color:#2563C9;
+}
+.jpl-support a:hover{color:var(--jpl-gold-dk);}
+.jpl-support a svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2.2;}
+
+.jpl-foot{
+  margin-top:22px; text-align:center; font-size:12px; color:#8D9CB2; line-height:1.7;
+}
+.jpl-foot a{font-weight:600; color:var(--jpl-muted);}
+.jpl-foot a:hover{color:var(--jpl-navy);}
+
+/* ------------------------------------------------------------------ steps
+   The stepper markup stays in the DOM because admin-auth.js and
+   super-admin-auth.js drive it (`#…AuthStepper .auth-step-dot`, toggling
+   `active`/`done`). It is hidden rather than removed: deleting it would mean
+   editing authentication JS, which the brief forbids. */
+.jpl .auth-stepper{display:none;}
+.jpl .auth-step{display:none;}
+.jpl .auth-step.active{display:block;}
+
+/* -------------------------------------------------------------- responsive */
+@media (max-width:1024px){
+  .jpl-art{padding:26px 30px 22px;}
+  .jpl-side{padding:32px 26px;}
+  .jpl-service{padding:9px 13px; min-width:64px;}
+}
+@media (max-width:900px){
+  .jpl{flex-direction:column; min-height:100vh;}
+  .jpl-art{flex:none; min-height:270px; padding:20px 22px 22px;}
+  .jpl-logo{height:52px;}
+  .jpl-welcome{font-size:27px;}
+  .jpl-rule{margin:12px 0 10px;}
+  .jpl-tag{font-size:13.5px;}
+  .jpl-tag-sub{font-size:12.5px;}
+  .jpl-services{display:none;}
+  .jpl-trust{display:none;}
+  .jpl-side{flex:1 1 auto; padding:28px 20px 38px;}
+}
+@media (max-width:420px){
+  .jpl-art{min-height:210px; padding:16px 16px 18px;}
+  .jpl-logo{height:44px;}
+  .jpl-welcome{font-size:23px;}
+  .jpl-card{padding:26px 20px 24px; border-radius:20px;}
+  .jpl-side{padding:20px 13px 30px;}
+  .jpl-title{font-size:23px;}
+  .jpl-row{gap:9px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .jpl-btn{transition:none;}
+  .jpl-btn:hover:not(:disabled){transform:none;}
+}
