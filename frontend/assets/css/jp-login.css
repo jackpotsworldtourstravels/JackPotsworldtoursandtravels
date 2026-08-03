@@ -141,7 +141,13 @@ html,body{margin:0;}
   padding:38px 40px 30px;
 }
 
-.jpl-logo{height:78px; width:auto; object-fit:contain; align-self:flex-start;}
+/* The mark is square (606×600), so height is the only dial and the width follows.
+   At 78px it read as a favicon against a 46px headline; 108px is roughly the
+   headline's cap-height x2 and holds the top-left corner properly. The art
+   column is ~890px wide at 1536, so ~109px of width costs nothing, and the art
+   side is never the height constraint (~490px against the card's ~724px) — the
+   logo can grow without touching the one-screen fit. */
+.jpl-logo{height:108px; width:auto; object-fit:contain; align-self:flex-start;}
 
 .jpl-copy{max-width:600px; margin-top:auto; padding-bottom:26px;}
 .jpl-welcome{
@@ -436,28 +442,87 @@ html,body{margin:0;}
 @media (max-width:1180px){
   .jpl-art{flex-basis:52%; padding:30px 30px 26px;}
   .jpl-side{flex-basis:48%; padding:clamp(14px,2.7vh,26px) 28px clamp(11px,2vh,22px);}
-  .jpl-logo{height:64px;}
+  .jpl-logo{height:86px;}
   .jpl-service{padding:14px 15px; min-width:80px; font-size:11.5px;}
   .jpl-card{padding:clamp(22px,4.2vh,32px) 32px clamp(21px,3.9vh,30px);}
   .jpl-field input{height:clamp(44px,5.9vh,52px);}
   .jpl-btn{height:clamp(48px,6.2vh,56px); font-size:17px;}
 }
-@media (max-width:900px){
-  .jpl{flex-direction:column; overflow:auto;}
+/* ======================================================== stacked / touch
+   THE BREAKPOINT IS NOT WIDTH-ALONE, AND THAT MATTERS.
+   `max-width:900px` misses phone landscape: an iPhone 14 Pro Max on its side is
+   932×430, so it cleared the 900px bar and got the two-column DESKTOP layout in
+   a 430px-tall window — 286px of overflow with the card's bottom 203px below
+   the fold. The height term catches every phone landscape (844×390, 932×430,
+   926×428) while `max-width:1200px` keeps a merely short desktop window on the
+   side-by-side design it is wide enough for. */
+@media (max-width:900px), (max-height:560px) and (max-width:1200px){
+  /* `svh` = the viewport with mobile browser chrome SHOWN, so the shell is
+     sized for the worst case and nothing hides behind Safari's toolbar. Chosen
+     over `dvh`, which changes as that toolbar retracts and would reflow the
+     card mid-scroll. Browsers without `svh` ignore this and keep the 100vh
+     above — a free fallback. */
+  .jpl{flex-direction:column; overflow:auto; min-height:100svh;}
   .jpl-art{flex:none; min-height:300px; padding:22px 22px 24px;}
-  .jpl-logo{height:56px;}
+  .jpl-logo{height:74px;}
   .jpl-welcome{font-size:29px;}
   .jpl-rule{margin:14px 0 12px;}
   .jpl-services{display:none;}
   .jpl-trust{display:none;}
   .jpl-side{flex:1 1 auto; padding:24px 20px 34px;}
   .jpl-side-inner{max-width:520px;}
+
+  /* EVERY `vh` CLAMP IS RETIRED HERE, DELIBERATELY. Those exist so the desktop
+     card fits one screen; stacked, the page scrolls by design, so compressing
+     against viewport height only cramps a card the reader will scroll anyway —
+     and worst on the small phones that can least afford it. Fixed, comfortable
+     sizes instead. */
+  .jpl-card{padding:28px 24px 26px;}
+  .jpl-avatar{width:66px; height:66px; margin-bottom:16px;}
+  .jpl-avatar svg{width:30px; height:30px;}
+  .jpl-title{font-size:27px;}
+  .jpl-div{margin:18px 0 20px;}
+  .jpl-field{margin-bottom:16px;}
+  .jpl-field > label{margin-bottom:8px;}
+  /* 16px IS A FUNCTIONAL THRESHOLD, NOT A TASTE CALL: iOS Safari zooms the
+     whole page when a focused input is under 16px, and the reader has to pinch
+     back out to see the form again. It was 15px. */
+  .jpl-field input{height:52px; font-size:16px;}
+  .jpl-row{margin:6px 0 20px;}
+  .jpl-btn{height:54px;}
+  .jpl-or{margin:20px 0 16px;}
+  .jpl-support{padding:16px;}
+  .jpl-foot{margin-top:16px;}
 }
+
+/* Phone landscape has width to spare and almost no height, so the photo band
+   is what should yield — not the form. */
+@media (max-height:560px) and (min-width:560px){
+  .jpl-art{min-height:170px; padding:16px 22px 18px;}
+  .jpl-logo{height:60px;}
+  .jpl-welcome{font-size:25px;}
+}
+
+/* The support row is icon + text + a `white-space:nowrap` link. Below ~560px
+   the link's un-shrinkable width starves the flexible text column: it measured
+   0px wide at 320px, which is what turned "We're here to assist you" into a
+   four-line sliver 160px tall. Giving the link its own full-width row frees the
+   text and turns the link into a proper touch target at the same time. */
+@media (max-width:560px){
+  .jpl-support{flex-wrap:wrap; gap:12px 14px;}
+  .jpl-support-txt{flex:1 1 140px;}
+  .jpl-support a{
+    flex:1 0 100%; justify-content:center;
+    padding:11px 14px; border-radius:10px;
+    background:#F1F5F9; border:1px solid #E2E8F0;
+  }
+}
+
 @media (max-width:420px){
   .jpl-art{min-height:230px; padding:16px 16px 18px;}
-  .jpl-logo{height:46px;}
+  .jpl-logo{height:60px;}
   .jpl-welcome{font-size:25px;}
-  .jpl-card{padding:26px 20px 24px; border-radius:20px;}
+  .jpl-card{padding:24px 18px 22px; border-radius:20px;}
   .jpl-title{font-size:25px;}
   .jpl-sub{font-size:14px;}
   .jpl-avatar{width:62px; height:62px;}
