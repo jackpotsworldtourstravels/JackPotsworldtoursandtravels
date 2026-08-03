@@ -878,3 +878,24 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .aa-barlist-row{grid-template-columns:1fr auto; row-gap:3px;}
   .aa-barlist-track{grid-column:1 / -1;}
 }
+
+/* ==========================================================================
+   TOUCH INPUT SIZING - FUNCTIONAL, NOT COSMETIC
+   ==========================================================================
+   iOS Safari zooms the ENTIRE PAGE whenever a focused input reports a
+   font-size under 16px, and the reader then has to pinch back out to see the
+   form they were filling in. The filter bars and toolbars in this sheet set
+   12.5-14px for density - correct on a desktop, unusable on a phone.
+
+   `!important` here is deliberate and load-bearing. The rules being overridden
+   are component-scoped (`.filter-bar input[type="text"]` is specificity 0,2,1),
+   so a plain `input` selector loses wherever it sits in the file; matching that
+   specificity for every one of them would be far more fragile than this.
+
+   Two-term query on purpose: the width term catches phones, and the pointer
+   term catches touch devices the width term misses - a tablet at 1024px zooms
+   just the same. Desktop density is untouched by both.
+   ========================================================================== */
+@media (max-width:900px), (hover:none) and (pointer:coarse){
+  input, select, textarea{font-size:16px !important;}
+}
