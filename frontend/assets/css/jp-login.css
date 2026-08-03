@@ -58,14 +58,23 @@
   -webkit-font-smoothing:antialiased;
   overflow:hidden;
 
-  /* The photograph, full bleed. The gradient underneath is the fallback and
-     shows through only where the file is missing. */
+  /* THE PHOTOGRAPH, FULL BLEED, AND NOTHING LAYERED UNDER IT.
+     There was a gradient beneath this as a stand-in while the file was missing;
+     it has been removed on request. `background-color` stays because every
+     image background needs one — it is what paints during the fetch and behind
+     the transparent edges of a JPEG that is not a perfect 16:9 — but it is a
+     flat navy, not a substitute picture.
+
+     THE URL IS RELATIVE TO THIS STYLESHEET, NOT TO THE PAGE. That is what lets
+     the same rule serve partner-login.html at the site root and admin/ and
+     super-admin/ one directory down: `../images/` resolves against
+     assets/css/, so every page gets assets/images/login-collage.jpg. Do not
+     "fix" it to a page-relative path. */
   background-color:var(--jpl-navy-deep);
-  background-image:var(--jpl-bg),
-    linear-gradient(135deg, #071B33 0%, #0D2C4A 45%, #123B5C 100%);
-  background-size:cover, cover;
-  background-position:center, center;
-  background-repeat:no-repeat, no-repeat;
+  background-image:var(--jpl-bg);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
 }
 .jpl *{box-sizing:border-box;}
 .jpl img{max-width:100%;}
