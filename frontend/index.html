@@ -30,7 +30,11 @@
       <a href="#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <a href="portal-login.html" class="nav-partner-mark" id="navPartnerLink">
+      <!-- B2B door. It goes straight to the Merchant login and asks nothing:
+           the role menu that used to sit behind this link named the Admin,
+           Manager and Super Admin portals on a public page. Those are internal
+           URLs now and are not advertised here. -->
+      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">
         <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
         <span>My Partner</span>
       </a>
@@ -66,7 +70,7 @@
     <a href="#" data-tab-link="cruises">Cruises</a>
     <a href="#contact">Contact</a>
     <div class="mobile-auth-links">
-      <a href="portal-login.html" class="mobile-partner-mark">
+      <a href="partner-login.html" class="mobile-partner-mark">
         <svg class="npm-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 L20.5 7 V17 L12 22 L3.5 17 V7 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="9.6" cy="12" r="3.3" fill="currentColor" opacity="0.92"/><circle cx="14.4" cy="12" r="3.3" fill="var(--coral)"/></svg>
         My Partner
       </a>
@@ -603,16 +607,34 @@
       <div class="modal-switch">Already have an account? <a href="#" data-auth="login">Login</a></div>
     </div>
 
-    <!-- Merchant sign-in. Merchants are this platform's users, so the site's
-         "Login" is the merchant login: it runs the same
-         Login -> Password -> OTP -> Portal flow as /merchant/ (API_CONTRACT.md §1)
-         and hands off to the Merchant Portal on success. -->
+    <!-- ===================================================================
+         CUSTOMER (B2C) SIGN-IN — travellers, not travel agencies.
+         ===================================================================
+         This modal used to be the MERCHANT login: it posted portal:'merchant'
+         and handed off to the Merchant Portal, which meant the public site's
+         "Login" and its "My Partner" button were two routes to the same B2B
+         door and there was no customer sign-in at all.
+
+         The audiences are split now. Merchants sign in at partner-login.html
+         behind "My Partner"; this is the traveller's door, and it opens the
+         Account Center already built into this page (My Bookings, Wishlist,
+         Payment History, Reviews) under the customer `jwt_*` namespace.
+
+         IT IS NOT LIVE YET, AND IT SAYS SO RATHER THAN PRETENDING.
+         There is no customer login endpoint to call: /api/auth/login accepts
+         Portal = super_admin|admin|manager|merchant only, the `customer` role
+         is defined with zero permissions, and the legacy /api/auth/user/login
+         this site once used was dropped in the V2 migration — it is absent
+         from the live OpenAPI. The form below is complete and wired; the
+         single `CUSTOMER_AUTH.enabled` flag in app.js is what turns it on when
+         the endpoint ships. Until then it declines clearly instead of throwing
+         a 404 at a traveller. -->
     <div class="auth-view" id="loginView" style="display:none;">
       <div id="loginStepCreds">
         <h2>Welcome back</h2>
-        <p class="modal-sub">Sign in to your merchant account.</p>
+        <p class="modal-sub">Sign in to manage your bookings, wishlist and reviews.</p>
         <form id="loginForm" novalidate>
-          <div class="modal-field"><label for="liUser">Email Address</label><input id="liUser" type="email" autocomplete="username" required placeholder="you@company.com"></div>
+          <div class="modal-field"><label for="liUser">Email Address</label><input id="liUser" type="email" autocomplete="username" required placeholder="you@example.com"></div>
           <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
           <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
           <button type="submit" class="btn btn-coral modal-submit">Continue</button>
@@ -620,19 +642,11 @@
         </form>
       </div>
 
-      <div id="loginStepOtp" style="display:none;">
-        <h2>Verify it's you</h2>
-        <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
-        <div class="modal-field"><label for="liOtp">One-Time Code</label><input id="liOtp" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"></div>
-        <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
-        <div class="modal-msg" id="loginOtpMsg"></div>
-        <div class="modal-switch">
-          <a href="#" id="liResendBtn">Resend code</a> &nbsp;·&nbsp;
-          <a href="#" id="liBackBtn">Use a different account</a>
-        </div>
-      </div>
-
       <div class="modal-switch">Need an account? <a href="#" data-auth="signup">Get started</a></div>
+      <!-- The one pointer to the B2B side. It names the Partner Portal and
+           nothing else — no Admin, Manager or Super Admin appears anywhere on
+           this site. -->
+      <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
     </div>
   </div>
 </div>

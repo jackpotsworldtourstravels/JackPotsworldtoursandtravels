@@ -100,7 +100,11 @@
           <div id="opsDeskList"></div>
           <div class="ops-menu-sep"></div>
           <div class="ops-menu-head">Interface</div>
-          <a id="opsV1Link" href="../portal-login.html">Version 1 (Premium) →</a>
+<!-- href is replaced at sign-in with THIS account's own V1 portal
+               (ops-core.js). The placeholder is the public site rather than a
+               portal directory, so a JS failure cannot turn this into a list
+               of internal portals. -->
+          <a id="opsV1Link" href="../index.html">Version 1 (Premium) →</a>
         </div>
       </div>
 

@@ -932,13 +932,10 @@ function openAuth(view) {
   signupView.style.display = view === 'login' ? 'none' : 'block';
   loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
-  /* Always reopen on the credentials step — a half-finished OTP attempt from
-     a previous open would otherwise still be showing. */
+  /* Open clean. The OTP step this used to reset went to partner-login.html with
+     the rest of the merchant flow — the customer login is a single screen. */
   if (view === 'login') {
-    loginChallengeToken = null;
-    showLoginStep('creds');
     setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
   }
   const firstInput = (view === 'login' ? loginView : signupView).querySelector('input');
   if (firstInput) firstInput.focus();
@@ -950,13 +947,12 @@ function closeAuth() {
 document.querySelectorAll('[data-auth]').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
-    /* A merchant who already has a live session shouldn't be asked to sign in
-       again — send them straight through. Merchant tokens live in their own
-       namespace (PARTNER_KEYS), which getStoredAuth() below doesn't see. */
-    if (el.dataset.auth === 'login' && isPartnerLoggedIn()) {
-      window.location.href = MERCHANT_PORTAL_URL;
-      return;
-    }
+    /* This used to forward a signed-in MERCHANT straight to their workspace,
+       because "Login" was the merchant login. It is the customer login now, so
+       a partner session is none of its business: forwarding a traveller's click
+       into the Merchant Portal — just because someone at that desk had signed
+       in earlier on the same browser — is the wrong product entirely.
+       The two namespaces stay separate; My Partner is the merchant's route. */
     const { access, role } = getStoredAuth();
     if (access) {
       if (el.dataset.auth === 'signup') {
@@ -1016,41 +1012,47 @@ document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
 });
 
 /* ---------------------------------------------------------------------------
-   Merchant sign-in — the site's "Login" is the merchant login.
+   CUSTOMER SIGN-IN — the site's "Login" is the traveller's login.
 
-   Runs the same two-step flow as the Merchant Portal's own shell
-   (Login -> Password -> OTP -> Portal, API_CONTRACT.md §1) using the shared
-   helpers in auth.js, then hands off to the merchant's workspace. Tokens are
-   written under the merchant namespace by storePortalTokens, so arriving there
-   the session is already live and no second sign-in is needed.
+   IT USED TO BE THE MERCHANT LOGIN. This modal posted portal:'merchant', ran
+   the password -> OTP flow and handed off to the Merchant Portal, which made
+   "Login" and "My Partner" two doors into the same B2B product and left the
+   platform's actual customers with nowhere to sign in.
 
-   WHERE A MERCHANT LANDS AFTER SIGNING IN
-   This one constant is the whole of it. Authentication — this modal, the OTP
-   step, forgot-password, reset-password, registration — is unchanged; only the
-   destination changes.
+   The two audiences are separated now:
 
-   THE MERCHANT UI IS THE CLASSIC PORTAL. The other two merchant-facing
-   frontends are out of service for merchants:
+     Login (here)   Customer / B2C. Opens the Account Center already built into
+                    this page, under the customer `jwt_*` namespace.
+     My Partner     Merchant / B2B -> partner-login.html, which is where the
+                    password -> OTP flow and MERCHANT_PORTAL_URL moved to.
+     Admin, Manager, Super Admin
+                    their own URLs. Named nowhere on this site.
 
-     merchant/     Premium — redirects here to Classic on load. Files kept.
-     operations/   still live for admin and super admin, but a merchant who
-                   reaches it is sent to Classic (see opsStartSession).
-
-   Nothing was deleted for this: both portals still exist on disk and both
-   redirects are a single statement, so restoring either is removing one line
-   and pointing this constant back at it.
-
-   Admin and Super Admin are untouched: they never route through here, they
-   sign in at admin/ and super-admin/ and land in their own portals, and
-   Operations continues to work for them.
+   THIS IS UI AHEAD OF ITS BACKEND, AND IT IS EXPLICIT ABOUT THAT.
+   There is no customer login endpoint: schemas/auth.py declares
+   Portal = Literal["super_admin","admin","manager","merchant"], the `customer`
+   role carries zero permissions, and the /api/auth/user/login this page's
+   legacy login.html still posts to was dropped in the V2 migration — it is not
+   in the live OpenAPI. So the form is wired end to end and gated behind ONE
+   flag. When the endpoint ships, set `enabled: true` and confirm `endpoint`;
+   nothing else here changes. Until then a traveller is told plainly, instead of
+   being handed a 404 or, worse, a silent failure.
    --------------------------------------------------------------------------- */
-const MERCHANT_PORTAL_URL = 'merchant-classic/';
-let loginChallengeToken = null;
+const CUSTOMER_AUTH = {
+  enabled: false,
+  /* The expected shape when it lands: { identifier, password } -> TokenResponse,
+     matching the contract the retired /api/auth/user/login had and which
+     auth_service.authenticate() still implements (it accepts the legacy "user"
+     alias for the v2 `customer` role). Confirm before flipping `enabled`. */
+  endpoint: '/api/auth/customer/login',
+};
 
-function showLoginStep(step) {
-  document.getElementById('loginStepCreds').style.display = step === 'creds' ? '' : 'none';
-  document.getElementById('loginStepOtp').style.display = step === 'otp' ? '' : 'none';
-}
+/* Where a MERCHANT lands once signed in. The sign-in itself lives on
+   partner-login.html now; this constant stays because the Operations handoff
+   and the already-signed-in short-circuit above still send merchants through.
+   The merchant UI is the Classic portal — merchant/ (Premium) redirects to it
+   and its files are all still on disk. */
+const MERCHANT_PORTAL_URL = 'merchant-classic/';
 
 function setModalMsg(el, text, tone) {
   el.textContent = text;
@@ -1068,50 +1070,42 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
     setModalMsg(msg, 'Enter your email and password.', 'error');
     return;
   }
-  setModalMsg(msg, 'Checking…', 'muted');
-  try {
-    const data = await startPortalLogin('merchant', email, pass);
-    loginChallengeToken = data.challenge_token;
-    setModalMsg(msg, '', 'muted');
-    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
-    document.getElementById('liOtp').value = '';
-    /* With SMTP unconfigured the API returns the code inline so local demos
-       work without a mailbox; show it rather than leaving the user stuck. */
-    document.getElementById('loginOtpSub').textContent = data.dev_otp
-      ? `Dev mode — your code is ${data.dev_otp}`
-      : `Enter the 6-digit code sent to ${email}.`;
-    showLoginStep('otp');
-    document.getElementById('liOtp').focus();
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
-  }
-});
-
-document.getElementById('liVerifyBtn')?.addEventListener('click', async () => {
-  const code = document.getElementById('liOtp').value.trim();
-  const msg = document.getElementById('loginOtpMsg');
-  if (!/^\d{6}$/.test(code)) {
-    setModalMsg(msg, 'Enter the 6-digit code.', 'error');
+  if (!CUSTOMER_AUTH.enabled) {
+    /* Said in the traveller's terms, not the API's. A merchant who lands here
+       out of habit is redirected by name rather than left guessing which of
+       the two logins is theirs. */
+    setModalMsg(msg, 'Customer accounts are not open yet — we are still building this. '
+      + 'If you are a travel agency, use My Partner to reach the Partner Portal.', 'error');
     return;
   }
-  setModalMsg(msg, 'Verifying…', 'muted');
+
+  setModalMsg(msg, 'Checking…', 'muted');
   try {
-    const data = await verifyPortalOtp(loginChallengeToken, code);
-    storePortalTokens('merchant', data);
-    setModalMsg(msg, 'Signed in — taking you to your workspace…', 'ok');
-    window.location.href = MERCHANT_PORTAL_URL;
+    const { data } = await axios.post(`${API_BASE}${CUSTOMER_AUTH.endpoint}`,
+      { identifier: email, password: pass });
+    const me = await axios.get(`${API_BASE}/api/auth/me`,
+      { headers: { Authorization: `Bearer ${data.access_token}` } });
+    /* The customer namespace — deliberately NOT the merchant one. A traveller
+       signing in here must never overwrite a partner session open in the same
+       browser (auth.js keeps the two apart on purpose). */
+    setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role, me.data.id);
+    setModalMsg(msg, 'Signed in — welcome back.', 'ok');
+    renderAuthNav();
+    closeAuth();
   } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'That code was not accepted.'), 'error');
+    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
   }
 });
 
 /* ---------------------------------------------------------------------------
    Arriving here to sign in, sent by the Operations workspace.
 
-   /operations/ has no login of its own; when it is opened without a session it
-   redirects to this page with #login (and an ops_reason explaining why), so the
-   merchant lands on the login they already know rather than a second one. This
-   only reacts to that hash — a normal visit to the site is untouched.
+   HISTORICAL: /operations/ used to bounce merchants to this page with #login,
+   because the modal above was the merchant login. It now sends them to
+   partner-login.html instead (OPS_SIGNIN in operations/js/ops-core.js), so this
+   handler only catches an old bookmark or an in-flight tab — and it must not
+   open the CUSTOMER modal for a merchant. It forwards instead, carrying the
+   reason so the partner login can still explain itself.
    --------------------------------------------------------------------------- */
 (function handleOperationsSignInHandoff() {
   if (location.hash !== '#login') return;
@@ -1122,39 +1116,10 @@ document.getElementById('liVerifyBtn')?.addEventListener('click', async () => {
     return;
   }
 
-  const reasons = {
-    'session-expired': 'Your session expired. Please sign in again.',
-    'signed-out': 'You have been signed out.',
-    'sign-in-required': 'Please sign in to open your workspace.',
-  };
   const reason = new URLSearchParams(location.search).get('ops_reason');
-
-  openAuth('login');
-  if (reasons[reason]) setModalMsg(document.getElementById('loginMsg'), reasons[reason], 'muted');
+  window.location.replace('partner-login.html'
+    + (reason ? `?ops_reason=${encodeURIComponent(reason)}` : ''));
 })();
-
-document.getElementById('liResendBtn')?.addEventListener('click', async e => {
-  e.preventDefault();
-  const msg = document.getElementById('loginOtpMsg');
-  setModalMsg(msg, 'Sending a new code…', 'muted');
-  try {
-    const data = await resendPortalOtp(loginChallengeToken);
-    /* resend issues a fresh challenge; keep using the newest one. */
-    if (data.challenge_token) loginChallengeToken = data.challenge_token;
-    setModalMsg(msg, data.dev_otp ? `Dev mode — your new code is ${data.dev_otp}` : 'A new code is on its way.', 'ok');
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'Could not resend the code just now.'), 'error');
-  }
-});
-
-document.getElementById('liBackBtn')?.addEventListener('click', e => {
-  e.preventDefault();
-  loginChallengeToken = null;
-  document.getElementById('liPass').value = '';
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  showLoginStep('creds');
-  document.getElementById('liUser').focus();
-});
 
 document.getElementById('forgotPasswordLink').addEventListener('click', async e => {
   e.preventDefault();

@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Travel Partner Portal — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="Secure sign-in for JackPots World travel partners.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- =========================================================================
+     MERCHANT (B2B) LOGIN — the only door "My Partner" opens.
+     =========================================================================
+     WHAT THIS REPLACED, AND WHY IT MATTERS MORE THAN THE VISUALS.
+     The public site used to send "My Partner" to portal-login.html, a hub that
+     advertised four doors: Super Admin, Admin, Manager and Merchant. Naming the
+     internal portals on a public page is the part that was wrong — the design
+     work below is secondary to deleting that menu. Admin, Manager and Super
+     Admin are now reachable only at their own URLs, which staff already hold.
+
+     AUTHENTICATION IS UNCHANGED. This page drives the same three functions the
+     site's modal drove — startPortalLogin('merchant') -> verifyPortalOtp() ->
+     storePortalTokens('merchant') — from assets/js/auth.js, against the same
+     /api/auth/* endpoints (API_CONTRACT.md §1). No endpoint, role, token
+     namespace or redirect changed; only where the form is drawn.
+
+     THE OTP STEP IS NOT AN "OTP LOGIN". The brief rules out OTP/QR/social as
+     ALTERNATIVE sign-in methods, and there are none here: password is the only
+     way in. The code screen after it is the second factor of that one flow, and
+     removing it would be modifying authentication, which the brief forbids.
+     ========================================================================= -->
+<style>
+:root{
+  --navy-deep:#04162B; --navy:#0A2540; --navy-2:#123157; --navy-3:#1B4577;
+  --gold:#E8A317; --gold-lt:#FFC24D; --gold-dk:#B87908;
+  --ink:#0A2540; --muted:#5B6B82; --line:rgba(10,37,64,0.10);
+  --ff:'Montserrat', sans-serif;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{max-width:100%; overflow-x:hidden;}
+body{
+  min-height:100vh; font-family:var(--ff); color:var(--ink);
+  -webkit-font-smoothing:antialiased; background:#F4F7FC;
+}
+button,input{font-family:inherit; font-size:inherit;}
+button{cursor:pointer;}
+a{color:inherit; text-decoration:none;}
+img{max-width:100%;}
+
+/* ------------------------------------------------------------------ shell */
+.pl{display:grid; grid-template-columns:1.12fr 1fr; min-height:100vh;}
+
+/* ============================================================== left panel
+   ONE CINEMATIC SCENE, NOT A COLLAGE. The brief asks for hotels, cruise,
+   beach, mountains, skyline, landmarks, ocean and palms — drawn as one
+   coastal evening rather than eight stickers. Depth does the blending: far
+   mountains and skyline sit behind the water, the ship sits on it, the resort
+   and palms sit in front, and every layer shares the same dusk palette so
+   nothing reads as pasted on.
+
+   IT IS INLINE SVG BECAUSE THERE IS NO PHOTOGRAPHY TO USE. assets/images/
+   holds a logo and two favicons; the hotel photography added in Phase 7 is
+   Commons-hosted and remote, and a login screen that waits on a third-party
+   image is a login screen that can render blank. Vector also stays crisp on
+   any display and costs one request that is already being made. */
+.pl-art{
+  position:relative; overflow:hidden; display:flex; flex-direction:column;
+  justify-content:space-between; padding:38px 46px 34px;
+  background:var(--navy-deep); isolation:isolate;
+}
+.pl-art svg.pl-scene{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit:cover; z-index:0;
+}
+/* Soft dark overlay + colour grading. Two stacked gradients: a vertical one
+   that sinks the top and bottom so the logo and footer always have contrast,
+   and a warm/cool grade that pulls the whole scene toward the brand navy. */
+.pl-art::after{
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:
+    linear-gradient(180deg, rgba(4,22,43,0.72) 0%, rgba(4,22,43,0.28) 34%, rgba(4,22,43,0.44) 62%, rgba(4,22,43,0.86) 100%),
+    radial-gradient(120% 90% at 78% 26%, rgba(232,163,23,0.16) 0%, transparent 58%),
+    linear-gradient(115deg, rgba(10,37,64,0.55) 0%, rgba(10,37,64,0.10) 52%, rgba(4,22,43,0.50) 100%);
+}
+.pl-art > *{position:relative; z-index:2;}
+
+/* Logo — 37px against the 52px it was on the old hub, the ~28% reduction the
+   brief asks for. Upper-left, and nowhere else on the page. */
+.pl-logo{height:37px; width:auto; object-fit:contain; align-self:flex-start;}
+
+.pl-copy{max-width:520px; padding-bottom:8px;}
+.pl-eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--gold-lt); margin-bottom:16px;
+}
+.pl-eyebrow::before{content:''; width:26px; height:1.5px; background:var(--gold); opacity:.9;}
+.pl-welcome{
+  font-size:clamp(30px,3.4vw,44px); font-weight:800; color:#fff;
+  line-height:1.1; letter-spacing:-0.02em;
+}
+.pl-portal{
+  font-size:clamp(17px,1.5vw,21px); font-weight:600; margin-top:10px;
+  color:rgba(255,255,255,0.90);
+}
+.pl-tag{
+  font-size:13.5px; color:rgba(255,255,255,0.66); margin-top:16px; line-height:1.7;
+  max-width:400px;
+}
+.pl-tag b{display:block; color:rgba(255,255,255,0.88); font-weight:600; margin-top:10px;}
+.pl-foot-l{font-size:11.5px; color:rgba(255,255,255,0.44); letter-spacing:.02em;}
+
+/* ============================================================= right panel */
+.pl-side{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:44px 40px; position:relative; overflow:hidden;
+  background:
+    radial-gradient(900px 520px at 82% -6%, rgba(232,163,23,0.10) 0%, transparent 62%),
+    radial-gradient(760px 620px at -12% 108%, rgba(27,69,119,0.13) 0%, transparent 60%),
+    linear-gradient(168deg, #FAFCFF 0%, #EDF2FA 58%, #E4ECF7 100%);
+}
+.pl-side-inner{width:100%; max-width:404px; position:relative; z-index:1;}
+
+/* ---------------------------------------------------------- the login card
+   ~10% GLASS, DELIBERATELY. The card is 90%-opaque white over a tinted panel,
+   so the blur and the tint show at the edges and the text sits on solid white.
+   A heavier glass would put body copy over a moving gradient, which is where
+   contrast goes and where "premium" turns into "hard to read". */
+.pl-card{
+  background:rgba(255,255,255,0.90);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid rgba(255,255,255,0.75);
+  box-shadow:
+    0 1px 2px rgba(10,37,64,0.04),
+    0 12px 28px -8px rgba(10,37,64,0.13),
+    0 36px 64px -24px rgba(10,37,64,0.20);
+  border-radius:24px; padding:36px 34px 30px;
+}
+.pl-card h1{font-size:23px; font-weight:800; letter-spacing:-0.015em;}
+.pl-card-sub{font-size:13px; color:var(--muted); margin-top:7px; line-height:1.6;}
+
+.pl-field{margin-top:17px;}
+.pl-field label{
+  display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:#43536B; margin-bottom:7px;
+}
+.pl-input-wrap{position:relative; display:flex; align-items:center;}
+.pl-field input{
+  width:100%; padding:12.5px 14px; border:1px solid rgba(10,37,64,0.14);
+  border-radius:11px; background:#fff; color:var(--ink); font-size:14.5px;
+  transition:border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.pl-field input::placeholder{color:#9AA8BC;}
+.pl-field input:focus{
+  outline:none; border-color:var(--gold);
+  box-shadow:0 0 0 3.5px rgba(232,163,23,0.16);
+}
+.pl-field input[type=password]{padding-right:46px;}
+.pl-peek{
+  position:absolute; right:6px; background:none; border:0; padding:8px;
+  color:#8494AB; display:flex; border-radius:8px;
+}
+.pl-peek:hover{color:var(--navy);}
+.pl-peek svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.9;}
+
+.pl-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-top:15px; flex-wrap:wrap;
+}
+.pl-remember{display:flex; align-items:center; gap:8px; font-size:13px; color:#43536B; cursor:pointer;}
+.pl-remember input{width:15px; height:15px; accent-color:var(--gold); cursor:pointer;}
+.pl-forgot{font-size:13px; font-weight:600; color:var(--navy-3);}
+.pl-forgot:hover{color:var(--gold-dk); text-decoration:underline;}
+
+/* ------------------------------------------------------- the login button */
+.pl-btn{
+  width:100%; margin-top:20px; padding:13.5px 18px; border:0; border-radius:12px;
+  font-size:15px; font-weight:700; letter-spacing:.01em; color:#3A2600;
+  background:linear-gradient(135deg, var(--gold-lt) 0%, var(--gold) 52%, var(--gold-dk) 100%);
+  box-shadow:0 1px 1px rgba(255,255,255,0.45) inset, 0 8px 18px -6px rgba(232,163,23,0.55), 0 2px 6px rgba(10,37,64,0.10);
+  transition:transform .18s var(--ease), box-shadow .22s var(--ease), filter .18s var(--ease);
+}
+.pl-btn:hover:not(:disabled){
+  transform:translateY(-1.5px); filter:saturate(112%);
+  box-shadow:0 1px 1px rgba(255,255,255,0.5) inset, 0 14px 30px -8px rgba(232,163,23,0.62), 0 4px 12px rgba(10,37,64,0.12);
+}
+.pl-btn:active:not(:disabled){transform:translateY(0);}
+.pl-btn:disabled{opacity:.62; cursor:not-allowed;}
+
+.pl-msg{margin-top:13px; font-size:12.8px; line-height:1.55; display:none;}
+.pl-msg.show{display:block;}
+.pl-msg.err{color:#B3261E;}
+.pl-msg.ok{color:#0F7B4F;}
+.pl-msg.info{color:var(--muted);}
+
+/* ------------------------------------------------------------- OTP screen */
+.pl-otp-back{
+  display:inline-flex; align-items:center; gap:6px; font-size:12.5px;
+  font-weight:600; color:var(--muted); margin-bottom:14px; background:none; border:0; padding:0;
+}
+.pl-otp-back:hover{color:var(--navy);}
+.pl-otp-back svg{width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2;}
+#plOtp{letter-spacing:.42em; font-size:19px; font-weight:700; text-align:center; padding-left:14px;}
+#plOtp::placeholder{letter-spacing:.3em;}
+.pl-resend{margin-top:14px; font-size:12.8px; color:var(--muted); text-align:center;}
+.pl-resend button{background:none; border:0; font-weight:700; color:var(--navy-3); font-size:12.8px;}
+.pl-resend button:hover{color:var(--gold-dk); text-decoration:underline;}
+
+/* ------------------------------------------------------------ support card
+   ONE small support block, per the brief — nothing more. */
+.pl-support{
+  margin-top:18px; padding:15px 18px; border-radius:16px;
+  background:rgba(255,255,255,0.62);
+  -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+  border:1px solid rgba(10,37,64,0.07);
+  display:flex; align-items:center; gap:13px;
+}
+.pl-support-ico{
+  width:36px; height:36px; flex:none; border-radius:11px; display:flex;
+  align-items:center; justify-content:center;
+  background:linear-gradient(135deg, rgba(232,163,23,0.20), rgba(232,163,23,0.09));
+  color:var(--gold-dk);
+}
+.pl-support-ico svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8;}
+.pl-support-txt{flex:1; min-width:0;}
+.pl-support-txt b{display:block; font-size:13px; font-weight:700;}
+.pl-support-txt span{font-size:12px; color:var(--muted);}
+.pl-support a{font-size:12.5px; font-weight:700; color:var(--navy-3); white-space:nowrap;}
+.pl-support a:hover{color:var(--gold-dk);}
+
+.pl-foot-r{margin-top:22px; text-align:center; font-size:11.5px; color:#8494AB; line-height:1.7;}
+.pl-foot-r a{font-weight:600; color:var(--muted);}
+.pl-foot-r a:hover{color:var(--navy);}
+
+/* -------------------------------------------------------------- responsive
+   Below 940px the artwork stops being a panel and becomes a compact branded
+   header — the scene still sets the tone, but the card is what the screen is
+   for and it comes first. */
+@media (max-width:940px){
+  .pl{grid-template-columns:1fr;}
+  .pl-art{min-height:210px; padding:22px 26px 24px; justify-content:space-between;}
+  .pl-logo{height:32px;}
+  .pl-welcome{font-size:26px;}
+  .pl-portal{font-size:16px; margin-top:6px;}
+  .pl-tag{display:none;}
+  .pl-foot-l{display:none;}
+  .pl-side{padding:30px 20px 40px;}
+}
+@media (max-width:420px){
+  .pl-art{padding:18px 18px 20px; min-height:180px;}
+  .pl-card{padding:28px 22px 24px; border-radius:20px;}
+  .pl-side{padding:22px 14px 32px;}
+  .pl-row{gap:9px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .pl-btn{transition:none;}
+  .pl-btn:hover:not(:disabled){transform:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="pl">
+  <!-- ===================================================== branding panel -->
+  <section class="pl-art">
+    <!-- The scene. viewBox is 16:10 and the element is stretched with
+         preserveAspectRatio="xMidYMid slice", so it crops like a photograph
+         instead of distorting on a tall or narrow panel. -->
+    <svg class="pl-scene" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#071B33"/>
+          <stop offset="34%"  stop-color="#123B63"/>
+          <stop offset="63%"  stop-color="#2E6285"/>
+          <stop offset="83%"  stop-color="#7C7E86"/>
+          <stop offset="100%" stop-color="#C98F4C"/>
+        </linearGradient>
+        <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%"   stop-color="#FFD79A" stop-opacity="0.95"/>
+          <stop offset="42%"  stop-color="#F0A94E" stop-opacity="0.42"/>
+          <stop offset="100%" stop-color="#E8A317" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#9E7B4E"/>
+          <stop offset="12%"  stop-color="#3E5F79"/>
+          <stop offset="52%"  stop-color="#123B5C"/>
+          <stop offset="100%" stop-color="#08203A"/>
+        </linearGradient>
+        <linearGradient id="mtnFar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#4A6C8C"/><stop offset="100%" stop-color="#2B4A68"/>
+        </linearGradient>
+        <linearGradient id="mtnNear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2C4A66"/><stop offset="100%" stop-color="#15304A"/>
+        </linearGradient>
+        <linearGradient id="sand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#123049"/><stop offset="100%" stop-color="#050F1E"/>
+        </linearGradient>
+        <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#3C6485"/><stop offset="100%" stop-color="#1B3A57"/>
+        </linearGradient>
+        <!-- "Slight background blur": the far layers are softened so the eye
+             settles on the foreground, the same way a long lens would. -->
+        <filter id="soft" x="-6%" y="-6%" width="112%" height="112%">
+          <feGaussianBlur stdDeviation="4.5"/>
+        </filter>
+        <filter id="softer" x="-6%" y="-6%" width="112%" height="112%">
+          <feGaussianBlur stdDeviation="8"/>
+        </filter>
+      </defs>
+
+      <!-- sky + low sun -->
+      <rect width="1600" height="1000" fill="url(#sky)"/>
+      <ellipse cx="1140" cy="612" rx="380" ry="230" fill="url(#sun)"/>
+      <circle cx="1140" cy="606" r="46" fill="#FFE3B0" opacity="0.80"/>
+      <g fill="#FFFFFF" opacity="0.30">
+        <circle cx="250" cy="130" r="1.9"/><circle cx="430" cy="86" r="1.5"/>
+        <circle cx="700" cy="150" r="1.6"/><circle cx="980" cy="98" r="1.4"/>
+        <circle cx="1330" cy="168" r="1.7"/><circle cx="1500" cy="104" r="1.5"/>
+        <circle cx="120" cy="230" r="1.3"/><circle cx="860" cy="240" r="1.2"/>
+      </g>
+
+      <!-- MOUNTAINS — far range, then a nearer one, both blurred back -->
+      <g filter="url(#softer)" opacity="0.72">
+        <path d="M0 640 L150 470 L250 545 L390 392 L520 540 L640 452 L760 620 Z" fill="url(#mtnFar)"/>
+        <path d="M300 640 L455 486 L560 566 L690 470 L830 640 Z" fill="url(#mtnFar)" opacity="0.85"/>
+        <path d="M390 392 L432 430 L470 404 L520 452 L455 486 Z" fill="#DCE8F2" opacity="0.55"/>
+        <path d="M150 470 L182 500 L214 480 L250 545 L200 528 Z" fill="#DCE8F2" opacity="0.42"/>
+      </g>
+      <g filter="url(#soft)" opacity="0.86">
+        <path d="M0 660 L120 556 L232 640 L330 588 L430 660 Z" fill="url(#mtnNear)"/>
+      </g>
+
+      <!-- SKYLINE + LANDMARKS — a spire, a dome and a stepped tower, read as a
+           distant city on the far shore rather than any one real building. -->
+      <g filter="url(#soft)" opacity="0.90">
+        <!-- stepped tower -->
+        <path d="M905 660 L905 470 L920 470 L920 430 L928 388 L936 430 L936 470 L951 470 L951 660 Z" fill="#20415F"/>
+        <!-- dome -->
+        <path d="M1010 660 L1010 566 Q1010 520 1048 520 Q1086 520 1086 566 L1086 660 Z" fill="#22445F"/>
+        <path d="M1048 500 L1052 520 L1044 520 Z" fill="#22445F"/>
+        <!-- blocks -->
+        <rect x="820" y="574" width="52" height="86" fill="#1D3C58"/>
+        <rect x="872" y="602" width="30" height="58" fill="#1A3752"/>
+        <rect x="1100" y="590" width="46" height="70" fill="#1D3C58"/>
+        <rect x="1152" y="558" width="34" height="102" fill="#20415F"/>
+        <rect x="1190" y="606" width="44" height="54" fill="#1A3752"/>
+        <!-- suspension bridge, right edge -->
+        <path d="M1252 660 L1252 560 M1420 660 L1420 560" stroke="#20415F" stroke-width="7" fill="none"/>
+        <path d="M1252 566 Q1336 646 1420 566" stroke="#2B5478" stroke-width="4.5" fill="none"/>
+        <path d="M1240 630 L1600 630" stroke="#20415F" stroke-width="6"/>
+        <g fill="#FFD79A" opacity="0.55">
+          <rect x="828" y="586" width="5" height="7"/><rect x="840" y="600" width="5" height="7"/>
+          <rect x="1108" y="602" width="5" height="7"/><rect x="1160" y="574" width="5" height="7"/>
+          <rect x="1160" y="596" width="5" height="7"/><rect x="1198" y="618" width="5" height="7"/>
+          <rect x="912" y="500" width="5" height="7"/><rect x="928" y="540" width="5" height="7"/>
+        </g>
+      </g>
+
+      <!-- OCEAN -->
+      <rect x="0" y="655" width="1600" height="200" fill="url(#sea)"/>
+      <!-- sun path on the water — the light the sky already established -->
+      <g opacity="0.44" fill="#FFD79A">
+        <rect x="1080" y="668" width="122" height="3" rx="1.5"/>
+        <rect x="1096" y="684" width="92"  height="3" rx="1.5"/>
+        <rect x="1070" y="700" width="146" height="2.5" rx="1.25"/>
+        <rect x="1104" y="716" width="76"  height="2.5" rx="1.25"/>
+        <rect x="1058" y="734" width="168" height="2" rx="1"/>
+      </g>
+      <g opacity="0.16" fill="#CFE2F0">
+        <rect x="120" y="690" width="150" height="2.5" rx="1.25"/>
+        <rect x="330" y="716" width="210" height="2.5" rx="1.25"/>
+        <rect x="620" y="700" width="130" height="2" rx="1"/>
+        <rect x="60"  y="748" width="240" height="2" rx="1"/>
+        <rect x="700" y="756" width="180" height="2" rx="1"/>
+      </g>
+
+      <!-- CRUISE SHIP — mid-water, small enough to be part of the scene -->
+      <g opacity="0.95">
+        <path d="M470 700 L742 700 L716 734 L496 734 Z" fill="#0E2B45"/>
+        <rect x="512" y="672" width="196" height="28" rx="4" fill="#16385A"/>
+        <rect x="536" y="652" width="148" height="20" rx="3" fill="#1B4066"/>
+        <rect x="566" y="636" width="92"  height="16" rx="3" fill="#1F4874"/>
+        <rect x="596" y="620" width="26"  height="16" rx="3" fill="#264F7C"/>
+        <g fill="#FFD79A" opacity="0.72">
+          <rect x="522" y="681" width="7" height="5"/><rect x="538" y="681" width="7" height="5"/>
+          <rect x="554" y="681" width="7" height="5"/><rect x="570" y="681" width="7" height="5"/>
+          <rect x="586" y="681" width="7" height="5"/><rect x="602" y="681" width="7" height="5"/>
+          <rect x="618" y="681" width="7" height="5"/><rect x="634" y="681" width="7" height="5"/>
+          <rect x="650" y="681" width="7" height="5"/><rect x="666" y="681" width="7" height="5"/>
+          <rect x="546" y="659" width="7" height="5"/><rect x="576" y="659" width="7" height="5"/>
+          <rect x="606" y="659" width="7" height="5"/><rect x="636" y="659" width="7" height="5"/>
+        </g>
+        <rect x="470" y="736" width="272" height="10" fill="#0A2138" opacity="0.45"/>
+      </g>
+
+      <!-- FOREGROUND SHORE — sand, resort, palms -->
+      <path d="M0 830 Q300 792 640 812 Q1020 834 1600 800 L1600 1000 L0 1000 Z" fill="url(#sand)"/>
+
+      <!-- LUXURY HOTEL / BEACH RESORT, left foreground. Lit windows are what
+           make a silhouette read as occupied rather than derelict. -->
+      <g>
+        <rect x="96" y="700" width="150" height="152" rx="7" fill="#0F2E4A"/>
+        <rect x="246" y="742" width="104" height="110" rx="6" fill="#0C2740"/>
+        <rect x="120" y="676" width="102" height="26" rx="6" fill="#143755"/>
+        <rect x="96" y="700" width="150" height="152" rx="7" fill="url(#glass)" opacity="0.34"/>
+        <g fill="#FFD79A" opacity="0.62">
+          <rect x="112" y="716" width="15" height="10" rx="1.5"/><rect x="137" y="716" width="15" height="10" rx="1.5"/>
+          <rect x="187" y="716" width="15" height="10" rx="1.5"/><rect x="212" y="716" width="15" height="10" rx="1.5"/>
+          <rect x="112" y="744" width="15" height="10" rx="1.5"/><rect x="162" y="744" width="15" height="10" rx="1.5"/>
+          <rect x="212" y="744" width="15" height="10" rx="1.5"/>
+          <rect x="137" y="772" width="15" height="10" rx="1.5"/><rect x="187" y="772" width="15" height="10" rx="1.5"/>
+          <rect x="112" y="800" width="15" height="10" rx="1.5"/><rect x="212" y="800" width="15" height="10" rx="1.5"/>
+          <rect x="262" y="762" width="13" height="9" rx="1.5"/><rect x="300" y="762" width="13" height="9" rx="1.5"/>
+          <rect x="262" y="790" width="13" height="9" rx="1.5"/><rect x="320" y="790" width="13" height="9" rx="1.5"/>
+          <rect x="284" y="818" width="13" height="9" rx="1.5"/>
+        </g>
+        <!-- infinity pool -->
+        <rect x="366" y="822" width="152" height="26" rx="12" fill="#1D5B7E" opacity="0.72"/>
+        <rect x="378" y="828" width="128" height="4" rx="2" fill="#7FC4E2" opacity="0.42"/>
+        <!-- loungers + parasol -->
+        <g fill="#0A2138" opacity="0.82">
+          <rect x="544" y="836" width="34" height="7" rx="3"/>
+          <rect x="590" y="836" width="34" height="7" rx="3"/>
+        </g>
+        <path d="M640 838 L640 800 M614 802 Q640 780 666 802 Z" stroke="#0A2138" stroke-width="4" fill="#12405E" opacity="0.85"/>
+      </g>
+
+      <!-- PALM TREES — right foreground, the nearest layer and the darkest -->
+      <g fill="#04121F">
+        <path d="M1372 1000 Q1358 900 1338 830 L1354 826 Q1376 902 1390 1000 Z"/>
+        <path d="M1346 828 Q1276 780 1218 792 Q1284 762 1352 812 Z"/>
+        <path d="M1346 826 Q1296 748 1230 720 Q1310 730 1358 810 Z"/>
+        <path d="M1348 824 Q1372 742 1440 706 Q1394 776 1362 818 Z"/>
+        <path d="M1350 828 Q1424 786 1494 796 Q1420 786 1358 840 Z"/>
+        <path d="M1348 820 Q1352 758 1338 704 Q1372 754 1362 818 Z"/>
+
+        <path d="M1520 1000 Q1512 912 1498 848 L1512 845 Q1530 914 1538 1000 Z"/>
+        <path d="M1506 846 Q1452 806 1404 812 Q1458 790 1512 834 Z"/>
+        <path d="M1508 844 Q1528 782 1584 752 Q1546 812 1520 838 Z"/>
+        <path d="M1510 848 Q1570 818 1600 826 Q1552 826 1518 862 Z"/>
+        <path d="M1506 842 Q1490 786 1452 750 Q1508 780 1518 836 Z"/>
+      </g>
+      <!-- foreground vignette -->
+      <rect x="0" y="0" width="1600" height="1000" fill="url(#sun)" opacity="0.04"/>
+    </svg>
+
+    <img class="pl-logo" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+
+    <div class="pl-copy">
+      <span class="pl-eyebrow">Secure Partner Access</span>
+      <h2 class="pl-welcome">Welcome Back</h2>
+      <p class="pl-portal">Travel Partner Portal</p>
+      <p class="pl-tag">
+        Professional B2B Travel Platform
+        <b>One Partner. Multiple Services. Unlimited Opportunities.</b>
+      </p>
+    </div>
+
+    <p class="pl-foot-l">Trusted by travel agencies across India</p>
+  </section>
+
+  <!-- ======================================================== login panel -->
+  <section class="pl-side">
+    <div class="pl-side-inner">
+      <div class="pl-card">
+        <!-- ---------------------------------------------- step 1: password -->
+        <div id="plStepCreds">
+          <h1>Partner Sign In</h1>
+          <p class="pl-card-sub">Use the credentials issued to your agency.</p>
+
+          <form id="plForm" novalidate>
+            <div class="pl-field">
+              <label for="plUser">Email or Username</label>
+              <input id="plUser" type="email" autocomplete="username" required
+                     placeholder="you@agency.com" spellcheck="false">
+            </div>
+
+            <div class="pl-field">
+              <label for="plPass">Password</label>
+              <div class="pl-input-wrap">
+                <input id="plPass" type="password" autocomplete="current-password" required
+                       placeholder="Enter your password">
+                <button type="button" class="pl-peek" id="plPeek" aria-label="Show password">
+                  <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="pl-row">
+              <label class="pl-remember">
+                <input type="checkbox" id="plRemember"> Remember me
+              </label>
+              <a class="pl-forgot" href="forgot-password.html">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="pl-btn" id="plSubmit">Sign In</button>
+            <div class="pl-msg" id="plMsg"></div>
+          </form>
+        </div>
+
+        <!-- ------------------------------------------- step 2: the 2nd factor -->
+        <div id="plStepOtp" style="display:none;">
+          <button type="button" class="pl-otp-back" id="plBack">
+            <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            Use a different account
+          </button>
+          <h1>Verify it's you</h1>
+          <p class="pl-card-sub" id="plOtpSub">Enter the 6-digit code we sent to your email.</p>
+
+          <div class="pl-field">
+            <label for="plOtp">One-Time Code</label>
+            <input id="plOtp" type="text" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" placeholder="••••••">
+          </div>
+
+          <button type="button" class="pl-btn" id="plVerify">Verify &amp; Continue</button>
+          <div class="pl-msg" id="plOtpMsg"></div>
+          <p class="pl-resend">Didn't get it? <button type="button" id="plResend">Resend code</button></p>
+        </div>
+      </div>
+
+      <div class="pl-support">
+        <span class="pl-support-ico">
+          <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg>
+        </span>
+        <span class="pl-support-txt">
+          <b>Need Help?</b>
+          <span>Contact Support</span>
+        </span>
+        <a href="index.html#contact">Support Center →</a>
+      </div>
+
+      <p class="pl-foot-r">
+        © <span id="plYear">2026</span> JackPots World Tours &amp; Travels. All Rights Reserved.<br>
+        <a href="index.html">← Back to main site</a>
+      </p>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/auth.js?v=20260803a"></script>
+<script>
+'use strict';
+
+/* Where a signed-in merchant belongs. Kept as a constant mirroring
+   MERCHANT_PORTAL_URL in assets/js/app.js — the two are the same destination
+   from different directories. */
+const PL_PORTAL = 'merchant-classic/';
+const PL_REMEMBER_KEY = 'partner_login_remember';
+
+const $ = id => document.getElementById(id);
+$('plYear').textContent = new Date().getFullYear();
+
+let plChallenge = null;
+
+function plMsg(el, text, kind) {
+  el.textContent = text || '';
+  el.className = `pl-msg${text ? ` show ${kind || 'info'}` : ''}`;
+}
+function plErr(err, fallback) {
+  /* 429 first, and by STATUS rather than by body. /api/auth/login is rate
+     limited per IP, and the limiter's payload is not the {detail: "..."} shape
+     the API uses everywhere else — so it fell through to the generic fallback
+     and told a partner to "check your details" when their details were fine
+     and the only cure was waiting. A shared office IP hits this on ordinary
+     use, not just under test. */
+  if (err?.response?.status === 429) {
+    return 'Too many sign-in attempts from this network. Wait a minute and try again.';
+  }
+  const d = err?.response?.data?.detail;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d) && d[0]?.msg) return d[0].msg;
+  return fallback;
+}
+function plStep(which) {
+  $('plStepCreds').style.display = which === 'otp' ? 'none' : 'block';
+  $('plStepOtp').style.display = which === 'otp' ? 'block' : 'none';
+  if (which === 'otp') { $('plOtp').value = ''; $('plOtp').focus(); }
+}
+
+/* A live partner session means there is nothing to sign in to — go straight
+   through, the same short-circuit the site's modal has always had. */
+if (isPartnerLoggedIn()) location.replace(PL_PORTAL);
+
+/* Remember me: the address only. Never the password, and never a token — the
+   session already lives in its own namespace with its own expiry. */
+(function plRestoreRemembered() {
+  const saved = localStorage.getItem(PL_REMEMBER_KEY);
+  if (!saved) return;
+  $('plUser').value = saved;
+  $('plRemember').checked = true;
+})();
+
+/* Arriving from /operations/, which has no login of its own and hands off here
+   with a reason. Anything unrecognised is ignored rather than echoed — this
+   parameter is in a URL a third party can write. */
+(function plHandoffReason() {
+  const reasons = {
+    'session-expired': 'Your session expired. Please sign in again.',
+    'signed-out': 'You have been signed out.',
+    'sign-in-required': 'Please sign in to open your workspace.',
+  };
+  /* `ops_reason` is the name opsRequireSignIn() actually sends; `reason` is
+     accepted too so any other caller reads naturally. */
+  const q = new URLSearchParams(location.search);
+  const r = q.get('ops_reason') || q.get('reason');
+  if (reasons[r]) plMsg($('plMsg'), reasons[r], 'info');
+})();
+
+$('plPeek').addEventListener('click', () => {
+  const inp = $('plPass');
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  $('plPeek').setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  inp.focus();
+});
+
+$('plForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('plUser').value.trim();
+  const password = $('plPass').value;
+  const msg = $('plMsg');
+  if (!email || !password) { plMsg(msg, 'Enter your email and password.', 'err'); return; }
+
+  const btn = $('plSubmit');
+  btn.disabled = true;
+  plMsg(msg, 'Checking your credentials…', 'info');
+  try {
+    /* portal:'merchant' is what makes this a partner door: the login endpoint
+       refuses an account whose role does not belong to the named portal, so
+       staff credentials cannot open the Merchant Portal from here. */
+    const data = await startPortalLogin('merchant', email, password);
+    plChallenge = data.challenge_token;
+
+    if ($('plRemember').checked) localStorage.setItem(PL_REMEMBER_KEY, email);
+    else localStorage.removeItem(PL_REMEMBER_KEY);
+
+    plMsg(msg, '', 'info');
+    plStep('otp');
+    /* `message` is the server's own wording for where the code went
+       (LoginChallengeResponse.message) — it knows whether SMTP delivered it or
+       whether this is a dev-mode challenge, and this screen does not. */
+    $('plOtpSub').textContent = data.message || 'Enter the 6-digit code we sent to your email.';
+    plMsg($('plOtpMsg'), data.dev_otp ? `Dev mode — your code is ${data.dev_otp}` : '', 'info');
+  } catch (err) {
+    plMsg(msg, plErr(err, 'We could not sign you in. Check your details and try again.'), 'err');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('plVerify').addEventListener('click', async () => {
+  const code = $('plOtp').value.trim();
+  const msg = $('plOtpMsg');
+  if (!/^\d{6}$/.test(code)) { plMsg(msg, 'Enter the 6-digit code.', 'err'); return; }
+
+  const btn = $('plVerify');
+  btn.disabled = true;
+  plMsg(msg, 'Verifying…', 'info');
+  try {
+    const data = await verifyPortalOtp(plChallenge, code);
+    storePortalTokens('merchant', data);
+    plMsg(msg, 'Signed in — opening your workspace…', 'ok');
+    location.href = PL_PORTAL;
+  } catch (err) {
+    plMsg(msg, plErr(err, 'That code was not accepted.'), 'err');
+    btn.disabled = false;
+  }
+});
+
+$('plOtp').addEventListener('keydown', e => { if (e.key === 'Enter') $('plVerify').click(); });
+
+$('plResend').addEventListener('click', async () => {
+  const msg = $('plOtpMsg');
+  plMsg(msg, 'Sending a new code…', 'info');
+  try {
+    const data = await resendPortalOtp(plChallenge);
+    /* Resend issues a fresh challenge — keep the newest, or the code that
+       arrives will be checked against a token that no longer applies. */
+    if (data.challenge_token) plChallenge = data.challenge_token;
+    plMsg(msg, data.dev_otp ? `Dev mode — your new code is ${data.dev_otp}` : 'A new code is on its way.', 'ok');
+  } catch (err) {
+    plMsg(msg, plErr(err, 'Could not resend the code just now.'), 'err');
+  }
+});
+
+$('plBack').addEventListener('click', () => {
+  plChallenge = null;
+  plStep('creds');
+  plMsg($('plMsg'), '', 'info');
+  $('plPass').value = '';
+  $('plPass').focus();
+});
+</script>
+</body>
+</html>

@@ -612,28 +612,28 @@ function opsAfterWrite() {
 
    WHERE IT SENDS PEOPLE, AND WHY IT DIFFERS
    If the session merely expired we know which portal it belonged to, so we
-   return them to their own front door — a merchant to the public site's login,
-   staff to theirs.
+   return them to their own front door — a merchant to the Partner login, staff
+   to theirs.
 
    With no session at all we do not know who is arriving, and the answer is the
-   public site's login. This workspace is where a MERCHANT now lands after
-   signing in, so a merchant is who turns up here with a cold bookmark, and the
-   modal on ../index.html is their login. Staff are not stranded by that choice:
-   the landing page carries a "staff sign in" link to ../portal-login.html in
-   its own header, one click from the right door.
+   Partner login. This workspace is where a MERCHANT lands after signing in, so
+   a merchant is who turns up here with a cold bookmark. Staff are not stranded
+   by that choice: their portals are at their own URLs, which is the only place
+   they are named now.
 
-   ../portal-login.html was the obvious-looking choice for the unknown case and
-   is the wrong one: its merchant card points at ../merchant/, so a merchant
-   sent there would sign in and land in the PREMIUM portal, never reaching this
-   workspace they were trying to open.                                       */
+   ../portal-login.html is NOT the answer for the unknown case, and no longer
+   could be: it was a public directory of the internal portals, and it now just
+   redirects here.                                                           */
 
 const OPS_SIGNIN = {
-  /* The public site's login modal is the merchant's canonical sign-in; #login
-     asks app.js to open it on arrival. */
-  merchant: '../index.html#login',
+  /* The merchant's canonical sign-in is now its own page rather than the public
+     site's modal. That modal became the CUSTOMER (B2C) login when the two
+     audiences were split, so sending a merchant to ../index.html#login would
+     land them on a login their credentials do not open. */
+  merchant: '../partner-login.html',
   admin: '../admin/index.html',
   super_admin: '../super-admin/index.html',
-  unknown: '../index.html#login',
+  unknown: '../partner-login.html',
 };
 
 /* Leaves the workspace for the existing login. `reason` is carried in the URL
