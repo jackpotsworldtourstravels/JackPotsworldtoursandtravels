@@ -531,12 +531,124 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .sc-triage-msg{padding:0 18px 12px;}
 }
 
-/* Support Management / Live Chat conversation */
-.chat-msg{max-width:82%; margin-bottom:14px; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.45;}
-.chat-msg-in{background:var(--card-bg); border:1px solid var(--border-color); margin-right:auto; border-bottom-left-radius:3px;}
-.chat-msg-out{background:var(--coral); color:#fff; margin-left:auto; border-bottom-right-radius:3px;}
-.chat-msg-meta{font-size:11px; opacity:.7; margin-bottom:3px;}
-.chat-msg-body{white-space:pre-wrap; word-break:break-word;}
+/* Support Management / Live Chat conversation
+   ---------------------------------------------------------------------------
+   Deliberately the same shape as the merchant's Support Center — same
+   conversation, same reading. A row is avatar + stack; the stack is the sender
+   name (once per run) and the bubble; the bubble is the message with a small
+   time-and-receipt line beneath it.
+
+   THE SENDER LINE USED TO LIVE INSIDE THE BUBBLE at full date, which is why
+   every bubble was pinned to the 82% ceiling and 57px tall whatever it said:
+   "Demo Contact · 3 Aug 2026, 1:52 pm" is wider than most replies. */
+/* The two 9.5–10px uppercase labels here — the day pill and the sender name —
+   are the smallest text on the screen and `--text-muted` is not dark enough to
+   carry them: measured on the drawer's glass panel it lands at 4.44:1 for the
+   name and 4.09:1 for the pill, both under AA. This is the same problem the
+   merchant portal solved by darkening its own muted token; the admin's is used
+   by far too much else to move, so these two take a darker one of their own.
+   Dark mode needs no help — `--text-muted` measures 6.2:1 there. */
+:root{ --chat-label:#5A687F; }
+:root[data-theme="dark"]{ --chat-label:var(--text-muted); }
+
+.chat-day{
+  align-self:center; width:max-content; margin:10px auto 6px;
+  padding:3px 12px; border-radius:999px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  color:var(--chat-label); background:var(--hover-bg);
+}
+.chat-day:first-child{margin-top:2px;}
+
+.chat-row{display:flex; align-items:flex-end; gap:8px; margin-top:6px; min-width:0;}
+.chat-row.out{flex-direction:row-reverse;}
+/* The two margins ARE the grouping: 6px says the other side is answering,
+   2px says the same person is still talking. */
+.chat-row.grouped{margin-top:2px;}
+.chat-row.grouped .chat-av{visibility:hidden;}
+.chat-av{
+  width:30px; height:30px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:10.5px; font-weight:800; color:#fff;
+}
+.chat-av.desk{background:var(--coral);}
+.chat-av.merch{background:var(--navy);}
+/* `align-items` is what keeps a bubble the width of its own words: left at the
+   default `stretch` every bubble grows to the width of the sender's name. */
+.chat-stack{
+  display:flex; flex-direction:column; align-items:flex-start;
+  min-width:0; max-width:min(78%, 460px);
+}
+.chat-row.out .chat-stack{align-items:flex-end;}
+.chat-who{
+  font-size:9.5px; font-weight:800; line-height:1.3; margin:0 0 2px 3px;
+  text-transform:uppercase; letter-spacing:0.06em; color:var(--chat-label);
+}
+
+.chat-msg{
+  max-width:100%; margin:0; padding:7px 12px 5px;
+  border-radius:14px; font-size:13px; line-height:1.45;
+  word-break:break-word; overflow-wrap:anywhere;
+}
+/* `color` IS REQUIRED HERE, and its absence was a live dark-mode bug that
+   predates this rewrite. The bubble sets `--card-bg` as its background but
+   inherited its text from the drawer, which is `--ink` — a dark navy. In dark
+   mode that put #0B1020 text on a #131B2E bubble: 1.09:1, an incoming message
+   invisible against its own background. With `--text-primary` it is 17.38:1. */
+.chat-msg-in{
+  background:var(--card-bg); color:var(--text-primary);
+  border:1px solid var(--border-color); border-bottom-left-radius:4px;
+}
+.chat-msg-out{background:var(--coral); color:#fff; border-bottom-right-radius:4px;}
+.chat-row.grouped .chat-msg-in{border-top-left-radius:5px;}
+.chat-row.grouped .chat-msg-out{border-top-right-radius:5px;}
+/* `pre-wrap` BELONGS ON THE MESSAGE, NOT THE BUBBLE. The bubble element also
+   contains the template literal's newlines and indentation, and pre-wrap
+   preserves those as real blank lines — the bug that made the merchant's
+   bubbles four times too tall before it was found. */
+.chat-msg-text{white-space:pre-wrap;}
+/* NO OPACITY ON THIS ROW: it groups the ticks with it, and white at .7 over
+   the accent does not hold 4.5:1. Size and weight are what make it recede. */
+.chat-msg-meta{
+  display:flex; align-items:center; gap:4px; justify-content:flex-end;
+  margin:1px 0 0; font-size:9.5px; line-height:1; font-weight:600;
+}
+.chat-msg-in .chat-msg-meta{justify-content:flex-start; color:var(--text-muted);}
+/* The fade has to sit on the tick itself — a parent opacity is a group a child
+   can never be more opaque than. Delivered and read differ by the SECOND TICK
+   first and the opacity second, never by colour alone. */
+.chat-seen{width:12.5px; height:12.5px; opacity:.72;}
+.chat-seen.read{opacity:1;}
+
+/* An attachment is a card, not the sentence "Shared a file: invoice.pdf".
+   Until this existed the desk could see that a merchant had sent something and
+   had no way to open it. */
+.chat-file{display:flex; align-items:center; gap:9px; min-width:0; padding:1px 0;}
+.chat-file-ico, .chat-file-thumb{
+  width:34px; height:34px; flex-shrink:0; border-radius:7px;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-size:8.5px; font-weight:800; letter-spacing:.02em;
+  background:var(--hover-bg); color:var(--text-muted);
+}
+.chat-msg-out .chat-file-ico, .chat-msg-out .chat-file-thumb{
+  background:rgba(255,255,255,0.22); color:#fff;
+}
+.chat-file-thumb img{width:100%; height:100%; object-fit:cover;}
+.chat-file-thumb.failed::after{content:'FILE'; font-size:8.5px; font-weight:800;}
+.chat-file-meta{display:flex; flex-direction:column; min-width:0; gap:1px;}
+.chat-file-meta b{font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.chat-file-meta > span{font-size:10.5px; font-weight:600; color:var(--text-muted);}
+.chat-msg-out .chat-file-meta > span{color:#fff; opacity:.85;}
+.chat-file-get{
+  flex-shrink:0; cursor:pointer; padding:4px 9px; border-radius:6px;
+  font-size:10.5px; font-weight:700; white-space:nowrap;
+  border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-primary);
+}
+.chat-file-get:hover:not(:disabled){background:var(--hover-bg);}
+.chat-file-get:disabled{opacity:.5; cursor:not-allowed;}
+.chat-msg-out .chat-file-get{
+  border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.2); color:#fff;
+}
+.chat-msg-out .chat-file-get:hover:not(:disabled){background:rgba(255,255,255,0.34);}
 
 @media print{
   body:not(.printing-section) > *:not(.modal-overlay):not(.drawer-overlay){display:none !important;}

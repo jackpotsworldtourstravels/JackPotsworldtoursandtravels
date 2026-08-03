@@ -1523,15 +1523,222 @@ async function loadSupportQueue() {
   refreshSupportBadge();
 }
 
-function renderChatMessages(messages) {
+/* ------------------------------------------------- the desk's transcript ---
+
+   BUILT THE SAME WAY AS THE MERCHANT'S (merchant-classic/js/classic-support.js),
+   because it is the same conversation and there is no reason the two sides
+   should read differently. What changed: day separators, runs of messages from
+   one sender grouped under a single avatar, bubbles the width of their own
+   words, the timestamp moved under the message as a receipt line, and real file
+   cards.
+
+   NO API CHANGE. `documents` (each with `is_staff`) and `is_read` per message
+   were already in the `GET /api/support/threads/{id}` payload and this drawer
+   simply dropped them on the floor — the merchant side has consumed both since
+   it was built. The desk could not open an attachment the merchant sent: it
+   rendered as the sentence "Shared a file: ledger.pdf" and nothing else.
+
+   `direction` is written from the PLATFORM's point of view, so on THIS side
+   "mine" is `outbound` — the mirror of the merchant portal, where it is
+   `inbound`. That was already right here and is left alone. */
+
+const SUPPORT_FILE_MSG = /^Shared a file:\s*(.+)$/;
+let supportChatDocs = [];
+/* Attachment bytes come from an authenticated endpoint, so a thumbnail cannot
+   be a plain `src` — each is fetched and held as an object URL. Cached because
+   sending a reply re-renders the whole transcript, and without this every
+   image was re-downloaded on every reply. */
+const supportThumbs = new Map();
+
+function supportInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '—';
+  return (parts.length === 1 ? parts[0].slice(0, 2)
+    : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function supportDayLabel(iso) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86400000);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function supportFileSize(bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+/* Delivered vs read, on the desk's own messages only. `is_read` is the SERVER's
+   receipt — set when the merchant actually opens the thread. There is no
+   "sending" state here: a reply re-renders from the server's response, so a
+   message only ever exists once it has landed. */
+function supportReceipt(read) {
+  return `<svg class="chat-seen${read ? ' read' : ''}" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+       aria-label="${read ? 'Read by the merchant' : 'Delivered'}">
+    ${read
+      ? '<polyline points="1 13 5 17 13 8"/><polyline points="10 13 14 17 23 6"/>'
+      : '<polyline points="4 13 9 18 20 6"/>'}
+  </svg>`;
+}
+
+function supportFileCard(doc) {
+  const image = (doc.content_type || '').startsWith('image/');
+  const ext = (doc.filename.split('.').pop() || 'FILE').slice(0, 4).toUpperCase();
+  return `<span class="chat-file">
+    ${image
+      ? `<span class="chat-file-thumb" data-chat-thumb="${doc.id}"></span>`
+      : `<span class="chat-file-ico">${escapeHtml(ext)}</span>`}
+    <span class="chat-file-meta">
+      <b>${escapeHtml(doc.filename)}</b>
+      <span>${escapeHtml(supportFileSize(doc.size_bytes))} · ${escapeHtml(image ? 'Image' : ext)}</span>
+    </span>
+    <button type="button" class="chat-file-get" data-chat-doc="${doc.id}"
+            aria-label="Download ${escapeHtml(doc.filename)}">Download</button>
+  </span>`;
+}
+
+function renderChatMessages(messages, documents) {
   const el = document.getElementById('supportChatMessages');
-  el.innerHTML = messages.length ? messages.map(m => `
-    <div class="chat-msg ${m.direction === 'outbound' ? 'chat-msg-out' : 'chat-msg-in'}">
-      <div class="chat-msg-meta">${escapeHtml(m.sender_name || (m.direction === 'outbound' ? 'Support' : 'Merchant'))} · ${fmtDateTime(m.created_at)}</div>
-      <div class="chat-msg-body">${escapeHtml(m.message || '')}</div>
-    </div>
-  `).join('') : '<div class="empty-state">No messages yet.</div>';
+  if (Array.isArray(documents)) supportChatDocs = documents;
+
+  if (!messages.length) {
+    el.innerHTML = '<div class="empty-state">No messages yet.</div>';
+    return;
+  }
+
+  /* Each upload posts its own "Shared a file: NAME" line and the documents
+     arrive as a separate list. Pairing them by name and CONSUMING each match
+     means two uploads of the same filename land on their own bubbles in order
+     rather than both pointing at the first document. `is_staff` is the
+     uploader's side, which stops the desk's own file binding to an identically
+     named one the merchant sent. */
+  const unclaimed = [...supportChatDocs];
+  const claimDoc = (text, mine) => {
+    const match = SUPPORT_FILE_MSG.exec(text || '');
+    if (!match) return null;
+    const name = match[1].trim();
+    let i = unclaimed.findIndex(d => d.filename === name && d.is_staff === mine);
+    if (i < 0) i = unclaimed.findIndex(d => d.filename === name);
+    return i < 0 ? null : unclaimed.splice(i, 1)[0];
+  };
+
+  /* Where the receipt goes: on the last thing the desk said, and nowhere else. */
+  let lastMine = -1;
+  messages.forEach((m, i) => { if (m.direction === 'outbound') lastMine = i; });
+
+  let lastDay = '';
+  let lastSide = '';
+
+  el.innerHTML = messages.map((m, i) => {
+    const mine = m.direction === 'outbound';
+    const who = m.sender_name || (mine ? 'Support' : 'Merchant');
+    const day = new Date(m.created_at).toDateString();
+    let block = '';
+
+    if (day !== lastDay) {
+      block += `<div class="chat-day">${escapeHtml(supportDayLabel(m.created_at))}</div>`;
+      lastDay = day;
+      lastSide = '';
+    }
+    const grouped = lastSide === (mine ? 'out' : 'in');
+    lastSide = mine ? 'out' : 'in';
+    const doc = claimDoc(m.message, mine);
+
+    /* The message goes in its own element and the template's newlines stay
+       OUTSIDE it. `.chat-msg-text` is `pre-wrap` so a merchant's line breaks
+       survive; put pre-wrap on the bubble instead and it also preserves this
+       literal's indentation, which is four phantom blank lines per bubble. */
+    block += `<div class="chat-row ${mine ? 'out' : 'in'}${grouped ? ' grouped' : ''}">
+      <span class="chat-av ${mine ? 'desk' : 'merch'}" aria-hidden="true">${
+        grouped ? '' : escapeHtml(supportInitials(who))}</span>
+      <div class="chat-stack">
+        ${!grouped ? `<div class="chat-who">${escapeHtml(who)}</div>` : ''}
+        <div class="chat-msg ${mine ? 'chat-msg-out' : 'chat-msg-in'}">
+          ${doc ? supportFileCard(doc)
+            : `<span class="chat-msg-text">${escapeHtml(m.message || '')}</span>`}
+          <div class="chat-msg-meta">
+            ${escapeHtml(fmtTime(m.created_at))}
+            ${mine && i === lastMine ? supportReceipt(m.is_read) : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+    return block;
+  }).join('');
+
+  bindChatFiles(el);
   el.scrollTop = el.scrollHeight;
+}
+
+/* Downloads are authenticated, so an attachment can never be a plain href —
+   the bytes are fetched with the bearer token and handed over as an object URL. */
+async function fetchChatDoc(documentId) {
+  const { data } = await axios.get(`${API_BASE}/api/documents/${documentId}/download`,
+    { headers: authHeaders(), responseType: 'blob' });
+  return URL.createObjectURL(data);
+}
+
+function bindChatFiles(root) {
+  const find = id => supportChatDocs.find(d => String(d.id) === String(id));
+
+  root.querySelectorAll('[data-chat-thumb]').forEach(async box => {
+    const doc = find(box.dataset.chatThumb);
+    if (!doc) return;
+    const paint = url => {
+      if (!box.isConnected) return;
+      const img = document.createElement('img');
+      img.alt = doc.filename;
+      /* Bytes that arrive are not necessarily bytes that decode — a truncated
+         upload, or a file that is not the image its type claimed. Fall back to
+         the same typed icon a failed fetch leaves behind rather than a broken
+         image glyph. */
+      img.addEventListener('error', () => {
+        box.classList.add('failed');
+        box.replaceChildren();
+      });
+      box.replaceChildren(img);
+      img.src = url;
+    };
+    if (supportThumbs.has(doc.id)) return paint(supportThumbs.get(doc.id));
+    try {
+      const url = await fetchChatDoc(doc.id);
+      supportThumbs.set(doc.id, url);
+      paint(url);
+    } catch {
+      /* A thumbnail that will not load is not worth an alert — the card still
+         carries the filename, the size and a working Download. */
+      box.classList.add('failed');
+    }
+  });
+
+  root.querySelectorAll('[data-chat-doc]').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const doc = find(btn.dataset.chatDoc);
+      if (!doc) return;
+      btn.disabled = true;
+      try {
+        const url = await fetchChatDoc(doc.id);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        /* Revoked on a delay — synchronously would cancel the download in some
+           browsers before they have read the blob. */
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch (err) {
+        alert(err.response?.data?.detail || 'That file could not be downloaded.');
+      } finally {
+        btn.disabled = false;
+      }
+    }));
 }
 
 /* The desk's own view of a thread's filing. Merchants no longer state a
@@ -1588,7 +1795,7 @@ async function openSupportChat(threadId) {
     const { data } = await axios.get(`${API_BASE}/api/support/threads/${threadId}`, { headers: authHeaders() });
     document.getElementById('supportChatTitle').textContent = `${data.thread.request_number} — ${data.thread.merchant_name || 'Merchant'}`;
     document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
-    renderChatMessages(data.messages);
+    renderChatMessages(data.messages, data.documents);
     applySupportChatState(data.thread);
     renderSupportTriage(data.thread);
     loadSupportNotes(threadId);
@@ -1620,7 +1827,10 @@ document.getElementById('supportChatReplyForm').addEventListener('submit', async
   try {
     const { data } = await axios.post(`${API_BASE}/api/support/threads/${currentChatThreadId}/messages`, { message }, { headers: authHeaders() });
     input.value = '';
-    renderChatMessages(data.messages);
+    /* The reply response may or may not carry `documents`; renderChatMessages
+       keeps the list it already has when it is absent, so a reply never blanks
+       the file cards already on screen. */
+    renderChatMessages(data.messages, data.documents);
     document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
     applySupportChatState(data.thread);
   } catch (err) {
