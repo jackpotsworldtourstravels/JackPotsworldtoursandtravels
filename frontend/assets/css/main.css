@@ -22,7 +22,16 @@
   --ff-body:'Montserrat', sans-serif;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
-html{scroll-behavior:smooth;}
+/* `overflow-x` MUST BE ON `html`, NOT ONLY ON `body` — the pair below is one
+   rule, not a belt-and-braces duplicate. With it on body alone, a phone at
+   320px laid the page out at 391 CSS px and scrolled sideways by 71: the
+   overflow propagates off body, so body stops being the clipping context and
+   the mobile layout viewport is free to widen to fit the offers carousel.
+   Naming html as well pins the viewport to the device width. Measured at
+   320x568: innerWidth 391 -> 320, scrollWidth 391 -> 320, overflow 71 -> 0.
+   Caught by tests/verify_responsive.py, not by eye — the page looks fine at
+   390px, which is where anyone checking by hand would look. */
+html{scroll-behavior:smooth; overflow-x:hidden;}
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto;}
   *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}

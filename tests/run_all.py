@@ -89,6 +89,13 @@ SUITE = [
     # other way round.
     ("verify_providers.py",
      "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
+    # The only script that opens a browser, and the only one asserting anything
+    # about layout. It signs in three times, so it sits after the API scripts
+    # (their failures explain its failures, never the reverse) and before M8,
+    # which spends what is left of the rate-limit budget. Skips with exit 0
+    # when Playwright or a served frontend is absent.
+    ("verify_responsive.py",
+     "Responsive: every portal screen at phone sizes - no sideways scroll, no iOS-zoom inputs"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.
