@@ -601,9 +601,7 @@ async function clScOpen(id, { quiet = false } = {}) {
     clScRenderChatHead();
     clScRenderFoot();
     $('clScLog').innerHTML = `<div class="cl-sc-loading"><span class="cl-spin cl-spin-lg"></span></div>`;
-    /* On a phone the grid shows one column at a time: opening a conversation
-       swaps the list out for the chat, and the back control swaps it in. */
-    $('clScGrid').classList.add('chatting');
+    clScChatting(true);
   }
 
   try {
@@ -716,23 +714,32 @@ function clScRenderChatHead() {
   const online = clDeskOnline();
   const resolved = t.status === 'completed';
 
+  /* WHO THE MERCHANT IS TALKING TO LEADS THIS HEADER — the shape of every
+     messaging app they already use, and the question they actually have open.
+     The subject was the headline until now, which is what made a conversation
+     read as a ticket record; it stays on the conversation card to the left,
+     which is highlighted while its thread is open, and on the `title` below.
+     Same reasoning that removed the third column — see clInitSupport.
+
+     Until an operator claims the ticket there is nobody to name, so the desk
+     itself stands there. An invented name would be worse than none. */
+  const named = !!t.assigned_admin_name;
+
   head.innerHTML = `
     <button type="button" class="cl-sc-back" id="clScBack" aria-label="Back to conversations">
       ${clIco('chevronRight', { size: 17 })}
     </button>
     <div class="cl-sc-chat-id">
-      <span class="cl-sc-av desk">${clIco('headset', { size: 17 })}</span>
+      <span class="cl-sc-av desk">${named
+        ? escapeHtml(clInitials(t.assigned_admin_name)) : clIco('headset', { size: 17 })}</span>
       <div>
-        <b>${escapeHtml(t.title || 'Conversation')}</b>
+        <b title="${escapeHtml(t.title || 'Conversation')}">${escapeHtml(
+          named ? t.assigned_admin_name : 'Partner support desk')}</b>
         <span>
-          <span class="cl-ref">${escapeHtml(t.request_number || '')}</span>
-          <span class="cl-sc-dot"></span>
-          ${escapeHtml(t.assigned_admin_name
-            ? `with ${t.assigned_admin_name}`
-            : resolved ? 'closed by our desk' : 'partner support desk')}
-          <span class="cl-sc-dot"></span>
           <span class="cl-presence ${online && !resolved ? 'online' : ''}">${
             resolved ? 'Closed' : online ? 'Online' : 'Outside hours'}</span>
+          <span class="cl-sc-dot"></span>
+          Ticket <span class="cl-ref">${escapeHtml(t.request_number || '')}</span>
         </span>
       </div>
     </div>
@@ -750,7 +757,7 @@ function clScRenderChatHead() {
     </div>`;
 
   $('clScBack').addEventListener('click', () => {
-    $('clScGrid').classList.remove('chatting');
+    clScChatting(false);
   });
   $('clScRefresh').addEventListener('click', () => {
     clScOpen(clScOpenId);
@@ -762,6 +769,29 @@ function clScRenderChatHead() {
 
 function clScShowInfo(open) {
   $('clScInfo')?.classList.toggle('open', !!open);
+}
+
+/* Below 900px the grid shows ONE column at a time: opening a conversation
+   swaps the list out for the chat, and the back control swaps it in.
+
+   THE WHATSAPP FAB HAS TO BE TOLD SEPARATELY, and that is why this is a
+   function rather than three `classList.add` calls. The FAB is `position:fixed`
+   at the viewport's bottom-right while the composer scrolls with the page, so
+   there is a scroll offset where the two coincide — measured at 375x812, it
+   covered 43x44px of the 44x44px Send button and took the tap. No fixed offset
+   dodges a moving target, so it comes off while a conversation is open.
+
+   It cannot be reached from `.cl-sc-grid.chatting` with a descendant selector
+   because it is a SIBLING of `.cl-sc`, not a child — and it must stay there:
+   that section carries an entrance animation, and a retained `transform:none`
+   computes to the identity matrix, which makes it a containing block for
+   `position:fixed`. Moving the FAB inside is the bug that anchored all four
+   fixed children to the section instead of the viewport. So the state is
+   mirrored onto the FAB instead. WhatsApp is not lost while it is hidden —
+   the button in `.cl-sc-head-live` is in the same viewport. */
+function clScChatting(on) {
+  $('clScGrid')?.classList.toggle('chatting', on);
+  $('clScFab')?.classList.toggle('cl-sc-fab-away', on);
 }
 
 /* Put a resolved ticket back in the desk's queue. The button only exists when
@@ -880,6 +910,13 @@ function clScRenderLog({ dividerAfter = null } = {}) {
     const doc = claimDoc(m.message, mine);
     const pending = String(m.id).startsWith('pending-');
 
+    /* THE MESSAGE SITS IN ITS OWN `.cl-bubble-text`, AND THAT IS LOAD-BEARING.
+       A merchant's own line breaks have to survive, so the text renders
+       `pre-wrap` — but while `pre-wrap` sat on `.cl-bubble` itself it also
+       preserved the newlines and indentation of THIS template literal, which
+       are real text nodes inside that element. Every bubble carried four
+       phantom blank lines: a one-line "thanks" measured 175px, not 55. Keep
+       the message inside the span and the template's whitespace outside it. */
     block += `<div class="cl-sc-row ${mine ? 'out' : 'in'}${grouped ? ' grouped' : ''}">
       <span class="cl-sc-av ${mine ? 'me' : 'desk'}" aria-hidden="true">${
         grouped ? '' : mine ? escapeHtml(me) : clIco('headset', { size: 15 })}</span>
@@ -887,7 +924,8 @@ function clScRenderLog({ dividerAfter = null } = {}) {
         ${!grouped && !mine
           ? `<div class="cl-sc-who">${escapeHtml(m.sender_name || 'Partner desk')}</div>` : ''}
         <div class="cl-bubble ${mine ? 'out' : 'in'}">
-          ${doc ? clScBubbleFile(doc) : escapeHtml(m.message || '')}
+          ${doc ? clScBubbleFile(doc)
+            : `<span class="cl-bubble-text">${escapeHtml(m.message || '')}</span>`}
           <div class="cl-bubble-meta">
             ${escapeHtml(fmtTime(m.created_at))}
             ${mine ? (pending ? clScReceipt('sending') : i === lastMine
@@ -907,7 +945,7 @@ function clScRenderLog({ dividerAfter = null } = {}) {
     <div class="cl-sc-row out failed">
       <span class="cl-sc-av me" aria-hidden="true">${escapeHtml(me)}</span>
       <div class="cl-sc-bub-wrap">
-        <div class="cl-bubble out">${escapeHtml(f.text)}
+        <div class="cl-bubble out"><span class="cl-bubble-text">${escapeHtml(f.text)}</span>
           <div class="cl-bubble-meta">Not sent</div>
         </div>
         <div class="cl-sc-retry">
@@ -1029,7 +1067,18 @@ function clScBindBubbleFiles(root) {
     const doc = find(box.dataset.clThumb);
     if (!doc) return;
     const paint = url => {
-      if (box.isConnected) box.innerHTML = `<img src="${url}" alt="${escapeHtml(doc.filename)}">`;
+      if (!box.isConnected) return;
+      /* BYTES THAT ARRIVE ARE NOT NECESSARILY BYTES THAT DECODE — a truncated
+         upload, or a file whose content type is not what it turned out to be.
+         Only the fetch was guarded, so those left a broken-image glyph and a
+         clipped filename sitting in the 4:3 box. The typed icon is already the
+         fallback for a failed fetch; give a failed decode the same one. */
+      const fallback = box.innerHTML;
+      const img = document.createElement('img');
+      img.alt = doc.filename;
+      img.addEventListener('error', () => { box.innerHTML = fallback; });
+      box.replaceChildren(img);
+      img.src = url;
     };
     if (clScThumbs.has(doc.id)) return paint(clScThumbs.get(doc.id));
     try {
@@ -1139,7 +1188,7 @@ function clScRenderFoot() {
 
     <div class="cl-sc-compose" id="clScCompose">
       <button type="button" class="cl-sc-cbtn" id="clScClip" aria-label="Attach a file">
-        ${clIco('paperclip', { size: 18 })}
+        ${clIco('paperclip', { size: 21 })}
       </button>
       <button type="button" class="cl-sc-cbtn" id="clScEmojiBtn" aria-label="Insert an emoji"
               aria-haspopup="true" aria-expanded="false">☺</button>
@@ -1147,7 +1196,7 @@ function clScRenderFoot() {
       <label class="cl-sr" for="clScInput">Your message</label>
       <textarea id="clScInput" rows="1" placeholder="Write a message…"></textarea>
       <button type="button" class="cl-sc-send" id="clScSend" disabled aria-label="Send message">
-        ${clIco('send', { size: 18 })}
+        ${clIco('send', { size: 21 })}
       </button>
       <input type="file" id="clScFileInput" multiple class="cl-sr"
              accept=".pdf,.jpg,.jpeg,.png,.webp">
@@ -1841,7 +1890,7 @@ async function clScSubmitDrawer() {
     clScAdopt(data);
     clScFailed = [];
     clScBookingFor = null;
-    $('clScGrid').classList.add('chatting');
+    clScChatting(true);
     clScRenderChatHead();
     clScRenderLog();
     clScRenderFoot();

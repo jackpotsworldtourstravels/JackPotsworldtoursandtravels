@@ -2139,7 +2139,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 
 .cl-sc-log-wrap{position:relative; flex:1; min-height:0; display:flex;}
 .cl-sc-log{
-  flex:1; overflow-y:auto; padding:18px 20px;
+  flex:1; overflow-y:auto; padding:12px 18px 14px;
   display:flex; flex-direction:column; min-height:0;
   background:
     radial-gradient(620px 320px at 20% 0%, var(--cl-canvas-2) 0%, transparent 70%),
@@ -2162,11 +2162,14 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 :root[data-theme="dark"] .cl-sc-jump{background:var(--cl-navy-500);}
 
 .cl-sc-day{
-  align-self:center; margin:12px 0 10px;
-  padding:4px 13px; border-radius:var(--cl-r-pill);
-  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+  align-self:center; margin:10px 0 6px;
+  padding:3px 12px; border-radius:var(--cl-r-pill);
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
   color:var(--cl-text-muted); background:var(--cl-canvas-2);
 }
+/* The first thing in the log is a day pill, and it does not need to be pushed
+   off the top border it is already sitting against. */
+.cl-sc-day:first-child{margin-top:2px;}
 /* The unread divider. A rule the width of the log with the label sitting in it,
    in the accent — it is a shape carrying a word, and the word is on the canvas
    rather than on the accent, so the bright tone is correct here. */
@@ -2180,25 +2183,43 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 :root[data-theme="dark"] .cl-sc-newline{color:#FFB08A;}
 
-/* A message: avatar, then the bubble stack. Reversed for the merchant's own. */
-.cl-sc-row{display:flex; align-items:flex-end; gap:9px; margin-top:8px; min-width:0;}
+/* A message: avatar, then the bubble stack. Reversed for the merchant's own.
+   The two margins ARE the grouping: 6px says "the other side is answering",
+   2px says "the same person is still talking". Widen the first and a short
+   exchange stops reading as one conversation. */
+.cl-sc-row{display:flex; align-items:flex-end; gap:8px; margin-top:6px; min-width:0;}
 .cl-sc-row.out{flex-direction:row-reverse;}
 .cl-sc-row.grouped{margin-top:2px;}
 /* A grouped run keeps the indent but drops the repeated avatar. */
 .cl-sc-row.grouped .cl-sc-av{visibility:hidden;}
-.cl-sc-bub-wrap{display:flex; flex-direction:column; min-width:0; max-width:min(78%, 560px);}
+/* `align-items` is what keeps a bubble the width of its own words. Left at the
+   default `stretch`, every bubble under a sender name grew to the width of
+   that name — "PRIYA R. RAGHAVAN" made a one-word reply 117px wide. */
+.cl-sc-bub-wrap{
+  display:flex; flex-direction:column; align-items:flex-start;
+  min-width:0; max-width:min(78%, 560px);
+}
 .cl-sc-row.out .cl-sc-bub-wrap{align-items:flex-end;}
 .cl-sc-who{
-  font-size:10px; font-weight:800; margin:0 0 3px 3px;
+  font-size:9.5px; font-weight:800; line-height:1.3; margin:0 0 2px 3px;
   text-transform:uppercase; letter-spacing:0.06em; color:var(--cl-text-muted);
 }
 
 .cl-bubble{
-  max-width:100%; padding:10px 14px;
-  border-radius:16px; font-size:13.5px; line-height:1.6; font-weight:500;
-  word-break:break-word; overflow-wrap:anywhere; white-space:pre-wrap;
+  max-width:100%; padding:7px 12px 5px;
+  border-radius:15px; font-size:13.5px; line-height:1.45; font-weight:500;
+  word-break:break-word; overflow-wrap:anywhere;
   animation:cl-bubble-in .26s var(--cl-ease) both;
 }
+/* `pre-wrap` BELONGS HERE AND NOT ON `.cl-bubble` — do not move it up.
+   A merchant's own line breaks have to survive, but the bubble element also
+   contains the newlines and indentation of the template literal in
+   clScRenderLog, and pre-wrap preserved those too: four phantom blank lines in
+   every bubble, a one-line "thanks" measuring 175px instead of 55, and the
+   whole transcript reading as a column of near-empty boxes. This span holds
+   the message and nothing else, so only the merchant's own whitespace is
+   inside a pre-wrap context. */
+.cl-bubble-text{white-space:pre-wrap;}
 .cl-bubble.out{
   background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
   color:#fff; border-bottom-right-radius:5px; box-shadow:var(--cl-sh-accent);
@@ -2208,15 +2229,28 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 .cl-sc-row.grouped .cl-bubble.out{border-top-right-radius:6px;}
 .cl-sc-row.grouped .cl-bubble.in{border-top-left-radius:6px;}
+/* The time and its receipt sit on ONE short line under the message, on the
+   same baseline as each other — small enough to be furniture, large enough to
+   read. `line-height:1` stops the row claiming a full text line of its own. */
 .cl-bubble-meta{
-  display:flex; align-items:center; gap:5px; justify-content:flex-end;
-  margin-top:4px; font-size:10px; font-weight:600; opacity:.92;
+  display:flex; align-items:center; gap:4px; justify-content:flex-end;
+  margin-top:1px; font-size:9.5px; line-height:1; font-weight:600;
 }
+/* NO OPACITY ON THIS ROW. Messaging apps fade the timestamp, and at 10px on a
+   .92 alpha this one measured 3.8:1 against the top of the accent gradient.
+   The two colours it sits on — `--cl-orange-cta-2` at the gradient's foot and
+   `--cl-text-muted` on the canvas — were both contrast-checked at full
+   strength, so the way to make a 9.5px timestamp recede is the size and the
+   weight it already has, not a veil over a measured pair. */
 .cl-bubble.in .cl-bubble-meta{justify-content:flex-start; color:var(--cl-text-muted);}
-.cl-seen{width:14px; height:14px;}
+.cl-seen{width:12.5px; height:12.5px; opacity:.72;}
 /* Delivered is the same tick at reading weight; read brightens it. On the
    orange bubble both are white, so the DIFFERENCE is the second tick and the
-   opacity — never colour alone. */
+   opacity — never colour alone.
+   THE FADE HAS TO LIVE ON THE TICK, not on `.cl-bubble-meta`: an opacity on
+   the parent groups the whole row, and a child can never be more opaque than
+   its group. While the meta carried .92 this rule was a no-op and delivered
+   and read were pixel-identical apart from the second tick. */
 .cl-seen.read{opacity:1;}
 .cl-seen-wait{
   width:11px; height:11px; border-radius:50%;
@@ -2227,7 +2261,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 /* Typing indicator — three dots on the same shape as a real bubble. */
 .cl-typing{
   display:inline-flex; align-items:center; gap:4px;
-  padding:13px 16px; border-radius:16px; border-bottom-left-radius:5px;
+  padding:11px 15px; border-radius:15px; border-bottom-left-radius:5px;
   background:var(--cl-canvas-2);
 }
 .cl-typing i{
@@ -2323,9 +2357,9 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   padding:13px 15px; border-radius:var(--cl-r-lg); line-height:1.5; font-size:13.5px;
 }
 .cl-sc-cbtn{
-  width:38px; height:38px; flex-shrink:0; margin-bottom:4px; border-radius:var(--cl-r-sm);
+  width:42px; height:42px; flex-shrink:0; margin-bottom:2px; border-radius:var(--cl-r-sm);
   display:flex; align-items:center; justify-content:center;
-  font-size:18px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
+  font-size:21px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
   transition:background var(--cl-fast), color var(--cl-fast);
 }
 .cl-sc-cbtn:hover{background:var(--cl-hover); color:var(--cl-text);}
@@ -2338,13 +2372,13 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   width:7px; height:7px; border-radius:50%; background:var(--cl-orange);
 }
 .cl-sc-send{
-  width:46px; height:46px; flex-shrink:0; border-radius:var(--cl-r-lg);
+  width:50px; height:50px; flex-shrink:0; border-radius:var(--cl-r-lg);
   display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff;
   background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
   box-shadow:var(--cl-sh-accent);
   transition:transform var(--cl-fast), filter var(--cl-fast);
 }
-.cl-sc-send svg{width:18px; height:18px;}
+.cl-sc-send svg{width:21px; height:21px;}
 .cl-sc-send:hover:not(:disabled){transform:translateY(-1px) scale(1.04);}
 .cl-sc-send:disabled{opacity:.42; cursor:not-allowed; box-shadow:none;}
 
@@ -2759,6 +2793,13 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
      and the chat is full width. */
   .cl-sc-fab{left:auto; right:16px; bottom:16px; padding:13px;}
   .cl-sc-fab span{display:none;}
+  /* AND IT COMES OFF ENTIRELY WHILE A CONVERSATION IS OPEN. Shrinking it to an
+     icon was not enough: it is fixed to the viewport's bottom-right and the
+     composer scrolls with the page, so at 375x812 there is a scroll offset
+     where it covered 43x44px of the 44x44px Send button and swallowed the tap.
+     The class is set in clScChatting() — see the note there for why this
+     cannot be a descendant of `.cl-sc-grid.chatting`. */
+  .cl-sc-fab.cl-sc-fab-away{display:none;}
 }
 
 @media (max-width:640px){
@@ -2774,6 +2815,16 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
      the top of the page, and at this width it was being sliced mid-word by the
      header's own truncation rather than dropped cleanly. */
   .cl-sc-chat-id .cl-presence{display:none;}
+  /* …and its separator with it, or the ticket number is left behind a dot
+     that no longer separates anything. */
+  .cl-sc-chat-id .cl-presence + .cl-sc-dot{display:none;}
+  /* AND THE STATUS TAG GOES TOO. It is 104px of a 352px header — with the back
+     button and the two tools beside it, the identity block was left 74px and
+     the operator's name rendered as "Pri…" with the ticket number ellipsed
+     away entirely. Every conversation card in the list behind this carries the
+     same status, and a resolved thread says so in place of the composer, so
+     nothing is only knowable from here. */
+  .cl-sc-chat-tools > .cl-tag{display:none;}
   .cl-sc-head h1{font-size:21px;}
   .cl-sc-head-live{width:100%;}
   .cl-sc-head-live .cl-btn{flex:1 1 auto; justify-content:center;}
@@ -2785,6 +2836,19 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-sc-quick-k{display:none;}
   .cl-sc-drawer{width:100vw;}
   .cl-sc-hint span:last-child{display:none;}
+  /* THE COMPOSER'S CHROME IS SIZED FOR A DESKTOP POINTER AND HAS TO GIVE WIDTH
+     BACK HERE. Two 42px buttons, a 50px send and three 8px gaps is 158px of a
+     324px row, which left the box 166px — and the box is 16px here (anything
+     smaller makes iOS zoom on focus), so "Write a message…" wrapped to a
+     second line and was clipped by the 46px min-height. These numbers leave it
+     190px, which fits the placeholder on one line. */
+  .cl-sc-compose{gap:6px; padding:10px 12px 8px;}
+  .cl-sc-cbtn{width:36px; height:36px; font-size:19px;}
+  .cl-sc-cbtn svg{width:19px; height:19px;}
+  .cl-sc-send{width:44px; height:44px;}
+  .cl-sc-send svg{width:19px; height:19px;}
+  /* 16px text on a 1.5 line-height inside 13px padding needs 50, not 46. */
+  .cl-sc-compose textarea{min-height:50px; padding:12px 13px;}
 }
 
 
