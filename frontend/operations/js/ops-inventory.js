@@ -50,20 +50,40 @@ function opsInitTravel(section) {
   const host = $(`ops-${section}`);
   const noun = OPS_TITLES[section];
 
+  /* One line for every role now that the inventory tab is off. The old copy
+     branched on ticket.enquiry to promise a live search to merchants and to
+     explain its absence to staff in permission jargon; with nothing able to
+     author a catalog row, both halves described something the screen does not
+     do. Kept as a JS comment above the template rather than an HTML one inside
+     it: a backtick in a comment nested in a template literal still closes the
+     literal, which took this whole file out of the parse. */
   host.innerHTML = `
     <div class="ops-page-head">
       <div>
         <h1>${escapeHtml(noun)}</h1>
-        <p>${escapeHtml(opsCan('ticket.enquiry')
-          ? `Search live ${travelType} inventory at contracted fares, or review every ${travelType} booking on file.`
-          : `Every ${travelType} booking on file. Inventory search requires the ticket.enquiry permission, which platform staff accounts do not hold.`)}</p>
+        <p>${escapeHtml(`Every ${travelType} booking on file.`)}</p>
       </div>
     </div>
     <div id="ops-${section}-tabs"></div>`;
 
   OpsTabs($(`ops-${section}-tabs`), [
     {
-      id: 'inventory', label: 'Inventory search', when: opsCan('ticket.enquiry'),
+      /* OFF UNTIL SOMETHING CAN AUTHOR INVENTORY — `when: false`, not a
+         permission change. This tab renders /api/catalog/search, which reads
+         service_requests with `request_type='catalog_item' AND
+         status=approved`. NOTHING IN THE PRODUCT CREATES ONE: every other
+         reference to RequestType.CATALOG_ITEM in the backend is an exclusion
+         filter (`!= CATALOG_ITEM`), and the module that would author them,
+         `catalog_management`, is still listed in main.py's PENDING_MODULES as
+         deliberately deferred. So it could only ever show "no results".
+
+         Staff never saw it anyway — the search 403s for them, because
+         `ticket.enquiry` is a merchant code (rbac._ADMIN has no enquiry). It
+         was merchant sub-roles that got an always-empty tab.
+
+         Restore by putting `opsCan('ticket.enquiry')` back here; opsInventoryGrid
+         and every column definition below are untouched and still referenced. */
+      id: 'inventory', label: 'Inventory search', when: false,
       render: body => opsInventoryGrid(body, travelType),
     },
     {

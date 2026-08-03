@@ -338,6 +338,12 @@ const OPS_NAV = [
   { group: 'Overview', items: [
     { id: 'dashboard', label: 'Dashboard', icon: '▦', desks: ['ticketing', 'finance', 'support', 'admin'] },
   ]},
+  /* These four stay in the rail. Each is TWO views (see ops-inventory.js): a
+     catalog "Inventory search" that nothing can populate, and a per-type
+     "Bookings" register over /api/requests that is real, live data — 8852
+     flight rows on the dev database alone. `ticket.view` in `any` below is
+     what carries the register, so the entry is never dead even for an account
+     that cannot search inventory. Only the search TAB is gated away. */
   { group: 'Inventory', items: [
     { id: 'flights', label: 'Flights', icon: '✈', any: ['ticket.enquiry', 'ticket.view'], desks: ['ticketing'] },
     { id: 'hotels', label: 'Hotels', icon: '⌂', any: ['ticket.enquiry', 'ticket.view'], desks: ['ticketing'] },
@@ -919,14 +925,15 @@ async function opsRunGlobalSearch(term) {
         go: () => opsGo('users'),
       })));
   }
-  if (opsCan('ticket.enquiry')) {
-    push('Inventory', OpsApi.searchCatalog({ q, page_size: 6 }), d =>
-      (d.items || []).map(i => ({
-        key: i.travel_type ? opsLabel(i.travel_type) : 'Item',
-        text: [i.title, fmtDate(i.travel_date), money(i.total_amount)].filter(Boolean).join(' · '),
-        go: () => opsGo(`${i.travel_type || 'flight'}s`),
-      })));
-  }
+  /* THE INVENTORY LEG IS GONE with the inventory search tab it fed (see
+     ops-inventory.js). It hit the same /api/catalog/search that nothing can
+     populate, so it could only ever return zero rows — and `if (rows.length)`
+     below meant the group never rendered even then, making it a wasted request
+     on every keystroke for anyone holding `ticket.enquiry`. Restore it beside
+     that tab's `when` when catalog_management ships.
+
+     The Flights/Hotels/Cruises/Packages RAIL ENTRIES are untouched and still
+     carry their bookings register — only the catalog search went. */
   /* The phone fallback described above. */
   if (opsIsPhoneish(q) && opsCan('merchant_user.manage')) {
     push('Contacts (phone match, most recent 100 accounts)',

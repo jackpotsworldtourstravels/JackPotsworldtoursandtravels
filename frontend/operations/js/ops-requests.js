@@ -1606,5 +1606,12 @@ function opsRequestSubmitted(requestNumber) {
       </div>
     </div></div>`;
   $('opsRsList').addEventListener('click', () => { opsForm = null; opsInvalidate('new-request'); opsGo('bookings'); });
-  $('opsRsNew').addEventListener('click', () => { opsForm = null; opsInvalidate('new-request'); opsGo('flights'); });
+  /* Straight back to the form. "Raise another" routed through `flights` so the
+     agent could pick a priced item first, but that picker is the catalog
+     Inventory tab, which is off while nothing can author a catalog row (see
+     ops-inventory.js) — so `flights` now opens its bookings register, and
+     sending someone there to start a new request is a detour through a list of
+     old ones. Every other "New" control in this portal already goes to
+     `new-request` directly; this now matches them. */
+  $('opsRsNew').addEventListener('click', () => { opsForm = null; opsInvalidate('new-request'); opsGo('new-request'); });
 }
