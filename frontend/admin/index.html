@@ -16,7 +16,7 @@
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui6">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui7">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -935,7 +935,7 @@
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260803ui6"></script>
+<script src="../assets/js/jp-login.js?v=20260803ui7"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -950,6 +950,9 @@
       remember: 'adminRemember', msg: 'adminLoginMsg',
       otp: 'adminOtp', otpSub: 'adminAuthStep2Sub', otpMsg: 'adminAuthStep2Msg',
       verify: 'adminVerifyOtpBtn', resend: 'adminResendOtpBtn', back: 'adminBackToCredsBtn',
+      /* Carried into the Forgot Password link so that screen wears the Admin
+         name and returns here — one flow, not two unrelated pages. */
+      portalKey: 'admin',
     },
   });
 </script>

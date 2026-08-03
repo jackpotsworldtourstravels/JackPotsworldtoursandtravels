@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/jp-login.css?v=20260803ui6">
+<link rel="stylesheet" href="assets/css/jp-login.css?v=20260803ui7">
 
 <!-- =========================================================================
      MERCHANT (B2B) LOGIN — the only door "My Partner" opens.
@@ -46,7 +46,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="assets/js/auth.js?v=20260803ui6"></script>
-<script src="assets/js/jp-login.js?v=20260803ui6"></script>
+<script src="assets/js/jp-login.js?v=20260803ui7"></script>
 <script>
 'use strict';
 
@@ -59,6 +59,9 @@ const PL_IDS = {
   form: 'plForm', email: 'plUser', password: 'plPass', remember: 'plRemember',
   msg: 'plMsg', otp: 'plOtp', otpSub: 'plOtpSub', otpMsg: 'plOtpMsg',
   verify: 'plVerify', resend: 'plResend', back: 'plBack',
+  /* Carried into the Forgot Password link so that screen wears the same portal
+     name and returns here — one flow, not three unrelated pages. */
+  portalKey: 'merchant',
 };
 
 jpLoginMount('merchantAuthShell', {
@@ -78,28 +81,14 @@ function plMsg(el, text, kind) {
   el.textContent = text || '';
   el.className = `msg${text ? ` ${kind || ''}` : ''}`.trim();
 }
-function plErr(err, fallback) {
-  /* 429 first, and by STATUS rather than by body. /api/auth/login is rate
-     limited per IP, and the limiter's payload is not the {detail: "..."} shape
-     the API uses everywhere else — so it fell through to the generic fallback
-     and told a partner to "check your details" when their details were fine
-     and the only cure was waiting. A shared office IP hits this on ordinary
-     use, not just under test. */
-  if (err?.response?.status === 429) {
-    return 'Too many sign-in attempts from this network. Wait a minute and try again.';
-  }
-  const d = err?.response?.data?.detail;
-  if (typeof d === 'string') return d;
-  if (Array.isArray(d) && d[0]?.msg) return d[0].msg;
-  return fallback;
-}
+/* jpAuthError (jp-login.js) is shared with Forgot and Reset — including the
+   429-by-status rule, which every one of those endpoints needs. */
+const plErr = jpAuthError;
 
-/* Same class contract the Admin and Super Admin auth modules use, so the CSS
-   that switches these two panes is the same rule for all three portals. */
+/* jpAuthStep is the same pane switch every other auth screen uses, so one CSS
+   rule drives Login, Forgot and Reset across all three portals. */
 function plStep(which) {
-  document.querySelectorAll('#merchantAuthShell .auth-step')
-    .forEach(s => s.classList.remove('active'));
-  $(which === 'otp' ? PL_IDS.step2 : PL_IDS.step1).classList.add('active');
+  jpAuthStep('merchantAuthShell', which === 'otp' ? PL_IDS.step2 : PL_IDS.step1);
   if (which === 'otp') { $(PL_IDS.otp).value = ''; $(PL_IDS.otp).focus(); }
 }
 
