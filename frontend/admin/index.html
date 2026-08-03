@@ -8,11 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260802ui13">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260803ui5">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260802ui13">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui5">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -786,6 +786,57 @@
       </div>
       <button type="button" class="profile-header-close" id="supportChatCloseBtn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
+    <!-- ===================================================================
+         THE DESK'S CONTROLS — the ones the merchant stopped carrying.
+         ===================================================================
+         The Merchant Portal used to ask the merchant to choose a category and
+         a priority before they could describe their problem. Those pickers were
+         removed from that screen and land here, where the people who know the
+         answer are. Nothing new was needed server-side: PATCH .../triage,
+         POST .../notes, /claim and /resolve have all existed since the Support
+         Center shipped — /triage and /notes simply had no UI.
+
+         Rendered collapsed so a reply is still the first thing in reach. -->
+    <details class="sc-triage" id="supportTriageWrap">
+      <summary>Ticket handling</summary>
+      <div class="sc-triage-grid">
+        <label for="supportTriageCategory">Category</label>
+        <select id="supportTriageCategory">
+          <option value="">Not categorised</option>
+          <option value="booking">Booking</option>
+          <option value="payment">Payment</option>
+          <option value="wallet">Wallet</option>
+          <option value="refund">Refund</option>
+          <option value="ticket_issue">Ticket Issue</option>
+          <option value="account">Account</option>
+          <option value="technical">Technical</option>
+          <option value="other">Other</option>
+        </select>
+
+        <label for="supportTriagePriority">Priority</label>
+        <select id="supportTriagePriority">
+          <option value="low">Low</option>
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
+
+        <span></span>
+        <button type="button" class="btn btn-navy btn-sm" id="supportTriageSaveBtn">Save filing</button>
+
+        <label for="supportNoteInput">Internal note</label>
+        <div class="sc-note-row">
+          <input type="text" id="supportNoteInput" maxlength="2000"
+                 placeholder="Only the desk sees this — never the merchant." autocomplete="off">
+          <button type="button" class="btn btn-ghost btn-sm" id="supportNoteAddBtn">Add</button>
+        </div>
+
+        <label>Notes</label>
+        <div id="supportNotesList" class="sc-notes"></div>
+      </div>
+      <div class="sc-triage-msg" id="supportTriageMsg"></div>
+    </details>
+
     <div class="drawer-body" id="supportChatMessages"></div>
     <div class="drawer-footer">
       <form id="supportChatReplyForm" style="display:flex; gap:8px; width:100%; flex-wrap:wrap;">
@@ -793,6 +844,7 @@
         <button type="submit" class="btn btn-coral btn-sm">Send</button>
         <button type="button" class="btn btn-navy btn-sm" id="supportChatClaimBtn" style="display:none;">Claim</button>
         <button type="button" class="btn btn-ghost btn-sm" id="supportChatResolveBtn" style="display:none;">Resolve &amp; Close</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="supportChatReopenBtn" style="display:none;">Reopen</button>
       </form>
     </div>
   </div>
@@ -891,43 +943,43 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260802ui13"></script>
-<script src="../components/toast.js?v=20260802ui13"></script>
-<script src="../components/spinner.js?v=20260802ui13"></script>
-<script src="../components/confirm-dialog.js?v=20260802ui13"></script>
-<script src="../components/focus-trap.js?v=20260802ui13"></script>
-<script src="../assets/js/auth.js?v=20260802ui13"></script>
+<script src="../shared/formatters.js?v=20260803ui5"></script>
+<script src="../components/toast.js?v=20260803ui5"></script>
+<script src="../components/spinner.js?v=20260803ui5"></script>
+<script src="../components/confirm-dialog.js?v=20260803ui5"></script>
+<script src="../components/focus-trap.js?v=20260803ui5"></script>
+<script src="../assets/js/auth.js?v=20260803ui5"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260802ui13"></script>
+<script src="../assets/js/admin.js?v=20260803ui5"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260803ui5"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-bookings.js?v=20260803ui2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260803ui5"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260803ui2"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260803ui5"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260803ui5"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-analytics.js?v=20260803ui5"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260802ui13"></script>
-<script src="../assets/js/admin-logs.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-providers.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-logs.js?v=20260803ui5"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260802ui13"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260803ui5"></script>
 </body>
 </html>

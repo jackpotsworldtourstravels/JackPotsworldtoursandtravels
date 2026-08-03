@@ -83,69 +83,18 @@ const CL_FILE_MAX_MB = 15;
    that explains it rather than after the upload. */
 const CL_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
-/* The server's eight categories (chat_service.CATEGORIES). Anything else is a
-   400, so this list drives every picker rather than free text. */
-const CL_CATEGORIES = [
-  ['booking', 'Booking'],
-  ['payment', 'Payment'],
-  ['wallet', 'Wallet'],
-  ['refund', 'Refund'],
-  ['ticket_issue', 'Ticket Issue'],
-  ['account', 'Account'],
-  ['technical', 'Technical'],
-  ['other', 'Other'],
-];
-const CL_CATEGORY_LABEL = Object.fromEntries(CL_CATEGORIES);
+/* Priority is READ here, never set. The merchant no longer states one when
+   opening a conversation and cannot change it afterwards: the desk owns it
+   through PATCH /api/support/threads/{id}/triage. This map is only how the
+   value the desk chose is coloured in the details panel.
 
-/* An opening assessment, not a promise. The desk re-files priority through
-   /triage, which is why it is not editable here after the fact. */
-const CL_PRIORITIES = [
-  ['low', 'Low'],
-  ['normal', 'Normal'],
-  ['high', 'High'],
-  ['urgent', 'Urgent'],
-];
+   THE CATEGORY AND PRIORITY PICKERS THAT USED TO LIVE HERE ARE GONE, along
+   with the keyword table that pre-filled them. Filing a ticket is the desk's
+   job — a merchant chasing a passenger at a counter should be typing, not
+   deciding between "Booking" and "Ticket Issue". Category labels shown on this
+   screen come from the server as `category_label` on the thread, so nothing
+   here has to keep a copy of the eight values in step with chat_service. */
 const CL_PRIORITY_TONE = { low: 'ok', normal: 'info', high: 'warn', urgent: 'err' };
-
-/* Quick-reply topics. Each chip drops an opening line into the composer and,
-   in the new-conversation drawer, files the ticket under the matching server
-   category — so a merchant who taps "Refund" never has to also find a dropdown.
-   `cat` is one of CL_CATEGORIES or null where the server has no equivalent
-   (reschedule and visa/passport are booking matters as far as the API is
-   concerned, and are mapped as such rather than invented). */
-const CL_SC_TOPICS = [
-  { key: 'booking', label: 'Booking', cat: 'booking', line: 'I have a question about a booking' },
-  { key: 'cancellation', label: 'Cancellation', cat: 'booking', line: 'I need to cancel a booking' },
-  { key: 'refund', label: 'Refund', cat: 'refund', line: 'I am following up on a refund' },
-  { key: 'reschedule', label: 'Reschedule', cat: 'booking', line: 'I need to change the travel date on a booking' },
-  { key: 'visa', label: 'Visa', cat: 'booking', line: 'I have a visa question' },
-  { key: 'passport', label: 'Passport', cat: 'booking', line: 'I have a passport question' },
-  { key: 'payment', label: 'Payment', cat: 'payment', line: 'I have a question about a payment' },
-  { key: 'wallet', label: 'Wallet', cat: 'wallet', line: 'I have a question about my wallet' },
-  { key: 'invoice', label: 'Invoice', cat: 'payment', line: 'I need an invoice' },
-  { key: 'ticket', label: 'Ticket issue', cat: 'ticket_issue', line: 'There is a problem with a ticket' },
-  { key: 'other', label: 'Other', cat: 'other', line: '' },
-];
-
-/* Keyword -> category, used to FILE a new conversation automatically so the
-   drawer can ask for a message and nothing else. It is a suggestion the
-   merchant can see and change, never a silent decision: the drawer prints
-   "Filed under X" with a change control beside it. Longest match wins, so
-   "ticket" does not beat "e-ticket not received" into the wrong desk. */
-const CL_SC_DETECT = [
-  ['refund', 'refund'], ['refunded', 'refund'], ['chargeback', 'refund'],
-  ['wallet', 'wallet'], ['top-up', 'wallet'], ['topup', 'wallet'], ['balance', 'wallet'],
-  ['invoice', 'payment'], ['payment', 'payment'], ['paid', 'payment'], ['utr', 'payment'],
-  ['transfer', 'payment'], ['gst', 'payment'],
-  ['e-ticket', 'ticket_issue'], ['eticket', 'ticket_issue'], ['pnr', 'ticket_issue'],
-  ['boarding pass', 'ticket_issue'], ['ticket not', 'ticket_issue'], ['wrong name', 'ticket_issue'],
-  ['cancel', 'booking'], ['reschedule', 'booking'], ['date change', 'booking'],
-  ['booking', 'booking'], ['passenger', 'booking'], ['visa', 'booking'],
-  ['passport', 'booking'], ['itinerary', 'booking'], ['enquiry', 'booking'],
-  ['password', 'account'], ['login', 'account'], ['access', 'account'], ['user', 'account'],
-  ['error', 'technical'], ['not loading', 'technical'], ['bug', 'technical'],
-  ['portal', 'technical'], ['crash', 'technical'],
-];
 
 /* --------------------------------------------------------------- state */
 
@@ -196,37 +145,31 @@ function clInitSupport() {
   $('cl-support').innerHTML = `
     <div class="cl-sc">
 
-      <!-- ================================================= immediate help -->
-      <!-- A BANNER, NOT A POPUP. The fastest channel for anything urgent is
-           the phone or WhatsApp, and a merchant should not have to discover
-           that by opening something. -->
-      <section class="cl-sc-banner" aria-label="Immediate help">
-        <span class="cl-sc-banner-ico">${clIco('whatsapp', { size: 27 })}</span>
-        <div class="cl-sc-banner-copy">
-          <b>Need immediate help?</b>
-          <p>Message us on WhatsApp or call the partner desk — for anything with a
-             passenger travelling inside 24 hours, always call.</p>
-          <div class="cl-sc-banner-num">
-            ${clIco('phone', { size: 14 })}
-            <span>WhatsApp <b>${escapeHtml(clScWaPretty())}</b></span>
-            <span class="cl-sc-dot"></span>
-            <span>Desk <b>${escapeHtml(CL_SUPPORT_PHONE)}</b></span>
-          </div>
-        </div>
-        <div class="cl-sc-banner-actions">
-          <a class="cl-btn cl-btn-wa" target="_blank" rel="noopener" id="clScWa"
-             href="${clScWaLink()}">${clIco('whatsapp', { size: 16 })} Chat on WhatsApp</a>
-          <a class="cl-btn cl-sc-btn-ghost" href="tel:${CL_SUPPORT_PHONE.replace(/\s/g, '')}">
-            ${clIco('phone', { size: 15 })} Call support
-          </a>
-        </div>
-      </section>
-
       <!-- ======================================================== header -->
+      <!-- ONE ROW ABOVE THE CHAT, not three.
+           This used to open with a full-width WhatsApp banner — icon, two lines
+           of copy, both numbers and two buttons — and then a page title, and
+           then a badge strip, before any conversation was visible. On a laptop
+           the message box was below the fold on a screen whose whole purpose is
+           to send a message.
+
+           The urgent channels are not lost, only made proportionate: WhatsApp
+           and the desk number are inline here, and the floating WhatsApp button
+           below follows the merchant down the page. The 24-hour advice moved
+           into the call link's tooltip, where it is read at the moment it
+           matters rather than every time the screen opens. -->
       <header class="cl-sc-head">
         <div class="cl-sc-head-copy">
           <h1>Support Center</h1>
           <p>Chat with our travel support team in real time.</p>
+        </div>
+        <div class="cl-sc-head-live">
+          <a class="cl-btn cl-btn-wa cl-btn-sm" target="_blank" rel="noopener" id="clScWa"
+             href="${clScWaLink()}">${clIco('whatsapp', { size: 15 })} WhatsApp</a>
+          <a class="cl-btn cl-btn-sm" href="tel:${CL_SUPPORT_PHONE.replace(/\s/g, '')}"
+             title="Travelling inside 24 hours? Always call.">
+            ${clIco('phone', { size: 14 })} ${escapeHtml(CL_SUPPORT_PHONE)}
+          </a>
         </div>
         <div class="cl-sc-badges" id="clScBadges">${clScBadges()}</div>
       </header>
@@ -241,7 +184,8 @@ function clInitSupport() {
               <b>Conversations</b>
               <span id="clScCount">&nbsp;</span>
             </div>
-            <button type="button" class="cl-btn cl-btn-primary cl-btn-sm" id="clScNew">
+            <button type="button" class="cl-btn cl-btn-primary cl-btn-sm" id="clScNew"
+              ${clActionAttrs('chat.create', CL_NO_CHAT)}>
               ${clIco('plus', { size: 14 })} New
             </button>
           </div>
@@ -252,16 +196,12 @@ function clInitSupport() {
               <input type="search" id="clScSearch" placeholder="Search conversations…"
                      autocomplete="off">
             </div>
-            <div class="cl-sc-tabs" id="clScTabs" role="tablist" aria-label="Filter by status">
-              <button type="button" class="active" data-cl-sc-tab="" role="tab"
-                      aria-selected="true">All</button>
-              <button type="button" data-cl-sc-tab="submitted" role="tab"
-                      aria-selected="false">Open</button>
-              <button type="button" data-cl-sc-tab="in_review" role="tab"
-                      aria-selected="false">Active</button>
-              <button type="button" data-cl-sc-tab="completed" role="tab"
-                      aria-selected="false">Resolved</button>
-            </div>
+            <!-- THE OPEN / ACTIVE / RESOLVED TABS ARE GONE. They asked the
+                 merchant to think in the desk's states before they had said
+                 anything, and a merchant with four conversations does not need
+                 to filter them. Each card still shows its own status, resolved
+                 threads still sort below live ones, and search still reaches
+                 the server across every thread. -->
           </div>
           <div class="cl-sc-convs" id="clScConvs"></div>
         </aside>
@@ -279,16 +219,16 @@ function clInitSupport() {
           <div class="cl-sc-foot" id="clScFoot"></div>
         </section>
 
-        <!-- ---- right: what we know about this ticket ---- -->
-        <aside class="cl-sc-col cl-sc-info" id="clScInfo" aria-label="Ticket information">
-          <div class="cl-sc-info-head">
-            <b>Details</b>
-            <button type="button" class="cl-sc-x" id="clScInfoClose" aria-label="Hide details">
-              ${clIco('x', { size: 16 })}
-            </button>
-          </div>
-          <div class="cl-sc-info-body" id="clScInfoBody"></div>
-        </aside>
+        <!-- THE THIRD COLUMN IS ADMIN-ONLY NOW.
+             It listed assigned team, handling operator, priority, category,
+             booking number, PNR, passenger and travel date — a case file. Most
+             of those are the DESK's working notes about the merchant's ticket,
+             and reading them back to the merchant is what made this screen feel
+             like a ticket system instead of a conversation. The Admin portal is
+             where that panel belongs and where the controls behind it live.
+
+             clScRenderInfo() is still called and simply no-ops without its
+             host, so nothing had to be unpicked from the render path. -->
       </div>
     </div>
 
@@ -389,7 +329,7 @@ function clScBindShell() {
     }, 320);
   });
 
-  $('clScTabs').querySelectorAll('[data-cl-sc-tab]').forEach(b =>
+  $('clScTabs')?.querySelectorAll('[data-cl-sc-tab]').forEach(b =>
     b.addEventListener('click', () => {
       clScTab = b.dataset.clScTab;
       $('clScTabs').querySelectorAll('button').forEach(x => {
@@ -400,9 +340,9 @@ function clScBindShell() {
       clScLoadThreads();
     }));
 
-  /* The details column is a slide-over below 1200px, where there is no room
-     for a third column. Above it, it is simply always there. */
-  $('clScInfoClose').addEventListener('click', () => clScShowInfo(false));
+  /* Optional chaining because the details column is admin-only and no longer
+     rendered here — see the note where it used to be. */
+  $('clScInfoClose')?.addEventListener('click', () => clScShowInfo(false));
 
   /* Auto-scroll only when the merchant is already at the newest message. If
      they have scrolled up to read something, a poll landing must not yank the
@@ -799,15 +739,14 @@ function clScRenderChatHead() {
     <div class="cl-sc-chat-tools">
       <span class="cl-tag cl-tag-${status.tone}">${escapeHtml(status.label)}</span>
       ${resolved && t.can_reopen
-        ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" id="clScReopen">
+        ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" id="clScReopen"
+             ${clActionAttrs('chat.create', CL_NO_CHAT)}>
              ${clIco('refresh', { size: 13 })} Reopen</button>` : ''}
       <button type="button" class="cl-btn cl-btn-sm" id="clScExport"
               title="Save this conversation as a PDF" aria-label="Save as PDF">
         ${clIco('download', { size: 14 })}</button>
       <button type="button" class="cl-btn cl-btn-sm" id="clScRefresh"
               aria-label="Refresh this conversation">${clIco('refresh', { size: 14 })}</button>
-      <button type="button" class="cl-btn cl-btn-sm cl-sc-info-btn" id="clScInfoOpen"
-              aria-label="Show ticket details">${clIco('info', { size: 14 })}</button>
     </div>`;
 
   $('clScBack').addEventListener('click', () => {
@@ -818,7 +757,6 @@ function clScRenderChatHead() {
     clScLoadThreads({ quiet: true });
   });
   $('clScExport').addEventListener('click', clScExportPdf);
-  $('clScInfoOpen').addEventListener('click', () => clScShowInfo(true));
   $('clScReopen')?.addEventListener('click', clScReopen);
 }
 
@@ -874,7 +812,8 @@ function clScRenderLog({ dividerAfter = null } = {}) {
       <p>${none
         ? 'Our travel team is here to assist you. Start your first conversation.'
         : 'Choose one from the list to read it, or start a new conversation.'}</p>
-      <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clScEmptyCta">
+      <button type="button" class="cl-btn cl-btn-primary cl-btn-lg" id="clScEmptyCta"
+        ${clActionAttrs('chat.create', CL_NO_CHAT)}>
         ${clIco('chat', { size: 16 })} Start conversation
       </button>
       <span class="cl-sc-empty-note">Typical first reply ${
@@ -1178,7 +1117,8 @@ function clScRenderFoot() {
           ? 'Reopen it to keep talking, or start a new conversation.'
           : 'It is past the reopening window — start a new conversation to continue.'}</span>
       </div>
-      <button type="button" class="cl-btn cl-btn-primary cl-btn-sm" id="clScClosedCta">
+      <button type="button" class="cl-btn cl-btn-primary cl-btn-sm" id="clScClosedCta"
+        ${clActionAttrs('chat.create', CL_NO_CHAT)}>
         ${clScThread.can_reopen ? 'Reopen' : 'New conversation'}
       </button>
     </div>`;
@@ -1187,16 +1127,13 @@ function clScRenderFoot() {
     return;
   }
 
+  /* THE QUICK-TOPICS ROW IS GONE from above the composer. It sat between the
+     transcript and the message box on every open conversation, which is not
+     something any messaging app the merchant already uses puts there — and its
+     chips only pasted an opening line, which is worth less than the vertical
+     space it cost on a laptop. The message box now sits directly under the
+     last message, which is what makes this read as a chat. */
   foot.innerHTML = `
-    <div class="cl-sc-quick" role="group" aria-label="Quick topics">
-      <span class="cl-sc-quick-k">Quick topics</span>
-      <div class="cl-sc-quick-row">
-        ${CL_SC_TOPICS.filter(t => t.line).map(t =>
-          `<button type="button" class="cl-sc-chip" data-cl-sc-topic="${t.key}">${
-            escapeHtml(t.label)}</button>`).join('')}
-      </div>
-    </div>
-
     <ul class="cl-files" id="clScFileList"></ul>
     <div class="cl-msg" id="clScFileMsg"></div>
 
@@ -1230,6 +1167,23 @@ function clScBindComposer() {
   const send = $('clScSend');
   const compose = $('clScCompose');
 
+  /* A role that may not write to the desk still READS every thread — chat.view
+     is in the merchant read floor (rbac.py) — so the conversation, the details
+     column and the whole layout are unchanged and only the composer is inert.
+     Disabling the textarea is enough for the send button: clScUploadState()
+     already derives `send.disabled` from `box.disabled`. */
+  if (!clCan('chat.create')) {
+    box.disabled = true;
+    box.placeholder = CL_NO_CHAT;
+    box.title = CL_NO_CHAT;
+    [$('clScClip'), $('clScEmojiBtn')].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+      btn.title = CL_NO_CHAT;
+    });
+  }
+
   /* Grow to fit, up to the CSS max-height. A one-line box for a paragraph of
      detail is how a support message ends up being three separate messages. */
   box.addEventListener('input', () => {
@@ -1242,20 +1196,6 @@ function clScBindComposer() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); clScSend(); }
   });
   send.addEventListener('click', clScSend);
-
-  /* Quick topics drop an opening line in rather than sending on their own —
-     a chip that fires a bare word at the desk starts a conversation nobody can
-     answer. The caret lands at the end so the merchant carries straight on. */
-  $('clScFoot').querySelectorAll('[data-cl-sc-topic]').forEach(b =>
-    b.addEventListener('click', () => {
-      const topic = CL_SC_TOPICS.find(t => t.key === b.dataset.clScTopic);
-      if (!topic) return;
-      const current = box.value.trim();
-      box.value = current ? `${current}\n${topic.line} — ` : `${topic.line} — `;
-      box.focus();
-      box.selectionStart = box.selectionEnd = box.value.length;
-      box.dispatchEvent(new Event('input'));
-    }));
 
   /* One file queue, two ways in. */
   const input = $('clScFileInput');
@@ -1462,6 +1402,16 @@ function clFileSize(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+/* WHERE THE FILE QUEUE IS CURRENTLY DRAWN.
+   The composer owns these ids. The "start a conversation" drawer offers the
+   same optional attachment before a thread exists, and borrows the same queue
+   rather than growing a second copy of the validation, the thumbnails and the
+   remove button. Only one of the two is ever open, so one queue is enough —
+   `clScOpenDrawer` points this at its own ids and `clScCloseDrawer` puts it
+   back. Without the indirection both would answer to getElementById and the
+   composer's list, being first in the document, would win. */
+let clScFileIds = { list: 'clScFileList', msg: 'clScFileMsg' };
+
 /* Validation happens here rather than only on `accept`, which is a hint a user
    can walk straight past in the file dialog. The server still checks the BYTES,
    so a .exe renamed to .pdf passes this and is refused there — that is the
@@ -1485,13 +1435,13 @@ function clScAddFiles(files) {
     });
   });
 
-  clMsg($('clScFileMsg'), rejected.join('. '), rejected.length ? 'err' : '');
+  clMsg($(clScFileIds.msg), rejected.join('. '), rejected.length ? 'err' : '');
   clScRenderFiles();
   clScUploadState();
 }
 
 function clScRenderFiles() {
-  const list = $('clScFileList');
+  const list = $(clScFileIds.list);
   if (!list) return;
   if (!clScFiles.length) { list.innerHTML = ''; return; }
 
@@ -1528,6 +1478,15 @@ function clScRenderFiles() {
 /* What the composer says about the queue. A queued file is worth sending on its
    own, so an empty box no longer means there is nothing to send. */
 function clScUploadState() {
+  /* The drawer's own send button, when the queue is being filled before any
+     thread exists. A message is still required to OPEN a conversation — an
+     attachment with no words gives the desk a file and no question. */
+  const drawerGo = $('clScDrawerGo');
+  if (drawerGo) {
+    const typed = ($('clScNewMsg')?.value || '').trim();
+    drawerGo.disabled = !typed;
+  }
+
   const box = $('clScInput');
   const send = $('clScSend');
   const clip = $('clScClip');
@@ -1718,9 +1677,35 @@ function clScBindHelp() {
    message is required here; the subject and the booking are optional, and the
    category and priority are WORKED OUT from what was typed and shown as a
    sentence the merchant can correct. */
+/* ===========================================================================
+   START A CONVERSATION — a message box, an optional attachment, and Send.
+   ===========================================================================
+   WHAT WAS TAKEN OUT, AND WHY.
+   This drawer used to ask a merchant to file their own ticket before they had
+   said what was wrong: quick-topic chips, a category picker seeded by keyword
+   detection, a priority picker, a subject line and a booking reference. Every
+   one of those is a decision about ROUTING, and routing is the desk's job. A
+   merchant with a passenger stuck at a counter should be typing, not choosing
+   between "Ticket issue" and "Booking".
+
+   None of it is lost — it MOVED. Category and priority are set by the desk
+   through PATCH /api/support/threads/{id}/triage, which the Admin portal now
+   exposes; the server already titles a thread from the opening of the first
+   message when no subject is sent (merchant-api.js: `subject` is optional).
+   So the same fields end up populated, by the people who know the answer.
+
+   The API call is unchanged apart from what it omits — still
+   POST /api/support/threads with a `message`. */
 function clScOpenDrawer() {
   const drawer = $('clScDrawer');
   const back = $('clScDrawerBack');
+
+  /* A fresh queue, and pointed at this drawer's list rather than the
+     composer's — see clScFileIds. */
+  clScFiles.forEach(f => f.url && URL.revokeObjectURL(f.url));
+  clScFiles = [];
+  clScFileIds = { list: 'clScNewFileList', msg: 'clScNewFileMsg' };
+
   drawer.hidden = false;
   drawer.innerHTML = `
     <div class="cl-sc-drawer-head">
@@ -1736,44 +1721,31 @@ function clScOpenDrawer() {
     <div class="cl-sc-drawer-body">
       <div class="cl-field">
         <label for="clScNewMsg">What can we help with?<span class="cl-req">*</span></label>
-        <textarea id="clScNewMsg" maxlength="4000" style="min-height:150px;"
+        <textarea id="clScNewMsg" maxlength="4000" style="min-height:170px;"
           placeholder="What has happened, what you expected, and what you need from us."></textarea>
       </div>
 
-      <div class="cl-sc-topics" role="group" aria-label="Quick topics">
-        ${CL_SC_TOPICS.map(t =>
-          `<button type="button" class="cl-sc-chip" data-cl-sc-newtopic="${t.key}">${
-            escapeHtml(t.label)}</button>`).join('')}
+      <!-- The optional attachment. Uploaded AFTER the thread exists, because
+           /documents is addressed to a thread id — see clScSubmitDrawer. -->
+      <div class="cl-sc-newfiles">
+        <button type="button" class="cl-btn cl-btn-sm" id="clScNewClip">
+          ${clIco('paperclip', { size: 15 })} Attach a file
+        </button>
+        <small>PDF, JPG, PNG or WebP · up to ${CL_FILE_MAX_MB} MB — optional</small>
+        <input type="file" id="clScNewFile" multiple hidden
+               accept="${CL_FILE_TYPES.join(',')}">
+        <ul class="cl-files" id="clScNewFileList"></ul>
+        <div class="cl-msg" id="clScNewFileMsg"></div>
       </div>
-
-      <!-- WHAT WE WORKED OUT, said out loud. An automatic decision a merchant
-           cannot see is one they cannot correct, so the detection prints itself
-           and the control that changes it is right there. -->
-      <div class="cl-sc-auto" id="clScAuto"></div>
-
-      <details class="cl-sc-more">
-        <summary>Add a subject or a booking reference <span>(optional)</span></summary>
-        <div class="cl-field">
-          <label for="clScNewSubject">Subject</label>
-          <input type="text" id="clScNewSubject" maxlength="200"
-                 placeholder="Leave blank and we will title it from your message">
-        </div>
-        <div class="cl-field">
-          <label for="clScNewBooking">Booking reference</label>
-          <select id="clScNewBooking" disabled>
-            <option value="">Loading your bookings…</option>
-          </select>
-          <small>Linking it means whoever answers can open the booking instead of asking you for it.</small>
-        </div>
-      </details>
 
       <div class="cl-msg" id="clScNewMsgErr"></div>
     </div>
 
     <div class="cl-sc-drawer-foot">
       <button type="button" class="cl-btn" id="clScDrawerCancel">Cancel</button>
-      <button type="button" class="cl-btn cl-btn-primary" id="clScDrawerGo">
-        ${clIco('send', { size: 15 })} Start conversation
+      <button type="button" class="cl-btn cl-btn-primary" id="clScDrawerGo" disabled
+        ${clActionAttrs('chat.create', CL_NO_CHAT)}>
+        ${clIco('send', { size: 15 })} Send
       </button>
     </div>`;
 
@@ -1784,36 +1756,24 @@ function clScOpenDrawer() {
   });
   document.body.style.overflow = 'hidden';
 
-  /* Detection is re-run as they type, but only the CATEGORY — priority stays
-     the merchant's own call, defaulting to Normal, because "urgent" in a
-     sentence is not the same as the merchant asking for urgent handling. */
-  const rerun = () => clScRenderAuto();
-  $('clScNewMsg').addEventListener('input', rerun);
-  clScRenderAuto();
+  $('clScNewMsg').addEventListener('input', clScUploadState);
+  /* Ctrl/Cmd+Enter sends, the same chord the composer uses. */
+  $('clScNewMsg').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') clScSubmitDrawer();
+  });
 
-  $('clScDrawer').querySelectorAll('[data-cl-sc-newtopic]').forEach(b =>
-    b.addEventListener('click', () => {
-      const topic = CL_SC_TOPICS.find(t => t.key === b.dataset.clScNewtopic);
-      const box = $('clScNewMsg');
-      if (!topic) return;
-      if (topic.line) {
-        const current = box.value.trim();
-        box.value = current ? `${current}\n${topic.line} — ` : `${topic.line} — `;
-      }
-      /* A chip is also an explicit filing instruction, which beats the guess. */
-      if (topic.cat) $('clScAuto').dataset.pick = topic.cat;
-      box.focus();
-      box.selectionStart = box.selectionEnd = box.value.length;
-      clScRenderAuto();
-    }));
-
-  clScLoadBookingOptions();
+  $('clScNewClip').addEventListener('click', () => $('clScNewFile').click());
+  $('clScNewFile').addEventListener('change', e => {
+    clScAddFiles([...e.target.files]);
+    e.target.value = '';
+  });
 
   $('clScDrawerX').addEventListener('click', clScCloseDrawer);
   $('clScDrawerCancel').addEventListener('click', clScCloseDrawer);
   back.addEventListener('click', clScCloseDrawer);
   document.addEventListener('keydown', clScDrawerEsc);
   $('clScDrawerGo').addEventListener('click', clScSubmitDrawer);
+  clScUploadState();
 }
 
 function clScDrawerEsc(e) {
@@ -1828,47 +1788,11 @@ function clScCloseDrawer() {
   back.classList.remove('open');
   document.body.style.overflow = '';
   document.removeEventListener('keydown', clScDrawerEsc);
+  /* Hand the file queue back to the composer. Leaving it pointed at the
+     drawer's ids would leave the composer's paperclip drawing into elements
+     that were just removed from the document. */
+  clScFileIds = { list: 'clScFileList', msg: 'clScFileMsg' };
   setTimeout(() => { drawer.hidden = true; drawer.innerHTML = ''; }, 240);
-}
-
-/* The detected category, printed as a sentence with the override beside it. */
-function clScRenderAuto() {
-  const host = $('clScAuto');
-  if (!host) return;
-  const picked = host.dataset.pick || '';
-  const guess = picked || clScDetect($('clScNewMsg')?.value || '');
-
-  host.innerHTML = `
-    <span class="cl-sc-auto-k">${clIco('check', { size: 13 })} Filed under</span>
-    <label class="cl-sr" for="clScNewCat">Category</label>
-    <select id="clScNewCat">
-      <option value="">Work it out for me</option>
-      ${CL_CATEGORIES.map(([v, l]) =>
-        `<option value="${v}"${v === guess ? ' selected' : ''}>${l}</option>`).join('')}
-    </select>
-    <label class="cl-sr" for="clScNewPri">Priority</label>
-    <select id="clScNewPri">
-      ${CL_PRIORITIES.map(([v, l]) =>
-        `<option value="${v}"${v === (host.dataset.pri || 'normal') ? ' selected' : ''}>${l} priority</option>`).join('')}
-    </select>`;
-
-  $('clScNewCat').addEventListener('change', e => { host.dataset.pick = e.target.value; });
-  $('clScNewPri').addEventListener('change', e => { host.dataset.pri = e.target.value; });
-}
-
-/* Longest keyword match wins, so "e-ticket" beats "ticket" into the right desk
-   and "date change" is not read as a payment. Returns '' when nothing matches,
-   which the server treats as uncategorised — a wrong category is worse than
-   none, because it routes the ticket to a desk that cannot answer it. */
-function clScDetect(text) {
-  const hay = (text || '').toLowerCase();
-  if (!hay.trim()) return '';
-  let best = '';
-  let bestLen = 0;
-  CL_SC_DETECT.forEach(([word, cat]) => {
-    if (word.length > bestLen && hay.includes(word)) { best = cat; bestLen = word.length; }
-  });
-  return best;
 }
 
 async function clScSubmitDrawer() {
@@ -1880,19 +1804,37 @@ async function clScSubmitDrawer() {
     return;
   }
 
-  const subject = $('clScNewSubject')?.value.trim() || '';
-  const bookingId = $('clScNewBooking')?.value || '';
-  const category = $('clScNewCat')?.value || clScDetect(message) || undefined;
-  const priority = $('clScNewPri')?.value || 'normal';
-
   const btn = $('clScDrawerGo');
   btn.disabled = true;
   btn.classList.add('loading');
   try {
-    const data = await MerchantApi.openSupportThread({
-      subject, message, category, priority,
-      relatedRequestId: bookingId ? Number(bookingId) : undefined,
-    });
+    /* MESSAGE ONLY. No subject, category, priority or booking link is sent:
+       the server titles the thread from this text, and the desk files it
+       through /triage. See the note above clScOpenDrawer. */
+    let data = await MerchantApi.openSupportThread({ message });
+
+    /* The attachments, now that there is a thread to address them to —
+       /documents is addressed to a thread id, so it cannot be part of the same
+       call. A file that fails here must NOT lose the conversation that was
+       already opened: the thread is real either way, so a failure is carried
+       into it and reported there rather than thrown back at a drawer that is
+       about to close. Each upload returns the WHOLE thread, so keeping the last
+       response is what makes the files appear in the log without a re-fetch. */
+    const queued = clScFiles.slice();
+    const failed = [];
+    if (queued.length) {
+      clMsg(err, `Sending ${queued.length} file${queued.length === 1 ? '' : 's'}…`, '');
+      for (const f of queued) {
+        try {
+          data = await MerchantApi.uploadSupportDocument(data.thread.id, f.file);
+        } catch {
+          failed.push(f.file.name);
+        }
+      }
+    }
+    clScFiles.forEach(f => f.url && URL.revokeObjectURL(f.url));
+    clScFiles = [];
+
     clScCloseDrawer();
 
     clScOpenId = String(data.thread.id);
@@ -1903,6 +1845,14 @@ async function clScSubmitDrawer() {
     clScRenderChatHead();
     clScRenderLog();
     clScRenderFoot();
+    /* Said in the conversation that now exists, not in the drawer that just
+       closed. The composer's file line is rendered by clScRenderFoot above, so
+       this has to come after it. */
+    if (failed.length) {
+      clMsg($('clScFileMsg'),
+        `Your message was sent, but ${failed.join(', ')} did not upload. `
+        + 'Attach it again with the paperclip below.', 'err');
+    }
     clScLoadBookingFacts();
     clScRenderInfo();
     clScScrollToEnd();
@@ -1912,31 +1862,6 @@ async function clScSubmitDrawer() {
     clMsg(err, clError(e2, 'Could not start the conversation.'), 'err');
     btn.disabled = false;
     btn.classList.remove('loading');
-  }
-}
-
-/* The merchant's bookings, for the optional link. Failure is not fatal and is
-   not reported as an error: the ticket can still be raised, so the field just
-   says the list is unavailable and stays empty. */
-async function clScLoadBookingOptions() {
-  const select = $('clScNewBooking');
-  if (!select) return;
-  try {
-    const data = await MerchantApi.listRequests({ page_size: 50 });
-    const rows = data.items || [];
-    if (!$('clScNewBooking')) return;      /* drawer closed mid-flight */
-
-    if (!rows.length) {
-      select.innerHTML = '<option value="">You have no bookings yet</option>';
-      return;
-    }
-    select.innerHTML = '<option value="">Not about a specific booking</option>'
-      + rows.map(r => `<option value="${r.id}">${
-        escapeHtml(`${r.request_number}${r.status_label ? ` — ${r.status_label}` : ''}`)}</option>`).join('');
-    select.disabled = false;
-  } catch {
-    if (!$('clScNewBooking')) return;
-    select.innerHTML = '<option value="">Your bookings could not be loaded</option>';
   }
 }
 

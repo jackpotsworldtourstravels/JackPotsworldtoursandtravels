@@ -489,6 +489,48 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .drawer-section-title:first-child{margin-top:0;}
 @media (max-width:640px){ .drawer-panel{width:100%;} }
 
+/* ---- support: the desk's triage panel ----------------------------------
+   Collapsed by default. These controls are how a thread gets a category and a
+   priority now that the merchant no longer supplies either, but the reply box
+   is still what an operator reaches for first, so they must not push it down
+   the drawer. */
+.sc-triage{border-bottom:1px solid var(--border-color); background:var(--bg-soft, rgba(10,37,64,0.025)); flex-shrink:0;}
+.sc-triage > summary{
+  cursor:pointer; padding:12px 26px; font-size:12px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);
+  list-style:none;
+}
+.sc-triage > summary::-webkit-details-marker{display:none;}
+.sc-triage > summary::before{content:'▸ '; display:inline-block; transition:transform .15s ease;}
+.sc-triage[open] > summary::before{content:'▾ ';}
+.sc-triage > summary:hover{color:var(--text-primary);}
+.sc-triage-grid{
+  display:grid; grid-template-columns:118px 1fr; gap:10px 14px;
+  align-items:center; padding:4px 26px 18px;
+}
+.sc-triage-grid > label{font-size:12px; font-weight:700; color:var(--text-muted);}
+.sc-triage-grid select,
+.sc-triage-grid input[type=text]{
+  width:100%; padding:8px 11px; border-radius:9px;
+  border:1.5px solid var(--border-color); background:var(--card-bg);
+  color:var(--text-primary); font-size:13px; font-family:inherit;
+}
+.sc-note-row{display:flex; gap:8px; align-items:center;}
+.sc-note-row input{flex:1; min-width:0;}
+.sc-notes{max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;}
+.sc-note{
+  padding:9px 11px; border-radius:9px; border:1px solid var(--border-color);
+  background:var(--card-bg); font-size:12.5px; color:var(--text-primary); line-height:1.5;
+}
+.sc-note-meta{font-size:10.5px; font-weight:700; color:var(--text-muted); margin-bottom:3px;}
+.sc-notes-empty{font-size:12px; color:var(--text-muted);}
+.sc-triage-msg{padding:0 26px 14px; font-size:12px; min-height:0;}
+@media (max-width:640px){
+  .sc-triage > summary{padding:11px 18px;}
+  .sc-triage-grid{grid-template-columns:1fr; gap:7px; padding:4px 18px 16px;}
+  .sc-triage-msg{padding:0 18px 12px;}
+}
+
 /* Support Management / Live Chat conversation */
 .chat-msg{max-width:82%; margin-bottom:14px; padding:9px 13px; border-radius:12px; font-size:13px; line-height:1.45;}
 .chat-msg-in{background:var(--card-bg); border:1px solid var(--border-color); margin-right:auto; border-bottom-left-radius:3px;}

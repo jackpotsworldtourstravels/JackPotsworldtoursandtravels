@@ -1534,6 +1534,51 @@ function renderChatMessages(messages) {
   el.scrollTop = el.scrollHeight;
 }
 
+/* The desk's own view of a thread's filing. Merchants no longer state a
+   category or a priority when they open a conversation — they type a message
+   and nothing else — so these controls are where both values now come from.
+   `category` may legitimately be null ("Not categorised"), which is why the
+   select carries an empty option rather than defaulting to Other. */
+function renderSupportTriage(thread) {
+  const cat = document.getElementById('supportTriageCategory');
+  const pri = document.getElementById('supportTriagePriority');
+  if (cat) cat.value = thread.category || '';
+  if (pri) pri.value = thread.priority || 'normal';
+  setSupportTriageMsg('');
+}
+
+function setSupportTriageMsg(text, tone) {
+  const el = document.getElementById('supportTriageMsg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = tone === 'error' ? 'var(--coral-dark)'
+    : tone === 'ok' ? 'var(--emerald)' : 'var(--text-muted)';
+}
+
+/* Internal notes are desk-only: the endpoint is behind chat.manage and the
+   merchant's own thread payload never carries them. Loaded separately from the
+   thread so a notes failure cannot take the conversation down with it. */
+async function loadSupportNotes(threadId) {
+  const host = document.getElementById('supportNotesList');
+  if (!host) return;
+  host.innerHTML = '<span class="sc-notes-empty">Loading…</span>';
+  try {
+    /* The endpoint returns a bare ARRAY of ChatNoteResponse
+       {id, body, author, created_at, edited_at} — not a Page envelope like the
+       list endpoints, so there is no `items` to unwrap. */
+    const { data } = await axios.get(`${API_BASE}/api/support/threads/${threadId}/notes`, { headers: authHeaders() });
+    const rows = Array.isArray(data) ? data : [];
+    host.innerHTML = rows.length ? rows.map(n => `
+      <div class="sc-note">
+        <div class="sc-note-meta">${escapeHtml(n.author || 'Desk')} · ${fmtDateTime(n.created_at)}${
+          n.edited_at ? ' · edited' : ''}</div>
+        <div>${escapeHtml(n.body || '')}</div>
+      </div>`).join('') : '<span class="sc-notes-empty">No internal notes yet.</span>';
+  } catch (err) {
+    host.innerHTML = '<span class="sc-notes-empty">Notes could not be loaded.</span>';
+  }
+}
+
 async function openSupportChat(threadId) {
   currentChatThreadId = threadId;
   document.getElementById('supportChatDrawerOverlay').classList.add('open');
@@ -1544,12 +1589,25 @@ async function openSupportChat(threadId) {
     document.getElementById('supportChatTitle').textContent = `${data.thread.request_number} — ${data.thread.merchant_name || 'Merchant'}`;
     document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
     renderChatMessages(data.messages);
-    document.getElementById('supportChatClaimBtn').style.display = data.thread.status_label === 'Open' ? '' : 'none';
-    document.getElementById('supportChatResolveBtn').style.display = data.thread.status_label !== 'Resolved' ? '' : 'none';
-    document.getElementById('supportChatReplyInput').disabled = data.thread.status_label === 'Resolved';
+    applySupportChatState(data.thread);
+    renderSupportTriage(data.thread);
+    loadSupportNotes(threadId);
   } catch (err) {
     document.getElementById('supportChatTitle').textContent = 'Failed to load chat';
   }
+}
+
+/* Which of claim / resolve / reopen apply, in one place. This was duplicated
+   between the open and the reply handlers and the two had already drifted —
+   only the opener disabled the reply box on a resolved thread, so replying to
+   a thread and then resolving it left the box live on a closed ticket. */
+function applySupportChatState(thread) {
+  const resolved = thread.status_label === 'Resolved';
+  document.getElementById('supportChatClaimBtn').style.display = thread.status_label === 'Open' ? '' : 'none';
+  document.getElementById('supportChatResolveBtn').style.display = resolved ? 'none' : '';
+  const reopen = document.getElementById('supportChatReopenBtn');
+  if (reopen) reopen.style.display = resolved ? '' : 'none';
+  document.getElementById('supportChatReplyInput').disabled = resolved;
 }
 document.getElementById('supportChatCloseBtn').addEventListener('click', () => {
   document.getElementById('supportChatDrawerOverlay').classList.remove('open');
@@ -1564,11 +1622,54 @@ document.getElementById('supportChatReplyForm').addEventListener('submit', async
     input.value = '';
     renderChatMessages(data.messages);
     document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
-    document.getElementById('supportChatClaimBtn').style.display = data.thread.status_label === 'Open' ? '' : 'none';
-    document.getElementById('supportChatResolveBtn').style.display = data.thread.status_label !== 'Resolved' ? '' : 'none';
+    applySupportChatState(data.thread);
   } catch (err) {
     alert(err.response?.data?.detail || 'Failed to send message.');
   }
+});
+
+/* PATCH, not POST — TriageRequest treats both fields as optional so that
+   changing one cannot silently clear the other. Both are sent together here
+   because the form shows both, and the current value of each is what the
+   selects were populated with. */
+document.getElementById('supportTriageSaveBtn')?.addEventListener('click', async () => {
+  if (!currentChatThreadId) return;
+  const category = document.getElementById('supportTriageCategory').value || null;
+  const priority = document.getElementById('supportTriagePriority').value || null;
+  setSupportTriageMsg('Saving…');
+  try {
+    await axios.patch(`${API_BASE}/api/support/threads/${currentChatThreadId}/triage`,
+      { category, priority }, { headers: authHeaders() });
+    setSupportTriageMsg('Filing updated.', 'ok');
+    if (loadedSections.has('support')) loadSupportQueue();
+  } catch (err) {
+    setSupportTriageMsg(err.response?.data?.detail || 'Could not update the filing.', 'error');
+  }
+});
+
+document.getElementById('supportNoteAddBtn')?.addEventListener('click', async () => {
+  const input = document.getElementById('supportNoteInput');
+  const body = input.value.trim();
+  if (!body || !currentChatThreadId) return;
+  setSupportTriageMsg('Adding note…');
+  try {
+    await axios.post(`${API_BASE}/api/support/threads/${currentChatThreadId}/notes`,
+      { body }, { headers: authHeaders() });
+    input.value = '';
+    setSupportTriageMsg('Note added — the merchant cannot see it.', 'ok');
+    loadSupportNotes(currentChatThreadId);
+  } catch (err) {
+    setSupportTriageMsg(err.response?.data?.detail || 'Could not add the note.', 'error');
+  }
+});
+
+document.getElementById('supportChatReopenBtn')?.addEventListener('click', async () => {
+  if (!currentChatThreadId) return;
+  try {
+    await axios.post(`${API_BASE}/api/support/threads/${currentChatThreadId}/reopen`, {}, { headers: authHeaders() });
+    openSupportChat(currentChatThreadId);
+    if (loadedSections.has('support')) loadSupportQueue();
+  } catch (err) { alert(err.response?.data?.detail || 'Failed to reopen.'); }
 });
 document.getElementById('supportChatClaimBtn').addEventListener('click', async () => {
   try {
