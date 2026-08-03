@@ -72,7 +72,6 @@ function clInitEnquiry() {
     <div class="cl-page-head">
       <div>
         <h1>Booking Enquiry</h1>
-        <p>Tell us the sector you need and our team will confirm availability and quote a fare.</p>
       </div>
       <!-- TWO WAYS TO START, AND THE ORDER IS THE RECOMMENDATION.
            Enquiry first is the primary button because a quoted booking is

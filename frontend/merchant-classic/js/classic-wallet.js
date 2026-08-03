@@ -75,8 +75,6 @@ function clInitWallet() {
     <div class="cl-page-head">
       <div>
         <h1>Wallet</h1>
-        <p>Your running account with us. Tickets are charged to it when they are
-           issued.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clWalletRefresh">

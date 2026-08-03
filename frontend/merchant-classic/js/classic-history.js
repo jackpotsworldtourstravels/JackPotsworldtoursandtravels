@@ -61,8 +61,6 @@ function clInitHistory() {
     <div class="cl-page-head">
       <div>
         <h1>Booking History</h1>
-        <p>Every booking that has reached its end — ticketed, travelled, cancelled or closed.
-           Anything still moving is on <a href="#" data-cl-to-requests>My Requests</a>.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clHistCsv"
@@ -170,9 +168,9 @@ function clInitHistory() {
       </div>
     </div>`;
 
-  $('cl-booking-history').querySelector('[data-cl-to-requests]').addEventListener('click', e => {
-    e.preventDefault(); clGo('requests');
-  });
+  /* The "anything still moving is on My Requests" line that used to carry a
+     link to that screen went with the page descriptions; the rail is the way
+     across, and it always was. */
   clChips('clHistStatus', 'Outcome');
 
   $('clHistApply').addEventListener('click', () => clLoadHistory({ resetPage: true }));

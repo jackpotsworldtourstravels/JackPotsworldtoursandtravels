@@ -170,18 +170,11 @@ function clRenderNoEnquiry() {
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head"><div>
       <h1>Booking Request</h1>
-      <p>A booking starts either from an enquiry we have quoted, or straight from the journey.</p>
     </div></div>
+    <!-- The two ways in are the two buttons. The paragraph and the bulleted
+         list that used to explain them above were removed on request; nothing
+         about either route changed. -->
     <div class="cl-panel"><div class="cl-panel-body">
-      <p style="margin:0 0 6px;font-size:13px;color:var(--cl-text-muted);">
-        Nothing selected. There are two ways in:</p>
-      <ul style="margin:0 0 14px 18px;padding:0;font-size:13px;color:var(--cl-text-muted);">
-        <li style="margin-bottom:5px;">Open <b>Booking Enquiry</b>, find an enquiry marked
-          <b>Available</b>, and press <b>Raise Booking</b> — its details are carried over here so
-          you only have to add the travellers, and the fare is the one we quoted.</li>
-        <li>Or press <b>Book Directly</b> to skip the quotation — you enter the journey yourself
-          and our team confirms the fare when the ticket is issued.</li>
-      </ul>
       <div class="cl-form-actions" style="margin:0;">
         <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
         <button type="button" class="cl-btn" id="clBrToDirect">Book Directly</button>

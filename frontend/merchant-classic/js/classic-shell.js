@@ -267,9 +267,11 @@ function clConfirm(message, confirmLabel, { danger = false } = {}) {
 
 /* ----------------------------------------------------------------- router */
 
-/* Title and the one line under it. The subtitle is what makes the topbar a
-   place rather than a strip of controls — it names the screen's job, which is
-   not always obvious from a two-word title. */
+/* The screen's name, and nothing under it. The standing one-line descriptions
+   that used to sit beneath every title were removed on request: a merchant who
+   has been in the portal twice does not need "Ask us for a fare" under
+   "Booking Enquiry", and thirteen of them made every screen open with a
+   paragraph before it showed any data. */
 const CL_TITLES = {
   dashboard: 'Dashboard',
   enquiry: 'Booking Enquiry',
@@ -289,22 +291,53 @@ const CL_TITLES = {
   support: 'Support Center',
 };
 
-const CL_SUBTITLES = {
-  dashboard: 'Account overview',
-  enquiry: 'Ask us for a fare',
-  'booking-request': 'Turn a quote into a booking',
-  'booking-detail': 'Everything on one booking',
-  requests: 'Work in progress',
-  'booking-history': 'Closed and completed travel',
-  approvals: 'Sign off your team’s bookings',
-  wallet: 'Your running account',
-  payments: 'Requests, approvals and settlement',
-  'service-request': 'Changes to issued bookings',
-  reports: 'Volume, value and mix',
-  notifications: 'Everything we have told you',
-  profile: 'Your details and security',
-  support: 'Talk to the partner desk',
-};
+/* THE DASHBOARD'S TOPBAR TITLE IS THE GREETING, NOT THE WORD "DASHBOARD".
+   The rail, the breadcrumb and the browser tab all already say which screen
+   this is, so the one slot at the top of the page is spent on the only line on
+   that screen that is not a figure. Everything else that identifies the section
+   keeps the section name — see clGo. */
+function clGreeting({ short = false } = {}) {
+  const name = (localStorage.getItem(PARTNER_KEYS.fullName) || '').split(' ')[0];
+  const h = new Date().getHours();
+  const part = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  if (!name) return 'Welcome back 👋';
+  return short ? `Hi ${name} 👋` : `Good ${part}, ${name} 👋`;
+}
+
+/* THE GREETING HAS TO FIT, OR IT IS WORSE THAN THE TITLE IT REPLACED.
+   `#clTopTitle` is nowrap + ellipsis, and on a 375px phone the slot is about
+   154px — "Good evening, Rohan 👋" renders there as "Good Evening, Ro…", which
+   cuts the merchant's own name off the one line that exists to greet them by
+   it. That is the whole reason `.cl-top-title{display:none}` came out of the
+   760px block, so leaving it truncated would undo the point of unhiding it.
+
+   MEASURED, NOT BREAKPOINTED. A media query would have to guess a width, and
+   the real limit depends on how long the merchant's first name is — "Al" fits
+   where "Bhavanishankar" does not. Writing the full form and asking the element
+   whether it overflowed costs one reflow on a paint that already happens, and
+   is right for every name at every width. */
+function clPaintTopTitle(section) {
+  const el = $('clTopTitle');
+  /* No section yet means nothing has navigated — the resize listener is live
+     from script load, so a merchant who resizes the window while still on the
+     sign-in screen would otherwise have the topbar written to the string
+     "null" the moment they got in. */
+  if (!el || !section) return;
+  if (section !== 'dashboard') {
+    el.textContent = CL_TITLES[section] || section;
+    return;
+  }
+  el.textContent = clGreeting();
+  if (el.scrollWidth > el.clientWidth + 1) el.textContent = clGreeting({ short: true });
+}
+
+/* Rotating a phone or dragging a desktop window changes that fit in both
+   directions, and the title is only written on navigation — without this a
+   merchant who opens the Dashboard in portrait keeps the short form after
+   turning the phone, and one who narrows a window keeps the truncated long
+   one. Repaint is a no-op on every screen except the Dashboard. */
+let clCurrentSection = null;
+window.addEventListener('resize', () => clPaintTopTitle(clCurrentSection));
 
 /* Each section renders on first visit and then keeps its state, so tabbing
    away and back does not throw away a half-filled form. Modules call
@@ -340,9 +373,9 @@ function clGo(section, afterLoad) {
   });
 
   const title = CL_TITLES[section] || section;
+  clCurrentSection = section;
   $('clCrumb').textContent = title;
-  $('clTopTitle').textContent = title;
-  $('clTopSub').textContent = CL_SUBTITLES[section] || '';
+  clPaintTopTitle(section);
   document.title = `${title} — JackPots Merchant Portal`;
   clCloseNav();
   clCloseProfileMenu();

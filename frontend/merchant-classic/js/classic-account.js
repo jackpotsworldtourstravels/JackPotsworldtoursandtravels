@@ -31,7 +31,6 @@ function clInitProfile() {
     <div class="cl-page-head">
       <div>
         <h1>Profile &amp; Settings</h1>
-        <p>Your details, how you sign in, and what our team holds against your company.</p>
       </div>
     </div>
 

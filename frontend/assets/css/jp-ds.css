@@ -888,6 +888,35 @@ table{width:100%;}
    the cards. `.cl-page-head` draws a bottom border by default. */
 .cl-page-head.cl-page-head-plain{border-bottom:none; padding-bottom:0;}
 
+/* ---- the Dashboard's page title ----------------------------------------
+   The merchant Dashboard is the one screen whose heading slot was emptied:
+   the greeting took the topbar title, leaving the breadcrumb pointing at a
+   "Dashboard" the page itself never said out loud at any size worth reading.
+   This restores the hierarchy the other twelve screens have — greeting,
+   breadcrumb, then the page's own name — at a weight that reads as a page
+   title rather than as a section label.
+
+   SCOPED TO THIS ONE HEAD ON PURPOSE. `.cl-page-head h1` is 26px on all
+   thirteen screens, and re-sizing that rule would restyle every one of them
+   off the back of a Dashboard request. The modifier is additive: remove the
+   class and the Dashboard is exactly what it was.
+
+   THE NEGATIVE MARGIN IS LOAD-BEARING, NOT A FUDGE. The gap under the
+   breadcrumb is `.cl-content{padding-top:14px}` plus this element's own
+   `margin-top:6px` = 20px, and the brief asks for 8–12px. `.cl-content` is
+   shared by every section, so the only part of that sum this head may touch
+   is its own margin: -4px lands the gap at 10px without moving anything on
+   the other twelve screens. */
+.cl-page-head.cl-page-head-hero{margin-top:-4px; margin-bottom:28px;}
+.cl-page-head.cl-page-head-hero h1{font-size:34px; line-height:1.15;}
+
+/* Below the rail breakpoint 34px starts to wrap "Dashboard" against the
+   Refresh button on a 320px screen. This is the same step-down the rest of
+   this stylesheet makes at 760px rather than a clamp, to match its idiom. */
+@media (max-width:760px){
+  .cl-page-head.cl-page-head-hero h1{font-size:28px;}
+}
+
 /* A smaller label, for "No. of Passengers". */
 .cl-field label.cl-label-sm{font-size:11px; letter-spacing:.02em;}
 

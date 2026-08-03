@@ -37,9 +37,10 @@ async function clInitBookingDetail() {
   const root = $('cl-booking-detail');
   if (!clDetailRequestId) {
     root.innerHTML = `
+      <!-- The button below says where to go; the line that used to say it in
+           prose above went with the rest of the page descriptions. -->
       <div class="cl-page-head"><div>
         <h1>Booking Request Details</h1>
-        <p>Open a booking from My Requests to see it here.</p>
       </div></div>
       <div class="cl-panel"><div class="cl-panel-body">
         <button type="button" class="cl-btn cl-btn-primary" id="clBdToRequests">Go to My Requests</button>

@@ -705,9 +705,14 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
 .cl-section{display:none;}
 .cl-section.active{display:block; animation:cl-enter .34s var(--cl-ease) both;}
 
-/* Page header — title, subtitle, actions. Every screen opens with one. */
+/* Page header — title and actions. Every screen opens with one.
+   CENTRED, NOT TOP-ALIGNED. The standing description under each title was
+   removed, so the left column is usually a single heading; against a 38px
+   button row, flex-start left the buttons sitting a few pixels high. The few
+   heads that still carry a line of their own (a booking's reference and title)
+   centre against the buttons just as well. */
 .cl-page-head{
-  display:flex; align-items:flex-start; gap:18px; flex-wrap:wrap;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
   margin:6px 0 24px;
 }
 .cl-page-head h1{font-size:26px;}
@@ -1934,7 +1939,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 
 /* ---- header ---- */
 
-.cl-sc-head{display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap;}
+.cl-sc-head{display:flex; align-items:center; gap:18px; flex-wrap:wrap;}
 .cl-sc-head-copy{flex:1 1 300px; min-width:0;}
 .cl-sc-head h1{
   font-size:26px; font-weight:800; letter-spacing:-0.022em;
@@ -3127,7 +3132,12 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 
 @media (max-width:760px){
-  .cl-top-title{display:none;}
+  /* The title used to be hidden here, back when it was two stacked lines and
+     the crumb below already named the screen. It is one line now, and on the
+     Dashboard that line is the greeting — the only place the greeting appears
+     since it stopped being a block on the page — so hiding it took the
+     greeting off every phone. It has min-width:0 and ellipsis, so it shrinks
+     rather than pushing the bar sideways. */
   .cl-theme{display:none;}         /* the profile menu carries the theme switch */
   .cl-statuses{grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px;}
   .cl-modal-back{padding:20px 14px;}

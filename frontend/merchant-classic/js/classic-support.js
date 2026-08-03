@@ -161,7 +161,6 @@ function clInitSupport() {
       <header class="cl-sc-head">
         <div class="cl-sc-head-copy">
           <h1>Support Center</h1>
-          <p>Chat with our travel support team in real time.</p>
         </div>
         <div class="cl-sc-head-live">
           <a class="cl-btn cl-btn-wa cl-btn-sm" target="_blank" rel="noopener" id="clScWa"

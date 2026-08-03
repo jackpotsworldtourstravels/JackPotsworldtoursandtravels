@@ -8,15 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260803ui18">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260803ui22">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui20">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui22">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui13">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui22">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -433,10 +433,6 @@
           <h2>Payment Accounts</h2>
           <button type="button" class="btn btn-coral" id="wdAddAccountBtn">Add account</button>
         </div>
-        <p class="ops-sub" style="margin:0 0 12px;">
-          Where merchants are told to send money. Only <strong>active</strong> accounts appear on
-          the merchant's Add Money screen.
-        </p>
         <div class="table-wrap"><table id="wdAccountsTable"><thead><tr>
           <th>Label</th><th>Type</th><th>Details</th><th>Order</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
@@ -601,11 +597,6 @@
             <h2>Provider Management</h2>
             <span class="panel-sub" id="provSummary"></span>
           </div>
-          <p class="ops-sub" style="margin:0 0 14px;">
-            The external suppliers our operations team buys tickets from — consolidators, booking
-            portals and travel suppliers. Providers never sign in; this is an internal record, and
-            the people listed against each one are contacts, not user accounts.
-          </p>
           <div class="filter-bar" style="margin-bottom:16px;">
             <input type="search" id="provSearch" aria-label="Search providers"
                    placeholder="Provider code, name, or a person there">
@@ -684,10 +675,6 @@
           <h2>Delivery Failures</h2>
           <span class="ops-sub" id="mdFailSummary"></span>
         </div>
-        <p class="ops-sub" style="margin:0 0 12px;">
-          Messages that did not go out. With SMTP unconfigured every attempt is recorded here
-          rather than being reported as sent — that is the intended behaviour, not an outage.
-        </p>
         <div class="table-wrap"><table id="mdFailTable"><thead><tr>
           <th>When</th><th>Type</th><th>Recipient</th><th>Subject</th><th>Why it failed</th>
         </tr></thead><tbody></tbody></table></div>
@@ -699,12 +686,10 @@
     <section class="section" id="section-audit">
       <div class="panel">
         <div class="panel-head"><h2>Audit Logs</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Row-level change history, written directly by a database trigger on users, merchants,
-          service requests and payments — the API only reads it. The trigger records <em>what</em>
-          changed, not <em>who</em> changed it, so &ldquo;Changed By&rdquo; reads
-          &ldquo;Not recorded&rdquo;; for the acting user, see <strong>System Logs</strong>.
-        </p>
+        <!-- The note that used to sit here explained that the database trigger
+             records WHAT changed and not WHO, so "Changed By" reads "Not
+             recorded" and System Logs is where the acting user is. Removed with
+             the rest of the page descriptions; the behaviour is unchanged. -->
         <div class="filter-bar" style="margin-bottom:16px;">
           <select id="adminAuditTableFilter" class="status-select" aria-label="Table"><option value="">All tables</option></select>
           <select id="adminAuditOpFilter" class="status-select" aria-label="Operation">
@@ -730,11 +715,6 @@
     <section class="section" id="section-system-logs">
       <div class="panel">
         <div class="panel-head"><h2>System Logs</h2></div>
-        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">
-          Every recorded user action across the platform, newest first — who did it, from which
-          address and on what device. This is where attribution lives; Audit Logs is where the
-          before/after values live.
-        </p>
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="adminSysLogSearch" placeholder="Search user, action or description…" aria-label="Search system logs">
           <select id="adminSysLogActionFilter" class="status-select" aria-label="Action"><option value="">All actions</option></select>
@@ -925,17 +905,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260803ui20"></script>
-<script src="../components/toast.js?v=20260803ui5"></script>
-<script src="../components/spinner.js?v=20260803ui5"></script>
-<script src="../components/confirm-dialog.js?v=20260803ui5"></script>
-<script src="../components/focus-trap.js?v=20260803ui5"></script>
-<script src="../assets/js/auth.js?v=20260803ui20"></script>
+<script src="../shared/formatters.js?v=20260803ui22"></script>
+<script src="../components/toast.js?v=20260803ui22"></script>
+<script src="../components/spinner.js?v=20260803ui22"></script>
+<script src="../components/confirm-dialog.js?v=20260803ui22"></script>
+<script src="../components/focus-trap.js?v=20260803ui22"></script>
+<script src="../assets/js/auth.js?v=20260803ui22"></script>
 <script src="../assets/js/api.js"></script>
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260803ui8"></script>
+<script src="../assets/js/jp-login.js?v=20260803ui22"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -957,35 +937,35 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260803ui20"></script>
+<script src="../assets/js/admin.js?v=20260803ui22"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260803ui20"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260803ui22"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260803ui20"></script>
+<script src="../assets/js/admin-bookings.js?v=20260803ui22"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260803ui22"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260803ui20"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260803ui22"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260803ui22"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260803ui22"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-analytics.js?v=20260803ui22"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260803ui18"></script>
-<script src="../assets/js/admin-logs.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-providers.js?v=20260803ui22"></script>
+<script src="../assets/js/admin-logs.js?v=20260803ui22"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260803ui5"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260803ui22"></script>
 </body>
 </html>

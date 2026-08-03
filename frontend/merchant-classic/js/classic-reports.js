@@ -39,8 +39,6 @@ function clInitReports() {
     <div class="cl-page-head">
       <div>
         <h1>Reports</h1>
-        <p>Volume, value and mix across your account. Every figure and every export below
-           describes the same filtered set.</p>
       </div>
       <!-- Reading the report is report.view, which every merchant account
            holds; taking a FILE away is report.export, which not every role
@@ -381,7 +379,6 @@ function clInitNotifications() {
     <div class="cl-page-head">
       <div>
         <h1>Notifications</h1>
-        <p>Approvals, quotations, payment reminders and ticketing updates for your account.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clNotesRefresh">

@@ -63,7 +63,6 @@ function clInitPayments() {
     <div class="cl-page-head">
       <div>
         <h1>Payment Management</h1>
-        <p>Payments our team has asked you to make. Your wallet is credited once we approve the proof.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clPrRefresh">

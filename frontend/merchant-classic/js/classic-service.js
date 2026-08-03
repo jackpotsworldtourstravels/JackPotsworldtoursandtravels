@@ -102,8 +102,6 @@ function clInitServiceRequest() {
     <div class="cl-page-head">
       <div>
         <h1>Service Requests</h1>
-        <p>Amend a booking after it has been approved. Each request is tracked against the booking,
-           and goes to a manager at your own company before it reaches our desk.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clSrRefresh">

@@ -234,10 +234,6 @@ async function openProvider(id) {
           <button type="button" class="btn btn-coral btn-sm" data-prov-add-user>+ Add User</button>
         </div>
       </div>
-      <p class="ops-sub" style="margin:0 0 12px;">
-        People at this supplier who book on our behalf. They have no login — these are contact
-        records, and the totals are their own bookings.
-      </p>
       <div class="table-wrap"><table><thead><tr>
         <th>Name</th><th>Email</th><th>Phone</th><th class="num">Tickets Booked</th>
         <th class="num">Total Amount</th><th>Status</th><th></th>

@@ -42,8 +42,6 @@ function clInitApprovals() {
     <div class="cl-page-head">
       <div>
         <h1>Approvals</h1>
-        <p>Booking requests raised by your team, waiting for your sign-off before
-           they go to the ticketing desk.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clApprRefresh">Refresh</button>

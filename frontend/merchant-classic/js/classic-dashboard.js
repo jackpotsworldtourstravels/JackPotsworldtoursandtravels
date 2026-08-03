@@ -54,19 +54,24 @@ let clDashData = null;
 
 async function clInitDashboard() {
   const root = $('cl-dashboard');
-  const name = (localStorage.getItem(PARTNER_KEYS.fullName) || '').split(' ')[0];
 
   root.innerHTML = `
-    <!-- THE GREETING IS THE PAGE TITLE NOW. "Dashboard" was a heading that
-         told the merchant where they already knew they were; the greeting plus
-         the current date and time is the only thing on this screen that is not
-         a figure. The standing description below it went with it, along with
-         the rule under the heading. -->
-    <div class="cl-page-head cl-page-head-plain">
-      <div class="jp-greet">
-        <b>${name ? `Good ${clPartOfDay()}, ${escapeHtml(name)} 👋` : 'Welcome back 👋'}</b>
-        <span id="clDashClock">—</span>
-      </div>
+    <!-- THE GREETING IS THE TOPBAR TITLE, and the page title is here.
+         clGo() in classic-shell.js writes "Good evening, <name>" into the
+         topbar on this screen alone, so the greeting is not repeated as a block
+         on the page and the in-page clock that used to sit under it is gone —
+         the topbar's date chip is the one date.
+
+         That left the Dashboard as the only screen not naming itself at page
+         level, with the breadcrumb pointing at a title the page never showed.
+         The cl-page-head-hero class (jp-ds.css) is what gives this h1 the size
+         a page title needs; the ordering — greeting, breadcrumb, title, cards
+         — comes out of the shell markup and is not set here.
+
+         NO BACKTICKS IN HERE. This comment lives inside a template literal, so
+         one would end the string and take the rest of the file with it. -->
+    <div class="cl-page-head cl-page-head-plain cl-page-head-hero">
+      <div><h1>Dashboard</h1></div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clDashRefresh">
           ${clIco('refresh', { size: 15 })} Refresh
@@ -78,35 +83,8 @@ async function clInitDashboard() {
     <div id="clDashCharts"></div>`;
 
   $('clDashRefresh').addEventListener('click', () => { clLoaded.add('dashboard'); clInitDashboard(); });
-  clStartDashClock();
 
   await clLoadDashboard();
-}
-
-function clPartOfDay() {
-  const h = new Date().getHours();
-  return h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening';
-}
-
-/* Date and time under the greeting, ticking each minute.
-   ONE INTERVAL FOR THE LIFE OF THE PAGE, not one per visit to the Dashboard.
-   `clInitDashboard` re-renders this markup every time the screen is re-entered
-   or Refresh is pressed, so starting a fresh interval here without clearing the
-   last one would leave a growing pile of timers all writing to an element that
-   no longer exists. The handle is module-scoped and cleared first. */
-let clDashClockTimer = null;
-function clStartDashClock() {
-  const paint = () => {
-    const el = $('clDashClock');
-    if (!el) { clearInterval(clDashClockTimer); clDashClockTimer = null; return; }
-    const now = new Date();
-    el.textContent = `${now.toLocaleDateString('en-IN', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    })} · ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-  };
-  clearInterval(clDashClockTimer);
-  paint();
-  clDashClockTimer = setInterval(paint, 30000);
 }
 
 /* The shape of the answer, while the answer is on its way. Eight boxes, not a
@@ -637,9 +615,7 @@ function clRenderDashCharts(analytics, airlines) {
 
   host.innerHTML = `
     <div class="cl-page-head" style="margin:30px 0 16px;">
-      <div><h2 style="font-size:18px;">Your activity</h2>
-        <p style="font-size:12.5px;margin-top:3px;color:var(--cl-text-muted);font-weight:500;">
-          Volume, value and where you fly, across every booking you have raised.</p></div>
+      <div><h2 style="font-size:18px;">Your activity</h2></div>
     </div>
 
     <div class="cl-charts">

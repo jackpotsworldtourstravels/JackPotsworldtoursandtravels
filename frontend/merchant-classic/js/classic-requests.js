@@ -60,8 +60,6 @@ function clInitRequests() {
     <div class="cl-page-head">
       <div>
         <h1>My Requests</h1>
-        <p>Everything still in motion — awaiting a fare, an approval, a payment or a ticket.
-           Finished bookings move to <a href="#" data-cl-to-history>Booking History</a>.</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clReqRefresh">
@@ -140,9 +138,9 @@ function clInitRequests() {
       <div class="cl-panel-note" id="clReqNote"></div>
     </div>`;
 
-  $('cl-requests').querySelector('[data-cl-to-history]').addEventListener('click', e => {
-    e.preventDefault(); clGo('booking-history');
-  });
+  /* The "finished bookings move to Booking History" line that used to carry a
+     link to that screen went with the page descriptions; the rail is the way
+     across, and it always was. */
   /* Booking starts at the enquiry, not at a search: a request can only be
      raised against an enquiry our team has already answered. */
   $('clReqNew').addEventListener('click', () => clGo('enquiry'));

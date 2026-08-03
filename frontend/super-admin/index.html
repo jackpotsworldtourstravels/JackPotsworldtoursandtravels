@@ -11,14 +11,14 @@
 <!-- Reuses the Partner Portal's design system (navy/gold, cards, tables,
      modals) so the Super Admin Portal matches the project's established
      premium-enterprise language rather than inventing a new one. -->
-<link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260803ui14">
-<link rel="stylesheet" href="../assets/css/super-admin.css?v=20260803ui14">
+<link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260803ui22">
+<link rel="stylesheet" href="../assets/css/super-admin.css?v=20260803ui22">
 <!-- Shared design system — must stay last, see admin/index.html for why. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui20">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui22">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui13">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260803ui22">
 </head>
 <body>
 
@@ -313,17 +313,17 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260803ui20"></script>
-<script src="../components/toast.js?v=20260803ui5"></script>
-<script src="../components/spinner.js?v=20260803ui5"></script>
-<script src="../components/confirm-dialog.js?v=20260803ui5"></script>
-<script src="../assets/js/auth.js?v=20260803ui20"></script>
+<script src="../shared/formatters.js?v=20260803ui22"></script>
+<script src="../components/toast.js?v=20260803ui22"></script>
+<script src="../components/spinner.js?v=20260803ui22"></script>
+<script src="../components/confirm-dialog.js?v=20260803ui22"></script>
+<script src="../assets/js/auth.js?v=20260803ui22"></script>
 <script src="../assets/js/api.js"></script>
-<script src="../assets/js/super-admin-shared.js?v=20260803ui20"></script>
+<script src="../assets/js/super-admin-shared.js?v=20260803ui22"></script>
 <!-- Renders the shared login into #saAuthShell. Ordered BEFORE
      super-admin-auth.js deliberately: that module calls getElementById at parse
      time, so every id it binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260803ui8"></script>
+<script src="../assets/js/jp-login.js?v=20260803ui22"></script>
 <script>
   jpLoginMount('saAuthShell', {
     title: 'Super Admin Login',
@@ -342,11 +342,11 @@
     },
   });
 </script>
-<script src="../assets/js/super-admin-auth.js?v=20260803ui5"></script>
-<script src="../assets/js/super-admin-dashboard.js?v=20260803ui5"></script>
-<script src="../assets/js/super-admin-admin-management.js?v=20260803ui5"></script>
-<script src="../assets/js/super-admin-reports.js?v=20260803ui5"></script>
-<script src="../assets/js/super-admin-profile.js?v=20260803ui5"></script>
+<script src="../assets/js/super-admin-auth.js?v=20260803ui22"></script>
+<script src="../assets/js/super-admin-dashboard.js?v=20260803ui22"></script>
+<script src="../assets/js/super-admin-admin-management.js?v=20260803ui22"></script>
+<script src="../assets/js/super-admin-reports.js?v=20260803ui22"></script>
+<script src="../assets/js/super-admin-profile.js?v=20260803ui22"></script>
 <script>
   'use strict';
   if (isSuperAdminLoggedIn()) { showSuperAdminPortal(); } else { showSuperAdminAuthShell(); }
