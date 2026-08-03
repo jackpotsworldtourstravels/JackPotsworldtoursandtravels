@@ -42,6 +42,19 @@
    overridden to flex and collapse.
    ========================================================================== */
 
+/* THIS SHEET MUST CARRY ITS OWN RESET. partner-login.html, forgot-password.html
+   and reset-password.html load NOTHING else — no main.css, no admin.css, no
+   partner-portal.css — so the UA's default `body{margin:8px}` survived and drew
+   a white border down all four sides of a full-bleed photograph. It also forced
+   a scrollbar: 8px top + 8px bottom on top of a `min-height:100vh` shell can
+   never fit in 100vh.
+
+   Harmless on admin/ and super-admin/, which already set `*{margin:0}` in
+   admin.css — this restates that value rather than changing it. Scoping it to
+   `body:has(.jpl)` would be tidier but pointless for a value every portal sheet
+   already agrees on. */
+html,body{margin:0;}
+
 .jpl{
   /* The `?v=` matters more here than on a script. This file gets REPLACED — a
      better plate, a seasonal shot — at a URL that never changes, and a browser
@@ -63,6 +76,21 @@
   align-items:stretch;
   min-height:100vh;
   width:100%;
+
+  /* `padding:0` IS LOAD-BEARING — do not delete it as redundant. The element is
+     `class="partner-auth-shell jpl"`, and admin.css / super-admin.css still
+     carry the pre-redesign `.partner-auth-shell{ padding:24px; ... }`. Equal
+     specificity means source order decides, and jp-login.css loads last, so
+     every property it names wins — but a property it does NOT name is simply
+     inherited from the old rule. Padding was the one nobody named, so 48px of
+     it leaked into Admin and Super Admin alone, pushing a `min-height:100vh`
+     shell 6px past the viewport and putting a scrollbar on a page designed to
+     fit exactly. The merchant pages never showed it: they load no other sheet.
+
+     The same rule also sets `align-items:center` and a navy gradient
+     `background`; both ARE named above, which is why only padding escaped. */
+  padding:0;
+
   font-family:'Montserrat', system-ui, -apple-system, sans-serif;
   color:var(--jpl-ink);
   -webkit-font-smoothing:antialiased;
@@ -167,11 +195,23 @@
 /* ====================================================== right: the card zone
    Transparent, so the photograph runs behind and around the card exactly as it
    does in the reference. */
+/* THE CARD COLUMN IS WHAT DECIDES WHETHER THE PAGE FITS IN ONE SCREEN.
+   The art column only needs ~487px; this one stacks card + footer and came to
+   926px against a 900px viewport, so the page scrolled by exactly the excess.
+
+   The three vertical values below are therefore `clamp(floor, vh, current)`,
+   not smaller fixed numbers: they hold the original spacing on tall displays
+   and give back ~34px by 900px tall, which is what buys the fit. Every `vh`
+   coefficient is under the ratio of its own maximum (34px is 3.8vh at 900px,
+   so 2.7vh is what actually compresses there) — raise one above that ratio and
+   it silently pins to the max and stops doing anything.
+
+   Horizontal padding is untouched; only height was ever the problem. */
 .jpl-side{
   position:relative; z-index:1;
   flex:1 1 42%; min-width:0;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:34px 42px 26px;
+  padding:clamp(16px,2.7vh,34px) 42px clamp(12px,2vh,26px);
 }
 .jpl-side-inner{width:100%; max-width:620px;}
 
@@ -186,7 +226,7 @@
   backdrop-filter:blur(22px) saturate(125%);
   border:1px solid rgba(255,255,255,0.55);
   border-radius:26px;
-  padding:44px 52px 40px;
+  padding:clamp(30px,4.2vh,44px) 52px clamp(28px,3.9vh,40px);
   box-shadow:
     0 2px 6px rgba(4,18,35,0.06),
     0 20px 44px -14px rgba(4,18,35,0.26),
@@ -343,7 +383,7 @@
 
 /* Sits on the photograph, under the card — not inside it. */
 .jpl-foot{
-  margin-top:22px; text-align:center; font-size:13.5px;
+  margin-top:clamp(12px,1.9vh,22px); text-align:center; font-size:13.5px;
   color:rgba(255,255,255,0.82); line-height:1.7;
   text-shadow:0 1px 10px rgba(4,18,35,0.55);
 }
