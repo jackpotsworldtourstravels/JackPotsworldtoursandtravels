@@ -37,7 +37,11 @@
    ========================================================================== */
 
 .jpl{
-  --jpl-bg:url('../images/login-collage.jpg');
+  /* The `?v=` matters more here than on a script. This file gets REPLACED — a
+     better plate, a seasonal shot — at a URL that never changes, and a browser
+     (or Caddy) holding the old bytes shows the previous artwork with no way for
+     anyone to tell why. Bump this whenever the file is swapped. */
+  --jpl-bg:url('../images/login-collage.jpg?v=20260803a');
   --jpl-navy-deep:#04162B;
   --jpl-navy:#0A2540;
   --jpl-gold:#E0A32E;
