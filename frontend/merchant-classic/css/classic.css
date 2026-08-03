@@ -575,7 +575,7 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
   text-decoration:none;
   transition:background var(--cl-fast), color var(--cl-fast), border-color var(--cl-fast);
 }
-.cl-top-btn:hover{background:var(--cl-hover); color:var(--cl-text); text-decoration:none;}
+.cl-top-btn:hover{background:var(--cl-hover-control); color:var(--cl-text); text-decoration:none;}
 .cl-top-btn svg{width:17px; height:17px;}
 .cl-top-icon{width:38px; padding:0;}
 
@@ -624,7 +624,7 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
   background:transparent; border:1px solid transparent;
   transition:background var(--cl-fast), border-color var(--cl-fast);
 }
-.cl-profile-btn:hover{background:var(--cl-hover); border-color:var(--cl-line);}
+.cl-profile-btn:hover{background:var(--cl-hover-control); border-color:var(--cl-line);}
 .cl-profile-btn[aria-expanded="true"]{background:var(--cl-hover); border-color:var(--cl-line);}
 .cl-avatar{
   width:34px; height:34px; flex-shrink:0; border-radius:var(--cl-r-pill);
@@ -677,7 +677,7 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
   cursor:pointer; text-align:left; text-decoration:none;
   transition:background var(--cl-fast), color var(--cl-fast);
 }
-.cl-menu-item:hover{background:var(--cl-hover); color:var(--cl-text); text-decoration:none;}
+.cl-menu-item:hover{background:var(--cl-hover-control); color:var(--cl-text); text-decoration:none;}
 .cl-menu-item svg{width:16px; height:16px; flex-shrink:0; color:var(--cl-text-muted);}
 .cl-menu-item:hover svg{color:var(--cl-orange);}
 .cl-menu-item.danger{color:var(--cl-danger-fg);}
@@ -914,8 +914,14 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
              color var(--cl-fast), transform var(--cl-fast), box-shadow var(--cl-fast);
 }
 .cl-btn svg{width:16px; height:16px; flex-shrink:0;}
+/* THE SECONDARY BUTTON IS THE ONE THE HOVER FAULT WAS REPORTED ON.
+   Its resting fill is `--cl-surface` (opaque #FFF in light) and it usually
+   sits on a panel that is also #FFF, so the old `--cl-hover` — 4% of near-black
+   with NO opaque base — painted the panel behind it and landed a couple of RGB
+   steps from where it started. The control token is opaque and accent-tinted,
+   so the button gains a background instead of appearing to lose one. */
 .cl-btn:hover:not(:disabled){
-  background:var(--cl-hover); border-color:#CBD6E4;
+  background:var(--cl-hover-control); border-color:var(--cl-hover-control-line);
   text-decoration:none; transform:translateY(-1px); box-shadow:var(--cl-sh-sm);
 }
 :root[data-theme="dark"] .cl-btn:hover:not(:disabled){border-color:#33455F;}
@@ -957,7 +963,7 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 
 .cl-btn-ghost{background:transparent; border-color:transparent; color:var(--cl-text-2);}
-.cl-btn-ghost:hover:not(:disabled){background:var(--cl-hover); border-color:transparent; box-shadow:none;}
+.cl-btn-ghost:hover:not(:disabled){background:var(--cl-hover-control); border-color:transparent; box-shadow:none;}
 
 .cl-btn-danger{
   color:var(--cl-danger-fg); background:var(--cl-danger-bg);
@@ -1268,7 +1274,10 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
   transition:background var(--cl-fast), color var(--cl-fast),
              border-color var(--cl-fast), box-shadow var(--cl-fast);
 }
-.cl-chip:hover{background:var(--cl-hover); color:var(--cl-text); border-color:var(--cl-text-muted);}
+/* The chip KEEPS ITS BORDER and gains a tint — the border was already the
+   thing that made it read as a chip, so strengthening it to the accent line
+   rather than to muted grey is what makes the hover feel deliberate. */
+.cl-chip:hover{background:var(--cl-hover-control); color:var(--cl-text); border-color:var(--cl-hover-control-line);}
 .cl-chip[aria-checked="true"]{
   background:var(--cl-navy-800); color:#fff; border-color:var(--cl-navy-800);
   box-shadow:var(--cl-sh-xs);
@@ -2128,7 +2137,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   color:var(--cl-text); background:var(--cl-canvas-2);
   transition:background var(--cl-fast);
 }
-.cl-sc-back:hover{background:var(--cl-hover);}
+.cl-sc-back:hover{background:var(--cl-hover-control);}
 .cl-sc-back svg{width:17px; height:17px; transform:rotate(180deg);}
 /* The details toggle only exists where the details column has left the flow. */
 .cl-sc-info-btn{display:none;}
@@ -2288,7 +2297,9 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   color:var(--cl-danger-fg); background:var(--cl-danger-bg);
   border:1px solid rgba(224,54,75,0.32);
 }
-.cl-sc-retry button:hover{background:#fff;}
+/* Was a literal `#fff` — the clearest instance of the reported fault, since the
+   retry button sits on a white panel and hovering it made the button vanish. */
+.cl-sc-retry button:hover{background:var(--cl-hover-control);}
 :root[data-theme="dark"] .cl-sc-retry button:hover{background:rgba(255,255,255,0.10);}
 .cl-sc-row.failed .cl-bubble.out{
   background:var(--cl-danger-bg); color:var(--cl-danger-fg); box-shadow:none;
@@ -2367,7 +2378,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   font-size:21px; line-height:1; cursor:pointer; color:var(--cl-text-muted);
   transition:background var(--cl-fast), color var(--cl-fast);
 }
-.cl-sc-cbtn:hover{background:var(--cl-hover); color:var(--cl-text);}
+.cl-sc-cbtn:hover{background:var(--cl-hover-control); color:var(--cl-text);}
 /* `relative` is scoped to this state rather than added to every composer
    button — the emoji popover is absolute to .cl-sc-compose, and making each
    button a containing block would reparent it onto the button. */
@@ -2424,7 +2435,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   aspect-ratio:1; border-radius:var(--cl-r-xs); font-size:18px; cursor:pointer;
   transition:background var(--cl-fast), transform var(--cl-fast);
 }
-.cl-emoji-pop button:hover{background:var(--cl-hover); transform:scale(1.18);}
+.cl-emoji-pop button:hover{background:var(--cl-hover-control); transform:scale(1.18);}
 
 /* ---- empty states ---- */
 
@@ -2483,7 +2494,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   display:flex; align-items:center; justify-content:center;
   color:var(--cl-text-muted); transition:background var(--cl-fast), color var(--cl-fast);
 }
-.cl-sc-x:hover{background:var(--cl-hover); color:var(--cl-text);}
+.cl-sc-x:hover{background:var(--cl-hover-control); color:var(--cl-text);}
 .cl-sc-info-body{flex:1; overflow-y:auto; padding:14px; min-height:0;}
 
 .cl-sc-card{
@@ -2589,7 +2600,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-sc-more summary::-webkit-details-marker{display:none;}
 .cl-sc-more summary::after{content:'+'; float:right; font-weight:800; font-size:15px; line-height:1.2;}
 .cl-sc-more[open] summary::after{content:'–';}
-.cl-sc-more summary:hover{background:var(--cl-hover); color:var(--cl-text);}
+.cl-sc-more summary:hover{background:var(--cl-hover-control); color:var(--cl-text);}
 .cl-sc-more summary span{font-weight:500; color:var(--cl-text-muted);}
 .cl-sc-more .cl-field{margin-top:14px;}
 
@@ -3121,7 +3132,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
     border-radius:var(--cl-r-sm);
     transition:background var(--cl-fast);
   }
-  .cl-burger:hover{background:var(--cl-hover);}
+  .cl-burger:hover{background:var(--cl-hover-control);}
   .cl-burger svg{width:19px; height:19px;}
   .cl-form, .cl-form-3{grid-template-columns:repeat(2, minmax(0,1fr));}
   .cl-top-date{display:none;}

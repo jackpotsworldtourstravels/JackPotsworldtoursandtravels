@@ -38,12 +38,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260803ui22">
+<link rel="stylesheet" href="css/classic.css?v=20260803ui23">
 <!-- Shared design system — must stay last. It re-points classic.css's own
      `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
      contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
      text) so every AA measurement in this portal still holds. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui22">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260803ui23">
 </head>
 <body>
 
@@ -226,9 +226,10 @@
            an "Operations" heading, which put the third step of the flow under
            a different label from the first two. -->
       <div class="cl-side-group">Operations</div>
-      <!-- "Booking Enquiry" here, "Ticket Enquiry" on every staff screen.
-           Deliberate: the merchant is starting a booking, the desk is working an
-           enquiry queue. Same rows, same request_type. -->
+      <!-- "Booking Enquiry" here AND in the Admin Portal now — the deliberate
+           split that used to call this "Ticket Enquiry" on staff screens was
+           dropped on request. Only the Premium portal still uses the old name.
+           Same rows, same request_type either way. -->
       <a href="#" data-cl-nav="enquiry">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.4 3.4-2 2H3.5l-.7 1.4 3 1.6 1.6 3 1.4-.7v-2.2l2-2 3.4 3.4a.5.5 0 0 0 .8-.5z"/></svg></span>
         <span class="cl-side-label">Booking Enquiry</span>
@@ -381,28 +382,28 @@
      Order matters: axios, then formatters + auth (shared), then API_BASE via
      classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260803ui22"></script>
-<script src="../assets/js/auth.js?v=20260803ui22"></script>
+<script src="../shared/formatters.js?v=20260803ui23"></script>
+<script src="../assets/js/auth.js?v=20260803ui23"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
-<script src="../assets/js/travel-locations.js?v=20260803ui22"></script>
-<script src="js/classic-shell.js?v=20260803ui22"></script>
-<script src="../shared/merchant-api.js?v=20260803ui22"></script>
-<script src="js/classic-icons.js?v=20260803ui22"></script>
-<script src="js/classic-dashboard.js?v=20260803ui22"></script>
-<script src="js/classic-enquiry.js?v=20260803ui22"></script>
-<script src="js/classic-booking.js?v=20260803ui22"></script>
-<script src="js/classic-booking-detail.js?v=20260803ui22"></script>
-<script src="js/classic-requests.js?v=20260803ui22"></script>
-<script src="js/classic-history.js?v=20260803ui22"></script>
-<script src="js/classic-approvals.js?v=20260803ui22"></script>
-<script src="js/classic-wallet.js?v=20260803ui22"></script>
-<script src="js/classic-payments.js?v=20260803ui22"></script>
-<script src="js/classic-service.js?v=20260803ui22"></script>
-<script src="js/classic-reports.js?v=20260803ui22"></script>
-<script src="js/classic-account.js?v=20260803ui22"></script>
-<script src="js/classic-support.js?v=20260803ui22"></script>
+<script src="../assets/js/travel-locations.js?v=20260803ui23"></script>
+<script src="js/classic-shell.js?v=20260803ui23"></script>
+<script src="../shared/merchant-api.js?v=20260803ui23"></script>
+<script src="js/classic-icons.js?v=20260803ui23"></script>
+<script src="js/classic-dashboard.js?v=20260803ui23"></script>
+<script src="js/classic-enquiry.js?v=20260803ui23"></script>
+<script src="js/classic-booking.js?v=20260803ui23"></script>
+<script src="js/classic-booking-detail.js?v=20260803ui23"></script>
+<script src="js/classic-requests.js?v=20260803ui23"></script>
+<script src="js/classic-history.js?v=20260803ui23"></script>
+<script src="js/classic-approvals.js?v=20260803ui23"></script>
+<script src="js/classic-wallet.js?v=20260803ui23"></script>
+<script src="js/classic-payments.js?v=20260803ui23"></script>
+<script src="js/classic-service.js?v=20260803ui23"></script>
+<script src="js/classic-reports.js?v=20260803ui23"></script>
+<script src="js/classic-account.js?v=20260803ui23"></script>
+<script src="js/classic-support.js?v=20260803ui23"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

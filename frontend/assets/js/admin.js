@@ -86,7 +86,7 @@ const sectionTitles = {
   support: 'Support Management', 'reports-export': 'Reports', analytics: 'Analytics',
   payments: 'Payment Management',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
-  'ticket-enquiries': 'Ticket Enquiries',
+  'ticket-enquiries': 'Booking Enquiries',
   'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
   /* Moved here from the Super Admin Portal; see assets/js/admin-logs.js. */

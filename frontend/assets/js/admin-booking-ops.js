@@ -128,7 +128,7 @@ const opsDash = v => (v === null || v === undefined || v === '' ? '—' : v);
    is a request the merchant made, and the desk reading a different clock from
    the person who filled the form in is how "09:30" becomes an evening flight.
    Normalised to two digits so a column of times lines up. */
-/* 12-hour, matching admTimeLabel (Bookings) and enqTime (Ticket Enquiries) —
+/* 12-hour, matching admTimeLabel (Bookings) and enqTime (Booking Enquiries) —
    this desk was the only one of the three still printing "19:45" for a merchant
    who chose 7:45 PM. The wire format is unchanged 24-hour "HH:MM"; this reads
    it, it does not write it. */

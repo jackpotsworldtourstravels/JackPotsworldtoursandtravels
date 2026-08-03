@@ -97,7 +97,7 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 .topbar .back-link{font-size:13px; font-weight:700; color:var(--sky);}
 .topbar-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
 .icon-btn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--hover-bg); color:var(--text-primary); position:relative; transition:background .18s ease;}
-.icon-btn:hover{background:var(--border-color);}
+.icon-btn:hover{background:var(--hover-control);}
 .theme-selector{display:flex; align-items:center; gap:2px; background:var(--hover-bg); border-radius:12px; padding:3px;}
 .theme-selector-btn{
   display:flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:9px;
@@ -334,7 +334,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .mm-page-head{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px;}
 .mm-page-head-left{display:flex; align-items:center; gap:14px;}
 .mm-back-btn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--hover-bg); color:var(--text-primary); flex-shrink:0;}
-.mm-back-btn:hover{background:var(--border-color);}
+.mm-back-btn:hover{background:var(--hover-control);}
 .mm-page-title{font-size:24px; font-weight:800; color:var(--text-primary); line-height:1.2;}
 .mm-page-sub{font-size:13px; color:var(--text-muted); margin-top:2px;}
 .mm-form-section{margin-bottom:20px;}
@@ -442,14 +442,18 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 
 .bm2-actions{display:flex; align-items:center; gap:6px; justify-content:flex-end;}
 .bm2-icon-btn{width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; color:var(--text-muted); transition:background .15s ease, color .15s ease; flex-shrink:0;}
-.bm2-icon-btn:hover{background:var(--card-bg); color:var(--text-primary); box-shadow:var(--shadow-sm);}
+/* THE TABLE ACTION BUTTON, AND THE MOST LITERAL FORM OF THE REPORTED FAULT:
+   `--card-bg` IS #FFFFFF in light mode, so hovering a row action turned it pure
+   white — brighter than the row it sits on and indistinguishable from the panel.
+   It keeps its lift; only the fill changes to the accent-tinted control token. */
+.bm2-icon-btn:hover{background:var(--hover-control); color:var(--text-primary); box-shadow:var(--shadow-sm);}
 .bm2-icon-btn .icon{width:16px; height:16px;}
 
 .bm2-more-wrap{position:relative;}
 .bm2-more-menu{position:absolute; top:calc(100% + 6px); right:0; min-width:196px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:var(--shadow-lg); padding:6px; z-index:50; display:none; opacity:0; transform:translateY(-6px) scale(.98); transition:opacity .15s ease, transform .15s ease;}
 .bm2-more-menu.open{display:block; opacity:1; transform:translateY(0) scale(1);}
 .bm2-more-item{display:flex; align-items:center; gap:9px; width:100%; padding:9px 10px; border-radius:8px; font-size:13px; font-weight:600; color:var(--text-primary); text-align:left;}
-.bm2-more-item:hover{background:var(--hover-bg);}
+.bm2-more-item:hover{background:var(--hover-control);}
 .bm2-more-item .icon{width:15px; height:15px; color:var(--text-muted); flex-shrink:0;}
 .bm2-more-item.danger{color:var(--coral-dark);}
 .bm2-more-item.danger .icon{color:var(--coral-dark);}
@@ -643,7 +647,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   font-size:10.5px; font-weight:700; white-space:nowrap;
   border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-primary);
 }
-.chat-file-get:hover:not(:disabled){background:var(--hover-bg);}
+.chat-file-get:hover:not(:disabled){background:var(--hover-control);}
 .chat-file-get:disabled{opacity:.5; cursor:not-allowed;}
 .chat-msg-out .chat-file-get{
   border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.2); color:#fff;
@@ -705,7 +709,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .topbar h1{font-size:18px;}
 }
 
-/* ---------- Ticket Enquiries (Phase 2) ----------
+/* ---------- Booking Enquiries (Phase 2) ----------
    Built from the tokens already defined above so the screen inherits light/dark
    automatically; nothing here hard-codes a colour that isn't a variable. */
 .panel-sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
@@ -763,7 +767,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   font-size:13px; font-weight:700; color:var(--text-muted);
   border-radius:8px 8px 0 0; margin-bottom:-2px;
 }
-.bo-tab:hover{background:var(--hover-bg); color:var(--text-primary);}
+.bo-tab:hover{background:var(--hover-control); color:var(--text-primary);}
 .bo-tab.active{color:var(--coral); border-bottom-color:var(--coral);}
 .bo-tab-count{font-weight:800; opacity:.75;}
 

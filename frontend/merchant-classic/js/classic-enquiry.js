@@ -14,10 +14,11 @@
                           is still called clRequestTicket.
      View Booking         replaces it once a booking exists, and only opens it
 
-   NAMING (CR-5). This is **Booking Enquiry** here and **Ticket Enquiry** on
-   every staff screen; the stored `request_type` is `ticket_enquiry` either way.
-   Renaming the API to match the merchant's word would have meant a migration
-   and a contract break for a label.
+   NAMING (CR-5, revised). This is **Booking Enquiry** here and in the Admin
+   Portal — the old split that said "Ticket Enquiry" on staff screens was
+   dropped on request, and only the Premium portal still carries it. The stored
+   `request_type` is `ticket_enquiry` throughout regardless: renaming the API to
+   match the label would have meant a migration and a contract break for a word.
 
    THE ANSWER IS A QUOTATION (CR-5). Our team replies with a total fare and the
    remarks that explain it, and that fare is binding: the booking raised from

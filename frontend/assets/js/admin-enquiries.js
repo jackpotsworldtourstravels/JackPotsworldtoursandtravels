@@ -1,4 +1,4 @@
-/* Admin — Ticket Enquiries (Phase 2)
+/* Admin — Booking Enquiries (Phase 2)
    ==================================
    The Admin half of the merchant's Enquire Ticket flow. A merchant describes a
    sector; this screen is where our team answers it.
@@ -21,10 +21,14 @@
    issued. There is no edit afterwards, which is why the confirmation names the
    figure.
 
-   THE WORDING HERE IS DELIBERATELY NOT THE MERCHANT'S. The merchant portal
-   calls this a **Booking Enquiry** (CR-5); staff screens keep **Ticket
-   Enquiry**, which is the internal operations vocabulary and the one the specs
-   use. Same rows, same `request_type`, two audiences.
+   THE ADMIN PORTAL NOW SAYS **BOOKING ENQUIRY**, THE SAME AS THE MERCHANT.
+   It used to say "Ticket Enquiry" on purpose — the merchant was starting a
+   booking, the desk was working an enquiry queue, and the split was the
+   internal operations vocabulary (CR-5). That split was dropped on request:
+   two names for one row cost more in confusion than the distinction was worth.
+   The Premium merchant portal (`merchant/`) still says "Ticket Enquiry"; it
+   was not in scope. Nothing underneath moved — same rows, same `request_type`,
+   and the section key is still `ticket-enquiries`.
 
    ENDPOINTS — all pre-existing or added in Phase 2, none duplicated here:
      GET  /api/enquiries                          list (platform staff see all)
@@ -193,7 +197,7 @@ async function loadTicketEnquiries(page = enqPage) {
       statusValue === 'awaiting' || !statusValue ? openCount : undefined);
     document.getElementById('enqPagination').innerHTML = '';
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load ticket enquiries.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load booking enquiries.</td></tr>`;
   }
 }
 
@@ -233,7 +237,7 @@ async function openEnquiryReview(enquiryId) {
   const overlay = document.getElementById('enqReviewModalOverlay');
   const body = document.getElementById('enqReviewModalBody');
   overlay.classList.add('open');
-  body.innerHTML = `<h2>Ticket Enquiry</h2><div>${rowsSkeleton(4)}</div>`;
+  body.innerHTML = `<h2>Booking Enquiry</h2><div>${rowsSkeleton(4)}</div>`;
 
   let r;
   try {
@@ -242,7 +246,7 @@ async function openEnquiryReview(enquiryId) {
        and the modal should open on the truth. */
     r = (await axios.get(`${API_BASE}/api/enquiries/${enquiryId}`, { headers: authHeaders() })).data;
   } catch (err) {
-    body.innerHTML = `<h2>Ticket Enquiry</h2>
+    body.innerHTML = `<h2>Booking Enquiry</h2>
       <div class="msg error">${escapeHtml(err.response?.data?.detail || 'Failed to load this enquiry.')}</div>
       <div class="modal-actions"><button class="btn btn-ghost" data-enq-close>Close</button></div>`;
     wireEnquiryModal(overlay, body, null);

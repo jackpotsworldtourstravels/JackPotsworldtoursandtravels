@@ -125,7 +125,27 @@
   --jp-text:#0B1020;
   --jp-text-2:#475569;
   --jp-text-muted:#64748B;      /* 4.76:1 on white                          */
-  --jp-hover:rgba(11,16,32,.04);
+  /* TWO HOVERS, BECAUSE A ROW AND A BUTTON WANT DIFFERENT ANSWERS.
+     `--jp-hover` is the passive one: table rows, list items, menu entries —
+     things you sweep across on the way somewhere else, where a strong wash
+     would strobe. It was .04, which is about one JND on white and read as
+     nothing at all; .055 is still quiet and is actually visible.
+
+     `--jp-hover-control` is for things you are aiming AT. It exists because a
+     translucent tint cannot work on a control whose resting fill is already
+     opaque white: `.cl-btn` sits at `--jp-surface` (#FFF) on a panel that is
+     usually also white, so painting 4% of near-black over the PANEL behind it
+     landed within a couple of RGB steps of where it started — the button
+     looked like it had lost its background rather than gained a hover. This
+     one is opaque and carries the accent's own hue, so the feedback is
+     unmistakable and still nowhere near a high-contrast flash.
+
+     LIGHT MODE ONLY. Both dark blocks below point `--jp-hover-control` back at
+     `--jp-hover`, so nothing about dark hover behaviour changes — the defect
+     is a light-mode one (white on white) and does not exist there. */
+  --jp-hover:rgba(11,16,32,.055);
+  --jp-hover-control:var(--jp-violet-50);
+  --jp-hover-control-line:var(--jp-accent-line);
   --jp-zebra:rgba(11,16,32,.018);
 
   --jp-accent:var(--jp-violet-500);
@@ -180,6 +200,12 @@
   --jp-text-2:#CBD5E1;
   --jp-text-muted:#94A3B8;      /* 6.78:1 on the card                       */
   --jp-hover:rgba(255,255,255,.045);
+  /* Dark keeps ONE hover. A light wash over a dark surface is already clearly
+     visible whatever the control's resting fill is, so the split above solves
+     a problem dark does not have — and re-tinting it violet here would change
+     a theme nobody reported a fault in. */
+  --jp-hover-control:var(--jp-hover);
+  --jp-hover-control-line:var(--jp-border-strong);
   --jp-zebra:rgba(255,255,255,.02);
 
   /* The fill stays #6D5DF6; only the READABLE weight moves. */
@@ -224,6 +250,12 @@
     --jp-text-2:#CBD5E1;
     --jp-text-muted:#94A3B8;
     --jp-hover:rgba(255,255,255,.045);
+  /* Dark keeps ONE hover. A light wash over a dark surface is already clearly
+     visible whatever the control's resting fill is, so the split above solves
+     a problem dark does not have — and re-tinting it violet here would change
+     a theme nobody reported a fault in. */
+  --jp-hover-control:var(--jp-hover);
+  --jp-hover-control-line:var(--jp-border-strong);
     --jp-zebra:rgba(255,255,255,.02);
     --jp-accent-ink:var(--jp-violet-300);
     --jp-accent-soft:rgba(109,93,246,.16);
@@ -282,6 +314,8 @@
   --text-muted:var(--jp-text-muted);
   --border-color:var(--jp-border);
   --hover-bg:var(--jp-hover);
+  --hover-control:var(--jp-hover-control);
+  --hover-control-line:var(--jp-hover-control-line);
 
   --shadow-xs:var(--jp-sh-xs);
   --shadow-sm:var(--jp-sh-sm);
@@ -314,6 +348,8 @@
   --text-muted:var(--jp-text-muted);
   --border-color:var(--jp-border);
   --hover-bg:var(--jp-hover);
+  --hover-control:var(--jp-hover-control);
+  --hover-control-line:var(--jp-hover-control-line);
   --gold-dark:var(--jp-warning-fg);
   --gold-soft:var(--jp-warning-bg);
   --coral-dark:var(--jp-accent-ink);
@@ -331,6 +367,8 @@
     --text-muted:var(--jp-text-muted);
     --border-color:var(--jp-border);
     --hover-bg:var(--jp-hover);
+  --hover-control:var(--jp-hover-control);
+  --hover-control-line:var(--jp-hover-control-line);
     --gold-soft:var(--jp-warning-bg);
     --shadow-sm:var(--jp-sh-sm);
     --shadow-md:var(--jp-sh-md);
@@ -373,6 +411,8 @@
   --cl-line:var(--jp-border);
   --cl-line-2:var(--jp-border);
   --cl-hover:var(--jp-hover);
+  --cl-hover-control:var(--jp-hover-control);
+  --cl-hover-control-line:var(--jp-hover-control-line);
   --cl-zebra:var(--jp-zebra);
   --cl-accent:var(--jp-accent);
   --cl-accent-soft:var(--jp-accent-soft);
@@ -411,6 +451,8 @@
   --cl-line:var(--jp-border);
   --cl-line-2:var(--jp-border);
   --cl-hover:var(--jp-hover);
+  --cl-hover-control:var(--jp-hover-control);
+  --cl-hover-control-line:var(--jp-hover-control-line);
   --cl-zebra:var(--jp-zebra);
   --cl-orange-cta:var(--jp-violet-500);
   --cl-orange-cta-2:var(--jp-violet-600);
@@ -488,14 +530,29 @@ h1,h2,h3,h4{letter-spacing:-.015em;}
 .btn:focus-visible, .cl-btn:focus-visible{outline:none; box-shadow:var(--jp-focus);}
 
 /* primary */
-.btn-coral, .btn-navy, .btn-primary, .cl-btn-primary{
+/* `.cl-btn.cl-btn-primary`, NOT `.cl-btn-primary` — AND THAT IS A BUG FIX.
+   The merchant portal writes both classes on one element (`class="cl-btn
+   cl-btn-primary"`), so this rule and the `.cl-btn` rule below were both
+   (0,1,0) and matched the same button. Equal specificity means source order
+   decides, the secondary block is second, and the result was that EVERY
+   primary button in the Classic portal — "Sign in", "Verify & continue", every
+   CTA — rendered with the white secondary fill and dark text. Verified in
+   production before changing it. Adding `.cl-btn` here takes primary to
+   (0,2,0) and its hover to (0,4,0), so the pair can never be flipped by
+   whatever gets appended to this file later. The other portals were unaffected:
+   nothing writes `btn-primary` and `btn-ghost` on the same element. */
+.btn-coral, .btn-navy, .btn-primary, .cl-btn.cl-btn-primary{
   background:linear-gradient(180deg, var(--jp-violet-500), var(--jp-violet-600));
   color:var(--jp-on-accent);
   border:1px solid transparent;
   box-shadow:var(--jp-sh-accent);
 }
-.btn-coral:hover, .btn-navy:hover, .btn-primary:hover, .cl-btn-primary:hover:not(:disabled){
-  background:linear-gradient(180deg, var(--jp-violet-400), var(--jp-violet-500));
+/* Primary hover DARKENS rather than lightening: the resting fill is already
+   the lightest violet that holds white text above 4.5:1, so brightening it
+   would fail AA in the one state the user is definitely looking at. This
+   matches the intent classic.css already documented for its own primary. */
+.btn-coral:hover, .btn-navy:hover, .btn-primary:hover, .cl-btn.cl-btn-primary:hover:not(:disabled){
+  background:linear-gradient(180deg, var(--jp-violet-600), var(--jp-violet-700));
   box-shadow:0 10px 26px -10px rgba(109,93,246,.66);
   transform:translateY(-1px);
   filter:none;
@@ -507,9 +564,15 @@ h1,h2,h3,h4{letter-spacing:-.015em;}
   color:var(--jp-text);
   border:1px solid var(--jp-border);
 }
+/* THIS is the rule that actually governs the secondary button's hover — it
+   loads after classic.css's own `.cl-btn:hover` and overrides it, so fixing
+   the portal sheet alone would have changed nothing. `--jp-hover` is a 4%
+   translucent wash and the button's resting fill is opaque #FFF on a panel
+   that is usually also #FFF, which is why hovering read as the button losing
+   its background. The control token is opaque and accent-tinted. */
 .btn-ghost:hover, .cl-btn:hover:not(:disabled){
-  background:var(--jp-hover);
-  border-color:var(--jp-border-strong);
+  background:var(--jp-hover-control);
+  border-color:var(--jp-hover-control-line);
   filter:none;
 }
 
@@ -776,7 +839,7 @@ input[type=checkbox], input[type=radio]{accent-color:var(--jp-accent);}
   font-size:12.5px;
   transition:background var(--jp-fast), border-color var(--jp-fast);
 }
-.pagination button:hover:not(:disabled){background:var(--jp-hover); border-color:var(--jp-border-strong);}
+.pagination button:hover:not(:disabled){background:var(--jp-hover-control); border-color:var(--jp-border-strong);}
 .pagination button:disabled{opacity:.42;}
 
 
@@ -943,7 +1006,7 @@ table{width:100%;}
   background:var(--jp-surface); color:var(--jp-text);
   transition:border-color var(--jp-fast), background var(--jp-fast), box-shadow var(--jp-fast);
 }
-.jp-method:hover{border-color:var(--jp-border-strong); background:var(--jp-hover);}
+.jp-method:hover{border-color:var(--jp-border-strong); background:var(--jp-hover-control);}
 .jp-method[aria-pressed="true"]{border-color:var(--jp-accent); background:var(--jp-accent-soft); box-shadow:var(--jp-focus);}
 .jp-method .jp-method-ico{width:38px; height:38px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:var(--jp-r-sm); background:var(--jp-accent-soft); color:var(--jp-accent-ink);}
 .jp-method b{display:block; font-size:13.5px; font-weight:700;}
@@ -980,7 +1043,7 @@ table{width:100%;}
   background:var(--jp-surface); color:var(--jp-text-muted);
   transition:background var(--jp-fast), color var(--jp-fast), border-color var(--jp-fast);
 }
-.jp-copy:hover{background:var(--jp-hover); color:var(--jp-text); border-color:var(--jp-border-strong);}
+.jp-copy:hover{background:var(--jp-hover-control); color:var(--jp-text); border-color:var(--jp-border-strong);}
 .jp-copy.is-done{color:var(--jp-success-fg); border-color:var(--jp-success-fg);}
 .jp-copy svg{width:16px; height:16px;}
 
