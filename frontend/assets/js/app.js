@@ -297,16 +297,11 @@ function applyWishlistState(container) {
     btn.textContent = saved ? '♥' : '♡';
   });
 }
-function cardActionsHtml(type, item, label) {
-  const id = item.id;
-  const detailsJson = JSON.stringify(item).replace(/'/g, '&apos;');
-  return `
-    <div class="card-actions">
-      <button type="button" class="wl-btn" data-wl-type="${type}" data-wl-id="${id}" aria-label="Save to wishlist">&#9825;</button>
-      <button type="button" class="review-link" data-review-type="${type}" data-review-id="${id}" data-review-label="${label}">&#9733; Reviews</button>
-      <button type="button" class="details-link" data-details-type="${type}" data-details-item='${detailsJson}'>View Details</button>
-    </div>`;
-}
+/* cardActionsHtml() built the wishlist / Reviews / View Details row for each rendered
+   card. It was only ever called by the search-result renderer and the featured-packages
+   loader, both of which called retired catalog endpoints and are gone. Nothing in the
+   static markup carries data-wl-type, data-review-type or data-details-type, so the
+   handlers below them have no entry point left — see the note in index.html. */
 document.addEventListener('click', async e => {
   const wlBtn = e.target.closest('[data-wl-type]');
   if (!wlBtn) return;
@@ -328,7 +323,7 @@ document.addEventListener('click', async e => {
       wishlistMap.set(key, data.id);
       showToast('Saved to wishlist!');
     }
-    applyWishlistState(wlBtn.closest('.pkg-grid, .search-results-list'));
+    applyWishlistState(wlBtn.closest('.pkg-grid'));
   } catch (err) { showToast(apiErrorText(err, 'Wishlist update failed.'), true); }
 });
 refreshWishlistState();
@@ -567,118 +562,17 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    redesign — tour_packages no longer exists — so that call only ever 404'd and fell
    through to the hardcoded cards. Removed rather than left firing on every load. */
 
-/* Search results: wire each tab's Search button to the matching content API */
-/* Parse a count out of select text like "3 Passengers" or "5+ Guests" */
-function parseCount(text) {
-  const match = (text || '').match(/\d+/);
-  return match ? Number(match[0]) : 1;
-}
-/* Each date field pairs a readonly display input with a hidden real <input type="date"> */
-function nativeDateValue(displayInputId) {
-  const display = document.getElementById(displayInputId);
-  const native = display?.closest('.field-date')?.querySelector('.date-native');
-  return native?.value || undefined;
-}
-
-const searchEndpoints = {
-  flights: () => ['flights', {
-    from_airport: document.getElementById('fFrom').value,
-    to_airport: document.getElementById('fTo').value,
-    departure_date: nativeDateValue('fDep'),
-    cabin_class: document.getElementById('fCabin').value,
-    passengers: parseCount(document.getElementById('fPax').value),
-  }],
-  hotels: () => ['hotels', {
-    location: document.getElementById('hDest').value,
-    rooms: parseCount(document.getElementById('hRooms').value),
-  }],
-  cruises: () => ['cruises', {
-    cruise_type: document.getElementById('crType').value,
-    departure_month: document.getElementById('crMonth').value,
-    duration_days: parseCount(document.getElementById('crDur').value),
-  }],
-  packages: () => ['packages', {
-    package_type: document.getElementById('pType').value,
-    month: document.getElementById('pMonth').value,
-  }],
-};
-
-function renderSearchResults(tab, items) {
-  const section = document.getElementById('searchResultsSection');
-  const list = document.getElementById('searchResultsList');
-  const empty = document.getElementById('searchResultsEmpty');
-  section.classList.add('open');
-  if (!items.length) {
-    list.innerHTML = '';
-    empty.style.display = 'block';
-    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
-  empty.style.display = 'none';
-  const cardFor = {
-    flights: f => `
-      <div class="result-card">
-        <div class="result-main">
-          <div class="result-title">${f.airline} — ${f.from_airport} → ${f.to_airport}</div>
-          <div class="result-sub">${new Date(f.departure_time).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} · ${f.cabin_class}</div>
-        </div>
-        <div class="result-price">₹${Math.round(f.price).toLocaleString('en-IN')}</div>
-        <a href="#" class="btn btn-coral result-book" data-book-type="flight" data-book-id="${f.id}" data-book-price="${f.price}" data-book-label="${f.airline} ${f.from_airport}→${f.to_airport}">Book Now</a>
-        ${cardActionsHtml('flight', f, `${f.airline} ${f.from_airport}→${f.to_airport}`)}
-      </div>`,
-    hotels: h => `
-      <div class="result-card">
-        <div class="result-main">
-          <div class="result-title">${h.name}</div>
-          <div class="result-sub">${h.location} · ★ ${h.rating.toFixed(1)}</div>
-        </div>
-        <div class="result-price">₹${Math.round(h.price_per_night).toLocaleString('en-IN')}<span>/night</span></div>
-        <a href="#" class="btn btn-coral result-book" data-book-type="hotel" data-book-id="${h.id}" data-book-price="${h.price_per_night}" data-book-label="${h.name}">Book Now</a>
-        ${cardActionsHtml('hotel', h, h.name)}
-      </div>`,
-    cruises: c => `
-      <div class="result-card">
-        <div class="result-main">
-          <div class="result-title">${c.name}</div>
-          <div class="result-sub">${c.departure_port} · ${c.duration_days} Days · ${c.departure_month}</div>
-        </div>
-        <div class="result-price">₹${Math.round(c.price).toLocaleString('en-IN')}</div>
-        <a href="#" class="btn btn-coral result-book" data-book-type="cruise" data-book-id="${c.id}" data-book-price="${c.price}" data-book-label="${c.name}">Book Now</a>
-        ${cardActionsHtml('cruise', c, c.name)}
-      </div>`,
-    packages: p => `
-      <div class="result-card">
-        <div class="result-main">
-          <div class="result-title">${p.title}</div>
-          <div class="result-sub">${p.duration_days} Days · ★ ${p.rating.toFixed(1)}</div>
-        </div>
-        <div class="result-price">₹${Math.round(p.price).toLocaleString('en-IN')}</div>
-        <a href="#" class="btn btn-coral result-book" data-book-type="package" data-book-id="${p.id}" data-book-price="${p.price}" data-book-label="${p.title}">Book Now</a>
-        ${cardActionsHtml('package', p, p.title)}
-      </div>`,
-  };
-  list.innerHTML = items.map(cardFor[tab]).join('');
-  applyWishlistState(list);
-  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
+/* The hero Search button has no API left to call. GET /api/flights|hotels|cruises|packages
+   went with the rest of the B2C surface in the V2 nine-table redesign, so every search
+   404'd and surfaced as "Search failed — please try again." — inviting a retry that could
+   never succeed. The request, the result-card renderer and the two form-reading helpers
+   only it used are gone; the button now says what is true. Restore from git history if
+   the catalog ever returns. */
 document.querySelectorAll('.search-go').forEach(btn => {
-  btn.addEventListener('click', async e => {
+  btn.addEventListener('click', e => {
     e.preventDefault();
-    const activeTab = document.querySelector('.tab.active')?.dataset.tab;
-    const buildQuery = searchEndpoints[activeTab];
-    if (!buildQuery) return;
-    const [endpoint, params] = buildQuery();
-    try {
-      const { data } = await axios.get(`${API_BASE}/api/${endpoint}`, { params });
-      renderSearchResults(activeTab, data);
-    } catch (err) {
-      showToast('Search failed — please try again.', true);
-    }
+    showToast("Live search isn't available — browse our featured packages below.", true);
   });
-});
-document.getElementById('searchResultsClose')?.addEventListener('click', () => {
-  document.getElementById('searchResultsSection').classList.remove('open');
 });
 
 /* AI chatbot */

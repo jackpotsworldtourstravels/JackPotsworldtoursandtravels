@@ -263,18 +263,12 @@
   <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
 </section>
 
-<section class="search-results-section" id="searchResultsSection">
-  <div class="wrap">
-    <div class="search-results-card">
-      <div class="search-results-head">
-        <span>Search results</span>
-        <button type="button" class="search-results-close" id="searchResultsClose" aria-label="Close results">&times;</button>
-      </div>
-      <div class="search-results-list" id="searchResultsList"></div>
-      <p class="search-results-empty" id="searchResultsEmpty" style="display:none;">No results match that search — try different filters.</p>
-    </div>
-  </div>
-</section>
+<!-- The search-results panel lived here. Nothing could ever open it: it was filled only
+     by renderSearchResults(), which consumed the catalog API retired in the V2 redesign.
+     Removed with that code. The wishlist, Reviews and View Details modals further down
+     are in the same position — their only trigger buttons were rendered into result and
+     package cards by cardActionsHtml(), so no element on this page opens them either. -->
+
 
 <section class="upcoming-section" id="upcomingJourneySection">
   <div class="wrap">
@@ -834,6 +828,6 @@
 <script src="components/confirm-dialog.js"></script>
 <script src="assets/js/auth.js?v=20260730a"></script>
 <script src="assets/js/api.js?v=20260730b"></script>
-<script src="assets/js/app.js?v=20260803a"></script>
+<script src="assets/js/app.js?v=20260803b"></script>
 </body>
 </html>
