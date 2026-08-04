@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manager Approvals — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- The Admin Portal's stylesheet, unchanged. This portal is one screen and a
+     modal; giving it its own design system would be two sets of table styles to
+     keep in step for no visible gain. -->
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260731cr2c">
+<style>
+  /* The handful of rules this portal needs that admin.css has no reason to
+     carry. Namespaced `mg-` so nothing here can reach the Admin screens. */
+  .mg-tabs{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+  .mg-tab{border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-muted);
+          padding:8px 14px; border-radius:100px; font-size:12.5px; font-weight:700; cursor:pointer;
+          font-family:inherit; display:inline-flex; align-items:center; gap:7px;}
+  .mg-tab:hover{border-color:var(--navy); color:var(--text-primary);}
+  .mg-tab:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+  .mg-tab.active{background:var(--navy); border-color:var(--navy); color:#fff;}
+  /* The notification rows are role="button" tabindex="0", so they need the same
+     visible ring a real button gets. */
+  .mg-notif:focus-visible{outline:2px solid var(--coral); outline-offset:-2px;}
+  .mg-tab-count{background:rgba(10,37,64,0.08); color:var(--text-primary); border-radius:100px;
+                padding:1px 8px; font-size:11px; font-weight:800;}
+  .mg-tab.active .mg-tab-count{background:rgba(255,255,255,0.22); color:#fff;}
+  .mg-empty{padding:34px 18px; text-align:center; color:var(--text-muted); font-size:13px;}
+  /* .modal-card.modal-lg sets padding:0 so a sticky header can sit flush; this
+     modal has one, so it supplies its own padding below it. */
+  #mgrReviewBody{padding:0 30px 30px;}
+  .mg-modal-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+                 position:sticky; top:0; background:var(--card-bg); z-index:2;
+                 padding:26px 0 16px; border-bottom:1px solid var(--border-color);}
+  .mg-modal-head h2{margin:0; font-size:19px; display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+  .mg-modal-close{width:34px; height:34px; border-radius:10px; background:var(--hover-bg);
+                  border:none; cursor:pointer; font-size:20px; line-height:1; color:var(--text-muted);
+                  flex-shrink:0; font-family:inherit;}
+  .mg-modal-close:hover{color:var(--text-primary);}
+  .mg-modal-close:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+  .mg-dl{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px 22px; margin:0;}
+  .mg-dl div{min-width:0;}
+  .mg-dl dt{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);
+            font-weight:700; margin-bottom:3px;}
+  .mg-dl dd{margin:0; font-size:13.5px; font-weight:600; color:var(--text-primary); word-break:break-word;}
+  .mg-ref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.02em;}
+  .mg-section{margin-top:22px;}
+  .mg-section h3{font-size:13px; text-transform:uppercase; letter-spacing:.05em;
+                 color:var(--text-muted); margin:0 0 10px;}
+  .mg-note{background:rgba(255,176,32,0.10); border:1px solid rgba(255,176,32,0.35);
+           border-radius:10px; padding:11px 13px; font-size:12.5px; color:var(--text-primary);
+           margin-top:14px;}
+  .mg-timeline{list-style:none; margin:0; padding:0;}
+  .mg-timeline li{position:relative; padding:0 0 14px 20px; border-left:2px solid var(--border-color);}
+  .mg-timeline li:last-child{padding-bottom:0;}
+  .mg-timeline li::before{content:''; position:absolute; left:-6px; top:3px; width:10px; height:10px;
+                          border-radius:50%; background:var(--emerald);}
+  .mg-timeline li.pending{opacity:.55;}
+  .mg-timeline li.pending::before{background:var(--border-color);}
+  .mg-tl-label{font-size:13px; font-weight:700; color:var(--text-primary);}
+  .mg-tl-meta{font-size:11.5px; color:var(--text-muted);}
+  .mg-tl-note{font-size:12px; color:var(--text-primary); margin-top:3px;}
+  .mg-hint{display:block; margin-top:4px; font-size:11.5px; color:var(--text-muted); font-weight:600;}
+  /* Notification rows — the dropdown and the full-page list share them. */
+  .mg-notif{padding:11px 14px; border-bottom:1px solid var(--border-color); cursor:pointer;}
+  .mg-notif:last-child{border-bottom:none;}
+  .mg-notif:hover{background:var(--hover-bg);}
+  .mg-notif.unread{border-left:3px solid var(--coral);}
+  .mg-notif b{display:block; font-size:13px; color:var(--text-primary); margin-bottom:2px;}
+  .mg-notif p{margin:0; font-size:12.5px; color:var(--text-muted);}
+  .mg-notif time{display:block; margin-top:4px; font-size:11px; color:var(--text-muted);}
+  #mgrNotifFull .mg-notif{border-radius:10px; border:1px solid var(--border-color); margin-bottom:8px;}
+  /* The table must scroll inside its own box; `.main` is a flex item and its
+     default min-width:auto otherwise pushes the whole page sideways (M3). */
+  .main{min-width:0;}
+  @media (max-width:600px){ .mg-dl{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="mobile-topbar">
+  <div class="brand"><img src="../assets/images/favicon-180.png" alt="JackPots World Tours &amp; Travels" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> JackPots Manager</div>
+  <button type="button" class="hamburger-btn" id="mobileMenuBtn" aria-label="Open menu">
+    <svg class="icon" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+  </button>
+</div>
+
+<!-- ===================== AUTH ===================== -->
+<div class="partner-auth-shell" id="mgrAuthShell">
+  <div class="partner-auth-card">
+    <div class="partner-auth-brand">
+      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <div class="pab-sub">Manager Portal</div>
+    </div>
+
+    <div class="auth-stepper" id="mgrAuthStepper">
+      <div class="auth-step-dot active" data-step-dot="1">1</div>
+      <div class="auth-step-line"></div>
+      <div class="auth-step-dot" data-step-dot="2">2</div>
+    </div>
+
+    <div class="auth-step active" id="mgrAuthStep1">
+      <h1>Manager Sign In</h1>
+      <p class="auth-step-sub">Sign in with your registered email and password.</p>
+      <form id="mgrLoginForm">
+        <div class="form-field"><label for="mgrEmail">Email</label><input id="mgrEmail" type="email" autocomplete="username" placeholder="you@jackpotsworldtours.com"></div>
+        <div class="form-field"><label for="mgrPassword">Password</label><input id="mgrPassword" type="password" autocomplete="current-password"></div>
+        <div class="auth-forgot-row"><a href="../forgot-password.html">Forgot Password?</a></div>
+        <button type="submit" class="btn btn-coral btn-block">Continue</button>
+        <div class="msg" id="mgrLoginMsg" aria-live="polite"></div>
+      </form>
+    </div>
+
+    <div class="auth-step" id="mgrAuthStep2">
+      <h1>Verify OTP</h1>
+      <p class="auth-step-sub" id="mgrAuthStep2Sub">Enter the 6-digit code sent to your email.</p>
+      <div class="form-field"><label for="mgrOtp">OTP</label><input id="mgrOtp" inputmode="numeric" maxlength="6" placeholder="••••••" class="otp-input"></div>
+      <button type="button" class="btn btn-coral btn-block" id="mgrVerifyOtpBtn">Verify OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="mgrResendOtpBtn">Resend OTP</button>
+      <button type="button" class="btn btn-ghost btn-block" id="mgrBackToCredsBtn">← Back</button>
+      <div class="msg" id="mgrAuthStep2Msg" aria-live="polite"></div>
+    </div>
+
+    <div class="partner-auth-footer"><a href="../portal-login.html">← Choose a different portal</a></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div class="layout" id="mgrLayout" style="display:none;">
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <nav class="sidebar">
+    <div class="brand">
+      <img class="brand-logo-full" src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <img class="brand-logo-collapsed" src="../assets/images/favicon-180.png" alt="JackPots">
+    </div>
+
+    <div class="nav-group-label">Approvals</div>
+    <a href="#" class="nav-item active" data-mg-nav="queue">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span class="nav-label">Booking Requests</span>
+      <span class="nav-badge" id="mgrNavBadge" hidden></span>
+    </a>
+
+    <a href="#" class="nav-item" data-mg-nav="notifications">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="nav-label">Notifications</span>
+      <span class="nav-badge" id="mgrNotifNavBadge" hidden></span>
+    </a>
+
+    <div class="nav-group-label">Account</div>
+    <a href="#" class="nav-item" data-mg-nav="profile">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      <span class="nav-label">Profile &amp; Security</span>
+    </a>
+    <a href="../portal-login.html" class="nav-item">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+      <span class="nav-label">Other portals</span>
+    </a>
+    <a href="#" class="nav-item logout" id="mgrSignOutBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="nav-label">Sign Out</span>
+    </a>
+  </nav>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1 id="mgrCrumb">Booking Requests</h1>
+        <span class="current-date">Verify passenger details, then approve for ticketing or return for correction.</span>
+      </div>
+      <div class="topbar-right">
+        <div class="icon-btn-wrap">
+          <button type="button" class="icon-btn" id="mgrBellBtn" title="Notifications" aria-label="Notifications">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="dot" id="mgrBellDot" style="display:none;"></span>
+          </button>
+          <div class="notif-dropdown" id="mgrNotifDropdown">
+            <div class="notif-dropdown-head">
+              Notifications
+              <button type="button" class="btn btn-ghost btn-sm" id="mgrMarkAllBtn">Mark all read</button>
+            </div>
+            <div id="mgrNotifList" class="empty-state">Loading…</div>
+          </div>
+        </div>
+        <div class="admin-chip">
+          <div class="admin-avatar" id="mgrAvatar">M</div>
+          <div class="admin-chip-text">
+            <span class="admin-chip-name" id="mgrUserName">Manager</span>
+            <span class="admin-chip-role">Manager</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="section active" id="mgr-queue">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Booking Requests</h2>
+          <button type="button" class="btn btn-navy btn-sm" id="mgrRefreshBtn">Refresh</button>
+        </div>
+
+        <div class="mg-tabs" id="mgrTabs" role="tablist"></div>
+
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <input type="search" id="mgrSearch" placeholder="Request no., booking ref or route" aria-label="Search booking requests">
+        </div>
+
+        <div class="table-wrap"><table id="mgrTable"><thead><tr>
+          <th>Request</th><th>Merchant</th><th>Journey</th><th>Travel date</th>
+          <th>Pax</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="mgrPagination"></div>
+      </div>
+    </section>
+
+    <!-- Full notification history. The bell dropdown shows the newest few;
+         this is where a manager goes back through them. -->
+    <section class="section" id="mgr-notifications">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Notifications</h2>
+          <button type="button" class="btn btn-ghost btn-sm" id="mgrNotifMarkAllBtn">Mark all read</button>
+        </div>
+        <div id="mgrNotifFull" class="empty-state">Loading…</div>
+        <div class="pagination" id="mgrNotifPagination"></div>
+      </div>
+    </section>
+
+    <section class="section" id="mgr-profile">
+      <div class="panel">
+        <div class="panel-head"><h2>My Profile</h2></div>
+        <form id="mgrProfileForm">
+          <div class="ops-grid-3">
+            <div class="form-field"><label for="mgrPfName">Full Name</label>
+              <input id="mgrPfName" name="full_name" required></div>
+            <div class="form-field"><label for="mgrPfEmail">Email</label>
+              <input id="mgrPfEmail" type="email" disabled>
+              <small class="mg-hint">Your sign-in address — changed by a Super Admin.</small></div>
+            <div class="form-field"><label for="mgrPfPhone">Phone</label>
+              <input id="mgrPfPhone" name="phone" placeholder="Optional"></div>
+          </div>
+          <div class="msg" id="mgrProfileMsg" aria-live="polite"></div>
+          <div class="modal-actions" style="margin-top:8px;">
+            <button type="submit" class="btn btn-coral">Save changes</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Change Password</h2></div>
+        <form id="mgrPasswordForm">
+          <div class="ops-grid-3">
+            <div class="form-field"><label for="mgrPwCurrent">Current password</label>
+              <input id="mgrPwCurrent" type="password" autocomplete="current-password" required></div>
+            <div class="form-field"><label for="mgrPwNew">New password</label>
+              <input id="mgrPwNew" type="password" autocomplete="new-password" minlength="8" required></div>
+            <div class="form-field"><label for="mgrPwConfirm">Confirm new password</label>
+              <input id="mgrPwConfirm" type="password" autocomplete="new-password" minlength="8" required></div>
+          </div>
+          <div class="msg" id="mgrPasswordMsg" aria-live="polite"></div>
+          <div class="modal-actions" style="margin-top:8px;">
+            <button type="submit" class="btn btn-coral">Change password</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Read-only review of one booking request, plus the two decisions. -->
+<div class="modal-overlay" id="mgrReviewOverlay">
+  <div class="modal-card modal-lg" id="mgrReviewBody" role="dialog" aria-modal="true" aria-labelledby="mgrReviewTitle"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
+<script src="../components/toast.js?v=20260731cr2"></script>
+<script src="../components/focus-trap.js?v=20260731cr2"></script>
+<script src="../assets/js/auth.js?v=20260731cr2"></script>
+<script src="../assets/js/manager-portal.js?v=20260731cr2d"></script>
+</body>
+</html>

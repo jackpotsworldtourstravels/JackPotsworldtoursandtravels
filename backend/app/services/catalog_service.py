@@ -55,10 +55,21 @@ def search(
 
     if travel_type is not None:
         conditions.append(ServiceRequest.travel_type == travel_type)
+    # Match the code *or* the city name: the UI's From/To fields accept either
+    # ("City or code"), and inventory carries the IATA code in `origin` with the
+    # human name in `origin_city`, so filtering on `origin` alone silently
+    # returned nothing for every city the user typed.
     if origin:
-        conditions.append(_detail("origin").ilike(f"%{origin}%"))
+        pattern = f"%{origin}%"
+        conditions.append(
+            _detail("origin").ilike(pattern) | _detail("origin_city").ilike(pattern)
+        )
     if destination:
-        conditions.append(_detail("destination").ilike(f"%{destination}%"))
+        pattern = f"%{destination}%"
+        conditions.append(
+            _detail("destination").ilike(pattern)
+            | _detail("destination_city").ilike(pattern)
+        )
     if cabin_class:
         conditions.append(_detail("cabin_class") == cabin_class)
     if airline:

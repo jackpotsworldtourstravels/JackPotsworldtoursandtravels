@@ -113,9 +113,17 @@ def admin_dashboard(db: Session, actor: User) -> dict:
         elif status_value is MerchantStatus.SUSPENDED:
             merchants["suspended"] = count
 
+    # Enquiries are excluded here and counted separately below. They are
+    # ``service_requests`` rows too, so before this filter a pending enquiry
+    # inflated "Pending Approval" — a number the Admin reads as "bookings
+    # awaiting my decision". The two queues have different actions and their
+    # own screens, so they get their own counters.
     status_rows = db.execute(
         select(ServiceRequest.status, func.count())
-        .where(ticket_service.scoped_query(actor))
+        .where(
+            ticket_service.scoped_query(actor),
+            ServiceRequest.request_type != RequestType.TICKET_ENQUIRY,
+        )
         .group_by(ServiceRequest.status)
     ).all()
     requests_by_status = {
@@ -171,9 +179,44 @@ def admin_dashboard(db: Session, actor: User) -> dict:
         for log, full_name in activity_rows
     ]
 
+    # The Ticket Enquiry queue, tracked independently of booking approvals.
+    # "Awaiting" is Pending + Under Review — both are still the desk's problem;
+    # the split between them is who has picked one up, which the screen shows.
+    def _enquiries(*statuses) -> int:
+        return db.scalar(
+            select(func.count())
+            .select_from(ServiceRequest)
+            .where(
+                ticket_service.scoped_query(actor),
+                ServiceRequest.request_type == RequestType.TICKET_ENQUIRY,
+                ServiceRequest.status.in_(statuses),
+            )
+        ) or 0
+
+    enquiries = {
+        "pending": _enquiries(RequestStatus.PENDING_APPROVAL),
+        "in_review": _enquiries(RequestStatus.IN_REVIEW),
+        "awaiting_response": _enquiries(
+            RequestStatus.PENDING_APPROVAL, RequestStatus.IN_REVIEW
+        ),
+        "available": _enquiries(RequestStatus.APPROVED),
+        "not_available": _enquiries(RequestStatus.REJECTED),
+        "answered_today": db.scalar(
+            select(func.count())
+            .select_from(ServiceRequest)
+            .where(
+                ticket_service.scoped_query(actor),
+                ServiceRequest.request_type == RequestType.TICKET_ENQUIRY,
+                ServiceRequest.status.in_((RequestStatus.APPROVED, RequestStatus.REJECTED)),
+                ServiceRequest.updated_at >= today_start,
+            )
+        ) or 0,
+    }
+
     return {
         "merchants": merchants,
         "requests_by_status": requests_by_status,
+        "enquiries": enquiries,
         "payments_pending_count": payments_pending_count,
         "payments_verified_today": payments_verified_today,
         "open_support_tickets": open_support_tickets,

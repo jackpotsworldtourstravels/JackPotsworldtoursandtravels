@@ -1,0 +1,66 @@
+# Production stack for a single EC2 instance: the app, and Caddy in front of it
+# for TLS. Postgres is deliberately absent — it lives in RDS, so that a rebuilt
+# instance costs nothing but downtime.
+#
+#   cd deploy && docker compose up -d --build
+#
+# Two files must exist first, neither of them in git:
+#   ../backend/.env   application settings (DATABASE_URL, JWT_SECRET_KEY, S3_*)
+#   ./.env            SITE_DOMAIN, read by Caddy for the certificate
+#
+# See docs/AWS_DEPLOYMENT.md for how to produce both.
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    env_file: ../backend/.env
+    restart: unless-stopped
+    # No ports mapping: the app is reachable only through Caddy, on the
+    # compose network. Publishing 8000 to the host would expose an untrusted
+    # plaintext port to anything the security group happens to allow.
+    expose:
+      - "8000"
+    volumes:
+      # Matters only when STORAGE_BACKEND=local, where it is the difference
+      # between keeping and losing customer documents on a container rebuild.
+      # With s3 it holds nothing but a scratch file mid-upload.
+      - app_uploads:/app/uploads
+    healthcheck:
+      # The entrypoint runs migrations before serving, so a slow first boot is
+      # normal; start_period covers it without marking the container unhealthy.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Named volumes, not bind mounts: these hold the issued certificate and
+      # its private key. Losing them on a rebuild means re-issuing, and Let's
+      # Encrypt rate-limits that to five per week per domain.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging: *logging
+
+volumes:
+  app_uploads:
+  caddy_data:
+  caddy_config:

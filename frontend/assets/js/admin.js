@@ -66,6 +66,8 @@ const sectionTitles = {
   reports: 'Dashboard', users: 'Merchant Management', 'active-users': 'Active Users',
   support: 'Support Management', 'reports-export': 'Reports', payments: 'Payment Management',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
+  'ticket-enquiries': 'Ticket Enquiries',
+  'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
 };
 const loadedSections = new Set();
@@ -101,6 +103,10 @@ function loadSection(name) {
   if (name === 'notifications') return initNotificationForm();
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
+  if (name === 'ticket-enquiries') return loadTicketEnquiries();
+  if (name === 'booking-ops') return loadBookingOps();
+  /* No 'change-requests' case: cancellations and reschedules are rows on
+     Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();
 }
 
@@ -196,13 +202,19 @@ async function loadReports() {
     issued: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>',
     support: '<rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/>',
     chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>',
+    enquiry: '<path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/>',
   };
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/dashboard`, { headers: authHeaders() });
     const s = data.requests_by_status;
+    /* Defaulted rather than assumed: an older backend that predates the split
+       returns no `enquiries` block, and the dashboard should still render. */
+    const enq = data.enquiries || { pending: 0, in_review: 0, awaiting_response: 0, answered_today: 0 };
+    updateEnquiryNavBadge(enq.awaiting_response);
     grid.innerHTML = `
       <div class="stat-card">${statIcon('coral', ICONS.merchant)}<div class="stat-body"><div class="num">${data.merchants.total}</div><div class="label">Total Merchants</div><div class="stat-sub">${data.merchants.active} active · ${data.merchants.pending_approval} pending · ${data.merchants.suspended} suspended</div></div></div>
-      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${s.pending_approval + s.in_review}</div><div class="label">Awaiting Approval</div></div></div>
+      <div class="stat-card">${statIcon('gold', ICONS.clock)}<div class="stat-body"><div class="num gold">${s.pending_approval + s.in_review}</div><div class="label">Awaiting Approval</div><div class="stat-sub">Bookings only — enquiries counted separately</div></div></div>
+      <div class="stat-card stat-card-link" data-goto-section="ticket-enquiries" role="button" tabindex="0">${statIcon('coral', ICONS.enquiry)}<div class="stat-body"><div class="num coral">${enq.awaiting_response}</div><div class="label">Enquiries Awaiting Answer</div><div class="stat-sub">${enq.pending} pending · ${enq.in_review} under review · ${enq.answered_today} answered today</div></div></div>
       <div class="stat-card">${statIcon('sky', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_pending_count}</div><div class="label">Payments Awaiting Verification</div></div></div>
       <div class="stat-card">${statIcon('emerald', ICONS.verify)}<div class="stat-body"><div class="num">${data.payments_verified_today}</div><div class="label">Payments Verified Today</div></div></div>
       <div class="stat-card">${statIcon('', ICONS.issued)}<div class="stat-body"><div class="num">${s.ticket_issued}</div><div class="label">Ticket Issued</div></div></div>
@@ -222,10 +234,15 @@ async function loadReports() {
 }
 
 /* ---------- Merchant Management ---------- GET/POST/PUT /api/admin/merchants (existing,
-   live v2 endpoints — API_CONTRACT.md §2/§3). Admin cannot create merchant staff users
-   directly (that's the merchant's own MERCHANT_USER_CREATE permission, Merchant Portal only) —
-   Admin's remit here is view/edit/approve/suspend the company plus reset an existing user's
-   password. */
+   live v2 endpoints — API_CONTRACT.md §2/§3). Admin's remit here is view/edit/approve/suspend
+   the company, plus the full staff-login lifecycle for it: list users, ADD a user
+   (POST /api/admin/merchants/{id}/users) and reset an existing user's password. All three are
+   gated on `merchant_user.manage`, which Admin holds.
+
+   The merchant's own MERCHANT_USER_CREATE is a different thing and still merchant-only: it is
+   what lets a merchant add staff to its own company from the Merchant Portal. An admin never
+   holds it — they create through the merchant-scoped admin path above, where the company comes
+   from the URL rather than from the caller's account. */
 const COMPANY_TYPE_LABELS = { gaming_company: 'Gaming Company', corporate_company: 'Corporate Company', travel_agency: 'Travel Agency', business_partner: 'Business Partner', direct_customer: 'Direct Customer' };
 const MERCHANT_STATUS_BADGE = { active: 'active', pending_approval: 'pending', suspended: 'cancelled', inactive: 'inactive' };
 
@@ -428,24 +445,224 @@ async function openMerchantDetail(merchantId) {
           <div class="info-item"><label>Email</label><div>${escapeHtml(m.email)}</div></div>
           <div class="info-item"><label>Phone</label><div>${escapeHtml(m.phone || '—')}</div></div>
           <div class="info-item"><label>Status</label><div><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></div></div>
-          <div class="info-item"><label>Wallet Balance</label><div>${money(m.wallet_balance)}</div></div>
-          <div class="info-item"><label>Credit Limit</label><div>${money(m.credit_limit)}</div></div>
           <div class="info-item"><label>Created Date</label><div>${fmtDate(m.created_at)}</div></div>
           <div class="info-item"><label>Number of Users</label><div>${m.user_count}</div></div>
         </div>
       </div>
+
+      <!-- M4. Wallet Balance and Credit Limit used to sit in the grid above,
+           read straight off the merchant row and rounded by money(). They are
+           here instead, from GET /api/admin/merchants/{id}/finance — the same
+           finance_service computation the merchant sees on its own Payments
+           screen, so the desk and the customer cannot be looking at two
+           different numbers. A credit limit is shown only beside what is left
+           of it. -->
       <div class="panel">
-        <h2 style="font-size:14px;margin-bottom:10px;">Users</h2>
+        <div class="panel-head">
+          <h2 style="font-size:14px;">Financial position</h2>
+          <button class="btn btn-ghost btn-sm" id="merchantStmtToggle">Show statement</button>
+        </div>
+        <div id="merchantFinance"><div class="empty-state">Loading…</div></div>
+        <div id="merchantStatement" hidden></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2 style="font-size:14px;">Users</h2>
+          <button class="btn btn-coral btn-sm" id="addMerchantUserBtn">+ Add User</button>
+        </div>
         <div class="table-wrap"><table id="merchantUsersTable"><thead><tr>
           <th>Full Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     `;
     document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
+    document.getElementById('addMerchantUserBtn').addEventListener('click', () => openMerchantUserModal(merchantId, m.company_name));
     loadMerchantUsersTable(merchantId);
+    loadMerchantFinance(merchantId);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
   }
+}
+
+/* ---------- Merchant financial position (M4) ----------
+   GET /api/admin/merchants/{id}/finance and /statement. Both are served by
+   finance_service, which is also what the merchant's own Payments screen reads,
+   so "what does this merchant owe" has exactly one answer on this platform.
+
+   Every value is a Decimal serialised as a string and is rendered with
+   moneyStr() — never money(), which rounds through a float and would show the
+   desk a different number from the one the merchant is looking at. */
+async function loadMerchantFinance(merchantId) {
+  const box = document.getElementById('merchantFinance');
+  if (!box) return;
+  try {
+    const { data: p } = await axios.get(
+      `${API_BASE}/api/admin/merchants/${merchantId}/finance`, { headers: authHeaders() });
+
+    const tile = (label, value, sub) => `
+      <div class="analytics-tile">
+        <div class="num">${escapeHtml(value)}</div>
+        <div class="label">${escapeHtml(label)}</div>
+        ${sub ? `<div class="label" style="text-transform:none;letter-spacing:0;font-weight:600;">${escapeHtml(sub)}</div>` : ''}
+      </div>`;
+
+    box.innerHTML = `
+      <div class="analytics-grid" style="margin:0 0 8px;">
+        ${tile('Outstanding', moneyStr(p.outstanding), `${p.bookings_billable} billable booking${p.bookings_billable === 1 ? '' : 's'}`)}
+        ${tile('Billed', moneyStr(p.billed), 'raised to date')}
+        ${tile('Net paid', moneyStr(p.net_paid), moneyIsPositive(p.refunded) ? `after ${moneyStr(p.refunded)} refunded` : 'verified')}
+        ${tile('Awaiting verification', moneyStr(p.awaiting_verification), 'submitted, unconfirmed')}
+        ${tile('Wallet', moneyStr(p.wallet_balance), 'on account')}
+        ${p.has_credit_limit
+          ? tile('Credit available', moneyStr(p.credit_available), `${moneyStr(p.credit_used)} of ${moneyStr(p.credit_limit)} used`)
+          : tile('Credit limit', 'Not set', 'no standing credit')}
+        ${tile('Spending power', moneyStr(p.spending_power), 'wallet + available credit')}
+        ${moneyIsPositive(p.overpaid) ? tile('Overpaid', moneyStr(p.overpaid), 'refund or allocate') : ''}
+      </div>`;
+
+    document.getElementById('merchantStmtToggle')?.addEventListener('click', async e => {
+      const panel = document.getElementById('merchantStatement');
+      if (!panel.hidden) {
+        panel.hidden = true;
+        e.target.textContent = 'Show statement';
+        return;
+      }
+      e.target.textContent = 'Hide statement';
+      panel.hidden = false;
+      panel.innerHTML = `<div class="empty-state">Loading statement…</div>`;
+      try {
+        const { data: s } = await axios.get(
+          `${API_BASE}/api/admin/merchants/${merchantId}/statement`, { headers: authHeaders() });
+        const entries = s.entries || [];
+        panel.innerHTML = `
+          <div class="table-wrap"><table><thead><tr>
+            <th>Date</th><th>Reference</th><th>Description</th>
+            <th>Debit</th><th>Credit</th><th>Balance</th>
+          </tr></thead><tbody>
+            ${entries.length ? entries.map(en => `
+              <tr>
+                <td>${escapeHtml(en.at ? fmtDate(en.at) : '—')}</td>
+                <td>${escapeHtml(en.reference || '—')}</td>
+                <td>${escapeHtml(en.description || en.kind)}</td>
+                <td>${moneyIsPositive(en.debit) ? escapeHtml(moneyStr(en.debit)) : ''}</td>
+                <td>${moneyIsPositive(en.credit) ? escapeHtml(moneyStr(en.credit)) : ''}</td>
+                <td>${escapeHtml(moneyStr(en.balance))}</td>
+              </tr>`).join('')
+              : '<tr><td colspan="6" class="empty-state">No ledger entries.</td></tr>'}
+          </tbody>
+          ${entries.length ? `<tfoot><tr>
+            <td colspan="3"><strong>Totals</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.total_debits))}</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.total_credits))}</strong></td>
+            <td><strong>${escapeHtml(moneyStr(s.closing_balance))}</strong></td>
+          </tr></tfoot>` : ''}
+          </table></div>`;
+      } catch (err) {
+        panel.innerHTML = `<div class="empty-state">${escapeHtml(
+          err.response?.data?.detail || 'Could not load the statement.')}</div>`;
+      }
+    });
+  } catch (err) {
+    box.innerHTML = `<div class="empty-state">${escapeHtml(
+      err.response?.data?.detail || 'Could not load this merchant’s financial position.')}</div>`;
+  }
+}
+
+/* ---------- Add a user to a merchant ---------- POST /api/admin/merchants/{id}/users.
+
+   The company comes from the URL, never from the form, so an admin cannot land a
+   user in the wrong company by editing a field. `merchant_role` is the internal
+   role the backend uses to widen a merchant_user's permissions (rbac
+   MERCHANT_ROLE_PERMISSIONS); it does not apply to a merchant_admin, who already
+   holds the full merchant set, so the field is disabled for that choice. */
+const MERCHANT_USER_ROLES = { merchant_user: 'Merchant User (staff)', merchant_admin: 'Merchant Admin (manages the company)' };
+const MERCHANT_INTERNAL_ROLES = {
+  '': 'None — base permissions only',
+  manager: 'Manager', supervisor: 'Supervisor', operator: 'Operator',
+  finance: 'Finance', data_operator: 'Data Operator',
+};
+
+function openMerchantUserModal(merchantId, companyName) {
+  const overlay = document.getElementById('merchantUserModalOverlay');
+  const body = document.getElementById('merchantUserModalBody');
+  body.innerHTML = `
+    <h2>Add User</h2>
+    <p style="font-size:13px;color:var(--text-muted);font-weight:600;margin:-10px 0 16px;">
+      New login for ${escapeHtml(companyName)}.
+    </p>
+    <form id="merchantUserForm">
+      <div class="form-grid">
+        <div class="form-field"><label>Full Name</label><input name="full_name" required maxlength="150"></div>
+        <div class="form-field"><label>Email</label><input name="email" type="email" required></div>
+        <div class="form-field"><label>Phone</label><input name="phone" maxlength="30"></div>
+        <div class="form-field"><label>Account Role</label>
+          <select name="role">
+            ${Object.entries(MERCHANT_USER_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Internal Role</label>
+          <select name="merchant_role">
+            ${Object.entries(MERCHANT_INTERNAL_ROLES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-field"><label>Password</label>
+          <input name="password" type="text" minlength="8" maxlength="72" placeholder="leave blank to generate one">
+        </div>
+      </div>
+      <div class="msg" id="merchantUserMsg"></div>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-coral">Create User</button>
+        <button type="button" class="btn btn-ghost" id="merchantUserCancelBtn">Cancel</button>
+      </div>
+    </form>`;
+  overlay.classList.add('open');
+
+  const form = document.getElementById('merchantUserForm');
+  const roleSel = form.elements.role;
+  const internalSel = form.elements.merchant_role;
+  const syncInternal = () => {
+    const isAdmin = roleSel.value === 'merchant_admin';
+    internalSel.disabled = isAdmin;
+    if (isAdmin) internalSel.value = '';
+  };
+  roleSel.addEventListener('change', syncInternal);
+  syncInternal();
+
+  document.getElementById('merchantUserCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const msg = document.getElementById('merchantUserMsg');
+    const submit = form.querySelector('button[type=submit]');
+    const payload = {
+      full_name: f.full_name.value.trim(),
+      email: f.email.value.trim(),
+      phone: f.phone.value.trim() || null,
+      role: f.role.value,
+      merchant_role: f.merchant_role.value || null,
+    };
+    if (f.password.value) payload.password = f.password.value;
+
+    submit.disabled = true;
+    msg.textContent = 'Creating…';
+    msg.className = 'msg';
+    try {
+      const { data } = await axios.post(
+        `${API_BASE}/api/admin/merchants/${merchantId}/users`, payload, { headers: authHeaders() });
+      overlay.classList.remove('open');
+      /* Shown once — the backend hashes it and cannot return it again. */
+      alert(`User created.\n\nLogin: ${data.account.email}\nTemporary password: ${data.temporary_password}\n\nShare these credentials securely — this password cannot be retrieved again.`);
+      /* Re-open the whole detail rather than just the table, so the "Number of
+         Users" figure in the info grid moves with it. */
+      openMerchantDetail(merchantId);
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to create user.';
+      msg.className = 'msg error';
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 async function loadMerchantUsersTable(merchantId) {
@@ -569,37 +786,112 @@ async function loadApprovalQueue(page = aqPage) {
     });
     let items = data.items;
     if (document.getElementById('aqTypeFilter').value === 'merchant') items = items.filter(i => i.kind === 'merchant');
-    tbody.innerHTML = items.length ? items.map(i => `
+    tbody.innerHTML = items.length ? items.map(i => {
+      /* A booking already at Payment Pending is past approval — approve and
+         reject both 400 on it, so it gets the one action it can still take: its
+         amount. Under the default "Awaiting action" filter only *unpriced* ones
+         appear (approval_service._awaits_admin); selecting Payment Pending
+         explicitly also lists priced ones, where the same endpoint serves the
+         ordinary "we quoted the wrong number" correction. */
+      const pastApproval = i.status === 'payment_pending';
+      const unpriced = pastApproval && !(Number(i.total_amount) > 0);
+      return `
       <tr>
         <td style="text-transform:capitalize">${i.kind === 'merchant' ? 'Merchant Onboarding' : escapeHtml((i.request_type || '').replace(/_/g, ' '))}</td>
         <td>${escapeHtml(i.title)}</td>
         <td>${escapeHtml(i.merchant_name || '—')}</td>
-        <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span></td>
+        <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span>
+          ${unpriced ? `<div class="cell-sub">No amount set — the merchant cannot pay</div>` : ''}</td>
         <td>${fmtDateTime(i.submitted_at)}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-navy btn-sm" data-aq-approve="${i.id}" data-kind="${i.kind}" data-request-type="${i.request_type || ''}">Approve</button>
-          ${i.kind === 'request' ? `<button class="btn btn-danger btn-sm" data-aq-reject="${i.id}" data-request-type="${i.request_type || ''}">Reject</button>` : ''}
+          ${i.request_type === 'booking'
+            ? `<button class="btn btn-ghost btn-sm" data-aq-review="${i.id}">Review</button>` : ''}
+          ${pastApproval
+            ? `<button class="btn ${unpriced ? 'btn-coral' : 'btn-ghost'} btn-sm" data-aq-reprice="${i.id}"
+                 data-title="${escapeHtml(i.title)}" data-unpriced="${unpriced ? '1' : ''}"
+                 data-amount="${escapeHtml(String(i.total_amount ?? ''))}"
+               >${unpriced ? 'Set amount' : 'Correct amount'}</button>`
+            : `<button class="btn btn-navy btn-sm" data-aq-approve="${i.id}" data-kind="${i.kind}" data-request-type="${i.request_type || ''}" data-title="${escapeHtml(i.title)}">Approve</button>
+               ${i.kind === 'request' ? `<button class="btn btn-danger btn-sm" data-aq-reject="${i.id}" data-request-type="${i.request_type || ''}">Reject</button>` : ''}`}
         </td>
-      </tr>
-    `).join('') : `<tr><td colspan="6" class="empty-state">Nothing awaiting approval.</td></tr>`;
+      </tr>`;
+    }).join('') : `<tr><td colspan="6" class="empty-state">Nothing awaiting approval.</td></tr>`;
     /* Three different backends share this one queue: a merchant approval, a booking's own
        approve/reject (walks Pending -> Under Review -> Approved -> Payment Pending), and a
        service request's resolve (walks Pending -> Under Review -> Approved, no payment step —
        calling the booking endpoint on one of these would wrongly push it through the booking
        lifecycle instead, landing it at "Payment Pending"). */
+    /* Booking rows get a Review step before the one-click Approve, because a
+       booking now carries traveller documents that ought to be looked at
+       first. Implemented in admin-bookings.js; the queue itself is unchanged. */
+    tbody.querySelectorAll('[data-aq-review]').forEach(btn => {
+      btn.addEventListener('click', () => openBookingReview(btn.dataset.aqReview));
+    });
     tbody.querySelectorAll('[data-aq-approve]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.aqApprove;
+        /* A booking's approval carries the fare. This used to post an empty
+           body, so every enquiry-led booking — which reaches approval at ₹0 by
+           design — was approved at zero and landed in Payment Pending unpayable.
+           The server refuses that now; asking here is what makes the refusal
+           unnecessary. Merchant onboarding and service-request resolution have
+           no amount and are unchanged. */
+        if (btn.dataset.requestType === 'booking') {
+          const result = await admAmountDialog({
+            title: 'Approve this booking',
+            message: `${btn.dataset.title || ''} — the merchant pays this amount, so it cannot be zero.`,
+            amountLabel: 'Final amount (₹)',
+            reasonLabel: 'Note to the merchant (optional)',
+            reasonPlaceholder: 'e.g. Fare confirmed with the airline',
+            confirmText: 'Approve at this amount',
+          });
+          if (!result) return;
+          try {
+            await axios.post(`${API_BASE}/api/admin/requests/${id}/approve`,
+              { final_amount: result.amount, note: result.reason || undefined },
+              { headers: authHeaders() });
+            showToast('Booking approved. The merchant can now pay.');
+            loadApprovalQueue(aqPage);
+          } catch (err) { alert(err.response?.data?.detail || 'Failed to approve.'); }
+          return;
+        }
         try {
           if (btn.dataset.kind === 'merchant') {
             await axios.post(`${API_BASE}/api/admin/merchants/${id}/approve`, {}, { headers: authHeaders() });
-          } else if (btn.dataset.requestType === 'booking') {
-            await axios.post(`${API_BASE}/api/admin/requests/${id}/approve`, {}, { headers: authHeaders() });
           } else {
             await axios.post(`${API_BASE}/api/admin/service-requests/${id}/resolve`, { approve: true }, { headers: authHeaders() });
           }
           loadApprovalQueue(aqPage);
         } catch (err) { alert(err.response?.data?.detail || 'Failed to approve.'); }
+      });
+    });
+    /* Correcting a booking that is already Payment Pending. Its own endpoint,
+       not approve: Payment Pending has no edge back to Approved, so calling
+       approve here returns "Cannot move a request from Payment Pending to
+       Approved". */
+    tbody.querySelectorAll('[data-aq-reprice]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.aqReprice;
+        const unpriced = !!btn.dataset.unpriced;
+        const result = await admAmountDialog({
+          title: unpriced ? 'Set the amount' : 'Correct the amount',
+          message: unpriced
+            ? `${btn.dataset.title || ''} — this booking was approved without a fare, so the merchant is shown "Awaiting amount" and cannot pay.`
+            : `${btn.dataset.title || ''} — the merchant is told the new amount and why it changed.`,
+          amountLabel: 'Amount to charge (₹)',
+          reasonLabel: 'Reason',
+          reasonPlaceholder: 'e.g. Fare confirmed with the airline',
+          value: unpriced ? '' : (btn.dataset.amount || ''),
+          confirmText: unpriced ? 'Set amount' : 'Update amount',
+          requireReason: true,
+        });
+        if (!result) return;
+        try {
+          await axios.post(`${API_BASE}/api/admin/requests/${id}/reprice`,
+            { amount: result.amount, reason: result.reason }, { headers: authHeaders() });
+          showToast('Amount set. The merchant has been notified and can now pay.');
+          loadApprovalQueue(aqPage);
+        } catch (err) { alert(err.response?.data?.detail || 'Failed to set the amount.'); }
       });
     });
     tbody.querySelectorAll('[data-aq-reject]').forEach(btn => {
@@ -622,70 +914,288 @@ async function loadApprovalQueue(page = aqPage) {
   }
 }
 
-/* ---------- Service Request Management ---------- GET /api/requests?request_type=...
-   (existing), POST /api/admin/service-requests/{id}/resolve (existing). */
+/* ---------- Service Request Management ----------
+   Every service request a merchant has raised, of every type, in one queue.
+
+   THE TWO SCREENS THAT USED TO BE HERE ARE ONE
+   Cancellations and date changes had a screen of their own, because settling
+   one does more than mark it Approved — it cancels the booking and states the
+   refund, or rewrites the travel dates and states what is payable. That is
+   still true, and the dialog that does it is still admin-change-requests.js.
+   What was wrong was making it a separate *queue*: an admin looking for
+   SRQ-000123 had to already know which of the two workflows it belonged to
+   before they could find it. The row now picks the dialog from its own type.
+
+   THE MERCHANT'S MANAGER GOES FIRST
+   A request arrives here only after a manager at the merchant has signed it
+   off. Until then it is listed as "Under Manager Approval" with no action —
+   it is not ours to touch yet, and the backend refuses every staff endpoint
+   for one (services/manager_approval.py). "Manager Approved" is the stage
+   that is actually ours, and it is what this screen opens on.
+
+   ENDPOINTS — all pre-existing
+     GET  /api/requests?request_type=...              the rows, per type
+     POST /api/admin/service-requests/{id}/resolve    approve/reject the generic types
+     GET/POST /api/change-requests/...                the settle dialog, for the two
+                                                      types that change the booking */
+
 const SERVICE_REQUEST_TYPES = ['cancellation', 'date_change', 'refund', 'passenger_modification', 'extra_baggage', 'meal', 'seat'];
+
+/* The two types whose Settle opens the pricing dialog rather than the plain
+   approve/reject one. The backend refuses the generic resolve endpoint for
+   them, so this list is the UI half of a rule the server also enforces. */
+const SRM_SETTLED_TYPES = ['cancellation', 'date_change'];
+
+/* Statuses at which the request is still somebody's to action. */
+const SRM_OPEN = ['pending_approval', 'in_review'];
+
+const SRM_TYPE_LABELS = {
+  cancellation: 'Cancellation', date_change: 'Date Change', refund: 'Refund',
+  passenger_modification: 'Passenger Modification', extra_baggage: 'Extra Baggage',
+  meal: 'Meal', seat: 'Seat',
+};
+
 let srmPage = 1;
+let srmRows = [];
 let srmFiltersWired = false;
+let srmSearchTimer = null;
+
+/* Whose approval a row is waiting on. `manager_state` comes straight from the
+   API; a row without one predates manager sign-off and is ours by default. */
+function srmStage(r) {
+  if (r.status === 'pending_approval') {
+    return r.manager_state === 'pending' ? 'awaiting_manager' : 'actionable';
+  }
+  return r.status;
+}
+
+function srmBadge(r) {
+  const stage = srmStage(r);
+  if (stage === 'awaiting_manager') return 'pending';
+  if (stage === 'actionable') return 'confirmed';
+  return aqStatusBadgeClass(r.status);
+}
+
+/* What the merchant actually asked for, in one cell, whatever the type. A
+   reschedule is only meaningful as "from → to"; an ancillary is meaningful as
+   the thing requested. Both come off `details`, which the API returns whole. */
+function srmAsk(r) {
+  const d = r.details || {};
+  let headline;
+  if (r.request_type === 'date_change') {
+    headline = `${d.current_travel_date ? fmtDate(d.current_travel_date) : '—'} →
+                <strong>${d.new_travel_date ? fmtDate(d.new_travel_date) : '—'}</strong>`;
+  } else if (r.request_type === 'cancellation') {
+    headline = 'Cancel the whole booking';
+  } else if (r.request_type === 'extra_baggage') {
+    headline = d.weight_kg ? `${escapeHtml(String(d.weight_kg))} kg extra` : 'Extra baggage';
+  } else if (r.request_type === 'meal') {
+    headline = d.meal ? escapeHtml(admLabel(d.meal)) : 'Meal';
+  } else if (r.request_type === 'seat') {
+    headline = d.seat_preference ? `${escapeHtml(admLabel(d.seat_preference))} seat` : 'Seat';
+  } else if (r.request_type === 'passenger_modification') {
+    headline = d.field
+      ? `${escapeHtml(admLabel(d.field))} → <strong>${escapeHtml(String(d.new_value ?? ''))}</strong>`
+      : 'Passenger correction';
+  } else {
+    headline = escapeHtml(SRM_TYPE_LABELS[r.request_type] || r.request_type);
+  }
+  const reason = d.reason || r.remarks || '';
+  return `<div>${headline}</div>${reason ? `<div class="cell-sub">${escapeHtml(reason)}</div>` : ''}`;
+}
+
+/* The settled figure, or nothing. A request nobody has priced shows a dash
+   rather than 0.00 — "not priced yet" and "nothing to refund" are different
+   statements, and only one of them is good news. */
+function srmSettlement(r) {
+  const p = r.pricing || {};
+  if (p.kind === 'cancellation') {
+    return `<div class="cell-sub">Charge ${crMoney(p.cancellation_charge)} ·
+            refund <strong>${crMoney(p.refund_amount)}</strong></div>`;
+  }
+  if (p.kind === 'reschedule') {
+    return `<div class="cell-sub">Payable <strong>${crMoney(p.total_payable)}</strong></div>`;
+  }
+  return '';
+}
+
+function srmStatusCell(r) {
+  const m = r.manager_approval || {};
+  const stage = srmStage(r);
+  let sub = '';
+  if (stage === 'awaiting_manager') {
+    sub = `<div class="cell-sub">with ${escapeHtml(m.by_name || 'the merchant’s manager')}</div>`;
+  } else if (stage === 'actionable' && m.by_name && !m.self_raised) {
+    sub = `<div class="cell-sub">signed off by ${escapeHtml(m.by_name)}</div>`;
+  } else if (r.status === 'in_review' && r.details?.review_claimed_by_name) {
+    sub = `<div class="cell-sub">with ${escapeHtml(r.details.review_claimed_by_name)}</div>`;
+  }
+  return `<span class="badge ${srmBadge(r)}">${escapeHtml(r.status_label)}</span>${sub}${srmSettlement(r)}`;
+}
+
+/* Settle only what the merchant's manager has released, and only what is still
+   open. Everything else gets View, so a row is never a dead end — an admin can
+   always read what was asked and what was decided. */
+function srmActions(r) {
+  const actionable = srmStage(r) === 'actionable' || r.status === 'in_review';
+  const label = actionable && SRM_OPEN.includes(r.status) ? 'Settle' : 'View';
+  return `<button class="btn ${label === 'Settle' ? 'btn-navy' : 'btn-ghost'} btn-sm"
+                  data-srm-open="${r.id}">${label}</button>`;
+}
+
 async function loadServiceRequestManagement(page = srmPage) {
   srmPage = page;
   if (!srmFiltersWired) {
     srmFiltersWired = true;
-    ['srmTypeFilter', 'srmStatusFilter'].forEach(id => document.getElementById(id).addEventListener('change', () => loadServiceRequestManagement(1)));
-  }
-  const tbody = document.querySelector('#srmTable tbody');
-  tbody.innerHTML = `<tr><td colspan="7">${rowsSkeleton(4)}</td></tr>`;
-  const typeFilter = document.getElementById('srmTypeFilter').value;
-  const statusFilter = document.getElementById('srmStatusFilter').value;
-  try {
-    const types = typeFilter ? [typeFilter] : SERVICE_REQUEST_TYPES;
-    const results = await Promise.all(types.map(t => axios.get(`${API_BASE}/api/requests`, {
-      headers: authHeaders(), params: { request_type: t, status: statusFilter || undefined, page: 1, page_size: 100 },
-    }).then(r => r.data.items).catch(() => [])));
-    const items = results.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    tbody.innerHTML = items.length ? items.map(r => `
-      <tr>
-        <td>${escapeHtml(r.request_number)}</td>
-        <td style="text-transform:capitalize">${escapeHtml(r.request_type.replace(/_/g, ' '))}</td>
-        <td>${escapeHtml(r.booking_reference || '—')}</td>
-        <td style="max-width:220px;">${escapeHtml(r.remarks || '—')}</td>
-        <td><span class="badge ${aqStatusBadgeClass(r.status)}">${escapeHtml(r.status_label)}</span></td>
-        <td>${fmtDateTime(r.created_at)}</td>
-        <td>${['pending_approval', 'in_review'].includes(r.status) ? `<button class="btn btn-ghost btn-sm" data-srm-resolve="${r.id}">Resolve</button>` : '—'}</td>
-      </tr>
-    `).join('') : `<tr><td colspan="7" class="empty-state">No service requests match this filter.</td></tr>`;
-    tbody.querySelectorAll('[data-srm-resolve]').forEach(btn => {
-      btn.addEventListener('click', () => openServiceRequestResolveModal(btn.dataset.srmResolve));
+    ['srmTypeFilter', 'srmStageFilter'].forEach(id =>
+      document.getElementById(id).addEventListener('change', () => loadServiceRequestManagement(1)));
+    document.getElementById('srmRefreshBtn').addEventListener('click',
+      () => loadServiceRequestManagement(1));
+    document.getElementById('srmSearch').addEventListener('input', () => {
+      clearTimeout(srmSearchTimer);
+      srmSearchTimer = setTimeout(() => srmRender(), 250);
     });
+  }
+
+  const tbody = document.querySelector('#srmTable tbody');
+  tbody.innerHTML = `<tr><td colspan="8">${rowsSkeleton(4)}</td></tr>`;
+  const typeFilter = document.getElementById('srmTypeFilter').value;
+
+  try {
+    /* /api/requests filters on a single request_type, so "all types" is seven
+       calls merged rather than one. Failures are per-type and swallowed: one
+       type erroring should cost that type's rows, not the whole screen. */
+    const types = typeFilter ? [typeFilter] : SERVICE_REQUEST_TYPES;
+    const results = await Promise.all(types.map(t =>
+      axios.get(`${API_BASE}/api/requests`, {
+        headers: authHeaders(), params: { request_type: t, page: 1, page_size: 100 },
+      }).then(r => r.data.items).catch(() => [])));
+    srmRows = results.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    srmRender();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load service requests.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load service requests.</td></tr>`;
   }
 }
 
-function openServiceRequestResolveModal(requestId) {
+/* Stage and search are applied here rather than server-side: neither is a
+   parameter /api/requests takes — the stage is a JSONB sub-field and the
+   endpoint has no free-text filter for requests — and re-fetching seven types
+   per keystroke would be both slower and no more correct. */
+function srmRender() {
+  const tbody = document.querySelector('#srmTable tbody');
+  const stage = document.getElementById('srmStageFilter').value;
+  const q = document.getElementById('srmSearch').value.trim().toLowerCase();
+
+  let rows = srmRows;
+  if (stage) rows = rows.filter(r => srmStage(r) === stage);
+  if (q) {
+    rows = rows.filter(r => [
+      r.request_number, r.booking_reference, r.pnr, r.merchant_name,
+      (r.details || {}).booking_request_number,
+    ].filter(Boolean).join(' ').toLowerCase().includes(q));
+  }
+
+  const actionable = srmRows.filter(r => srmStage(r) === 'actionable').length;
+  const waiting = srmRows.filter(r => srmStage(r) === 'awaiting_manager').length;
+  document.getElementById('srmQueueSummary').textContent =
+    `${srmRows.length} request${srmRows.length === 1 ? '' : 's'}`
+    + (actionable ? ` · ${actionable} ready to action` : '')
+    + (waiting ? ` · ${waiting} with the merchant's manager` : '');
+  updateServiceRequestNavBadge(actionable);
+
+  tbody.innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td><span class="mono">${escapeHtml(r.request_number)}</span></td>
+      <td>${escapeHtml(SRM_TYPE_LABELS[r.request_type] || admLabel(r.request_type))}</td>
+      <td>${escapeHtml(r.merchant_name || '—')}</td>
+      <td><span class="mono">${escapeHtml((r.details || {}).booking_request_number || r.booking_reference || '—')}</span>
+          <div class="cell-sub">${escapeHtml(r.pnr || '')}</div></td>
+      <td>${srmAsk(r)}</td>
+      <td>${srmStatusCell(r)}</td>
+      <td>${fmtDateTime(r.created_at)}</td>
+      <td style="white-space:nowrap;">${srmActions(r)}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="8" class="empty-state">No service requests match this filter.</td></tr>`;
+
+  tbody.querySelectorAll('[data-srm-open]').forEach(btn =>
+    btn.addEventListener('click', () => openServiceRequest(btn.dataset.srmOpen)));
+  document.getElementById('srmPagination').innerHTML = '';
+}
+
+function updateServiceRequestNavBadge(count) {
+  const badge = document.getElementById('srmNavBadge');
+  if (!badge) return;
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.hidden = !count;
+}
+
+/* One entry point, two dialogs. A cancellation or a date change opens the
+   pricing dialog in admin-change-requests.js — it quotes the charge, derives
+   the refund and applies the result to the booking. Everything else opens the
+   plain approve/reject dialog below, which is all the generic resolve endpoint
+   can do. Choosing here rather than at the button means a new service request
+   type lands in the right dialog by default. */
+function openServiceRequest(requestId) {
+  const row = srmRows.find(r => String(r.id) === String(requestId));
+  if (row && SRM_SETTLED_TYPES.includes(row.request_type)) {
+    return openChangeRequest(requestId);
+  }
+  openServiceRequestResolveModal(requestId, row);
+}
+
+function openServiceRequestResolveModal(requestId, row) {
   const overlay = document.getElementById('prServiceRequestModalOverlay');
   const body = document.getElementById('prServiceRequestModalBody');
   overlay.classList.add('open');
+
+  const readOnly = row && !SRM_OPEN.includes(row.status);
+  const awaitingManager = row && srmStage(row) === 'awaiting_manager';
+
   body.innerHTML = `
-    <h2>Resolve Service Request</h2>
-    <div class="form-field" style="max-width:none;">
-      <label>Decision</label>
-      <select id="srmResolveDecision" class="status-select" style="width:100%;">
-        <option value="approve">Approve</option>
-        <option value="reject">Reject</option>
-      </select>
-    </div>
-    <div class="form-field" id="srmReasonField" style="max-width:none;display:none;">
-      <label>Reason</label>
-      <textarea id="srmReason" rows="2" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-color);font-family:var(--ff);font-size:14px;"></textarea>
-    </div>
-    <div class="modal-actions" style="margin-top:16px;">
-      <button type="button" class="btn btn-coral" id="srmConfirmBtn">Confirm</button>
-      <button type="button" class="btn btn-ghost" id="srmCloseBtn">Cancel</button>
-    </div>
-    <div class="msg" id="srmModalMsg"></div>
+    <h2>${escapeHtml(row ? SRM_TYPE_LABELS[row.request_type] || admLabel(row.request_type) : 'Service request')}
+        ${escapeHtml(row ? row.request_number : '')}</h2>
+    ${row ? `<p class="modal-sub">${escapeHtml(row.merchant_name || '')} · raised ${fmtDateTime(row.created_at)}</p>
+      <div class="detail-grid">
+        ${crDetailRow('Status', `<span class="badge ${srmBadge(row)}">${escapeHtml(row.status_label)}</span>`)}
+        ${crDetailRow('Booking', `<span class="mono">${escapeHtml((row.details || {}).booking_request_number || '—')}</span>`)}
+        ${crDetailRow('PNR', escapeHtml(row.pnr || '—'))}
+        ${crDetailRow('Asked for', srmAsk(row))}
+      </div>
+      ${(row.manager_approval || {}).by_name ? `<div class="detail-note"><strong>Merchant's manager</strong>
+        <p>${escapeHtml(row.manager_approval.by_name)} —
+        ${escapeHtml(row.manager_approval.state === 'approved' ? 'approved' : 'rejected')}${
+          row.manager_approval.reason ? `: ${escapeHtml(row.manager_approval.reason)}` : ''}</p></div>` : ''}
+      ${row.rejection_reason ? `<div class="detail-note"><strong>Refused because</strong><p>${escapeHtml(row.rejection_reason)}</p></div>` : ''}`
+    : ''}
+
+    ${awaitingManager ? `<div class="msg info">
+      This request is still with the merchant's own manager. It cannot be actioned here until they
+      have approved it — the server refuses it too.</div>` : ''}
+    ${readOnly && !awaitingManager ? '<div class="msg info">This request has been settled and is now read-only.</div>' : ''}
+
+    ${!readOnly && !awaitingManager ? `
+      <div class="form-field" style="max-width:none;">
+        <label for="srmResolveDecision">Decision</label>
+        <select id="srmResolveDecision" class="status-select" style="width:100%;">
+          <option value="approve">Approve</option>
+          <option value="reject">Reject</option>
+        </select>
+      </div>
+      <div class="form-field" id="srmReasonField" style="max-width:none;display:none;">
+        <label for="srmReason">Reason</label>
+        <textarea id="srmReason" rows="2" style="width:100%;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border-color);font-family:var(--ff);font-size:14px;"></textarea>
+      </div>
+      <div class="msg" id="srmModalMsg"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-coral" id="srmConfirmBtn">Confirm</button>
+        <button type="button" class="btn btn-ghost" id="srmCloseBtn">Cancel</button>
+      </div>`
+    : '<div class="modal-actions"><button type="button" class="btn btn-ghost" id="srmCloseBtn">Close</button></div>'}
   `;
+
   document.getElementById('srmCloseBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  if (readOnly || awaitingManager) return;
+
   document.getElementById('srmResolveDecision').addEventListener('change', e => {
     document.getElementById('srmReasonField').style.display = e.target.value === 'reject' ? 'block' : 'none';
   });
@@ -694,11 +1204,16 @@ function openServiceRequestResolveModal(requestId) {
     const approve = document.getElementById('srmResolveDecision').value === 'approve';
     const reason = document.getElementById('srmReason').value.trim();
     if (!approve && !reason) { msg.textContent = 'Enter a reason for rejecting.'; msg.className = 'msg error'; return; }
+    const btn = document.getElementById('srmConfirmBtn');
+    btn.disabled = true;
     try {
-      await axios.post(`${API_BASE}/api/admin/service-requests/${requestId}/resolve`, { approve, reason: reason || undefined }, { headers: authHeaders() });
+      await axios.post(`${API_BASE}/api/admin/service-requests/${requestId}/resolve`,
+        { approve, reason: reason || undefined }, { headers: authHeaders() });
+      showToast(`${row ? row.request_number : 'Request'} ${approve ? 'approved' : 'rejected'}.`);
       overlay.classList.remove('open');
       loadServiceRequestManagement(srmPage);
     } catch (err) {
+      btn.disabled = false;
       msg.textContent = err.response?.data?.detail || 'Failed to resolve.';
       msg.className = 'msg error';
     }
@@ -886,7 +1401,16 @@ function openRefundModal(paymentId, maxAmount) {
   if (!amount) return;
   const reason = prompt('Reason for this refund:');
   if (!reason) return;
-  axios.post(`${API_BASE}/api/admin/payments/${paymentId}/refund`, { amount: Number(amount), reason }, { headers: authHeaders() })
+
+  /* M4: the amount is sent as the STRING the operator typed, not Number(amount).
+     The endpoint's schema is `Decimal`, and a float on the way in is a rounding
+     error waiting for a value where one shows — the whole point of keeping money
+     out of JavaScript's number type. Validation is the server's: it already
+     refuses <= 0 and anything above what the payment took, and its message says
+     by how much. Re-checking here would be a second opinion about money, which
+     is exactly what this milestone removes. */
+  const trimmed = String(amount).trim();
+  axios.post(`${API_BASE}/api/admin/payments/${paymentId}/refund`, { amount: trimmed, reason }, { headers: authHeaders() })
     .then(() => loadPayments(pvPage))
     .catch(err => alert(err.response?.data?.detail || 'Refund failed.'));
 }

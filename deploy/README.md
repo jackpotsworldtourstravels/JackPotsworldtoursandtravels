@@ -1,4 +1,16 @@
-# Deploying to AWS EC2
+# Deploying to AWS EC2 — SUPERSEDED
+
+> **Use [../docs/AWS_DEPLOYMENT.md](../docs/AWS_DEPLOYMENT.md) instead.**
+>
+> This guide predates the Docker image and the S3 document backend, and it
+> installs PostgreSQL on the web server — where an instance rebuild takes the
+> database with it, and where booking documents live only on that one disk.
+> The current guide uses RDS and S3 so the instance stays disposable.
+>
+> Kept because the nginx and systemd files here are still a working reference
+> for a no-Docker deployment. Do not follow both guides: `setup.sh` installs a
+> second PostgreSQL and an nginx that will fight the Caddy container for
+> port 80.
 
 All-in-one setup: one EC2 instance runs nginx (static frontend + reverse proxy),
 the FastAPI backend (gunicorn/uvicorn via systemd), and PostgreSQL.
@@ -72,7 +84,7 @@ auto-renewal. Visit `https://YOUR_DOMAIN` to confirm.
 
 - `https://YOUR_DOMAIN/api/health` → `{"status":"ok"}`
 - `https://YOUR_DOMAIN/` → the public site loads and can sign up/search/book
-- `https://YOUR_DOMAIN/admin/admin.html` → log in with the seeded admin account
+- `https://YOUR_DOMAIN/admin/` → log in with the seeded admin account
   (check `sudo journalctl -u jackpots-backend | grep -i admin` right after
   the first migration ran, for the auto-generated password if you didn't set
   `ADMIN_SEED_PASSWORD`)

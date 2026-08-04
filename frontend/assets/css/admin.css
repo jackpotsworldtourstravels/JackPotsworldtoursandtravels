@@ -3,6 +3,9 @@
   --navy:#0B3C6D; --navy-2:#0F4A85; --navy-3:#155A9E;
   --coral:#FF6B35; --coral-dark:#E85A2A; --coral-hover:#FFEFE8;
   --bg:#F5F7FA; --white:#FFFFFF; --sky:#1E88E5; --emerald:#12B76A; --gold:#FFB020;
+  /* --gold is a fill colour; at 13px on white it fails contrast, so text that
+     needs the same "attention, not error" tone uses this darker pair. */
+  --gold-dark:#8A5A00;
   --ink:#0B3C6D; --muted:#5B6B82; --line:rgba(11,60,109,0.10);
   --shadow-sm:0 8px 24px -12px rgba(11,60,109,0.18); --shadow-lg:0 30px 70px -20px rgba(11,60,109,0.35);
   --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
@@ -15,6 +18,8 @@
 :root[data-theme="dark"]{
   --page-bg:#0B1220; --card-bg:#131B2E; --text-primary:#E7ECF5; --text-muted:#93A2BE;
   --border-color:rgba(255,255,255,0.08); --hover-bg:rgba(255,255,255,0.05);
+  /* Inverted for dark: the light-mode brown reads as dirt on a dark card. */
+  --gold-dark:#F0B429;
   --shadow-sm:0 8px 24px -12px rgba(0,0,0,0.5); --shadow-lg:0 30px 70px -20px rgba(0,0,0,0.65);
 }
 *{box-sizing:border-box; margin:0; padding:0;}
@@ -34,7 +39,14 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   transition:width .25s ease, transform .25s ease;
 }
 .sidebar::-webkit-scrollbar{width:6px;} .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
-.main{flex:1; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
+/* min-width:0 is load-bearing, not tidying. `.main` is a flex item, and a flex
+   item defaults to min-width:auto — it refuses to shrink below its content's
+   min-content width. A wide table therefore pushes `.main` past the viewport
+   and the whole page scrolls sideways, even though `.table-wrap` has
+   overflow-x:auto and would have scrolled the table by itself. With this, the
+   table scrolls inside its own box and the page does not. Measured at 768px:
+   Merchant Management was 830px wide against a 768px viewport before this. */
+.main{flex:1; min-width:0; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
 .layout.collapsed .sidebar{width:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .main{margin-left:var(--sidebar-w-collapsed) !important;}
 .layout.collapsed .nav-item span.nav-label, .layout.collapsed .brand-text, .layout.collapsed .sidebar-collapse-btn span{display:none;}
@@ -149,10 +161,10 @@ tbody tr:hover{background:var(--hover-bg);}
 .table-wrap{overflow-x:auto; border-radius:12px;}
 .badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700;}
 .badge.confirmed, .badge.success, .badge.active{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.pending{background:rgba(255,176,32,0.15); color:#8f5c00;}
 .badge.cancelled, .badge.failed, .badge.inactive{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
 .badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky);}
-.badge.unread{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.unread{background:rgba(255,176,32,0.15); color:#8f5c00;}
 .badge.read{background:rgba(10,37,64,0.06); color:var(--text-muted);}
 
 .form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px;}
@@ -293,7 +305,7 @@ tbody tr:hover{background:var(--hover-bg);}
 
 /* Inventory Management */
 .badge.healthy{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.badge.low-stock{background:rgba(255,176,32,0.15); color:#a06600;}
+.badge.low-stock{background:rgba(255,176,32,0.15); color:#8f5c00;}
 .badge.sold-out{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
 
 /* Customer Management */
@@ -420,7 +432,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .bm2-badge{display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:100px; font-size:11px; font-weight:700; text-transform:capitalize; white-space:nowrap;}
 .bm2-badge::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0;}
 .bm2-badge.paid, .bm2-badge.confirmed, .bm2-badge.completed{background:rgba(18,183,106,0.12); color:var(--emerald);}
-.bm2-badge.pending{background:rgba(255,176,32,0.15); color:#a06600;}
+.bm2-badge.pending{background:rgba(255,176,32,0.15); color:#8f5c00;}
 :root[data-theme="dark"] .bm2-badge.pending{color:var(--gold);}
 .bm2-badge.cancelled, .bm2-badge.failed{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
 .bm2-badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky);}
@@ -537,4 +549,196 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .stat-grid{grid-template-columns:1fr 1fr;}
   .panel{padding:18px;}
   .topbar h1{font-size:18px;}
+}
+
+/* ---------- Ticket Enquiries (Phase 2) ----------
+   Built from the tokens already defined above so the screen inherits light/dark
+   automatically; nothing here hard-codes a colour that isn't a variable. */
+.panel-sub{font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+/* Secondary line inside a table cell — merchant contact under the company,
+   flight under the route, reviewer under the status badge. */
+.cell-sub{font-size:11.5px; font-weight:600; color:var(--text-muted); margin-top:2px;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700;}
+
+.msg.warn{color:var(--gold-dark);}
+.msg.info{color:var(--text-muted);}
+
+/* A stat card that navigates. Keyboard-reachable, so it also needs a focus ring
+   the mouse path never shows. */
+.stat-card-link{cursor:pointer;}
+.stat-card-link:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+
+/* Enquiry detail — label/value pairs, two across on desktop and one on mobile. */
+.detail-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:10px 18px; margin:16px 0 4px;
+}
+.detail-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.detail-label{font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.detail-value{font-size:13.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.detail-note{
+  margin-top:14px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px solid var(--border-color);
+}
+.detail-note strong{font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
+.detail-note p{margin:4px 0 0; font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+
+.modal-sub{margin:-8px 0 4px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+
+.enq-claim{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:16px 0 4px; padding:10px 12px; border-radius:10px;
+  background:var(--hover-bg); border:1px dashed var(--border-color);
+}
+
+/* ---------- Booking Operations tabs ----------
+   A tab strip inside a panel, for switching one table between queues. The
+   count rides in the tab rather than in a separate badge: "To Book (7)" is one
+   thing to read, and a badge that can disagree with the table beneath it is
+   worse than no badge. */
+.bo-tabs{
+  display:flex; gap:4px; flex-wrap:wrap;
+  margin:0 0 16px; padding-bottom:2px;
+  border-bottom:1.5px solid var(--border-color);
+}
+.bo-tab{
+  padding:9px 16px; border:none; border-bottom:2.5px solid transparent;
+  background:none; cursor:pointer; font:inherit;
+  font-size:13px; font-weight:700; color:var(--text-muted);
+  border-radius:8px 8px 0 0; margin-bottom:-2px;
+}
+.bo-tab:hover{background:var(--hover-bg); color:var(--text-primary);}
+.bo-tab.active{color:var(--coral); border-bottom-color:var(--coral);}
+.bo-tab-count{font-weight:800; opacity:.75;}
+
+/* The search box in a filter bar. Only input[type="text"] was styled, so the
+   type="search" boxes were rendering as unstyled browser defaults next to the
+   selects they sit beside. */
+.filter-bar input[type="search"]{
+  padding:9px 12px; border-radius:10px; border:1.5px solid var(--line);
+  font-size:13px; background:var(--card-bg); color:var(--text-primary);
+  min-width:220px; font-family:inherit;
+}
+
+@media (max-width:640px){
+  .detail-grid{grid-template-columns:1fr;}
+  .bo-tabs{overflow-x:auto; flex-wrap:nowrap;}
+  .bo-tab{white-space:nowrap;}
+}
+
+/* ---------- Booking Operations desk (CR-2, over the M1/M2 backend) ---------- */
+/* Namespaced `ops-` so nothing here reaches the Approval Queue or the enquiry
+   screens, which share this stylesheet. */
+.ops-tabs{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;}
+.ops-tab{border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-muted);
+         padding:8px 14px; border-radius:100px; font-size:12.5px; font-weight:700; cursor:pointer;
+         font-family:inherit; display:inline-flex; align-items:center; gap:7px;}
+.ops-tab:hover{border-color:var(--navy); color:var(--text-primary);}
+.ops-tab.active{background:var(--navy); border-color:var(--navy); color:#fff;}
+.ops-tab:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+.ops-tab-count{background:rgba(10,37,64,0.08); color:var(--text-primary); border-radius:100px;
+               padding:1px 8px; font-size:11px; font-weight:800;}
+.ops-tab.active .ops-tab-count{background:rgba(255,255,255,0.22); color:#fff;}
+
+/* .modal-card.modal-lg sets padding:0 so a sticky header can sit flush against
+   the top; this modal has one, so its body supplies the padding. */
+.ops-modal-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+                position:sticky; top:0; background:var(--card-bg); z-index:2;
+                padding:24px 30px 16px; border-bottom:1px solid var(--border-color);}
+.ops-modal-head h2{margin:0; font-size:19px; display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+.ops-modal-close{width:34px; height:34px; border-radius:10px; background:var(--hover-bg);
+                 border:none; cursor:pointer; font-size:20px; line-height:1; color:var(--text-muted);
+                 flex-shrink:0; font-family:inherit;}
+.ops-modal-close:hover{color:var(--text-primary);}
+.ops-modal-close:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+.ops-modal-body{padding:4px 30px 30px;}
+
+.ops-hint{background:rgba(47,128,237,0.08); border:1px solid rgba(47,128,237,0.30);
+          border-radius:10px; padding:12px 14px; font-size:12.5px; color:var(--text-primary);
+          margin:16px 0 4px;}
+.ops-section{margin-top:24px; padding-top:18px; border-top:1px solid var(--border-color);}
+.ops-section h3{font-size:13px; text-transform:uppercase; letter-spacing:.05em;
+                color:var(--text-muted); margin:0 0 10px; display:flex; align-items:baseline;
+                gap:10px; flex-wrap:wrap;}
+.ops-staff-only{font-size:11px; font-weight:700; text-transform:none; letter-spacing:0;
+                color:var(--coral-dark);}
+/* Same shape as .ops-staff-only but muted — a provenance note, not a warning. */
+.ops-staff-note{font-size:11px; font-weight:600; text-transform:none; letter-spacing:0;
+                color:var(--text-muted);}
+/* The first section under the modal head supplies no rule of its own: the head
+   already has a bottom border, and a second one 24px below it reads as an empty
+   band where the removed Assignment form used to sit. */
+.ops-section-first{margin-top:16px; padding-top:0; border-top:none;}
+/* .detail-grid carries its own 16px top margin for the enquiry screens, where
+   it follows body text rather than a heading. Under an .ops-section h3 that
+   stacks into a 26px gap the heading looks detached from its own contents. */
+.ops-section .detail-grid{margin-top:2px;}
+.ops-sub{font-size:12.5px; color:var(--text-muted); margin:0 0 10px;}
+.ops-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+.ops-row input[type="text"], .ops-row input[type="file"], .ops-row select{
+  padding:9px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13px;
+  background:var(--card-bg); color:var(--text-primary); min-width:200px; flex:1;}
+.ops-grid-3{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px 16px;
+            margin-bottom:12px;}
+/* Bottom-aligned, so a label that wraps to two lines does not drop its input
+   16px below its neighbours'. "Airline reference (if applicable)" wraps at most
+   widths where three columns still fit.
+   Scoped to the work modal on purpose: the Manager portal reuses `.ops-grid-3`
+   for its profile form, where one field carries a hint *below* its input —
+   bottom-aligning there would align the hint and lift the input instead. */
+#opsWorkBody .ops-grid-3{align-items:end;}
+/* One card per traveller. A table would need thirteen columns and therefore a
+   horizontal scrollbar at every viewport; the desk reads one passenger at a
+   time, so the cards win on the screen this is actually used on. */
+.ops-pax{border:1px solid var(--border-color); border-radius:12px; padding:12px 14px;
+         background:var(--hover-bg); margin-bottom:10px;}
+.ops-pax:last-of-type{margin-bottom:0;}
+.ops-pax-head{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:11px;}
+.ops-pax-num{width:22px; height:22px; border-radius:50%; background:var(--navy); color:#fff;
+             font-size:11px; font-weight:800; flex-shrink:0;
+             display:inline-flex; align-items:center; justify-content:center;}
+.ops-pax-name{font-size:14px; font-weight:800; color:var(--text-primary); overflow-wrap:anywhere;}
+/* 150px min: the values here are short (a gender, a meal code, a date), so a
+   220px track like .detail-grid's would strand half of every column. */
+.ops-pax-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+              gap:10px 16px;}
+.ops-pax-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.ops-pax-label{font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+               color:var(--text-muted);}
+.ops-pax-value{font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-pax-note{margin-top:11px; padding-top:9px; border-top:1px dashed var(--border-color);
+              font-size:12.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-pax-note strong{display:block; margin-bottom:3px; font-size:10px; font-weight:800;
+                     letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+
+.ops-note{padding:10px 12px; border-radius:10px; background:var(--hover-bg);
+          border:1px solid var(--border-color); margin-bottom:8px;}
+.ops-note-body{font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-note-meta{font-size:11.5px; color:var(--text-muted); margin-top:3px;}
+.ops-actions{display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+             margin-top:24px; padding-top:18px; border-top:1px solid var(--border-color);}
+/* CR-4b: the fare the desk paid, captured on an enquiry-led booking that has no
+   amount yet. Full width so it sits above the action buttons rather than
+   competing with them for the row. */
+.ops-fare{flex:1 1 100%; min-width:0;}
+.ops-fare label{display:block; font-size:12px; font-weight:700; color:var(--text-primary);
+                margin-bottom:6px;}
+.ops-fare input{width:100%; max-width:260px; padding:9px 12px; font-size:14px;
+                border:1px solid var(--border-color); border-radius:8px;
+                background:var(--surface); color:var(--text-primary);}
+.ops-fare input:focus-visible{outline:2px solid var(--brand-coral); outline-offset:1px;}
+.ops-fare .ops-sub{margin-top:6px;}
+
+@media (max-width:640px){
+  .ops-modal-head{padding:20px 20px 14px;}
+  .ops-modal-body{padding:4px 20px 24px;}
+  .ops-grid-3{grid-template-columns:1fr;}
+  .ops-row input[type="text"], .ops-row input[type="file"], .ops-row select{min-width:0; width:100%;}
+  /* Two columns still fit at 375px once the modal and card padding are taken
+     out, and these values are short enough to read at that width — one column
+     would double the height of a six-passenger booking for nothing. */
+  .ops-pax{padding:11px 12px;}
+  .ops-pax-grid{grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:9px 12px;}
 }

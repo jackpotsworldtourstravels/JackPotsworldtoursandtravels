@@ -12,7 +12,7 @@
      modals) so the Super Admin Portal matches the project's established
      premium-enterprise language rather than inventing a new one. -->
 <link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260725f">
-<link rel="stylesheet" href="../assets/css/super-admin.css?v=2">
+<link rel="stylesheet" href="../assets/css/super-admin.css?v=20260731cr2">
 </head>
 <body>
 
@@ -130,13 +130,20 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Admin Management</h2>
-          <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Admin</button>
+          <button type="button" class="btn btn-coral btn-sm" id="saAddAdminBtn">+ Add Staff Account</button>
         </div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="saAdminSearch" placeholder="Search name or email…">
+          <!-- Managers are staff accounts this screen owns too (CR-2), so the
+               list carries both and this narrows it. -->
+          <select id="saAdminRoleFilter" class="status-select" aria-label="Role">
+            <option value="">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+          </select>
         </div>
         <div class="table-wrap"><table id="saAdminsTable"><thead><tr>
-          <th>Full Name</th><th>Email</th><th>Status</th><th>Last Login</th><th>Created</th><th>Actions</th>
+          <th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Created</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="saAdminsPagination"></div>
       </div>
@@ -150,7 +157,7 @@
           Fixed by design — role responsibilities (e.g. Super Admin cannot hold ticket permissions) are not
           reassignable here. This is visibility into the matrix, not an editor for it.
         </p>
-        <div class="table-wrap"><table id="saMatrixTable"><thead><tr><th>Permission</th><th>Super Admin</th><th>Admin</th><th>Merchant Admin</th><th>Merchant User</th></tr></thead><tbody></tbody></table></div>
+        <div class="table-wrap"><table id="saMatrixTable"><thead><tr><th>Permission</th><th>Super Admin</th><th>Admin</th><th>Manager</th><th>Merchant Admin</th><th>Merchant User</th></tr></thead><tbody></tbody></table></div>
       </div>
       <div class="panel">
         <div class="panel-head"><h2>Per-Admin Extra Grants</h2></div>
@@ -263,8 +270,15 @@
 <!-- ============== Add Admin modal ============== -->
 <div class="modal-overlay" id="saAddAdminModalOverlay">
   <div class="modal-card">
-    <h2>Add Admin</h2>
+    <h2>Add Staff Account</h2>
     <form id="saAddAdminForm">
+      <div class="form-field" style="max-width:none;"><label for="saAddRole">Role</label>
+        <select name="role" id="saAddRole" required>
+          <option value="admin">Admin — merchants, enquiries, payments, ticketing</option>
+          <option value="manager">Manager — approves submitted booking requests</option>
+        </select>
+      </div>
+      <div class="sa-pw-hint" id="saAddRoleHint"></div>
       <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
       <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
       <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone" placeholder="Optional"></div>
@@ -272,7 +286,7 @@
       <div class="sa-pw-hint">Leave the password blank to have a strong one generated and shown once on creation.</div>
       <div class="msg" id="saAddAdminMsg"></div>
       <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">Create Admin</button>
+        <button type="submit" class="btn btn-coral" id="saAddAdminSubmit">Create Account</button>
         <button type="button" class="btn btn-ghost" id="saAddAdminCancelBtn">Cancel</button>
       </div>
     </form>
@@ -282,9 +296,16 @@
 <!-- ============== Edit Admin modal ============== -->
 <div class="modal-overlay" id="saEditAdminModalOverlay">
   <div class="modal-card">
-    <h2>Edit Admin</h2>
+    <h2>Edit Staff Account</h2>
     <form id="saEditAdminForm">
       <input type="hidden" name="admin_id">
+      <div class="form-field" style="max-width:none;"><label for="saEditRole">Role</label>
+        <select name="role" id="saEditRole">
+          <option value="admin">Admin</option>
+          <option value="manager">Manager</option>
+        </select>
+      </div>
+      <div class="sa-pw-hint" id="saEditRoleHint"></div>
       <div class="form-field" style="max-width:none;"><label>Full Name</label><input name="full_name" required></div>
       <div class="form-field" style="max-width:none;"><label>Email Address</label><input name="email" type="email" required></div>
       <div class="form-field" style="max-width:none;"><label>Phone</label><input name="phone"></div>
@@ -379,8 +400,8 @@
 <script src="../assets/js/super-admin-shared.js?v=2"></script>
 <script src="../assets/js/super-admin-auth.js?v=1"></script>
 <script src="../assets/js/super-admin-dashboard.js?v=2"></script>
-<script src="../assets/js/super-admin-admin-management.js?v=2"></script>
-<script src="../assets/js/super-admin-permissions.js?v=1"></script>
+<script src="../assets/js/super-admin-admin-management.js?v=20260731cr2"></script>
+<script src="../assets/js/super-admin-permissions.js?v=20260731cr2"></script>
 <script src="../assets/js/super-admin-reports.js?v=1"></script>
 <script src="../assets/js/super-admin-audit.js?v=1"></script>
 <script src="../assets/js/super-admin-settings.js?v=1"></script>

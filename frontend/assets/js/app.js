@@ -6,6 +6,21 @@ const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http:
 
 /* escapeHtml() now lives in shared/formatters.js, loaded before this file. */
 
+/* Turn an axios failure into a sentence a person can act on.
+   FastAPI returns `detail` as a plain string for a raised HTTPException but as
+   an ARRAY of {loc,msg,type} objects for a 422 validation error. Assigning that
+   array straight to textContent renders "[object Object]", which is what the
+   login and signup forms used to show. */
+function apiErrorText(err, fallback) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    const text = detail.map(d => d?.msg).filter(Boolean).join(' ');
+    return text || fallback;
+  }
+  if (typeof detail === 'string' && detail) return detail;
+  return fallback;
+}
+
 /* Nav: header fades from transparent to solid black gradually over a long scroll range */
 const header = document.getElementById('siteHeader');
 const HEADER_FADE_RANGE = 600;
@@ -224,8 +239,7 @@ document.getElementById('contactForm').addEventListener('submit', async e => {
     msg.classList.add('show');
     e.target.reset();
   } catch (err) {
-    const detail = err.response?.data?.detail;
-    msg.textContent = Array.isArray(detail) ? detail.map(d => d.msg).join(' ') : (detail || 'Something went wrong — please try again.');
+    msg.textContent = apiErrorText(err, 'Something went wrong — please try again.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -254,7 +268,7 @@ async function handleBookNow(type, id, price, label, quantity = 1, travelDate = 
     showToast(couponCode ? `Booked "${label}" with coupon ${couponCode} — confirmation sent instantly!` : `Booked "${label}" — confirmation sent instantly!`);
     loadUpcomingJourney();
   } catch (err) {
-    showToast(err.response?.data?.detail || 'Booking failed — please try again.', true);
+    showToast(apiErrorText(err, 'Booking failed — please try again.'), true);
   }
 }
 document.addEventListener('click', e => {
@@ -315,7 +329,7 @@ document.addEventListener('click', async e => {
       showToast('Saved to wishlist!');
     }
     applyWishlistState(wlBtn.closest('.pkg-grid, .search-results-list'));
-  } catch (err) { showToast(err.response?.data?.detail || 'Wishlist update failed.', true); }
+  } catch (err) { showToast(apiErrorText(err, 'Wishlist update failed.'), true); }
 });
 refreshWishlistState();
 
@@ -417,7 +431,7 @@ reviewForm.addEventListener('submit', async e => {
     msg.classList.add('show');
     openReviewsModal(currentReviewItem.type, currentReviewItem.id, document.getElementById('reviewsModalSub').textContent);
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to submit review.';
+    msg.textContent = apiErrorText(err, 'Failed to submit review.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -533,7 +547,7 @@ document.getElementById('detailsCouponApplyBtn').addEventListener('click', async
     msg.classList.add('show');
   } catch (err) {
     currentAppliedCoupon = null;
-    msg.textContent = err.response?.data?.detail || 'Could not validate this coupon right now.';
+    msg.textContent = apiErrorText(err, 'Could not validate this coupon right now.');
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
   }
@@ -918,6 +932,14 @@ function openAuth(view) {
   signupView.style.display = view === 'login' ? 'none' : 'block';
   loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
+  /* Always reopen on the credentials step — a half-finished OTP attempt from
+     a previous open would otherwise still be showing. */
+  if (view === 'login') {
+    loginChallengeToken = null;
+    showLoginStep('creds');
+    setModalMsg(document.getElementById('loginMsg'), '', 'muted');
+    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
+  }
   const firstInput = (view === 'login' ? loginView : signupView).querySelector('input');
   if (firstInput) firstInput.focus();
 }
@@ -928,6 +950,13 @@ function closeAuth() {
 document.querySelectorAll('[data-auth]').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
+    /* A merchant who already has a live session shouldn't be asked to sign in
+       again — send them straight through. Merchant tokens live in their own
+       namespace (PARTNER_KEYS), which getStoredAuth() below doesn't see. */
+    if (el.dataset.auth === 'login' && isPartnerLoggedIn()) {
+      window.location.href = MERCHANT_PORTAL_URL;
+      return;
+    }
     const { access, role } = getStoredAuth();
     if (access) {
       if (el.dataset.auth === 'signup') {
@@ -936,7 +965,7 @@ document.querySelectorAll('[data-auth]').forEach(el => {
         wishlistMap = new Map();
         renderAuthNav();
       }
-      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/admin.html'; }
+      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/'; }
       return;
     }
     openAuth(el.dataset.auth);
@@ -948,68 +977,183 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
-document.getElementById('signupForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const fullName = document.getElementById('suName').value;
-  const email = document.getElementById('suEmail').value;
-  const pass = document.getElementById('suPass').value;
-  const pass2 = document.getElementById('suPass2').value;
+/* ---------------------------------------------------------------------------
+   Merchant access request.
+
+   Merchants don't self-register: an Admin creates the company
+   (POST /api/admin/merchants) and it stays pending_approval until approved, so
+   there is no /api/auth/signup in the v2 API to post to. This collects the
+   details the team needs and tells the applicant plainly that registration is
+   approval-based, rather than pretending an account was created.
+   --------------------------------------------------------------------------- */
+document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
+  const company = document.getElementById('suCompany').value.trim();
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const phone = document.getElementById('suPhone').value.trim();
   const msg = document.getElementById('signupMsg');
-  if (pass !== pass2) {
-    msg.textContent = "Passwords don't match — please try again.";
+  const fail = text => {
+    msg.textContent = text;
     msg.style.color = 'var(--coral-dark)';
     msg.classList.add('show');
-    return;
-  }
-  try {
-    const data = await Api.register({ full_name: fullName, email, password: pass });
-    const me = await Api.me({ Authorization: `Bearer ${data.access_token}` });
-    setStoredAuth(data.access_token, data.refresh_token, fullName, 'user', me.id);
-    renderAuthNav();
-    refreshWishlistState().then(() => {
-      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
-      applyWishlistState(document.getElementById('searchResultsList'));
-    });
-    msg.textContent = "Account created — you're all set!";
-    msg.style.color = 'var(--emerald)';
-    msg.classList.add('show');
-    e.target.reset();
-    setTimeout(closeAuth, 1200);
-  } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Something went wrong — please try again.';
-    msg.style.color = 'var(--coral-dark)';
-    msg.classList.add('show');
-  }
+  };
+
+  if (!company) return fail('Please tell us your company name.');
+  if (!name) return fail('Please tell us your name.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid work email.');
+
+  /* Holding state until the registration endpoint exists.
+     Partner registration is approval-based: an Admin creates the company and
+     it waits in pending_approval before it can trade, so there is nothing for
+     this form to POST to yet. Rather than fake a submission, say plainly how
+     onboarding works. When the registration module lands, replace this block
+     with the real call — the fields above are already the ones it needs, so
+     the swap is this handler only. */
+  msg.textContent = 'Partner registration is currently by approval. '
+    + 'Please contact our team or wait for the onboarding module.';
+  msg.style.color = 'var(--ink)';
+  msg.classList.add('show');
 });
+
+/* ---------------------------------------------------------------------------
+   Merchant sign-in — the site's "Login" is the merchant login.
+
+   Runs the same two-step flow as the Merchant Portal's own shell
+   (Login -> Password -> OTP -> Portal, API_CONTRACT.md §1) using the shared
+   helpers in auth.js, then hands off to the merchant's workspace. Tokens are
+   written under the merchant namespace by storePortalTokens, so arriving there
+   the session is already live and no second sign-in is needed.
+
+   WHERE A MERCHANT LANDS AFTER SIGNING IN
+   This one constant is the whole of it. Authentication — this modal, the OTP
+   step, forgot-password, reset-password, registration — is unchanged; only the
+   destination changes.
+
+   THE MERCHANT UI IS THE CLASSIC PORTAL. The other two merchant-facing
+   frontends are out of service for merchants:
+
+     merchant/     Premium — redirects here to Classic on load. Files kept.
+     operations/   still live for admin and super admin, but a merchant who
+                   reaches it is sent to Classic (see opsStartSession).
+
+   Nothing was deleted for this: both portals still exist on disk and both
+   redirects are a single statement, so restoring either is removing one line
+   and pointing this constant back at it.
+
+   Admin and Super Admin are untouched: they never route through here, they
+   sign in at admin/ and super-admin/ and land in their own portals, and
+   Operations continues to work for them.
+   --------------------------------------------------------------------------- */
+const MERCHANT_PORTAL_URL = 'merchant-classic/';
+let loginChallengeToken = null;
+
+function showLoginStep(step) {
+  document.getElementById('loginStepCreds').style.display = step === 'creds' ? '' : 'none';
+  document.getElementById('loginStepOtp').style.display = step === 'otp' ? '' : 'none';
+}
+
+function setModalMsg(el, text, tone) {
+  el.textContent = text;
+  el.style.color = tone === 'error' ? 'var(--coral-dark)'
+    : tone === 'ok' ? 'var(--emerald)' : 'var(--muted)';
+  el.classList.toggle('show', !!text);
+}
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const email = document.getElementById('liUser').value;
+  const email = document.getElementById('liUser').value.trim();
   const pass = document.getElementById('liPass').value;
   const msg = document.getElementById('loginMsg');
-  try {
-    const data = await Api.login(email, pass);
-    const me = await Api.me({ Authorization: `Bearer ${data.access_token}` });
-    setStoredAuth(data.access_token, data.refresh_token, me.full_name, me.role, me.id);
-    renderAuthNav();
-    if (me.role === 'admin') {
-      window.location.href = 'admin/admin.html';
-      return;
-    }
-    refreshWishlistState().then(() => {
-      applyWishlistState(document.querySelector('.packages-section .pkg-grid'));
-      applyWishlistState(document.getElementById('searchResultsList'));
-    });
-    msg.textContent = 'Logged in — welcome back!';
-    msg.style.color = 'var(--emerald)';
-    msg.classList.add('show');
-    e.target.reset();
-    setTimeout(closeAuth, 1200);
-  } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Invalid email or password.';
-    msg.style.color = 'var(--coral-dark)';
-    msg.classList.add('show');
+  if (!email || !pass) {
+    setModalMsg(msg, 'Enter your email and password.', 'error');
+    return;
   }
+  setModalMsg(msg, 'Checking…', 'muted');
+  try {
+    const data = await startPortalLogin('merchant', email, pass);
+    loginChallengeToken = data.challenge_token;
+    setModalMsg(msg, '', 'muted');
+    setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
+    document.getElementById('liOtp').value = '';
+    /* With SMTP unconfigured the API returns the code inline so local demos
+       work without a mailbox; show it rather than leaving the user stuck. */
+    document.getElementById('loginOtpSub').textContent = data.dev_otp
+      ? `Dev mode — your code is ${data.dev_otp}`
+      : `Enter the 6-digit code sent to ${email}.`;
+    showLoginStep('otp');
+    document.getElementById('liOtp').focus();
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
+  }
+});
+
+document.getElementById('liVerifyBtn')?.addEventListener('click', async () => {
+  const code = document.getElementById('liOtp').value.trim();
+  const msg = document.getElementById('loginOtpMsg');
+  if (!/^\d{6}$/.test(code)) {
+    setModalMsg(msg, 'Enter the 6-digit code.', 'error');
+    return;
+  }
+  setModalMsg(msg, 'Verifying…', 'muted');
+  try {
+    const data = await verifyPortalOtp(loginChallengeToken, code);
+    storePortalTokens('merchant', data);
+    setModalMsg(msg, 'Signed in — taking you to your workspace…', 'ok');
+    window.location.href = MERCHANT_PORTAL_URL;
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'That code was not accepted.'), 'error');
+  }
+});
+
+/* ---------------------------------------------------------------------------
+   Arriving here to sign in, sent by the Operations workspace.
+
+   /operations/ has no login of its own; when it is opened without a session it
+   redirects to this page with #login (and an ops_reason explaining why), so the
+   merchant lands on the login they already know rather than a second one. This
+   only reacts to that hash — a normal visit to the site is untouched.
+   --------------------------------------------------------------------------- */
+(function handleOperationsSignInHandoff() {
+  if (location.hash !== '#login') return;
+
+  /* A live session means they did not need to sign in at all — just go. */
+  if (isPartnerLoggedIn()) {
+    window.location.replace(MERCHANT_PORTAL_URL);
+    return;
+  }
+
+  const reasons = {
+    'session-expired': 'Your session expired. Please sign in again.',
+    'signed-out': 'You have been signed out.',
+    'sign-in-required': 'Please sign in to open your workspace.',
+  };
+  const reason = new URLSearchParams(location.search).get('ops_reason');
+
+  openAuth('login');
+  if (reasons[reason]) setModalMsg(document.getElementById('loginMsg'), reasons[reason], 'muted');
+})();
+
+document.getElementById('liResendBtn')?.addEventListener('click', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('loginOtpMsg');
+  setModalMsg(msg, 'Sending a new code…', 'muted');
+  try {
+    const data = await resendPortalOtp(loginChallengeToken);
+    /* resend issues a fresh challenge; keep using the newest one. */
+    if (data.challenge_token) loginChallengeToken = data.challenge_token;
+    setModalMsg(msg, data.dev_otp ? `Dev mode — your new code is ${data.dev_otp}` : 'A new code is on its way.', 'ok');
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'Could not resend the code just now.'), 'error');
+  }
+});
+
+document.getElementById('liBackBtn')?.addEventListener('click', e => {
+  e.preventDefault();
+  loginChallengeToken = null;
+  document.getElementById('liPass').value = '';
+  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
+  showLoginStep('creds');
+  document.getElementById('liUser').focus();
 });
 
 document.getElementById('forgotPasswordLink').addEventListener('click', async e => {
@@ -1167,7 +1311,7 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
     msg.textContent = 'Profile updated.';
     msg.className = 'acct-msg success';
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to update profile.';
+    msg.textContent = apiErrorText(err, 'Failed to update profile.');
     msg.className = 'acct-msg error';
   }
 });
@@ -1183,7 +1327,7 @@ document.getElementById('acctPasswordForm').addEventListener('submit', async e =
     msg.className = 'acct-msg success';
     e.target.reset();
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to change password.';
+    msg.textContent = apiErrorText(err, 'Failed to change password.');
     msg.className = 'acct-msg error';
   }
 });
@@ -1360,7 +1504,7 @@ async function cancelBookingById(bookingId, onSuccess) {
     await axios.delete(`${API_BASE}/api/bookings/${bookingId}`, { headers: authHeaders() });
     await loadPaymentsMap();
     if (typeof onSuccess === 'function') await onSuccess();
-  } catch (err) { alert(err.response?.data?.detail || 'Failed to cancel booking.'); }
+  } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
 function wireBookingRowActions(container) {
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
@@ -1733,7 +1877,7 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
     e.target.reset();
     loadAcctSupportTickets();
   } catch (err) {
-    msg.textContent = err.response?.data?.detail || 'Failed to submit ticket.';
+    msg.textContent = apiErrorText(err, 'Failed to submit ticket.');
     msg.className = 'acct-msg error';
   }
 });

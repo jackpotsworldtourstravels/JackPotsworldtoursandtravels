@@ -34,6 +34,13 @@ from app.services import activity_service, notification_service
 #: Roles a merchant may assign to its own staff.
 MERCHANT_ASSIGNABLE_ROLES = (UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
 
+#: Platform staff accounts the Super Admin's Admin Management screen owns.
+#: Manager joined the list with CR-2 — a role nobody can create is a role that
+#: does not exist, and the Super Admin is already the account authority for
+#: every non-merchant login. Super Admin itself is absent on purpose: it is
+#: seeded, not created through the API.
+STAFF_MANAGED_ROLES = (UserRole.ADMIN, UserRole.MANAGER)
+
 
 def generate_temp_password(length: int = 14) -> str:
     """A readable-but-random first password, handed over once at creation.
@@ -77,9 +84,22 @@ def _has_history(db: Session, user_id: int) -> bool:
 # ---------------------------------------------------------------------------
 def create_admin(
     db: Session, actor: User, full_name: str, email: str, phone: str | None,
-    password: str | None = None,
+    password: str | None = None, role: UserRole = UserRole.ADMIN,
 ) -> tuple[User, str]:
-    """Create an Admin. Returns the row and the plaintext first password."""
+    """Create a platform staff account. Returns the row and its first password.
+
+    ``role`` is Admin unless a Manager is asked for; anything else is refused
+    here rather than trusted from the request body, so a crafted payload cannot
+    mint a Super Admin through the admin-creation endpoint.
+    """
+    if role not in STAFF_MANAGED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "A staff account may be created as "
+                + " or ".join(r.value for r in STAFF_MANAGED_ROLES)
+            ),
+        )
     _require_unique_email(db, email)
     temp_password = password or generate_temp_password()
 
@@ -88,7 +108,7 @@ def create_admin(
         email=email,
         phone=phone,
         password_hash=hash_password(temp_password),
-        role=UserRole.ADMIN,
+        role=role,
         permissions=[],
         profile={},
         status=UserStatus.ACTIVE,
@@ -99,15 +119,20 @@ def create_admin(
     db.commit()
     db.refresh(admin)
 
+    label = "manager" if role is UserRole.MANAGER else "admin"
     activity_service.log_activity(
-        db, actor.user_id, "Admin created",
+        db, actor.user_id, f"{label.capitalize()} created",
         activity_type="Account", module="Admin Management",
-        description=f"{actor.full_name} created admin {admin.email}",
+        description=f"{actor.full_name} created {label} {admin.email}",
         reference_id=admin.user_id,
     )
     notification_service.create_notification(
-        db, admin.user_id, "Your administrator account is ready",
-        "An account has been created for you on the JackPots admin console.",
+        db, admin.user_id,
+        f"Your {'manager' if role is UserRole.MANAGER else 'administrator'} account is ready",
+        "An account has been created for you on the JackPots admin console."
+        if role is UserRole.ADMIN else
+        "An account has been created for you on the JackPots manager console. "
+        "Booking Requests awaiting your approval appear there.",
     )
     return admin, temp_password
 
@@ -146,8 +171,20 @@ def list_all_users(
     return list(db.scalars(stmt).all()), total
 
 
-def list_admins(db: Session, page: int, page_size: int, search: str | None = None):
-    conditions = [User.role == UserRole.ADMIN]
+def list_admins(
+    db: Session, page: int, page_size: int, search: str | None = None,
+    role: UserRole | None = None,
+):
+    """Platform staff accounts — Admins and Managers, newest first.
+
+    Managers are listed alongside Admins rather than on a screen of their own:
+    they are the same kind of thing to the Super Admin (a staff login it
+    created and can suspend), and a separate screen would have been the same
+    table twice. ``role`` narrows it when the caller wants only one.
+    """
+    conditions = [
+        User.role == role if role is not None else User.role.in_(STAFF_MANAGED_ROLES)
+    ]
     if search:
         pattern = f"%{search}%"
         conditions.append(or_(User.full_name.ilike(pattern), User.email.ilike(pattern)))
@@ -165,29 +202,115 @@ def list_admins(db: Session, page: int, page_size: int, search: str | None = Non
 
 
 def get_admin(db: Session, user_id: int) -> User:
-    """Fetch an Admin by id. 404 when missing or when the row is not an Admin."""
+    """Fetch a staff account by id. 404 when missing or not staff-managed.
+
+    Covers Managers as well as Admins, so every screen that already edits,
+    suspends, resets or deletes an administrator does the same for a Manager
+    without a second copy of each rule.
+    """
     admin = db.get(User, user_id)
-    if not admin or admin.role is not UserRole.ADMIN:
+    if not admin or admin.role not in STAFF_MANAGED_ROLES:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
     return admin
 
 
+def _assert_manager_holds_no_claims(db: Session, admin: User) -> None:
+    """Refuse to move a Manager off the role while it is mid-review.
+
+    A Manager claims a booking by taking it to Under Manager Review, and only
+    the holder may decide it. Converting that account to an Admin would leave
+    the claim standing while its holder no longer has the permission to act on
+    it — a booking stuck In Review that nobody can approve or return.
+
+    Refused rather than silently released: releasing would rewrite booking
+    status as a side effect of an account edit, which is exactly the kind of
+    hidden state change the lifecycle rules exist to prevent. The Super Admin is
+    told which bookings to have decided first.
+    """
+    from app.models_v2 import RequestStatus, ServiceRequest
+
+    held = db.scalars(
+        select(ServiceRequest.request_number).where(
+            and_(
+                ServiceRequest.status == RequestStatus.IN_REVIEW,
+                ServiceRequest.travel_details["manager_claimed_by"].astext
+                == str(admin.user_id),
+            )
+        ).limit(6)
+    ).all()
+    if held:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{admin.full_name} is still reviewing {', '.join(held)}. "
+                "Those booking requests must be approved or returned before this "
+                "account can stop being a Manager."
+            ),
+        )
+
+
 def update_admin(
-    db: Session, actor: User, user_id: int, full_name: str, email: str, phone: str | None
+    db: Session, actor: User, user_id: int, full_name: str, email: str, phone: str | None,
+    role: UserRole | None = None,
 ) -> User:
+    """Edit a staff account. ``role`` may move it between Admin and Manager.
+
+    ``role=None`` leaves it alone, so every caller written before CR-2 keeps
+    working and an edit that only changes a phone number cannot reclassify
+    anybody by omission.
+    """
     admin = get_admin(db,user_id)
     _require_unique_email(db, email, exclude_user_id=user_id)
+
+    previous_role = admin.role
+    if role is not None and role is not previous_role:
+        if role not in STAFF_MANAGED_ROLES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "A staff account may be "
+                    + " or ".join(r.value for r in STAFF_MANAGED_ROLES)
+                ),
+            )
+        if admin.user_id == actor.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot change your own role",
+            )
+        if previous_role is UserRole.MANAGER:
+            _assert_manager_holds_no_claims(db, admin)
+        admin.role = role
+
     admin.full_name = full_name
     admin.email = email
     admin.phone = phone
     db.commit()
     db.refresh(admin)
+
+    changed_role = role is not None and role is not previous_role
     activity_service.log_activity(
         db, actor.user_id, "Admin updated",
         activity_type="Account", module="Admin Management",
-        description=f"{actor.full_name} updated admin {admin.email}",
+        description=(
+            f"{actor.full_name} updated {admin.role.value} {admin.email}"
+            + (f" (role changed from {previous_role.value})" if changed_role else "")
+        ),
         reference_id=admin.user_id,
     )
+    if changed_role:
+        # The permission set changes underneath them; an open session would keep
+        # the old one until its token expired.
+        from app.services import session_service
+        from app.services.auth_service import logout as revoke_tokens
+
+        session_service.force_logout_all(db, admin.user_id)
+        revoke_tokens(db, admin)
+        db.commit()
+        notification_service.create_notification(
+            db, admin.user_id, "Your role has changed",
+            f"Your account is now a {admin.role.value.replace('_', ' ')}. "
+            "Please sign in again.",
+        )
     return admin
 
 

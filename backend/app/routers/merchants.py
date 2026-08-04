@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 from app.auth.rbac import P, require
 from app.database.session import get_db
 from app.models_v2 import CompanyType, Merchant, MerchantStatus, User
-from app.schemas.accounts import AccountResponse, CredentialsResponse
+from app.schemas.accounts import (
+    AccountResponse,
+    CreateMerchantUserRequest,
+    CredentialsResponse,
+)
 from app.schemas.merchant import (
     CreateMerchantRequest,
     MerchantCreatedResponse,
@@ -191,6 +195,45 @@ def list_merchant_users(
     merchant_service.get_merchant(db, merchant_id)  # 404 if it doesn't exist
     users, total = account_service.list_merchant_users(db, merchant_id, page, page_size, search)
     return Page.build([AccountResponse.of(u) for u in users], total, page, page_size)
+
+
+@router.post(
+    "/{merchant_id}/users",
+    response_model=CredentialsResponse,
+    status_code=201,
+    summary="Create a user under a merchant",
+    description=(
+        "Requires `merchant_user.manage`. Creates a `merchant_admin` or `merchant_user` parented "
+        "to the merchant in the path — not to the caller, who is platform staff and has no "
+        "merchant of their own. Optionally takes an internal role (Manager, Supervisor, Operator, "
+        "Finance, Data Operator). The generated password is returned **once**.\n\n"
+        "This is the Admin-side counterpart of `POST /api/merchant/team`, which a merchant uses to "
+        "create staff inside its own company. Both funnel into the same "
+        "`account_service.create_merchant_user`; only where `merchant_id` comes from differs — the "
+        "path here, the caller's own account there."
+    ),
+)
+def create_merchant_user(
+    merchant_id: int,
+    payload: CreateMerchantUserRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.MERCHANT_USER_MANAGE)),
+):
+    merchant_service.get_merchant(db, merchant_id)  # 404 if it doesn't exist
+    user, temp_password = account_service.create_merchant_user(
+        db,
+        current_user,
+        merchant_id=merchant_id,
+        full_name=payload.full_name,
+        email=payload.email,
+        phone=payload.phone,
+        role=payload.role,
+        merchant_role=payload.merchant_role,
+        password=payload.password,
+    )
+    return CredentialsResponse(
+        account=AccountResponse.of(user), temporary_password=temp_password
+    )
 
 
 @router.post(

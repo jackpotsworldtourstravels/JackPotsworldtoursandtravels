@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260801merge">
 </head>
 <body>
 <div class="mobile-topbar">
@@ -99,13 +99,38 @@
       <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
       <span class="nav-label">Payment Management</span>
     </a>
+    <!-- Ticket Enquiries sits above the Approval Queue deliberately: an enquiry
+         precedes the booking it may become, and the two are separate workflows
+         with different actions (answer vs approve) and no payable stage. -->
+    <a href="#" class="nav-item" data-section="ticket-enquiries">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
+      <span class="nav-label">Ticket Enquiries</span>
+      <span class="nav-badge" id="enqNavBadge" hidden></span>
+    </a>
     <a href="#" class="nav-item" data-section="partner-requests">
       <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
       <span class="nav-label">Approval Queue</span>
     </a>
+    <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
+         from the Approval Queue above: a booking is in exactly one of the two
+         screens at any time, so nothing is ever worked twice. Classic Tours
+         bookings arrive here only once a Manager has approved them. -->
+    <a href="#" class="nav-item" data-section="booking-ops">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
+      <span class="nav-label">Booking Operations</span>
+      <span class="nav-badge" id="opsNavBadge" hidden></span>
+    </a>
+    <!-- One screen for every service request, whatever its type. There used to
+         be a second, "Cancellations & Reschedules", because those two settle
+         money and change the booking while the others do not — but that is a
+         difference in what the Settle button does, not a different queue, and
+         splitting them meant an admin had to know which screen a request had
+         landed on before they could find it. The action is chosen per row from
+         the request's type; the settle dialog itself is unchanged. -->
     <a href="#" class="nav-item" data-section="service-requests-mgmt">
       <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
       <span class="nav-label">Service Request Management</span>
+      <span class="nav-badge" id="srmNavBadge" hidden></span>
     </a>
     <a href="#" class="nav-item" data-section="notifications">
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
@@ -323,21 +348,59 @@
       </div>
     </section>
 
+    <!-- Ticket Enquiries — the Admin half of the merchant's Enquire Ticket flow.
+         Reads GET /api/enquiries (platform staff see every merchant) and answers
+         via POST /api/admin/enquiries/{id}/review|respond. -->
+    <section class="section" id="section-ticket-enquiries">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Ticket Enquiries</h2>
+          <span class="panel-sub" id="enqQueueSummary"></span>
+        </div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <select id="enqStatusFilter" class="status-select">
+            <option value="awaiting">Awaiting response</option>
+            <option value="">All statuses</option>
+            <option value="pending_approval">Pending</option>
+            <option value="in_review">Under Review</option>
+            <option value="approved">Available</option>
+            <option value="rejected">Not Available</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <input type="search" id="enqSearch" placeholder="Reference, merchant, route or flight no.">
+          <input type="date" id="enqDateFrom" title="Travel date from">
+          <input type="date" id="enqDateTo" title="Travel date to">
+          <button class="btn btn-ghost btn-sm" id="enqRefreshBtn" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap"><table id="enqTable"><thead><tr>
+          <th>Reference No.</th><th>Merchant</th><th>Journey</th><th>Travel Date</th>
+          <th>Pax</th><th>Status</th><th>Raised</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="enqPagination"></div>
+      </div>
+    </section>
+
     <section class="section" id="section-partner-requests">
       <div class="panel">
         <div class="panel-head"><h2>Approval Queue</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <select id="aqStatusFilter" class="status-select">
+            <!-- "Awaiting action" means awaiting *ours*: Pending Approval and
+                 Under Review, plus any booking approved without a fare, which
+                 sits in Payment Pending with nothing the merchant can pay. -->
             <option value="">Awaiting action</option>
             <option value="pending_approval">Pending Approval</option>
             <option value="in_review">Under Review</option>
+            <option value="payment_pending">Payment Pending</option>
           </select>
+          <!-- Cancellation and Date Change are absent on purpose: approving one
+               here would walk it to Payment Pending — a Pay button on a request
+               to cancel — so the backend refuses them and they are settled on
+               the Cancellations & Reschedules screen instead. -->
           <select id="aqTypeFilter" class="status-select">
             <option value="">All types</option>
             <option value="merchant">Merchant Onboarding</option>
             <option value="booking">Ticket Booking</option>
-            <option value="cancellation">Cancellation</option>
-            <option value="date_change">Date Change</option>
             <option value="refund">Refund</option>
             <option value="passenger_modification">Passenger Modification</option>
           </select>
@@ -351,30 +414,81 @@
       </div>
     </section>
 
+    <!-- Booking Operations desk (M1/M2 backend, surfaced by CR-2). Rendered by
+         admin-booking-ops.js. Deliberately disjoint from the Approval Queue
+         above: a booking is in exactly one of the two at any time, so nothing
+         is ever worked twice. Classic Tours bookings arrive here only once a
+         Manager has approved them. -->
+    <section class="section" id="section-booking-ops">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Booking Operations</h2>
+          <button type="button" class="btn btn-navy btn-sm" id="opsRefreshBtn">Refresh</button>
+        </div>
+        <div class="ops-tabs" id="opsTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <input type="text" id="opsSearch" placeholder="Request no., booking ref, PNR or ticket no.">
+          <select id="opsAssignFilter" class="status-select" aria-label="Assignment">
+            <option value="">Everyone</option>
+            <option value="mine">Assigned to me</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="opsTable"><thead><tr>
+          <th>Booking</th><th>Merchant</th><th>Travellers</th><th>Travel date</th>
+          <th>Stage</th><th>Assigned</th><th>Waiting</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="opsPagination"></div>
+      </div>
+    </section>
+
+    <!-- There is no #section-change-requests. Cancellations and reschedules are
+         rows on Service Request Management below, which routes those two types
+         to the settle dialog in admin-change-requests.js and everything else to
+         the plain approve/reject one. The dialog is still that file's; only its
+         standalone queue is gone. -->
+
     <section class="section" id="section-service-requests-mgmt">
       <div class="panel">
-        <div class="panel-head"><h2>Service Request Management</h2></div>
+        <div class="panel-head">
+          <h2>Service Request Management</h2>
+          <span class="panel-sub" id="srmQueueSummary"></span>
+        </div>
+        <!-- Every service request type is here, cancellations and date changes
+             included. They were on a screen of their own until the two were
+             merged; what differs between them is which dialog Settle opens, and
+             the row decides that from its type. -->
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="srmTypeFilter" class="status-select">
+          <select id="srmTypeFilter" class="status-select" aria-label="Filter by request type">
             <option value="">All types</option>
             <option value="cancellation">Cancellation</option>
             <option value="date_change">Date Change</option>
-            <option value="refund">Refund</option>
             <option value="passenger_modification">Passenger Modification</option>
             <option value="extra_baggage">Extra Baggage</option>
             <option value="meal">Meal</option>
             <option value="seat">Seat</option>
+            <option value="refund">Refund</option>
           </select>
-          <select id="srmStatusFilter" class="status-select">
-            <option value="">All statuses</option>
-            <option value="pending_approval">Pending Approval</option>
+          <!-- "Manager Approved" and "Under Manager Approval" are not statuses
+               in request_status_enum — both rows are Pending Approval, and the
+               difference is whose approval is outstanding. Filtered client-side
+               on the manager_state the API returns. -->
+          <select id="srmStageFilter" class="status-select" aria-label="Filter by stage">
+            <option value="actionable">Manager Approved — ready to action</option>
+            <option value="">All stages</option>
+            <option value="awaiting_manager">Under Manager Approval</option>
             <option value="in_review">Under Review</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+            <option value="cancelled">Closed by the merchant</option>
           </select>
+          <input type="search" id="srmSearch" aria-label="Search service requests"
+                 placeholder="Request no., booking ref or PNR">
+          <button class="btn btn-ghost btn-sm" id="srmRefreshBtn" type="button">Refresh</button>
         </div>
         <div class="table-wrap"><table id="srmTable"><thead><tr>
-          <th>Request #</th><th>Type</th><th>Booking Ref</th><th>Remarks</th><th>Status</th><th>Raised</th><th>Actions</th>
+          <th>Request #</th><th>Type</th><th>Merchant</th><th>Booking Ref</th>
+          <th>Asked for</th><th>Status</th><th>Raised</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="srmPagination"></div>
       </div>
@@ -452,8 +566,48 @@
   <div class="modal-card" id="prServiceRequestModalBody"></div>
 </div>
 
+<!-- Review / answer a ticket enquiry. Same overlay+card pattern as the other
+     admin modals; contents are rendered by admin-enquiries.js. -->
+<div class="modal-overlay" id="enqReviewModalOverlay">
+  <div class="modal-card modal-lg" id="enqReviewModalBody"></div>
+</div>
+
+<!-- Settle a cancellation or reschedule: quote the amounts, then approve or
+     reject. Rendered by admin-change-requests.js, opened from a row on Service
+     Request Management. -->
+<div class="modal-overlay" id="crModalOverlay">
+  <div class="modal-card modal-lg" id="crModalBody"></div>
+</div>
+
+<!-- Work one booking on the operations desk: assign an operator, record the
+     airline references, read the internal notes. Rendered by
+     admin-booking-ops.js. -->
+<div class="modal-overlay" id="boModalOverlay">
+  <div class="modal-card modal-lg" id="boModalBody"></div>
+</div>
+
+<!-- Review a booking request and verify its documents before approving.
+     Rendered by admin-bookings.js. -->
+<div class="modal-overlay" id="bookingReviewModalOverlay">
+  <div class="modal-card modal-lg" id="bookingReviewModalBody"></div>
+</div>
+
+<!-- Work one booking: the booking and passenger details the merchant submitted,
+     ticket uploads, internal notes and the two lifecycle actions. Rendered by
+     admin-booking-ops.js. -->
+<div class="modal-overlay" id="opsWorkOverlay">
+  <div class="modal-card modal-lg" id="opsWorkBody" role="dialog" aria-modal="true" aria-labelledby="opsWorkTitle"></div>
+</div>
+
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
   <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
+</div>
+
+<!-- Add a staff login to the merchant currently open in Merchant Management.
+     POST /api/admin/merchants/{id}/users — gated on merchant_user.manage, the
+     same code behind the Users list and Reset Password beside it. -->
+<div class="modal-overlay" id="merchantUserModalOverlay">
+  <div class="modal-card modal-lg" id="merchantUserModalBody"></div>
 </div>
 
 <div class="modal-overlay" id="customerMsgModalOverlay">
@@ -473,13 +627,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
 <script src="../components/toast.js"></script>
 <script src="../components/spinner.js"></script>
 <script src="../components/confirm-dialog.js"></script>
+<script src="../components/focus-trap.js?v=20260731cr2"></script>
 <script src="../assets/js/auth.js?v=20260730a"></script>
 <script src="../assets/js/api.js"></script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js"></script>
+<script src="../assets/js/admin.js?v=20260801merge"></script>
+<!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
+     fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
+<script src="../assets/js/admin-enquiries.js?v=20260801cr5"></script>
+<!-- Booking review + document verification (Phase 3). Also after admin.js. -->
+<script src="../assets/js/admin-bookings.js?v=20260731b"></script>
+<!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
+     into Service Request Management; this file now only owns the dialog that
+     screen opens for those two types. Also after admin.js. -->
+<script src="../assets/js/admin-change-requests.js?v=20260801merge"></script>
+<!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
+<script src="../assets/js/admin-booking-ops.js?v=20260801cr5c"></script>
 </body>
 </html>

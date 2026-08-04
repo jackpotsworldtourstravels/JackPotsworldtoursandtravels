@@ -17,3 +17,8 @@ slowapi>=0.1.9
 # Report export (API_CONTRACT.md §6.2) — csv is stdlib, these cover xlsx/pdf.
 openpyxl>=3.1
 reportlab>=4.2
+
+# S3 document storage (STORAGE_BACKEND=s3). Imported lazily, so a local-disk
+# deployment never loads it — but it ships in the image so the same image can
+# run either way.
+boto3>=1.35

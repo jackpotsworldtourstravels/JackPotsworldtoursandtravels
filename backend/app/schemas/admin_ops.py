@@ -22,6 +22,11 @@ class ApprovalQueueItemResponse(BaseModel):
     request_type: str | None = None
     title: str
     submitted_at: datetime.datetime
+    #: What the request is priced at. ``None`` on a merchant-onboarding row,
+    #: which has no money. The queue renders it so an unpriced booking sitting in
+    #: Payment Pending is visible as such — the state a booking approved without
+    #: a fare used to land in silently.
+    total_amount: Decimal | None = None
 
 
 class RefundRequest(BaseModel):

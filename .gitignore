@@ -1,4 +1,6 @@
 backend/.env
+# Written on the server only: holds SITE_DOMAIN for the Caddy container.
+deploy/.env
 backend/__pycache__/
 backend/**/__pycache__/
 backend/venv/
@@ -7,3 +9,10 @@ backend/.venv/
 *.db
 .netlify/
 .claude/settings.local.json
+
+# Uploaded booking documents — passport, visa and ID scans. These are customer
+# personal data written into the working tree at runtime; committing them would
+# put identity documents in the repository history permanently. The folder's
+# README is kept, the contents never are.
+uploads/*
+!uploads/README.md

@@ -5,6 +5,37 @@
 
 let profileFormWired = false;
 
+/* Account standing at the top of Profile. GET /api/profile carries the identity
+   fields only (merchant_name, contact details), so the money comes from
+   GET /api/merchant/dashboard — the merchant-readable endpoint that already backs
+   Home's strip and the Dashboard KPIs. No new endpoint, and nothing is shown that
+   the API doesn't return: GST, documents and API keys have no merchant-facing
+   source, so they are absent rather than blank. */
+async function loadAccountSummary(merchantName) {
+  const host = document.getElementById('profAccountSummary');
+  if (!host) return;
+  const card = (label, value, hint, variant) => `
+    <div class="acct-card${variant ? ` acct-${variant}` : ''}">
+      <div class="acct-label">${escapeHtml(label)}</div>
+      <div class="acct-value">${value}</div>
+      ${hint ? `<div class="acct-hint">${escapeHtml(hint)}</div>` : ''}
+    </div>`;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/merchant/dashboard`, { headers: partnerAuthHeaders() });
+    host.innerHTML = [
+      card('Company', escapeHtml(merchantName || '—'), 'Registered partner account'),
+      card('Wallet balance', money(data.wallet_balance), 'Available to settle requests', 'money'),
+      card('Credit limit', money(data.credit_limit), 'Agreed with our team', 'money'),
+      card('Support', '24×7 partner desk',
+        'Open Live Chat Support from the account menu for a threaded reply'),
+    ].join('');
+  } catch (err) {
+    /* Standing is supporting detail — a failure here must not stop the merchant
+       editing their profile below. */
+    host.innerHTML = '';
+  }
+}
+
 async function loadProfile() {
   if (!profileFormWired) wireProfileForms();
   try {
@@ -19,6 +50,7 @@ async function loadProfile() {
     document.getElementById('profState').value = data.state || '';
     document.getElementById('profCity').value = data.city || '';
     document.getElementById('profAddress').value = data.address || '';
+    loadAccountSummary(data.merchant_name);
   } catch (err) {
     document.getElementById('profileMsg').textContent = 'Failed to load profile.';
     document.getElementById('profileMsg').className = 'msg error';

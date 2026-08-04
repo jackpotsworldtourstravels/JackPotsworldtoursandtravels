@@ -33,7 +33,10 @@ const SA_PERM_GROUPS = [
   ['system', 'System'],
   ['audit', 'Audit'],
 ];
-const SA_MATRIX_ROLES = ['super_admin', 'admin', 'merchant_admin', 'merchant_user'];
+/* Column order matches the table head in super-admin/index.html. `manager`
+   joined with CR-2 — the matrix is the one screen that answers "what can this
+   role actually do", and a role missing from it is a role nobody can audit. */
+const SA_MATRIX_ROLES = ['super_admin', 'admin', 'manager', 'merchant_admin', 'merchant_user'];
 
 let saPermMatrix = null;
 
@@ -61,7 +64,7 @@ function saGroupCodes(codes) {
 
 async function loadSaPermissions() {
   const tbody = document.querySelector('#saMatrixTable tbody');
-  saTableError(tbody, 5, 'Loading…');
+  saTableError(tbody, 6, 'Loading…');
   try {
     const { data } = await axios.get(`${API_BASE}/api/super-admin/permissions/matrix`,
                                      { headers: saAuthHeaders() });
@@ -69,7 +72,7 @@ async function loadSaPermissions() {
 
     const rows = [];
     saGroupCodes(data.all_codes).forEach((codes, label) => {
-      rows.push(`<tr class="sa-matrix-group"><td colspan="5">${saEscapeHtml(label)}</td></tr>`);
+      rows.push(`<tr class="sa-matrix-group"><td colspan="6">${saEscapeHtml(label)}</td></tr>`);
       codes.forEach(code => {
         const cells = SA_MATRIX_ROLES.map(role => (data.roles[role] || []).includes(code)
           ? '<td><span class="sa-tick">✓</span></td>'
@@ -79,7 +82,7 @@ async function loadSaPermissions() {
     });
     tbody.innerHTML = rows.join('');
   } catch (err) {
-    saTableError(tbody, 5, saErrorText(err, 'Failed to load the permission matrix.'));
+    saTableError(tbody, 6, saErrorText(err, 'Failed to load the permission matrix.'));
     return;
   }
   await saLoadPermAdminPicker();

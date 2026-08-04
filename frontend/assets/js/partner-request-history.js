@@ -179,6 +179,12 @@ function openPayModal(request) {
       loadedSections.delete('dashboard');
       showToast('Payment submitted — awaiting verification.');
       loadRequestHistory();
+      /* This modal is reachable from Payments too (partner-payments.js), and that
+         table would otherwise still show the row as unpaid until a re-navigation. */
+      if (typeof loadPayments === 'function'
+          && document.getElementById('section-payments')?.classList.contains('active')) {
+        loadPayments();
+      }
     } catch (err) {
       msg.textContent = err.response?.data?.detail || 'Payment failed.'; msg.className = 'msg error';
     }

@@ -1,10 +1,11 @@
 """Schemas for catalog search, ticket requests, and the request lifecycle."""
 import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.document import DocumentResponse
 from app.models_v2 import (
     Gender,
     PassengerType,
@@ -60,6 +61,13 @@ class QuoteResponse(BaseModel):
 # Passengers
 # ---------------------------------------------------------------------------
 class PassengerInput(BaseModel):
+    #: The id of an existing passenger on this request, when the caller is
+    #: editing rather than adding. Supplying it keeps that traveller's database
+    #: row — and therefore the passport scans attached to it — alive across a
+    #: replace. Omitted for a newly added traveller, and by every caller written
+    #: before documents existed, which keeps the old delete-and-recreate
+    #: behaviour for them.
+    id: int | None = None
     title: str | None = Field(default=None, max_length=10)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -117,6 +125,11 @@ class UpdateDraftRequest(BaseModel):
     remarks: str | None = None
     travel_date: datetime.date | None = None
     return_date: datetime.date | None = None
+    #: Booking-level contact and party notes, added in Phase 3. Both are
+    #: optional and merge into ``travel_details``, so a catalog-led caller that
+    #: has never sent them is unaffected.
+    contact: dict | None = None
+    special_requests: str | None = None
 
 
 class ReplacePassengersRequest(BaseModel):
@@ -125,8 +138,23 @@ class ReplacePassengersRequest(BaseModel):
 
 class ApproveRequest(BaseModel):
     #: Optional override — the spec lets an Admin approve at a final amount.
+    #:
+    #: Still optional, and still ``ge=0``, because a catalog-led booking already
+    #: carries a price computed from the catalog row and does not need one sent.
+    #: That a *priced* booking must result is enforced in
+    #: ``ticket_service.approve_request``, where the request's own total is in
+    #: hand — a schema rule here could only ever see this field.
     final_amount: Decimal | None = Field(default=None, ge=0)
     note: str | None = None
+
+
+class RepriceRequest(BaseModel):
+    """Correct the amount on a booking already at Payment Pending."""
+
+    amount: Decimal = Field(gt=0)
+    #: Mandatory: this changes what a merchant owes, and the merchant is told
+    #: why. Same standard as a rejection reason.
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class RejectRequest(BaseModel):
@@ -141,6 +169,18 @@ class PayRequest(BaseModel):
     amount: Decimal = Field(gt=0)
     method: str = Field(min_length=1, max_length=50)
     transaction_id: str | None = Field(default=None, max_length=100)
+
+
+class IssueTicketRequest(BaseModel):
+    """CR-4b. The fare the desk actually paid the airline.
+
+    Required only on a wallet-billed booking that still carries no amount —
+    enquiry-led bookings are created at 0 and no live path sets a fare before
+    this point. Ignored where an amount already exists, which is every
+    catalog-led booking, so the standard track is untouched.
+    """
+
+    fare_amount: Decimal | None = Field(default=None, gt=0)
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -186,8 +226,21 @@ class PaymentSummary(BaseModel):
     status: str
     paid_date: datetime.datetime | None = None
 
+    #: Which booking this payment is against. Redundant when nested inside that
+    #: booking's own detail response, but essential on the Admin payments
+    #: screens, which list payments across every merchant — without it a
+    #: reviewer is asked to approve an amount with no way to see what it buys.
+    #: Optional so nothing that already consumes this schema breaks.
+    request_id: int | None = None
+    request_number: str | None = None
+    merchant_id: int | None = None
+    merchant_name: str | None = None
+    #: Set when the payment has been refunded in whole or in part.
+    refund_amount: Decimal | None = None
+
     @classmethod
     def of(cls, p) -> "PaymentSummary":
+        request = getattr(p, "request", None)
         return cls(
             id=p.payment_id,
             amount=p.amount,
@@ -196,6 +249,13 @@ class PaymentSummary(BaseModel):
             transaction_id=p.transaction_id,
             status=p.payment_status.value,
             paid_date=p.paid_date,
+            request_id=p.request_id,
+            request_number=request.request_number if request else None,
+            merchant_id=p.merchant_id,
+            merchant_name=(
+                request.merchant.company_name if request and request.merchant else None
+            ),
+            refund_amount=p.refund_amount or None,
         )
 
 
@@ -204,7 +264,23 @@ class RequestResponse(BaseModel):
     request_number: str
     request_type: RequestType
     status: RequestStatus
+    #: What the status column should READ. On a service request still awaiting
+    #: the merchant's own manager this is "Under Manager Approval" or "Manager
+    #: Approved" rather than the bare "Pending" — `status` itself is unchanged,
+    #: so filters and the state machine are untouched. See
+    #: services/manager_approval.py.
     status_label: str
+    #: `pending` / `approved` / `rejected`, or None on anything that does not go
+    #: through manager sign-off (a booking, an enquiry, a pre-existing row).
+    manager_state: str | None = None
+    manager_approval: dict[str, Any] = {}
+
+    #: ``classic_tours`` for an enquiry-led booking running the CR-2 workflow
+    #: (Manager approval, no payment step), ``standard`` for everything else.
+    #: Frontends branch on this rather than re-deriving the rule — the Classic
+    #: portal hides its payment surfaces on it, and the operations desk shows
+    #: "upload tickets" instead of "awaiting payment".
+    workflow: Literal["classic_tours", "standard"] = "standard"
     parent_request_id: int | None = None
     merchant_id: int | None = None
     merchant_name: str | None = None
@@ -234,14 +310,21 @@ class RequestResponse(BaseModel):
 
     @classmethod
     def of(cls, r, *, include_passengers: bool = True) -> "RequestResponse":
-        from app.services.lifecycle import SPEC_LABELS
+        from app.services import lifecycle, manager_approval
 
+        classic = lifecycle.is_classic_track(r)
         return cls(
             id=r.request_id,
             request_number=r.request_number,
             request_type=r.request_type,
             status=r.status,
-            status_label=SPEC_LABELS.get(r.status, r.status.value),
+            # `label_of` is the track-aware lifecycle label (CR-2 gave the
+            # classic track its own wording); the manager sign-off label wins
+            # over it only while the request is still Pending Approval.
+            status_label=manager_approval.status_label(r, lifecycle.label_of(r)),
+            manager_state=manager_approval.state(r),
+            manager_approval=manager_approval.block(r),
+            workflow="classic_tours" if classic else "standard",
             parent_request_id=r.parent_request_id,
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,
@@ -276,4 +359,7 @@ class RequestDetailResponse(BaseModel):
     timeline: list[TimelineStep]
     actions: list[ActionOption]
     payments: list[PaymentSummary] = []
+    #: Attachments (Phase 3). Defaulted, so a catalog-led request that has none
+    #: — and every caller written before documents existed — is unaffected.
+    documents: list["DocumentResponse"] = []
     can_download: bool = False

@@ -586,31 +586,53 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <button class="modal-close" id="authCloseBtn" type="button" aria-label="Close">&times;</button>
 
+    <!-- Merchants are onboarded by the JackPots team, not self-registered: a
+         merchant is created by an Admin (POST /api/admin/merchants) and starts
+         in pending_approval until approved, so it cannot trade the moment a
+         form is submitted. There is no /api/auth/signup in the v2 API, so this
+         asks for the details the team needs instead of posting to nothing. -->
     <div class="auth-view" id="signupView">
-      <h2 id="authTitle">Create your account</h2>
-      <p class="modal-sub">Join 2 million+ travellers booking smarter.</p>
-      <form id="signupForm" novalidate>
-        <div class="modal-field"><label for="suName">Full Name</label><input id="suName" type="text" autocomplete="name" required placeholder="Your name"></div>
-        <div class="modal-field"><label for="suEmail">Email Address</label><input id="suEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
-        <div class="modal-field"><label for="suPass">Password</label><input id="suPass" type="password" autocomplete="new-password" required placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>
-        <div class="modal-field"><label for="suPass2">Confirm Password</label><input id="suPass2" type="password" autocomplete="new-password" required placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>
-        <button type="submit" class="btn btn-coral modal-submit">Sign Up</button>
-        <div class="modal-msg" id="signupMsg">Account created — you're all set! (demo)</div>
-      </form>
+      <h2 id="authTitle">Partner registration</h2>
+      <p class="modal-sub">Accounts are set up by our onboarding team. Share your details and we'll take it from there.</p>
+      <div class="modal-field"><label for="suCompany">Company Name</label><input id="suCompany" type="text" autocomplete="organization" placeholder="Your travel company"></div>
+      <div class="modal-field"><label for="suName">Contact Name</label><input id="suName" type="text" autocomplete="name" placeholder="Your name"></div>
+      <div class="modal-field"><label for="suEmail">Work Email</label><input id="suEmail" type="email" autocomplete="email" placeholder="you@company.com"></div>
+      <div class="modal-field"><label for="suPhone">Phone</label><input id="suPhone" type="tel" autocomplete="tel" placeholder="Optional"></div>
+      <button type="button" class="btn btn-coral modal-submit" id="suRequestBtn">Request Access</button>
+      <div class="modal-msg" id="signupMsg"></div>
       <div class="modal-switch">Already have an account? <a href="#" data-auth="login">Login</a></div>
     </div>
 
+    <!-- Merchant sign-in. Merchants are this platform's users, so the site's
+         "Login" is the merchant login: it runs the same
+         Login -> Password -> OTP -> Portal flow as /merchant/ (API_CONTRACT.md §1)
+         and hands off to the Merchant Portal on success. -->
     <div class="auth-view" id="loginView" style="display:none;">
-      <h2>Welcome back</h2>
-      <p class="modal-sub">Log in to manage your bookings.</p>
-      <form id="loginForm" novalidate>
-        <div class="modal-field"><label for="liUser">Email Address or Username</label><input id="liUser" type="text" autocomplete="username" required placeholder="you@example.com"></div>
-        <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="text" autocomplete="current-password" required placeholder="Enter your password"></div>
-        <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
-        <button type="submit" class="btn btn-coral modal-submit">Login</button>
-        <div class="modal-msg" id="loginMsg">Logged in — welcome back! (demo)</div>
-      </form>
-      <div class="modal-switch">Don't have an account? <a href="#" data-auth="signup">Sign Up</a></div>
+      <div id="loginStepCreds">
+        <h2>Welcome back</h2>
+        <p class="modal-sub">Sign in to your merchant account.</p>
+        <form id="loginForm" novalidate>
+          <div class="modal-field"><label for="liUser">Email Address</label><input id="liUser" type="email" autocomplete="username" required placeholder="you@company.com"></div>
+          <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
+          <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
+          <button type="submit" class="btn btn-coral modal-submit">Continue</button>
+          <div class="modal-msg" id="loginMsg"></div>
+        </form>
+      </div>
+
+      <div id="loginStepOtp" style="display:none;">
+        <h2>Verify it's you</h2>
+        <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
+        <div class="modal-field"><label for="liOtp">One-Time Code</label><input id="liOtp" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"></div>
+        <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
+        <div class="modal-msg" id="loginOtpMsg"></div>
+        <div class="modal-switch">
+          <a href="#" id="liResendBtn">Resend code</a> &nbsp;·&nbsp;
+          <a href="#" id="liBackBtn">Use a different account</a>
+        </div>
+      </div>
+
+      <div class="modal-switch">Need an account? <a href="#" data-auth="signup">Get started</a></div>
     </div>
   </div>
 </div>
@@ -797,7 +819,7 @@
 <script src="components/spinner.js"></script>
 <script src="components/confirm-dialog.js"></script>
 <script src="assets/js/auth.js?v=20260730a"></script>
-<script src="assets/js/api.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/api.js?v=20260730b"></script>
+<script src="assets/js/app.js?v=20260730d"></script>
 </body>
 </html>

@@ -45,9 +45,27 @@ class RecentActivityEntry(BaseModel):
     created_at: str
 
 
+class EnquiryCounts(BaseModel):
+    """Ticket Enquiry queue, counted apart from booking approvals.
+
+    ``requests_by_status`` deliberately excludes enquiries, so these are the
+    only place they are counted — an enquiry awaiting an answer is a different
+    job from a booking awaiting approval, on a different screen.
+    """
+
+    pending: int = 0
+    in_review: int = 0
+    #: pending + in_review — what the Ticket Enquiries queue still owes an answer.
+    awaiting_response: int = 0
+    available: int = 0
+    not_available: int = 0
+    answered_today: int = 0
+
+
 class AdminDashboardResponse(BaseModel):
     merchants: MerchantCounts
     requests_by_status: RequestsByStatus
+    enquiries: EnquiryCounts = EnquiryCounts()
     payments_pending_count: int
     payments_verified_today: int
     open_support_tickets: int

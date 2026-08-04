@@ -130,7 +130,11 @@ h1,h2{font-weight:800; color:var(--text-primary); letter-spacing:-.01em;}
 .layout.sidebar-collapsed .nav-item.active::before{left:-14px;}
 .layout.sidebar-collapsed .sidebar .brand{justify-content:center; padding:0 0 20px;}
 
-.main{flex:1; padding:32px 40px; max-width:1320px;}
+/* min-width:0 is load-bearing: as a flex child .main defaults to min-width:auto,
+   so it refuses to shrink below its widest table and .table-wrap's overflow-x
+   never engages — every table-bearing screen scrolled the whole page sideways
+   instead of scrolling the table. */
+.main{flex:1; min-width:0; padding:32px 40px; max-width:1320px;}
 .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:14px;}
 .topbar h1{font-size:22px;}
 .breadcrumb{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); font-weight:600; margin-bottom:22px;}
@@ -180,8 +184,42 @@ h1,h2{font-weight:800; color:var(--text-primary); letter-spacing:-.01em;}
 .stat-icon.emerald{background:rgba(18,138,94,0.12); color:var(--emerald);}
 .stat-icon.coral{background:var(--gold-soft); color:var(--gold-dark);}
 .stat-icon.sky{background:rgba(30,111,168,0.12); color:var(--sky);}
-.stat-body .num{font-size:23px; font-weight:800; color:var(--text-primary); line-height:1.1;}
-.stat-body .label{font-size:12px; color:var(--text-muted); font-weight:600; margin-top:3px;}
+/* .stat-body and its children are now spans inside a <button> (the KPI cards
+   navigate), so they need explicit display — a span won't stack on its own. */
+.stat-body{display:block; min-width:0;}
+.stat-body .num{display:block; font-size:23px; font-weight:800; color:var(--text-primary); line-height:1.1;}
+.stat-body .label{display:block; font-size:12px; color:var(--text-muted); font-weight:600; margin-top:3px;}
+
+/* Clickable KPI cards. Each one is a real button that opens the queue it counts,
+   so the chevron is an affordance rather than decoration. */
+.stat-card-link{
+  font-family:inherit; text-align:left; cursor:pointer; width:100%;
+  justify-content:flex-start; position:relative;
+}
+.stat-card-link:hover{border-color:var(--gold); }
+.stat-card-link:focus-visible{outline:2px solid var(--sky); outline-offset:3px;}
+.stat-go{
+  margin-left:auto; flex-shrink:0; font-size:22px; line-height:1; font-weight:700;
+  color:var(--text-muted); opacity:.45; transition:transform .18s var(--ease), opacity .18s var(--ease);
+}
+.stat-card-link:hover .stat-go{opacity:1; transform:translateX(3px); color:var(--gold-dark);}
+
+/* Shown in place of a Pay button when a Payment Pending request has no amount yet
+   — the pay endpoint rejects a zero amount, so there is nothing to click. */
+.pay-note{font-size:11.5px; font-weight:600; color:var(--text-muted); font-style:italic;}
+
+/* Account standing strip at the top of Profile. */
+.acct-summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:22px;}
+.acct-summary:empty{display:none;}
+.acct-card{
+  background:var(--card-bg); border:1px solid var(--border-color); border-radius:var(--radius);
+  padding:18px 20px; box-shadow:var(--shadow-sm);
+}
+.acct-label{font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--text-muted);}
+.acct-value{font-size:19px; font-weight:800; color:var(--text-primary); margin-top:7px; line-height:1.25; word-break:break-word;}
+.acct-money .acct-value{color:var(--gold-dark);}
+.acct-hint{font-size:11.5px; font-weight:600; color:var(--text-muted); margin-top:6px; line-height:1.45;}
+@media (max-width:520px){ .acct-summary{grid-template-columns:1fr;} }
 
 .filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;}
 .filter-bar input[type="text"], .filter-bar input[type="date"]{padding:9px 12px; border-radius:10px; border:1.5px solid var(--border-color); font-size:13px; background:var(--card-bg); color:var(--text-primary); min-width:150px; transition:border-color .15s var(--ease);}
@@ -226,6 +264,13 @@ tr:last-child td{border-bottom:none;}
 .badge.approved, .badge.completed, .badge.success{background:rgba(18,138,94,0.12); color:var(--emerald);}
 .badge.pending_approval, .badge.submitted, .badge.in_review, .badge.draft{background:var(--gold-soft); color:var(--gold-dark);}
 .badge.rejected, .badge.cancelled{background:rgba(214,41,61,0.10); color:var(--coral-dark);}
+/* Payment-stage statuses. These were unstyled, so they rendered as a colourless
+   pill wherever they appear (Request History, Reports, and now Payments' main
+   status column). Amber = merchant owes money, sky = paid and awaiting Admin
+   verification, emerald = verified and ticketed. */
+.badge.payment_pending{background:rgba(184,134,11,0.12); color:var(--amber);}
+.badge.paid{background:rgba(30,111,168,0.12); color:var(--sky);}
+.badge.ticket_issued{background:rgba(18,138,94,0.12); color:var(--emerald);}
 
 .profile-tabs{display:flex; gap:4px; border-bottom:1px solid var(--border-color); overflow-x:auto;}
 .profile-tab{padding:12px 18px; font-size:13px; font-weight:700; color:var(--text-muted); white-space:nowrap; border-bottom:2.5px solid transparent; cursor:pointer; transition:color .15s var(--ease), border-color .15s var(--ease);}
@@ -378,3 +423,14 @@ tr:last-child td{border-bottom:none;}
   .breadcrumb{display:none;}
 }
 @media (max-width:520px){ .stat-grid{grid-template-columns:1fr 1fr;} .panel{padding:18px;} .partner-auth-card{padding:28px 22px;} }
+/* The notification panel is a fixed 340px anchored to the bell, which sits only
+   ~50px from the right edge — under ~420px of viewport its left edge went
+   negative and the header and items were clipped off-screen. Pin it to the
+   viewport instead of the bell. `top` clears the sticky header (67px tall). */
+@media (max-width:480px){
+  .notif-dropdown{position:fixed; top:74px; left:12px; right:12px; width:auto; max-height:70vh;}
+  /* Two columns don't fit 375px: a `1fr` track is minmax(auto,1fr), so the cards
+     can't shrink below their content's min-width and pushed the page ~15px wide.
+     One column below 480px. */
+  .stat-grid, .info-grid{grid-template-columns:1fr;}
+}

@@ -8,10 +8,18 @@ is still meaningful if the account is later deleted (``user_id`` is
 ``ON DELETE SET NULL``).
 """
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models_v2 import MessageStatus, MessageType, MsgLog, User, UserRole
+from app.models_v2 import (
+    MerchantRole,
+    MessageStatus,
+    MessageType,
+    MsgLog,
+    User,
+    UserRole,
+    UserStatus,
+)
 from app.services import activity_service
 
 _ADMIN_ROLES = (UserRole.SUPER_ADMIN, UserRole.ADMIN)
@@ -54,6 +62,71 @@ def notify_admins(db: Session, title: str, message: str) -> int:
         db.add(_new(admin_id, email, title, message))
     db.commit()
     return len(admins)
+
+
+def notify_merchant_managers(db: Session, merchant_id: int | None, title: str, message: str) -> int:
+    """Notify the people at one merchant who can sign off a service request.
+
+    The same definition as ``manager_approval.is_manager`` — a MANAGER, or the
+    company's merchant_admin — expressed as a query rather than by loading every
+    user and filtering in Python. Returns how many were told, so a caller can
+    notice a company with nobody able to approve.
+    """
+    if merchant_id is None:
+        return 0
+    managers = db.execute(
+        select(User.user_id, User.email).where(
+            and_(
+                User.merchant_id == merchant_id,
+                or_(
+                    User.merchant_role == MerchantRole.MANAGER,
+                    User.role == UserRole.MERCHANT_ADMIN,
+                ),
+            )
+        )
+    ).all()
+    for user_id, email in managers:
+        db.add(_new(user_id, email, title, message, merchant_id))
+    db.commit()
+    return len(managers)
+
+
+def notify_managers(db: Session, title: str, message: str) -> int:
+    """Notify the Manager approval desk (CR-2).
+
+    Separate from :func:`notify_admins` on purpose. A submitted Classic Tours
+    booking is not the admins' work — the generic approval path refuses that
+    track — so telling them would be an alert nobody can act on, and telling
+    only the managers keeps the two desks' inboxes honest about what is theirs.
+    """
+    managers = db.execute(
+        select(User.user_id, User.email).where(
+            and_(User.role == UserRole.MANAGER, User.status == UserStatus.ACTIVE)
+        )
+    ).all()
+    for manager_id, email in managers:
+        db.add(_new(manager_id, email, title, message))
+    db.commit()
+    return len(managers)
+
+
+def notify_request_merchant(db, request, title: str, message: str) -> None:
+    """Notify whoever raised a request, falling back to the company's admins.
+
+    Lives here rather than in one caller because two services now need it, and
+    a second copy of "who counts as the merchant for this request" is exactly
+    how one of them ends up notifying nobody after a refactor.
+
+    ``request`` is a ``ServiceRequest``; typed loosely to avoid a circular
+    import back into the models this module already reaches through ``User``.
+    """
+    if request.user_id:
+        create_notification(db, request.user_id, title, message)
+        return
+    if request.merchant is None:
+        return
+    for user in request.merchant.users:
+        create_notification(db, user.user_id, title, message)
 
 
 def list_user_notifications(db: Session, user_id: int) -> list[MsgLog]:

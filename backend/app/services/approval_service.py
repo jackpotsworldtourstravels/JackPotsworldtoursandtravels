@@ -14,11 +14,34 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models_v2 import Merchant, MerchantStatus, RequestStatus, RequestType, User
-from app.services import ticket_service
+from app.services import lifecycle, ticket_service
 from app.services.lifecycle import SPEC_LABELS
 
 #: Ticket/service-request statuses still awaiting an Admin decision.
 _AWAITING_ACTION = (RequestStatus.PENDING_APPROVAL, RequestStatus.IN_REVIEW)
+
+
+def _awaits_admin(request) -> bool:
+    """Is this row waiting on *us*, rather than on the merchant?
+
+    Payment Pending is normally the merchant's turn and is deliberately absent
+    from :data:`_AWAITING_ACTION` — a queue listing every booking awaiting
+    payment would be a list of other people's homework.
+
+    An **unpriced** Payment Pending booking is the exception, and it is the one
+    the desk cannot see anywhere else. ``record_payment`` refuses ``amount <= 0``,
+    so the merchant is shown "Awaiting amount" rather than a Pay button and can
+    do nothing at all; the only move left belongs to an admin, through
+    ``POST /api/admin/requests/{id}/reprice``. Approval now refuses to create
+    these, but rows created before that landed still exist and would otherwise
+    be invisible in every admin screen.
+    """
+    if request.status in _AWAITING_ACTION:
+        return True
+    return (
+        request.status is RequestStatus.PAYMENT_PENDING
+        and (request.total_amount or 0) <= 0
+    )
 
 
 def list_approval_queue(
@@ -68,7 +91,13 @@ def list_approval_queue(
             date_from=date_from, date_to=date_to,
         )
         for r in rows:
-            if ticket_status is None and r.status not in _AWAITING_ACTION:
+            # A Classic Tours booking awaits the *Manager*, not this desk
+            # (CR-2). Listing it here would offer an Approve button that the
+            # service layer refuses by track — the queue must not advertise an
+            # action the server will not take.
+            if lifecycle.is_classic_track(r):
+                continue
+            if ticket_status is None and not _awaits_admin(r):
                 continue
             if priority is not None and r.priority.value != priority:
                 continue
@@ -80,6 +109,7 @@ def list_approval_queue(
                 "merchant_name": r.merchant.company_name if r.merchant else None,
                 "request_type": r.request_type.value, "title": r.title or r.request_number,
                 "submitted_at": r.created_at,
+                "total_amount": r.total_amount,
             })
 
     items.sort(key=lambda x: x["submitted_at"], reverse=True)

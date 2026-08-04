@@ -48,7 +48,7 @@ one endpoint set, discriminated by a `portal` field rather than three separate l
 
 | Method | Path | Auth | Request | Response | Notes |
 |---|---|---|---|---|---|
-| POST | `/api/auth/login` | none, `10/min` | `LoginRequest{email, password, portal}` | `LoginChallengeResponse{otp_required, challenge_token, delivery, message, dev_otp?}` | `portal` ∈ `super_admin\|admin\|merchant`. Wrong-portal account → generic 401 (doesn't reveal the account exists on another portal). |
+| POST | `/api/auth/login` | none, `10/min` | `LoginRequest{email, password, portal}` | `LoginChallengeResponse{otp_required, challenge_token, delivery, message, dev_otp?}` | `portal` ∈ `super_admin\|admin\|manager\|merchant`. Wrong-portal account → generic 401 (doesn't reveal the account exists on another portal). `manager` added by CR-2 — see §6.3c. |
 | POST | `/api/auth/verify-otp` | none | `VerifyOtpRequest{challenge_token, code}` | `TokenResponse{access_token, refresh_token, token_type, user}` | 5-min TTL on the challenge, max 5 attempts. |
 | POST | `/api/auth/resend-otp` | none | `ResendOtpRequest{challenge_token}` | `LoginChallengeResponse` | Max 5 requests/hour per account. |
 | POST | `/api/auth/refresh` | none | `RefreshRequest{refresh_token}` | `TokenResponse` | |
@@ -141,11 +141,20 @@ GET /api/admin/approval-queue
   ApprovalQueueItemResponse = {
     id, kind: "merchant"|"request", status, priority,
     merchant_id, merchant_name, request_type?, title, submitted_at,
+    total_amount?,   # null on a merchant row; 0 marks a booking that still needs a fare
     # discriminated union in one list so the frontend renders one sortable table;
     # "kind" tells it which detail route to open (/admin/merchants/{id} vs /requests/{id})
   }
 Permission: P.MERCHANT_VIEW + P.TICKET_VIEW (require(..., require_all=False) — Admin already holds both)
 ```
+
+**"Awaiting action" means awaiting *ours*.** The default (no `status`) covers `pending_approval`
+and `in_review`, plus one deliberate addition: a booking at **Payment Pending with
+`total_amount = 0`**. Payment Pending is normally the merchant's turn and is excluded — but an
+unpriced one is nobody's turn, because `record_payment` refuses `amount <= 0`, so the merchant is
+shown "Awaiting amount" and can do nothing. The only move belongs to an admin, via
+`POST /api/admin/requests/{id}/reprice` (§6.3b). An explicit `status=payment_pending` still lists
+every Payment Pending row, priced or not.
 
 Internally this is a `UNION ALL` (or two queries merged in Python) over `merchants` filtered to
 `pending_approval` and `service_requests` filtered to the awaiting-action statuses, sorted by
@@ -360,6 +369,497 @@ Permission: P.DOCUMENT_VERIFY
 Stored path convention: `uploads/<merchant_id>/<uuid4>_<original_filename>`; mime/size validated
 server-side before write (existing `python-multipart` dependency covers the upload parsing).
 
+### 6.3z Booking Enquiry quotation (CR-5)
+
+The Admin's answer to a ticket enquiry stopped being an availability flag and became a **binding
+quotation**. No new endpoint and no migration — one existing request body gained a field, and one
+existing response gained two.
+
+**Naming.** The merchant portal calls this a **Booking Enquiry**; every staff surface and the API
+keep **ticket enquiry** / `request_type = ticket_enquiry`. The split is deliberate and the stored
+value is unchanged.
+
+```
+POST /api/admin/enquiries/{id}/respond
+  Body: {available: bool,
+         total_fare: Decimal|null,      # CR-5 — required and > 0 when available
+         reason: str|null,              # now required on BOTH answers (≤2000)
+         response: str|null}            # optional covering note (≤2000)
+→ EnquiryResponse                                          200
+Permission: require(TICKET_APPROVE, TICKET_REJECT), then the code matching the payload
+422 available:true with no total_fare, a total_fare ≤ 0, or no reason
+422 available:false carrying a total_fare  (refused, never silently dropped)
+409 the enquiry is already answered, or is claimed by another admin
+```
+
+`EnquiryResponse` gains:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `quoted_fare` | `Decimal` \| null | Crosses the wire as a **decimal string**. `null` on a pending enquiry, a declined one, and every enquiry answered before CR-5 — so consumers must handle its absence rather than assume `0` |
+| `quotation_remarks` | str \| null | The breakdown the merchant reads beside the amount |
+
+**The quotation is binding.** `POST /api/enquiries/{id}/booking-request` creates the booking at
+`total_amount = quoted_fare` (was hard-coded `0`), with
+`pricing = {currency, quoted: true, source: "ticket_enquiry", final_amount, priced_at: "enquiry_quotation"}`.
+
+Two consequences follow **without any change to CR-4b's frozen code**:
+
+- The credit limit (§6.3b) now bites with the real amount at **submission and approval**, because
+  both `assert_credit_available` call sites already pass the amount when it is non-zero.
+- `POST /api/admin/requests/{id}/issue-ticket` no longer requires `fare_amount` on a quoted
+  booking, because `_capture_fare_for_wallet_billing` no-ops above zero. It is **still required**
+  on a booking sitting at `0` — that is every enquiry-led booking raised before CR-5, and they
+  finish the way they were made.
+
+`travel_class` is unchanged: still free text, `1..80`. The merchant form narrowed to a four-option
+dropdown (`Economy`, `Premium Economy`, `Business`, `First Class`), which is a strict subset of
+what this endpoint accepts.
+
+---
+
+### 6.3a Cancellation & Reschedule (M3)
+
+A confirmed booking moving backwards. These are `ServiceRequest` rows of
+`request_type = cancellation | date_change`, linked to the booking by `parent_request_id` — no new
+table and no migration.
+
+**Why these are not `POST /api/service-requests`.** That generic hook stays, for baggage, meals,
+seats, refunds and passenger corrections. Cancellation and date change settle money and change the
+parent booking, which the generic hook does neither of, so the three generic paths now **refuse
+these two types with 400** — `/api/admin/requests/{id}/approve`, `/api/admin/requests/{id}/reject`,
+`/api/admin/service-requests/{id}/resolve`, plus `/api/requests/{id}/cancel`.
+Same treatment ticket enquiries got.
+
+**No amounts are sent when raising.** The cancellation charge and the fare difference come from the
+airline and are quoted by staff at approval; a pending request carries `pricing = {}` and
+`total_amount = 0.00`. Amounts cross the wire as **strings**, never JSON numbers.
+
+```
+POST /api/bookings/{booking_id}/cancellation
+  Body: {reason: str}
+→ ChangeRequestDetail                                      201
+Permission: P.SERVICE_REQUEST_CREATE
+409 unless the booking is approved | payment_pending | paid | ticket_issued | completed
+409 if another change request is already open against it (names it)
+409 if a cancellation has EVER been raised on it and was not refused — one per booking
+```
+
+A **completed** booking may be cancelled: what is being settled after travel is the money, not the
+journey. A reschedule may not — see the `RESCHEDULABLE_PARENT_STATUSES` split in
+`change_request_service`. The `COMPLETED -> CANCELLED` edge lives in
+`lifecycle.SETTLEMENT_TRANSITIONS`, so it is reachable only through an approved cancellation and
+never appears in `allowed_transitions`.
+
+```
+POST /api/bookings/{booking_id}/reschedule
+  Body: {new_travel_date: date, new_return_date?: date, reason: str}
+→ ChangeRequestDetail                                      201
+Permission: P.SERVICE_REQUEST_CREATE
+400 if the date is not in the future, equals the current one, or return < travel
+The booking's own dates are NOT touched until approval.
+```
+
+```
+GET  /api/change-requests
+  ?type=cancellation|date_change &request_status=<RequestStatus>
+  &merchant_id=<int> (staff) &search=<request no. | booking ref | PNR | title>
+  &page &page_size
+→ Page[ChangeRequestItem]      newest first; merchant sees only its own
+GET  /api/change-requests/counts        → ChangeRequestCounts  (adds `open` = pending + in_review)
+GET  /api/change-requests/{id}          → ChangeRequestDetail
+GET  /api/bookings/{id}/change-requests → ChangeRequestItem[]  (every change ever raised on it)
+Permission: P.TICKET_VIEW
+```
+
+**There is no withdraw.** It existed and was removed: it let whoever raised a request pull it out
+from under an operator already working it, and left no record of who changed their mind. The
+merchant's manager rejects it instead — §6.3b.
+
+```
+POST /api/admin/change-requests/{id}/review   → ChangeRequestDetail   (Pending → Under Review)
+POST /api/admin/change-requests/{id}/approve
+  Body (cancellation): {cancellation_charge?: str, note?: str}
+  Body (reschedule):   {fare_difference?: str, change_fee?: str, note?: str}
+→ ChangeRequestDetail
+POST /api/admin/change-requests/{id}/reject
+  Body: {reason: str}                                       reason mandatory
+→ ChangeRequestDetail
+Permission: P.SERVICE_REQUEST_MANAGE
+```
+
+Approval is row-locked on **both** the request and its booking, and the booking's status is
+re-checked under that lock (409 if it closed while queued). The refund is derived server-side as
+`booking_total - cancellation_charge` and never sent; a charge above the booking total is refused.
+A reschedule's amounts must both be non-negative — a date change never produces a refund.
+
+`ChangeRequestItem`: `{id, request_number, change_type, change_type_label, status, status_label,
+manager_state, manager_approval, booking_id, booking_request_number, booking_reference, pnr,
+merchant_id, merchant_name, reason, pricing, amount, new_travel_date, current_travel_date,
+review_claimed_by, review_claimed_by_name, rejection_reason, created_at, updated_at}`.
+
+`ChangeRequestDetail`: `{request, booking, timeline, can_review, can_settle, can_manager_decide}`.
+`can_review` and `can_settle` are false until the merchant's manager has signed the request off.
+
+### 6.3b Manager approval — the merchant's own sign-off
+
+Every service request a merchant raises (`cancellation`, `date_change`, `refund`,
+`passenger_modification`, `extra_baggage`, `meal`, `seat`) waits for a **manager of that merchant**
+before our desk can see or settle it:
+
+```
+raised  ->  Under Manager Approval  ->  Manager Approved  ->  our desk
+```
+
+**No migration, no new enum members.** The stage is a JSONB block at
+`service_requests.travel_details.manager_approval`, `{state, by, by_name, at, reason?}` with
+`state` one of `pending | approved | rejected`. The lifecycle `status` stays `pending_approval`
+throughout — the request *is* pending; the sub-state only says whose approval is outstanding.
+`status_label` is derived, so every surface reads "Under Manager Approval" / "Manager Approved"
+without the state machine, its filters or its dropdowns changing. See
+`services/manager_approval.py`.
+
+A request raised **by** a manager is stamped `approved` on the spot. A request with `state = null`
+predates this stage and is treated as approved, so nothing already on the desk became stuck.
+
+```
+GET  /api/manager/service-requests
+  ?outstanding=bool (default true) &page &page_size
+→ Page[ManagerQueueItem]     newest first; the caller's own merchant, never widenable
+GET  /api/manager/service-requests/counts        → ManagerQueueCounts {pending}
+POST /api/manager/service-requests/{id}/approve  → ManagerQueueItem
+POST /api/manager/service-requests/{id}/reject
+  Body: {reason: str}                                       reason mandatory
+→ ManagerQueueItem
+Permission: P.SERVICE_REQUEST_APPROVE  (NEW code)
+409 if a manager has already decided it (names them); 404 for another company's request
+```
+
+`P.SERVICE_REQUEST_APPROVE` is held by `MerchantRole.MANAGER` and by `merchant_admin`, and by **no
+platform role** — an admin approving on the merchant's behalf would collapse the two approvals this
+stage exists to keep apart. Approving moves no status; rejecting walks the request to `cancelled`
+via the existing merchant-side edge and closes it without our desk ever seeing it.
+
+Staff paths enforce this at the service layer, not only in the UI:
+`/api/admin/change-requests/{id}/review|approve|reject` and
+`/api/admin/service-requests/{id}/resolve` all return **409** for a request the merchant's manager
+has not signed off.
+
+`ManagerQueueItem`: `{id, request_number, request_type, request_type_label, status, status_label,
+manager_state, manager_approval, booking_id, booking_request_number, booking_reference, pnr,
+raised_by, reason, details, created_at, updated_at}`.
+
+### 6.3b Finance, Billing & Payment Tracking (M4)
+
+One computation, in `services/finance_service.py`, behind every money figure on every screen.
+Nothing here does arithmetic of its own. **No new permission codes** — reading your own money
+is not a new capability.
+
+```
+GET  /api/merchant/finance/position          → MerchantPosition
+GET  /api/merchant/finance/statement          ?date_from&date_to   → Statement
+Permission: P.PAYMENT_VIEW   (the caller's own merchant, resolved from the token)
+
+GET  /api/admin/merchants/{merchant_id}/finance    → MerchantPosition
+GET  /api/admin/merchants/{merchant_id}/statement  ?date_from&date_to  → Statement
+Permission: P.PAYMENT_VIEW   (staff see any; a merchant reaching for another id gets 404)
+
+POST /api/admin/merchants/{merchant_id}/wallet
+     {amount, reason, txn_type?}               → WalletAdjustmentResult
+Permission: P.PAYMENT_MANAGE  (staff only)
+
+POST /api/admin/requests/{request_id}/issue-ticket
+     {fare_amount?: Decimal > 0}               → RequestDetailResponse
+Permission: P.TICKET_ISSUE
+
+POST /api/admin/requests/{request_id}/reprice
+     {amount: Decimal > 0, reason: str}        → RequestDetailResponse
+Permission: P.TICKET_APPROVE   (no new code — this is the approver's own figure)
+```
+
+**The wallet (CR-4, `docs/WALLET_ARCHITECTURE.md` is authoritative).** A merchant holds a running
+account that **may go negative** — a negative balance is its outstanding position, bounded by
+`merchants.credit_limit` rather than by a floor at zero. Every movement is one
+`wallet_transactions` row written by `wallet_service.post` under a row lock, and every response
+that names a movement quotes its **`WTX-…` reference, never an internal id**.
+
+- `txn_type` on the wallet endpoint (CR-4b) is optional: `manual_adjustment`, `credit_note`,
+  `refund_credit` or `cancellation_charge`. Omitted, a credit defaults to `wallet_recharge` and a
+  debit to `manual_adjustment`, exactly as before. `booking_debit` is **refused (422)** — only
+  ticket issuance writes that type, and posting it by hand would route around the one-debit-per-
+  booking unique index.
+- `WalletAdjustmentResult` carries `transaction_reference`.
+
+**`/issue-ticket` — `fare_amount` (CR-4b).** What the desk paid the airline. **Required** on a
+wallet-billed (enquiry-led) booking that still carries no amount: those are created at
+`total_amount = 0` and no earlier step on that track ever sets a fare, so without it the wallet
+would be debited nothing. It becomes the booking's `total_amount` and is the amount debited.
+Omitted or ≤ 0 on such a booking → **400**, raised *before* the transition so no ticket or invoice
+number is burned. **Ignored** where an amount already exists, so every catalog-led booking behaves
+exactly as it did. Issuance also writes a wallet settlement `payments` row, so the booking reads as
+settled and the debt is not counted twice.
+
+**Issuance is serialised.** The booking row is locked (`SELECT … FOR UPDATE`) for the whole
+operation, so simultaneous issues of one booking resolve to **one 200 and the rest 400**
+("already Ticket Issued") — never two successes, never a 500. Before the lock, six concurrent
+issues returned two 200s and three 500s: the debit stayed correct (one row, enforced by
+`uq_wallet_transactions_booking_debit`) but the `IntegrityError` reached callers raw and two desks
+were told they had issued the same ticket. Clients should treat a 400 here as "someone else got
+there first" and re-read the booking.
+
+**Credit limit (CR-4b) is a hard block**, enforced at `POST /api/requests/{id}/submit` and at
+`POST /api/manager/bookings/{id}/approve`. It is deliberately **not** applied at issuance: a ticket
+already bought must be recorded.
+
+The 400 `detail` is built by `wallet_service.credit_refusal_message` — one text shared by both
+gates, so the same refusal does not read two different ways depending on which one caught it. It
+names all five figures the business asked for: **wallet balance, outstanding, credit limit,
+available credit**, and — where the amount is known — **the amount required and the shortfall**. On
+the enquiry-led track at submission the fare is genuinely unknown, so that last pair is omitted
+rather than guessed. Because there is no per-booking override, this message is the merchant's whole
+remedy, which is why it carries the numbers rather than only a refusal.
+
+### The merchant's own wallet (CR-4c)
+
+```
+GET  /api/merchant/wallet                                  → WalletSummary
+GET  /api/merchant/wallet/transactions ?date_from&date_to&page&page_size
+                                                           → WalletTransactionPage
+GET  /api/merchant/wallet/payment-accounts                 → [PaymentAccountOut]
+GET  /api/merchant/wallet/payment-accounts/{id}/qr         → image stream
+GET  /api/merchant/wallet/topups       ?status&page&page_size → TopupPage
+POST /api/merchant/wallet/topups       (multipart)         → TopupOut          201
+GET  /api/merchant/wallet/topups/{id}/proof                → file stream
+Permission: payment.view on every read; payment.pay to submit a top-up. No new codes.
+```
+
+**Every route is implicitly scoped to the caller's own merchant — no path carries a
+`merchant_id`,** so there is no id to tamper with. The two that take an id (a top-up, its proof)
+re-check ownership and return **404, not 403**. A platform staff account has no merchant of its own
+and gets a **400** pointing at `/api/admin/merchants/{id}/finance`.
+
+**`POST /topups` records a claim and credits nothing.** This is the rule the whole flow rests on:
+the wallet moves only when an admin verifies the claim (CR-4d), which is what stops a merchant
+raising its own spending power by typing a number into a form. Multipart fields:
+
+| Field | Rule |
+| --- | --- |
+| `amount` | Decimal > 0. Required. |
+| `method` | `bank_transfer` \| `upi` \| `qr`. `cash`/`other` are **refused** — a merchant cannot claim an instrument nobody can check. |
+| `payment_account_id` | Optional; must be an **active** account, else 404. |
+| `utr` | **Required for `bank_transfer`.** Otherwise required *unless* a proof file is attached. |
+| `proof` | Optional file. Same allowlist, magic-byte sniff and 10 MB streaming cap as a passport scan — literally the same `document_service.store_upload`. 415 / 400 / 413. |
+
+**A UTR may be claimed once.** `uq_wallet_topups_utr` is platform-wide and excludes rejected
+claims; a repeat returns **400** naming the reference, not a 500. The message never says *who* holds
+the existing claim — the index spans every merchant, and confirming it would let anyone probe for
+other companies' bank references.
+
+**`WalletSummary` reports `pending_topups` separately and never inside `balance`.** `balance` may
+be **negative** (that is the outstanding position) and is `SUM(credit) - SUM(debit)` over the
+ledger; a submitted claim is not in it. Adding the two together on a client is the bug this shape
+exists to prevent. `credit_available` is `null` when no limit is configured — not zero.
+
+Transactions come back **oldest first, ordered by `txn_id`**, each carrying the `balance_after` the
+server stored when the balance moved; clients render it and never accumulate their own (see
+`WALLET_ARCHITECTURE.md` §6). Proofs are served as **attachments** with `Cache-Control: no-store`;
+QR images stream inline from an authenticated route and are **never** public URLs.
+
+**`/reprice` — correcting what a booking owes.** The only way to change `total_amount` after
+approval *on the standard track*. Rules, all server-side:
+
+- **Payment Pending only.** Before it, approval carries the amount; after it money has moved and
+  a change is a refund or an extra charge — the change-request and refund paths, which quote and
+  settle, not a silent overwrite of the figure the invoice was raised on. Any other status → 400
+  naming the current one.
+- **The status is untouched**, so it does not call `lifecycle.transition` — there is no movement
+  to record. The trail is `pricing.history[]` (`{from, to, reason, by, by_name, at}`), the
+  activity log, and a notification telling the merchant the new amount and why.
+- **Row-locked**, with the scope filter inside the locked `SELECT … FOR UPDATE`, so two admins
+  cannot both price against a total the other is replacing.
+- **Credit is checked on the delta** (`new − previous`), not the new total: whatever has been
+  paid cancels out, and a reduction can never breach a limit.
+- `reason` is mandatory (the merchant reads it), `amount` must be `> 0`, and re-sending the
+  amount it already has returns 400. Enquiries and change requests are refused by type, like
+  approve and reject.
+
+`MerchantPosition`: `{merchant_id, merchant_name, currency, bookings_billable, billed, paid,
+refunded, net_paid, awaiting_verification, outstanding, overpaid, wallet_balance, credit_limit,
+credit_used, credit_available, has_credit_limit, spending_power}`.
+
+`Statement`: `{merchant_id, merchant_name, currency, date_from, date_to, opening_balance,
+closing_balance, total_debits, total_credits, entries[], position}` where an entry is
+`{at, kind, reference, request_id, description, debit, credit, balance, wallet_movement,
+unverified}` and `kind` ∈ `charge | payment | refund | payment_pending | wallet_topup |
+wallet_adjustment`.
+
+**Rules this milestone made binding, all enforced server-side:**
+
+- **Money is `Decimal` everywhere.** No `float` appears in the money path, in any service,
+  schema or response. Amounts serialise as decimal strings.
+- **`credit_limit = 0` means *no limit configured*, not a limit of zero.** Every merchant
+  carries the column default, so a literal reading would refuse every booking on the platform.
+  `credit_available` is `null` while unconfigured. Decided 2026-07-31; see the M4 entry in
+  `BOOKING_OPS_MILESTONES.md`.
+- **The credit limit is checked at admin approval**, against `final_amount`, because an
+  enquiry-led booking carries ₹0 until the desk prices it. A refusal leaves the booking
+  completely untouched rather than half-priced.
+- **A booking cannot be approved at 0.** Approval ends at Payment Pending, where
+  `record_payment` refuses `amount <= 0` — so approving without a fare produced a booking the
+  merchant was asked to pay and could not, and which no admin could re-price either, since
+  Payment Pending has no edge back to Approved. `final_amount` stays optional on the wire
+  (a catalog-led booking carries its own quote); what is enforced is that the **resulting
+  total is positive**. See §6.3b for correcting one after the fact.
+- **A partial payment no longer marks a booking Paid.** It moves to Paid only when the ledger
+  says nothing is left. Previously *any* verified payment settled it.
+- **A merchant cannot pay more than is owed**, counting payments already awaiting verification.
+- **A `wallet` payment moves the wallet** at submission, and a refused verification returns it.
+- **`verify_payment` and `refund_payment` are row-locked** (`SELECT … FOR UPDATE`).
+- **A wallet never moves without a `payments` row** explaining why.
+- **M3's cancellation refund settles here**, oldest payment first, clamped to what those
+  payments actually took; any shortfall is recorded as `refund_unsettled` rather than hidden.
+
+### 6.3c Manager Approval & the Classic Tours payment bypass (CR-2)
+
+A **Manager** sign-off sits between the merchant's submitted Booking Request and the Admin
+Booking Operations queue, and the payment workflow is bypassed entirely for enquiry-led
+(Classic Tours) bookings. Approved 2026-07-31.
+
+**The Manager is a platform role of its own** (`UserRole.MANAGER`, migrations `0033`/`0034`),
+not an Admin with an extra code. The Admin who answers a Ticket Enquiry must not also be able
+to sign off the booking that came out of it, and a separate role is what makes that
+enforceable. It signs into its own portal (`portal=manager`, `frontend/manager/`).
+
+**Two new permission codes**, held by the Manager role alone:
+
+| Code | Grants |
+|---|---|
+| `booking.manager_approve` | read the manager queue, claim a booking, approve it |
+| `booking.manager_return` | return a booking to the merchant with remarks |
+
+The Manager deliberately holds **no** `ticket.view` — that code opens the Admin's booking
+screens, the operations queue and the internal-notes API. Its own endpoints scope by
+`is_platform_staff` instead.
+
+```
+GET  /api/manager/bookings
+     ?bucket=awaiting|approved|returned|ticketed   (server-side tabs)
+     &status=<RequestStatus>  &merchant_id  &search  &page  &page_size
+   → Page[ManagerBookingSummary]
+   Waiting requests sort OLDEST FIRST (a work queue); decided ones newest first.
+   `bucket` and `status` compose; a contradictory pair is a 400, not an empty page.
+
+GET  /api/manager/bookings/counts        → ManagerQueueCounts
+   One count per status plus one roll-up per tab, from one grouped query.
+
+GET  /api/manager/bookings/{id}          → ManagerBookingDetail
+   {request, timeline, actions, reviewer_id, reviewer_name, can_decide}
+   The whole submitted booking, read-only. No payments, no internal notes.
+
+POST /api/manager/bookings/{id}/start-review   → ManagerBookingDetail
+   Claim, under SELECT FOR UPDATE. Re-claiming your own is a no-op; another
+   manager's claim is a 409.
+
+POST /api/manager/bookings/{id}/approve  {note?}      → ManagerBookingDetail
+POST /api/manager/bookings/{id}/return   {remarks}    → ManagerBookingDetail
+Permission: the two codes above. Every one of these is 403 for an Admin, a
+Super Admin and a merchant, and 400 for anything that is not a Classic Tours
+booking (an enquiry, a change request, a catalog-led booking).
+```
+
+#### §6.3d — Merchant approval desk (CR-3)
+
+**CR-3 moved this sign-off to the merchant that raised the booking.** The endpoints above still
+work and the platform Manager role still exists, but in practice its queue stays empty: a merchant
+approves before the platform ever sees the booking. Same statuses, same lifecycle edges, **no
+migration** — only who may walk the approval edge changed.
+
+**Two more permission codes**, held by `MerchantRole.MANAGER` and by `merchant_admin`:
+
+| Code | Grants |
+|---|---|
+| `booking.merchant_approve` | read this merchant's approval queue, claim, approve |
+| `booking.merchant_return` | return a booking to the raiser with remarks |
+
+Deliberately **not** the `booking.manager_*` codes: those are gated on `is_platform_staff`, and a
+merchant must not be able to address the platform queue at all rather than be refused by it late.
+`merchant_admin` holds them as well as the manager sub-role because every merchant has a Merchant
+Admin by construction, and one manager's absence must not stop a merchant submitting work.
+
+```
+GET  /api/merchant/approvals
+     ?bucket=awaiting|approved|returned|ticketed  &status  &search  &page  &page_size
+   → Page[ManagerBookingSummary]
+   NO merchant_id parameter: scope comes from the token and cannot be widened.
+
+GET  /api/merchant/approvals/counts       → ManagerQueueCounts
+GET  /api/merchant/approvals/{id}         → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/start-review        → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/approve  {note?}    → ManagerBookingDetail
+POST /api/merchant/approvals/{id}/return   {remarks}  → ManagerBookingDetail
+```
+
+Two refusals specific to this surface:
+
+* **Another merchant's booking is a 404, not a 403** — confirming it exists would leak request
+  numbers to anyone willing to enumerate them.
+* **The raiser cannot decide their own booking → 403.** The manager sub-role holds
+  `ticket.request`, so without this the same person could raise and sign off the same booking.
+  `ManagerBookingDetail.can_decide` is false in that case, so the UI never offers the buttons.
+
+**Two tracks in one state machine** (`services/lifecycle.py`). `is_classic_track(request)` is
+true for a booking raised from an answered enquiry — and **false once a booking has entered
+Payment Pending or Paid**, so bookings already in the payment workflow when this shipped finish
+the way they started rather than becoming unmovable.
+
+```
+Classic Tours:  Created → Pending Manager Approval → Under Manager Review
+                        → Manager Approved → Ticket Issued → Completed
+                Pending / Under Review → Created  ("returned for correction", remarks required)
+```
+
+- **Payment Pending and Paid have no inbound edge on this track.** That is the bypass: not a
+  hidden button, an unreachable state. `record_payment` refuses these bookings by name.
+- **Reject means returned, not Rejected.** Rejected is terminal; the change request says the
+  merchant corrects and resubmits. The booking goes back to **Created** — editable, with its
+  passengers, enquiry link and history intact — carrying `travel_details.manager_remarks`,
+  which is cleared on resubmission.
+- **`RequestResponse.workflow`** (`classic_tours` | `standard`) is on every request response, and
+  `status_label` is track-aware. Frontends branch on those rather than re-deriving the rule.
+
+**Closed bypass paths.** `ticket_service._reject_enquiry_here` now refuses Classic Tours
+bookings **by track**, which covers `/api/admin/requests/{id}/approve`, `.../reject` and
+`.../reprice`; `approval_service` drops them from the Admin Approval Queue.
+
+**Ticket delivery.** `document_service.staff_upload_stages` widens the staff upload window to
+**Manager Approved → Ticket Issued → Completed** on this track (there is no Paid stage to wait
+for). `issue_ticket` refuses to mark a Classic Tours booking issued with **no ticket document
+attached** — on this track that status is what tells the merchant its paperwork is ready, and
+there is no later stage at which the file could arrive. Merchants read them from
+`GET /api/requests/{id}/tickets` and fetch bytes from `/api/documents/{id}/download`.
+
+**Staff accounts.** `POST /api/super-admin/admins` takes `role: admin|manager` (default
+`admin`), and `GET /api/super-admin/admins` lists both, narrowable with `?role=`. Every other
+staff-account endpoint (edit, suspend, reset password, delete) already covers Managers via
+`account_service.get_admin`.
+
+`PUT /api/super-admin/admins/{id}` takes an **optional** `role`. Omitted, the role is left
+alone — an edit that only changes a phone number cannot reclassify anybody by omission. Supplied,
+it moves the account between Admin and Manager and:
+
+- **409 while that Manager still holds a booking under review.** Only the claim-holder may decide
+  a booking; converting the holder would leave the claim standing with nobody able to act on it.
+  The refusal names the booking requests to decide first. It is refused rather than silently
+  released — releasing would rewrite booking status as a side effect of an account edit.
+- **revokes the account's sessions**, because its permission set changes underneath it, and
+  notifies the holder.
+- refuses a self-role-change, and refuses any role outside `admin|manager`.
+
+**Performance.** Migration `0035` adds `ix_sr_classic_queue`, a partial index on
+`service_requests (created_at, status)` whose predicate is character-for-character what
+`manager_service._classic_bookings_filter` emits — a partial index is only used when the planner
+can *prove* the query implies its predicate. It serves both the queue list and the counts.
+
 ### 6.4 Notification Center
 
 Backed by the existing `msg_logs` table, `message_type=notification`.
@@ -464,9 +964,15 @@ Two layers, both already partially built — no new concept, just filling the on
 
 Everything above reuses an existing `P.*` code **except**:
 
-- Nothing, actually — every new endpoint above maps onto a permission code that already exists
-  in `app/auth/rbac.py`. This was checked deliberately while drafting this contract so the RBAC
-  matrix doesn't need to change; only new routers/services do.
+- Nothing in the original contract — every endpoint drafted here mapped onto a permission code
+  that already existed in `app/auth/rbac.py`. This was checked deliberately so the RBAC matrix
+  did not need to change; only new routers/services did.
+- **CR-2 (2026-07-31) added two, and one role.** `P.BOOKING_MANAGER_APPROVE`
+  (`booking.manager_approve`) and `P.BOOKING_MANAGER_RETURN` (`booking.manager_return`), held by
+  the new `UserRole.MANAGER` and by nothing else. They are new because the capability is
+  genuinely new: reusing `ticket.approve` would have handed every Admin the Manager's job on day
+  one, and handing the Manager `ticket.approve` would have given it the Admin's catalog queue.
+  See §6.3c.
 
 ---
 

@@ -7,9 +7,9 @@ A full-stack tours & travel booking platform.
 
 Visitors can search and book flights, hotels, cruises, and tour packages; keep a wishlist; leave
 reviews; and manage bookings/payments from an Account Center. Admins get a separate console
-(`admin/admin.html`) for catalog, users, bookings, payments, pricing/coupons, support tickets, and
+(`admin/index.html`) for catalog, users, bookings, payments, pricing/coupons, support tickets, and
 reports. Registered B2B partner companies (gaming companies, corporate travel desks, agencies) get
-their own portal (`partner/partner-portal.html`) to raise and track ticket requests and service requests
+their own portal (`merchant/index.html`) to raise and track ticket requests and service requests
 against their own bookings only.
 
 ## Contents
@@ -69,8 +69,8 @@ python -m http.server 5500
 ```
 
 Open **http://127.0.0.1:5500/index.html** in your browser. Sign up, log in, search, and book — or
-log in with the [seeded admin account](#default-admin-login) and open `admin/admin.html` (relative
-to `frontend/`, i.e. http://127.0.0.1:5500/admin/admin.html) to manage the platform.
+log in with the [seeded admin account](#default-admin-login) and open `admin/index.html` (relative
+to `frontend/`, i.e. http://127.0.0.1:5500/admin/) to manage the platform.
 
 > ⚠️ The frontend must be served over HTTP (`python -m http.server`), never opened directly as a
 > `file://` path, or the browser will block API calls. The backend's default `CORS_ORIGINS`
@@ -98,13 +98,13 @@ TOURS AND TRAVEL/
 │   │                         Standalone auth pages (index.html also has its own login/signup
 │   │                         modals — both exist; admin.html's "reset customer password" action
 │   │                         links to reset-password.html specifically)
-│   ├── admin/admin.html      Admin console — CRUD, reports, pricing/coupons, support tickets,
+│   ├── admin/index.html      Admin console — CRUD, reports, pricing/coupons, support tickets,
 │   │                         Merchant Management (all as sections within this one file)
-│   ├── partner/partner-portal.html
-│   │                         B2B Partner Portal shell — auth flow + sidebar/section markup
-│   ├── super-admin/super-admin.html
-│   │                         Super Admin Portal shell (frontend + backend scaffold only — no
-│   │                         database yet, by design; see docs/)
+│   ├── merchant/index.html   Merchant Portal — dashboard, ticket enquiry/request, request
+│   │                         history, service requests, reports, profile (served at /merchant/)
+│   ├── super-admin/index.html
+│   │                         Super Admin Portal — dashboard, admin management, roles &
+│   │                         permissions, system config, global reports, audit logs, profile
 │   ├── assets/
 │   │   ├── images/ (logo, favicons)   videos/ (hero clips)
 │   │   ├── css/    main.css, admin.css (extracted from what used to be inline <style> blocks),
@@ -209,7 +209,7 @@ python -m alembic upgrade head
 | `0014_pricing_coupons` | Pricing rules and coupon tables |
 | `0015_partner_portal` | Partner Portal: 19 tables, 3 views, 9 triggers, 19 stored procedures — applies `backend/db/partner_portal/*.sql` |
 | `0016_partner_portal_gap_completion` | Partner Portal follow-up: status-history tables, 4 more stored procedures, 2 more views, sample partner seed data — applies `backend/db/partner_portal/gap_completion/*.sql` |
-| `0017_partner_portal_back_office` | Partner Portal Back Office: 2 stored procedures backing the new admin/admin.html Partner Requests screen — applies `backend/db/partner_portal/back_office/*.sql` |
+| `0017_partner_portal_back_office` | Partner Portal Back Office: 2 stored procedures backing the new admin/index.html Partner Requests screen — applies `backend/db/partner_portal/back_office/*.sql` |
 
 </details>
 
@@ -276,7 +276,7 @@ Both route to the same real inbox via Gmail "+" sub-addressing (mail to `local+t
 delivers to `local@gmail.com`, while staying a distinct string for the `email` UNIQUE constraint) —
 swap in different real addresses per company if you want separate inboxes.
 
-Sign in at `partner/partner-portal.html`; the OTP step requires `SMTP_HOST`/`SMTP_FROM_EMAIL` (and the rest
+Sign in at `merchant/index.html`; the OTP step requires `SMTP_HOST`/`SMTP_FROM_EMAIL` (and the rest
 of the SMTP variables) to be set in `backend/.env` — there is no server-side log fallback. If SMTP
 isn't configured, OTP requests fail with a `503` rather than ever printing the code anywhere.
 
@@ -310,14 +310,14 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
   reviews, support tickets, profile & password management
 - Contact form and newsletter signup
 
-**Admin console (`admin/admin.html`)**
+**Admin console (`admin/index.html`)**
 - Dashboard KPIs, revenue/booking charts, CSV report export
 - CRUD for flights, hotels, cruises, tour packages, and pricing/coupons
 - Paginated management of users, bookings, payments, contact messages, reviews, wishlist, support
   tickets, and activity logs
 - Send notifications to one user or broadcast to all users
 
-**Partner Portal (`partner/partner-portal.html`)** — separate B2B surface, own JWT scope, own login
+**Partner Portal (`merchant/index.html`)** — separate B2B surface, own JWT scope, own login
 - 3-step OTP + password sign-in (email → OTP → password), plus forgot-password
 - Dashboard KPIs, Ticket Enquiry (searches the same live flight catalog as the public site)
 - Request Ticket: flights/hotels/cruises, multi-passenger, draft-then-submit-for-approval workflow
@@ -326,7 +326,7 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
 - Partners can only ever see and act on their own bookings — enforced server-side, not just hidden
   in the UI (verified: a second partner's token gets `404`, not someone else's data)
 
-**Partner Requests (`admin/admin.html`)** — the Back Office side of the workflow above
+**Partner Requests (`admin/index.html`)** — the Back Office side of the workflow above
 - Booking Approvals tab: queue of pending partner bookings across every company, with a review
   drawer (full trip + passenger detail) and Approve (with an optional final amount) / Reject
   (with a required reason)
@@ -350,8 +350,13 @@ Every endpoint is documented and browsable via interactive Swagger UI at `/docs`
 The frontend is fully static — deploy the HTML files as-is to any static host (Netlify, Vercel,
 GitHub Pages, S3 + CloudFront). The backend needs a Python host with PostgreSQL.
 
-For a complete guide to deploying both on a single AWS EC2 instance (nginx + gunicorn/uvicorn +
-PostgreSQL, systemd service, HTTPS via certbot), see [deploy/README.md](deploy/README.md).
+**The current deployment guide is [docs/AWS_DEPLOYMENT.md](docs/AWS_DEPLOYMENT.md)** — one EC2
+instance running the Docker image, RDS Postgres, S3 for booking documents, and automatic TLS.
+
+[deploy/README.md](deploy/README.md) describes an earlier approach (nginx + systemd + PostgreSQL
+installed on the instance itself). It is kept for reference but is **superseded**: it predates both
+the Docker image and the S3 document backend, and it puts the database on the web server, where an
+instance rebuild destroys it. Follow one guide or the other, not a mixture.
 
 Minimum steps for any host:
 1. Provision PostgreSQL and set `DATABASE_URL`, `JWT_SECRET_KEY`, and `CORS_ORIGINS` (pointing at
@@ -359,7 +364,7 @@ Minimum steps for any host:
 2. `pip install -r requirements.txt` then `alembic upgrade head` as part of your deploy step.
 3. Run with a production ASGI server, e.g. `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
 4. Update `API_BASE` to your deployed backend URL — inline at the top of each HTML file's
-   `<script>` block (`index.html`, `admin/admin.html`) or, for the Partner Portal, in
+   `<script>` block (`index.html`, `admin/index.html`) or, for the Partner Portal, in
    `assets/js/partner-shared.js`.
 5. Confirm `/api/health` returns `{"status": "ok"}`.
 </content>

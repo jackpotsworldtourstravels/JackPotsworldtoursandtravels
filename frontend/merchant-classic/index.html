@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merchant Portal (Classic) — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
+
+<!-- ===========================================================================
+     CLASSIC MERCHANT PORTAL — the enterprise/form alternative to the Premium
+     travel UI at ../merchant/index.html.
+
+     Both frontends are powered by ONE backend. Nothing here duplicates an API,
+     a model or a business rule; every call goes through shared/merchant-api.js,
+     which is a faithful transcription of the endpoints the Premium screens use.
+
+     What is SHARED with Premium (loaded from ../assets and ../shared):
+       axios, formatters.js, auth.js, components/*  — and, crucially, the
+       partner_jwt_* localStorage session, so a merchant signed into one portal
+       is already signed into the other.
+
+     What is NOT shared, by design:
+       CSS, layout, DOM ids, and every rendering function. This page loads none
+       of merchant-home.css / merchant-booking.css / partner-portal.css and none
+       of the partner-*.js screen files. Premium cannot restyle Classic and
+       Classic cannot break Premium.
+
+     LOOK AND FEEL: this portal is styled to match the Admin Portal at
+     ../admin/ — same Montserrat, navy gradient rail, coral accent, rounded
+     cards and light/dark theme. It does NOT load ../assets/css/admin.css;
+     css/classic.css holds its own copy of those tokens under `cl-` names, so
+     the two portals look alike without either being able to restyle the other.
+     =========================================================================== -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/classic.css?v=20260801merge">
+</head>
+<body>
+
+<!-- ============================== AUTH ============================== -->
+<!-- Same Email -> Password -> OTP order and the same /api/auth/* endpoints as
+     Premium (docs/API_CONTRACT.md §1). Same session keys, so signing in here
+     signs you into Premium too. -->
+<div class="cl-auth" id="clAuth">
+  <div class="cl-auth-box">
+    <div class="cl-auth-brand">
+      <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      <span>Merchant Portal</span>
+    </div>
+
+    <div class="cl-auth-step active" id="clAuthStep1">
+      <h1>Sign in</h1>
+      <p class="cl-auth-sub">Classic interface. Use your registered merchant credentials.</p>
+      <div class="cl-form cl-form-2">
+        <div class="cl-field cl-field-full">
+          <label for="clEmail">Email address<span class="cl-req">*</span></label>
+          <input type="email" id="clEmail" autocomplete="username" placeholder="you@company.com">
+        </div>
+        <div class="cl-field cl-field-full">
+          <label for="clPassword">Password<span class="cl-req">*</span></label>
+          <input type="password" id="clPassword" autocomplete="current-password">
+        </div>
+      </div>
+      <div class="cl-form-actions">
+        <button type="button" class="cl-btn cl-btn-primary" id="clLoginBtn">Sign in</button>
+        <a href="../forgot-password.html">Forgot password?</a>
+      </div>
+      <div class="cl-msg" id="clAuthMsg1"></div>
+    </div>
+
+    <div class="cl-auth-step" id="clAuthStep2">
+      <h1>Verify OTP</h1>
+      <p class="cl-auth-sub" id="clOtpSub">Enter the 6-digit code sent to your email.</p>
+      <div class="cl-form cl-form-2">
+        <div class="cl-field cl-field-full">
+          <label for="clOtp">One-time code<span class="cl-req">*</span></label>
+          <input type="text" id="clOtp" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+        </div>
+      </div>
+      <div class="cl-form-actions">
+        <button type="button" class="cl-btn cl-btn-primary" id="clVerifyBtn">Verify</button>
+        <button type="button" class="cl-btn" id="clResendBtn">Resend code</button>
+        <button type="button" class="cl-btn cl-btn-link" id="clBackBtn">Back</button>
+      </div>
+      <div class="cl-msg" id="clAuthMsg2"></div>
+    </div>
+
+    <div class="cl-auth-foot">
+      <a href="../index.html">Main site</a>
+      <a href="../portal-login.html">Other portals</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== APP =============================== -->
+<div class="cl-app" id="clApp">
+
+  <header class="cl-top">
+    <button type="button" class="cl-burger" id="clBurger" aria-label="Toggle navigation">☰</button>
+    <!-- No brand block here. The rail below already carries the JackPots logo,
+         and repeating the name on every page bought nothing but width. -->
+
+    <div class="cl-top-search">
+      <label class="cl-sr" for="clSearch">Search your requests</label>
+      <input type="search" id="clSearch" placeholder="Search request no., PNR, passenger…" autocomplete="off">
+      <div class="cl-gs" id="clSearchResults"></div>
+    </div>
+
+    <div class="cl-top-right">
+      <!-- Name, then the signed-in ROLE — not the company. Every user in this
+           portal belongs to one merchant, so the company name told them
+           nothing; which hat they are wearing decides what they may do. -->
+      <span class="cl-top-user"><b id="clUserName">—</b> · <span id="clUserRole">—</span></span>
+
+      <!-- Same light / dark / system control the Admin Portal carries, with the
+           same three choices and the same persistence behaviour. -->
+      <div class="cl-theme" id="clTheme" role="group" aria-label="Theme">
+        <button type="button" class="cl-theme-btn" data-cl-theme="light" title="Light theme" aria-label="Light theme">☀</button>
+        <button type="button" class="cl-theme-btn" data-cl-theme="dark" title="Dark theme" aria-label="Dark theme">☾</button>
+        <button type="button" class="cl-theme-btn" data-cl-theme="system" title="Match system theme" aria-label="Match system theme">◐</button>
+      </div>
+
+      <button type="button" class="cl-top-btn cl-bell" id="clBellBtn" aria-label="Notifications">
+        🔔<span class="cl-bell-count" id="clBellCount"></span>
+      </button>
+      <!-- The "Premium view" switch was removed with the Premium portal: this
+           is now the merchant UI, and there is no second interface to switch
+           to. Restoring Premium means restoring this link too. -->
+      <button type="button" class="cl-top-btn" id="clSignOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="cl-body">
+    <nav class="cl-side" id="clSide" aria-label="Main">
+      <!-- Brand block at the head of the rail, the same place the Admin Portal
+           puts it. The full gold logo is on a transparent background, so it
+           sits on the navy gradient without a plate behind it. -->
+      <a class="cl-brand" href="../index.html" title="JackPots World Tours &amp; Travels">
+        <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+      </a>
+
+      <div class="cl-side-group">Overview</div>
+      <a href="#" data-cl-nav="dashboard" class="active"><span class="cl-side-ico">▦</span>Dashboard</a>
+
+      <div class="cl-side-group">Booking</div>
+      <!-- CR-5 — "Booking Enquiry" here, "Ticket Enquiry" on every staff
+           screen. Deliberate: the merchant is starting a booking, the desk is
+           working an enquiry queue. Same rows, same request_type. -->
+      <a href="#" data-cl-nav="enquiry"><span class="cl-side-ico">✈</span>Booking Enquiry</a>
+      <a href="#" data-cl-nav="booking-request"><span class="cl-side-ico">✎</span>Booking Request</a>
+
+      <div class="cl-side-group">Operations</div>
+      <a href="#" data-cl-nav="requests"><span class="cl-side-ico">☰</span>My Requests</a>
+      <!-- CR-3 — only the merchant's approvers see this; revealed by
+           classic-shell.js once the session's permissions are known. -->
+      <a href="#" data-cl-nav="approvals" id="clNavApprovals" style="display:none;"><span class="cl-side-ico">✓</span>Approvals</a>
+      <!-- CR-4c — the running account. Sits above Payments: it is now the main
+           settlement surface for enquiry-led bookings, and Payments covers the
+           catalog-led track only. -->
+      <a href="#" data-cl-nav="wallet"><span class="cl-side-ico">◈</span>Wallet</a>
+      <a href="#" data-cl-nav="payments"><span class="cl-side-ico">₹</span>Payments</a>
+      <a href="#" data-cl-nav="service-request"><span class="cl-side-ico">⇄</span>Service Requests</a>
+
+      <div class="cl-side-group">Insight</div>
+      <a href="#" data-cl-nav="reports"><span class="cl-side-ico">▤</span>Reports</a>
+      <a href="#" data-cl-nav="notifications"><span class="cl-side-ico">✉</span>Notifications</a>
+
+      <div class="cl-side-group">Account</div>
+      <a href="#" data-cl-nav="profile"><span class="cl-side-ico">◉</span>Profile &amp; Settings</a>
+      <a href="#" data-cl-nav="support"><span class="cl-side-ico">☏</span>Support</a>
+    </nav>
+
+    <main class="cl-main">
+      <div class="cl-crumb">
+        <span>Merchant Portal</span><span>›</span><b id="clCrumb">Dashboard</b>
+        <span class="cl-crumb-date" id="clDate"></span>
+      </div>
+
+      <div class="cl-content">
+        <!-- Every section is rendered by its module in js/. Markup is
+             intentionally thin: the modules own their own DOM. -->
+        <section class="cl-section active" id="cl-dashboard"></section>
+        <section class="cl-section" id="cl-enquiry"></section>
+        <section class="cl-section" id="cl-booking-request"></section>
+        <!-- Booking Request Details. No sidebar entry: opened from a row
+             action on My Requests or from the submit confirmation. -->
+        <section class="cl-section" id="cl-booking-detail"></section>
+        <section class="cl-section" id="cl-requests"></section>
+        <section class="cl-section" id="cl-approvals"></section>
+        <section class="cl-section" id="cl-wallet"></section>
+        <section class="cl-section" id="cl-payments"></section>
+        <section class="cl-section" id="cl-service-request"></section>
+        <section class="cl-section" id="cl-reports"></section>
+        <section class="cl-section" id="cl-notifications"></section>
+        <section class="cl-section" id="cl-profile"></section>
+        <section class="cl-section" id="cl-support"></section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Body-level so nothing above can become their containing block. -->
+<div class="cl-modal-back" id="clModalBack">
+  <div class="cl-modal" id="clModal" role="dialog" aria-modal="true" aria-labelledby="clModalTitle">
+    <div class="cl-modal-head">
+      <h2 id="clModalTitle">Details</h2>
+      <button type="button" class="cl-modal-close" id="clModalClose" aria-label="Close">×</button>
+    </div>
+    <div class="cl-modal-body" id="clModalBody"></div>
+    <div class="cl-modal-foot" id="clModalFoot"></div>
+  </div>
+</div>
+
+<div class="cl-drawer-back" id="clDrawerBack"></div>
+<aside class="cl-drawer" id="clDrawer" aria-label="Notifications">
+  <div class="cl-drawer-head">
+    <h2>Notifications</h2>
+    <button type="button" class="cl-btn cl-btn-sm" id="clMarkAllBtn">Mark all read</button>
+    <button type="button" class="cl-modal-close" id="clDrawerClose" aria-label="Close">×</button>
+  </div>
+  <div class="cl-drawer-list" id="clDrawerList"></div>
+</aside>
+
+<!-- ============================== SCRIPTS ==========================
+     Order matters: axios, then formatters + auth (shared with Premium), then
+     API_BASE via classic-shell.js, then merchant-api.js, then the modules. -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
+<script src="../assets/js/auth.js?v=20260731cr2"></script>
+<!-- Static city/airport reference data for the enquiry form's searchable From
+     and To fields. There is no airport endpoint in the v2 API — see the note at
+     the head of the file — so the table lives in the UI layer and is shared,
+     unchanged, with the other frontends. -->
+<script src="../assets/js/travel-locations.js?v=20260730b"></script>
+<script src="js/classic-shell.js?v=20260801merge"></script>
+<script src="../shared/merchant-api.js?v=20260801merge"></script>
+<script src="js/classic-dashboard.js?v=20260801merge"></script>
+<script src="js/classic-enquiry.js?v=20260801cr5"></script>
+<script src="js/classic-booking.js?v=20260801cr5"></script>
+<script src="js/classic-booking-detail.js?v=20260801cr5"></script>
+<script src="js/classic-requests.js?v=20260801merge"></script>
+<script src="js/classic-approvals.js?v=20260731cr3b"></script>
+<script src="js/classic-wallet.js?v=20260801cr4c"></script>
+<script src="js/classic-payments.js?v=20260801cr5"></script>
+<script src="js/classic-service.js?v=20260801merge"></script>
+<script src="js/classic-reports.js?v=20260731m4"></script>
+<script src="js/classic-account.js?v=20260801merge"></script>
+<script>
+  /* Boot last, once every module's init function exists. */
+  clBoot();
+</script>
+</body>
+</html>

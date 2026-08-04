@@ -1,0 +1,20 @@
+.git
+.gitignore
+.claude
+
+# Local virtualenv — the image installs its own from requirements.txt, and
+# copying a 136 MB Windows venv into a Linux image would only break it.
+backend/venv
+backend/.venv
+**/__pycache__
+*.pyc
+
+# Secrets and customer documents never enter the image.
+backend/.env
+uploads
+
+tests
+docs
+deploy/README.md
+README.md
+*.dump

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operations Portal — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
+
+<!-- ===========================================================================
+     OPERATIONS PORTAL — VERSION 2.
+     ===========================================================================
+     A SECOND, INDEPENDENT FRONTEND over the same backend. It is not a redesign
+     of anything: Version 1 (the Premium travel portal at ../merchant/,
+     ../admin/, ../super-admin/) and the Classic merchant portal at
+     ../merchant-classic/ are untouched, byte for byte, and keep working
+     exactly as they did.
+
+     WHO IT IS FOR
+     Merchants who work in the system all day, and platform staff — admins,
+     super admins, ticketing, finance, support. A merchant sees a merchant-only
+     workspace and staff see theirs; the difference is decided by permissions,
+     not by two codebases. Everything is a form or a table; there are no cards,
+     banners, hero images or photography anywhere in this directory, on purpose.
+
+     ONE BACKEND, ONE DATABASE, ONE SESSION, ONE LOGIN
+       * Every call goes through ../shared/ops-api.js, which is a transcription
+         of the live OpenAPI document. No endpoint, payload, schema, permission
+         or business rule is defined here.
+       * THIS PAGE HAS NO LOGIN OF ITS OWN. Authentication lives entirely on
+         the public site (the modal on ../index.html, plus forgot-password /
+         reset-password / register). No login form, OTP box or password reset is
+         reimplemented here. Without a session this page redirects to that
+         existing login; with one it opens straight away, because the tokens are
+         the very ones Version 1 writes (jwt_*, partner_jwt_*,
+         super_admin_jwt_*) — one session shared by every interface.
+       * What appears in the sidebar is decided by the `permissions` array that
+         /api/auth/me returns — the same rbac.effective_permissions the API
+         itself enforces. The UI hides nothing the server would allow and
+         offers nothing the server would refuse.
+
+     WHAT IS SHARED WITH VERSION 1 (deliberately, to avoid a second copy of
+     the truth): axios, ../shared/formatters.js, ../assets/js/auth.js and the
+     session keys. Nothing else — no CSS, no DOM ids, no render function. This
+     page loads none of partner-*.js / classic-*.js and none of their
+     stylesheets, so neither side can restyle or break the other.
+     =========================================================================== -->
+
+<link rel="stylesheet" href="css/ops.css?v=20260730h">
+</head>
+<body>
+
+<!-- ============================ NO SIGN-IN HERE ============================
+     This workspace has NO login screen of its own, on purpose.
+
+     There is ONE authentication system in this project and it lives on the
+     public site: the login modal on ../index.html (Login -> Password -> OTP,
+     API_CONTRACT.md §1), with ../forgot-password.html, ../reset-password.html
+     and ../register.html alongside it. This page does not reimplement any part
+     of that — no second login form, no second OTP box, no second password
+     reset, no second "account type" question.
+
+     ARRIVING HERE WITHOUT A SESSION redirects to that existing login rather
+     than drawing one (see opsRequireSignIn in js/ops-core.js). Arriving WITH
+     one — because the merchant just signed in on the public site, or was
+     already signed in to a Version 1 portal in this browser — drops straight
+     into the workspace, since the tokens are the same ones Version 1 writes.
+
+     WHAT SENDS A MERCHANT HERE is a single constant in the public site's own
+     script: MERCHANT_PORTAL_URL in ../assets/js/app.js. Authentication is
+     untouched; only where a merchant lands afterwards changed. The Premium
+     workspace stays reachable from the workspace menu in the header.
+     ======================================================================== -->
+
+<!-- ================================ APP ================================ -->
+<div class="ops-app" id="opsApp">
+
+  <!-- ---------------------------- TOP TOOLBAR ---------------------------- -->
+  <header class="ops-top">
+    <button type="button" class="ops-icon-btn" id="opsRailToggle"
+            aria-label="Collapse or expand navigation" title="Collapse navigation">☰</button>
+
+    <div class="ops-top-brand"><b>JackPots World</b> <span>Operations</span></div>
+
+    <div class="ops-top-search">
+      <label class="ops-sr" for="opsSearch">Global search</label>
+      <input type="search" id="opsSearch" autocomplete="off" spellcheck="false"
+             placeholder="Booking / request no., PNR, passenger, merchant, hotel, flight, email, phone…   (Ctrl+K)">
+      <div class="ops-gs" id="opsSearchResults" role="listbox" aria-label="Search results"></div>
+    </div>
+
+    <div class="ops-top-right">
+      <!-- Workspace switcher: narrows the sidebar to one desk's work, and
+           links across to the Version 1 portal for this account's role. -->
+      <div class="ops-menu-wrap">
+        <button type="button" class="ops-icon-btn" id="opsWorkspaceBtn" title="Workspace">
+          <span id="opsWorkspaceLabel">All modules</span> ▾
+        </button>
+        <div class="ops-menu" id="opsWorkspaceMenu">
+          <div class="ops-menu-head">Desk</div>
+          <div id="opsDeskList"></div>
+          <div class="ops-menu-sep"></div>
+          <div class="ops-menu-head">Interface</div>
+          <a id="opsV1Link" href="../portal-login.html">Version 1 (Premium) →</a>
+        </div>
+      </div>
+
+      <span class="ops-top-user"><b id="opsUserName">—</b><span id="opsUserOrg"></span></span>
+
+      <button type="button" class="ops-icon-btn ops-bell" id="opsBellBtn" title="Notifications">
+        🔔<span class="ops-badge-dot ops-hidden" id="opsBellCount"></span>
+      </button>
+
+      <div class="ops-menu-wrap">
+        <button type="button" class="ops-icon-btn" id="opsHelpBtn" title="Keyboard shortcuts and help">?</button>
+      </div>
+
+      <div class="ops-menu-wrap">
+        <button type="button" class="ops-icon-btn" id="opsUserBtn" title="Account">◉ ▾</button>
+        <div class="ops-menu" id="opsUserMenu">
+          <div class="ops-menu-head" id="opsUserMenuHead">Account</div>
+          <button type="button" data-ops-nav="settings">Profile &amp; settings</button>
+          <button type="button" id="opsChangePwBtn">Change password</button>
+          <div class="ops-menu-sep"></div>
+          <button type="button" id="opsSignOutBtn">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="ops-body">
+    <!-- Rendered by opsRenderNav() from the permissions /api/auth/me returns —
+         see OPS_NAV in js/ops-core.js. -->
+    <nav class="ops-rail" id="opsRail" aria-label="Modules"></nav>
+
+    <main class="ops-main">
+      <div class="ops-crumb">
+        <span>Operations</span><span>›</span><b id="opsCrumb">Dashboard</b>
+        <span class="ops-crumb-right">
+          <span id="opsCrumbRole" class="ops-muted"></span>
+          <span id="opsCrumbDate" class="ops-muted"></span>
+        </span>
+      </div>
+
+      <div class="ops-content">
+        <!-- Each section's markup is owned entirely by its module in js/. -->
+        <section class="ops-section active" id="ops-dashboard"></section>
+
+        <section class="ops-section" id="ops-flights"></section>
+        <section class="ops-section" id="ops-hotels"></section>
+        <section class="ops-section" id="ops-cruises"></section>
+        <section class="ops-section" id="ops-packages"></section>
+
+        <section class="ops-section" id="ops-bookings"></section>
+        <section class="ops-section" id="ops-requests"></section>
+        <section class="ops-section" id="ops-new-request"></section>
+        <section class="ops-section" id="ops-approvals"></section>
+
+        <section class="ops-section" id="ops-payments"></section>
+        <section class="ops-section" id="ops-wallet"></section>
+
+        <section class="ops-section" id="ops-customers"></section>
+        <section class="ops-section" id="ops-merchants"></section>
+        <section class="ops-section" id="ops-users"></section>
+
+        <section class="ops-section" id="ops-reports"></section>
+        <section class="ops-section" id="ops-support"></section>
+        <section class="ops-section" id="ops-logs"></section>
+        <section class="ops-section" id="ops-profile"></section>
+        <section class="ops-section" id="ops-settings"></section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Body-level, so no transformed ancestor can become their containing block. -->
+<div class="ops-modal-back" id="opsModalBack">
+  <div class="ops-modal" id="opsModal" role="dialog" aria-modal="true" aria-labelledby="opsModalTitle">
+    <div class="ops-modal-head">
+      <h2 id="opsModalTitle">Details</h2>
+      <button type="button" class="ops-modal-close" id="opsModalClose" aria-label="Close">×</button>
+    </div>
+    <div class="ops-modal-body" id="opsModalBody"></div>
+    <div class="ops-modal-foot" id="opsModalFoot"></div>
+  </div>
+</div>
+
+<div class="ops-drawer-back" id="opsDrawerBack"></div>
+<aside class="ops-drawer" id="opsDrawer" aria-label="Notifications">
+  <div class="ops-drawer-head">
+    <h2>Notifications</h2>
+    <button type="button" class="ops-btn ops-btn-sm" id="opsMarkAllBtn">Mark all read</button>
+    <button type="button" class="ops-modal-close" id="opsDrawerClose" aria-label="Close">×</button>
+  </div>
+  <div class="ops-drawer-list" id="opsDrawerList"></div>
+</aside>
+
+<div class="ops-toasts" id="opsToasts" aria-live="polite"></div>
+
+<!-- ============================== SCRIPTS ==============================
+     Order matters: axios, then the two shared helpers Version 1 also uses,
+     then ops-core (which declares OPS_API_BASE + opsAuthHeaders), then the
+     transport layer, then one file per module group. -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="../shared/formatters.js?v=20260731m4"></script>
+<script src="../assets/js/auth.js?v=20260730h"></script>
+<script src="js/ops-core.js?v=20260730h"></script>
+<script src="../shared/ops-api.js?v=20260731m4"></script>
+<script src="js/ops-grid.js?v=20260730h"></script>
+<script src="js/ops-dashboard.js?v=20260730h"></script>
+<script src="js/ops-inventory.js?v=20260730h"></script>
+<script src="js/ops-requests.js?v=20260731b"></script>
+<script src="js/ops-finance.js?v=20260731m4"></script>
+<script src="js/ops-directory.js?v=20260730h"></script>
+<script src="js/ops-insight.js?v=20260730h"></script>
+<script src="js/ops-support.js?v=20260730h"></script>
+<script src="js/ops-profile.js?v=20260730h"></script>
+<script src="js/ops-settings.js?v=20260730h"></script>
+<script>
+  /* Boot last, once every module's init function is defined. */
+  opsBoot();
+</script>
+</body>
+</html>
