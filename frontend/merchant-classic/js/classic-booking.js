@@ -164,24 +164,237 @@ function clIsInternational(e) {
     && isInternationalRoute(e.origin, e.destination);
 }
 
-/* Landing here directly — from the sidebar, or from a #booking-request deep
-   link — is a legitimate thing to do and needs an answer, not an empty page. */
+/* THE HUB — what this screen is when there is no booking in progress.
+   ===========================================================================
+   Landing here directly — from the sidebar, or from a #booking-request deep
+   link — is a legitimate thing to do and needs an answer, not an empty page.
+   It used to answer with two bare buttons on an otherwise blank panel, which
+   left the screen looking half-built and said nothing about which route a
+   merchant should take or what they had already raised.
+
+   It is now two things: the CHOICE (the two ways a booking can start, as
+   cards) and the CONTEXT (what this merchant raised most recently). Both were
+   already reachable — Booking Enquiry and My Requests — so nothing new is
+   being offered here; the page simply stops being the one screen in the portal
+   that shows the merchant nothing.
+
+   NOTHING BELOW TOUCHES THE WORKFLOW. The two actions call exactly what the
+   two buttons called, and the table is a read of /api/requests filtered to
+   bookings. Every row action is the same function My Requests binds. */
 function clRenderNoEnquiry() {
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head"><div>
       <h1>Booking Request</h1>
     </div></div>
-    <!-- The two ways in are the two buttons. The paragraph and the bulleted
-         list that used to explain them above were removed on request; nothing
-         about either route changed. -->
-    <div class="cl-panel"><div class="cl-panel-body">
-      <div class="cl-form-actions" style="margin:0;">
-        <button type="button" class="cl-btn cl-btn-primary" id="clBrToEnquiry">Go to Booking Enquiry</button>
-        <button type="button" class="cl-btn" id="clBrToDirect">Book Directly</button>
+
+    <section class="cl-qa" aria-labelledby="clQaTitle">
+      <div class="cl-qa-head">
+        <span class="cl-qa-head-ico">${clIco('activity', { size: 17 })}</span>
+        <div>
+          <h2 id="clQaTitle">Quick Actions</h2>
+          <p>Choose how you want to create a booking.</p>
+        </div>
       </div>
-    </div></div>`;
-  $('clBrToEnquiry').addEventListener('click', () => clGo('enquiry'));
-  $('clBrToDirect').addEventListener('click', () => clGo('enquiry', () => clOpenEnquiryForm(true)));
+
+      <!-- THE CARD IS THE TARGET, THE BUTTON IS THE CONTROL.
+           One click handler per card, bound below on the card itself — the
+           button inside deliberately has none, so a press on it bubbles up to
+           exactly the same handler. That is what makes the whole surface
+           clickable without the action firing twice, and it keeps the keyboard
+           path honest: the <button> is still the focusable, Enter/Space
+           control, and the card is only a bigger hit area for a pointer. -->
+      <div class="cl-qa-grid">
+        <div class="cl-qa-card cl-qa-card-rec" data-cl-qa="enquiry">
+          <span class="cl-qa-ico">${clIco('file', { size: 24 })}</span>
+          <div class="cl-qa-body">
+            <div class="cl-qa-title">
+              <h3>From Booking Enquiry</h3>
+              <span class="cl-tag cl-tag-accent">Recommended</span>
+            </div>
+            <p>Create a booking using an approved quotation from your booking enquiry.</p>
+          </div>
+          <button type="button" class="cl-btn cl-btn-primary cl-btn-cta cl-btn-block"
+            id="clBrToEnquiry">Go to Booking Enquiry ${clIco('arrowRight', { size: 15 })}</button>
+        </div>
+
+        <div class="cl-qa-card" data-cl-qa="direct">
+          <span class="cl-qa-ico">${clIco('plane', { size: 24 })}</span>
+          <div class="cl-qa-body">
+            <div class="cl-qa-title"><h3>Direct Booking</h3></div>
+            <p>Create a booking directly without requesting a quotation.</p>
+          </div>
+          <button type="button" class="cl-btn cl-btn-cta cl-btn-block"
+            id="clBrToDirect">Book Directly ${clIco('arrowRight', { size: 15 })}</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="cl-panel">
+      <div class="cl-panel-head">
+        <h2>${clIco('history')} Recent Booking Requests</h2>
+        <div class="cl-panel-tools">
+          <button type="button" class="cl-btn cl-btn-sm" id="clBrRecentRefresh">
+            ${clIco('refresh', { size: 14 })} Refresh
+          </button>
+          <button type="button" class="cl-btn cl-btn-sm" id="clBrRecentAll">View all</button>
+        </div>
+      </div>
+      <div class="cl-panel-body cl-flush">
+        <div class="cl-table-wrap">
+          <table class="cl-table">
+            <thead><tr>
+              <th>Booking reference</th><th>Journey</th><th>Booking type</th>
+              <th>Status</th><th>Created</th>
+              <th class="cl-actions">Action</th>
+            </tr></thead>
+            <tbody id="clBrRecentBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="cl-panel-note" id="clBrRecentNote"></div>
+    </div>`;
+
+  /* The action is bound ONCE, on the card. See the comment in the markup. */
+  $('cl-booking-request').querySelectorAll('[data-cl-qa]').forEach(card => {
+    card.addEventListener('click', () => {
+      if (card.dataset.clQa === 'enquiry') clGo('enquiry');
+      else clGo('enquiry', () => clOpenEnquiryForm(true));
+    });
+  });
+
+  $('clBrRecentRefresh').addEventListener('click', () => clLoadRecentBookings());
+  $('clBrRecentAll').addEventListener('click', () => clGo('requests'));
+  return clLoadRecentBookings();
+}
+
+/* ------------------------------------------------- recent booking requests */
+
+/* Six is a strip, not a table to work from. My Requests is the worklist and
+   Booking History is the archive; this is only "what did I raise lately", so
+   it deliberately has no filters and no pager — the footer says how many there
+   are in total and View all goes to the screen that can page through them. */
+const CL_BR_RECENT = 6;
+
+let clBrRecentRows = [];
+
+/* Reload the strip if it is on screen, and do nothing at all otherwise.
+   `#clBrRecentBody` exists only while the HUB is rendered — never while the
+   booking FORM is, even though both are the same section — so this can be
+   called from anywhere that changes a booking without any risk of throwing
+   away a half-filled passenger form, which `clRefreshIfVisible('booking-
+   request')` would do. */
+function clRefreshRecentBookings() {
+  if ($('clBrRecentBody')) clLoadRecentBookings();
+}
+
+async function clLoadRecentBookings() {
+  const body = $('clBrRecentBody');
+  if (!body) return;
+  body.innerHTML = clLoadingRow(6, 'Loading your recent booking requests…', 3);
+
+  try {
+    /* ONE call, and no status filter: `list_requests` orders by `created_at`
+       DESC over whatever the filter matches, so the newest six bookings at any
+       stage come back in one page. My Requests has to fan out per status
+       because it is showing a whole POPULATION ("everything still active") and
+       the API takes one status at a time — this is showing a PREFIX, which
+       needs no merge and cannot be undercounted by one. */
+    const data = await MerchantApi.listRequests({
+      request_type: 'booking', page_size: CL_BR_RECENT,
+    });
+    clBrRecentRows = data.items || [];
+    const total = data.total ?? clBrRecentRows.length;
+
+    body.innerHTML = clBrRecentRows.length
+      ? clBrRecentRows.map(clBrRecentRow).join('')
+      : clEmptyRow(6, 'No booking requests yet',
+        ' Start with a booking enquiry above, or book directly — anything you raise appears here.');
+
+    /* `total` is the server's own COUNT over the same filter, not a count of
+       what came back, so this is the real number of bookings rather than the
+       size of a page. */
+    $('clBrRecentNote').textContent = !total
+      ? ''
+      : total > clBrRecentRows.length
+        ? `Showing your ${clBrRecentRows.length} most recent of ${total} booking requests. `
+          + 'View all opens My Requests, where everything still in motion can be filtered and paged.'
+        : `All ${total} of your booking request${total === 1 ? '' : 's'}.`;
+
+    clBindRecentActions(body);
+  } catch (err) {
+    clBrRecentRows = [];
+    body.innerHTML = clEmptyRow(6, clError(err, 'Could not load your recent booking requests.'));
+    $('clBrRecentNote').textContent = '';
+  }
+}
+
+function clBrRecentRow(r) {
+  /* `details` is `travel_details` on the wire; the fallback matches the shape
+     the rest of the portal reads (clJourneyCell takes either). */
+  const d = r.details || r.travel_details || {};
+  /* The same two markers the backend decides the Classic track from —
+     lifecycle.CLASSIC_MARKER_KEYS. Read rather than re-derived, so this column
+     can never disagree with the workflow the booking is actually running. */
+  const direct = !!d.direct_booking;
+  return `<tr>
+    <td class="cl-ref">${escapeHtml(r.request_number || '—')}
+      ${r.pnr ? `<div class="cl-kpi-sub">PNR ${escapeHtml(r.pnr)}</div>` : ''}</td>
+    <td>${clJourneyCell(r)}</td>
+    <td class="cl-nowrap">
+      <span class="cl-tag cl-tag-plain">${direct ? 'Direct booking' : 'From enquiry'}</span>
+      ${!direct && d.enquiry_reference
+        ? `<div class="cl-kpi-sub cl-ref">${escapeHtml(d.enquiry_reference)}</div>` : ''}</td>
+    <td>${clTag(r.status, r.status_label)}</td>
+    <td class="cl-nowrap">${escapeHtml(fmtDateTime(r.created_at))}</td>
+    <td class="cl-actions">${clBrRecentActions(r)}</td>
+  </tr>`;
+}
+
+/* The same status-driven rules as My Requests, minus Cancel.
+   ===========================================================================
+   Cancel is deliberately not here. It is irreversible, it needs a reason, and
+   this strip is six rows of context on a page whose job is starting a booking
+   — not the screen anyone should be taking a booking back from. It is
+   untouched on My Requests and on the booking's own detail page, which is
+   where the merchant has the whole row in front of them. */
+function clBrRecentActions(r) {
+  const out = [`<button type="button" class="cl-btn cl-btn-sm" data-cl-recent-view="${r.id}">View</button>`];
+  if (r.status === 'draft') {
+    out.push(`<button type="button" class="cl-btn cl-btn-sm" data-cl-recent-continue="${r.id}"
+      ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Continue</button>`);
+    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-recent-submit="${r.id}"
+      ${clActionAttrs('ticket.request', CL_NO_BOOKING)}>Submit</button>`);
+  }
+  if (r.status === 'payment_pending') {
+    /* record_payment rejects amount <= 0 with a 400, so an unpriced row can
+       only fail. Say so rather than offering a button that cannot work — the
+       same rule clRequestActions applies. */
+    out.push(moneyIsPositive(r.total_amount)
+      ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-recent-pay="${r.id}"
+         ${clActionAttrs('payment.pay', CL_NO_PAY)}>Pay</button>`
+      : '<span class="cl-tag">Awaiting amount</span>');
+  }
+  return out.join('');
+}
+
+/* Every one of these is My Requests' own handler, called unchanged. The strip
+   reloads afterwards because those functions refresh the screen THEY belong to
+   and know nothing about this one. */
+function clBindRecentActions(body) {
+  body.querySelectorAll('[data-cl-recent-view]').forEach(b =>
+    b.addEventListener('click', () => clOpenRequestDetail(b.dataset.clRecentView)));
+  body.querySelectorAll('[data-cl-recent-continue]').forEach(b =>
+    b.addEventListener('click', () => clContinueBookingDraft(b.dataset.clRecentContinue, b)));
+  body.querySelectorAll('[data-cl-recent-submit]').forEach(b =>
+    b.addEventListener('click', async () => {
+      await clSubmitDraft(b.dataset.clRecentSubmit);
+      clRefreshRecentBookings();
+    }));
+  body.querySelectorAll('[data-cl-recent-pay]').forEach(b =>
+    b.addEventListener('click', () => {
+      const r = clBrRecentRows.find(x => String(x.id) === b.dataset.clRecentPay);
+      if (r) clOpenPayModal(r);
+    }));
 }
 
 function clRenderBookingForm(e) {

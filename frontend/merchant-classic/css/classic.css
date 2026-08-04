@@ -1720,6 +1720,118 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-progress-idle i{animation:none; width:100%; opacity:.5;}
 }
 
+/* ---- quick actions ------------------------------------------------------
+   Two ways into one workflow, presented as cards rather than as two buttons
+   on an empty panel. Used by Booking Request's hub (clRenderNoEnquiry).
+
+   A card is a bigger hit area for a control that already exists — the <button>
+   inside it is the real, focusable, keyboard-operable action, and the card
+   carries no tabindex and no role. That is why the focus ring lives on the
+   button and `:focus-within` only tints the card's edge: promoting the card to
+   a control as well would put the same action in the tab order twice.
+
+   The breakpoints are HERE rather than in section 16 because they are about
+   this component and nothing else, which is the same reason `.cl-kpis-5`
+   carries its own. */
+
+.cl-qa{margin-bottom:32px;}
+
+.cl-qa-head{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
+.cl-qa-head-ico{
+  width:34px; height:34px; flex-shrink:0; border-radius:var(--cl-r-sm);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-accent-soft); color:var(--cl-accent);
+}
+.cl-qa-head h2{font-size:16px; font-weight:700; letter-spacing:-0.02em;}
+.cl-qa-head p{margin:2px 0 0; font-size:12.5px; font-weight:500; color:var(--cl-text-muted);}
+
+/* Two equal tracks, never `auto-fit`: there are exactly two cards and they are
+   a pair of alternatives, so a viewport that happens to fit three columns must
+   not leave the second one stranded beside an empty cell. `minmax(0,1fr)`
+   keeps a long description inside its card instead of widening the grid. */
+.cl-qa-grid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:20px;}
+
+.cl-qa-card{
+  position:relative; overflow:hidden; cursor:pointer; min-width:0;
+  display:flex; flex-direction:column; gap:14px; padding:24px;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-lg); box-shadow:var(--cl-sh-xs);
+  transition:transform var(--cl-base), box-shadow var(--cl-base), border-color var(--cl-base);
+}
+/* The tint is a pseudo-element, so the card's own background stays a flat,
+   readable surface — the same trick `.cl-kpi` uses. */
+.cl-qa-card::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.55;
+  background:linear-gradient(150deg, var(--cl-accent-soft) 0%, transparent 62%);
+  transition:opacity var(--cl-base);
+}
+.cl-qa-card:hover{
+  transform:translateY(-3px); box-shadow:var(--cl-sh-md);
+  border-color:color-mix(in srgb, var(--cl-accent) 40%, var(--cl-line));
+}
+.cl-qa-card:hover::before{opacity:1;}
+.cl-qa-card:active{transform:translateY(-1px);}
+.cl-qa-card:focus-within{border-color:color-mix(in srgb, var(--cl-accent) 40%, var(--cl-line));}
+
+/* The alternative's tile is deliberately neutral, and its glyph takes the
+   secondary TEXT weight rather than the accent: `--cl-navy-600` (which the
+   design-system bridge re-points to the accent) measures 3.09:1 on the
+   recessed canvas in dark mode, and this is the one of the two cards that
+   should not be competing for the eye anyway. */
+.cl-qa-ico{
+  position:relative;
+  width:52px; height:52px; flex-shrink:0; border-radius:var(--cl-r-md);
+  display:flex; align-items:center; justify-content:center;
+  background:var(--cl-canvas-2); color:var(--cl-text-2);
+}
+/* THE RECOMMENDED TILE IS FILLED, NOT TINTED, AND THAT IS A CONTRAST DECISION.
+   `--cl-accent-soft` is a 16% wash in dark mode, so an accent-coloured glyph on
+   it measured 3.18:1 — over the 3:1 bar for a graphic, but only just, and this
+   is the one card the page is steering people to. The two CTA weights are the
+   tokens that exist precisely because text may sit on them (white is 4.6:1 on
+   the lighter one), so filling the tile lands the glyph well clear in BOTH
+   themes and makes the recommended card read as recommended at a glance. */
+.cl-qa-card-rec .cl-qa-ico{
+  background:linear-gradient(180deg, var(--cl-orange-cta) 0%, var(--cl-orange-cta-2) 100%);
+  color:#fff; box-shadow:var(--cl-sh-accent);
+}
+.cl-qa-ico svg{width:24px; height:24px;}
+
+/* `flex:1` on the copy is what makes the two cards equal height with their
+   buttons on the same line — the grid stretches them to the taller one, and
+   the copy block absorbs the difference instead of the button floating. */
+.cl-qa-body{position:relative; flex:1; min-width:0;}
+.cl-qa-title{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.cl-qa-title h3{font-size:16.5px; font-weight:700; letter-spacing:-0.02em;}
+.cl-qa-card p{
+  margin:9px 0 0; max-width:46ch;
+  font-size:13px; font-weight:500; line-height:1.6; color:var(--cl-text-2);
+}
+/* Above the tint, or the gradient paints over the button. */
+.cl-qa-card .cl-btn{position:relative;}
+
+@media (max-width:900px){
+  .cl-qa{margin-bottom:26px;}
+  .cl-qa-grid{gap:16px;}
+  .cl-qa-card{padding:20px; gap:12px;}
+  .cl-qa-ico{width:46px; height:46px;}
+  .cl-qa-ico svg{width:21px; height:21px;}
+  .cl-qa-title h3{font-size:15.5px;}
+}
+
+/* One column. Two cards at 375px would be two 160px columns, which is narrower
+   than either button's label. */
+@media (max-width:760px){
+  .cl-qa-grid{grid-template-columns:minmax(0,1fr);}
+}
+
+@media (max-width:640px){
+  .cl-qa{margin-bottom:20px;}
+  .cl-qa-head{gap:10px; margin-bottom:13px;}
+  .cl-qa-head h2{font-size:15px;}
+  .cl-qa-card{padding:18px; border-radius:var(--cl-r-md);}
+}
+
 
 /* ==========================================================================
    11. MODALS & DRAWERS

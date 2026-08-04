@@ -109,8 +109,9 @@ function clInitWallet() {
          balance gets read as larger than it is. Every state of a request now
          lives on Payment Management, which is the screen about requests.
          clLoadTopups, clTopupBody and clTopupNote still exist in this module;
-         they simply have no host element on this screen. (No backticks in this
-         comment: it sits inside a template literal and one would close it.) -->
+         they simply have no host element on this screen, and clLoadTopups
+         returns early when that is the case. (No backticks in this comment: it
+         sits inside a template literal and one would close it.) -->
 
     <div class="cl-panel">
       <div class="cl-panel-head">
@@ -201,8 +202,15 @@ function clInitWallet() {
     clWalletState.page += 1; clLoadWalletLedger();
   });
 
+  /* clLoadTopups() WAS IN THIS LIST AND IT SHOULD NOT HAVE BEEN.
+     The comment three lines above already said "clLoadTopups is not called from
+     here" — the call simply outlived the conversion to a read-only ledger. It
+     writes to `#clTopupBody`, which went with the "Money you have added" panel,
+     so every FIRST visit to this screen raised an unhandled rejection
+     (`Cannot set properties of null`) after the other three loaders had already
+     been kicked off. Nothing rendered wrong, which is exactly why it survived. */
   return Promise.all([
-    clLoadWalletSummary(), clLoadTopups(), clLoadWalletLedger(), clLoadWalletTrend(),
+    clLoadWalletSummary(), clLoadWalletLedger(), clLoadWalletTrend(),
   ]);
 }
 
@@ -612,9 +620,16 @@ function clWalletDetail(t) {
 
 /* --------------------------------------------------------------- top-ups */
 
+/* NO HOST ELEMENT ON THE WALLET SCREEN — see the banner at the top of this
+   file. The table this fills moved to Payment Management, but the submit path
+   below is deliberately kept whole, and it ends by re-reading this list. So the
+   function stays callable and simply does nothing when its table is not on the
+   page, rather than throwing into whatever called it. It renders exactly as it
+   always did wherever `#clTopupBody` is hosted again. */
 async function clLoadTopups() {
   const body = $('clTopupBody');
   const note = $('clTopupNote');
+  if (!body || !note) return;
   body.innerHTML = clLoadingRow(8, 'Loading…');
   note.textContent = '';
 

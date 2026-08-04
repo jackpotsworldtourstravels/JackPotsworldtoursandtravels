@@ -375,6 +375,11 @@ function clOpenPayModal(request) {
       /* Both money screens can be looking at this row. */
       clRefreshIfVisible('payments');
       clRefreshIfVisible('requests');
+      /* And so can Booking Request's recent strip, which is a third place this
+         dialog is now opened from. Not clRefreshIfVisible('booking-request') —
+         that would re-run the section's loader, and the same section renders
+         the passenger FORM. See clRefreshRecentBookings in classic-booking.js. */
+      clRefreshRecentBookings();
       if (!$('cl-payments').classList.contains('active')) clInvalidate('payments');
       if (!$('cl-requests').classList.contains('active')) clInvalidate('requests');
       clLoadUnreadCount();

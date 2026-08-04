@@ -300,6 +300,17 @@ function clRequestParams() {
 }
 
 async function clLoadRequests({ resetPage = false } = {}) {
+  /* THIS SCREEN MAY NEVER HAVE BEEN RENDERED.
+     `clSubmitDraft`, `clCancelRequest` and `clContinueBookingDraft` all end by
+     re-reading this table, and until Booking Request grew a strip of recent
+     bookings those three were only ever reachable FROM this table, so the
+     element was always there. They are now also reachable from a screen a
+     merchant can land on first — every id below would be null and the reload
+     would throw after a submit the server had already accepted. The
+     clInvalidate() that precedes every one of those calls is what actually
+     keeps this screen honest; re-reading it is only for when it is on screen. */
+  if (!$('clReqBody')) return;
+
   if (resetPage) clReqPage = 1;
   const body = $('clReqBody');
   body.innerHTML = clLoadingRow(8, 'Loading your active work…');
