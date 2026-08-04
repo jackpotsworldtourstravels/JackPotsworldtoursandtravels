@@ -160,7 +160,13 @@ async function openChangeRequest(requestId) {
           <span class="cell-sub" id="crRefundPreview">
             Leave blank for a free cancellation. The refund is calculated from the booking total.
           </span>
-        </div>`
+        </div>
+        <!-- What approving will do to the merchant's wallet, before it is done.
+             Rendered only when the server sent the balance — it is staff-only,
+             so a payload without it means this operator may not see it and the
+             block is simply absent rather than showing a wrong zero. -->
+        ${b && b.merchant_wallet_balance != null ? `
+          <div class="cr-settle" id="crSettlePreview"></div>` : ''}`
       : `
         <div class="form-field" style="max-width:none;">
           <label for="crFareInput">Fare difference (₹)</label>
@@ -214,7 +220,47 @@ function wireChangeRequestModal(overlay, body, data) {
   const charge = document.getElementById('crChargeInput');
   if (charge && b) {
     const preview = document.getElementById('crRefundPreview');
-    charge.addEventListener('input', () => {
+    const settle = document.getElementById('crSettlePreview');
+
+    /* WHAT APPROVING WILL DO TO THE WALLET, MIRRORING `approve` EXACTLY.
+       The cancellation is irreversible from this screen, so the resulting
+       balance is shown before it is committed rather than discovered after.
+
+       THE CAP IS THE WHOLE REASON THIS IS NOT `total - fee`. The server credits
+       `min(refund_due, refundable)`, and `refundable_against` counts only
+       SETTLED payments net of anything already refunded — so a part-paid
+       booking gives back less than the quoted refund and an unpaid one gives
+       back nothing. Previewing the quote instead of the capped figure would
+       promise the merchant money that the settlement is not going to move, on
+       the one screen where the operator is deciding whether to commit it. */
+    const renderSettle = () => {
+      if (!settle) return;
+      const total = Number(b.total_amount || 0);
+      const fee = Number(charge.value || 0);
+      const balance = Number(b.merchant_wallet_balance || 0);
+      const refundDue = Math.max(total - fee, 0);
+      // `refundable` absent means the server did not send it; fall back to the
+      // quote rather than inventing a cap of zero, which would understate.
+      const refundable = b.refundable == null ? refundDue : Number(b.refundable);
+      const credited = Math.min(refundDue, refundable);
+      const after = balance + credited;
+      const capped = credited < refundDue - 0.005;
+
+      settle.innerHTML = `
+        <div class="cr-settle-row"><span>Original ticket cost</span><b>${crMoney(total)}</b></div>
+        <div class="cr-settle-row"><span>Cancellation fee</span><b>&minus;&nbsp;${crMoney(fee)}</b></div>
+        <div class="cr-settle-row"><span>Refund to wallet</span><b>${crMoney(credited)}</b></div>
+        <div class="cr-settle-row cr-settle-total">
+          <span>Wallet after settlement</span>
+          <b class="${after < 0 ? 'is-neg' : after > 0 ? 'is-pos' : ''}">${crMoney(after)}</b>
+        </div>
+        <div class="cr-settle-now">Wallet now: ${crMoney(balance)}</div>
+        ${capped ? `<div class="cr-settle-note">Only ${crMoney(refundable)} of this booking has
+          been paid, so the refund is capped at that. The remaining
+          ${crMoney(refundDue - credited)} is recorded as unsettled.</div>` : ''}`;
+    };
+
+    const sync = () => {
       const value = Number(charge.value || 0);
       const total = Number(b.total_amount);
       if (value > total) {
@@ -222,7 +268,12 @@ function wireChangeRequestModal(overlay, body, data) {
       } else {
         preview.textContent = `Refund due: ${crMoney(total - value)} of ${crMoney(total)}.`;
       }
-    });
+      renderSettle();
+    };
+    charge.addEventListener('input', sync);
+    // Painted once on open, so the preview is right at a charge of zero rather
+    // than blank until the operator touches the field.
+    renderSettle();
   }
   const fare = document.getElementById('crFareInput');
   const fee = document.getElementById('crFeeInput');

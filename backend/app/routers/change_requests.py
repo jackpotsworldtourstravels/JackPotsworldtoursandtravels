@@ -39,7 +39,13 @@ from app.schemas.change_request import (
     RescheduleRequest,
 )
 from app.schemas.pagination import Page
-from app.services import change_request_service, lifecycle, manager_approval
+from app.services import (
+    change_request_service,
+    finance_service,
+    lifecycle,
+    manager_approval,
+    wallet_service,
+)
 
 router = APIRouter(prefix="/api", tags=["cancellation & reschedule"])
 
@@ -68,6 +74,29 @@ def _detail(db: Session, request, actor: User) -> ChangeRequestDetail:
                 "total_amount": str(booking.total_amount),
                 "passengers": len(booking.passengers),
                 "title": booking.title,
+                # ---- what the settlement will actually do to the wallet ----
+                # So the desk can be shown the resulting balance BEFORE it
+                # commits an irreversible cancellation, instead of typing a fee
+                # and finding out afterwards.
+                #
+                # BOTH NUMBERS ARE NEEDED, AND `refundable` IS THE ONE THAT IS
+                # EASY TO MISS. `approve` credits `min(refund_due, refundable)`,
+                # never the quoted refund itself — `refundable_against` sums only
+                # SETTLED payments net of what has already been given back, so an
+                # unpaid or part-paid booking returns less than
+                # `total_amount - charge`, and an unpaid one returns nothing at
+                # all. A preview computed as `balance + (total - fee)` would
+                # therefore promise the merchant money the settlement will not
+                # move. Staff-only: this is the settlement desk's view, and the
+                # merchant-facing responses that share this builder have no use
+                # for it.
+                **(
+                    {
+                        "merchant_wallet_balance": str(wallet_service.balance(booking.merchant)),
+                        "refundable": str(finance_service.refundable_against(db, booking)),
+                    }
+                    if staff and booking.merchant else {}
+                ),
             }
             if booking else None
         ),

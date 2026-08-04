@@ -885,6 +885,35 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .ops-modal-close:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
 .ops-modal-body{padding:4px 30px 30px;}
 
+/* ---- cancellation settlement preview (change-request modal) ----
+   A receipt, not a form: the operator reads down it and the last line is the
+   answer. `is-neg` / `is-pos` are the same names and the same intent the
+   merchant wallet uses, so a balance that is red here is red there too. The
+   minus sign on the fee is a literal &minus; in the markup rather than a
+   negative number, because the fee is entered as a positive figure and showing
+   it as "-1,500" would read as though the operator had typed a negative. */
+.cr-settle{
+  margin:14px 0 4px; padding:14px 16px;
+  background:var(--hover-bg); border:1px solid var(--border-color);
+  border-radius:12px; font-size:13px;
+}
+.cr-settle-row{display:flex; justify-content:space-between; gap:16px; padding:4px 0;}
+.cr-settle-row span{color:var(--text-muted);}
+.cr-settle-row b{font-variant-numeric:tabular-nums; white-space:nowrap;}
+.cr-settle-total{
+  margin-top:6px; padding-top:10px; border-top:1px solid var(--border-color);
+  font-size:14px;
+}
+.cr-settle-total span{color:var(--text-primary); font-weight:700;}
+.cr-settle-total b{font-size:16px;}
+.cr-settle-total b.is-neg{color:var(--jp-danger-fg);}
+.cr-settle-total b.is-pos{color:var(--jp-success-fg);}
+.cr-settle-now{margin-top:8px; font-size:12px; color:var(--text-muted);}
+.cr-settle-note{
+  margin-top:10px; padding-top:9px; border-top:1px dashed var(--border-color);
+  font-size:12px; color:var(--jp-warning-fg); line-height:1.45;
+}
+
 .ops-hint{background:rgba(47,128,237,0.08); border:1px solid rgba(47,128,237,0.30);
           border-radius:10px; padding:12px 14px; font-size:12.5px; color:var(--text-primary);
           margin:16px 0 4px;}
