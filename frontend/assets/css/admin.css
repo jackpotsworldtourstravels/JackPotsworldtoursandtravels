@@ -208,11 +208,83 @@ tbody tr:hover{background:var(--hover-bg);}
 .empty-state{color:var(--text-muted); font-size:13.5px; padding:20px 0; text-align:center;}
 .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;}
 .panel-head h2{margin-bottom:0;}
-.modal-overlay{position:fixed; inset:0; background:rgba(10,37,64,0.6); display:none; align-items:center; justify-content:center; z-index:300; padding:20px;}
+/* MODALS MUST FIT THE VIEWPORT, AND THIS ONE DID NOT EVEN TRY.
+   `.modal-card` had no max-height and no scroll, inside an overlay that is
+   `position:fixed; inset:0` and centres with `align-items:center`. A flex item
+   taller than its container does not push the container taller — it overflows
+   EQUALLY IN BOTH DIRECTIONS, and because the overlay itself never scrolled,
+   the top of a long form was cut off and permanently unreachable while the
+   Save/Cancel row ran off the bottom. That is every symptom reported: fields
+   invisible, buttons half-hidden, and no amount of scrolling helping.
+
+   TWO INDEPENDENT SAFETY NETS, because they fail in different situations.
+     1. The overlay scrolls, and the card centres with `margin:auto` instead of
+        `align-items:center`. Auto margins on a flex item centre it when it
+        fits and — unlike `align-items:center` — do NOT push it past the start
+        edge when it does not. So even a modal that somehow exceeds the cap
+        stays reachable from the top.
+     2. The card caps itself and scrolls internally, so the backdrop stays
+        visible and the dialog reads as a dialog rather than as a page. */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(10,37,64,0.6);
+  display:none; justify-content:center; z-index:300; padding:20px;
+  overflow-y:auto; overscroll-behavior:contain;
+}
 .modal-overlay.open{display:flex;}
-.modal-card{background:var(--card-bg); border-radius:var(--radius); padding:32px; max-width:420px; width:100%; box-shadow:var(--shadow-lg);}
+.modal-card{
+  background:var(--card-bg); border-radius:var(--radius); padding:32px;
+  max-width:420px; width:100%; box-shadow:var(--shadow-lg);
+  margin:auto;
+  /* 88vh matches .modal-lg below; the calc is the floor that keeps the 20px
+     overlay padding visible on a short laptop, where 88vh alone would not. */
+  max-height:min(88vh, calc(100vh - 40px));
+  overflow-y:auto; overscroll-behavior:contain;
+}
+/* The heading and the button row stay put while the fields between them
+   scroll. Sticky rather than a flex header/body/footer because these modals
+   have no body wrapper — their JS writes `<h2>`, fields and `.modal-actions`
+   as direct siblings, and adding a wrapper would mean editing every builder in
+   the portal. The negative margin lets each one cover the card's own 32px
+   padding, which is inside the scrollport and would otherwise let content
+   slide visibly past above the title and below the buttons. */
+/* THE BOX-SHADOW IS THE BACKGROUND, NOT A SHADOW — and it is required.
+   A sticky element is offset by its MARGIN box, so `margin-top:-32px` with
+   `top:0` pins the margin edge at the scrollport top and leaves the border box
+   (and therefore the background) starting 32px lower. Fields scrolled up
+   through that 32px strip and were visible above the title. A spread-only
+   shadow at `0 -32px` paints exactly that strip in the card colour; the card's
+   own `overflow-y:auto` clips it to the rounded corner, so nothing escapes.
+   Padding alone cannot do this — padding moves the text, not the sticky edge. */
+.modal-card:not(.modal-lg) > h2{
+  position:sticky; top:0; z-index:2; background:var(--card-bg);
+  margin-top:-32px; padding-top:32px;
+  box-shadow:0 -32px 0 var(--card-bg);
+}
+.modal-card:not(.modal-lg) > .modal-actions{
+  position:sticky; bottom:0; z-index:2; background:var(--card-bg);
+  margin-bottom:-32px; padding-bottom:32px; padding-top:16px;
+  box-shadow:0 32px 0 var(--card-bg);
+}
+/* `.modal-lg` sets `padding:0` so its own sticky header can sit flush, which
+   means the negative margins above would drag a title clean out of the card.
+   The well-built large modals (ops, profile) bring their own padded sticky
+   head; the ones that write a bare `<h2>` — the enquiry and change-request
+   reviews — had no inset at all and sat against the card edge. These two rules
+   give exactly those the padding and the pinning, matching `.ops-modal-head`. */
+.modal-card.modal-lg > h2{
+  position:sticky; top:0; z-index:2; background:var(--card-bg);
+  padding:24px 30px 14px; margin:0 0 4px;
+  border-bottom:1px solid var(--border-color);
+}
+.modal-card.modal-lg > .modal-actions,
+.modal-card.modal-lg > p, .modal-card.modal-lg > .msg{padding-left:30px; padding-right:30px;}
+.modal-card.modal-lg > .modal-actions{
+  position:sticky; bottom:0; z-index:2; background:var(--card-bg);
+  padding-top:14px; padding-bottom:24px; margin-top:8px;
+  border-top:1px solid var(--border-color);
+}
 .modal-card h2{font-size:19px; margin-bottom:18px; color:var(--text-primary);}
-.modal-actions{display:flex; gap:10px; margin-top:20px;}
+.modal-actions{display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;}
 .pagination{display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-top:16px; font-size:13px; color:var(--text-muted); flex-wrap:wrap;}
 .pagination button:disabled{opacity:.4; cursor:default;}
 

@@ -949,6 +949,23 @@ async function loadApprovalQueue(page = aqPage) {
     tbody.querySelectorAll('[data-aq-approve]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.aqApprove;
+        /* A CANCELLATION OR DATE CHANGE IS SETTLED, NOT APPROVED — SO SEND THE
+           OPERATOR TO THE SCREEN THAT SETTLES IT.
+           Approving one through the generic path would mark the request
+           Approved while leaving the booking untouched and no money moved, so
+           `ticket_service.resolve_service_request` refuses it by type. That
+           refusal is correct and stays; what was wrong is that this button
+           called it anyway and then `alert()`-ed the raw 400 back — an API
+           path and an endpoint name shown to a desk operator as if it were an
+           instruction. The change-request modal is the settlement UI: it
+           quotes the charge, previews the refund live and posts to
+           /api/admin/change-requests/{id}/approve, which moves the money and
+           applies the outcome to the parent booking. Opening it here means the
+           operator finishes the job in one click instead of being told to go
+           and find another screen. */
+        if (btn.dataset.requestType === 'cancellation' || btn.dataset.requestType === 'date_change') {
+          if (typeof openChangeRequest === 'function') return openChangeRequest(id);
+        }
         /* A booking's approval carries the fare. This used to post an empty
            body, so every enquiry-led booking — which reaches approval at ₹0 by
            design — was approved at zero and landed in Payment Pending unpayable.
