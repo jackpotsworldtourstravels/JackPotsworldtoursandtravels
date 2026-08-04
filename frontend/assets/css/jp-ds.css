@@ -1204,3 +1204,381 @@ table{ width:100%; }
 @media (prefers-reduced-motion:reduce){
   table tbody tr, .stat-card, .cl-kpi, .btn, .cl-btn{ transition:none !important; }
 }
+
+
+/* ==========================================================================
+   15. ADMIN DIALOG & FORM STANDARD                              (2026-08-04)
+   ==========================================================================
+   ONE dialog frame and ONE form layout for every form, modal, popup, drawer
+   and dialog in the Admin Portal. Before this section the portal ran five
+   competing patterns — `.modal-card`, `.modal-card.modal-lg`, `.ops-modal-*`,
+   `.drawer-*` and `.mm-form-*` — and the two defaults underneath them are what
+   actually produced the reported symptoms:
+
+     * `.form-grid` was `repeat(auto-fit, minmax(230px, 1fr))`. In a 1180px
+       dialog that resolves to FOUR OR FIVE columns, and the count changes with
+       the field count, so no two forms lined up and single fields stretched the
+       full width of the card. It is now exactly two columns.
+     * `.modal-actions` was `display:flex` with no `justify-content`, so buttons
+       sat hard LEFT, immediately under the last input, and scrolled away with
+       the fields. It is now a right-aligned sticky footer with a top border.
+
+   WHY THIS IS A STYLESHEET AND NOT SEVENTEEN BUILDER EDITS. The dialogs are
+   empty shells — `<div class="modal-card" id="XBody">` — whose contents are
+   written as template literals by ten different JS files. Restyling the shared
+   vocabulary those builders already emit (`.form-grid`, `.form-field`,
+   `.modal-actions`, `h2`) reaches all of them at once and cannot change a
+   field, a payload, a validation rule or a workflow, which is the constraint
+   this work was given. No API, no backend, no markup semantics were touched.
+
+   THIS SECTION IS LAST ON PURPOSE. jp-ds.css loads after admin.css, and every
+   rule here has the same specificity as the one it replaces, so it wins on
+   source order alone — the same mechanism §11 and §14 rely on. Moving it above
+   §14 would silently hand the old values back.
+   ========================================================================== */
+
+/* ---- TIER 1: every dialog, whatever its size -----------------------------
+   The standard is "one design system", not "one width". A dialog with a single
+   field — Add Provider is literally one input — rendered at 1060px is a huge
+   empty box, and that is the same inconsistency the wide forms had, pointing
+   the other way. So width is the ONLY thing that varies with content, and it
+   varies between two deliberate tiers; radius, input metrics, label rhythm and
+   button placement are identical everywhere.
+
+   These rules deliberately do NOT touch padding on the narrow tier. admin.css
+   pins its header and footer there with `margin:-32px` plus a `0 ±32px` spread
+   shadow keyed to its own 32px card padding, and that mechanism works. Changing
+   the padding without rewriting those offsets would tear the header off the
+   card — so the narrow tier keeps its padding and only gains the shared
+   vocabulary. */
+.jp-admin .modal-card{border-radius:var(--jp-r-lg);}
+.jp-admin .modal-card .modal-actions{
+  display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:flex-end;              /* primary action right, everywhere */
+  gap:12px;
+}
+
+/* PRIMARY ACTION ON THE RIGHT, ORDERED BY ROLE rather than by where the builder
+   happened to write it. Across the 19 footers in this portal the markup order
+   is genuinely mixed — the change-request and enquiry reviews write `Cancel`
+   first, the merchant, notification and payment forms write the primary first.
+   Reversing the row would fix one group and break the other, so the rule keys
+   on the variant class, which is what actually says which button commits.
+
+   The trade-off: where the markup puts the primary first, DOM order no longer
+   matches visual order for a keyboard user. That is two adjacent buttons in a
+   footer — nothing is skipped, hidden, or mouse-only — so it is a contained
+   cost. Swapping the markup in those builders is the clean fix if wanted. */
+.jp-admin .modal-card .modal-actions > .btn{order:1;}
+.jp-admin .modal-card .modal-actions > .btn-coral,
+.jp-admin .modal-card .modal-actions > .btn-navy,
+.jp-admin .modal-card .modal-actions > .btn-danger{order:2;}
+
+/* The narrow tier's footer sticks too — but admin.css only pins a footer that
+   is a DIRECT child of the card, and dialogs like Send Notification nest theirs
+   inside the `<form>` they submit, so those had no sticky footer at all. The
+   ±32px here is not arbitrary: it is admin.css's own `.modal-card` padding,
+   bled out so the footer's border reaches both edges and its background covers
+   the card's bottom padding, exactly as the direct-child rule does. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > form > .modal-actions{
+  position:sticky; bottom:0; z-index:3;
+  background:var(--card-bg);
+  border-top:1px solid var(--jp-border);
+  margin:20px -32px -32px;
+  padding:16px 32px 32px;
+}
+.jp-admin .modal-card .form-field input:not([type=checkbox]):not([type=radio]),
+.jp-admin .modal-card .form-field select{
+  width:100%; height:42px; padding:0 14px; font-size:14px;
+  border-radius:var(--jp-r-sm);
+}
+.jp-admin .modal-card .form-field select{padding-right:34px;}
+.jp-admin .modal-card .form-field label{
+  display:block; margin-bottom:8px;
+  font-size:11.5px; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase;
+  color:var(--jp-text-muted);
+}
+/* A one-field dialog should not be a wide one, but it should not be a cramped
+   one either — this is the floor that keeps its input off both edges. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)){
+  max-width:min(480px, 94vw);
+}
+
+/* ---- TIER 2: what counts as a WIDE form dialog ---------------------------
+   Two entry conditions, because the portal marks its wide dialogs two
+   different ways: `.modal-lg` is set by hand in admin/index.html, while the
+   three form dialogs that were left at the 420px confirm width (Provider,
+   Notification, Service Request) carry no marker at all. `:has(.form-grid)`
+   catches those by what they CONTAIN, so a dialog becomes a form dialog by
+   holding a form — and a true confirm dialog, which has no `.form-grid`, keeps
+   its narrow 420px card and is deliberately untouched. Sizing a two-button
+   "are you sure?" at 1060px is the same inconsistency in the other direction. */
+.jp-admin .modal-card:has(.form-grid),
+.jp-admin .modal-card.modal-lg{
+  --jp-dlg-pad-x:28px;
+  --jp-dlg-pad-y:22px;
+  /* 1060px sits inside the 900–1100 band; 94vw is what keeps it off the edge
+     on a laptop. §11 set 1180px for detail panes — narrowed here so a detail
+     dialog and an edit dialog are the same object at the same size. */
+  max-width:min(1060px, 94vw);
+  width:100%;
+  /* 90vh as specified, with the calc floor that keeps the overlay's own 20px
+     padding visible on a short laptop where 90vh alone would fill it. */
+  max-height:min(90vh, calc(100vh - 40px));
+  border-radius:var(--jp-r-lg);          /* 18px — inside the 16–20 band */
+  box-shadow:var(--jp-sh-lg);
+  padding:0;                             /* header/body/footer pad themselves */
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+
+/* ---- header --------------------------------------------------------------
+   Sticky, not a flex row of the card, because these dialogs have no body
+   wrapper — the builders write `<h2>`, `<form>` and `.modal-actions` as
+   siblings. Sticky gets the same result (header fixed, middle scrolls) without
+   requiring a wrapper element in ten files.
+
+   `margin:0` and `box-shadow:none` are RESETS, not defaults. admin.css pins
+   its header with `margin-top:-32px` plus a `0 -32px 0` spread shadow to paint
+   over the card's own 32px padding. This section sets the card to `padding:0`,
+   so that negative margin would drag the title clean out through the top of
+   the card. Both must be cleared for the new geometry to hold. */
+.jp-admin .modal-card:has(.form-grid) > h2,
+.jp-admin .modal-card.modal-lg > h2{
+  position:sticky; top:0; z-index:3;
+  display:flex; align-items:center; gap:12px;
+  margin:0;
+  padding:var(--jp-dlg-pad-y) var(--jp-dlg-pad-x) 15px;
+  background:var(--card-bg);
+  border-bottom:1px solid var(--jp-border);
+  box-shadow:none;
+  font-size:18px; font-weight:700; letter-spacing:-0.01em;
+  color:var(--jp-text);
+}
+/* Optional subtitle, and the close control the standard asks to sit right.
+   `margin-left:auto` is what right-aligns the close button inside the flex
+   header without caring whether a subtitle is present. */
+.jp-admin .modal-card > h2 > .jp-dlg-sub{
+  font-size:12.5px; font-weight:500; color:var(--jp-text-muted);
+  letter-spacing:0; margin-left:2px;
+}
+.jp-admin .modal-card > h2 > .jp-dlg-x{
+  margin-left:auto; flex:none;
+  width:32px; height:32px; display:inline-flex; align-items:center;
+  justify-content:center; border-radius:var(--jp-r-sm);
+  background:transparent; border:1px solid transparent; cursor:pointer;
+  color:var(--jp-text-muted); font-size:20px; line-height:1;
+  transition:background var(--jp-fast), color var(--jp-fast), border-color var(--jp-fast);
+}
+.jp-admin .modal-card > h2 > .jp-dlg-x:hover{
+  background:var(--jp-hover-control); color:var(--jp-text);
+  border-color:var(--jp-border);
+}
+.jp-admin .modal-card > h2 > .jp-dlg-x:focus-visible{
+  outline:none; border-color:var(--jp-accent); box-shadow:var(--jp-focus);
+}
+
+/* ---- body ----------------------------------------------------------------
+   Everything that is neither the header nor the footer is the scrolling body.
+   Two selectors because the builders split evenly: some wrap their fields in a
+   `<form>`, others write them loose into the card. */
+.jp-admin .modal-card:has(.form-grid) > form,
+.jp-admin .modal-card.modal-lg > form{
+  padding:22px var(--jp-dlg-pad-x) 0;
+}
+
+/* THE CARD IS THE SCROLLPORT, AND THE HEADER AND FOOTER ARE STICKY INSIDE IT.
+   The obvious alternative — card as a flex column, `<form>` as a scrolling
+   middle — was built and measured, and it is worse HERE for one concrete
+   reason: the footer lives INSIDE the form in most of these builders, so it
+   would sit inside the scrollport while the header sat outside it. The header
+   then spans the full 1060px and the footer only 1048px, because the scrollbar
+   takes 10px from the form's content box but not from the card's. A footer
+   border that stops 10px short of a header border directly above it is more
+   visible than the thing it was meant to fix.
+
+   With both sticky inside one scrollport they are geometrically identical —
+   same width, same insets — and the visible behaviour is what the standard
+   asks for either way: the title and the buttons hold still, the fields move.
+   The only difference is that the scrollbar runs the card's full height, which
+   is conventional and reads as the dialog's bar rather than the body's.
+
+   Changing this back means also moving `.modal-actions` out of the `<form>`,
+   which would break every `type="submit"` button that depends on being inside
+   it — the reason it is not simply a markup fix. */
+.jp-admin .modal-card:has(.form-grid) > *:not(h2):not(form):not(.modal-actions),
+.jp-admin .modal-card.modal-lg > *:not(h2):not(form):not(.modal-actions){
+  padding-left:var(--jp-dlg-pad-x);
+  padding-right:var(--jp-dlg-pad-x);
+}
+/* Breathing room under the last thing in the body — but NEVER on a `<form>`.
+   A `<form>` is the body itself and carries the sticky footer inside it, and a
+   sticky element cannot be pushed past its containing block's content edge: a
+   24px bottom padding here lifted the footer 24px clear of the card's bottom,
+   leaving a strip of the fields visible underneath it. The form's own padding
+   rule above already ends in `0` for exactly this reason. */
+.jp-admin .modal-card:has(.form-grid) > *:not(h2):not(form):not(.modal-actions):last-child,
+.jp-admin .modal-card.modal-lg > *:not(h2):not(form):not(.modal-actions):last-child{
+  padding-bottom:24px;
+}
+
+/* ---- the two-column grid -------------------------------------------------
+   The whole point of the exercise. Fixed at two columns rather than auto-fit,
+   so a six-field form and a ten-field form put their labels in the same two
+   places. `minmax(0,1fr)` rather than `1fr` because a long unbroken value in a
+   readonly input can otherwise force a column wider than its share. */
+.jp-admin .modal-card .form-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:24px;                              /* 24px rows AND columns, as specified */
+  margin-bottom:0;
+}
+/* Fields that earn the full width. Matched by what the field CONTAINS rather
+   than by a class, so no builder has to be edited to opt in: any textarea, and
+   the free-text names the standard calls out. `.span-2` stays available for
+   markup that wants to say so explicitly. */
+.jp-admin .modal-card .form-field:has(textarea),
+.jp-admin .modal-card .form-field:has(input[name="address"]),
+.jp-admin .modal-card .form-field:has(input[name="remarks"]),
+.jp-admin .modal-card .form-field:has(input[name="notes"]),
+.jp-admin .modal-card .form-field:has(input[name="note"]),
+.jp-admin .modal-card .form-field:has(input[name="description"]),
+.jp-admin .modal-card .form-field:has(input[name="message"]),
+.jp-admin .modal-card .form-field:has(input[name="reason"]),
+.jp-admin .modal-card .form-field:has(input[name="comments"]),
+.jp-admin .modal-card .form-field.span-2{
+  grid-column:1 / -1;
+}
+
+/* ---- one input, one height ----------------------------------------------
+   The "stretched and compressed inputs" complaint is mostly this: inputs took
+   `padding:10px 12px` and selects added `padding-right:34px` for their arrow,
+   so a select was measurably taller than the input beside it. Fixing HEIGHT
+   rather than vertical padding makes every control in every dialog identical
+   regardless of which element it is. */
+.jp-admin .modal-card .form-field input,
+.jp-admin .modal-card .form-field select{
+  width:100%;
+  height:42px;
+  padding:0 14px;
+  font-size:14px;
+  border-radius:var(--jp-r-sm);
+}
+/* The arrow drawn in §7 lives in the right 34px; keep that room or the glyph
+   sits on top of the value. */
+.jp-admin .modal-card .form-field select{padding-right:34px;}
+.jp-admin .modal-card .form-field textarea{
+  width:100%;
+  min-height:96px;
+  padding:12px 14px;
+  font-size:14px;
+  border-radius:var(--jp-r-sm);
+  resize:vertical;
+}
+.jp-admin .modal-card .form-field input[type=checkbox],
+.jp-admin .modal-card .form-field input[type=radio]{width:auto; height:auto;}
+
+/* ---- labels -------------------------------------------------------------- */
+.jp-admin .modal-card .form-field label{
+  display:block;
+  margin-bottom:8px;
+  font-size:11.5px; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase;
+  color:var(--jp-text-muted);
+}
+
+/* ---- sections ------------------------------------------------------------
+   32px between sections, as specified. The rule is written against the first
+   one too — a section title immediately under the header should not push a
+   32px hole into the top of the body. */
+.jp-admin .modal-card .form-section-title{
+  margin:32px 0 16px;
+  padding-top:20px;
+  border-top:1px solid var(--jp-border);
+  font-size:12px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.05em;
+  color:var(--jp-text-muted);
+}
+.jp-admin .modal-card .form-section-title:first-child{
+  margin-top:0; padding-top:0; border-top:none;
+}
+
+/* ---- footer --------------------------------------------------------------
+   A DESCENDANT selector, deliberately. admin.css targets
+   `.modal-card.modal-lg > .modal-actions`, but most builders nest the buttons
+   inside the `<form>` they submit — so that child combinator never matched and
+   those dialogs had no sticky footer at all. Matching at any depth is what
+   makes the footer appear on every dialog rather than on the handful whose
+   markup happened to be flat.
+
+   Sticky still works nested: the nearest scrolling ancestor is the card, so the
+   footer pins to the card's bottom edge even though its containing block is the
+   form. */
+.jp-admin .modal-card:has(.form-grid) .modal-actions,
+.jp-admin .modal-card.modal-lg .modal-actions{
+  position:sticky; bottom:0; z-index:3;
+  display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:flex-end;              /* buttons right, never under a field */
+  gap:12px;
+  margin:24px 0 0;
+  padding:16px var(--jp-dlg-pad-x);
+  background:var(--card-bg);
+  border-top:1px solid var(--jp-border);
+}
+/* Nested in the padded form, the footer has to bleed back out to the card's
+   edges or its border stops short of both sides. */
+.jp-admin .modal-card:has(.form-grid) > form > .modal-actions,
+.jp-admin .modal-card.modal-lg > form > .modal-actions{
+  margin-left:calc(-1 * var(--jp-dlg-pad-x));
+  margin-right:calc(-1 * var(--jp-dlg-pad-x));
+}
+/* (Button ordering lives in TIER 1 — it applies to every dialog, not just the
+   wide ones, so keeping a second copy here would only be a thing to forget.) */
+
+/* The inline message a builder drops above the buttons should not inherit the
+   footer's right alignment. */
+.jp-admin .modal-card .modal-actions + .msg,
+.jp-admin .modal-card .msg{text-align:left;}
+
+/* ---- drawers align to the same standard ---------------------------------
+   The Support drawer is the one dialog that is not a modal. It keeps its slide
+   -in geometry — it is a chat surface and reads correctly as a side panel — but
+   takes the same header/footer treatment so it belongs to the same system. */
+.jp-admin .drawer-panel{
+  width:min(560px, 100%);
+  border-top-left-radius:var(--jp-r-lg);
+  border-bottom-left-radius:var(--jp-r-lg);
+}
+.jp-admin .drawer-head{padding:20px 24px;}
+.jp-admin .drawer-body{padding:20px 24px 26px;}
+.jp-admin .drawer-footer{padding:16px 24px;}
+
+/* ---- responsive ----------------------------------------------------------
+   Two columns on desktop and laptop, one from tablet down — the breakpoint is
+   900px because that is where a 1060px dialog stops being able to show two
+   readable columns rather than where a device category begins. */
+@media (max-width:900px){
+  .jp-admin .modal-card .form-grid{
+    grid-template-columns:minmax(0,1fr);
+    gap:18px;
+  }
+}
+@media (max-width:600px){
+  .jp-admin .modal-card:has(.form-grid),
+  .jp-admin .modal-card.modal-lg{
+    --jp-dlg-pad-x:18px;
+    --jp-dlg-pad-y:17px;
+    /* 90vh still holds on a phone. An earlier draft used `calc(100vh - 24px)`
+       to win back room, which measured 788px against a 731px cap on a 812px
+       viewport — more usable, but it broke the one hard number in the standard
+       and let the dialog read as a full-screen page instead of a dialog. */
+    max-height:min(90vh, calc(100vh - 24px));
+    border-radius:var(--jp-r-md);
+  }
+  .jp-admin .modal-card:has(.form-grid) > h2,
+  .jp-admin .modal-card.modal-lg > h2{font-size:16.5px;}
+  /* A wrapped footer must not stack two full-width buttons on a phone. */
+  .jp-admin .modal-card .modal-actions{gap:10px;}
+  .jp-admin .modal-card .modal-actions .btn{flex:1 1 auto; justify-content:center;}
+}
