@@ -458,9 +458,25 @@ check("...and describe fewer requests than the platform's",
       mine_cr["totals"]["requests"] <= cr["totals"]["requests"])
 
 mine_summary = get("/api/reports/summary", token=mtok, type="bookings").json()
+# `rows` IS THE CAPPED COUNT, ON PURPOSE — it is what the EXPORT would contain,
+# not what SQL holds. The row builders run at `page_size=row_cap` so the header
+# on the screen and the file the user downloads can never describe different
+# sets, which routers/reports.py calls out as the bug this endpoint exists to
+# avoid. Asserting `rows == sql_mine.n` was therefore only ever true while this
+# merchant had fewer than row_cap bookings; test data crossed 5,000 and the
+# check began failing on correct behaviour. Compare against the capped figure,
+# and assert the flag that reports the cap rather than ignoring it.
+cap = mine_summary["row_cap"]
+expected_rows = min(sql_mine.n, cap)
 check("the merchant's report summary is scoped as well",
-      mine_summary["rows"] == sql_mine.n,
-      f"api={mine_summary['rows']} sql={sql_mine.n}")
+      mine_summary["rows"] == expected_rows,
+      f"api={mine_summary['rows']} expected={expected_rows} sql={sql_mine.n} cap={cap}")
+# The API computes this as `len(rows) >= cap`, which cannot tell "exactly cap"
+# from "cap and more" without a second query — so at exactly the cap it warns
+# rather than staying silent. That is the safe direction, and this mirrors it.
+check("...and the summary says so when the cap bit",
+      mine_summary["truncated"] == (sql_mine.n >= cap),
+      f"truncated={mine_summary['truncated']} sql={sql_mine.n} cap={cap}")
 
 
 print("\n=== 8. RBAC and authentication ===")
