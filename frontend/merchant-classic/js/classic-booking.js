@@ -607,13 +607,17 @@ function clRenderBookingForm(e) {
          being re-sent rather than by the server's fallback — which stays in
          place for a caller that omits the field entirely.
 
-         CLIENT FARE, MOVED HERE FROM THE ENQUIRY FORM (2026-08-05).
-         What the merchant is charging its own end customer. It sat on the
-         enquiry until now, which asked them to name a selling price before we
-         had told them the cost; on this screen the quoted fare is on the page
-         directly above, so the comparison is one they can actually make.
-         Never used for settlement — it only produces the "You Saved" figure on
-         the booking, in Reports and on the Dashboard's Total Savings tile. -->
+         CLIENT FARE — THE SECOND OF TWO OPTIONAL CHANCES TO STATE IT.
+         What the merchant is charging its own end customer. The enquiry form
+         asks for it too and neither is required: a merchant who already knows
+         its selling price can say so there, and one who would rather see our
+         quotation first fills it in here, where the quoted fare sits on the
+         page directly above. Never used for settlement — it only produces the
+         "You Saved" figure on the booking, in Reports and on the Dashboard.
+
+         PRE-FILLED FROM THE ENQUIRY when one was given, which is what stops
+         this screen reading as though the earlier entry was lost. Editing it
+         here overrides; leaving it alone re-sends the same number. -->
     <div class="cl-panel">
       <div class="cl-panel-head"><h2>Your customer&rsquo;s fare</h2></div>
       <div class="cl-panel-body">

@@ -850,16 +850,32 @@ function clOpenEnquiryForm(direct = false) {
       </div>
     </div>
 
-    <!-- CLIENT FARE IS NOT ASKED FOR HERE ANY MORE (2026-08-05).
-         It used to sit at the bottom of this form on both paths. An enquiry is
-         a question about availability and price, and asking a merchant what
-         they will charge their own customer before we have told them what it
-         costs put the two numbers in the wrong order — they were quoting blind
-         and then finding out.
-         It moved to the Booking Request screen, which is the first point at
-         which our fare is known, and it is collected there on BOTH paths so the
-         "You Saved" figure has exactly one source. See clBrClientFare in
-         classic-booking.js. -->
+    <!-- CLIENT FARE — OPTIONAL, AND OFFERED AT BOTH STAGES (migration 0040).
+         What the merchant has quoted its OWN end customer. Never used for
+         settlement; it only produces the "You Saved" figure on the enquiry, on
+         the booking, in Reports and on the Dashboard's Total Savings tile.
+
+         It is asked for HERE and again on Booking Request, deliberately. A
+         merchant who already knows what it is charging can say so while the
+         enquiry is fresh; one who would rather see our quotation first can
+         leave this blank and fill it in there, where our fare is on the screen
+         above it. Neither is required.
+
+         The two cannot fight: to_booking_request takes the Booking Request
+         value when one is supplied and falls back to whatever the enquiry
+         carried, so filling this in early is never overwritten by leaving the
+         later box empty. See clBrClientFare in classic-booking.js.
+         (No backticks in this comment — it is inside a template literal.) -->
+    <div class="cl-form-legend">Your customer&rsquo;s fare</div>
+    <div class="cl-form cl-form-2">
+      <div class="cl-field">
+        <label for="clEnqClientFare">Client Fare</label>
+        <input type="number" id="clEnqClientFare" min="0" step="0.01"
+               inputmode="decimal" placeholder="e.g. 20000">
+        <small>What you have quoted your customer. Optional — leave it blank and you
+               can add it when you raise the booking, once we have quoted you.</small>
+      </div>
+    </div>
 
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
@@ -2066,10 +2082,14 @@ async function clSubmitEnquiry() {
     infants: isGroup ? 0 : f.infants,
     group_import_id: isGroup && f.direct ? f.group_import.import_id : null,
     notes: ($('clEnqNotes').value || '').trim() || null,
-    /* CLIENT FARE IS NOT SENT FROM THIS FORM ANY MORE (0040 collected it here).
-       The Booking Request screen asks for it instead, once our fare is known —
-       an enquiry has no quotation to compare against, so there was nothing a
-       number typed here could yet be a saving on. */
+    /* 0040. SENT AS null WHEN BLANK, NOT 0 — the column distinguishes "not
+       recorded" from "quoted at zero", and a 0 here would drop a zero-saving
+       booking into the merchant's savings average. Parsed rather than passed
+       through so an empty string never reaches a Decimal field.
+
+       Optional at this stage: a merchant who leaves it blank is offered the
+       same field again on Booking Request, where our quotation is visible. */
+    client_fare: clParseMoney($('clEnqClientFare').value),
   };
 
   /* DIRECT MODE STOPS HERE. Nothing is sent: the itinerary is handed to Booking
