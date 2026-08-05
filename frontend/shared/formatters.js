@@ -125,6 +125,29 @@ function tripTypeLabel(t) {
    arrow — a group trip is one-way in the only sense this symbol reports. */
 function tripTypeArrow(t) { return t === 'round_trip' ? '⇄' : '→'; }
 
+/* AN ABSENT AIRLINE IS AN ANSWER, NOT A GAP.
+   ===========================================================================
+   The enquiry form defaults to "All Airlines" and sends no airline at all for
+   it, so `null` here means the merchant deliberately left the carrier open and
+   is asking us to quote whatever is best. Rendering that as "—" would make an
+   open enquiry indistinguishable from one where the field failed to save, and
+   the desk answering it would have no way to tell that it may quote freely.
+
+   Here rather than in the ten screens that show an airline, for the same reason
+   the trip-type labels above are: one fact, named one way, in six portals.
+
+   `fmtFlightNumber` keeps the dash on purpose — an unstated flight number is
+   genuinely "nothing to show", not a choice with a name. */
+const ANY_AIRLINE_LABEL = 'All Airlines';
+function fmtAirline(v) {
+  const t = (v ?? '').toString().trim();
+  return t || ANY_AIRLINE_LABEL;
+}
+function fmtFlightNumber(v) {
+  const t = (v ?? '').toString().trim();
+  return t || '—';
+}
+
 function fmtDate(s) { return s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
 function fmtDateTime(s) { return s ? new Date(s).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—'; }
 function fmtTime(s) { return s ? new Date(s).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }) : '—'; }

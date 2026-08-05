@@ -274,11 +274,12 @@ async function openRaisePaymentRequestModal() {
     return;
   }
 
+  /* The explanatory line that used to sit here — "The manager is asked to pay.
+     Nothing is credited until you approve the proof." — was removed on request.
+     The workflow it described is unchanged: this endpoint still only *asks*,
+     and a wallet is still credited nowhere but the top-up verify endpoint. */
   body.innerHTML = `
     <h2>Initiate Payment Request</h2>
-    <p class="ops-sub" style="margin:-6px 0 16px;">
-      The manager is asked to pay. Nothing is credited until you approve the proof.
-    </p>
     <form id="prRaiseForm">
       <div class="form-grid">
         <div class="form-field"><label>Merchant Company</label>

@@ -367,7 +367,7 @@ function clHistoryRow(r) {
       ${r.booking_reference ? `<div class="cl-kpi-sub">${escapeHtml(r.booking_reference)}</div>` : ''}</td>
     <td><b>${route}</b>
       <div class="cl-kpi-sub">${escapeHtml(clLabel(r.request_type || r.travel_type || '—'))}</div></td>
-    <td class="cl-nowrap">${escapeHtml(d.airline || '—')}
+    <td class="cl-nowrap">${escapeHtml(fmtAirline(d.airline))}
       ${d.flight_number ? `<div class="cl-kpi-sub">${escapeHtml(d.flight_number)}</div>` : ''}</td>
     <td class="cl-ref">${escapeHtml(r.pnr || '—')}
       ${r.ticket_number ? `<div class="cl-kpi-sub">${escapeHtml(r.ticket_number)}</div>` : ''}</td>

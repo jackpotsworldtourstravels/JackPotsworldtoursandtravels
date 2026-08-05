@@ -307,16 +307,39 @@ function provCloseModal() {
   document.getElementById('provModalOverlay').classList.remove('open');
 }
 
+/* THE SHARED SHELL FOR ALL THREE PROVIDER DIALOGS — and it is now the same
+   shell the rest of the portal uses. It previously wrote the title, the fields
+   and the buttons as three loose children of the card, which put this screen's
+   dialogs outside jp-ds.css §15: no top padding under the header, a footer that
+   did not reach the card edges, and single-column fields in a card sized for a
+   confirm box.
+
+   Three changes, all layout:
+     * a `<form>` wrapper — §15 pads `> form` and bleeds `> form > .modal-actions`
+       out to the card edges, which is what makes the footer's border span the
+       full width like every other dialog's.
+     * `submit` is swallowed. The primary button in each caller is now
+       `type="submit"`, so Enter in any field triggers its existing click
+       handler through implicit submission — and clicking it still runs that one
+       handler exactly once, because this preventDefault stops the form from
+       doing anything of its own.
+     * the callers wrap their fields in `.form-grid`, which is both the
+       two-column layout and §15's marker for a form dialog.
+
+   No endpoint, payload, validation rule or button label changed. */
 function provOpenModal(title, bodyHtml, footHtml) {
   const overlay = document.getElementById('provModalOverlay');
-  document.getElementById('provModalBody').innerHTML = `
+  const card = document.getElementById('provModalBody');
+  card.innerHTML = `
     <h2 id="provModalTitle">${escapeHtml(title)}</h2>
-    ${bodyHtml}
-    <div class="msg" id="provModalMsg" aria-live="polite"></div>
-    <div class="modal-actions">${footHtml}</div>`;
+    <form id="provModalForm" novalidate>
+      ${bodyHtml}
+      <div class="msg" id="provModalMsg" aria-live="polite"></div>
+      <div class="modal-actions">${footHtml}</div>
+    </form>`;
   overlay.classList.add('open');
-  document.getElementById('provModalBody')
-    .querySelectorAll('[data-prov-cancel]')
+  card.querySelector('#provModalForm').addEventListener('submit', e => e.preventDefault());
+  card.querySelectorAll('[data-prov-cancel]')
     .forEach(b => b.addEventListener('click', provCloseModal));
 }
 
@@ -332,17 +355,23 @@ function provOpenProviderForm(provider) {
   const editing = !!provider;
   provOpenModal(
     editing ? `Edit ${provider.provider_code}` : 'Add Provider',
-    `<div class="form-field" style="max-width:none;">
-       <label for="provNameInput">Provider Name</label>
-       <input type="text" id="provNameInput" maxlength="200" autocomplete="off"
-              value="${editing ? escapeHtml(provider.provider_name) : ''}"
-              placeholder="e.g. Sky Travels">
-       <span class="cell-sub">${editing
-         ? 'The provider code never changes — it is what past bookings are recorded against.'
-         : 'A provider code (PRD001, PRD002, …) is assigned automatically.'}</span>
+    /* One field, so it takes the whole row rather than leaving a hole in the
+       right-hand column. The grid is still what puts this dialog on the
+       standard — a one-column form and a two-column form are the same object
+       here, they just have different numbers of fields. */
+    `<div class="form-grid">
+       <div class="form-field span-2">
+         <label for="provNameInput">Provider Name</label>
+         <input type="text" id="provNameInput" maxlength="200" autocomplete="off"
+                value="${editing ? escapeHtml(provider.provider_name) : ''}"
+                placeholder="e.g. Sky Travels">
+         <span class="cell-sub">${editing
+           ? 'The provider code never changes — it is what past bookings are recorded against.'
+           : 'A provider code (PRD001, PRD002, …) is assigned automatically.'}</span>
+       </div>
      </div>`,
     `<button type="button" class="btn btn-ghost" data-prov-cancel>Cancel</button>
-     <button type="button" class="btn btn-navy" id="provSaveBtn">${editing ? 'Save' : 'Add Provider'}</button>`);
+     <button type="submit" class="btn btn-navy" id="provSaveBtn">${editing ? 'Save' : 'Add Provider'}</button>`);
 
   const input = document.getElementById('provNameInput');
   input.focus();
@@ -381,37 +410,43 @@ function provOpenProviderForm(provider) {
    provider is fixed context rather than a field on this form. */
 function provOpenUserForm(providerId, person) {
   const editing = !!person;
+  /* Name spans both columns — it is the field the dialog is about, and pairing
+     it with Email would put the longest label next to the longest value. Email
+     and Phone then sit side by side, and Status (edit only) takes the row under
+     them so its explanatory line has somewhere to go. */
   provOpenModal(
     editing ? `Edit ${person.user_name}` : 'Add Provider User',
-    `<p class="ops-sub" style="margin:0 0 14px;">
+    `<p class="ops-sub">
        This is a contact record, not a login — no password is set and this person cannot sign in.
      </p>
-     <div class="form-field" style="max-width:none;">
-       <label for="provUserName">Name</label>
-       <input type="text" id="provUserName" maxlength="150" autocomplete="off"
-              value="${editing ? escapeHtml(person.user_name) : ''}" placeholder="e.g. John">
-     </div>
-     <div class="form-field" style="max-width:none;">
-       <label for="provUserEmail">Email</label>
-       <input type="email" id="provUserEmail" maxlength="255" autocomplete="off"
-              value="${editing ? escapeHtml(person.email) : ''}" placeholder="john@skytravels.com">
-     </div>
-     <div class="form-field" style="max-width:none;">
-       <label for="provUserPhone">Phone Number <span class="cell-sub">(optional)</span></label>
-       <input type="text" id="provUserPhone" maxlength="30" autocomplete="off"
-              value="${editing ? escapeHtml(person.phone_number || '') : ''}">
-     </div>
-     ${editing ? `<div class="form-field" style="max-width:none;">
-       <label for="provUserStatus">Status</label>
-       <select id="provUserStatus">
-         <option value="active"${person.status === 'active' ? ' selected' : ''}>Active</option>
-         <option value="inactive"${person.status === 'inactive' ? ' selected' : ''}>Inactive</option>
-       </select>
-       <span class="cell-sub">An inactive person is not offered when a ticket is issued.
-         Their past bookings still count.</span>
-     </div>` : ''}`,
+     <div class="form-grid">
+       <div class="form-field span-2">
+         <label for="provUserName">Name</label>
+         <input type="text" id="provUserName" maxlength="150" autocomplete="off"
+                value="${editing ? escapeHtml(person.user_name) : ''}" placeholder="e.g. John">
+       </div>
+       <div class="form-field">
+         <label for="provUserEmail">Email</label>
+         <input type="email" id="provUserEmail" maxlength="255" autocomplete="off"
+                value="${editing ? escapeHtml(person.email) : ''}" placeholder="john@skytravels.com">
+       </div>
+       <div class="form-field">
+         <label for="provUserPhone">Phone Number <span class="cell-sub">(optional)</span></label>
+         <input type="text" id="provUserPhone" maxlength="30" autocomplete="off"
+                value="${editing ? escapeHtml(person.phone_number || '') : ''}">
+       </div>
+       ${editing ? `<div class="form-field span-2">
+         <label for="provUserStatus">Status</label>
+         <select id="provUserStatus">
+           <option value="active"${person.status === 'active' ? ' selected' : ''}>Active</option>
+           <option value="inactive"${person.status === 'inactive' ? ' selected' : ''}>Inactive</option>
+         </select>
+         <span class="cell-sub">An inactive person is not offered when a ticket is issued.
+           Their past bookings still count.</span>
+       </div>` : ''}
+     </div>`,
     `<button type="button" class="btn btn-ghost" data-prov-cancel>Cancel</button>
-     <button type="button" class="btn btn-navy" id="provUserSaveBtn">${editing ? 'Save' : 'Add User'}</button>`);
+     <button type="submit" class="btn btn-navy" id="provUserSaveBtn">${editing ? 'Save' : 'Add User'}</button>`);
 
   document.getElementById('provUserName').focus();
   document.getElementById('provUserSaveBtn').addEventListener('click', async () => {
@@ -502,23 +537,25 @@ async function provExport(kind, format, providerId) {
 
 function provOpenExportMenu() {
   provOpenModal('Export',
-    `<div class="form-field" style="max-width:none;">
-       <label for="provExportKind">What to export</label>
-       <select id="provExportKind">
-         <option value="providers">Provider list</option>
-         <option value="provider_users">Provider users</option>
-         <option value="booking_summary">Booking summary</option>
-       </select>
-     </div>
-     <div class="form-field" style="max-width:none;">
-       <label for="provExportFormat">Format</label>
-       <select id="provExportFormat">
-         <option value="csv">CSV</option>
-         <option value="xlsx">Excel</option>
-       </select>
+    `<div class="form-grid">
+       <div class="form-field">
+         <label for="provExportKind">What to export</label>
+         <select id="provExportKind">
+           <option value="providers">Provider list</option>
+           <option value="provider_users">Provider users</option>
+           <option value="booking_summary">Booking summary</option>
+         </select>
+       </div>
+       <div class="form-field">
+         <label for="provExportFormat">Format</label>
+         <select id="provExportFormat">
+           <option value="csv">CSV</option>
+           <option value="xlsx">Excel</option>
+         </select>
+       </div>
      </div>`,
     `<button type="button" class="btn btn-ghost" data-prov-cancel>Cancel</button>
-     <button type="button" class="btn btn-navy" id="provExportGo">Download</button>`);
+     <button type="submit" class="btn btn-navy" id="provExportGo">Download</button>`);
 
   document.getElementById('provExportGo').addEventListener('click', () => {
     const kind = document.getElementById('provExportKind').value;

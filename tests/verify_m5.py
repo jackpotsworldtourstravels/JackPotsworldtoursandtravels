@@ -2,9 +2,20 @@
 
 WHAT THIS PROTECTS
 
-1. **Every lifecycle event still notifies, and now also emails.** Before M5 no
-   lifecycle event sent mail at all — `email_service` was reachable only from
-   OTP and password reset.
+1. **Every lifecycle event notifies in the portal, and does NOT email.**
+   `settings.lifecycle_emails_enabled` is False by default as of 2026-08-05:
+   thirty lifecycle events the merchant can already see in the portal are no
+   longer mailed. The in-app half is unconditional and unchanged — that is the
+   half being protected here, because "we stopped mailing" must never quietly
+   become "we stopped telling them".
+
+   The send machinery itself is still exercised, in-process, with the flag
+   flipped (see "the send path still works when it is switched on"). It is
+   correct and reversible; it is simply not what the business wants by default.
+
+   THE TWO AUTHENTICATION EMAILS ARE UNAFFECTED and are asserted separately:
+   Login OTP and password reset call `email_service` directly and never pass
+   through `delivery_service`, so no flag here can lock anyone out.
 2. **`communication_settings` is honoured.** A merchant that switches email off
    stops receiving it; one that switches notifications off stops receiving
    those. Neither switch can silence platform staff, whose alerts are not a
@@ -103,8 +114,12 @@ for secret in ("password", "otp", "token", "Bearer "):
           secret.lower() not in (text_body + html_body).lower(), secret)
 
 # ===========================================================================
-print("\n== a lifecycle event notifies AND attempts email ==")
+print("\n== a lifecycle event notifies in the portal, and sends NO email ==")
 # ===========================================================================
+# The default posture since 2026-08-05. Both channels are switched ON for this
+# merchant, so a mail that went out would be the merchant's own settings being
+# honoured — which is precisely why this is the strong form of the assertion:
+# with nothing opted out, still no email.
 set_channels(email=True, notifications=True)
 before_notif = msg_count(merchant_id=MID, message_type=MessageType.NOTIFICATION)
 before_email = msg_count(merchant_id=MID, message_type=MessageType.EMAIL)
@@ -115,10 +130,47 @@ after_notif = msg_count(merchant_id=MID, message_type=MessageType.NOTIFICATION)
 after_email = msg_count(merchant_id=MID, message_type=MessageType.EMAIL)
 check("the merchant got in-app notifications for the booking lifecycle",
       after_notif > before_notif, f"{before_notif} -> {after_notif}")
-check("...and an email was attempted for the same events",
-      after_email > before_email, f"{before_email} -> {after_email}")
+check("...and NO email was sent for any of them",
+      after_email == before_email, f"{before_email} -> {after_email}")
+
+# ===========================================================================
+print("\n== the send path still works when it is switched on ==")
+# ===========================================================================
+# In-process, against delivery_service directly: the flag is read per call, and
+# this process is not the server, so flipping it here exercises the machinery
+# without mailing anything from the running API. This is what keeps M5's
+# guarantees — msg_logs records every attempt, an unsent message says why, and
+# nothing is ever claimed as delivered — under test rather than merely present.
+from app.config import settings as _settings                        # noqa: E402
+from app.models_v2 import User as _User                             # noqa: E402
 
 db = SessionLocal()
+recipient = db.scalars(
+    select(_User).where(_User.merchant_id == MID, _User.email.isnot(None)).limit(1)).first()
+before = msg_count(merchant_id=MID, message_type=MessageType.EMAIL)
+
+_was = _settings.lifecycle_emails_enabled
+try:
+    _settings.lifecycle_emails_enabled = False
+    off = delivery_service.deliver(
+        db, [(recipient.user_id, recipient.email, MID)],
+        "Suppressed", "This must not be mailed.", merchant_id=MID)
+    check("with the flag off, deliver() writes the in-app row", off["in_app"] == 1, str(off))
+    check("...and sends nothing", off["emailed"] == 0 and off["failed"] == 0, str(off))
+    check("...counting it as suppressed, not failed", off["suppressed"] >= 1, str(off))
+    check("...and no email row is written at all",
+          msg_count(merchant_id=MID, message_type=MessageType.EMAIL) == before)
+
+    _settings.lifecycle_emails_enabled = True
+    on = delivery_service.deliver(
+        db, [(recipient.user_id, recipient.email, MID)],
+        "Switched on", "This one is attempted.", merchant_id=MID)
+    check("with the flag on, the send is attempted", on["emailed"] + on["failed"] == 1, str(on))
+    check("...and an email row is written",
+          msg_count(merchant_id=MID, message_type=MessageType.EMAIL) == before + 1)
+finally:
+    _settings.lifecycle_emails_enabled = _was
+
 latest = db.scalars(
     select(MsgLog).where(MsgLog.merchant_id == MID, MsgLog.message_type == MessageType.EMAIL)
     .order_by(MsgLog.message_id.desc()).limit(1)).first()
@@ -138,6 +190,69 @@ check("...and the reason names the actual cause",
       str(latest.error_message))
 check("the email is addressed to a real recipient", "@" in (latest.recipient or ""),
       latest.recipient)
+
+# ===========================================================================
+print("\n== the two authentication emails are NOT suppressed ==")
+# ===========================================================================
+# The property that makes one flag safe: neither of these passes through
+# delivery_service, so neither can be switched off by it.
+#
+# EXERCISED IN-PROCESS, NOT OVER HTTP, and deliberately. `/api/auth/login` is
+# rate-limited to 10/minute per account, and by the time this script runs inside
+# the full suite the shared merchant has spent that budget on the twenty scripts
+# before it — so an HTTP login here fails with 429 in a suite run while passing
+# when the script is run alone. That is a broken test, not a broken product.
+# Calling `otp_service.issue` directly proves the thing that actually matters:
+# the OTP path reaches the mailer with lifecycle email switched off.
+from app.services import otp_service                                # noqa: E402
+
+db = SessionLocal()
+otp_user = db.scalars(
+    select(_User).where(_User.merchant_id == MID, _User.email.isnot(None)).limit(1)).first()
+#: `otp_service` has its OWN per-hour request limit, counted on the user row and
+#: cleared by a successful verify. Twenty scripts' worth of logins run before
+#: this one, so the counter is reset here as a fixture — otherwise this check
+#: would depend on how many times the shared account happened to sign in, which
+#: is the same order-dependence the HTTP version above was rejected for.
+otp_user.otp_attempts = 0
+otp_user.otp_requested_at = None
+db.commit()
+
+_was = _settings.lifecycle_emails_enabled
+try:
+    _settings.lifecycle_emails_enabled = False        # the production default
+    code = otp_service.issue(db, otp_user)
+    check("a Login OTP is still issued with lifecycle email switched off",
+          code is None or (isinstance(code, str) and len(code) == 6), repr(code))
+    row = db.scalars(
+        select(MsgLog).where(MsgLog.user_id == otp_user.user_id)
+        .order_by(MsgLog.message_id.desc()).limit(1)).first()
+    check("...and the send is logged, so OTP delivery is still auditable",
+          row is not None and "OTP" in (row.message or "") + (row.subject or ""),
+          str(row.message if row else None)[:90])
+finally:
+    _settings.lifecycle_emails_enabled = _was
+    db.close()
+# The structural property, stated as an import check rather than a substring
+# one: `otp_service` has its own `delivery_mode()` and the word "delivery" all
+# through its prose, so searching for the text finds itself. What must remain
+# true is that neither auth path IMPORTS delivery_service — that is what puts
+# them outside the flag's reach, and it is a one-line change away from not
+# being true.
+_auth_sources = {
+    name: (BACKEND / "app" / path).read_text(encoding="utf-8")
+    for name, path in (
+        ("otp_service", "services/otp_service.py"),
+        ("partner_auth_service", "services/partner_auth_service.py"),
+        ("routers/auth", "routers/auth.py"),
+    )
+}
+for _name, _src in _auth_sources.items():
+    check(f"{_name} does not import delivery_service",
+          "import delivery_service" not in _src
+          and "delivery_service." not in _src,
+          f"{_name} must reach email_service directly, or the flag would gate it")
+    check(f"...and it does reach email_service", "email_service" in _src, _name)
 
 # ===========================================================================
 print("\n== opting out is honoured ==")

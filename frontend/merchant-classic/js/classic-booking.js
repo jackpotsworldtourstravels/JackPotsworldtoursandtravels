@@ -70,10 +70,26 @@ let clBookingDraft = null;
    update endpoints and this is no longer consulted. */
 let clBookingDirect = null;
 
+/* THE MANIFEST UPLOADED ON THIS SCREEN, for an enquiry-led group booking.
+   ===========================================================================
+   A group ENQUIRY no longer carries a passenger list — it asks whether a party
+   of N can fly and what it costs, and the sheet listing that party arrives
+   here, once we have answered. This holds the accepted import between the
+   upload finishing and the booking being submitted.
+
+   A FOURTH variable rather than a field on clBookingDraft because it exists
+   before a draft does: the merchant can upload, review the imported rows and
+   submit in one pass without ever saving a draft, and hanging it on an object
+   that is still null at that point would lose it. Once a draft has been saved
+   the server knows the import anyway, and `clResolveGroupImportId` below reads
+   whichever of the three sources actually has it. */
+let clBrGroupImport = null;
+
 function clStartBookingRequest(enquiry, draft = null) {
   clBookingEnquiry = enquiry;
   clBookingDraft = draft;
   clBookingDirect = null;
+  clBrGroupImport = null;
 }
 
 /* Book Directly: no enquiry, no quotation, no server round trip yet.
@@ -130,7 +146,10 @@ function clStartDirectBooking(itinerary) {
    where `_itinerary_details` wrote it, so this needs no enquiry for either
    path. `total_amount` stands in for the quotation on an enquiry-led draft —
    CR-5 creates that booking AT the quoted fare, so the row already holds it. */
-function clResumeBookingDraft(booking) {
+/* `detail` is the whole GET /api/requests/{id} envelope, not just its
+   `request`: the manifest id lives on the envelope, because putting it on
+   RequestResponse would make every listing lazy-load a backref per row. */
+function clResumeBookingDraft(booking, detail = null) {
   const d = booking.details || {};
   clBookingDirect = null;               // the server holds it now; nothing to send
   clBookingDraft = booking;
@@ -142,6 +161,15 @@ function clResumeBookingDraft(booking) {
     quotation_remarks: null,
     admin_response: null,
     trip_type: d.trip_type,
+    /* WITHOUT THESE TWO A RESUMED GROUP DRAFT LOOKS LIKE A FRESH ONE.
+       `group_journey_type` is what the return-leg panel and the group branches
+       key off, and `group_import_id` is how the screen knows the sheet is
+       already in — omitting it would show the upload card over a booking that
+       has a manifest, and invite a second one. The id rides on the detail
+       response (RequestDetailResponse.group_import_id); the journey type is in
+       travel_details, where _itinerary_details wrote it. */
+    group_journey_type: d.group_journey_type,
+    group_import_id: detail?.group_import_id || booking.group_import_id || null,
     origin: d.origin, origin_city: d.origin_city,
     destination: d.destination, destination_city: d.destination_city,
     airline: d.airline,
@@ -151,6 +179,7 @@ function clResumeBookingDraft(booking) {
     return_date: booking.return_date,
     return_preferred_time: d.return_preferred_time,
     travel_class: d.travel_class,
+    booking_class: d.booking_class,
     passenger_count: d.passenger_count || (booking.passengers || []).length,
     adults: d.adults, children: d.children, infants: d.infants,
   };
@@ -472,17 +501,23 @@ function clRenderBookingForm(e) {
           <div><dt>Trip type</dt><dd>${tripTypeLabel(e.trip_type)}</dd></div>
           <div><dt>From</dt><dd>${escapeHtml([e.origin_city, e.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
           <div><dt>To</dt><dd>${escapeHtml([e.destination_city, e.destination].filter(Boolean).join(' · ') || '—')}</dd></div>
-          <div><dt>Airline</dt><dd>${escapeHtml(e.airline || '—')}</dd></div>
+          <div><dt>Airline</dt><dd>${escapeHtml(fmtAirline(e.airline))}</dd></div>
           <div><dt>Flight number</dt><dd class="cl-ref">${escapeHtml(e.flight_number || '—')}</dd></div>
           <div><dt>Departure date</dt><dd>${escapeHtml(fmtDate(e.travel_date))}</dd></div>
           <div><dt>Preferred time</dt><dd>${escapeHtml(clTimeLabel(e.preferred_time) || '—')}</dd></div>
           ${roundTrip ? `
             <div><dt>Return date</dt><dd>${escapeHtml(fmtDate(e.return_date))}</dd></div>
             <div><dt>Return time</dt><dd>${escapeHtml(clTimeLabel(e.return_preferred_time) || '—')}</dd></div>` : ''}
-          <div><dt>Travel class</dt><dd>${escapeHtml(e.travel_class || '—')}</dd></div>
-          <div><dt>Party</dt><dd>${e.passenger_count} — ${e.adults} adult${e.adults === 1 ? '' : 's'}${
-            e.children ? `, ${e.children} child${e.children === 1 ? '' : 'ren'}` : ''}${
-            e.infants ? `, ${e.infants} infant${e.infants === 1 ? '' : 's'}` : ''}</dd></div>
+          ${isGroup ? '' : `
+            <div><dt>Class</dt><dd>${escapeHtml(e.travel_class || '—')}</dd></div>
+            <div><dt>Booking Class</dt><dd>${escapeHtml(e.booking_class || '—')}</dd></div>`}
+          <!-- A group states a total and no breakdown, so printing "0 children,
+               0 infants" beside it would assert a composition nobody gave. -->
+          <div><dt>Party</dt><dd>${isGroup
+            ? `${e.passenger_count} passenger${e.passenger_count === 1 ? '' : 's'}`
+            : `${e.passenger_count} — ${e.adults} adult${e.adults === 1 ? '' : 's'}${
+              e.children ? `, ${e.children} child${e.children === 1 ? '' : 'ren'}` : ''}${
+              e.infants ? `, ${e.infants} infant${e.infants === 1 ? '' : 's'}` : ''}`}</dd></div>
           <div><dt>Route type</dt><dd>${intl
             ? `<span class="cl-tag cl-tag-warn">International</span>`
             : `<span class="cl-tag">Domestic</span>`}${
@@ -561,6 +596,41 @@ function clRenderBookingForm(e) {
             + 'expiry after the travel date. No documents need to be uploaded.'
           : 'First and last name are required for every passenger. Passport details are optional '
             + 'on a domestic sector and can be supplied later.'}
+      </div>
+    </div>
+
+    <!-- PRE-FILLED FROM THE DRAFT FIRST, THEN FROM THE ENQUIRY. The second
+         source is the backward-compatible one: an enquiry raised before this
+         field moved may already carry a client fare, and showing it here lets
+         the merchant confirm or correct it rather than wonder where it went.
+         Submitting sends whatever is in the box, so the value is preserved by
+         being re-sent rather than by the server's fallback — which stays in
+         place for a caller that omits the field entirely.
+
+         CLIENT FARE, MOVED HERE FROM THE ENQUIRY FORM (2026-08-05).
+         What the merchant is charging its own end customer. It sat on the
+         enquiry until now, which asked them to name a selling price before we
+         had told them the cost; on this screen the quoted fare is on the page
+         directly above, so the comparison is one they can actually make.
+         Never used for settlement — it only produces the "You Saved" figure on
+         the booking, in Reports and on the Dashboard's Total Savings tile. -->
+    <div class="cl-panel">
+      <div class="cl-panel-head"><h2>Your customer&rsquo;s fare</h2></div>
+      <div class="cl-panel-body">
+        <div class="cl-form cl-form-2">
+          <div class="cl-field">
+            <label for="clBrClientFare">Client Fare</label>
+            <input type="number" id="clBrClientFare" min="0" step="0.01"
+              inputmode="decimal" placeholder="e.g. 20000"
+              value="${(clBookingDraft?.client_fare ?? e.client_fare) != null
+                ? escapeHtml(String(clBookingDraft?.client_fare ?? e.client_fare)) : ''}">
+            <small>${e.quoted_fare != null
+              ? `We quoted <b>${escapeHtml(moneyStr(e.quoted_fare))}</b>. Enter what you are
+                 charging your customer and we will show you the saving.`
+              : `Enter what you are charging your customer. We compare our fare against it
+                 once the ticket is priced.`} Optional.</small>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -644,11 +714,85 @@ function clRenderBookingForm(e) {
     if (!await clConfirm(question, clBookingDraft ? 'Leave' : 'Discard')) return;
     clBookingEnquiry = null;
     clBookingDirect = null;
+    /* Drop the upload host with the screen that installed it, so a handler
+       closed over this booking cannot write into whatever renders the card
+       next. clOpenEnquiryForm reinstalls its own, but only once it opens. */
+    clBrGroupImport = null;
+    clGbSetHost(null);
     clLoaded.delete('booking-request');
     clGo(clBookingDraft ? 'requests' : 'enquiry');
   });
   $('clBrSubmitBtn').addEventListener('click', () => clSubmitBookingRequest(true));
   $('clBrDraftBtn').addEventListener('click', () => clSubmitBookingRequest(false));
+}
+
+/* WHERE A GROUP BOOKING'S MANIFEST ID CAN COME FROM — three places, in the
+   order they take precedence:
+
+     1. the enquiry itself, for a group enquiry raised BEFORE the upload moved
+        to this screen. That sheet is what the desk quoted against, so it wins.
+     2. an upload just completed on this screen, held in clBrGroupImport.
+     3. a saved draft, which is how a resumed booking finds the sheet it was
+        saved with.
+
+   One function so the render path and the submit path cannot disagree about
+   whether a booking has a manifest — they did, briefly, and the result was a
+   screen showing an imported party that submit then refused for having none. */
+function clResolveGroupImportId(e) {
+  return e?.group_import_id
+    || clBrGroupImport?.import_id
+    || clBookingDraft?.group_import?.import_id
+    || null;
+}
+
+/* THE UPLOAD CARD, ON THE BOOKING REQUEST SCREEN.
+   ===========================================================================
+   Reuses `clUploadCard()` from classic-enquiry.js verbatim — same markup, same
+   ids, same drop zone, progress bar, validation summary and Replace File — so
+   there is one upload workflow in this portal rather than a second copy that
+   drifts. classic-enquiry.js is loaded before this file, which is what makes
+   the function available; see the script order in index.html.
+
+   The card ships hidden (the enquiry modal shows it conditionally); here it is
+   always the point of the panel, so the `cl-hidden` comes straight back off. */
+function clRenderGroupUploadCard(list, e) {
+  list.innerHTML = clUploadCard();
+
+  const card = list.querySelector('#clEnqUpload');
+  if (!card) {
+    list.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:14px;">
+      The passenger list upload could not be loaded. Reload the page and try again.</div>`;
+    return;
+  }
+  card.classList.remove('cl-hidden');
+
+  /* The lede is written for the enquiry modal ("upload all passenger details
+     using our Excel template"). At this stage the merchant has a quotation and
+     is committing to it, which is worth saying — it is the difference between
+     the two screens the sheet can be uploaded on. */
+  const lede = card.querySelector('.cl-gb-lede');
+  if (lede) {
+    lede.innerHTML = 'Your enquiry has been answered — now tell us who is travelling. '
+      + 'Download the template, fill in one row per traveller, and upload it. '
+      + 'Every row is checked before the booking can be submitted.';
+  }
+
+  /* The upload writes here rather than into the enquiry modal's form object. */
+  clGbSetHost({
+    journeyType: () => e?.group_journey_type || 'one_way_group',
+    get: () => clBrGroupImport,
+    set: imp => { clBrGroupImport = imp; },
+    /* DELIBERATELY LEAVES THE IMPORT SUMMARY ON SCREEN rather than swapping in
+       the read-only passenger table. The summary is what carries "View Imported
+       Data" and "Replace File", and replacing a sheet is something a merchant
+       does most often in the seconds after uploading the wrong one — trading
+       that away to show a table they can open from the same card would be a
+       poor bargain. The table is still what a resumed draft renders, where
+       there is nothing to replace. */
+    onDone: () => {},
+  });
+
+  clWireUpload();
 }
 
 /* THE IMPORTED PARTY, REPORTED RATHER THAN COLLECTED.
@@ -662,14 +806,20 @@ function clRenderBookingForm(e) {
    Passengers are fetched rather than passed in, because a resumed draft has an
    import id and nothing else — the rows live on the server. */
 async function clRenderImportedPassengers(list, e) {
-  const importId = e.group_import_id || clBookingDraft?.group_import?.import_id;
-  list.innerHTML = '<div class="cl-empty">Loading the imported passenger list…</div>';
+  const importId = clResolveGroupImportId(e);
 
+  /* NO MANIFEST YET IS THE NORMAL STATE HERE, not an error. The enquiry stage
+     deliberately does not collect one — it asks whether the seats exist — so an
+     enquiry-led group booking arrives at this screen with a passenger count and
+     nothing else, and THIS is where the sheet is uploaded. It used to say "go
+     back and upload one", which now points at a card that no longer exists on
+     the enquiry form. */
   if (!importId) {
-    list.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:14px;">
-      This group booking has no passenger list attached. Go back and upload one.</div>`;
+    clRenderGroupUploadCard(list, e);
     return;
   }
+
+  list.innerHTML = '<div class="cl-empty">Loading the imported passenger list…</div>';
 
   let d;
   try {
@@ -810,6 +960,11 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
   });
 
   clBindPassportLookup(el);
+  /* Passport scanning (classic-passport-ocr.js). Renders nothing at all unless
+     the deployment has an OCR provider configured, so a card looks exactly as
+     it did before this shipped when it does not. Guarded so the booking screen
+     still works if that file fails to load. */
+  if (typeof clOcrAttach === 'function') clOcrAttach(el);
 }
 
 /* ============================================ passenger auto-fill by passport */
@@ -1090,11 +1245,57 @@ async function clSubmitBookingRequest(finalize) {
      Every check below reads the traveller cards, and a group booking has none
      — its party was validated row by row when the sheet was uploaded, which is
      a stricter pass than this screen performs. Running the card checks over an
-     empty list would refuse the booking for having no passengers. */
-  const groupImportId = enquiry.group_import_id
-    || clBookingDraft?.group_import?.import_id
-    || null;
-  const isGroup = !!groupImportId;
+     empty list would refuse the booking for having no passengers.
+
+     WHAT MAKES IT A GROUP IS THE TRIP TYPE, NOT THE PRESENCE OF A MANIFEST.
+     It was the manifest until the upload moved to this screen — and a group
+     booking that has not uploaded yet then fell through to the passenger-card
+     branch and was refused with "Add at least one passenger", which is neither
+     true nor actionable. The two facts are now separate: the trip type decides
+     which branch runs, and a missing manifest is reported as the missing
+     manifest it is. */
+  const isGroup = enquiry.trip_type === 'group_trip' || !!enquiry.group_journey_type;
+  const groupImportId = clResolveGroupImportId(enquiry);
+
+  if (isGroup && !groupImportId) {
+    return clMsg(msg,
+      'Upload the passenger list before saving this booking. Use the Excel template '
+      + 'in the Passengers panel above.', 'err');
+  }
+
+  /* A SHEET WITH BAD ROWS IS NOT A PARTY. `attach_to_request` refuses a
+     less-than-valid import on the server, so this is not the guarantee — it is
+     the difference between a 400 the merchant has to interpret and a sentence
+     naming how many rows to fix. Checked only for an import uploaded on this
+     screen: that is the only one whose validation summary is in hand, and an
+     inherited or drafted manifest already passed this same gate. */
+  if (isGroup && clBrGroupImport && !clBrGroupImport.can_submit) {
+    return clMsg(msg,
+      `${clBrGroupImport.invalid_rows} row(s) in the passenger list still need fixing. `
+      + 'Correct them in the spreadsheet and upload it again.', 'err');
+  }
+
+  /* THE SHEET AND THE QUOTED PARTY SIZE ARE NOW TWO SEPARATE STATEMENTS, so
+     they can disagree. Splitting the count (stated at enquiry) from the list
+     (uploaded here) is the whole point of the change, and the cost of it is
+     exactly this: a merchant can ask us to quote 120 seats and then upload
+     three. That is a legitimate thing to do — parties shrink — but at 450,000
+     quoted against 120 it is far more often a wrong file, and it is worth one
+     question before the booking is raised at the quoted amount.
+
+     The same confirmation the typed-passenger path below has asked for years,
+     applied to the source a group actually uses. Skipped when the count is
+     unknown (0/absent on a pre-change enquiry), because there is nothing to
+     disagree with. */
+  if (isGroup && clBrGroupImport && enquiry.passenger_count
+      && clBrGroupImport.passengers_imported !== enquiry.passenger_count) {
+    const ok = await clConfirm(
+      `The enquiry was for ${enquiry.passenger_count} passenger(s) and the uploaded list `
+      + `has ${clBrGroupImport.passengers_imported}. Our team will re-check availability `
+      + 'for the new party size. Continue?',
+      'Continue');
+    if (!ok) return;
+  }
 
   let passengers = [];
   if (!isGroup) {
@@ -1132,6 +1333,11 @@ async function clSubmitBookingRequest(finalize) {
   const remarks = ($('clBrRemarks').value || '').trim();
   const specialRequests = ($('clBrSpecial').value || '').trim();
   const contact = clContactPayload();
+  /* 0040. null when blank, NEVER 0 — the column distinguishes "not recorded"
+     from "sold at zero", and a 0 would drop a zero-saving booking into the
+     merchant's savings average. Reuses the enquiry form's parser so the two
+     screens cannot disagree about what a blank box means. */
+  const clientFare = clParseMoney($('clBrClientFare')?.value);
 
   /* THREE try BLOCKS, NOT ONE.
      These steps fail in different ways and must be reported differently. When
@@ -1149,23 +1355,28 @@ async function clSubmitBookingRequest(finalize) {
          manifest and are not editable here, so there is nothing to replace. */
       if (!isGroup) await MerchantApi.replacePassengers(clBookingDraft.id, passengers);
       request = await MerchantApi.updateDraft(clBookingDraft.id, {
-        remarks, contact, specialRequests,
+        remarks, contact, specialRequests, clientFare,
       });
       request = request.request || request;
     } else if (clBookingDirect) {
       /* First save, direct path: the journey goes up with the travellers,
          because there is no enquiry holding it. Same two-step shape as below —
          this creates the draft, /submit is still what reaches the desk. */
-      request = await MerchantApi.createDirectBooking(clBookingDirect, {
-        passengers, remarks, contact, international: intl, specialRequests,
-        groupImportId: groupImportId,
-      });
+      request = await MerchantApi.createDirectBooking(
+        /* The direct payload is the itinerary the form produced; the client
+           fare is collected on THIS screen now, so it is layered on here
+           rather than carried through the enquiry form's state. */
+        { ...clBookingDirect, client_fare: clientFare },
+        {
+          passengers, remarks, contact, international: intl, specialRequests,
+          groupImportId: groupImportId,
+        });
     } else {
       /* First save: creates the draft against the enquiry. Only /submit puts
          it in front of the approvals team. */
       request = await MerchantApi.enquiryToBookingRequest(enquiry.id, {
         passengers, remarks, contact, international: intl, specialRequests,
-        groupImportId: groupImportId,
+        groupImportId: groupImportId, clientFare,
       });
     }
   } catch (err) {
@@ -1191,6 +1402,20 @@ async function clSubmitBookingRequest(finalize) {
       submitBtn.disabled = false; draftBtn.disabled = false;
       return;
     }
+  }
+
+  /* The passenger rows exist now, so any passport scan that filled this form
+     can be told which booking and traveller it became — and which of its values
+     the merchant changed on the way. Deliberately after the save and outside
+     its error handling: the audit is about the scan, and a booking the server
+     has already accepted must never be reported as a failure because an audit
+     write did not land. `clOcrRecordEdits` swallows its own errors too. */
+  if (typeof clOcrRecordEdits === 'function') {
+    clSyncPassengerIds(request.passengers);
+    clOcrRecordEdits(
+      [...$('clBrPaxList').querySelectorAll('[data-cl-pax]')],
+      request.id,
+    );
   }
 
   /* Cosmetic from here: the screen, the cached section lists and the unread

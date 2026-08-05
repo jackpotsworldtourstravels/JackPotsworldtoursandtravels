@@ -54,6 +54,16 @@ const MGR_TITLES = {
   profile: ['Profile & Security', 'Your details and password.'],
 };
 
+/* 24-hour preferred time, the same clock the merchant entered it on and the
+   Admin screens render it in. Preferred times only — record timestamps keep
+   whatever format their own formatter gives them. */
+function mgTime(hhmm) {
+  if (!hhmm) return '—';
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h)) return String(hhmm);
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+}
+
 function mgrErr(err, fallback) {
   return err?.response?.data?.detail || err?.message || fallback || 'Something went wrong.';
 }
@@ -574,11 +584,16 @@ function mgrRenderReview(data) {
         <div><dt>Trip type</dt><dd>${tripTypeLabel(d.trip_type)}</dd></div>
         <div><dt>From</dt><dd>${escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
         <div><dt>To</dt><dd>${escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—')}</dd></div>
-        <div><dt>Airline</dt><dd>${escapeHtml(d.airline || '—')}</dd></div>
+        <div><dt>Airline</dt><dd>${escapeHtml(fmtAirline(d.airline))}</dd></div>
         <div><dt>Flight number</dt><dd class="mg-ref">${escapeHtml(d.flight_number || '—')}</dd></div>
         <div><dt>Departure</dt><dd>${escapeHtml(fmtDate(r.travel_date))}</dd></div>
         ${roundTrip ? `<div><dt>Return</dt><dd>${escapeHtml(fmtDate(r.return_date))}</dd></div>` : ''}
+        <div><dt>Preferred time</dt><dd>${escapeHtml(mgTime(d.preferred_time))}</dd></div>
+        ${roundTrip
+          ? `<div><dt>Return time</dt><dd>${escapeHtml(mgTime(d.return_preferred_time))}</dd></div>`
+          : ''}
         <div><dt>Class</dt><dd>${escapeHtml(d.travel_class || '—')}</dd></div>
+        <div><dt>Booking Class</dt><dd>${escapeHtml(d.booking_class || '—')}</dd></div>
         <div><dt>Route</dt><dd>${d.international ? 'International' : 'Domestic'}</dd></div>
       </dl>
     </div>

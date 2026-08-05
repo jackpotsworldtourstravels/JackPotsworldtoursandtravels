@@ -79,6 +79,14 @@ def _detail(db: Session, request, actor: User) -> RequestDetailResponse:
             for d in sorted(request.documents, key=lambda d: d.created_at)
         ],
         can_download=ticket_service.can_download(request, actor),
+        # Present only on a group booking. `group_import` is the backref from
+        # group_booking_imports.request_id, so this is a plain attribute read
+        # rather than a query, and None on every request that never had one.
+        group_import_id=(
+            getattr(request, "group_import", None).import_id
+            if getattr(request, "group_import", None) is not None
+            else None
+        ),
     )
 
 
@@ -240,6 +248,7 @@ def update_request(
         db, current_user, request_id,
         remarks=payload.remarks, travel_date=payload.travel_date, return_date=payload.return_date,
         contact=payload.contact, special_requests=payload.special_requests,
+        client_fare=payload.client_fare,
     )
     return _detail(db, request, current_user)
 

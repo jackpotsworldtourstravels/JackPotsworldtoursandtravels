@@ -204,7 +204,7 @@ async function clOpenApproval(requestId) {
       <div><dt>Trip type</dt><dd>${roundTrip ? 'Round trip' : 'One way'}</dd></div>
       <div><dt>From</dt><dd>${escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
       <div><dt>To</dt><dd>${escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—')}</dd></div>
-      <div><dt>Airline</dt><dd>${escapeHtml(d.airline || '—')}</dd></div>
+      <div><dt>Airline</dt><dd>${escapeHtml(fmtAirline(d.airline))}</dd></div>
       <div><dt>Flight</dt><dd class="cl-ref">${escapeHtml(d.flight_number || '—')}</dd></div>
       <div><dt>Departure</dt><dd>${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}</dd></div>
       ${roundTrip ? `<div><dt>Return</dt><dd>${escapeHtml(fmtDate(r.return_date))}</dd></div>` : ''}

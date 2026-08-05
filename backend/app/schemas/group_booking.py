@@ -22,6 +22,24 @@ from app.models_v2 import GroupImportStatus
 from app.schemas.ticket import PassengerInput
 
 
+class GroupBookingLimits(BaseModel):
+    """The bounds the group-booking screens have to enforce, served not guessed.
+
+    The enquiry form refuses a party larger than the platform allows *before*
+    sending it, and the upload card advertises the row and byte limits. All
+    three numbers are configuration, so a UI that hard-coded them would start
+    disagreeing with the server the moment the setting changed — and disagreeing
+    in the worst direction, telling a merchant 1000 is fine while the API says
+    otherwise.
+
+    ``max_passengers`` bounds BOTH the number a group enquiry may state and the
+    rows a manifest may carry, because they are the same setting.
+    """
+
+    max_passengers: int
+    max_upload_mb: int
+
+
 class GroupImportError(BaseModel):
     """One thing wrong with one row.
 

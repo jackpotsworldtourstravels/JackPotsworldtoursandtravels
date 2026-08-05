@@ -187,6 +187,12 @@ class UpdateDraftRequest(BaseModel):
     #: has never sent them is unaffected.
     contact: dict | None = None
     special_requests: str | None = None
+    #: 0040, editable on a draft since the field moved to the Booking Request
+    #: screen (2026-08-05). ``None`` means "not supplied by this call" and leaves
+    #: the stored value alone — the same convention every other field here uses,
+    #: which is why clearing a client fare back to blank is not expressible and
+    #: does not need to be: a merchant who mistyped it overwrites it.
+    client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
 
 
 class ReplacePassengersRequest(BaseModel):
@@ -464,3 +470,22 @@ class RequestDetailResponse(BaseModel):
     #: — and every caller written before documents existed — is unaffected.
     documents: list["DocumentResponse"] = []
     can_download: bool = False
+    #: The uploaded passenger manifest's id, on a group booking. ``None`` on
+    #: every other request, which is what the default expresses.
+    #:
+    #: NEEDED BY THE RESUMED DRAFT. The upload moved from the enquiry to the
+    #: Booking Request screen, so a group draft is now the only place a merchant
+    #: can hold a manifest the *booking* knows about and the enquiry does not.
+    #: Without this the screen cannot tell "this draft already has its passenger
+    #: list" from "it has none", and would ask for the sheet a second time.
+    #:
+    #: A BARE ID RATHER THAN ``GroupImportSummary``, deliberately.
+    #: ``schemas.group_booking`` imports ``PassengerInput`` from this module, so
+    #: naming its type here would close an import cycle. The dependency runs one
+    #: way — group_booking depends on ticket, never the reverse — and the id is
+    #: the whole of what the screen needs: it re-reads the import through
+    #: ``GET /api/group-bookings/imports/{id}`` when it wants the detail, which
+    #: is the same call the enquiry-led path already makes. An id that is
+    #: attached to a request is also a *valid* import by construction, because
+    #: ``attach_to_request`` refuses anything less.
+    group_import_id: int | None = None

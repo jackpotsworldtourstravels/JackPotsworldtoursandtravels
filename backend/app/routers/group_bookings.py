@@ -38,6 +38,7 @@ from app.auth.rbac import P, require
 from app.database.session import get_db
 from app.models_v2 import GroupImportStatus, User
 from app.schemas.group_booking import (
+    GroupBookingLimits,
     GroupImportDetail,
     GroupImportUploadResult,
 )
@@ -99,6 +100,30 @@ def _log(
 # ---------------------------------------------------------------------------
 # Merchant
 # ---------------------------------------------------------------------------
+@router.get(
+    "/group-bookings/limits",
+    response_model=GroupBookingLimits,
+    tags=["merchant · group booking"],
+    summary="The configured group-booking bounds",
+    description=(
+        "Requires `ticket.request`. The party size a group booking may carry and the upload "
+        "size limit, both read from server configuration. The enquiry form validates the "
+        "merchant's **Number of Passengers** against `max_passengers` before sending, and the "
+        "same number bounds the rows an uploaded manifest may contain — one setting, so the "
+        "two gates cannot contradict each other."
+    ),
+)
+def group_booking_limits(
+    current_user: User = Depends(require(P.TICKET_REQUEST)),
+) -> GroupBookingLimits:
+    # Deliberately not logged to activity: it is read on every open of the
+    # enquiry form and says nothing about what the merchant did.
+    return GroupBookingLimits(
+        max_passengers=gb.MAX_ROWS,
+        max_upload_mb=gb.MAX_UPLOAD_BYTES // (1024 * 1024),
+    )
+
+
 @router.get(
     "/group-bookings/template",
     tags=["merchant · group booking"],

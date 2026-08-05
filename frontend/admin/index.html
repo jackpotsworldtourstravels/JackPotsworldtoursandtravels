@@ -8,15 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260805ui28">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260805ui31">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260805ui28">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260805ui31">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260805ui28">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260805ui31">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -63,131 +63,183 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span>Collapse</span>
     </button>
 
-    <div class="nav-group-label">Overview</div>
-    <a href="#" class="nav-item active" data-section="reports">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-      <span class="nav-label">Dashboard</span>
-    </a>
-    <a href="#" class="nav-item" data-section="users">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="nav-label">Merchant Management</span>
-    </a>
-    <a href="#" class="nav-item" data-section="active-users">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
-      <span class="nav-label">Active Users</span>
-    </a>
-    <a href="#" class="nav-item" data-section="support">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
-      <span class="nav-label">Support Management</span>
-      <span class="nav-badge" id="supportNavBadge" style="display:none;"></span>
-    </a>
-    <a href="#" class="nav-item" data-section="reports-export">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-      <span class="nav-label">Reports</span>
-    </a>
-    <!-- M6. Its own section rather than tiles bolted onto the Dashboard: the
-         Dashboard answers "what needs me right now" in counters, and this
-         answers "how is the desk doing" over a period. Mixing the two puts a
-         six-month average beside a live queue badge, and the pair gets read as
-         one number. Reports (above) exports rows; this only ever aggregates. -->
-    <a href="#" class="nav-item" data-section="analytics">
-      <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
-      <span class="nav-label">Analytics</span>
-    </a>
-    <a href="#" class="nav-item" data-section="payments">
-      <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-      <span class="nav-label">Payment Management</span>
-    </a>
-    <!-- CR-4d — the wallet desk. Deliberately its own section rather than a tab
-         inside Payment Management: that screen is per-booking payments on the
-         standard track, this one is the running merchant account. Two different
-         settlement models sharing one screen is how a figure ends up read
-         against the wrong one. -->
-    <a href="#" class="nav-item" data-section="wallet-desk">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
-      <span class="nav-label">Wallet &amp; Top-ups</span>
-      <span class="nav-badge" id="wdNavBadge" hidden></span>
-    </a>
-    <!-- Booking Enquiries sits above the Approval Queue deliberately: an enquiry
-         precedes the booking it may become, and the two are separate workflows
-         with different actions (answer vs approve) and no payable stage. -->
-    <a href="#" class="nav-item" data-section="ticket-enquiries">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
-      <span class="nav-label">Booking Enquiries</span>
-      <span class="nav-badge" id="enqNavBadge" hidden></span>
-    </a>
-    <a href="#" class="nav-item" data-section="partner-requests">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="nav-label">Approval Queue</span>
-    </a>
-    <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
-         from the Approval Queue above: a booking is in exactly one of the two
-         screens at any time, so nothing is ever worked twice. Classic Tours
-         bookings arrive here only once a Manager has approved them. -->
-    <a href="#" class="nav-item" data-section="booking-ops">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
-      <span class="nav-label">Booking Operations</span>
-      <span class="nav-badge" id="opsNavBadge" hidden></span>
-    </a>
-    <!-- One screen for every service request, whatever its type. There used to
-         be a second, "Cancellations & Reschedules", because those two settle
-         money and change the booking while the others do not — but that is a
-         difference in what the Settle button does, not a different queue, and
-         splitting them meant an admin had to know which screen a request had
-         landed on before they could find it. The action is chosen per row from
-         the request's type; the settle dialog itself is unchanged. -->
-    <a href="#" class="nav-item" data-section="service-requests-mgmt">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-      <span class="nav-label">Service Request Management</span>
-      <span class="nav-badge" id="srmNavBadge" hidden></span>
-    </a>
-    <!-- 0039 — the external suppliers the desk buys tickets FROM. Placed with
-         the other management modules and directly under Booking Operations,
-         because a provider is chosen on that screen at ticket issuance and this
-         is where the resulting purchase history is read. Deliberately NOT near
-         Merchant Management: a merchant is a customer, a provider is a
-         supplier, and the two lists must not read as variations of one thing. -->
-    <a href="#" class="nav-item" data-section="providers">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
-      <span class="nav-label">Provider Management</span>
-    </a>
-    <!-- Audit Logs moved here from the Super Admin Portal, with System Logs
-         added beside it. Both endpoints are permission-gated (`audit.view` /
-         `system.activity.view`), which `_ADMIN` already holds — see the header
-         of assets/js/admin-logs.js. No backend change was required. -->
-    <a href="#" class="nav-item" data-section="audit">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-      <span class="nav-label">Audit Logs</span>
-    </a>
-    <a href="#" class="nav-item" data-section="system-logs">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m8 10 2 2-2 2"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
-      <span class="nav-label">System Logs</span>
-    </a>
-    <a href="#" class="nav-item" data-section="notifications">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-      <span class="nav-label">Communication</span>
-    </a>
-    <a href="#" class="nav-item" data-section="profile">
-      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
-      <span class="nav-label">Profile</span>
-    </a>
+    <!-- ============== NAVIGATION ==============
+         SEVEN GROUPS, AND EVERY MODULE THAT WAS HERE IS STILL HERE. Nothing was
+         removed, no `data-section` changed, no badge id changed, and nothing is
+         permission-gated differently — admin.js routes on `data-section` alone
+         and never on position, so this is ordering and headings only.
+
+         WHY THE GROUPS ARE THESE GROUPS. The list had grown to sixteen items
+         under a single "Overview" heading, in the order each was built: Reports
+         sat between Support and Analytics, the wallet sat between Payment
+         Management and Booking Enquiries, and Profile sat below Audit Logs. The
+         headings below are the questions an operator actually arrives with —
+         who are my merchants, what is waiting on the desk, where is the money,
+         what happened — and each group is small enough to scan without reading.
+
+         Two things deliberately did NOT move. Booking Enquiries stays above
+         Approval Queue, because an enquiry precedes the booking it may become.
+         Booking Operations stays directly under Approval Queue, because a
+         booking is in exactly one of the two at any moment and the pair reads
+         as one pipeline. -->
+
+    <div class="nav-group">
+      <div class="nav-group-label">Overview</div>
+      <a href="#" class="nav-item active" data-section="reports">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Merchant Management</div>
+      <a href="#" class="nav-item" data-section="users">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Merchant Management</span>
+      </a>
+      <a href="#" class="nav-item" data-section="active-users">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
+        <span class="nav-label">Active Users</span>
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Operations</div>
+      <!-- Booking Enquiries sits above the Approval Queue deliberately: an enquiry
+           precedes the booking it may become, and the two are separate workflows
+           with different actions (answer vs approve) and no payable stage. -->
+      <a href="#" class="nav-item" data-section="ticket-enquiries">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
+        <span class="nav-label">Booking Enquiries</span>
+        <span class="nav-badge" id="enqNavBadge" hidden></span>
+      </a>
+      <a href="#" class="nav-item" data-section="partner-requests">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <span class="nav-label">Approval Queue</span>
+      </a>
+      <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
+           from the Approval Queue above: a booking is in exactly one of the two
+           screens at any time, so nothing is ever worked twice. Classic Tours
+           bookings arrive here only once a Manager has approved them. -->
+      <a href="#" class="nav-item" data-section="booking-ops">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
+        <span class="nav-label">Booking Operations</span>
+        <span class="nav-badge" id="opsNavBadge" hidden></span>
+      </a>
+      <!-- One screen for every service request, whatever its type. There used to
+           be a second, "Cancellations & Reschedules", because those two settle
+           money and change the booking while the others do not — but that is a
+           difference in what the Settle button does, not a different queue, and
+           splitting them meant an admin had to know which screen a request had
+           landed on before they could find it. The action is chosen per row from
+           the request's type; the settle dialog itself is unchanged. -->
+      <a href="#" class="nav-item" data-section="service-requests-mgmt">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+        <span class="nav-label">Service Request Management</span>
+        <span class="nav-badge" id="srmNavBadge" hidden></span>
+      </a>
+      <!-- 0039 — the external suppliers the desk buys tickets FROM. It sits at the
+           foot of Operations, directly under the queues, because a provider is
+           chosen on Booking Operations at ticket issuance and this is where the
+           resulting purchase history is read. Deliberately NOT in the Merchant
+           group above: a merchant is a customer, a provider is a supplier, and
+           the two lists must not read as variations of one thing. -->
+      <a href="#" class="nav-item" data-section="providers">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
+        <span class="nav-label">Provider Management</span>
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Finance</div>
+      <a href="#" class="nav-item" data-section="payments">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span class="nav-label">Payment Management</span>
+      </a>
+      <!-- CR-4d — the wallet desk. Deliberately its own section rather than a tab
+           inside Payment Management: that screen is per-booking payments on the
+           standard track, this one is the running merchant account. Two different
+           settlement models sharing one screen is how a figure ends up read
+           against the wrong one. -->
+      <a href="#" class="nav-item" data-section="wallet-desk">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
+        <span class="nav-label">Wallet &amp; Top-ups</span>
+        <span class="nav-badge" id="wdNavBadge" hidden></span>
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Reports &amp; Analytics</div>
+      <a href="#" class="nav-item" data-section="reports-export">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        <span class="nav-label">Reports</span>
+      </a>
+      <!-- M6. Its own section rather than tiles bolted onto the Dashboard: the
+           Dashboard answers "what needs me right now" in counters, and this
+           answers "how is the desk doing" over a period. Mixing the two puts a
+           six-month average beside a live queue badge, and the pair gets read as
+           one number. Reports (above) exports rows; this only ever aggregates. -->
+      <a href="#" class="nav-item" data-section="analytics">
+        <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
+        <span class="nav-label">Analytics</span>
+      </a>
+      <!-- Audit Logs moved here from the Super Admin Portal, with System Logs
+           added beside it. Both endpoints are permission-gated (`audit.view` /
+           `system.activity.view`), which `_ADMIN` already holds — see the header
+           of assets/js/admin-logs.js. No backend change was required. -->
+      <a href="#" class="nav-item" data-section="audit">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        <span class="nav-label">Audit Logs</span>
+      </a>
+      <a href="#" class="nav-item" data-section="system-logs">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m8 10 2 2-2 2"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
+        <span class="nav-label">System Logs</span>
+      </a>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-group-label">Support</div>
+      <a href="#" class="nav-item" data-section="support">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
+        <span class="nav-label">Support Management</span>
+        <span class="nav-badge" id="supportNavBadge" style="display:none;"></span>
+      </a>
+      <a href="#" class="nav-item" data-section="notifications">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="nav-label">Communication</span>
+      </a>
+    </div>
 
     <div class="spacer"></div>
-    <a href="../index.html" class="nav-item">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-      <span class="nav-label">Back to site</span>
-    </a>
-    <a href="#" class="nav-item logout" id="logoutBtn">
-      <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-      <span class="nav-label">Sign Out</span>
-    </a>
+
+    <!-- ACCOUNT — pinned to the foot by the spacer above, which is why this
+         group carries `nav-group-last`: the 18px top margin every other group
+         gets would push it away from the bottom edge, and `.spacer` has already
+         provided all the separation it needs. -->
+    <div class="nav-group nav-group-last">
+      <div class="nav-group-label">Account</div>
+      <a href="#" class="nav-item" data-section="profile">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+        <span class="nav-label">Profile</span>
+      </a>
+      <a href="../index.html" class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        <span class="nav-label">Back to site</span>
+      </a>
+      <a href="#" class="nav-item logout" id="logoutBtn">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span class="nav-label">Sign Out</span>
+      </a>
+    </div>
   </nav>
 
   <main class="main">
-    <div class="env-banner">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/></svg>
-      <span>Mock payment gateway — all payments here are simulated, no real transactions are processed.</span>
-    </div>
+    <!-- The `.env-banner` that used to sit here — "Mock payment gateway — all
+         payments here are simulated, no real transactions are processed." — was
+         removed on request. It was the only element in the platform carrying
+         that class; the rules for it in admin.css and jp-ds.css are left in
+         place so re-adding a banner stays a one-line change, and a class with
+         no element renders nothing. Nothing about payment handling changed. -->
     <div class="topbar">
       <div class="topbar-left">
         <h1 id="pageTitle">Dashboard</h1>
@@ -397,10 +449,14 @@
       </div>
     </section>
 
-    <!-- CR-4d — the wallet desk: three panels, rendered by admin-wallet-desk.js.
+    <!-- CR-4d — the wallet desk: two panels, rendered by admin-wallet-desk.js.
          1. the verification queue (the work), 2. reconciliation (the proof the
-         ledger and the cached balances still agree), 3. payment accounts (where
-         merchants are told to send money). -->
+         ledger and the cached balances still agree).
+
+         A third panel, Payment Accounts, was removed on request. It was the
+         editor for the bank/UPI/QR rows the merchant's Add Money screen reads,
+         and /api/admin/payment-accounts is untouched and still serves them —
+         only this portal's editor for them is gone. -->
     <section class="section" id="section-wallet-desk">
       <div class="panel">
         <div class="panel-head">
@@ -430,16 +486,6 @@
         <div class="table-wrap"><table id="wdReconTable"><thead><tr>
           <th>Merchant</th><th>Wallet balance</th><th>Ledger balance</th><th>Drift</th>
           <th>Outstanding</th><th>Credit limit</th><th>Pending top-ups</th><th></th>
-        </tr></thead><tbody></tbody></table></div>
-      </div>
-
-      <div class="panel" style="margin-top:20px;">
-        <div class="panel-head">
-          <h2>Payment Accounts</h2>
-          <button type="button" class="btn btn-coral" id="wdAddAccountBtn">Add account</button>
-        </div>
-        <div class="table-wrap"><table id="wdAccountsTable"><thead><tr>
-          <th>Label</th><th>Type</th><th>Details</th><th>Order</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -854,13 +900,12 @@
   <div class="modal-card modal-lg" id="opsWorkBody" role="dialog" aria-modal="true" aria-labelledby="opsWorkTitle"></div>
 </div>
 
-<!-- CR-4d — reviewing one top-up claim, and the payment-account editor. Both
-     rendered by admin-wallet-desk.js and focus-trapped by components/focus-trap.js. -->
+<!-- CR-4d — reviewing one top-up claim, and one merchant's ledger. Both
+     rendered by admin-wallet-desk.js and focus-trapped by components/focus-trap.js.
+     The payment-account editor that used to sit between them went with the
+     Payment Accounts panel. -->
 <div class="modal-overlay" id="wdReviewOverlay">
   <div class="modal-card modal-lg" id="wdReviewBody" role="dialog" aria-modal="true" aria-labelledby="wdReviewTitle"></div>
-</div>
-<div class="modal-overlay" id="wdAccountOverlay">
-  <div class="modal-card modal-lg" id="wdAccountBody" role="dialog" aria-modal="true" aria-labelledby="wdAccountTitle"></div>
 </div>
 <div class="modal-overlay" id="wdLedgerOverlay">
   <div class="modal-card modal-lg" id="wdLedgerBody" role="dialog" aria-modal="true" aria-labelledby="wdLedgerTitle"></div>
@@ -879,11 +924,15 @@
      One overlay for both: only one of the two is ever open, and a second
      overlay would just be a second thing to remember to close. -->
 <div class="modal-overlay" id="provModalOverlay">
-  <div class="modal-card" id="provModalBody" role="dialog" aria-modal="true" aria-labelledby="provModalTitle"></div>
+  <div class="modal-card modal-md" id="provModalBody" role="dialog" aria-modal="true" aria-labelledby="provModalTitle"></div>
 </div>
 
+<!-- `modal-md`, not `modal-lg`: this form is down to Company Name, Email and
+     Phone, and jp-ds.css §15's wide tier is sized for a ten-field grid. The
+     class changes the width only — the frame, grid, inputs and footer are the
+     same standard every other Admin dialog uses. -->
 <div class="modal-overlay" id="onboardMerchantModalOverlay">
-  <div class="modal-card modal-lg" id="onboardMerchantModalBody"></div>
+  <div class="modal-card modal-md" id="onboardMerchantModalBody"></div>
 </div>
 
 <!-- Add a staff login to the merchant currently open in Merchant Management.
@@ -910,17 +959,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260805ui28"></script>
-<script src="../components/toast.js?v=20260805ui28"></script>
-<script src="../components/spinner.js?v=20260805ui28"></script>
-<script src="../components/confirm-dialog.js?v=20260805ui28"></script>
-<script src="../components/focus-trap.js?v=20260805ui28"></script>
-<script src="../assets/js/auth.js?v=20260805ui28"></script>
+<script src="../shared/formatters.js?v=20260805ui31"></script>
+<script src="../components/toast.js?v=20260805ui31"></script>
+<script src="../components/spinner.js?v=20260805ui31"></script>
+<script src="../components/confirm-dialog.js?v=20260805ui31"></script>
+<script src="../components/focus-trap.js?v=20260805ui31"></script>
+<script src="../assets/js/auth.js?v=20260805ui31"></script>
 <script src="../assets/js/api.js"></script>
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260805ui28"></script>
+<script src="../assets/js/jp-login.js?v=20260805ui31"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -942,39 +991,39 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260805ui28"></script>
+<script src="../assets/js/admin.js?v=20260805ui31"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260805ui31"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-bookings.js?v=20260805ui31"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260805ui31"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260805ui31"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260805ui31"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260805ui31"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-analytics.js?v=20260805ui31"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260805ui28"></script>
-<script src="../assets/js/admin-logs.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-providers.js?v=20260805ui31"></script>
+<script src="../assets/js/admin-logs.js?v=20260805ui31"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260805ui31"></script>
 <!-- Dialog standard (jp-ds.css §15). Adds only the header close control, which
      is the one part of the standard CSS cannot supply — the rest is stylesheet.
      Loaded LAST so every overlay it observes already exists in the document. -->
-<script src="../assets/js/admin-dialog-standard.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-dialog-standard.js?v=20260805ui31"></script>
 </body>
 </html>

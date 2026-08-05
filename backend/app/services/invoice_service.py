@@ -102,6 +102,23 @@ def _sector(request: ServiceRequest) -> str:
     return f"{origin} → {dest}" if (origin or dest) else (request.title or "—")
 
 
+def _flight_label(details: dict) -> str:
+    """"IndiGo 6E217", "IndiGo", "6E217", or "" — whatever was actually stated.
+
+    Both keys are optional as of 2026-08-05: an OPEN enquiry names no carrier
+    and asks the desk to quote the best available, and a merchant may name a
+    carrier without a service. Both are stored PRESENT AND NULL, which is the
+    trap this exists to close — ``details.get("airline", "")`` returns ``None``
+    for a key that exists with a null value, and an f-string then prints the
+    word "None" onto an invoice a merchant sends to its own customer.
+    """
+    parts = [
+        (details.get("airline") or "").strip(),
+        (details.get("flight_number") or "").strip(),
+    ]
+    return " ".join(p for p in parts if p)
+
+
 def _header(story, styles, heading: str, request: ServiceRequest, merchant):
     story.append(Paragraph("JackPots World Tours &amp; Travels", styles["title"]))
     story.append(Paragraph("B2B travel bookings", styles["sub"]))
@@ -168,7 +185,10 @@ def build_invoice(db: Session, actor: User, request_id: int) -> tuple[bytes, str
 
     story.append(Paragraph("Booking", styles["h"]))
     d = request.travel_details or {}
-    flight = f"{d.get('airline', '')} {d.get('flight_number', '')}".strip()
+    # `or ''` and not `.get(k, '')`: both keys are PRESENT AND NULL on an open
+    # enquiry (no carrier named), and a default only applies to a missing key —
+    # so the dict form would interpolate the string "None" onto an invoice.
+    flight = _flight_label(d)
     # A Paragraph, not a bare string: a plain table cell renders markup
     # literally, so the <br/> would print as the characters "<br/>".
     description = Paragraph(
@@ -296,7 +316,7 @@ def build_confirmation(db: Session, actor: User, request_id: int) -> tuple[bytes
     story.append(Paragraph("Itinerary", styles["h"]))
     story.append(_kv_table([
         ("Route", _sector(request)),
-        ("Flight", f"{d.get('airline', '')} {d.get('flight_number', '')}".strip() or "—"),
+        ("Flight", _flight_label(d) or "All Airlines"),
         ("Departure", request.travel_date.strftime("%d %b %Y") if request.travel_date else "—"),
         ("Time", d.get("preferred_time") or "—"),
         ("Return", request.return_date.strftime("%d %b %Y") if request.return_date else "—"),

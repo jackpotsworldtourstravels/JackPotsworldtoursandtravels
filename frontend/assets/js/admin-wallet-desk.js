@@ -1,8 +1,11 @@
 /* Admin — Wallet & Top-ups (CR-4d)
    ================================
    The staff side of the merchant wallet: the queue that decides whether money
-   arrived, the reconciliation that proves the ledger still adds up, and the
-   accounts merchants are told to pay into.
+   arrived, and the reconciliation that proves the ledger still adds up.
+
+   The third panel — Payment Accounts, the editor for where merchants are told
+   to pay — was removed on request; see the note further down before its
+   endpoints are assumed unused.
 
    WHY THIS IS NOT A TAB INSIDE PAYMENT MANAGEMENT
    That screen is per-booking payments on the standard track — an invoice, a
@@ -26,8 +29,6 @@
      POST /api/admin/wallet/topups/{id}/reject         moves no money, needs a reason
      GET  /api/admin/wallet/reconciliation             drift per merchant
      GET  /api/admin/merchants/{id}/wallet/transactions the ledger, as the merchant sees it
-     GET/POST/PUT/DELETE /api/admin/payment-accounts   where money is sent
-     POST /api/admin/payment-accounts/{id}/qr          the QR image
 */
 
 const WD_BUCKETS = [
@@ -407,216 +408,28 @@ async function wdOpenLedger(merchantId, name) {
   }
 }
 
-/* ------------------------------------------------------ payment accounts --- */
-const WD_ACCOUNT_FIELDS = {
-  bank: [
-    ['account_name', 'Account name', true], ['account_number', 'Account number', true],
-    ['ifsc', 'IFSC', true], ['bank_name', 'Bank', false], ['branch', 'Branch', false],
-  ],
-  upi: [['upi_id', 'UPI ID', true], ['payee_name', 'Payee name', false]],
-  qr: [['upi_id', 'UPI ID', false], ['payee_name', 'Payee name', false], ['note', 'Note', false]],
-};
+/* ------------------------------------------------- payment accounts (gone) ---
+   The Payment Accounts panel and its editor were removed from this desk on
+   request. What lived here was WD_ACCOUNT_FIELDS, wdLoadAccounts,
+   wdOpenAccount/wdCloseAccount, wdSaveAccount and wdRetireAccount — the CRUD
+   over /api/admin/payment-accounts.
 
-async function wdLoadAccounts() {
-  const tbody = document.querySelector('#wdAccountsTable tbody');
-  tbody.innerHTML = '<tr><td colspan="6">Loading…</td></tr>';
-  try {
-    const { data } = await axios.get(
-      `${API_BASE}/api/admin/payment-accounts`, { headers: authHeaders() });
+   DELETED RATHER THAN LEFT UNREACHABLE. Every one of those functions read an
+   element that no longer exists (#wdAccountsTable, #wdAccountOverlay,
+   #wdAccLabel), so keeping them would have left calls that throw on
+   `null.innerHTML` the moment anything reached them.
 
-    if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="ops-sub">
-        No payment accounts yet. Until one is active and usable, the merchant's
-        Add Money screen has nowhere to send money to.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.map(a => `
-      <tr>
-        <td><strong>${wdEsc(a.label)}</strong></td>
-        <td>${wdEsc(a.account_type.toUpperCase())}</td>
-        <td class="ops-sub">${wdEsc(
-          Object.entries(a.details || {}).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ')
-          || (a.has_qr_image ? 'QR image attached' : '—'))}</td>
-        <td>${a.display_order}</td>
-        <td>${a.is_active
-              ? '<span class="badge ok">Active</span>'
-              : '<span class="badge">Retired</span>'}</td>
-        <td>
-          <button type="button" class="btn btn-sm" data-wd-editacc="${a.account_id}">Edit</button>
-          ${a.is_active
-            ? `<button type="button" class="btn btn-sm" data-wd-retireacc="${a.account_id}"
-                       data-wd-acclabel="${wdEsc(a.label)}">Retire</button>`
-            : ''}
-        </td>
-      </tr>`).join('');
-
-    window.__wdAccounts = data;
-    document.querySelectorAll('[data-wd-editacc]').forEach(b => {
-      b.addEventListener('click', () => wdOpenAccount(Number(b.dataset.wdEditacc)));
-    });
-    document.querySelectorAll('[data-wd-retireacc]').forEach(b => {
-      b.addEventListener('click', () => wdRetireAccount(Number(b.dataset.wdRetireacc), b.dataset.wdAcclabel));
-    });
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" class="msg error">${wdEsc(wdErr(err, 'Could not load accounts.'))}</td></tr>`;
-  }
-}
-
-function wdCloseAccount() {
-  document.getElementById('wdAccountOverlay').classList.remove('open');
-  if (wdReleaseTrap) { wdReleaseTrap(); wdReleaseTrap = null; }
-}
-
-function wdOpenAccount(accountId) {
-  const overlay = document.getElementById('wdAccountOverlay');
-  const body = document.getElementById('wdAccountBody');
-  const existing = accountId
-    ? (window.__wdAccounts || []).find(a => a.account_id === accountId)
-    : null;
-  const type = existing?.account_type || 'bank';
-
-  const fieldsFor = t => (WD_ACCOUNT_FIELDS[t] || []).map(([key, label, required]) => `
-    <div class="form-field" style="max-width:none;">
-      <label for="wdAcc_${key}">${wdEsc(label)}${required ? ' *' : ''}</label>
-      <input type="text" id="wdAcc_${key}" data-wd-detail="${key}"
-             value="${wdEsc(existing?.details?.[key] || '')}">
-    </div>`).join('');
-
-  body.innerHTML = `
-    <div class="ops-modal-head">
-      <h2 id="wdAccountTitle">${existing ? 'Edit payment account' : 'Add payment account'}</h2>
-      <button type="button" class="icon-btn" id="wdAccClose" aria-label="Close">&times;</button>
-    </div>
-    <div class="ops-modal-body">
-      <div class="form-field" style="max-width:none;">
-        <label for="wdAccType">Type</label>
-        <select id="wdAccType" ${existing ? 'disabled' : ''}>
-          <option value="bank"${type === 'bank' ? ' selected' : ''}>Bank account</option>
-          <option value="upi"${type === 'upi' ? ' selected' : ''}>UPI ID</option>
-          <option value="qr"${type === 'qr' ? ' selected' : ''}>QR code</option>
-        </select>
-        ${existing ? '<p class="ops-sub">The rail cannot be changed — retire this account and add another.</p>' : ''}
-      </div>
-      <div class="form-field" style="max-width:none;">
-        <label for="wdAccLabel">Label *</label>
-        <input type="text" id="wdAccLabel" value="${wdEsc(existing?.label || '')}"
-               placeholder="What merchants see, e.g. HDFC Current — JackPots">
-      </div>
-      <div id="wdAccFields">${fieldsFor(type)}</div>
-      <div class="form-field" style="max-width:none;">
-        <label for="wdAccOrder">Display order</label>
-        <input type="number" id="wdAccOrder" value="${existing?.display_order ?? 0}" step="1">
-      </div>
-      <div class="form-field" style="max-width:none;">
-        <label for="wdAccQr">QR image${type === 'qr' ? ' *' : ''}</label>
-        <input type="file" id="wdAccQr" accept="image/png,image/jpeg,image/webp">
-        <p class="ops-sub">${existing?.has_qr_image
-          ? 'An image is attached — uploading replaces it.'
-          : 'PNG, JPEG or WebP. Required before a QR account can be made active.'}</p>
-      </div>
-      <label class="ops-check">
-        <input type="checkbox" id="wdAccActive" ${existing ? (existing.is_active ? 'checked' : '') : 'checked'}>
-        Active — shown on the merchant's Add Money screen
-      </label>
-      <div class="ops-actions">
-        <button type="button" class="btn btn-coral" id="wdAccSave">${existing ? 'Save changes' : 'Create account'}</button>
-        <div class="msg" id="wdAccMsg" aria-live="polite"></div>
-      </div>
-    </div>`;
-
-  overlay.classList.add('open');
-  document.getElementById('wdAccClose').addEventListener('click', wdCloseAccount);
-  document.getElementById('wdAccType').addEventListener('change', e => {
-    document.getElementById('wdAccFields').innerHTML = fieldsFor(e.target.value);
-  });
-  document.getElementById('wdAccSave').addEventListener('click', () => wdSaveAccount(accountId));
-  wdReleaseTrap = trapFocus(body);
-}
-
-async function wdSaveAccount(accountId) {
-  const msg = document.getElementById('wdAccMsg');
-  const label = document.getElementById('wdAccLabel').value.trim();
-  if (!label) {
-    msg.className = 'msg error';
-    msg.textContent = 'Give the account a label — it is what merchants see.';
-    document.getElementById('wdAccLabel').focus();
-    return;
-  }
-
-  const details = {};
-  document.querySelectorAll('[data-wd-detail]').forEach(i => {
-    if (i.value.trim()) details[i.dataset.wdDetail] = i.value.trim();
-  });
-
-  const type = document.getElementById('wdAccType').value;
-  const active = document.getElementById('wdAccActive').checked;
-  const order = Number(document.getElementById('wdAccOrder').value) || 0;
-  const file = document.getElementById('wdAccQr').files[0];
-
-  msg.className = 'msg';
-  msg.textContent = 'Saving…';
-  try {
-    let id = accountId;
-    if (id) {
-      /* Deactivate-then-upload-then-reactivate is not needed: the server checks
-         usability against the resulting state, and the QR upload below happens
-         before we ask for `is_active: true` on a QR account. */
-      await axios.put(`${API_BASE}/api/admin/payment-accounts/${id}`,
-        { label, details, display_order: order, is_active: file && type === 'qr' ? false : active },
-        { headers: authHeaders() });
-    } else {
-      const { data } = await axios.post(`${API_BASE}/api/admin/payment-accounts`,
-        { account_type: type, label, details, display_order: order,
-          /* A QR account cannot be created active — it has no image yet. It is
-             switched on after the upload, below. */
-          is_active: type === 'qr' ? false : active },
-        { headers: authHeaders() });
-      id = data.account_id;
-    }
-
-    if (file) {
-      const fd = new FormData();
-      fd.append('file', file);
-      await axios.post(`${API_BASE}/api/admin/payment-accounts/${id}/qr`, fd,
-        { headers: authHeaders() });
-      if (active) {
-        await axios.put(`${API_BASE}/api/admin/payment-accounts/${id}`,
-          { is_active: true }, { headers: authHeaders() });
-      }
-    }
-
-    showToast(accountId ? 'Payment account updated.' : 'Payment account added.');
-    wdCloseAccount();
-    wdLoadAccounts();
-  } catch (err) {
-    msg.className = 'msg error';
-    msg.textContent = wdErr(err, 'Could not save that account.');
-  }
-}
-
-async function wdRetireAccount(accountId, label) {
-  if (!await confirmDialog({
-    title: `Retire ${label}?`,
-    message: 'It disappears from the merchant’s Add Money screen. Past top-ups paid into it keep their record — the account is never deleted.',
-    confirmText: 'Retire',
-  })) return;
-  try {
-    await axios.delete(`${API_BASE}/api/admin/payment-accounts/${accountId}`,
-      { headers: authHeaders() });
-    showToast('Account retired.');
-    wdLoadAccounts();
-  } catch (err) {
-    showToast(wdErr(err, 'Could not retire that account.'), true);
-  }
-}
+   THE ENDPOINTS ARE UNTOUCHED, AND THEY ARE STILL LOAD-BEARING. The merchant's
+   Add Money screen reads GET /api/merchant/wallet/payment-accounts to know
+   where to send money; those rows are the same records. Removing this editor
+   removes the way to ADD or EDIT them from the Admin Portal — existing accounts
+   keep working and keep being offered to merchants. */
 
 /* ----------------------------------------------------------------- wire --- */
 function wdInit() {
   wdLoadCounts();
   wdLoadQueue();
   wdLoadReconciliation();
-  wdLoadAccounts();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -629,7 +442,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('wdMerchantFilter')?.addEventListener('change', e => {
     wdMerchantId = e.target.value; wdPage = 1; wdLoadQueue();
   });
-  document.getElementById('wdAddAccountBtn')?.addEventListener('click', () => wdOpenAccount(null));
 
   document.querySelector('[data-section="wallet-desk"]')?.addEventListener('click', () => {
     setTimeout(wdInit, 0);
@@ -641,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('jwt_access')) wdLoadCounts();
 });
 
-['wdReviewOverlay', 'wdAccountOverlay', 'wdLedgerOverlay'].forEach(id => {
+['wdReviewOverlay', 'wdLedgerOverlay'].forEach(id => {
   document.getElementById(id)?.addEventListener('click', e => {
     if (e.target === document.getElementById(id)) {
       document.getElementById(id).classList.remove('open');
@@ -651,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
-  ['wdReviewOverlay', 'wdAccountOverlay', 'wdLedgerOverlay'].forEach(id => {
+  ['wdReviewOverlay', 'wdLedgerOverlay'].forEach(id => {
     const el = document.getElementById(id);
     if (el?.classList.contains('open')) {
       el.classList.remove('open');

@@ -127,17 +127,13 @@ const opsDash = v => (v === null || v === undefined || v === '' ? '—' : v);
    collects and displays it that way, so it is printed unconverted: this field
    is a request the merchant made, and the desk reading a different clock from
    the person who filled the form in is how "09:30" becomes an evening flight.
-   Normalised to two digits so a column of times lines up. */
-/* 12-hour, matching admTimeLabel (Bookings) and enqTime (Booking Enquiries) —
-   this desk was the only one of the three still printing "19:45" for a merchant
-   who chose 7:45 PM. The wire format is unchanged 24-hour "HH:MM"; this reads
-   it, it does not write it. */
+   Normalised to two digits so a column of times lines up. Preferred times only;
+   record timestamps are unaffected. See admTimeLabel in admin-bookings.js. */
 function opsTime(hhmm) {
   if (!hhmm) return '—';
   const [h, m] = String(hhmm).split(':').map(Number);
   if (Number.isNaN(h)) return String(hhmm);
-  return `${String(h % 12 === 0 ? 12 : h % 12).padStart(2, '0')}:${
-    String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
 }
 
 /* When this booking's travel is scheduled to finish, for the "it completes on
@@ -510,13 +506,17 @@ function opsRenderWork() {
           ${cell('Route', d.international ? 'International' : 'Domestic')}
           ${cell('From', escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—'))}
           ${cell('To', escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—'))}
-          ${cell('Airline', escapeHtml(opsDash(d.airline)))}
+          ${cell('Airline', escapeHtml(fmtAirline(d.airline)))}
           ${cell('Flight number', escapeHtml(opsDash(d.flight_number)))}
           ${cell('Departure', escapeHtml(fmtDate(r.travel_date)))}
           ${cell('Preferred departure time', escapeHtml(opsTime(d.preferred_time)))}
           ${roundTrip ? cell('Return', escapeHtml(fmtDate(r.return_date))) : ''}
           ${roundTrip ? cell('Preferred return time', escapeHtml(opsTime(d.return_preferred_time))) : ''}
           ${cell('Class', escapeHtml(travelClass))}
+          <!-- The airline's single-letter fare bucket within that cabin, which
+               is what the desk actually books against. "—" on a group booking
+               and on anything raised before the field existed. -->
+          ${cell('Booking Class', escapeHtml(opsDash(d.booking_class)))}
           ${cell('Total passengers', String(passengers.length))}
           ${/* The desk is about to spend the platform's money against this
                 figure, so it belongs on the screen where that happens. It was

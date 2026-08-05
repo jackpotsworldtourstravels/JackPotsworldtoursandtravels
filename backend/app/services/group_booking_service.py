@@ -51,6 +51,7 @@ from fastapi import HTTPException, UploadFile, status as http_status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models_v2 import (
     Gender,
     GroupBookingImport,
@@ -109,12 +110,24 @@ BOOKING_COLUMNS: tuple[str, ...] = (
 #: Columns a row cannot be imported without. Everything else is optional —
 #: passports are only mandatory on an international sector, and that is decided
 #: by the booking form (which knows the countries), not by this sheet.
+#:
+#: AIRLINE AND AIRLINE NUMBER CAME OFF THIS LIST ON 2026-08-05, when the booking
+#: form made both optional. They have to agree: a merchant who raises an OPEN
+#: enquiry — no carrier named, asking us to quote the best available — and has it
+#: answered would otherwise reach Booking Request, upload the manifest for it,
+#: and have every row rejected for omitting exactly what the form had just told
+#: them was optional. Two gates disagreeing about the same field is the failure
+#: this pass exists to remove, and it is the same one `group_booking_max_passengers`
+#: removed for party size.
+#:
+#: NOTHING BECAME UNVALIDATED. A flight number that IS supplied is still checked
+#: against `_FLIGHT_RE` below, and the journey-consensus check still refuses a
+#: sheet whose rows disagree about the carrier. What changed is only that
+#: *absent* is now an accepted answer, exactly as it is on the form.
 REQUIRED_COLUMNS: frozenset[str] = frozenset(
     {
         "Origin City",
         "Destination City",
-        "Airline",
-        "Airline Number",
         "Travel Date",
         "Passenger Name",
     }
@@ -151,7 +164,13 @@ _FLIGHT_RE = re.compile(r"^[A-Z0-9]{2,3}\s*\d{1,4}[A-Z]?$", re.IGNORECASE)
 
 #: Cap on rows read. A group is a party on an aircraft, not a database dump, and
 #: an unbounded loop over a hostile sheet is the easy way to spend all the RAM.
-MAX_ROWS = 1000
+#:
+#: READ FROM CONFIGURATION, and from the same setting that bounds the "Number of
+#: Passengers" a group enquiry may state. The two gates have to agree: a
+#: merchant told it may enquire for 400 seats and then refused the sheet listing
+#: them is being given contradictory rules by the same system. See
+#: ``Settings.group_booking_max_passengers``.
+MAX_ROWS = settings.group_booking_max_passengers
 
 
 def columns_for(journey_type: str) -> tuple[str, ...]:
@@ -353,6 +372,14 @@ def _add_instructions_sheet(wb, journey_type: str, cols: tuple[str, ...]) -> Non
         ("Time", "Preferred Hour is 1-12, Preferred Minute is 0-59, and AM/PM decides the rest."),
         ("Passenger Name", "Full name, as printed in the passport. First name and surname, separated by a space."),
         ("Mandatory columns", ", ".join(c for c in cols if c in REQUIRED_COLUMNS)),
+        # Stated explicitly rather than left to be inferred from the mandatory
+        # list above: a column that has always been required and quietly stopped
+        # being one is exactly the change a merchant will not notice, and they
+        # will keep inventing a flight number to fill it.
+        ("Airline / Airline Number",
+         "Both optional. Leave them blank for an open booking and our team will "
+         "quote the best carrier and service available. If you do fill Airline Number in, "
+         "use a real one — AI217 or 6E456."),
         ("Passport", "Required only for international sectors. Leave blank for a domestic group."),
         ("Client Fare", "What you have quoted your own customer. Optional, and never used to bill you."),
         ("Row limit", f"Up to {MAX_ROWS} passengers per upload, and up to 10 MB."),
@@ -757,8 +784,13 @@ def validate_sheet(rows: list[list[Any]], journey_type: str) -> dict[str, Any]:
                 "_row": excel_row,
                 "origin_city": origin,
                 "destination_city": destination,
-                "airline": airline,
-                "flight_number": flight.upper(),
+                # None, not "", when the merchant left them blank — the same
+                # thing `EnquiryCreate._blank_to_none` does to the form's empty
+                # boxes. The declared journey on a manifest is compared against
+                # the itinerary on the booking, and "" on one side with None on
+                # the other is a difference that is not a difference.
+                "airline": airline or None,
+                "flight_number": flight.upper() or None,
                 "travel_date": travel_date.isoformat() if travel_date else None,
                 "preferred_time": _time_24h(
                     cell(row, "Preferred Hour"),

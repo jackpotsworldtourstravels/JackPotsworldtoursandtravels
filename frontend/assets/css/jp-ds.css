@@ -1333,6 +1333,33 @@ table{ width:100%; }
   overscroll-behavior:contain;
 }
 
+/* ---- `.modal-md` — a WIDTH MODIFIER on tier 2, not a third design ---------
+   Tier 2 is 1060px because that is what a ten-field two-column form needs. A
+   two-field form rendered in the same card is the empty-box problem tier 1 was
+   written to avoid, pointing the other way — which is exactly what the Set
+   Amount and Add Provider User dialogs looked like.
+
+   So this class changes ONE property. Everything that makes a dialog premium —
+   the sticky header, the sticky right-aligned footer, the 42px inputs, the
+   uppercase labels, the 24px grid, the radius, the shadow, the padding — is
+   inherited from tier 2 unchanged, which is what keeps "one design system"
+   literally true rather than approximately true.
+
+   IT MODIFIES TIER 2, IT DOES NOT CREATE IT. A dialog still enters tier 2 by
+   containing a `.form-grid` (or by carrying `.modal-lg`); `.modal-md` then says
+   "…but this one is small". Put it on a card with neither and it stays a tier-1
+   card at 480px, which is the right answer for a card with no form in it.
+
+   620px, not 480px: two columns of 42px controls plus the 24px gutter and two
+   28px pads needs ~560px before a label starts wrapping, and 620 leaves the
+   margin. Below the §15 breakpoint at 900px the grid is already one column, so
+   this width never fights the responsive rules.
+
+   Ties on specificity with the tier-2 rule above (`:has()` scores as its
+   argument), so it wins on source order — the same mechanism the whole of
+   §11/§14/§15 relies on. Moving it above that block hands 1060px back. */
+.jp-admin .modal-card.modal-md{max-width:min(620px, 94vw);}
+
 /* ---- header --------------------------------------------------------------
    Sticky, not a flex row of the card, because these dialogs have no body
    wrapper — the builders write `<h2>`, `<form>` and `.modal-actions` as
@@ -1486,6 +1513,28 @@ table{ width:100%; }
   font-size:11.5px; font-weight:700;
   letter-spacing:.05em; text-transform:uppercase;
   color:var(--jp-text-muted);
+}
+
+/* ---- helper text under a field -------------------------------------------
+   Builders write this three different ways — `<span class="cell-sub">`,
+   `<p class="ops-sub">`, and a bare `<small>` — and each carries its own
+   margin, so the gap under an input changed from dialog to dialog. Normalised
+   here rather than in the builders, for the same reason as the rest of §15.
+   Scoped to inside a `.form-field` so the `.ops-sub` used as a dialog subtitle
+   under the header keeps its own spacing. */
+.jp-admin .modal-card .form-field > .cell-sub,
+.jp-admin .modal-card .form-field > .ops-sub,
+.jp-admin .modal-card .form-field > small{
+  display:block;
+  margin:7px 0 0;
+  font-size:11.5px; font-weight:500; line-height:1.45;
+  color:var(--jp-text-muted);
+}
+/* A label's own parenthetical — "(optional)" — is part of the label, so it
+   must not inherit the block display above. */
+.jp-admin .modal-card .form-field label .cell-sub{
+  display:inline; margin:0; font-size:inherit; font-weight:inherit;
+  text-transform:none; letter-spacing:0; opacity:.75;
 }
 
 /* ---- sections ------------------------------------------------------------

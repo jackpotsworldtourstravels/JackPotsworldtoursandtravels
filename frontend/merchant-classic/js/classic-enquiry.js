@@ -62,7 +62,7 @@ const CL_AIRLINES = [
 let clEnquiryRows = [];
 
 /* Live state of the open form. Held here rather than read back off the DOM at
-   submit time because the steppers, the AM/PM toggles and the two combos each
+   submit time because the steppers, the time controls and the two combos each
    have a value that is not simply an input's .value. */
 let clEnqForm = null;
 
@@ -340,7 +340,7 @@ function clEnquiryRow(r) {
     <td>
       ${escapeHtml(clEnquiryRoute(r))}
       <small style="display:block;color:var(--cl-text-muted);">
-        ${escapeHtml([r.airline, r.flight_number].filter(Boolean).join(' '))}
+        ${escapeHtml([fmtAirline(r.airline), r.flight_number].filter(Boolean).join(' '))}
         · ${escapeHtml(fmtDate(r.travel_date))} ${escapeHtml(clTimeLabel(r.preferred_time) || '')}
         · ${r.passenger_count} pax
       </small>
@@ -415,17 +415,29 @@ async function clOpenEnquiryDetail(id) {
       ['Trip type', tripTypeLabel(r.trip_type)],
       ['From', [r.origin_city, r.origin].filter(Boolean).join(' · ')],
       ['To', [r.destination_city, r.destination].filter(Boolean).join(' · ')],
-      ['Airline', r.airline],
+      /* fmtAirline never returns empty, so this row always renders — "All
+         Airlines" is what the merchant chose and is worth showing back. The
+         flight number is genuinely absent when unstated and the filter below
+         drops it. */
+      ['Airline', fmtAirline(r.airline)],
       ['Flight number', r.flight_number],
       ['Departure date', fmtDate(r.travel_date)],
       ['Preferred time', clTimeLabel(r.preferred_time)],
       ['Return date', r.trip_type === 'round_trip' ? fmtDate(r.return_date) : null],
       ['Return time', r.trip_type === 'round_trip' ? clTimeLabel(r.return_preferred_time) : null],
-      ['Travel class', r.travel_class],
+      /* "Class" and "Booking Class", matching the form's own labels — the
+         merchant should recognise what they typed. Both are absent on a group
+         booking, and the `.filter` below drops a null row rather than printing
+         an empty one. */
+      ['Class', r.travel_class],
+      ['Booking Class', r.booking_class],
       ['Passengers', r.passenger_count],
-      ['Adults', r.adults],
-      ['Children', r.children],
-      ['Infants', r.infants],
+      /* The breakdown is only meaningful where the form collected one. A group
+         states a total and nothing else, and rendering "Adults 300 · Children 0
+         · Infants 0" would assert a composition nobody supplied. */
+      ['Adults', r.trip_type === 'group_trip' ? null : r.adults],
+      ['Children', r.trip_type === 'group_trip' ? null : r.children],
+      ['Infants', r.trip_type === 'group_trip' ? null : r.infants],
       ['Created', clDateTime24(r.created_at)],
       ['Answered', r.responded_at ? clDateTime24(r.responded_at) : null],
       ['Booking request', r.booking_request_number],
@@ -522,59 +534,43 @@ function clUpsertEnquiryRow(r) {
   if ($('cl-enquiry')?.classList.contains('active')) clRenderEnquiryRows();
 }
 
-/* THE WIRE IS 24-HOUR; THE MERCHANT PORTAL IS 12-HOUR.
+/* ONE CLOCK, 24-HOUR, ENTRY AND DISPLAY ALIKE.
    ===========================================================================
    `schemas/enquiry.py` pins `preferred_time` to `^([01]\d|2[0-3]):[0-5]\d$`, so
-   "14:30" is what is stored and what every other portal reads. That is not
-   changing — this is a presentation layer over it, and the pair below is the
-   only place the two clocks meet:
+   "14:30" is what is stored and what every other portal reads. It always was —
+   what changed is that the merchant now *types* that, and reads it back
+   unaltered on every screen it appears on.
 
-     cl24To12('14:30')       -> { hour: 2, minute: '30', meridiem: 'PM' }
-     cl12To24(2, '30', 'PM') -> '14:30'
-     clTimeLabel('14:30')    -> '02:30 PM'
+   The 12-hour presentation layer that used to sit here is gone: `cl24To12`,
+   `cl12To24` and the AM/PM select. A merchant who entered 14:30 was shown
+   "02:30 PM" by the enquiry detail, the booking detail and three Admin screens,
+   and had to re-do the conversion in their head to check their own entry
+   against the sheet they typed it from. There is now nothing to convert, which
+   is also two fewer places a meridiem can be wrong.
 
-   CR-5 had removed a 12-hour control and its comment argued the case: an hour
-   1-12 beside an AM/PM toggle is "three decisions for one value" and "12" is
-   ambiguous. The ambiguity was in the *old* control, which offered no minutes
-   and put the meridiem on a toggle button. It is answered here by making all
-   three parts explicit, labelled selects — and midnight/noon are the two cases
-   the conversion below is written around, because they are the only ones where
-   12-hour and 24-hour disagree about the leading digit. */
+   Record timestamps (Created, Updated, audit and notification times) are NOT
+   affected and stay on `clDateTime24`'s 12-hour clock — they are a different
+   kind of value, written by the system rather than chosen by the merchant. */
 
-/* Minute granularity. Five minutes, not thirty: the business asked for a time
-   the merchant chooses manually, and "09:35" is a real preferred departure. */
-const CL_TIME_MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
-
-function cl24To12(hhmm) {
-  const [rawH, rawM] = String(hhmm || '').split(':');
-  let h = Number(rawH);
-  const m = Number(rawM);
-  if (!Number.isFinite(h) || h < 0 || h > 23) return null;
-  const meridiem = h < 12 ? 'AM' : 'PM';
-  // 0 -> 12 AM, 12 -> 12 PM, 13 -> 1 PM. The modulo alone gives 0 for both
-  // midnight and noon, which is not an hour anybody writes on a clock face.
-  h = h % 12 || 12;
-  return {
-    hour: h,
-    minute: String(Number.isFinite(m) ? m : 0).padStart(2, '0'),
-    meridiem,
-  };
-}
-
-function cl12To24(hour, minute, meridiem) {
-  let h = Number(hour) % 12;           // 12 -> 0, which is right for both halves
-  if (String(meridiem).toUpperCase() === 'PM') h += 12;
-  return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-/* "02:30 PM". Survives a value the API never wrote — an unparseable string is
-   returned as-is rather than rendered as "NaN:NaN AM", because a time nobody
+/* "14:30". Survives a value the API never wrote — an unparseable string is
+   returned as-is rather than rendered as "NaN:NaN", because a time nobody
    recognises is still more useful to the desk than a placeholder. */
 function clTimeLabel(hhmm) {
+  const t = clNormaliseTime(hhmm);
   if (!hhmm) return null;
-  const t = cl24To12(hhmm);
-  if (!t) return hhmm;
-  return `${String(t.hour).padStart(2, '0')}:${t.minute} ${t.meridiem}`;
+  return t || hhmm;
+}
+
+/* "9:5" -> "09:05"; anything out of range -> null. The one parser, used by the
+   label above and by the control's own blur handler, so a typed time and a
+   stored one are held to identical bounds. */
+function clNormaliseTime(hhmm) {
+  const [rawH, rawM] = String(hhmm ?? '').split(':');
+  const h = Number(rawH);
+  const m = Number(rawM);
+  if (!Number.isInteger(h) || h < 0 || h > 23) return null;
+  if (!Number.isInteger(m) || m < 0 || m > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 /* Timestamps, in the same 12-hour clock as the times above.
@@ -647,10 +643,17 @@ function clOpenEnquiryForm(direct = false) {
     /* Only sent when trip_type is group_trip — the server refuses the pairing
        any other way round. `group_import` holds the validated upload. */
     group_journey_type: 'one_way_group',
+    /* Only ever set on the Book Directly form. A group ENQUIRY carries no
+       manifest at all now — it states a passenger count and the sheet is
+       uploaded at Booking Request, once we have answered. */
     group_import: null,
+    /* The party size a group enquiry is asking about. Null until typed, which
+       is what makes "required" enforceable — 0 would be a real answer and 1 a
+       plausible default nobody chose. */
+    group_pax: null,
     from: null, to: null,                 // { code, city, label } once picked
     airline: '',
-    /* 24-hour "HH:MM" on the wire; the control that collects it is 12-hour. */
+    /* 24-hour "HH:MM", which is now also what the control shows. */
     depTime: '09:00',
     retTime: '18:00',
     adults: 1, children: 0, infants: 0,
@@ -721,21 +724,34 @@ function clOpenEnquiryForm(direct = false) {
       </div>
     </div>
 
+    <!-- BOTH FIELDS ARE OPTIONAL NOW, and neither carries the required marker.
+         An enquiry is a question about a route on a date; which carrier and
+         which service answer it best is part of what the desk is being asked.
+         Requiring them made the merchant guess, and a guessed airline silently
+         narrowed the quotation to it. -->
     <div class="cl-form-legend">Airline Details</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
-        <label for="clEnqAirline">Airline<span class="cl-req">*</span></label>
+        <label for="clEnqAirline">Airline</label>
         <div class="cl-combo">
+          <!-- Pre-filled with the open-enquiry text rather than left blank: an
+               empty box invites the merchant to fill it, which is the opposite
+               of the default being "we do not mind". clEnqForm.airline stays ''
+               until a real carrier is picked, so what is SENT is nothing. -->
           <input type="text" id="clEnqAirline" autocomplete="off" role="combobox"
                  aria-expanded="false" aria-autocomplete="list"
-                 placeholder="Air India, IndiGo, Emirates…">
+                 value="${escapeHtml(CL_ANY_AIRLINE)}"
+                 placeholder="${escapeHtml(CL_ANY_AIRLINE)}">
           <div class="cl-combo-list" id="clEnqAirlineList" role="listbox"></div>
         </div>
+        <small id="clEnqAirlineHint">Leave as <b>${escapeHtml(CL_ANY_AIRLINE)}</b> and we will
+          quote the best fare we can find on any carrier.</small>
       </div>
       <div class="cl-field">
-        <label for="clEnqFlight">Airline Number<span class="cl-req">*</span></label>
-        <input type="text" id="clEnqFlight" autocomplete="off" placeholder="e.g. AI217, 6E456"
+        <label for="clEnqFlight">Airline Number</label>
+        <input type="text" id="clEnqFlight" autocomplete="off" placeholder="Optional — e.g. AI217"
                maxlength="20" style="text-transform:uppercase;">
+        <small>Leave blank if you do not have a specific flight in mind.</small>
       </div>
     </div>
 
@@ -769,18 +785,52 @@ function clOpenEnquiryForm(direct = false) {
     </div>
 
     <div class="cl-form-legend">Travellers &amp; class</div>
-    <div class="cl-form cl-form-2">
+    <!-- THREE COLUMNS so Booking Class sits beside Class rather than wrapping
+         to a row of its own — they are a pair (cabin, then the fare bucket
+         within it) and reading one without the other is what the rename was
+         meant to stop. cl-form-3 collapses to 2 columns and then to 1 on the
+         existing breakpoints, so the pair stacks in order on a phone. -->
+    <div class="cl-form cl-form-3">
       <div class="cl-field">
         <label for="clEnqPax" class="cl-label-sm">No. of Passengers<span class="cl-req">*</span></label>
         <input type="number" id="clEnqPax" min="1" max="99" value="1" inputmode="numeric">
         <small id="clEnqPaxHint">Type a total, or use the breakdown below — the two stay in step.</small>
       </div>
-      <div class="cl-field">
-        <label for="clEnqClass">Booking Class<span class="cl-req">*</span></label>
+      <!-- TWO FIELDS, TWO DIFFERENT THINGS, and the names are genuinely
+           confusing so they are worth stating: Class is the CABIN (Economy,
+           Business…), Booking Class is the airline's single-letter FARE BUCKET
+           within that cabin (Y, M and K are all Economy on different fare
+           rules). The desk needs the letter to quote the right bucket. Until
+           this pass the cabin dropdown was itself labelled "Booking Class",
+           which is why the rename is a rename and not just a new field.
+           (No backticks in this comment — it is inside a template literal.) -->
+      <div class="cl-field" id="clEnqClassField">
+        <label for="clEnqClass">Class<span class="cl-req">*</span></label>
         <select id="clEnqClass">
           ${CL_TRAVEL_CLASSES.map((c, i) =>
             `<option value="${escapeHtml(c)}"${i === 0 ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
         </select>
+      </div>
+      <div class="cl-field" id="clEnqBookingClassField">
+        <label for="clEnqBookingClass">Booking Class</label>
+        <input type="text" id="clEnqBookingClass" maxlength="1" autocomplete="off"
+               inputmode="latin" placeholder="Y" class="cl-bkclass">
+        <small>One letter — the airline&rsquo;s fare class. Optional.</small>
+      </div>
+    </div>
+
+    <!-- GROUP BOOKINGS ONLY. A group enquiry asks whether a party of this size
+         can fly and what it would cost; the travellers themselves are listed on
+         the spreadsheet later, at Booking Request. So this is the only number
+         the merchant can give at this stage, and the adults/children/infants
+         breakdown below is not shown for a group at all. -->
+    <div class="cl-form cl-form-2 cl-hidden" id="clEnqGroupPaxRow">
+      <div class="cl-field">
+        <label for="clEnqGroupPax">Number of Passengers<span class="cl-req">*</span></label>
+        <input type="number" id="clEnqGroupPax" min="1" step="1" value="" inputmode="numeric"
+               placeholder="e.g. 45">
+        <small id="clEnqGroupPaxHint">Roughly how many seats you need. You will upload the
+          passenger list once we have answered.</small>
       </div>
     </div>
 
@@ -800,21 +850,16 @@ function clOpenEnquiryForm(direct = false) {
       </div>
     </div>
 
-    <!-- CLIENT FARE (migration 0040). What the Data Operator has quoted their
-         OWN customer. Optional, never used for settlement, and visible to the
-         Admin answering the enquiry. Once we send a quotation the difference
-         becomes the "You Saved" figure on this enquiry, on the booking, in
-         Reports and on the Dashboard's Total Savings tile. -->
-    <div class="cl-form-legend">Your customer&rsquo;s fare</div>
-    <div class="cl-form cl-form-2">
-      <div class="cl-field">
-        <label for="clEnqClientFare">Client Fare</label>
-        <input type="number" id="clEnqClientFare" min="0" step="0.01"
-               inputmode="decimal" placeholder="e.g. 20000">
-        <small>What you have quoted your customer. We compare our fare against
-               this and show you the saving. Leave blank if not applicable.</small>
-      </div>
-    </div>
+    <!-- CLIENT FARE IS NOT ASKED FOR HERE ANY MORE (2026-08-05).
+         It used to sit at the bottom of this form on both paths. An enquiry is
+         a question about availability and price, and asking a merchant what
+         they will charge their own customer before we have told them what it
+         costs put the two numbers in the wrong order — they were quoting blind
+         and then finding out.
+         It moved to the Booking Request screen, which is the first point at
+         which our fare is known, and it is collected there on BOTH paths so the
+         "You Saved" figure has exactly one source. See clBrClientFare in
+         classic-booking.js. -->
 
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
@@ -822,10 +867,38 @@ function clOpenEnquiryForm(direct = false) {
        direct ? 'Continue to travellers' : 'Send Enquiry'}</button>`);
 
   $('clModal').classList.add('cl-modal-form');
-  clModalOnClose = () => { $('clModal').classList.remove('cl-modal-form'); clEnqForm = null; };
+  /* The upload card in this modal writes to clEnqForm. Cleared on close so a
+     handler left over from a dismissed modal cannot write into the next screen
+     that renders the card. */
+  clGbSetHost(clGbEnquiryHost());
+  clModalOnClose = () => {
+    $('clModal').classList.remove('cl-modal-form');
+    clEnqForm = null;
+    clGbSetHost(null);
+  };
 
   clWireEnquiryForm();
   $('clEnqFrom').focus();
+
+  /* Not awaited: the merchant is looking at the form now, and the ceiling is
+     only needed by the time they have typed a group count. When it lands it
+     refreshes the hint in place, so the limit is stated before it is enforced
+     rather than only in the error that follows breaking it. */
+  clLoadGroupLimits().then(limits => {
+    if (!limits || !clEnqForm) return;
+    const el = $('clEnqGroupPax');
+    if (el) el.max = limits.max_passengers;
+    /* Re-render the hint only while it is still the untouched default —
+       overwriting a validation message the merchant is currently reading with
+       generic help would hide the reason their entry was rejected. */
+    if (!$('clEnqGroupPaxHint')?.classList.contains('cl-hint-err')) {
+      const hint = $('clEnqGroupPaxHint');
+      if (hint) {
+        hint.textContent = `Roughly how many seats you need, up to ${limits.max_passengers}. `
+          + 'You will upload the passenger list once we have answered.';
+      }
+    }
+  });
 }
 
 /* THE PASSENGER LIST UPLOAD — group bookings only.
@@ -867,58 +940,104 @@ function clUploadCard() {
     </div>
 
     <div class="cl-msg" id="clGbMsg"></div>
+  </div>
+
+  <!-- THE ENQUIRY STAGE'S HALF OF THE SAME CARD: the template, and nothing to
+       upload it into. Shown for a group booking on the enquiry form only, where
+       the card above is hidden. Separate markup rather than the same card with
+       its body hidden, because the two say genuinely different things — this
+       one has to explain *why* there is no upload here, or its absence reads as
+       a missing feature. Its button carries its own id: two elements sharing
+       the id clGbTemplate would make document.getElementById a coin toss.
+       (No backticks in this comment — it is inside a template literal.) -->
+  <div class="cl-gb cl-hidden" id="clEnqTemplateOnly">
+    <div class="cl-form-legend">Passenger List</div>
+    <p class="cl-gb-lede">You do not need the passenger details yet. Tell us how many
+      seats you need above, and we will confirm availability and a fare.
+      <b>You will upload the passenger list when you raise the booking</b>, once we
+      have answered — <b>Raise Booking</b> on this enquiry takes you there.</p>
+
+    <button type="button" class="cl-btn cl-gb-tmpl" id="clGbTemplateOnlyBtn">
+      <span aria-hidden="true">↓</span> Download Excel Template
+    </button>
+    <p class="cl-gb-lede" style="margin-top:10px;">Download it now if it helps you start
+      collecting names and passport details while you wait.</p>
   </div>`;
 }
 
-/* THE 12-HOUR TIME CONTROL — hour, minute, AM/PM.
+/* THE 24-HOUR TIME CONTROL — hour and minute, both typed.
    ===========================================================================
-   Three real <select>s rather than an <input type="time">, for two reasons that
-   both showed up in this portal before: the native picker renders in the
-   *browser's* locale, so the same form reads 24-hour for a merchant whose
-   machine is set that way, and on Firefox/desktop it is a text field that
-   accepts typing the platform then has to police. Three selects cannot be
-   typed wrong, read the same everywhere, and are reachable by Tab.
+   Still not an <input type="time">, for the two reasons that ruled it out when
+   this control was 12-hour and are unchanged: the native picker renders in the
+   *browser's* locale, so the very thing being specified here — that everyone
+   sees 24-hour — would be up to the merchant's machine, and on Firefox/desktop
+   it is a text field the platform then has to police anyway.
 
-   `id` is the base — the parts are `<id>Hour`, `<id>Min`, `<id>Mer`, which is
-   what clReadTimeField and clSetTimeField below look for. `value` is 24-hour,
-   because that is what the caller has: a default, or a saved enquiry.
+   What did change is that both parts are now typed rather than picked. The old
+   control offered minutes in five-minute steps, which cannot express "09:37";
+   the spec asks for any minute 00-59, and 60 options in a <select> is a worse
+   way to enter two digits than typing them.
 
-   A minute the stored value does not land on (a legacy "09:07", or a row some
-   other portal wrote) is added to the list for that field only, so opening an
-   old enquiry never silently rounds its time to something nobody chose. */
+   `id` is the base — the parts are `<id>Hour` and `<id>Min`, which is what
+   clReadTimeField and clBindTimeField below look for. There is no `<id>Mer`
+   any more; anything still reaching for one is reading a stale copy of this
+   file. `value` is 24-hour "HH:MM", which is both what the caller has and now
+   what the merchant sees. */
 function clTimeField(id, value, label) {
-  const t = cl24To12(value) || { hour: 9, minute: '00', meridiem: 'AM' };
-  const minutes = CL_TIME_MINUTES.includes(t.minute)
-    ? CL_TIME_MINUTES
-    : [...CL_TIME_MINUTES, t.minute].sort();
+  const t = clNormaliseTime(value) || '09:00';
+  const [hh, mm] = t.split(':');
 
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1).map(h =>
-    `<option value="${h}"${h === t.hour ? ' selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('');
-  const mins = minutes.map(m =>
-    `<option value="${m}"${m === t.minute ? ' selected' : ''}>${m}</option>`).join('');
-  const mers = ['AM', 'PM'].map(x =>
-    `<option value="${x}"${x === t.meridiem ? ' selected' : ''}>${x}</option>`).join('');
+  /* TYPED, NOT PICKED. Both parts are number inputs rather than selects: the
+     merchant reads a departure time off an airline schedule and types it, and a
+     24-hour <select> would be 24 options beside 60 more. `inputmode="numeric"`
+     brings up the digit keypad on a phone, and the pattern keeps a stray letter
+     out on the browsers that honour it.
 
-  return `<div class="cl-timesel" id="${id}">
-    <select id="${id}Hour" class="cl-timesel-h" aria-label="${escapeHtml(label)} — hour">${hours}</select>
+     `maxlength` is deliberately absent on a number input — it does nothing
+     there. Range is enforced on blur by `clWireTimeField`, which is the only
+     place that can clamp "27" back to something real. */
+  return `<div class="cl-timesel cl-timesel-24" id="${id}">
+    <input type="number" id="${id}Hour" class="cl-timesel-h" value="${hh}"
+           min="0" max="23" step="1" inputmode="numeric" pattern="[0-9]*"
+           aria-label="${escapeHtml(label)} — hour, 00 to 23">
     <span class="cl-timesel-sep" aria-hidden="true">:</span>
-    <select id="${id}Min" class="cl-timesel-m" aria-label="${escapeHtml(label)} — minute">${mins}</select>
-    <select id="${id}Mer" class="cl-timesel-p" aria-label="${escapeHtml(label)} — AM or PM">${mers}</select>
+    <input type="number" id="${id}Min" class="cl-timesel-m" value="${mm}"
+           min="0" max="59" step="1" inputmode="numeric" pattern="[0-9]*"
+           aria-label="${escapeHtml(label)} — minute, 00 to 59">
+    <span class="cl-timesel-hint" aria-hidden="true">24h</span>
   </div>`;
 }
 
-/* The three parts, back as the "HH:MM" the API stores. */
+/* The two parts, back as the "HH:MM" the API stores. Returns null when either
+   is empty or out of range, so submit falls back to the last good value in the
+   form state rather than sending "NaN:NaN" — the same contract the 12-hour
+   version had. */
 function clReadTimeField(id) {
-  const h = $(`${id}Hour`), m = $(`${id}Min`), p = $(`${id}Mer`);
-  if (!h || !m || !p) return null;
-  return cl12To24(h.value, m.value, p.value);
+  const h = $(`${id}Hour`), m = $(`${id}Min`);
+  if (!h || !m) return null;
+  return clNormaliseTime(`${h.value}:${m.value}`);
 }
 
 /* Keeps the form's state object in step with whichever part was just changed,
-   in one handler per field rather than three. */
+   and normalises what the merchant sees on the way out of the field.
+
+   CLAMP ON BLUR, NOT ON KEYSTROKE. Typing "1" on the way to "18" would be
+   rewritten to "01" mid-entry if this ran on `input`, and a merchant who then
+   types the "8" gets "018" -> "18" only by luck. `change` fires on blur, on
+   Enter and on the spinner, which is when the value is actually meant. */
 function clBindTimeField(id, onChange) {
-  ['Hour', 'Min', 'Mer'].forEach(part => {
-    $(`${id}${part}`)?.addEventListener('change', () => onChange(clReadTimeField(id)));
+  ['Hour', 'Min'].forEach(part => {
+    const el = $(`${id}${part}`);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      const max = part === 'Hour' ? 23 : 59;
+      let n = Number(el.value);
+      if (!Number.isFinite(n)) n = 0;
+      n = Math.min(max, Math.max(0, Math.trunc(n)));
+      el.value = String(n).padStart(2, '0');
+      const read = clReadTimeField(id);
+      if (read) onChange(read);
+    });
   });
 }
 
@@ -961,12 +1080,20 @@ function clWireEnquiryForm() {
 
   /* ---- airline ---- */
   clCombo($('clEnqAirline'), $('clEnqAirlineList'), clAirlineOptions, picked => {
+    /* `picked.value` is '' for the All Airlines option — see clAirlineOptions —
+       so an open enquiry and a cleared box reach the same state by design. */
     clEnqForm.airline = picked ? picked.value : '';
+    clSyncAirlineHint();
   });
+  /* Typing does not go through onPick, so the hint is refreshed on input too:
+     a merchant who types over "All Airlines" should see the note stop claiming
+     the enquiry is open the moment it stops being open. */
+  $('clEnqAirline').addEventListener('input', clSyncAirlineHint);
 
-  /* ---- 12-hour time controls. `depTime` / `retTime` stay 24-hour "HH:MM" —
-     the conversion happens in the control, not at submit, so there is exactly
-     one place a wrong meridiem could come from. ---- */
+  /* ---- 24-hour time controls. `depTime` / `retTime` hold "HH:MM", which is
+     now also what the control shows — there is no conversion left anywhere, so
+     entry, state and wire format are one value. Clamping to 00-23 / 00-59
+     happens in the control on blur, not at submit. ---- */
   clBindTimeField('clEnqTime', v => { clEnqForm.depTime = v; });
   clBindTimeField('clEnqReturnTime', v => { clEnqForm.retTime = v; });
 
@@ -994,6 +1121,23 @@ function clWireEnquiryForm() {
     e.target.value = e.target.value.toUpperCase();
     e.target.setSelectionRange(pos, pos);
   });
+
+  /* ---- booking class: exactly one A-Z letter ----
+     Filtered on the way in rather than validated on the way out, because there
+     is only ever one keystroke to get right and a merchant who typed "y1"
+     should see "Y", not an error after they have moved on. `maxlength="1"` in
+     the markup stops a second *accepted* character; this strips anything that
+     is not a letter, which maxlength cannot do — "1" fills the field otherwise
+     and the box then silently refuses the "Y" that follows it. */
+  $('clEnqBookingClass').addEventListener('input', e => {
+    e.target.value = (e.target.value.toUpperCase().match(/[A-Z]/) || [''])[0];
+  });
+
+  /* ---- group passenger count ----
+     `change`, not `input`: the bound check below reports a number the merchant
+     has finished typing, and running it per keystroke tells someone entering
+     "150" that "1" is fine, then "15" is fine, then complains. */
+  $('clEnqGroupPax').addEventListener('change', clValidateGroupPax);
 
   /* ---- group journey type + manifest upload ---- */
   $('clEnqGroupJtOpts').querySelectorAll('[data-cl-gjt]').forEach(opt => {
@@ -1036,9 +1180,27 @@ function clSetGroupJourneyType(gjt) {
 }
 
 /* WHICH SECTIONS A TRIP TYPE SHOWS, DECIDED IN ONE PLACE.
-   The return panel and the upload card are each driven by two inputs now
-   (trip type and, for a group, journey type), and working that out at each of
-   the three call sites is how one of them ends up disagreeing. */
+   ===========================================================================
+   Four inputs decide this now — trip type, the group journey type, and whether
+   this is the enquiry form or the Book Directly form — and working it out at
+   each call site is how one of them ends up disagreeing with the others.
+
+   THE UPLOAD CARD IS THE INTERESTING ONE. It is shown for a group booking on
+   the BOOKING REQUEST side only, never on an enquiry:
+
+     enquiry  (direct === false)   count + template. No upload.
+     directly (direct === true)    the full upload workflow.
+
+   An enquiry asks whether a party of N can fly and what it costs; nobody has
+   committed to anything, and the merchant frequently does not yet know who is
+   going. Requiring eighty passport-bearing rows to ask a question was the wrong
+   order, so the sheet now arrives once we have answered — at Booking Request,
+   which is what `direct === true` already is. The enquiry-led path uploads on
+   the Booking Request screen instead (classic-booking.js).
+
+   ONE WAY AND ROUND TRIP ARE UNTOUCHED by all of this: every branch below is
+   gated on `isGroup`, so both keep the passenger total, the breakdown, the
+   cabin and the fare bucket exactly as they were. */
 function clSyncTripSections() {
   const f = clEnqForm;
   if (!f) return;
@@ -1048,13 +1210,29 @@ function clSyncTripSections() {
 
   $('clEnqGroupJt').classList.toggle('cl-hidden', !isGroup);
   $('clEnqReturn').classList.toggle('cl-hidden', !hasReturn);
-  $('clEnqUpload').classList.toggle('cl-hidden', !isGroup);
-  /* The manual traveller breakdown is the thing the manifest replaces. The
-     total field stays: it is what the server reconciles adults+children+infants
-     against, and for a group it is filled in from the imported row count. */
+
+  /* Upload on the Booking Request form only — see the block comment above. */
+  $('clEnqUpload').classList.toggle('cl-hidden', !(isGroup && f.direct));
+  /* The template is offered at BOTH stages. A merchant asking us to quote a
+     group has every reason to start collecting passport details while they
+     wait, and the template is how they do that. It is the *upload* that has to
+     wait for an answer, not the download. */
+  $('clEnqTemplateOnly')?.classList.toggle('cl-hidden', !(isGroup && !f.direct));
+
+  /* The manual traveller breakdown and its typed total are what the group
+     passenger count replaces — a group has no per-traveller entry at this
+     stage, so showing steppers that add up to something else would offer two
+     answers to one question. */
   $('clEnqPaxGrid').classList.toggle('cl-hidden', isGroup);
   const paxField = $('clEnqPax')?.closest('.cl-field');
   if (paxField) paxField.classList.toggle('cl-hidden', isGroup);
+  $('clEnqGroupPaxRow').classList.toggle('cl-hidden', !isGroup);
+
+  /* Cabin and fare bucket are hidden for a group: which cabin a party of 300
+     ends up in is part of what the desk negotiates, not something the merchant
+     states up front. Both remain for one way and round trip. */
+  $('clEnqClassField').classList.toggle('cl-hidden', isGroup);
+  $('clEnqBookingClassField').classList.toggle('cl-hidden', isGroup);
 
   if (hasReturn) {
     clSyncReturnRoute();
@@ -1062,12 +1240,124 @@ function clSyncTripSections() {
   }
 }
 
+/* THE CONFIGURED GROUP CEILING, FETCHED NOT ASSUMED.
+   ===========================================================================
+   `group_booking_max_passengers` is a server setting and bounds two things: the
+   count a group enquiry may state, and the rows its manifest may carry. The
+   form has to enforce the same number, so it asks for it.
+
+   Cached for the page's lifetime — it is configuration, it does not change
+   between two opens of a modal, and re-fetching on every open would put a
+   request in front of a form the merchant is already looking at.
+
+   `null` until the first answer arrives, and the validation below treats that
+   as "no client-side bound": a merchant whose network hiccupped can still send
+   the enquiry and let the server judge it, rather than being blocked by a limit
+   we could not read. The server is the authority either way. */
+let clGroupLimits = null;
+
+async function clLoadGroupLimits() {
+  if (clGroupLimits) return clGroupLimits;
+  try {
+    clGroupLimits = await MerchantApi.groupBookingLimits();
+  } catch {
+    clGroupLimits = null;                       // stay silent; the server still checks
+  }
+  return clGroupLimits;
+}
+
+/* The bound, applied to the group count field. Returns the number when it is
+   usable and null when it is not, so submit can reuse it as its own check
+   rather than restating the rules. */
+function clValidateGroupPax() {
+  const el = $('clEnqGroupPax');
+  const hint = $('clEnqGroupPaxHint');
+  if (!el) return null;
+
+  const raw = String(el.value ?? '').trim();
+  const n = Number(raw);
+  const max = clGroupLimits?.max_passengers ?? null;
+
+  let problem = null;
+  if (!raw) problem = 'Enter how many passengers are travelling.';
+  else if (!Number.isInteger(n)) problem = 'Enter a whole number of passengers.';
+  else if (n < 1) problem = 'A group booking needs at least one passenger.';
+  else if (max && n > max) {
+    problem = `The maximum number of passengers allowed for a Group Booking is ${max}.`;
+  }
+
+  el.classList.toggle('cl-input-err', !!problem);
+  if (hint) {
+    hint.textContent = problem
+      || (max
+        ? `Roughly how many seats you need, up to ${max}. You will upload the passenger list once we have answered.`
+        : 'Roughly how many seats you need. You will upload the passenger list once we have answered.');
+    hint.classList.toggle('cl-hint-err', !!problem);
+  }
+  if (problem) return null;
+  clEnqForm.group_pax = n;
+  return n;
+}
+
 /* ===========================================================================
    THE PASSENGER MANIFEST — upload, validate, review.
    =========================================================================== */
 const CL_GB_MAX_BYTES = 10 * 1024 * 1024;
 
+/* ONE UPLOAD IMPLEMENTATION, TWO HOSTS.
+   ===========================================================================
+   The card now appears on two different screens: the Book Directly form (a
+   modal, in this file) and the Booking Request page (classic-booking.js), which
+   is where an enquiry-led group booking uploads its sheet now that the enquiry
+   stage does not. The workflow is identical on both — same template, same drop
+   zone, same progress bar, same validation summary, same Replace File — so it
+   is one implementation with the two host-specific bits injected, rather than a
+   copy on each screen that would drift the first time one is fixed.
+
+   What actually differs is only this:
+     journeyType()  where the one_way/round_trip choice lives
+     get() / set()  where the accepted import is remembered
+     onDone(d)      anything the host wants after a successful import
+
+   The element ids (clGbBody, clGbMsg, clGbDrop, clGbFile) are shared rather
+   than parameterised because the two hosts are never on screen together — one
+   is a modal over the enquiry screen, the other is the booking page — so a
+   getElementById can only ever find the live one. `clGbSetHost` is called by
+   whichever screen is rendering the card, and the null default is what makes a
+   stale handler from a closed modal a no-op instead of a crash. */
+let clGbHost = null;
+
+function clGbSetHost(host) {
+  clGbHost = host;
+}
+
+/* The enquiry/Book Directly modal's own host. Kept here beside the workflow it
+   configures rather than at the call site, so the two stay legible together. */
+function clGbEnquiryHost() {
+  return {
+    journeyType: () => clEnqForm?.group_journey_type || 'one_way_group',
+    get: () => clEnqForm?.group_import || null,
+    set: imp => { if (clEnqForm) clEnqForm.group_import = imp; },
+    /* Keep the passenger total in step with what was actually imported, so the
+       server's adults+children+infants reconciliation cannot fail on a number
+       the merchant never typed. Only the modal has those fields. */
+    onDone: d => {
+      if (!clEnqForm) return;
+      clEnqForm.adults = d.passengers_imported;
+      clEnqForm.children = 0;
+      clEnqForm.infants = 0;
+      const pax = $('clEnqPax');
+      if (pax) pax.value = d.passengers_imported;
+    },
+  };
+}
+
 function clWireUpload() {
+  /* Bound before the early return below: on the enquiry form the drop zone is
+     hidden and this button is the only part of the group card that exists to
+     the merchant, so wiring it must not depend on the upload half being live. */
+  $('clGbTemplateOnlyBtn')?.addEventListener('click', clDownloadTemplate);
+
   const drop = $('clGbDrop');
   const input = $('clGbFile');
   if (!drop || !input) return;
@@ -1111,16 +1401,20 @@ function clWireUpload() {
   });
 }
 
-async function clDownloadTemplate() {
-  const btn = $('clGbTemplate');
-  const jt = clEnqForm?.group_journey_type || 'one_way_group';
-  btn.disabled = true;
+/* `ev` is passed by the click listeners so the button that was actually pressed
+   is the one disabled — there are three of them across the two screens
+   (clGbTemplate, clGbTemplateOnlyBtn, clBrGbTemplate) and hard-coding one meant
+   the other two threw on a null `disabled`. */
+async function clDownloadTemplate(ev) {
+  const btn = ev?.currentTarget || $('clGbTemplate');
+  const jt = clGbHost?.journeyType() || 'one_way_group';
+  if (btn) btn.disabled = true;
   try {
     await MerchantApi.downloadGroupTemplate(jt);
   } catch (err) {
     clMsg($('clGbMsg'), clError(err, 'Could not download the template.'), 'err');
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -1145,11 +1439,11 @@ function clUploadManifest(file) {
   }
 
   clUploadBusy(file.name);
-  const previous = clEnqForm?.group_import?.import_id || null;
+  const previous = clGbHost?.get()?.import_id || null;
 
   MerchantApi.uploadGroupManifest({
     file,
-    journey_type: clEnqForm.group_journey_type,
+    journey_type: clGbHost?.journeyType() || 'one_way_group',
     replaces: previous,
     onProgress: pct => {
       const bar = $('clGbBar');
@@ -1158,10 +1452,10 @@ function clUploadManifest(file) {
       if (label) label.textContent = `${pct}%`;
     },
   }).then(result => {
-    clEnqForm.group_import = result.imported;
+    clGbHost?.set(result.imported);
     clUploadDone(result);
   }).catch(err => {
-    clEnqForm.group_import = null;
+    clGbHost?.set(null);
     clUploadFailed(clEnquiryError(err));
   });
 }
@@ -1225,16 +1519,10 @@ function clUploadDone(result) {
     }
   });
 
-  /* Keep the passenger total in step with what was actually imported, so the
-     server's adults+children+infants reconciliation cannot fail on a number
-     the merchant never typed. */
-  if (clEnqForm) {
-    clEnqForm.adults = d.passengers_imported;
-    clEnqForm.children = 0;
-    clEnqForm.infants = 0;
-    const pax = $('clEnqPax');
-    if (pax) pax.value = d.passengers_imported;
-  }
+  /* Whatever the host wants to do with a successful import — the modal keeps
+     its passenger total in step, the Booking Request page swaps the card for
+     the read-only traveller table. */
+  clGbHost?.onDone?.(d);
 }
 
 /* Row-level errors, exactly as the spec renders them: the merchant's own Excel
@@ -1295,10 +1583,10 @@ function clUploadFailed(text) {
   clWireUpload();
 }
 
-/* Back to the empty drop zone. Also forgets the import on the form, which is
+/* Back to the empty drop zone. Also forgets the import on the host, which is
    what stops a replaced sheet from being the one that gets submitted. */
 function clClearImport(note) {
-  if (clEnqForm) clEnqForm.group_import = null;
+  clGbHost?.set(null);
   const body = $('clGbBody');
   if (!body) return;
   body.innerHTML = `
@@ -1473,12 +1761,59 @@ function clCityOptions(query) {
   }));
 }
 
+/* THE OPEN-ENQUIRY OPTION, and the exact text the input carries for it.
+   Compared against on submit, so it must be one constant rather than a string
+   literal repeated at the three places that read it. */
+const CL_ANY_AIRLINE = 'All Airlines';
+
+/* Carrier code (2-3 alphanumerics), then 1-4 digits, then an optional
+   operational suffix: AI217, 6E456, UK 955, AI101A. Mirrors `_FLIGHT_RE` in
+   group_booking_service.py, which validates the same thing on the spreadsheet
+   rows — one shape for a flight number, wherever it is typed. */
+const CL_FLIGHT_RE = /^[A-Z0-9]{2,3}\s*\d{1,4}[A-Z]?$/i;
+
+/* "All Airlines" always heads the list and is never filtered out by the query,
+   so a merchant who has typed a carrier's name and changed their mind can get
+   back to an open enquiry without clearing the box by hand. */
 function clAirlineOptions(query) {
   const q = query.trim().toLowerCase();
-  return CL_AIRLINES
+  const any = {
+    value: CL_ANY_AIRLINE,
+    label: CL_ANY_AIRLINE,
+    sub: 'Open enquiry — we quote the best fare on any carrier',
+    data: { value: '' },                 // '' is what "no airline" sends
+  };
+  const matches = CL_AIRLINES
     .filter(a => !q || a.name.toLowerCase().includes(q) || a.code.toLowerCase().startsWith(q))
     .slice(0, 8)
     .map(a => ({ value: a.name, label: a.name, sub: `Carrier code ${a.code}`, data: { value: a.name } }));
+  return [any, ...matches];
+}
+
+/* WHAT THE AIRLINE BOX ACTUALLY MEANS, in one place.
+   Returns '' for an open enquiry and the carrier's name otherwise. Reads the
+   live input rather than `clEnqForm.airline` so free text the merchant typed
+   without picking from the list is honoured — the same fallback the city
+   fields use. "All Airlines" is a LABEL: matched case-insensitively and
+   translated to '', so it can never be stored as a carrier by that name. */
+function clReadAirline() {
+  const typed = ($('clEnqAirline')?.value || '').trim();
+  if (!typed || typed.toLowerCase() === CL_ANY_AIRLINE.toLowerCase()) return '';
+  return typed;
+}
+
+/* Says which of the two things the enquiry currently is. Worth stating rather
+   than leaving implicit: "All Airlines" in a box that also accepts a carrier
+   name reads as a placeholder, and a merchant who assumed it was one would be
+   surprised to get quotes on four carriers. */
+function clSyncAirlineHint() {
+  const hint = $('clEnqAirlineHint');
+  if (!hint) return;
+  const airline = clReadAirline();
+  hint.innerHTML = airline
+    ? `We will quote <b>${escapeHtml(airline)}</b> for this sector.`
+    : `Leave as <b>${escapeHtml(CL_ANY_AIRLINE)}</b> and we will quote the best fare we can `
+      + 'find on any carrier.';
 }
 
 /* A searchable dropdown over an input.
@@ -1565,10 +1900,12 @@ function clHighlight(text, query) {
     + escapeHtml(text.slice(at + q.length));
 }
 
-/* CR-5 removed `clMeridiemToggle` and `cl24h` from this file. The form no
-   longer collects an hour and a meridiem, so there is nothing to toggle and
-   nothing to convert — the <select> already holds "HH:MM". Both were used only
-   by this screen. */
+/* NOTHING IN THIS FILE CONVERTS BETWEEN CLOCKS ANY MORE.
+   CR-5 removed `clMeridiemToggle` and `cl24h`; the 12-hour layer that briefly
+   replaced them — `cl24To12`, `cl12To24` and the AM/PM select — went on
+   2026-08-05. The control collects "HH:MM" on a 24-hour clock, the state holds
+   it, the API stores it and every screen prints it back unchanged. A helper
+   here that converted anything would be reintroducing the gap it closed. */
 
 /* ================================================================ submit == */
 
@@ -1593,7 +1930,11 @@ async function clSubmitEnquiry() {
      first thing the merchant is sent back to is the first thing that is wrong. */
   const from = f.from || clFreeTextPlace($('clEnqFrom').value);
   const to = f.to || clFreeTextPlace($('clEnqTo').value);
-  const airline = ($('clEnqAirline').value || '').trim();
+  /* AN OPEN ENQUIRY SENDS NO AIRLINE AT ALL. The box reads "All Airlines" by
+     default, and that text is a label rather than a value — sending it would
+     store a carrier by that name and the desk would read it as one. Anything
+     the merchant actually typed or picked is sent as-is. */
+  const airline = clReadAirline();
   const flight = ($('clEnqFlight').value || '').trim();
   const date = $('clEnqDate').value;
   const travelClass = ($('clEnqClass').value || '').trim();
@@ -1607,28 +1948,64 @@ async function clSubmitEnquiry() {
   if (!from) return fail('Choose the city you are flying from.', 'clEnqFrom');
   if (!to) return fail('Choose the city you are flying to.', 'clEnqTo');
   if (from.code === to.code) return fail('From and To cannot be the same city.', 'clEnqTo');
-  if (!airline) return fail('Choose or type the airline.', 'clEnqAirline');
-  if (!flight) return fail('Enter the flight number.', 'clEnqFlight');
+  /* NEITHER AIRLINE NOR FLIGHT NUMBER IS REQUIRED. Blank is a real answer on
+     both — "any carrier", "no particular service" — and the desk chooses when
+     it quotes. A flight number that IS typed is still checked below, because a
+     half-remembered one is worse than none: the desk would quote the wrong
+     service rather than pick a right one. */
+  if (flight && !CL_FLIGHT_RE.test(flight)) {
+    return fail('That does not look like a flight number. Use a form like AI217 or 6E456, '
+      + 'or leave it blank and we will choose the flight.', 'clEnqFlight');
+  }
   if (!date) return fail('Choose the travel date.', 'clEnqDate');
   if (date < clTodayIso()) return fail('The travel date cannot be in the past.', 'clEnqDate');
-  if (!travelClass) return fail('Choose the cabin class.', 'clEnqClass');
 
   const isGroup = f.trip_type === 'group_trip';
 
-  /* A GROUP BOOKING'S TRAVELLERS COME FROM THE SHEET, so the adults/infants
-     rules below are about a breakdown that is not on screen for it. The
-     equivalent check is that a clean manifest exists. */
+  /* Cabin and fare bucket are not on screen for a group — see clSyncTripSections
+     — so they are neither read nor required there. Both stay exactly as they
+     were for one way and round trip. */
+  if (!isGroup && !travelClass) return fail('Choose the cabin class.', 'clEnqClass');
+
+  let groupPax = null;
   if (isGroup) {
-    if (!f.group_import) {
-      clMsg($('clGbMsg'), 'Upload the passenger list before continuing.', 'err');
-      $('clGbDrop')?.focus();
-      return null;
-    }
-    if (!f.group_import.can_submit) {
-      clMsg($('clGbMsg'),
-        `${f.group_import.invalid_rows} row(s) still need fixing. Correct them and upload again.`,
-        'err');
-      return null;
+    /* A GROUP ENQUIRY IS A QUESTION ABOUT SEATS, so what it must carry is a
+       count, not a manifest. The adults/infants rules below are about a
+       breakdown that is not on screen for a group at all. */
+    groupPax = clValidateGroupPax();
+    if (groupPax === null) return fail(
+      $('clEnqGroupPaxHint')?.textContent || 'Enter how many passengers are travelling.',
+      'clEnqGroupPax');
+
+    /* THE MANIFEST IS ONLY EVER PART OF THE BOOKING-REQUEST FORM. On the
+       enquiry there is no upload card to have filled in, so this whole branch
+       is skipped and `group_import` stays null. */
+    if (f.direct) {
+      if (!f.group_import) {
+        clMsg($('clGbMsg'), 'Upload the passenger list before continuing.', 'err');
+        $('clGbDrop')?.focus();
+        return null;
+      }
+      if (!f.group_import.can_submit) {
+        clMsg($('clGbMsg'),
+          `${f.group_import.invalid_rows} row(s) still need fixing. Correct them and upload again.`,
+          'err');
+        return null;
+      }
+      /* BOTH ANSWERS ARE ON THIS ONE FORM, so they can disagree in a way the
+         enquiry-led path cannot: there, the count is stated on one screen and
+         the sheet uploaded on another, days apart. Here the merchant typed 45
+         and attached three rows in the same sitting, which is a slip far more
+         often than a decision. The sheet still wins — it is the list of people
+         who fly — but not silently. */
+      const imported = f.group_import.passengers_imported;
+      if (groupPax !== imported) {
+        const ok = await clConfirm(
+          `You entered ${groupPax} passenger(s) but the uploaded list has ${imported}. `
+          + 'The booking will be raised for the travellers in the list. Continue?',
+          'Continue');
+        if (!ok) return null;
+      }
     }
   } else {
     if (f.adults < 1) return fail('At least one adult must travel.', 'clEnqPax');
@@ -1654,8 +2031,10 @@ async function clSubmitEnquiry() {
     group_journey_type: isGroup ? f.group_journey_type : null,
     origin: from.code, origin_city: from.city,
     destination: to.code, destination_city: to.city,
-    airline,
-    flight_number: flight,
+    /* null, not '', for both — the schema normalises either, but null is what
+       "not stated" means and what every reader already tests for. */
+    airline: airline || null,
+    flight_number: flight || null,
     travel_date: date,
     /* Read from the control, with the form state as the fallback. Both are
        24-hour "HH:MM" and cannot disagree — the control's own change handler is
@@ -1664,23 +2043,33 @@ async function clSubmitEnquiry() {
     preferred_time: clReadTimeField('clEnqTime') || f.depTime,
     return_date: returnDate,
     return_preferred_time: returnTime,
-    travel_class: travelClass,
-    /* On a group booking the party IS the imported rows — the breakdown cards
-       are hidden, so sending the stepper state would send a party of one
-       against a sheet of eighty and fail the server's arithmetic check. */
+    /* Omitted on a group booking, whose form shows neither field. The server
+       makes both optional and requires the cabin only where it is asked for. */
+    travel_class: isGroup ? null : travelClass,
+    booking_class: isGroup ? null : (($('clEnqBookingClass').value || '').trim() || null),
+    /* WHERE A GROUP'S PARTY SIZE COMES FROM, and it is two different places:
+         enquiry  — the number the merchant typed. Nobody has listed the
+                    travellers yet, and that is the whole point of the stage.
+         directly — the imported rows, because a Book Directly group DOES carry
+                    its manifest and the sheet is then the authority. Sending
+                    the typed count instead would let a party of 45 be claimed
+                    against a sheet of 44 and fail the server's arithmetic.
+       The breakdown cards are hidden either way, so the stepper state is not
+       sent for a group at all. */
     passenger_count: isGroup
-      ? f.group_import.passengers_imported
+      ? (f.direct ? f.group_import.passengers_imported : groupPax)
       : f.adults + f.children + f.infants,
-    adults: isGroup ? f.group_import.passengers_imported : f.adults,
+    adults: isGroup
+      ? (f.direct ? f.group_import.passengers_imported : groupPax)
+      : f.adults,
     children: isGroup ? 0 : f.children,
     infants: isGroup ? 0 : f.infants,
-    group_import_id: isGroup ? f.group_import.import_id : null,
+    group_import_id: isGroup && f.direct ? f.group_import.import_id : null,
     notes: ($('clEnqNotes').value || '').trim() || null,
-    /* 0040. SENT AS null WHEN BLANK, NOT 0 — the column distinguishes "not
-       recorded" from "quoted at zero", and a 0 here would put a zero-saving
-       booking into the merchant's savings average. Parsed rather than passed
-       through so an empty string never reaches a Decimal field. */
-    client_fare: clParseMoney($('clEnqClientFare').value),
+    /* CLIENT FARE IS NOT SENT FROM THIS FORM ANY MORE (0040 collected it here).
+       The Booking Request screen asks for it instead, once our fare is known —
+       an enquiry has no quotation to compare against, so there was nothing a
+       number typed here could yet be a saving on. */
   };
 
   /* DIRECT MODE STOPS HERE. Nothing is sent: the itinerary is handed to Booking

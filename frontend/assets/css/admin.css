@@ -62,6 +62,100 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
 .sidebar .brand span.accent{color:var(--gold);}
 .nav-group-label{padding:16px 22px 6px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.32); white-space:nowrap;}
 .layout.collapsed .nav-group-label{display:none;}
+
+/* ==========================================================================
+   SIDEBAR GROUPS — Admin only                                    (2026-08-04)
+   ==========================================================================
+   THIS STYLESHEET IS ALSO THE MANAGER PORTAL'S, so nearly everything below is
+   scoped to `.nav-group` (the wrapper only admin/index.html writes) or to
+   `body.jp-admin` (the class only that page carries). manager/index.html
+   renders its two headings as flat siblings of its `.nav-item`s, so restyling
+   the bare `.nav-group-label` above would have silently re-spaced a portal
+   nobody asked about.
+
+   The one deliberate exception is `.sidebar{overflow-x:hidden}` at the foot of
+   this block. It is unscoped because it can only ever prevent a sideways
+   scrollbar in a vertical rail, never cause one — a guard worth having in both
+   portals.
+   ========================================================================== */
+
+/* ---- the rail is wider, and only in this portal --------------------------
+   Measured at the old 270px, the label column is 161px — and the portal's own
+   vocabulary does not fit in it. "Merchant Management" is 165px and "Service
+   Request Management" 210px; "Booking Enquiries" (128) and "Support
+   Management" (154) each need ~40px more again for the count badge beside
+   them, and "Payment Management" lands exactly on 161 with nothing to spare.
+   `white-space:nowrap` hid all of that by letting the longest one spill out of
+   the rail rather than by making room for it.
+
+   308px gives a 199px label column, which clears every label plus its badge
+   with one exception — "Service Request Management", which wraps to two lines
+   under the rule further down. The cost is 38px of `.main`, and `.main` is
+   `min-width:0` with `overflow-x:auto` on every table, so it gives that up
+   without anything overflowing.
+
+   `body.jp-admin` beats the `:root` declaration in jp-ds.css on SPECIFICITY,
+   not source order, so it holds regardless of which sheet loads first. */
+body.jp-admin{--sidebar-w:308px;}
+
+/* ---- group rhythm --------------------------------------------------------
+   The group owns the gap above its heading, so the distance between two
+   sections is one number in one place rather than a top padding on the heading
+   plus a bottom margin on the last item of the group before it.
+
+   34px on the heading, not 22px. `.nav-item` is `margin:2px 12px` +
+   `padding:11px 22px`, so its icon starts 34px from the sidebar edge — and a
+   heading at 22px sat a whole icon-width to the left of the items it labelled,
+   which is the misalignment in the screenshot this pass started from. */
+.nav-group{display:flex; flex-direction:column; margin-top:18px;}
+.nav-group .nav-group-label{padding:0 22px 7px 34px;}
+
+/* ---- a label too long for the rail wraps; it does not spill out of it -----
+   Even at 308px one label does not fit, and the failure mode mattered: with
+   `white-space:nowrap` the text ran past the sidebar's content box, and
+   `.sidebar` is `overflow-y:auto`, which computes overflow-x to `auto` too — so
+   the rail was quietly scrollable sideways and rendered "Service Request
+   Manageme".
+
+   Wrapping rather than `text-overflow:ellipsis` because an ellipsis in primary
+   navigation hides which module the row is, and a `title` tooltip is no answer
+   for something that should be readable at a glance.
+
+   `align-items:flex-start` with the matching icon offset keeps the icon on the
+   FIRST line of a wrapped label instead of floating to its vertical centre,
+   which is what keeps the icon column a column. */
+.nav-group .nav-item{white-space:normal; align-items:flex-start; min-width:0;}
+.nav-group .nav-item .icon{margin-top:1px;}
+.nav-group .nav-label{min-width:0; line-height:1.35;}
+/* The count must not be the thing that gives way when a label grows. */
+.nav-group .nav-badge{flex:none;}
+/* Sign Out carried `margin-top:4px` from when it was the last thing in the rail
+   with nothing above it but a flexible spacer. Inside the Account group it has a
+   heading and a divider above it instead, so that extra 2px only made one gap in
+   the list measurably wider than the other eighteen. The rule still stands for
+   the Manager Portal, which has no `.nav-group` wrapper and still needs it. */
+.sidebar .nav-group .nav-item.logout{margin-top:2px;}
+/* See the block header: unscoped on purpose. */
+.sidebar{overflow-x:hidden;}
+
+/* Collapsed to the icon rail the headings are gone, so a border is the only
+   thing left saying where one group ends — without it seventeen icons read as
+   one undifferentiated column. */
+.layout.collapsed .nav-group{margin-top:0;}
+.layout.collapsed .nav-group + .nav-group{
+  margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);
+}
+
+/* Account sits after `.spacer`, which is `flex:1` and normally supplies all the
+   separation it needs — but it collapses to nothing once the nav is taller than
+   the viewport and starts scrolling. The border is what keeps the group legible
+   in that case, and the reduced margin stops it drifting off the bottom edge
+   when the spacer IS doing its job. */
+.nav-group-last{
+  margin-top:10px; padding-top:12px;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+.layout.collapsed .nav-group-last{margin-top:10px;}
 .nav-item{display:flex; align-items:center; gap:12px; padding:11px 22px; margin:2px 12px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--sidebar-text); transition:background .18s ease, color .18s ease; white-space:nowrap; position:relative;}
 .nav-item:hover{background:rgba(255,255,255,0.07); color:var(--sidebar-text-hover);}
 .nav-item.active{background:rgba(255,77,77,0.16); color:#fff;}
@@ -92,10 +186,43 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
   position:sticky; top:16px; z-index:150;
 }
 .topbar-left{display:flex; flex-direction:column; gap:2px; min-width:0;}
-.topbar h1{font-size:21px;}
+/* `overflow-wrap:anywhere` is the guarantee, not a nicety. A flex item's
+   automatic minimum is its MIN-CONTENT width, and for a heading that is its
+   longest unbreakable word — "Management" at 21px. So `min-width:0` above lets
+   the column shrink but the heading still refused to go under ~118px, and on a
+   932px-wide screen that was enough to push the identity chip past the edge of
+   the page. With this, the title can always give up whatever the row needs, and
+   in practice it still breaks at spaces like any other heading. */
+.topbar h1{font-size:21px; overflow-wrap:anywhere;}
 .topbar .current-date{font-size:12.5px; color:var(--text-muted); font-weight:600;}
 .topbar .back-link{font-size:13px; font-weight:700; color:var(--sky);}
-.topbar-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+/* THE TOPBAR MUST GIVE WAY BEFORE THE PAGE DOES.
+   This was `flex-shrink:0`, which meant the search box, theme switch, bell and
+   identity chip together claimed a fixed ~570px whatever room `.main` actually
+   had — and when they did not fit they pushed straight through it, scrolling
+   the whole document sideways rather than overflowing something with its own
+   scrollbar. It only ever fitted by luck: widening the sidebar by 38px was
+   enough to break it at 932px wide, which is what tests/verify_responsive.py
+   caught.
+
+   The ORDER in which things give way is now declared rather than left to
+   whichever element happens to have the loosest content:
+
+     1. the search box, which is `flex:1` and allowed below its content width;
+     2. the page title beside it, which can now break anywhere (see `.topbar h1`);
+     3. nothing else. The theme switch, the bell and the identity chip are the
+        controls that say who is signed in and how to sign out, and they keep
+        their size.
+
+   `flex-shrink:0` STAYS ON THE ROW ITSELF, and that is the pairing that matters:
+   its three remaining children cannot shrink, so a row that could shrink would
+   simply have them spill out of it instead — which is exactly what happened when
+   this was tried the other way round. The row holds its width and the title
+   yields, which is why the title needed to become able to. */
+.topbar-right{display:flex; align-items:center; gap:8px; flex-shrink:0; min-width:0;}
+.topbar-right > .theme-selector,
+.topbar-right > .icon-btn-wrap,
+.topbar-right > .admin-chip{flex-shrink:0;}
 .icon-btn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--hover-bg); color:var(--text-primary); position:relative; transition:background .18s ease;}
 .icon-btn:hover{background:var(--hover-control);}
 .theme-selector{display:flex; align-items:center; gap:2px; background:var(--hover-bg); border-radius:12px; padding:3px;}
@@ -344,7 +471,10 @@ tbody tr:hover{background:var(--hover-bg);}
 .skeleton-rows .skeleton:nth-child(3n+1){width:92%;} .skeleton-rows .skeleton:nth-child(3n+2){width:78%;} .skeleton-rows .skeleton:nth-child(3n){width:65%;}
 
 /* ---------- Global search ---------- */
-.global-search{position:relative; flex:1; max-width:340px;}
+/* `min-width:0` is what actually lets it shrink: a flex item defaults to
+   `min-width:auto`, which is the input's min-content width, so `flex:1` alone
+   would still refuse to go below it and push the row wide. */
+.global-search{position:relative; flex:1 1 0; min-width:0; max-width:340px;}
 .global-search input{
   width:100%; padding:9px 14px 9px 38px; border-radius:12px; border:1px solid var(--border-color); background:var(--hover-bg);
   color:var(--text-primary); font-family:var(--ff); font-size:13.5px; outline:none; transition:border-color .18s ease, background .18s ease;
@@ -361,7 +491,12 @@ tbody tr:hover{background:var(--hover-bg);}
 .gs-result-item:hover{background:var(--hover-bg);}
 .gs-result-item .gs-title{font-weight:700; color:var(--text-primary);}
 .gs-result-item .gs-meta{color:var(--text-muted); font-size:11.5px; margin-top:2px;}
-@media (max-width:900px){.global-search{display:none;}}
+/* Hidden from 1024px down, not 900px. Between those two the sidebar is still a
+   fixed 308px rail, so the search survives only by shrinking to a box too
+   narrow to read a placeholder in — and the rules above would happily let it.
+   Below 900px the sidebar becomes a drawer and the room comes back, but by then
+   the mobile topbar carries navigation instead, so the search stays away. */
+@media (max-width:1024px){.global-search{display:none;}}
 
 /* ---------- Quick Actions ---------- */
 .quick-actions-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px;}

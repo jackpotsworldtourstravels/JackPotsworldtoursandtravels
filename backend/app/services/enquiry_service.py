@@ -114,9 +114,18 @@ def _title(payload) -> str:
     The flight number is upper-cased here for the same reason it is in
     ``travel_details``: the merchant types "ai217" as readily as "AI217", and a
     title that disagrees with the stored value reads as two different flights.
+
+    BOTH THE AIRLINE AND THE FLIGHT NUMBER ARE OPTIONAL. An open enquiry — no
+    carrier named, asking us to quote the best available — is titled by its
+    route and says so, rather than trailing the empty space where a carrier
+    would have gone. The parts are joined only if they exist, so "All Airlines"
+    is the whole of the suffix when neither was given.
     """
     route = f"{payload.origin_city or payload.origin} → {payload.destination_city or payload.destination}"
-    return f"Enquiry: {route} · {payload.airline.strip()} {payload.flight_number.strip().upper()}"
+    airline = (payload.airline or "").strip()
+    flight = (payload.flight_number or "").strip().upper()
+    carrier = " ".join(p for p in (airline, flight) if p) or "All Airlines"
+    return f"Enquiry: {route} · {carrier}"
 
 
 def _base_filter(actor: User):
@@ -492,7 +501,7 @@ def to_booking_request(
     db: Session, actor: User, enquiry_id: int, *, passengers: list[dict],
     remarks: str | None = None, contact: dict | None = None,
     international: bool = False, special_requests: str | None = None,
-    group_import_id: int | None = None,
+    group_import_id: int | None = None, client_fare: Decimal | None = None,
 ) -> ServiceRequest:
     """Create the draft booking the Request Ticket button leads to.
 
@@ -531,12 +540,19 @@ def to_booking_request(
                 f"{details.get('booking_request_number') or existing_id}"
             ),
         )
-    # A GROUP ENQUIRY ALREADY CARRIES ITS MANIFEST.
-    # The sheet was attached when the enquiry was raised, so the travellers are
-    # read off that row rather than re-uploaded — and the import stays pointed
-    # at the enquiry, which is what keeps the desk's view of what it quoted
-    # intact. `group_import_id` in the body is the fallback for a merchant that
-    # uploaded only at this step.
+    # WHERE A GROUP BOOKING'S TRAVELLERS COME FROM — and the order matters.
+    #
+    # `group_import_id` in the body is now the ORDINARY path, not the fallback:
+    # an enquiry asks whether seats exist and what they cost, so the merchant
+    # states a passenger *count* there and uploads the sheet listing them at
+    # this step, once we have answered. The Merchant portal no longer offers an
+    # upload on the enquiry form at all.
+    #
+    # The inherited branch is kept and is still checked FIRST, because enquiries
+    # raised before that change really do carry a manifest, and for those the
+    # sheet the desk quoted against is the one the booking must use. Preferring
+    # the body on such an enquiry would let a second, different sheet silently
+    # replace what was quoted.
     group_import = None
     inherited = getattr(enquiry, "group_import", None)
     if inherited is not None:
@@ -571,14 +587,22 @@ def to_booking_request(
         status=S.DRAFT,
         title=(enquiry.title or "").replace("Enquiry: ", "", 1) or enquiry.title,
         remarks=remarks,
-        # 0040 — CARRIED ONTO THE BOOKING, NOT LEFT BEHIND ON THE ENQUIRY.
-        # The savings figure has to survive conversion: Reports, the invoice and
-        # the Dashboard's "Total Savings" all aggregate over BOOKINGS, and an
-        # enquiry that has become a booking is no longer counted by them. If
-        # this were not copied, every merchant's savings would reset to zero the
-        # moment they actually booked. On the booking the comparison is against
-        # `total_amount` (the billed figure), which is `fare` below.
-        client_fare=enquiry.client_fare,
+        # 0040 — THE MERCHANT'S OWN SELLING PRICE, NOW STATED AT THIS STEP.
+        #
+        # It used to be collected on the enquiry form and is copied forward here
+        # so the savings figure survives conversion: Reports, the invoice and the
+        # Dashboard's "Total Savings" all aggregate over BOOKINGS, and an enquiry
+        # that has become a booking is no longer counted by them. Without the
+        # copy every merchant's savings reset to zero the moment they booked.
+        #
+        # As of 2026-08-05 the Booking Request screen is where it is ENTERED,
+        # because that is the first moment our quotation exists to compare it
+        # against — asking on the enquiry meant naming a selling price before
+        # knowing the cost. So the payload wins when it carries one, and the
+        # enquiry's value is the fallback that keeps every enquiry raised before
+        # the move working untouched. `is not None` rather than a truth test:
+        # zero is a real client fare and must not fall through to the enquiry's.
+        client_fare=client_fare if client_fare is not None else enquiry.client_fare,
         # The enquiry's own details are spread first so the itinerary is
         # verbatim what was answered; only the booking-specific additions are
         # layered on. The review claim is dropped — it belongs to the enquiry's
@@ -689,11 +713,23 @@ def _itinerary_details(payload) -> dict:
         "origin_city": (payload.origin_city or "").strip() or None,
         "destination": payload.destination.strip(),
         "destination_city": (payload.destination_city or "").strip() or None,
-        "airline": payload.airline.strip(),
-        "flight_number": payload.flight_number.strip().upper(),
+        # BOTH OPTIONAL, AND None MEANS SOMETHING. A null airline is an OPEN
+        # enquiry — the merchant chose "All Airlines" and is asking the desk to
+        # quote whatever is best — and a null flight number means no particular
+        # service. Stored as present-and-null rather than omitted, like
+        # group_journey_type above, so every reader is a plain lookup.
+        "airline": (payload.airline or "").strip() or None,
+        "flight_number": (payload.flight_number or "").strip().upper() or None,
         "preferred_time": payload.preferred_time,
         "return_preferred_time": payload.return_preferred_time,
-        "travel_class": payload.travel_class.strip(),
+        # None on a group booking, whose form asks for neither: the cabin and
+        # the fare bucket are settled when the desk quotes the party. Stored as
+        # a present-and-null key rather than omitted, like `group_journey_type`
+        # above, so every reader is a plain lookup and never a `in details` test.
+        "travel_class": (payload.travel_class or "").strip() or None,
+        # The single-letter fare bucket (Y/J/C/F/…). Already uppercased and
+        # pattern-checked by the schema, so nothing is re-normalised here.
+        "booking_class": getattr(payload, "booking_class", None),
         "passenger_count": payload.passenger_count,
         "adults": payload.adults,
         "children": payload.children,

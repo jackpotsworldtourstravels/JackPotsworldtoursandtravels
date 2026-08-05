@@ -282,6 +282,7 @@ def update_draft(
     db: Session, actor: User, request_id: int, *, remarks: str | None = None,
     travel_date: datetime.date | None = None, return_date: datetime.date | None = None,
     contact: dict | None = None, special_requests: str | None = None,
+    client_fare: Decimal | None = None,
 ) -> ServiceRequest:
     request = get_request(db, actor, request_id)
     if request.status not in lifecycle.EDITABLE_STATUSES:
@@ -295,6 +296,12 @@ def update_draft(
         request.travel_date = travel_date
     if return_date is not None:
         request.return_date = return_date
+    # 0040. A real COLUMN, not a travel_details key — Reports and the Dashboard
+    # aggregate over it in SQL, which a JSONB key could not serve. Editable only
+    # while the request is a draft, which the status gate above already enforces
+    # for everything here.
+    if client_fare is not None:
+        request.client_fare = client_fare
 
     # Merged, never replaced: travel_details also holds the locked itinerary
     # copied from the enquiry, and this endpoint must not be a way to edit it.
@@ -543,6 +550,32 @@ def _validate_classic_submission(request: ServiceRequest) -> None:
                     "on or before the travel date"
                 ),
             )
+
+    # TWO TRAVELLERS CANNOT SHARE A PASSPORT. Physically impossible, and it
+    # reaches the airline as two tickets against one document — which is caught
+    # at check-in, after the money has moved. Cheap to state here and expensive
+    # everywhere else.
+    #
+    # It went unstated until CR-8 because typing the same number twice by hand is
+    # a rare slip. Scanning made it easy: one file dropped onto three passenger
+    # cards fills all three identically, and the form was perfectly happy to
+    # submit that. Compared case-insensitively and without spaces, because that
+    # is the same normalisation `lookup_passenger` matches on — otherwise
+    # "z1234567" and "Z123 4567" read as two different documents.
+    seen: dict[str, str] = {}
+    for p in request.passengers:
+        key = (p.passport_number or "").replace(" ", "").upper()
+        if not key:
+            continue
+        if key in seen:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"{p.full_name} and {seen[key]} both have passport {key}. "
+                    "Each traveller needs their own passport."
+                ),
+            )
+        seen[key] = p.full_name
 
 
 def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:

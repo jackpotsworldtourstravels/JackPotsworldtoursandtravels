@@ -15,9 +15,9 @@
    its header touches none of that.
 
    HOW IT CLOSES — AND WHY IT DOES NOT JUST REMOVE `.open`
-   Three of these dialogs (wdReview, wdAccount, wdLedger) and two more
-   (prRaise, prDetail) install a FOCUS TRAP when they open, and release it in
-   their backdrop-click handler. A close button that only removed `.open` would
+   Two of these dialogs (wdReview, wdLedger) and two more (prRaise, prDetail)
+   install a FOCUS TRAP when they open, and release it in their backdrop-click
+   handler. A close button that only removed `.open` would
    hide the dialog and leave the trap live — keyboard focus cycling inside an
    invisible element, with no way out. So the button replays the dialog's own
    dismiss path in priority order:

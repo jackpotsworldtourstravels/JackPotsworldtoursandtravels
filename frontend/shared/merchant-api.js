@@ -42,6 +42,7 @@
 
    Added 2026-08-04 with Group Booking (backend/app/routers/group_bookings.py).
    The passenger list for a group arrives as a spreadsheet instead of a form:
+     limits           GET    /api/group-bookings/limits
      template         GET    /api/group-bookings/template
      upload+validate  POST   /api/group-bookings/imports
      import detail    GET    /api/group-bookings/imports/{id}
@@ -115,6 +116,14 @@ const MerchantApi = {
 
   /* ------------------------------------------------- group booking manifest */
 
+  /* The configured party-size and upload bounds. Fetched once per form open and
+     cached by the caller — the enquiry form needs `max_passengers` to validate
+     Number of Passengers before it sends, and hard-coding it here is exactly
+     how the UI and the server come to disagree about the same setting. */
+  groupBookingLimits() {
+    return this._req('get', '/api/group-bookings/limits');
+  },
+
   /* The passenger template. Downloads are a browser concern, not a data one:
      the response is a stream with a Content-Disposition, so it is fetched as a
      blob and handed to a temporary anchor rather than returned to the caller.
@@ -178,7 +187,7 @@ const MerchantApi = {
      Returns the booking; it still needs submitRequest() to reach the desk.
      409 if this enquiry has already been booked. */
   enquiryToBookingRequest(id, { passengers, remarks, contact, international, specialRequests,
-                                groupImportId }) {
+                                groupImportId, clientFare }) {
     return this._req('post', `/api/enquiries/${id}/booking-request`, {
       data: {
         /* A group booking sends its manifest INSTEAD of a passenger array —
@@ -193,6 +202,10 @@ const MerchantApi = {
            passports are enforced at submit. */
         international: !!international,
         special_requests: specialRequests || undefined,
+        /* 0040, collected on the Booking Request screen since 2026-08-05.
+           `?? undefined` rather than `|| undefined`: 0 is a real client fare
+           and `||` would drop it, leaving whatever the enquiry carried. */
+        client_fare: clientFare ?? undefined,
       },
     });
   },
@@ -280,12 +293,15 @@ const MerchantApi = {
     return this._req('put', `/api/requests/${id}/passengers`, { data: { passengers } });
   },
 
-  updateDraft(id, { remarks, contact, specialRequests }) {
+  updateDraft(id, { remarks, contact, specialRequests, clientFare }) {
     return this._req('put', `/api/requests/${id}`, {
       data: {
         remarks: remarks ?? undefined,
         contact: contact ?? undefined,
         special_requests: specialRequests ?? undefined,
+        /* `??`, not `||`: 0 is a real client fare. undefined means "not
+           supplied", which leaves the stored value untouched. */
+        client_fare: clientFare ?? undefined,
       },
     });
   },
@@ -306,6 +322,59 @@ const MerchantApi = {
 
   listDocuments(requestId) {
     return this._req('get', `/api/requests/${requestId}/documents`);
+  },
+
+  /* ---------------------------------------------------------- passport OCR */
+
+  /* Whether to render a Scan control at all. A deployment with no OCR provider
+     configured answers `{available: false}`, and the booking form then looks
+     exactly as it did before this shipped. Asked once per screen load. */
+  ocrAvailability() {
+    return this._req('get', '/api/bookings/passport/availability');
+  },
+
+  /* Read a passport and get passenger fields back, each with a confidence.
+
+     MULTIPART, so it bypasses _req for the same reason uploadDocument does.
+     `validateStatus` is widened to accept 202: the server answers 202 when the
+     provider is still working, and axios would otherwise throw on it — turning
+     "your scan is taking a moment" into "your scan failed". The caller polls
+     when `status` comes back `queued` or `processing`.
+
+     `requestId` is optional and is only a label. Scanning works on a blank form
+     with no draft saved, which is the whole point — see the router docstring. */
+  extractPassport(file, { requestId = null } = {}) {
+    const form = new FormData();
+    form.append('file', file);
+    if (requestId != null) form.append('request_id', String(requestId));
+    return axios.post(`${API_BASE}/api/bookings/passport/extract`, form, {
+      headers: partnerAuthHeaders(),
+      validateStatus: s => (s >= 200 && s < 300),
+    }).then(r => r.data);
+  },
+
+  getPassportExtraction(extractionId) {
+    return this._req('get', `/api/bookings/passport/extract/${extractionId}`);
+  },
+
+  /* The scan itself. Authenticated, so a plain <img src> cannot fetch it — the
+     blob is pulled with the bearer token and handed over as an object URL, the
+     same dance downloadDocument does. Callers must revoke it. */
+  async passportScanUrl(extractionId) {
+    const blob = await this._req(
+      'get', `/api/bookings/passport/extract/${extractionId}/scan`,
+      { responseType: 'blob' },
+    );
+    return URL.createObjectURL(blob);
+  },
+
+  /* Tell the server what the merchant actually saved, so it can record which
+     OCR values were overridden. Send the passenger as saved — the server works
+     out the differences, because it is the only side that knows what was read. */
+  recordPassportEdits(extractionId, values, { requestId = null, passengerId = null } = {}) {
+    return this._req('post', `/api/bookings/passport/extract/${extractionId}/edits`, {
+      data: { values, request_id: requestId, passenger_id: passengerId },
+    });
   },
 
   /* The airline's own files, attached by the operations desk. A narrower list

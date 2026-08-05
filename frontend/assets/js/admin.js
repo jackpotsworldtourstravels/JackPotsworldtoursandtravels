@@ -367,30 +367,42 @@ async function openOnboardMerchantModal(merchantId) {
     catch (err) { alert('Failed to load merchant.'); return; }
   }
   const v = (field, fallback = '') => m ? (m[field] ?? fallback) : fallback;
+  /* THREE FIELDS ARE ASKED FOR; THE EIGHT THAT WENT ARE NOT ALL SIMPLY GONE.
+     Merchant Name, Company Type, Credit Limit, Address, City, Country, Contact
+     Person and Contact Email were removed from this form on request. Five of
+     them — company_type, credit_limit, address, city, country — are optional
+     server-side and are now just omitted, which leaves the column at its
+     default on create and untouched on edit.
+
+     The other three are NOT optional. CreateMerchantRequest requires
+     `merchant_name`, `contact_person` and `contact_email`, and this work is not
+     allowed to change the API, so they are DERIVED from what is still asked
+     for — see the submit handler below. Two consequences worth knowing:
+     the merchant's trading name starts equal to its company name, and the first
+     admin login is created against the company email rather than a separate
+     contact address. Both are editable afterwards.
+
+     `span-2` on Company Name is what makes three fields read as a balanced
+     form rather than a two-column grid with a hole in it: the name gets its own
+     full-width row, then Email and Phone pair off underneath. */
   body.innerHTML = `
     <h2>${m ? 'Edit Merchant' : 'Onboard Merchant'}</h2>
     <form id="onboardMerchantForm">
       <div class="form-grid">
-        <div class="form-field"><label>Company Name</label><input name="company_name" required value="${escapeHtml(v('company_name'))}"></div>
-        <div class="form-field"><label>Merchant Name</label><input name="merchant_name" required value="${escapeHtml(v('merchant_name'))}"></div>
-        <div class="form-field"><label>Company Type</label>
-          <select name="company_type" required>
-            ${Object.entries(COMPANY_TYPE_LABELS).map(([val, label]) => `<option value="${val}" ${v('company_type') === val ? 'selected' : ''}>${label}</option>`).join('')}
-          </select>
+        <div class="form-field span-2"><label>Company Name</label>
+          <input name="company_name" required maxlength="150" autocomplete="off"
+                 value="${escapeHtml(v('company_name'))}" placeholder="e.g. Skyline Travel Services">
         </div>
-        <div class="form-field"><label>Email</label><input name="email" type="email" required value="${escapeHtml(v('email'))}" ${m ? 'disabled' : ''}></div>
+        <div class="form-field"><label>Email</label>
+          <input name="email" type="email" required value="${escapeHtml(v('email'))}" ${m ? 'disabled' : ''}>
+          ${m ? '' : '<span class="cell-sub">Also becomes the first admin login for this merchant.</span>'}
+        </div>
         <div class="form-field"><label>Phone</label><input name="phone" value="${escapeHtml(v('phone'))}"></div>
-        <div class="form-field"><label>Credit Limit</label><input name="credit_limit" type="number" min="0" step="0.01" value="${v('credit_limit', 0)}"></div>
-        <div class="form-field"><label>Address</label><input name="address" value="${escapeHtml(v('address'))}"></div>
-        <div class="form-field"><label>City</label><input name="city" value="${escapeHtml(v('city'))}"></div>
-        <div class="form-field"><label>Country</label><input name="country" value="${escapeHtml(v('country'))}"></div>
-        ${m ? '' : `<div class="form-field"><label>Contact Person</label><input name="contact_person" required></div>
-        <div class="form-field"><label>Contact Email</label><input name="contact_email" type="email" required></div>`}
       </div>
       <div class="msg" id="onboardMerchantMsg"></div>
       <div class="modal-actions">
-        <button type="submit" class="btn btn-coral">${m ? 'Save Changes' : 'Save Merchant'}</button>
         <button type="button" class="btn btn-ghost" id="onboardMerchantCancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-coral">${m ? 'Save Changes' : 'Save Merchant'}</button>
       </div>
     </form>
   `;
@@ -400,16 +412,27 @@ async function openOnboardMerchantModal(merchantId) {
     e.preventDefault();
     const f = e.target.elements;
     const msg = document.getElementById('onboardMerchantMsg');
-    const payload = {
-      company_name: f.company_name.value, merchant_name: f.merchant_name.value,
-      company_type: f.company_type.value, phone: f.phone.value || null,
-      credit_limit: f.credit_limit.value || 0, address: f.address.value || null,
-      city: f.city.value || null, country: f.country.value || null,
-    };
+    const companyName = f.company_name.value.trim();
+    /* EDIT SENDS ONLY WHAT THE FORM STILL ASKS FOR.
+       UpdateMerchantRequest changes only the fields present in the body, so
+       omitting company_type / credit_limit / address / city / country here
+       LEAVES THE EXISTING VALUES ALONE. Sending them as null instead would wipe
+       the address of every merchant onboarded before this change. `merchant_name`
+       is omitted for the same reason: renaming the company should not silently
+       overwrite a trading name somebody set deliberately. */
+    const payload = { company_name: companyName, phone: f.phone.value.trim() || null };
     if (!m) {
-      payload.email = f.email.value;
-      payload.contact_person = f.contact_person.value;
-      payload.contact_email = f.contact_email.value;
+      /* Create needs the three the schema marks required. The form's 150-char
+         cap on Company Name is not cosmetic — it is `merchant_name`'s and
+         `contact_person`'s limit (company_name itself allows 200), so a name
+         that fits the input always fits everything derived from it. */
+      payload.email = f.email.value.trim();
+      payload.merchant_name = companyName;
+      payload.contact_person = companyName;
+      payload.contact_email = f.email.value.trim();
+      /* company_type and credit_limit are left off entirely: the schema
+         defaults them to `business_partner` and 0, and both are editable
+         afterwards through the API. */
     }
     try {
       if (m) {

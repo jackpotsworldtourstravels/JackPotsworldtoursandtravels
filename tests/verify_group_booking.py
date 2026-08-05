@@ -424,6 +424,140 @@ check("a group booking with no journey type is refused", r.status_code == 422, f
 
 
 # ---------------------------------------------------------------------------
+print("\n== the enquiry stage asks for a COUNT, not a manifest ==")
+# ---------------------------------------------------------------------------
+# A group enquiry asks whether N seats exist and what they cost. The sheet that
+# lists those N travellers is uploaded at Booking Request, once we have
+# answered — so the enquiry must accept a party size with no manifest, and with
+# neither of the two class fields, which its form no longer shows.
+r = enquiry(trip_type="group_trip", group_journey_type="one_way_group",
+            passenger_count=120, adults=120, travel_class=None)
+check("a group enquiry needs no manifest and no cabin", r.status_code == 201,
+      f"{r.status_code} {r.text[:160]}")
+if r.status_code == 201:
+    d = r.json()
+    check("  it keeps the stated party size", d.get("passenger_count") == 120,
+          str(d.get("passenger_count")))
+    check("  and carries no cabin", d.get("travel_class") is None, str(d.get("travel_class")))
+    check("  and no fare bucket", d.get("booking_class") is None, str(d.get("booking_class")))
+
+# One way and round trip still REQUIRE the cabin. Making the field optional for
+# the group must not have quietly made it optional everywhere — that is the
+# regression this pairing exists to catch.
+r = enquiry(travel_class=None)
+check("a one way with no cabin is still refused", r.status_code == 422, f"{r.status_code}")
+r = enquiry(trip_type="round_trip", return_date=RETURN.isoformat(), travel_class=None)
+check("a round trip with no cabin is still refused", r.status_code == 422, f"{r.status_code}")
+
+
+# ---------------------------------------------------------------------------
+print("\n== how large a party may be, by trip type ==")
+# ---------------------------------------------------------------------------
+# The group ceiling is configuration and bounds BOTH the enquiry count and the
+# manifest row limit, so the two gates cannot contradict each other. Ordinary
+# bookings keep the 99 they have always had.
+MAX = gb.MAX_ROWS
+r = requests.get(f"{GB}/limits", headers=H(mtok))
+check("the configured limits are served to the form", r.status_code == 200, f"{r.status_code}")
+if r.status_code == 200:
+    check("  max_passengers matches the manifest row cap",
+          r.json().get("max_passengers") == MAX, f"{r.json()} vs {MAX}")
+
+r = enquiry(trip_type="group_trip", group_journey_type="one_way_group",
+            passenger_count=MAX, adults=MAX, travel_class=None)
+check(f"a group of exactly {MAX} is allowed", r.status_code == 201, f"{r.status_code}")
+
+r = enquiry(trip_type="group_trip", group_journey_type="one_way_group",
+            passenger_count=MAX + 1, adults=MAX + 1, travel_class=None)
+check(f"a group of {MAX + 1} is refused", r.status_code == 422, f"{r.status_code}")
+check("  and the message names the limit",
+      str(MAX) in r.text and "Group Booking" in r.text, r.text[:200])
+
+r = enquiry(passenger_count=100, adults=100)
+check("a ONE WAY of 100 is still refused — the group cap is not shared",
+      r.status_code == 422, f"{r.status_code}")
+r = enquiry(passenger_count=99, adults=99)
+check("  and 99 still works", r.status_code == 201, f"{r.status_code}")
+
+
+# ---------------------------------------------------------------------------
+print("\n== Booking Class: one letter, and a different field from Class ==")
+# ---------------------------------------------------------------------------
+# The cabin (Economy/Business) and the airline's fare bucket (Y/J/K) are two
+# separate things that the merchant form used to call by one name.
+r = enquiry(travel_class="Business", booking_class="j")
+check("a lowercase bucket is stored uppercase",
+      r.status_code == 201 and r.json().get("booking_class") == "J",
+      f"{r.status_code} {r.json().get('booking_class') if r.status_code == 201 else r.text[:120]}")
+check("  and the cabin is untouched beside it",
+      r.status_code == 201 and r.json().get("travel_class") == "Business")
+
+for bad, why in [("AB", "two letters"), ("1", "a digit"), ("@", "punctuation"),
+                 ("Y1", "a letter and a digit")]:
+    r = enquiry(travel_class="Economy", booking_class=bad)
+    check(f"  {bad!r} is refused ({why})", r.status_code == 422, f"{r.status_code}")
+
+r = enquiry(travel_class="Economy", booking_class="")
+check("a blank bucket is 'not stated', not an error",
+      r.status_code == 201 and r.json().get("booking_class") is None,
+      f"{r.status_code} {r.json().get('booking_class') if r.status_code == 201 else r.text[:120]}")
+
+r = enquiry(travel_class="Economy")
+check("omitting it entirely is fine too",
+      r.status_code == 201 and r.json().get("booking_class") is None, f"{r.status_code}")
+
+
+# ---------------------------------------------------------------------------
+print("\n== the sheet accepts what the form accepts: airline is optional ==")
+# ---------------------------------------------------------------------------
+# THE TWO GATES HAVE TO AGREE. The booking form made Airline and Airline Number
+# optional on 2026-08-05, and until this was fixed the spreadsheet still listed
+# both in REQUIRED_COLUMNS — so a merchant who raised an OPEN enquiry, had it
+# quoted, and then uploaded the manifest for it had every row rejected for
+# omitting exactly what the form had told them was optional.
+OPEN_CASES = [
+    ("neither airline nor flight", {"Airline": "", "Airline Number": ""}, None, None),
+    ("airline only", {"Airline Number": ""}, "Air India", None),
+    ("flight only", {"Airline": ""}, None, "AI217"),
+    ("both, as before", {}, "Air India", "AI217"),
+]
+for label, override, want_airline, want_flight in OPEN_CASES:
+    r = track(upload(sheet("one_way_group", [row(**override)])))
+    if r.status_code != 201:
+        check(f"a sheet with {label} imports", False, f"{r.status_code} {r.text[:140]}")
+        continue
+    d = r.json()["imported"]
+    check(f"a sheet with {label} imports cleanly",
+          d["validation_status"] == "valid" and d["invalid_rows"] == 0,
+          f'{d["validation_status"]} {[e["message"] for e in d["errors"]][:2]}')
+    # The declared journey is on the DETAIL response, not on the upload summary
+    # (GroupImportSummary carries counts and status only) — so it is re-read
+    # rather than looked for on `d`, where it would silently be None for every
+    # case and turn this into an assertion that always passes.
+    j = requests.get(f'{GB}/imports/{d["import_id"]}', headers=H(mtok)).json().get("journey") or {}
+    check(f"  ...and records airline={want_airline!r} flight={want_flight!r}",
+          j.get("airline") == want_airline and j.get("flight_number") == want_flight,
+          f'airline={j.get("airline")!r} flight={j.get("flight_number")!r}')
+
+# The format check must SURVIVE the field becoming optional — blank is an
+# answer, a mangled flight number is still a mistake.
+r = track(upload(sheet("one_way_group", [row(**{"Airline Number": "NOT A FLIGHT"})])))
+d = r.json()["imported"] if r.status_code == 201 else {}
+check("a supplied flight number is still format-checked",
+      d.get("validation_status") == "invalid"
+      and any("not a valid airline number" in e["message"].lower() for e in d.get("errors", [])),
+      str(d.get("validation_status")))
+
+# And the columns that ARE required must stay required.
+r = track(upload(sheet("one_way_group", [row(**{"Origin City": ""})])))
+d = r.json()["imported"] if r.status_code == 201 else {}
+check("a genuinely required column is still refused",
+      d.get("validation_status") == "invalid"
+      and any("Origin City is missing" in e["message"] for e in d.get("errors", [])),
+      str(d.get("validation_status")))
+
+
+# ---------------------------------------------------------------------------
 print("\n== scope ==")
 # ---------------------------------------------------------------------------
 r = requests.get(f"{GB}/imports/99999999", headers=H(mtok))

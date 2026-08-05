@@ -63,13 +63,17 @@ function admLabel(s) {
   return String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/* '18:30' -> '6:30 PM'. Preferred times are stored as HH:MM strings on the
-   enquiry and carried onto the booking verbatim. */
+/* 24-HOUR, MATCHING WHAT THE MERCHANT TYPED.
+   `preferred_time` is stored as "HH:MM" and is now entered as 24-hour on the
+   merchant form, so rendering "02:30 PM" here made the desk and the merchant
+   describe the same departure two different ways — and a desk reading a time
+   back to a merchant over the phone had to convert it. Applies to preferred
+   TIMES only; record timestamps keep their own format. */
 function admTimeLabel(hhmm) {
   if (!hhmm) return null;
   const [h, m] = String(hhmm).split(':').map(Number);
   if (Number.isNaN(h)) return String(hhmm);
-  return `${h % 12 === 0 ? 12 : h % 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
 }
 
 const admDash = v => (v === null || v === undefined || v === '' ? '—' : v);
@@ -95,6 +99,151 @@ async function openBookingReview(requestId) {
     return;
   }
   renderBookingReview(data);
+  /* Passport OCR (migration 0042). Fetched AFTER the modal has rendered rather
+     than awaited alongside the booking: it is supplementary, it is a second
+     round trip, and a desk that has to wait for it to read a booking is a desk
+     that waits for nothing useful. A deployment with no scans — or one where
+     this endpoint is unavailable — simply never grows the section. */
+  admLoadPassportOcr(requestId);
+}
+
+/* ---------------------------------------------------------------- OCR panel */
+
+const ADM_OCR_TONE = { high: 'confirmed', medium: 'pending', low: 'cancelled' };
+
+/* Injected under the passenger table once the request lands. Its own function
+   rather than part of renderBookingReview so a failure here cannot take the
+   booking review down with it — a scan is context, a booking is the work. */
+async function admLoadPassportOcr(requestId) {
+  const host = document.getElementById('admOcrSection');
+  if (!host) return;
+  let rows;
+  try {
+    rows = (await axios.get(
+      `${API_BASE}/api/admin/requests/${requestId}/passport-ocr`,
+      { headers: authHeaders() },
+    )).data;
+  } catch (err) {
+    // Silent: an admin reviewing a booking should not be shown an error about
+    // a panel they did not ask for and that adds nothing to the decision.
+    console.debug('passport OCR panel unavailable', err);
+    return;
+  }
+  if (!rows.length) return;
+
+  host.innerHTML = `
+    <h3 style="font-size:13px;margin:18px 0 8px;">Passport scans</h3>
+    <div class="table-wrap"><table><thead><tr>
+      <th>Read</th><th>Confidence</th><th>Fields</th><th>Merchant edits</th>
+      <th>Provider</th><th>Actions</th>
+    </tr></thead><tbody>
+      ${rows.map(row => admOcrRow(row)).join('')}
+    </tbody></table></div>
+    <div id="admOcrDetail"></div>`;
+
+  window.__admOcrRows = rows;
+  host.querySelectorAll('[data-adm-ocr-scan]').forEach(b =>
+    b.addEventListener('click', () => admViewScan(b.dataset.admOcrScan)));
+  host.querySelectorAll('[data-adm-ocr-data]').forEach(b =>
+    b.addEventListener('click', () => admShowOcrData(Number(b.dataset.admOcrData))));
+}
+
+function admOcrRow(row) {
+  const failed = row.status !== 'succeeded';
+  const pct = row.overall_confidence == null
+    ? null : Math.round(row.overall_confidence * 100);
+  /* The count that matters is how many fields were read BELOW the high band —
+     "98%" on its own reads as "fine" even when the expiry was a coin flip. */
+  const doubtful = Object.values(row.fields || {}).filter(f => f.band !== 'high').length;
+  return `<tr>
+    <td>${escapeHtml(fmtDateTime(row.created_at))}
+      <div class="cell-sub">${escapeHtml(row.uploaded_by_name || '')}</div></td>
+    <td>${failed
+      ? `<span class="badge cancelled">Failed</span>`
+      : `<span class="badge ${pct >= 95 ? 'confirmed' : pct >= 80 ? 'pending' : 'cancelled'}">
+           OCR verified · ${pct == null ? '—' : `${pct}%`}</span>`}
+      ${row.simulated ? '<div class="cell-sub"><b>Simulated — not a real read</b></div>' : ''}</td>
+    <td>${failed ? '—' : Object.keys(row.fields || {}).length}
+      ${doubtful ? `<div class="cell-sub">${doubtful} below 95%</div>` : ''}</td>
+    <td>${(row.edits || []).length
+      ? `<b>${row.edits.length}</b> field${row.edits.length === 1 ? '' : 's'} changed`
+      : '<span class="cell-sub">None</span>'}</td>
+    <td>${escapeHtml(row.provider)}
+      <div class="cell-sub">${escapeHtml(row.provider_model || '')}</div></td>
+    <td style="white-space:nowrap;">
+      <button class="btn btn-ghost btn-sm" data-adm-ocr-scan="${row.id}">View passport</button>
+      <button class="btn btn-ghost btn-sm" data-adm-ocr-data="${row.id}">View OCR data</button>
+    </td>
+  </tr>`;
+}
+
+/* The scan itself, fetched with the bearer token and opened from an object URL
+   — there is no public link to a passport image and there must not be. */
+async function admViewScan(extractionId) {
+  try {
+    const res = await axios.get(
+      `${API_BASE}/api/bookings/passport/extract/${extractionId}/scan`,
+      { headers: authHeaders(), responseType: 'blob' },
+    );
+    const url = URL.createObjectURL(res.data);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    const msg = document.getElementById('admReviewMsg');
+    if (msg) { msg.textContent = 'Could not open that scan.'; msg.className = 'msg error'; }
+  }
+}
+
+/* Field-by-field: what the provider read, how sure it was, and what the
+   merchant saved instead. The last column is the whole reason the edit audit
+   exists — "OCR read JOHN, the merchant changed it to JOHNN" is the question an
+   investigation asks, and neither value survives anywhere else. */
+function admShowOcrData(extractionId) {
+  const row = (window.__admOcrRows || []).find(r => r.id === extractionId);
+  const host = document.getElementById('admOcrDetail');
+  if (!row || !host) return;
+
+  const edits = Object.fromEntries((row.edits || []).map(e => [e.field_name, e]));
+  const names = [...new Set([...Object.keys(row.fields || {}), ...Object.keys(edits)])];
+
+  host.innerHTML = `
+    <h3 style="font-size:13px;margin:16px 0 8px;">
+      OCR data · ${escapeHtml(row.original_filename)}
+    </h3>
+    ${row.validity && row.validity.checked && !row.validity.valid
+      ? `<div class="msg ${row.validity.severity === 'error' ? 'error' : ''}">
+           ${escapeHtml(row.validity.message || '')}</div>` : ''}
+    <div class="table-wrap"><table><thead><tr>
+      <th>Field</th><th>Read by OCR</th><th>Confidence</th><th>Merchant saved</th>
+    </tr></thead><tbody>
+      ${names.map(name => {
+        const read = (row.fields || {})[name];
+        const edit = edits[name];
+        const conf = read?.confidence == null ? null : Math.round(read.confidence * 100);
+        return `<tr>
+          <td>${escapeHtml(admLabel(name))}</td>
+          <td>${escapeHtml(read?.value ?? edit?.ocr_value ?? '—')}</td>
+          <td>${conf == null
+            ? '—'
+            : `<span class="badge ${ADM_OCR_TONE[read.band] || ''}">${conf}%</span>`}</td>
+          <td>${edit
+            ? `<b>${escapeHtml(edit.edited_value ?? '—')}</b>
+               <div class="cell-sub">changed by ${escapeHtml(edit.edited_by_name || '—')} ·
+                 ${escapeHtml(fmtDateTime(edit.edited_at))}</div>`
+            : '<span class="cell-sub">unchanged</span>'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;">
+        Provider response (${escapeHtml(row.provider)} ${escapeHtml(row.provider_api_version || '')})
+      </summary>
+      <pre style="font-size:11px;overflow:auto;max-height:280px;margin:8px 0 0;
+                  padding:10px;background:var(--hover-bg);border-radius:8px;">${
+        escapeHtml(JSON.stringify(row.raw_response ?? {}, null, 2))
+      }</pre>
+    </details>`;
+  host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function admPassengerName(request, passengerId) {
@@ -151,7 +300,7 @@ function renderBookingReview(data) {
       ${cell('Trip type', tripTypeLabel(d.trip_type))}
       ${cell('Route', escapeHtml(admDash(
         [d.origin_city || d.origin, d.destination_city || d.destination].filter(Boolean).join(' → '))))}
-      ${cell('Airline', escapeHtml(admDash(d.airline)))}
+      ${cell('Airline', escapeHtml(fmtAirline(d.airline)))}
       ${cell('Flight number', escapeHtml(admDash(d.flight_number)))}
       ${cell('Departure', `${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}${
         d.preferred_time ? ` · ${escapeHtml(admTimeLabel(d.preferred_time))}` : ''}`)}
@@ -160,6 +309,7 @@ function renderBookingReview(data) {
             d.return_preferred_time ? ` · ${escapeHtml(admTimeLabel(d.return_preferred_time))}` : ''}`
         : 'One way')}
       ${cell('Class', escapeHtml(admDash(d.travel_class)))}
+      ${cell('Booking Class', escapeHtml(admDash(d.booking_class)))}
       ${cell('Route type', intl ? 'International' : 'Domestic')}
       ${cell('Passengers', `${paxCount}${mix ? `<div class="cell-sub">${escapeHtml(mix)}</div>` : ''}${
         declared && declared !== paxCount
@@ -223,6 +373,12 @@ function renderBookingReview(data) {
           </td>
         </tr>`).join('')}
       </tbody></table></div>` : ''}
+
+    <!-- Filled in by admLoadPassportOcr once the second request lands, and left
+         empty when this booking carries no scans. Placed after Documents and
+         before the Timeline: it is evidence about the passengers above it, not
+         a step in the booking's history. -->
+    <div id="admOcrSection"></div>
 
     <h3 style="font-size:13px;margin:18px 0 8px;">Timeline</h3>
     <div class="timeline">
@@ -358,7 +514,32 @@ function promptDialog({ title = 'Reason', message = '', placeholder = '', confir
    supply the number instead of discovering the refusal.
 
    Resolves to {amount, reason} or null. `reason` is free text: the note on an
-   approval, and the mandatory justification on a correction. */
+   approval, and the mandatory justification on a correction.
+
+   THE MARKUP IS THE STANDARD'S, NOT THIS FILE'S.
+   This dialog used to write a bare `.modal-card` with a hand-set 440px width,
+   two loose `.form-field`s and a left-aligned button row — which is why it read
+   as unfinished next to the rest of the portal. It now emits exactly the
+   vocabulary jp-ds.css §15 styles, so its frame, grid, input metrics, labels,
+   sticky header and right-aligned sticky footer come from the same place as
+   every other Admin dialog:
+
+     `.modal-md`     the mid width — §15 tier 2 at 620px rather than 1060px,
+                     because two fields do not fill a ten-field card.
+     `<form>`        the scrolling body §15 pads, and what makes Enter submit.
+     `.form-grid`    the two-column grid; also the marker that puts a dialog in
+                     tier 2 in the first place.
+     `name="reason"` NOT decoration — §15 spans a field with that name across
+                     both columns, which is what gives the layout a full-width
+                     reason under a half-width amount.
+     `.jp-dlg-x`     the header close. Added here rather than left to
+                     admin-dialog-standard.js, which only watches overlays
+                     present at DOMContentLoaded — this one is built on demand,
+                     so the injector never sees it.
+
+   NOT ONE VALIDATION RULE, PAYLOAD FIELD OR RESOLVED SHAPE CHANGED. It still
+   resolves to {amount, reason} or null, and still refuses <= 0 and an empty
+   required reason before any request is made. */
 function admAmountDialog({
   title = 'Amount', message = '', amountLabel = 'Amount (₹)', reasonLabel = 'Note',
   reasonPlaceholder = '', value = '', confirmText = 'Confirm', requireReason = false,
@@ -367,33 +548,51 @@ function admAmountDialog({
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay open';
     overlay.innerHTML = `
-      <div class="modal-card" style="max-width:440px;">
-        <h2>${escapeHtml(title)}</h2>
-        ${message ? `<p style="font-size:13.5px;color:var(--text-muted);margin:-6px 0 10px;">${escapeHtml(message)}</p>` : ''}
-        <div class="form-field" style="max-width:none;">
-          <label for="admAmountInput">${escapeHtml(amountLabel)}</label>
-          <input type="number" id="admAmountInput" min="0.01" step="0.01" value="${escapeHtml(String(value))}">
-        </div>
-        <div class="form-field" style="max-width:none;">
-          <label for="admAmountReason">${escapeHtml(reasonLabel)}${requireReason ? ' *' : ''}</label>
-          <input type="text" id="admAmountReason" maxlength="500" placeholder="${escapeHtml(reasonPlaceholder)}">
-        </div>
-        <div class="msg" data-amount-msg></div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-coral" data-amount-ok>${escapeHtml(confirmText)}</button>
-          <button type="button" class="btn btn-ghost" data-amount-cancel>Cancel</button>
-        </div>
+      <div class="modal-card modal-md" role="dialog" aria-modal="true" aria-labelledby="admAmountTitle">
+        <h2 id="admAmountTitle">${escapeHtml(title)}
+          <button type="button" class="jp-dlg-x" data-amount-cancel aria-label="Close dialog">&times;</button>
+        </h2>
+        <form data-amount-form novalidate>
+          ${message ? `<p class="ops-sub">${escapeHtml(message)}</p>` : ''}
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="admAmountInput">${escapeHtml(amountLabel)}</label>
+              <input type="number" id="admAmountInput" name="amount" min="0.01" step="0.01"
+                     inputmode="decimal" autocomplete="off" value="${escapeHtml(String(value))}">
+            </div>
+            <div class="form-field">
+              <label for="admAmountReason">${escapeHtml(reasonLabel)}${requireReason ? ' *' : ''}</label>
+              <input type="text" id="admAmountReason" name="reason" maxlength="500"
+                     autocomplete="off" placeholder="${escapeHtml(reasonPlaceholder)}">
+            </div>
+          </div>
+          <div class="msg" data-amount-msg></div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" data-amount-cancel>Cancel</button>
+            <button type="submit" class="btn btn-coral" data-amount-ok>${escapeHtml(confirmText)}</button>
+          </div>
+        </form>
       </div>`;
     document.body.appendChild(overlay);
     const amountInput = overlay.querySelector('#admAmountInput');
     const reasonInput = overlay.querySelector('#admAmountReason');
     const msg = overlay.querySelector('[data-amount-msg]');
-    const done = result => { overlay.remove(); resolve(result); };
+    const done = result => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(result);
+    };
     const fail = (text, el) => { msg.textContent = text; msg.className = 'msg error'; el.focus(); };
+    /* Escape dismisses, matching every other dialog in the portal. Bound on the
+       document because focus may be on the card rather than a field, and
+       removed in done() so a closed dialog leaves no listener behind. */
+    function onKey(e) { if (e.key === 'Escape') done(null); }
+    document.addEventListener('keydown', onKey);
     amountInput.focus();
     amountInput.select();
 
-    overlay.querySelector('[data-amount-ok]').addEventListener('click', () => {
+    overlay.querySelector('[data-amount-form]').addEventListener('submit', e => {
+      e.preventDefault();
       const amount = Number(amountInput.value);
       /* Mirrors the server's own rule rather than guessing at it: the API
          refuses <= 0, so refusing here means the admin is told at the point of
@@ -405,7 +604,10 @@ function admAmountDialog({
       if (requireReason && !reason) return fail('A reason is required.', reasonInput);
       done({ amount, reason: reason || null });
     });
-    overlay.querySelector('[data-amount-cancel]').addEventListener('click', () => done(null));
+    /* Two elements carry `data-amount-cancel` now — the footer button and the
+       header close — and both mean the same thing. */
+    overlay.querySelectorAll('[data-amount-cancel]').forEach(
+      b => b.addEventListener('click', () => done(null)));
     overlay.addEventListener('click', e => { if (e.target === overlay) done(null); });
   });
 }

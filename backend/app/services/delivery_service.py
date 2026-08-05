@@ -37,6 +37,20 @@ recorded with ``status = failed`` and the reason in ``error_message``, and
 surfaced to staff on the admin messages screen — a bounced send that nobody can
 see is the failure mode this milestone exists to remove.
 
+LIFECYCLE EMAIL IS SWITCHED OFF BY DEFAULT (2026-08-05)
+``settings.lifecycle_emails_enabled`` gates the email half of :func:`deliver`,
+and it defaults to False. Everything above still describes how the machinery
+works and all of it still runs when the flag is on; what changed is the
+business's answer to whether these thirty events warrant mail. The in-app half
+is untouched and unconditional — the portal notification IS the notification
+now, and no workflow, API or template was removed to achieve that.
+
+**The two authentication emails are not affected and cannot be.** The Login OTP
+(``otp_service``, ``partner_auth_service``) and the password reset
+(``routers/auth``) call ``email_service`` directly and have never passed through
+this module — which is exactly the property that lets one flag here mean "no
+lifecycle mail" without ever meaning "nobody can sign in".
+
 KNOWN LIMITATION, STATED HERE RATHER THAN DISCOVERED LATER
 Sending is **synchronous**. With SMTP unconfigured it is a no-op and costs
 nothing; with a real server it adds that server's latency to the request that
@@ -57,6 +71,7 @@ from app.models_v2 import (
     MsgLog,
     User,
 )
+from app.config import settings
 from app.services import email_service, notification_templates
 
 logger = logging.getLogger("jackpots.delivery")
@@ -199,7 +214,19 @@ def deliver(
         else:
             counts["suppressed"] += 1
 
-        if email_on and email:
+        # THREE INDEPENDENT REASONS NOT TO MAIL, and they mean different things:
+        #   settings.lifecycle_emails_enabled  the platform does not mail
+        #                                      lifecycle events at all (default)
+        #   email_on                           this merchant opted out
+        #   email                              we have no address for this user
+        # All three count as `suppressed` — the message was not sent and nothing
+        # went wrong. `failed` stays reserved for a send that was attempted and
+        # did not arrive, which is what the admin messages screen is looking at;
+        # folding a policy decision into that number would fill a failure report
+        # with things that never failed.
+        if not settings.lifecycle_emails_enabled or not email_on or not email:
+            counts["suppressed"] += 1
+        else:
             subject, text_body, html_body = notification_templates.render(
                 title, message, reference=reference, event=event,
                 action_label=action_label,
@@ -213,8 +240,6 @@ def deliver(
                 counts["emailed"] += 1
             else:
                 counts["failed"] += 1
-        elif not email_on:
-            counts["suppressed"] += 1
 
     if commit:
         db.commit()

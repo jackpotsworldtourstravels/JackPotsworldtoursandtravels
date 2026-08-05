@@ -134,6 +134,7 @@ def enquiry_to_booking_request(
         international=payload.international,
         special_requests=payload.special_requests,
         group_import_id=payload.group_import_id,
+        client_fare=payload.client_fare,
     )
     return RequestResponse.of(
         enquiry_service.load_with_passengers(db, current_user, booking.request_id)

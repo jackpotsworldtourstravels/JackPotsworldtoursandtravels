@@ -457,7 +457,9 @@ async function clContinueBookingDraft(id, btn) {
         </div>`,
         '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
     }
-    clResumeBookingDraft(booking);
+    /* The envelope goes too: a group draft's manifest id is on it rather than
+       on `request`, and without it the screen would ask for the sheet again. */
+    clResumeBookingDraft(booking, detail);
   } catch (err) {
     clOpenModal('Could not open this draft',
       `<div class="cl-msg cl-msg-err" style="margin-top:0">${
@@ -656,7 +658,7 @@ async function clOpenRequestDetail(id) {
    than assuming a flight-shaped record. */
 function clDetailFacts(d) {
   const pairs = [
-    ['Airline', d.airline], ['Flight', d.flight_number],
+    ['Airline', fmtAirline(d.airline)], ['Flight', d.flight_number],
     ['Origin', d.origin_city || d.origin], ['Destination', d.destination_city || d.destination],
     ['Departs', d.departure_time ? fmtDateTime(d.departure_time) : null],
     ['Arrives', d.arrival_time ? fmtDateTime(d.arrival_time) : null],

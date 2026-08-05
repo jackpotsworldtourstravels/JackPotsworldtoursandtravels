@@ -56,9 +56,15 @@ TRAVEL = datetime.date.today() + datetime.timedelta(days=60)
 
 
 def raise_enquiry(label, *, pax=1, adults=1, children=0, infants=0,
-                  travel_class="Economy", preferred_time="09:30"):
-    """A merchant enquiry, through the real endpoint."""
-    r = requests.post(f"{BASE}/api/enquiries", headers=H(mtok), json={
+                  travel_class="Economy", preferred_time="09:30", client_fare=None):
+    """A merchant enquiry, through the real endpoint.
+
+    ``client_fare`` is still accepted by the API but is no longer collected on
+    the merchant form (it moved to Booking Request on 2026-08-05). It is a
+    parameter here so the backward-compatible path — an enquiry that already
+    carries one — stays under test.
+    """
+    body = {
         "trip_type": "one_way",
         "origin": "HYD", "origin_city": "Hyderabad",
         "destination": "BOM", "destination_city": "Mumbai",
@@ -68,8 +74,20 @@ def raise_enquiry(label, *, pax=1, adults=1, children=0, infants=0,
         "passenger_count": pax, "adults": adults,
         "children": children, "infants": infants,
         "notes": f"cr5 {label}",
-    })
+    }
+    if client_fare is not None:
+        body["client_fare"] = client_fare
+    r = requests.post(f"{BASE}/api/enquiries", headers=H(mtok), json=body)
     assert r.status_code in (200, 201), f"enquiry {label}: {r.status_code} {r.text[:300]}"
+    return r.json()
+
+
+def answer_enquiry(eid, *, fare="18000.00"):
+    """Claim and quote, the two steps every booking-side check needs first."""
+    claim(eid)
+    r = respond(eid, {"available": True, "response": "Seats confirmed.",
+                      "total_fare": fare, "reason": "Base fare plus taxes."})
+    assert r.status_code == 200, f"respond: {r.status_code} {r.text[:200]}"
     return r.json()
 
 
@@ -490,6 +508,128 @@ for t in ("00:00", "00:30", "12:00", "23:30"):
     e3 = raise_enquiry(f"time {t}", preferred_time=t)
     check(f"24-hour time '{t}' round-trips", e3["preferred_time"] == t,
           str(e3.get("preferred_time")))
+
+
+# ===========================================================================
+print("\n== an enquiry may name no airline and no flight ==")
+# ===========================================================================
+# 2026-08-05. Both were mandatory; an enquiry is a question about a route on a
+# date, and which carrier and service answer it best is part of what the desk
+# is being asked. "All Airlines" is a UI label, never a stored value — the form
+# sends nothing at all for it.
+def enq_raw(**over):
+    body = {
+        "trip_type": "one_way", "origin": "HYD", "destination": "BOM",
+        "travel_date": str(TRAVEL), "preferred_time": "09:30",
+        "travel_class": "Economy", "passenger_count": 1, "adults": 1,
+    }
+    body.update(over)
+    return requests.post(f"{BASE}/api/enquiries", headers=H(mtok), json=body)
+
+
+r = enq_raw()
+check("an enquiry with neither airline nor flight is accepted", r.status_code == 201,
+      f"{r.status_code} {r.text[:180]}")
+open_enq = r.json() if r.status_code == 201 else {}
+check("...and stores the airline as null, not an empty string",
+      open_enq.get("airline") is None, repr(open_enq.get("airline")))
+check("...and the flight number as null too",
+      open_enq.get("flight_number") is None, repr(open_enq.get("flight_number")))
+
+r = enq_raw(airline="", flight_number="   ")
+check("blank strings normalise to null rather than storing whitespace",
+      r.status_code == 201
+      and r.json().get("airline") is None and r.json().get("flight_number") is None,
+      f"{r.status_code} {r.text[:140]}")
+
+r = enq_raw(airline="Air India")
+check("an airline with no flight number is accepted", r.status_code == 201, f"{r.status_code}")
+check("...and keeps the carrier the merchant chose",
+      r.status_code == 201 and r.json().get("airline") == "Air India",
+      r.text[:120])
+
+r = enq_raw(flight_number="ai217")
+check("a flight number with no airline is accepted", r.status_code == 201, f"{r.status_code}")
+check("...and is upper-cased as it always was",
+      r.status_code == 201 and r.json().get("flight_number") == "AI217", r.text[:120])
+
+r = enq_raw(airline="IndiGo", flight_number="6E217")
+check("naming both still works exactly as before",
+      r.status_code == 201
+      and (r.json().get("airline"), r.json().get("flight_number")) == ("IndiGo", "6E217"),
+      r.text[:140])
+
+# THE "None" ON AN INVOICE, GUARDED.
+# `travel_details` stores both keys PRESENT AND NULL for an open enquiry, and a
+# dict default only fires for a MISSING key — so `d.get("airline", "")` returns
+# None and an f-string prints the word "None" onto the invoice and confirmation
+# PDF the merchant sends to its own customer. Asserted against the helper the
+# documents now build that line with.
+from app.services.invoice_service import _flight_label  # noqa: E402
+
+check("an open enquiry's flight line is empty, not the string 'None'",
+      _flight_label({"airline": None, "flight_number": None}) == "",
+      repr(_flight_label({"airline": None, "flight_number": None})))
+check("...a carrier with no service reads as the carrier alone",
+      _flight_label({"airline": "IndiGo", "flight_number": None}) == "IndiGo",
+      repr(_flight_label({"airline": "IndiGo", "flight_number": None})))
+check("...a service with no carrier reads as the service alone",
+      _flight_label({"airline": None, "flight_number": "6E217"}) == "6E217",
+      repr(_flight_label({"airline": None, "flight_number": "6E217"})))
+check("...and both together are unchanged",
+      _flight_label({"airline": "IndiGo", "flight_number": "6E217"}) == "IndiGo 6E217",
+      repr(_flight_label({"airline": "IndiGo", "flight_number": "6E217"})))
+
+
+# ===========================================================================
+print("\n== the client fare is stated at the BOOKING, not at the enquiry ==")
+# ===========================================================================
+# It used to be collected on the enquiry form, which asked the merchant to name
+# a selling price before we had quoted them a cost. It moved to Booking Request
+# — the first screen on which our fare is known.
+priced = raise_enquiry("client fare at booking", pax=1, adults=1)
+check("an enquiry carries no client fare of its own",
+      priced.get("client_fare") is None, repr(priced.get("client_fare")))
+
+answer_enquiry(priced["id"], fare="18000.00")
+r = requests.post(f"{BASE}/api/enquiries/{priced['id']}/booking-request", headers=H(mtok), json={
+    "passengers": [{"first_name": "Asha", "last_name": "Rao", "passenger_type": "adult"}],
+    "contact": {"email": "ops@demo.example", "phone": "+919000000001"},
+    "client_fare": "22500.00",
+})
+check("the booking request accepts a client fare", r.status_code == 201,
+      f"{r.status_code} {r.text[:180]}")
+booked = r.json() if r.status_code == 201 else {}
+check("...and stores it", str(booked.get("client_fare") or "") .startswith("22500"),
+      repr(booked.get("client_fare")))
+check("...alongside the quoted amount it will be compared against",
+      str(booked.get("total_amount") or "").startswith("18000"),
+      repr(booked.get("total_amount")))
+
+# Editable while it is still a draft — a mistyped selling price is the one a
+# merchant notices immediately after saving.
+r = requests.put(f"{BASE}/api/requests/{booked['id']}", headers=H(mtok),
+                 json={"client_fare": "21000.00"})
+edited = (r.json().get("request") or r.json()) if r.status_code == 200 else {}
+check("a draft's client fare can be corrected", r.status_code == 200, f"{r.status_code}")
+check("...and the new figure is what is stored",
+      str(edited.get("client_fare") or "").startswith("21000"),
+      repr(edited.get("client_fare")))
+
+# The fallback that keeps every enquiry raised before the move working: one
+# that already carries a client fare passes it on when no new one is sent.
+legacy = raise_enquiry("legacy client fare", pax=1, adults=1, client_fare="30000.00")
+check("an enquiry that DOES carry a client fare still accepts it",
+      str(legacy.get("client_fare") or "").startswith("30000"),
+      repr(legacy.get("client_fare")))
+answer_enquiry(legacy["id"], fare="18000.00")
+r = requests.post(f"{BASE}/api/enquiries/{legacy['id']}/booking-request", headers=H(mtok), json={
+    "passengers": [{"first_name": "Legacy", "last_name": "Case", "passenger_type": "adult"}],
+    "contact": {"email": "ops@demo.example", "phone": "+919000000001"},
+})
+check("...and it is carried onto the booking when none is sent at this step",
+      r.status_code == 201 and str(r.json().get("client_fare") or "").startswith("30000"),
+      f"{r.status_code} {str(r.json().get('client_fare') if r.status_code == 201 else r.text[:120])}")
 
 
 sys.exit(check.report())

@@ -93,7 +93,11 @@ function enqRoute(r) {
   const from = r.origin_city || r.origin || '—';
   const to = r.destination_city || r.destination || '—';
   const arrow = tripTypeArrow(r.trip_type);
-  const flight = [r.airline, r.flight_number].filter(Boolean).join(' ');
+  /* fmtAirline never returns empty, so the sub-line always names the carrier
+     position — "All Airlines" for an open enquiry — and the flight number joins
+     it only when there is one. A queue row that showed neither used to look
+     like a row with missing data. */
+  const flight = [fmtAirline(r.airline), r.flight_number].filter(Boolean).join(' ');
   return `<div>${escapeHtml(from)} ${arrow} ${escapeHtml(to)}</div>
           <div class="cell-sub">${escapeHtml(flight)}${r.travel_class ? ` · ${escapeHtml(r.travel_class)}` : ''}</div>`;
 }
@@ -108,12 +112,13 @@ function enqPaxSummary(r) {
 
 /* 24h "19:00" -> "7:00 PM". The merchant form collects 1-12 + AM/PM and stores
    24h; this reverses it for display so both portals show the same clock. */
+/* 24-hour, matching the merchant form that produced it — see admTimeLabel in
+   admin-bookings.js for why. Preferred times only; timestamps are unaffected. */
 function enqTime(hhmm) {
   if (!hhmm) return '—';
-  const [h, m] = hhmm.split(':').map(Number);
-  const mer = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${mer}`;
+  const [h, m] = String(hhmm).split(':').map(Number);
+  if (Number.isNaN(h)) return String(hhmm);
+  return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
 }
 
 async function loadTicketEnquiries(page = enqPage) {
@@ -270,11 +275,18 @@ async function openEnquiryReview(enquiryId) {
       ${enqDetailRow('Trip type', tripTypeLabel(r.trip_type))}
       ${enqDetailRow('From', escapeHtml([r.origin_city, r.origin].filter(Boolean).join(' · ')))}
       ${enqDetailRow('To', escapeHtml([r.destination_city, r.destination].filter(Boolean).join(' · ')))}
-      ${enqDetailRow('Airline', escapeHtml(r.airline || '—'))}
+      <!-- "All Airlines" when the merchant left it open — this is the desk's
+           signal that it may quote any carrier, so it must not read as "—". -->
+      ${enqDetailRow('Airline', escapeHtml(fmtAirline(r.airline)))}
+      ${enqDetailRow('Flight number', escapeHtml(fmtFlightNumber(r.flight_number)))}
       ${enqDetailRow('Flight number', escapeHtml(r.flight_number || '—'))}
       ${enqDetailRow('Departure', `${r.travel_date ? fmtDate(r.travel_date) : '—'} · ${enqTime(r.preferred_time)}`)}
       ${r.return_date ? enqDetailRow('Return', `${fmtDate(r.return_date)} · ${enqTime(r.return_preferred_time)}`) : ''}
-      ${enqDetailRow('Travel class', escapeHtml(r.travel_class || '—'))}
+      <!-- Two fields: Class is the cabin, Booking Class the airline's
+           single-letter fare bucket within it. Both are absent on a group
+           enquiry, where the desk settles them when it quotes the party. -->
+      ${enqDetailRow('Class', escapeHtml(r.travel_class || '—'))}
+      ${enqDetailRow('Booking Class', escapeHtml(r.booking_class || '—'))}
       ${enqDetailRow('Passengers', `${r.passenger_count} — ${escapeHtml(enqPaxSummary(r))}`)}
       ${r.booking_request_number ? enqDetailRow('Booking raised', `<span class="mono">${escapeHtml(r.booking_request_number)}</span>`) : ''}
       ${/* 0040 — what the merchant has already quoted its OWN customer. Shown

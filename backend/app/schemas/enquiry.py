@@ -13,10 +13,26 @@ import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.config import settings
 from app.schemas.group_booking import GroupImportSummary
 from app.schemas.ticket import PassengerInput
+
+#: The party size an ORDINARY booking may carry. Unchanged, and deliberately a
+#: separate number from the group ceiling below — one way and round trip are not
+#: affected by how large a group is allowed to be.
+ORDINARY_MAX_PASSENGERS = 99
+
+#: The ceiling on a GROUP booking, from configuration. Also bounds the uploaded
+#: manifest (``group_booking_service.MAX_ROWS``), so the number a merchant may
+#: state and the number it may then list can never disagree.
+GROUP_MAX_PASSENGERS = settings.group_booking_max_passengers
+
+#: Which of the two applies is decided per-request in ``EnquiryCreate._check``
+#: against ``trip_type`` — there is no field-level bound, because a field bound
+#: cannot see the trip type and would refuse a group of 400 before the validator
+#: ever ran.
 
 #: ``group_trip`` is a MARKER, not a fourth workflow. It says "this booking is a
 #: large party travelling together" — a corporate group, a tour, a pilgrimage —
@@ -75,11 +91,25 @@ class EnquiryCreate(BaseModel):
     destination: str = Field(min_length=1, max_length=100)
     destination_city: str | None = Field(default=None, max_length=120)
 
-    airline: str = Field(min_length=1, max_length=120)
-    flight_number: str = Field(min_length=1, max_length=20)
+    #: OPTIONAL — ``None`` means "any airline", which is a real answer and the
+    #: form's default. A merchant asking whether Hyderabad→Delhi can be flown on
+    #: Tuesday for 40 people usually does not care whose aircraft it is, and
+    #: naming one narrowed the quotation to a carrier they never meant to
+    #: require. An open enquiry lets the desk quote the best fare it can find.
+    #:
+    #: The UI sends nothing at all for "All Airlines" rather than the literal
+    #: string, so no stored enquiry can be confused with one for a carrier named
+    #: "All Airlines". Whitespace is normalised to None for the same reason.
+    airline: str | None = Field(default=None, max_length=120)
+    #: OPTIONAL for the same reason, one step finer: a merchant who knows the
+    #: carrier still often does not know which service, and picking a flight is
+    #: part of what the desk is being asked to do. When a value IS given it is
+    #: normalised and stored exactly as before.
+    flight_number: str | None = Field(default=None, max_length=20)
 
     travel_date: datetime.date
-    #: 24-hour ``HH:MM``. The form collects 1-12 plus AM/PM and converts.
+    #: 24-hour ``HH:MM``, and now also what the merchant types — the 12-hour
+    #: presentation layer was removed from the form on 2026-08-05.
     preferred_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
 
     return_date: datetime.date | None = None
@@ -87,18 +117,48 @@ class EnquiryCreate(BaseModel):
         default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
     )
 
-    #: Still free text on the wire, though CR-5 made the merchant form a
-    #: four-option dropdown (Economy / Premium Economy / Business / First
-    #: Class). Narrowing this to an enum would be a contract change that breaks
-    #: every enquiry already stored with a fare-family name, and the dropdown is
-    #: a strict subset of what is accepted — the UI offers less than the server
-    #: allows, which is the safe direction.
-    travel_class: str = Field(min_length=1, max_length=80)
+    #: The CABIN — labelled simply "Class" on the merchant form. Still free text
+    #: on the wire, though CR-5 made the merchant form a four-option dropdown
+    #: (Economy / Premium Economy / Business / First Class). Narrowing this to an
+    #: enum would be a contract change that breaks every enquiry already stored
+    #: with a fare-family name, and the dropdown is a strict subset of what is
+    #: accepted — the UI offers less than the server allows, which is the safe
+    #: direction.
+    #:
+    #: OPTIONAL SINCE THE GROUP-BOOKING PASS, REQUIRED IN THE VALIDATOR for
+    #: every trip type that still asks for it. A group booking is an enquiry
+    #: about seats for a party, and the cabin is settled when the desk quotes it,
+    #: so the merchant form no longer collects one. Made optional rather than
+    #: refused-on-group on purpose: relaxing a required field is backward
+    #: compatible, whereas rejecting a value the API accepted yesterday would
+    #: break every stored integration that still sends one.
+    travel_class: str | None = Field(default=None, max_length=80)
 
-    passenger_count: int = Field(ge=1, le=99)
-    adults: int = Field(default=1, ge=1, le=99)
-    children: int = Field(default=0, ge=0, le=99)
-    infants: int = Field(default=0, ge=0, le=99)
+    #: THE FARE BUCKET — a single letter, and a different thing from the cabin
+    #: above. Airlines sell one cabin at many booking classes ("Y", "M" and "K"
+    #: are all Economy at different fare rules), and the desk needs the letter to
+    #: quote against the right one. Confusingly, this is what the industry calls
+    #: "booking class" while the merchant form used that name for the cabin until
+    #: now — hence the rename on the form: cabin is **Class**, this is **Booking
+    #: Class**.
+    #:
+    #: Always optional. Not every merchant knows the bucket, and an enquiry with
+    #: only a cabin is still answerable. Uppercased before validation so "y" and
+    #: "Y" are one value; the pattern then admits exactly one A-Z letter, which
+    #: refuses digits, punctuation and multi-character input.
+    booking_class: str | None = Field(default=None, pattern=r"^[A-Z]$")
+
+    #: NO ``le`` HERE ON PURPOSE — the ceiling depends on ``trip_type``, which a
+    #: field bound cannot see, and it is applied in ``_check``. Bounding the
+    #: field as well would only decide which of two messages a merchant gets:
+    #: pydantic's "Input should be less than or equal to 1000" would pre-empt the
+    #: validator's "The maximum number of passengers allowed for a Group Booking
+    #: is 1000" exactly at the boundary that matters most. ``ge`` stays, because
+    #: "at least one traveller" is true of every trip type.
+    passenger_count: int = Field(ge=1)
+    adults: int = Field(default=1, ge=1)
+    children: int = Field(default=0, ge=0)
+    infants: int = Field(default=0, ge=0)
 
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -108,6 +168,31 @@ class EnquiryCreate(BaseModel):
     #: settlement; it only produces the "You Saved" figure once we have quoted.
     #: ``le`` guards the Numeric(14, 2) column: 12 digits before the point.
     client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
+
+    #: BEFORE the pattern, not after — ``mode="before"`` is what lets a merchant
+    #: type "y" and have it stored as "Y" rather than 422'd against ``^[A-Z]$``.
+    #: A blank box arrives as "" and means "not stated", so it becomes None here
+    #: instead of failing the pattern: the field is optional, and an empty string
+    #: is how an untouched text input reports that.
+    @field_validator("booking_class", mode="before")
+    @classmethod
+    def _normalise_booking_class(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        text = str(v).strip().upper()
+        return text or None
+
+    #: AN EMPTY BOX IS "NOT STATED", NOT AN EMPTY STRING. Both fields are now
+    #: optional, and a browser submits an untouched text input as "" — storing
+    #: that would give every reader two ways to spell "no airline" (`None` and
+    #: `""`) and a UI that renders one of them as a blank gap instead of "Any".
+    #: Normalised here, once, so nothing downstream has to test for both.
+    @field_validator("airline", "flight_number", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        return str(v).strip() or None
 
     @model_validator(mode="after")
     def _check(self) -> "EnquiryCreate":
@@ -160,6 +245,34 @@ class EnquiryCreate(BaseModel):
             # here for that same reason.
             self.return_date = None
             self.return_preferred_time = None
+
+        # THE CABIN IS REQUIRED EVERYWHERE IT IS ASKED FOR.
+        # The field became optional so a group booking — whose form no longer
+        # shows Class or Booking Class — can omit it. One way and round trip are
+        # unchanged: a missing cabin is still refused on both, exactly as the old
+        # ``min_length=1`` refused it, only with a message a merchant can read.
+        is_group = self.trip_type == "group_trip"
+        if not is_group and not (self.travel_class or "").strip():
+            raise ValueError("Choose the cabin class")
+
+        # HOW LARGE A PARTY MAY BE, decided by trip type and by nothing else.
+        # A group is corporate/tour/pilgrimage travel and is bounded by
+        # configuration; everything else keeps the 99 it has always had. The
+        # field bound admits the larger of the two, so this is where the smaller
+        # one is actually applied.
+        cap = GROUP_MAX_PASSENGERS if is_group else ORDINARY_MAX_PASSENGERS
+        if self.passenger_count > cap:
+            raise ValueError(
+                f"The maximum number of passengers allowed for a "
+                f"{'Group Booking' if is_group else 'booking'} is {cap}"
+            )
+        for name, value in (
+            ("adults", self.adults),
+            ("children", self.children),
+            ("infants", self.infants),
+        ):
+            if value > cap:
+                raise ValueError(f"There cannot be more than {cap} {name}")
 
         if self.adults + self.children + self.infants != self.passenger_count:
             raise ValueError(
@@ -301,6 +414,15 @@ class EnquiryToBooking(BaseModel):
     international: bool = False
     #: Free text for the desk: wheelchair, bassinet, dietary, seating together.
     special_requests: str | None = Field(default=None, max_length=1000)
+    #: What the merchant is charging its OWN customer (0040). Collected here
+    #: rather than on the enquiry as of 2026-08-05: this is the first screen on
+    #: which our quoted fare is known, so it is the first point at which naming
+    #: a selling price is an informed act rather than a guess.
+    #:
+    #: ``None`` means "not stated" and leaves whatever the enquiry carried in
+    #: place — which is what keeps enquiries raised before the move intact. It
+    #: is never used for settlement; it only produces the "You Saved" figure.
+    client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
 
     @model_validator(mode="after")
     def _one_passenger_source(self) -> "EnquiryToBooking":
@@ -388,6 +510,9 @@ class EnquiryResponse(BaseModel):
     return_preferred_time: str | None = None
 
     travel_class: str | None = None
+    #: The single-letter fare bucket. None on every enquiry raised before this
+    #: field existed, and on any the merchant left blank — both render as "—".
+    booking_class: str | None = None
     passenger_count: int = 1
     adults: int = 1
     children: int = 0
@@ -477,6 +602,7 @@ class EnquiryResponse(BaseModel):
             return_date=r.return_date,
             return_preferred_time=d.get("return_preferred_time"),
             travel_class=d.get("travel_class"),
+            booking_class=d.get("booking_class"),
             passenger_count=d.get("passenger_count", r.quantity),
             adults=d.get("adults", 1),
             children=d.get("children", 0),
