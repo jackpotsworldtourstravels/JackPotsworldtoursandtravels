@@ -3012,6 +3012,138 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-trip-opt.checked::before{border-color:var(--cl-orange); box-shadow:inset 0 0 0 3.5px var(--cl-orange);}
 .cl-trip-opt:focus-within{outline:2px solid var(--cl-orange); outline-offset:2px;}
 
+/* ---- group booking: journey type, and the passenger manifest upload ----
+   The upload card replaces the traveller entry section for a group booking. It
+   is built from the same tokens as every other panel — no new colours, no new
+   radii — so it reads as part of the form rather than as a widget dropped into
+   it. The one thing it does own is the dashed drop zone, which has to look
+   droppable and has no precedent elsewhere in the portal. */
+.cl-groupjt{margin:14px 0 4px;}
+
+.cl-gb{margin-top:18px;}
+.cl-gb-lede{
+  margin:0 0 14px; font-size:13px; line-height:1.6; color:var(--cl-text-muted);
+}
+.cl-gb-tmpl{margin-bottom:14px;}
+
+.cl-gb-input{display:none;}
+
+.cl-gb-drop{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:34px 20px; text-align:center; cursor:pointer;
+  border:2px dashed var(--cl-line); border-radius:var(--cl-r-lg);
+  background:var(--cl-canvas-2);
+  transition:border-color var(--cl-fast), background var(--cl-fast),
+             box-shadow var(--cl-fast);
+}
+.cl-gb-drop:hover{border-color:var(--cl-orange); background:var(--cl-surface);}
+.cl-gb-drop:focus-visible{outline:2px solid var(--cl-orange); outline-offset:3px;}
+/* Applied while a file is over the zone. Deliberately stronger than :hover —
+   a drag has no cursor feedback of its own, so this is the only confirmation
+   the merchant gets that letting go will do something. */
+.cl-gb-over{
+  border-color:var(--cl-orange); background:var(--cl-surface);
+  box-shadow:0 0 0 4px rgba(232,119,34,.14);
+}
+.cl-gb-drop-err{border-color:var(--cl-danger, #c0392b);}
+.cl-gb-drop-icon{font-size:30px; line-height:1; color:var(--cl-orange);}
+.cl-gb-drop-title{font-size:15px; font-weight:700; color:var(--cl-text);}
+.cl-gb-drop-or{font-size:12px; color:var(--cl-text-muted);}
+.cl-gb-meta{
+  display:flex; flex-wrap:wrap; justify-content:center; gap:6px 18px;
+  margin-top:8px; font-size:12px; color:var(--cl-text-muted);
+}
+
+/* ---- uploading ---- */
+.cl-gb-busy{
+  padding:26px 22px; border:1px solid var(--cl-border-color);
+  border-radius:var(--cl-r-lg); background:var(--cl-surface);
+}
+.cl-gb-file{
+  display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  font-size:13px; font-weight:600; color:var(--cl-text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cl-gb-progress{
+  height:8px; border-radius:var(--cl-r-pill); overflow:hidden;
+  background:var(--cl-canvas-2);
+}
+.cl-gb-bar{
+  height:100%; width:0; border-radius:var(--cl-r-pill);
+  background:var(--cl-orange); transition:width 140ms linear;
+}
+.cl-gb-pct{margin-top:8px; font-size:12px; font-weight:700; color:var(--cl-text);}
+.cl-gb-hint{margin-top:2px; font-size:12px; color:var(--cl-text-muted);}
+
+/* ---- imported ---- */
+.cl-gb-done{
+  padding:20px; border:1px solid var(--cl-border-color);
+  border-left-width:4px; border-radius:var(--cl-r-lg);
+  background:var(--cl-surface); box-shadow:var(--cl-sh-xs);
+}
+.cl-gb-ok{border-left-color:var(--cl-success, #2e7d4f);}
+.cl-gb-warn{border-left-color:var(--cl-orange);}
+.cl-gb-bad{border-left-color:var(--cl-danger, #c0392b);}
+
+.cl-gb-done-head{display:flex; align-items:flex-start; gap:12px;}
+.cl-gb-tick{
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  width:30px; height:30px; border-radius:50%;
+  font-size:16px; font-weight:700; color:#fff; background:var(--cl-orange);
+}
+.cl-gb-ok .cl-gb-tick{background:var(--cl-success, #2e7d4f);}
+.cl-gb-bad .cl-gb-tick{background:var(--cl-danger, #c0392b);}
+.cl-gb-done-title{font-size:15px; font-weight:700; color:var(--cl-text);}
+.cl-gb-done-file{margin-top:2px; font-size:12px; color:var(--cl-text-muted);}
+
+.cl-gb-stats{
+  display:grid; grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:10px; margin:16px 0;
+}
+.cl-gb-stat{
+  padding:12px 10px; text-align:center;
+  border:1px solid var(--cl-border-color); border-radius:var(--cl-r-md);
+  background:var(--cl-canvas-2);
+}
+.cl-gb-stat b{display:block; font-size:20px; line-height:1.2; color:var(--cl-text);}
+.cl-gb-stat span{font-size:11px; color:var(--cl-text-muted);}
+.cl-gb-stat-ok b{color:var(--cl-success, #2e7d4f);}
+.cl-gb-stat-bad b{color:var(--cl-danger, #c0392b);}
+
+.cl-gb-actions{display:flex; flex-wrap:wrap; gap:8px;}
+
+.cl-gb-errs{
+  margin-top:16px; max-height:260px; overflow-y:auto;
+  border:1px solid var(--cl-border-color); border-radius:var(--cl-r-md);
+}
+.cl-gb-err{
+  display:grid; grid-template-columns:88px 1fr; gap:10px;
+  padding:10px 12px; font-size:12.5px;
+  border-bottom:1px solid var(--cl-border-color);
+}
+.cl-gb-err:last-child{border-bottom:none;}
+.cl-gb-err-row{font-weight:700; color:var(--cl-danger, #c0392b);}
+.cl-gb-err-msg{color:var(--cl-text); line-height:1.5;}
+.cl-gb-err-more{padding:10px 12px; font-size:12px; color:var(--cl-text-muted);}
+
+/* The imported party, on the booking form. Scrolls in its own box: a party of
+   eighty must not push Submit off the bottom of the page. */
+.cl-gb-imported{padding:4px;}
+.cl-gb-imported-head{
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+  gap:10px; padding:12px 14px; font-size:13px;
+}
+.cl-gb-viewwrap{max-height:420px; overflow:auto;}
+.cl-gb-view{width:100%; font-size:12.5px;}
+.cl-gb-view th{position:sticky; top:0; z-index:1; background:var(--cl-canvas-2);}
+
+@media (max-width:720px){
+  .cl-gb-stats{grid-template-columns:repeat(2, minmax(0, 1fr));}
+  .cl-gb-drop{padding:26px 14px;}
+  .cl-gb-err{grid-template-columns:1fr; gap:2px;}
+  .cl-gb-actions .cl-btn{flex:1 1 100%;}
+}
+
 /* ---- searchable dropdown ---- */
 .cl-combo{position:relative;}
 .cl-combo-list{

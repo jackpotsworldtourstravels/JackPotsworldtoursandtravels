@@ -303,7 +303,25 @@ class DocumentType(str, enum.Enum):
     VISA = "visa"
     PHOTO_ID = "photo_id"
     TICKET = "ticket"
+    #: The filled passenger spreadsheet behind a group booking (0042). Kept
+    #: distinct from OTHER so the desk can tell a manifest from a scan in a
+    #: listing, and so retention rules can treat the two differently.
+    GROUP_MANIFEST = "group_manifest"
     OTHER = "other"
+
+
+class GroupImportStatus(str, enum.Enum):
+    """How a group manifest fared against validation (0042).
+
+    ``PARTIAL`` is why this is not a boolean: a 200-row sheet with 3 bad rows is
+    neither valid nor invalid, and the merchant is offered a per-row error
+    report against exactly that state. Only ``VALID`` may become a booking.
+    """
+
+    PENDING = "pending"
+    VALID = "valid"
+    PARTIAL = "partial"
+    INVALID = "invalid"
 
 
 class DocumentVerification(str, enum.Enum):
@@ -751,6 +769,16 @@ class ServiceRequest(Base):
         back_populates="request",
         cascade="all, delete-orphan",
         order_by="RequestDocument.document_id",
+    )
+    #: The passenger manifest this booking was imported from (0042), or None.
+    #: ``uselist=False`` because a booking has at most one — replacing the file
+    #: before submission replaces the staging row, it does not add a second.
+    #: Left lazy on purpose: listings render hundreds of rows and almost none of
+    #: them are group bookings, so the screens that need it eager-load it.
+    group_import: Mapped[Optional["GroupBookingImport"]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
     #: Internal operator notes. Never serialised into a merchant-facing
     #: response — see RequestNote and migration 0032.
@@ -1278,7 +1306,113 @@ class RequestDocument(Base):
 
 
 # =====================================================================
-# 10. request_notes
+# 10. group_booking_imports  (migration 0042)
+# =====================================================================
+class GroupBookingImport(Base):
+    """The passenger spreadsheet behind a group booking.
+
+    ``request_id`` is NULL for the window between upload and submission — the
+    merchant uploads, reviews the summary, possibly replaces the file, and only
+    then raises the booking. See migration 0042 for why that staging window is
+    what forced this out of ``travel_details`` and out of ``request_documents``.
+
+    ``imported_passengers`` is what the sheet *said*, frozen at import. The
+    ``passenger_data`` rows created at submission remain the source of truth for
+    who is travelling; this copy is evidence, not state.
+    """
+
+    __tablename__ = "group_booking_imports"
+
+    import_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE"), nullable=False
+    )
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="CASCADE")
+    )
+
+    #: ``one_way_group`` | ``round_trip_group`` — mirrors ``travel_details``.
+    journey_type: Mapped[str] = mapped_column(String(24), nullable=False)
+
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Storage key under ``group-imports/``. Never returned to a client.
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    checksum: Mapped[Optional[str]] = mapped_column(String(64))
+
+    imported_passengers: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    #: The journey/booking columns the sheet declared. The booking is still
+    #: raised from the form's itinerary — this is what the file claimed, kept so
+    #: a disagreement is visible instead of silently resolved.
+    imported_journey: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    validation_errors: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+
+    total_rows: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    valid_rows: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    invalid_rows: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    passengers_imported: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+
+    validation_status: Mapped[GroupImportStatus] = mapped_column(
+        _pg_enum(GroupImportStatus, "group_import_status_enum"),
+        nullable=False,
+        server_default=text("'pending'"),
+    )
+
+    uploaded_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    imported_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    request: Mapped[Optional["ServiceRequest"]] = relationship(
+        back_populates="group_import"
+    )
+
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="ck_group_import_size_positive"),
+        CheckConstraint(
+            "valid_rows >= 0 AND invalid_rows >= 0 "
+            "AND total_rows = valid_rows + invalid_rows",
+            name="ck_group_import_row_counts",
+        ),
+        CheckConstraint(
+            "journey_type IN ('one_way_group', 'round_trip_group')",
+            name="ck_group_import_journey_type",
+        ),
+        Index("ix_group_import_merchant", "merchant_id"),
+        Index(
+            "ix_group_import_request", "request_id",
+            postgresql_where=text("request_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_group_import_unattached", "created_at",
+            postgresql_where=text("request_id IS NULL"),
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<GroupBookingImport {self.original_filename} "
+            f"{self.validation_status.value} req={self.request_id}>"
+        )
+
+
+# =====================================================================
+# 11. request_notes
 # =====================================================================
 class RequestNote(Base):
     """An internal operator note on a booking.

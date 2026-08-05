@@ -15,8 +15,16 @@ python-dotenv>=1.0
 slowapi>=0.1.9
 
 # Report export (API_CONTRACT.md §6.2) — csv is stdlib, these cover xlsx/pdf.
+# openpyxl also builds and reads the group booking passenger template (0042).
 openpyxl>=3.1
 reportlab>=4.2
+
+# Legacy .xls (BIFF) only. openpyxl reads the zip-based .xlsx format and
+# nothing else, and merchants do still send files saved out of Office 2003 —
+# without this the group booking upload would have to reject a format its own
+# UI advertises. Pinned to 2.x, which dropped .xlsx support on purpose: the two
+# libraries therefore cannot disagree about who parses what.
+xlrd>=2.0
 
 # S3 document storage (STORAGE_BACKEND=s3). Imported lazily, so a local-disk
 # deployment never loads it — but it ships in the image so the same image can

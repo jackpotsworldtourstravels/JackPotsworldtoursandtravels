@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.group_booking import GroupImportSummary
 from app.schemas.ticket import PassengerInput
 
 #: ``group_trip`` is a MARKER, not a fourth workflow. It says "this booking is a
@@ -30,7 +31,20 @@ from app.schemas.ticket import PassengerInput
 #: stage is for. This literal is shared by both schemas anyway — the UI offering
 #: less than the server accepts is the safe direction, exactly as with
 #: ``travel_class`` below.
+#:
+#: **Both forms now offer it (2026-08-04).** The sentence above described the
+#: state before group bookings had a passenger manifest. A group fare still is
+#: not priced at the quotation stage, but a merchant asking us to quote a party
+#: of eighty has the same reason to attach the party as one raising the booking
+#: directly — so the enquiry form offers the third option too, and
+#: ``group_journey_type`` below decides its shape.
 TripType = Literal["one_way", "round_trip", "group_trip"]
+
+#: The shape of a group booking, and the ONLY thing that distinguishes the two.
+#: Required when ``trip_type`` is ``group_trip``, refused otherwise — a journey
+#: type on a one-way booking would be a field nothing reads, and the pair going
+#: out of step is how a round-trip group loses its return leg silently.
+GroupJourneyType = Literal["one_way_group", "round_trip_group"]
 
 
 class EnquiryCreate(BaseModel):
@@ -43,6 +57,18 @@ class EnquiryCreate(BaseModel):
     """
 
     trip_type: TripType = "one_way"
+    #: Mandatory on a group booking, refused on anything else — see the
+    #: validator, which is the only place the pairing is enforced.
+    group_journey_type: GroupJourneyType | None = None
+    #: The uploaded passenger manifest, on a group booking.
+    #:
+    #: AN ENQUIRY HAS NO PASSENGERS, so this may look out of place here — but
+    #: the merchant uploads the sheet while filling *this* form, and the desk
+    #: quoting a party of eighty needs to see the eighty. The manifest is
+    #: therefore bound to the enquiry, and ``to_booking_request`` reads the
+    #: travellers back off it when the enquiry becomes a booking. Without this
+    #: the merchant would upload once to enquire and again to book.
+    group_import_id: int | None = None
 
     origin: str = Field(min_length=1, max_length=100)
     origin_city: str | None = Field(default=None, max_length=120)
@@ -91,7 +117,38 @@ class EnquiryCreate(BaseModel):
         if self.travel_date < datetime.date.today():
             raise ValueError("Travel date cannot be in the past")
 
-        if self.trip_type == "round_trip":
+        # THE PAIRING, BEFORE ANYTHING READS EITHER FIELD.
+        # These two describe one choice made on one form, and every rule below
+        # reads both. Letting them disagree — a group booking with no journey
+        # type, or a journey type on a one-way — would mean the return-leg rule
+        # silently picks a branch the merchant never chose.
+        if self.trip_type == "group_trip":
+            if self.group_journey_type is None:
+                raise ValueError(
+                    "Choose whether this is a One Way Group or a Round Trip Group"
+                )
+        elif self.group_journey_type is not None:
+            raise ValueError(
+                "group_journey_type applies only to a group booking"
+            )
+
+        # WHICH ITINERARIES CARRY A RETURN LEG.
+        # Until 2026-08-04 this was ``trip_type == "round_trip"`` and nothing
+        # else, and ``group_trip`` deliberately fell through to the one-way
+        # branch: a group needing a return raised two bookings. The Group
+        # Booking spec replaced that with an explicit Round Trip Group, so the
+        # question is no longer "is it a round trip?" but "does this itinerary
+        # have a return leg?" — which round_trip and round_trip_group both
+        # answer yes to, and which is now asked in exactly one place.
+        #
+        # Nothing about one_way or round_trip changes. A round_trip validates
+        # against the identical two rules it always has.
+        has_return_leg = self.trip_type == "round_trip" or (
+            self.trip_type == "group_trip"
+            and self.group_journey_type == "round_trip_group"
+        )
+
+        if has_return_leg:
             if self.return_date is None:
                 raise ValueError("A round trip needs a return date")
             if self.return_date <= self.travel_date:
@@ -99,15 +156,8 @@ class EnquiryCreate(BaseModel):
         else:
             # A one-way enquiry that carries return details would store a
             # return leg nobody asked for, and ck_sr_date_order would then
-            # judge dates the merchant never entered.
-            #
-            # ``group_trip`` lands here DELIBERATELY, not by omission. The
-            # return-leg rule is the only thing ``trip_type`` has ever decided,
-            # and a group booking was asked for as a marker on the existing
-            # form — so it keeps the existing rule rather than introducing a
-            # third one. A group that also needs a return leg raises the outward
-            # and return as two bookings, which is what it does today for any
-            # itinerary the single return field cannot express.
+            # judge dates the merchant never entered. A One Way Group lands
+            # here for that same reason.
             self.return_date = None
             self.return_preferred_time = None
 
@@ -199,6 +249,32 @@ class BookingContact(BaseModel):
     alternate_phone: str | None = Field(default=None, max_length=30)
 
 
+def _check_passenger_source(model):
+    """A booking takes its travellers from the form OR from a manifest, never both.
+
+    Shared by both booking-creating schemas rather than written twice, for the
+    reason ``DirectBookingCreate`` subclasses ``EnquiryCreate``: the rule is the
+    same rule, and a second copy is a second thing to forget.
+
+    The "at least one passenger" guarantee is unchanged for every booking that
+    is not a group one — it has simply moved off the field and into here, where
+    it can see whether a manifest is supplying the list instead. Dropping
+    ``min_length=1`` without this would have quietly allowed an empty booking on
+    both paths.
+    """
+    if model.group_import_id is not None:
+        if model.passengers:
+            raise ValueError(
+                "This booking already takes its travellers from the uploaded "
+                "passenger list — remove the manually entered passengers"
+            )
+        return model
+
+    if not model.passengers:
+        raise ValueError("A booking needs at least one passenger")
+    return model
+
+
 class EnquiryToBooking(BaseModel):
     """Turn an available enquiry into a draft booking request.
 
@@ -208,7 +284,14 @@ class EnquiryToBooking(BaseModel):
     contact, and anything special about the party.
     """
 
-    passengers: list[PassengerInput] = Field(min_length=1)
+    #: Empty ONLY on a group booking, where the travellers come from the
+    #: uploaded manifest instead — see ``group_import_id`` and the validator.
+    #: Every other booking still requires at least one, exactly as before.
+    passengers: list[PassengerInput] = []
+    #: A validated ``group_booking_imports`` row whose passengers become this
+    #: booking's. Mutually exclusive with ``passengers``: two sources for one
+    #: list is how a manifest silently loses to a stale form field.
+    group_import_id: int | None = None
     remarks: str | None = Field(default=None, max_length=1000)
     contact: BookingContact | None = None
     #: Set by the Classic UI from its airport reference data, which is the only
@@ -218,6 +301,10 @@ class EnquiryToBooking(BaseModel):
     international: bool = False
     #: Free text for the desk: wheelchair, bassinet, dietary, seating together.
     special_requests: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def _one_passenger_source(self) -> "EnquiryToBooking":
+        return _check_passenger_source(self)
 
 
 class DirectBookingCreate(EnquiryCreate):
@@ -242,7 +329,12 @@ class DirectBookingCreate(EnquiryCreate):
     from the merchant here would let it name the price of its own booking.
     """
 
-    passengers: list[PassengerInput] = Field(min_length=1)
+    #: Empty ONLY on a group booking — ``_check_passenger_source`` still refuses
+    #: a passenger-less booking on every other path, so the guarantee the old
+    #: ``min_length=1`` gave is intact.
+    passengers: list[PassengerInput] = []
+    #: The validated manifest supplying those travellers on a group booking.
+    group_import_id: int | None = None
     contact: BookingContact | None = None
     #: Set by the Classic UI from its airport reference data, which is the only
     #: place country is known. False when it cannot be determined — passports
@@ -261,6 +353,12 @@ class DirectBookingCreate(EnquiryCreate):
     #: still the only thing that moves the status.
     submit: bool = False
 
+    # Runs alongside the inherited itinerary validator, not instead of it —
+    # pydantic executes every ``model_validator`` on the class.
+    @model_validator(mode="after")
+    def _one_passenger_source(self) -> "DirectBookingCreate":
+        return _check_passenger_source(self)
+
 
 class EnquiryResponse(BaseModel):
     id: int
@@ -269,6 +367,14 @@ class EnquiryResponse(BaseModel):
     status_label: str
 
     trip_type: TripType
+    #: ``None`` on everything that is not a group booking, which is what every
+    #: screen keys off to decide whether to show the manifest panel at all.
+    group_journey_type: GroupJourneyType | None = None
+    #: Import summary for a group booking, so the Admin drawer and the merchant
+    #: listing can show "48 passengers imported" without a second round trip.
+    #: ``None`` when this booking did not come from a manifest.
+    group_import: GroupImportSummary | None = None
+
     origin: str | None = None
     origin_city: str | None = None
     destination: str | None = None
@@ -351,6 +457,15 @@ class EnquiryResponse(BaseModel):
             status=r.status.value,
             status_label=SPEC_LABELS.get(r.status, r.status.value),
             trip_type=d.get("trip_type", "one_way"),
+            group_journey_type=d.get("group_journey_type"),
+            # Populated only when the caller eager-loaded it — every screen that
+            # needs the manifest asks for the detail endpoint anyway, and a
+            # lazy relationship here would put one query per row in the listing.
+            group_import=(
+                GroupImportSummary.of(r.group_import)
+                if getattr(r, "group_import", None) is not None
+                else None
+            ),
             origin=d.get("origin"),
             origin_city=d.get("origin_city"),
             destination=d.get("destination"),

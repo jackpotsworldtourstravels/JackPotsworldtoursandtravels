@@ -301,6 +301,11 @@ async function opsOpenWork(id) {
     ]);
     opsCurrent = { id, detail, docs, notes, providers };
     opsRenderWork();
+    /* AFTER the render, not in the Promise.all above. The manifest is wanted on
+       a small minority of bookings, and adding a fifth request that 404s on
+       every ordinary one would slow the common case to help the rare one. The
+       panel renders its own placeholder and fills itself in. */
+    opsLoadGroupImport(id);
   } catch (err) {
     document.getElementById('opsWorkBody').innerHTML = `
       <div class="ops-modal-head"><h2 id="opsWorkTitle">Booking</h2>
@@ -359,13 +364,92 @@ function opsPassengerCard(p, i) {
     </article>`;
 }
 
+/* THE UPLOADED PASSENGER LIST, FOR THE DESK (0042).
+   ===========================================================================
+   Three things the spec asks for, in one panel: download the file the merchant
+   actually sent, see the validation summary it passed, and read the imported
+   passenger list. The fourth — "issue tickets using the imported data" — needs
+   no code at all: the passengers below this panel ARE the imported rows, so
+   the existing issuance flow already works against them with no re-entry.
+
+   A 404 is the normal answer for any booking that was not raised from a sheet;
+   the panel simply removes itself. */
+async function opsLoadGroupImport(id) {
+  const host = document.getElementById('opsGroupImport');
+  if (!host) return;                       // not a group booking
+
+  let d;
+  try {
+    d = await axios.get(`${API_BASE}/api/admin/requests/${id}/group-import`,
+      { headers: authHeaders() }).then(r => r.data);
+  } catch (err) {
+    host.innerHTML = err?.response?.status === 404
+      ? '<p class="ops-sub">No uploaded passenger list on this booking.</p>'
+      : `<p class="ops-sub">${escapeHtml(opsErr(err, 'Could not load the uploaded passenger list.'))}</p>`;
+    return;
+  }
+
+  const j = d.journey || {};
+  host.classList.remove('ops-sub');
+  host.innerHTML = `
+    <div class="ops-gb">
+      <div class="ops-gb-head">
+        <div>
+          <strong>${escapeHtml(d.original_filename)}</strong>
+          <div class="ops-sub">${d.passengers_imported} passenger(s) imported
+            ${d.imported_at ? `on ${escapeHtml(fmtDateTime(d.imported_at))}` : ''}
+            ${d.uploaded_by_name ? `by ${escapeHtml(d.uploaded_by_name)}` : ''}</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="opsGbDownload">
+          Download uploaded Excel
+        </button>
+      </div>
+
+      <div class="ops-gb-stats">
+        <span><b>${d.total_rows}</b> total rows</span>
+        <span><b>${d.valid_rows}</b> valid</span>
+        <span><b>${d.invalid_rows}</b> invalid</span>
+        <span class="badge read">${escapeHtml(d.validation_status)}</span>
+      </div>
+
+      ${/* What the SHEET declared, which is not necessarily what the booking
+           says — the itinerary comes from the form. Shown so a disagreement is
+           visible to the desk rather than buried. */''}
+      <div class="ops-sub ops-gb-declared">
+        Sheet declared: ${escapeHtml(j.origin_city || '—')} →
+        ${escapeHtml(j.destination_city || '—')},
+        ${escapeHtml(j.airline || '—')} ${escapeHtml(j.flight_number || '')},
+        ${escapeHtml(j.travel_date || '—')}${j.return_date ? ` · returning ${escapeHtml(j.return_date)}` : ''}
+      </div>
+    </div>`;
+
+  document.getElementById('opsGbDownload').addEventListener('click', async () => {
+    try {
+      const blob = await axios.get(
+        `${API_BASE}/api/admin/requests/${id}/group-import/file`,
+        { headers: authHeaders(), responseType: 'blob' }).then(r => r.data);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = d.original_filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(opsErr(err, 'Could not download the file.'));
+    }
+  });
+}
+
 function opsRenderWork() {
   const { id, detail, docs, notes, providers } = opsCurrent;
   const r = detail.request;
   const d = r.details || {};
   const contact = d.contact || {};
   const passengers = r.passengers || [];
-  const roundTrip = d.trip_type === 'round_trip';
+  /* A Round Trip Group carries a return leg too, so the return rows key off
+     whether one exists rather than off the trip type alone (0042). */
+  const roundTrip = d.trip_type === 'round_trip'
+    || d.group_journey_type === 'round_trip_group';
+  const isGroup = d.trip_type === 'group_trip';
   const classic = r.workflow === 'classic_tours';
   const tickets = (docs || []).filter(x => x.doc_type === 'ticket' || x.doc_type === 'other');
   const canIssue = r.status === (classic ? 'approved' : 'paid');
@@ -420,7 +504,9 @@ function opsRenderWork() {
           ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
           ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
           ${cell('Submitted', escapeHtml(fmtDateTime(r.created_at)))}
-          ${cell('Journey type', tripTypeLabel(d.trip_type))}
+          ${cell('Journey type', isGroup && groupJourneyLabel(d.group_journey_type)
+            ? `${tripTypeLabel(d.trip_type)} · ${groupJourneyLabel(d.group_journey_type)}`
+            : tripTypeLabel(d.trip_type))}
           ${cell('Route', d.international ? 'International' : 'Domestic')}
           ${cell('From', escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—'))}
           ${cell('To', escapeHtml([d.destination_city, d.destination].filter(Boolean).join(' · ') || '—'))}
@@ -456,6 +542,12 @@ function opsRenderWork() {
              bookings, which an Admin approves. True of both tracks or not said. */''}
         <h3>Passenger information
           <span class="ops-staff-note">as submitted by the merchant</span></h3>
+        ${/* GROUP BOOKING (0042). The party arrived as a spreadsheet, so the
+             desk gets the validation summary and the original file alongside
+             the passenger cards. The cards themselves are unchanged — these
+             are real passenger_data rows, created from the sheet at
+             submission, so nothing here needs re-entering to issue tickets. */''}
+        ${isGroup ? '<div id="opsGroupImport" class="ops-sub">Loading the uploaded passenger list…</div>' : ''}
         ${passengers.length
           ? passengers.map(opsPassengerCard).join('')
           : '<p class="ops-sub">No passengers recorded on this booking.</p>'}

@@ -40,9 +40,33 @@
    REMOVED here when Inventory Search was retired. The backend routes still
    exist and are untouched — nothing in this portal calls them any more.
 
+   Added 2026-08-04 with Group Booking (backend/app/routers/group_bookings.py).
+   The passenger list for a group arrives as a spreadsheet instead of a form:
+     template         GET    /api/group-bookings/template
+     upload+validate  POST   /api/group-bookings/imports
+     import detail    GET    /api/group-bookings/imports/{id}
+     error report     GET    /api/group-bookings/imports/{id}/errors
+     stored file      GET    /api/group-bookings/imports/{id}/file
+
    This is a transport layer.
 
    Requires (in this order): axios, API_BASE, auth.js (partnerAuthHeaders). */
+
+/* A streamed download, handed to the browser.
+   Three of the group booking endpoints return a file rather than JSON, and a
+   blob URL that is never revoked keeps the whole file alive in memory for the
+   life of the tab — so the object URL is released as soon as the click has
+   been dispatched. */
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 const MerchantApi = {
   /* Single choke point so auth headers, base URL and error shape are uniform.
@@ -89,6 +113,61 @@ const MerchantApi = {
     return this._req('get', '/api/enquiries', { params });
   },
 
+  /* ------------------------------------------------- group booking manifest */
+
+  /* The passenger template. Downloads are a browser concern, not a data one:
+     the response is a stream with a Content-Disposition, so it is fetched as a
+     blob and handed to a temporary anchor rather than returned to the caller.
+     `_req` is still used, so the auth header and base URL stay in one place. */
+  async downloadGroupTemplate(journeyType) {
+    const blob = await this._req('get', '/api/group-bookings/template', {
+      params: { journey_type: journeyType },
+      responseType: 'blob',
+    });
+    const kind = journeyType === 'round_trip_group' ? 'round-trip' : 'one-way';
+    saveBlob(blob, `jackpots-group-booking-${kind}-template.xlsx`);
+  },
+
+  /* Upload and validate in one call. Multipart rather than JSON because the
+     payload is a file; `onProgress` is wired to axios's upload event so the
+     card can show real progress rather than an indeterminate spinner.
+
+     A 4xx here is a real answer, not a transport failure — the server returns
+     the row-level detail as `detail`, which clEnquiryError() unpacks. */
+  uploadGroupManifest({ file, journey_type, replaces, onProgress }) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('journey_type', journey_type);
+    if (replaces) form.append('replaces', String(replaces));
+
+    return axios({
+      method: 'post',
+      url: `${API_BASE}/api/group-bookings/imports`,
+      headers: partnerAuthHeaders(),
+      data: form,
+      onUploadProgress: e => {
+        if (!onProgress || !e.total) return;
+        onProgress(Math.min(100, Math.round((e.loaded * 100) / e.total)));
+      },
+    }).then(res => res.data);
+  },
+
+  getGroupImport(importId) {
+    return this._req('get', `/api/group-bookings/imports/${importId}`);
+  },
+
+  async downloadGroupErrors(importId) {
+    const blob = await this._req('get', `/api/group-bookings/imports/${importId}/errors`,
+      { responseType: 'blob' });
+    saveBlob(blob, 'passenger-list-errors.xlsx');
+  },
+
+  async downloadGroupManifest(importId, filename) {
+    const blob = await this._req('get', `/api/group-bookings/imports/${importId}/file`,
+      { responseType: 'blob' });
+    saveBlob(blob, filename || 'passenger-list.xlsx');
+  },
+
   getEnquiry(id) {
     return this._req('get', `/api/enquiries/${id}`);
   },
@@ -98,10 +177,15 @@ const MerchantApi = {
      server-side, so the booking is always the journey that was answered.
      Returns the booking; it still needs submitRequest() to reach the desk.
      409 if this enquiry has already been booked. */
-  enquiryToBookingRequest(id, { passengers, remarks, contact, international, specialRequests }) {
+  enquiryToBookingRequest(id, { passengers, remarks, contact, international, specialRequests,
+                                groupImportId }) {
     return this._req('post', `/api/enquiries/${id}/booking-request`, {
       data: {
-        passengers,
+        /* A group booking sends its manifest INSTEAD of a passenger array —
+           the server refuses both together, because two sources for one list
+           is how a manifest silently loses to a stale form field. */
+        passengers: groupImportId ? [] : passengers,
+        group_import_id: groupImportId || undefined,
         remarks: remarks || undefined,
         contact: contact || undefined,
         /* Sent from the UI because the API has no country data — see
@@ -127,11 +211,16 @@ const MerchantApi = {
      call, but this portal always goes create-then-submitRequest() so that a
      submit failure still leaves the merchant a saved draft — see the three
      try blocks in clSubmitBookingRequest. */
-  createDirectBooking(itinerary, { passengers, remarks, contact, international, specialRequests }) {
+  createDirectBooking(itinerary, { passengers, remarks, contact, international, specialRequests,
+                                   groupImportId }) {
     return this._req('post', '/api/bookings/direct', {
       data: {
         ...itinerary,
-        passengers,
+        /* See enquiryToBookingRequest: the manifest replaces the array, it does
+           not accompany it. `itinerary` already carries group_import_id from
+           the enquiry form, so this only has to win over a stale passengers. */
+        passengers: groupImportId ? [] : passengers,
+        group_import_id: groupImportId || itinerary.group_import_id || undefined,
         remarks: remarks || undefined,
         contact: contact || undefined,
         international: !!international,

@@ -926,6 +926,26 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 /* Same shape as .ops-staff-only but muted — a provenance note, not a warning. */
 .ops-staff-note{font-size:11px; font-weight:600; text-transform:none; letter-spacing:0;
                 color:var(--text-muted);}
+
+/* ---- group booking manifest (0042) ----
+   Sits above the passenger cards on a booking raised from a spreadsheet. Built
+   from the existing modal tokens so it reads as another block of the same
+   dialog rather than a panel bolted on. */
+.ops-gb{margin:0 0 16px; padding:14px 16px; border:1px solid var(--border-color);
+        border-radius:10px; background:var(--surface-2, var(--bg-soft, #f7f8fa));}
+.ops-gb-head{display:flex; flex-wrap:wrap; align-items:flex-start;
+             justify-content:space-between; gap:12px;}
+.ops-gb-head strong{font-size:13.5px; color:var(--text-primary); overflow-wrap:anywhere;}
+.ops-gb-stats{display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:10px;
+              font-size:12px; color:var(--text-muted);}
+.ops-gb-stats b{font-size:14px; color:var(--text-primary);}
+.ops-gb-declared{margin-top:8px; padding-top:8px;
+                 border-top:1px dashed var(--border-color); font-size:12px;}
+
+@media (max-width:640px){
+  .ops-gb-head{flex-direction:column;}
+  .ops-gb-head .btn{width:100%;}
+}
 /* The first section under the modal head supplies no rule of its own: the head
    already has a bottom border, and a second one 24px below it reads as an empty
    band where the removed Assignment form used to sit. */

@@ -133,6 +133,7 @@ def enquiry_to_booking_request(
         contact=payload.contact.model_dump() if payload.contact else None,
         international=payload.international,
         special_requests=payload.special_requests,
+        group_import_id=payload.group_import_id,
     )
     return RequestResponse.of(
         enquiry_service.load_with_passengers(db, current_user, booking.request_id)

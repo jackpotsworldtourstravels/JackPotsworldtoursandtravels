@@ -101,8 +101,22 @@ function moneyToneClass(value, prefix = 'cl-money') {
 const TRIP_TYPE_LABELS = {
   one_way: 'One Way',
   round_trip: 'Round Trip',
-  group_trip: 'Group Trip',
+  /* "Group Booking" on every surface, matching the label the merchant chooses
+     on the form. The shape — One Way Group or Round Trip Group — lives in
+     `group_journey_type` and is appended by the screens that show it. */
+  group_trip: 'Group Booking',
 };
+
+/* The full name of a group booking's shape, or null when it is not one.
+   Here rather than in six screens for the reason the labels above are: a trip
+   type named in one place cannot be named differently in another. */
+const GROUP_JOURNEY_LABELS = {
+  one_way_group: 'One Way Group',
+  round_trip_group: 'Round Trip Group',
+};
+function groupJourneyLabel(t) {
+  return GROUP_JOURNEY_LABELS[t] || null;
+}
 function tripTypeLabel(t) {
   return TRIP_TYPE_LABELS[t] || (t ? String(t).replace(/_/g, ' ') : '—');
 }

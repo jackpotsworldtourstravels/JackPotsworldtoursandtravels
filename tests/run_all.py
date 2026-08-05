@@ -67,6 +67,12 @@ SUITE = [
     # the whole endpoint and is asserted against a second real merchant.
     ("verify_passenger_lookup.py",
      "Passenger auto-fill: passport lookup, newest record wins, writes nothing, cross-tenant scope"),
+    # Straight after the direct booking script, because a group booking IS a
+    # direct or enquiry-led booking whose passengers arrived as a spreadsheet —
+    # if that path is broken, every failure here is a symptom of it. It also
+    # re-asserts the One Way / Round Trip return-leg rules, which 0042 rewrote.
+    ("verify_group_booking.py",
+     "Group Booking: Excel template, row-level validation, partial imports cannot book, admin manifest"),
     ("verify_cr3.py", "CR-3: merchant approves its own bookings, scoping, self-approval, concurrency"),
     ("verify_cr4b.py", "CR-4b: wallet debit at Ticket Issued, credit limit, refunds, credit notes"),
     ("verify_cr4c.py", "CR-4c: merchant wallet screen, ledger, top-ups, payment accounts, proofs"),

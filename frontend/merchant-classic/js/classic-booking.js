@@ -95,6 +95,11 @@ function clStartDirectBooking(itinerary) {
     quotation_remarks: null,
     admin_response: null,
     trip_type: itinerary.trip_type,
+    /* Carried through so the traveller step knows to skip itself: a group
+       booking's passengers were already supplied as a spreadsheet, and asking
+       for them again is the one thing this feature exists to avoid. */
+    group_journey_type: itinerary.group_journey_type,
+    group_import_id: itinerary.group_import_id,
     origin: itinerary.origin, origin_city: itinerary.origin_city,
     destination: itinerary.destination, destination_city: itinerary.destination_city,
     airline: itinerary.airline,
@@ -398,7 +403,14 @@ function clBindRecentActions(body) {
 }
 
 function clRenderBookingForm(e) {
-  const roundTrip = e.trip_type === 'round_trip';
+  /* A Round Trip Group has a return leg too, so the journey panel keys off
+     whether one EXISTS rather than off the trip type alone. */
+  const roundTrip = e.trip_type === 'round_trip'
+    || e.group_journey_type === 'round_trip_group';
+  /* Whether the travellers came from an uploaded sheet. On a resumed draft the
+     itinerary is rebuilt from travel_details, which is why the trip type is
+     checked as well as the import id — one or the other is always present. */
+  const isGroup = e.trip_type === 'group_trip' || !!e.group_journey_type;
   /* No enquiry in front of this booking. Changes what the page SAYS — where the
      journey came from, what step 1 and 2 were, and when the fare gets named —
      and nothing about what it COLLECTS. The travellers, the contact and the
@@ -532,13 +544,17 @@ function clRenderBookingForm(e) {
     <div class="cl-panel">
       <div class="cl-panel-head">
         <h2>Passengers</h2>
-        <div class="cl-panel-tools">
+        <div class="cl-panel-tools"${isGroup ? ' hidden' : ''}>
           <button type="button" class="cl-btn cl-btn-sm" id="clBrAddPax">Add passenger</button>
           <button type="button" class="cl-btn cl-btn-sm" id="clBrCopyFirst"
             title="Copy nationality and document country from the first passenger">Fill down</button>
         </div>
       </div>
-      <div class="cl-panel-body" id="clBrPaxList"></div>
+      <!-- A GROUP BOOKING'S TRAVELLERS ARE ALREADY IN. They came from the
+           uploaded sheet, so this panel reports them rather than collecting
+           them — re-entering eighty passports is the drudgery the upload
+           exists to remove. The list is still rendered, read-only. -->
+      <div class="cl-panel-body" id="clBrPaxList"${isGroup ? ' data-cl-readonly="1"' : ''}></div>
       <div class="cl-panel-note">
         ${intl
           ? 'This is an international sector, so every traveller needs a passport number and an '
@@ -600,7 +616,9 @@ function clRenderBookingForm(e) {
      already and should not have to say it twice. */
   const list = $('clBrPaxList');
   list.innerHTML = '';
-  if (clBookingDraft?.passengers?.length) {
+  if (isGroup) {
+    clRenderImportedPassengers(list, e);
+  } else if (clBookingDraft?.passengers?.length) {
     // Resuming: rebuild the rows from what was saved rather than from the
     // enquiry breakdown, or edits made before saving would be lost.
     clBookingDraft.passengers.forEach((p, i) => clAddPaxCard(list, i, p.passenger_type, p));
@@ -608,10 +626,10 @@ function clRenderBookingForm(e) {
     clSeedPassengerRows(list, e);
   }
 
-  $('clBrAddPax').addEventListener('click', () => {
+  $('clBrAddPax')?.addEventListener('click', () => {
     clAddPaxCard(list, list.querySelectorAll('[data-cl-pax]').length);
   });
-  $('clBrCopyFirst').addEventListener('click', clFillDown);
+  $('clBrCopyFirst')?.addEventListener('click', clFillDown);
   $('clBrViewEnquiry')?.addEventListener('click', () => clOpenEnquiryDetail(e.id));
   $('clBrCancel').addEventListener('click', async () => {
     /* Worth naming what survives. On the direct path nothing has been created
@@ -631,6 +649,78 @@ function clRenderBookingForm(e) {
   });
   $('clBrSubmitBtn').addEventListener('click', () => clSubmitBookingRequest(true));
   $('clBrDraftBtn').addEventListener('click', () => clSubmitBookingRequest(false));
+}
+
+/* THE IMPORTED PARTY, REPORTED RATHER THAN COLLECTED.
+   ===========================================================================
+   Rendered from the manifest the merchant already uploaded. Read-only on
+   purpose: the sheet is the source, and an editable copy here would be a
+   second one that silently wins or silently loses. Correcting a traveller
+   means correcting the sheet and uploading it again, which is also the only
+   way the row-level validation gets re-run over the change.
+
+   Passengers are fetched rather than passed in, because a resumed draft has an
+   import id and nothing else — the rows live on the server. */
+async function clRenderImportedPassengers(list, e) {
+  const importId = e.group_import_id || clBookingDraft?.group_import?.import_id;
+  list.innerHTML = '<div class="cl-empty">Loading the imported passenger list…</div>';
+
+  if (!importId) {
+    list.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:14px;">
+      This group booking has no passenger list attached. Go back and upload one.</div>`;
+    return;
+  }
+
+  let d;
+  try {
+    d = await MerchantApi.getGroupImport(importId);
+  } catch (err) {
+    list.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:14px;">
+      ${escapeHtml(clError(err, 'Could not load the imported passenger list.'))}</div>`;
+    return;
+  }
+
+  const rows = (d.passengers || []).map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><b>${escapeHtml(`${p.first_name} ${p.last_name}`)}</b></td>
+      <td>${escapeHtml(p.passenger_type || '—')}</td>
+      <td>${escapeHtml(p.gender || '—')}</td>
+      <td>${escapeHtml(p.dob || '—')}</td>
+      <td>${escapeHtml(p.nationality || '—')}</td>
+      <td>${escapeHtml(p.passport_number || '—')}</td>
+      <td>${escapeHtml(p.passport_expiry || '—')}</td>
+    </tr>`).join('');
+
+  list.innerHTML = `
+    <div class="cl-gb-imported">
+      <div class="cl-gb-imported-head">
+        <div>
+          <b>${d.passengers_imported} passenger(s)</b> imported from
+          <span class="cl-ref">${escapeHtml(d.original_filename)}</span>
+        </div>
+        <button type="button" class="cl-btn cl-btn-sm" id="clBrDownloadManifest">
+          Download the uploaded file
+        </button>
+      </div>
+      <div class="cl-gb-viewwrap">
+        <table class="cl-table cl-gb-view">
+          <thead><tr>
+            <th>#</th><th>Name</th><th>Type</th><th>Gender</th>
+            <th>Date of Birth</th><th>Nationality</th><th>Passport</th><th>Expiry</th>
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="8">No passengers imported.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  $('clBrDownloadManifest').addEventListener('click', async () => {
+    try {
+      await MerchantApi.downloadGroupManifest(d.import_id, d.original_filename);
+    } catch (err) {
+      clMsg($('clBrMsg'), clError(err, 'Could not download the file.'), 'err');
+    }
+  });
 }
 
 /* Adults first, then children, then infants — the order every airline lists a
@@ -996,31 +1086,44 @@ async function clSubmitBookingRequest(finalize) {
   const contactProblem = clFlagMissingContact();
   if (contactProblem) return clMsg(msg, contactProblem, 'err');
 
-  /* Passport rules bite only on submit — a half-filled draft is a legitimate
-     thing to save. There is nothing else to satisfy: an international sector
-     asks for passport numbers typed into the form, never for an upload, so a
-     merchant who has filled the grid in can always go straight to Submit. */
-  const paxProblem = clFlagMissingPassengerFields(finalize && intl, enquiry.travel_date);
-  if (paxProblem) return clMsg(msg, paxProblem, 'err');
+  /* A GROUP BOOKING SENDS ITS MANIFEST ID, NOT A PASSENGER ARRAY.
+     Every check below reads the traveller cards, and a group booking has none
+     — its party was validated row by row when the sheet was uploaded, which is
+     a stricter pass than this screen performs. Running the card checks over an
+     empty list would refuse the booking for having no passengers. */
+  const groupImportId = enquiry.group_import_id
+    || clBookingDraft?.group_import?.import_id
+    || null;
+  const isGroup = !!groupImportId;
 
-  const cards = [...$('clBrPaxList').querySelectorAll('[data-cl-pax]')];
-  if (!cards.length) return clMsg(msg, 'Add at least one passenger.', 'err');
+  let passengers = [];
+  if (!isGroup) {
+    /* Passport rules bite only on submit — a half-filled draft is a legitimate
+       thing to save. There is nothing else to satisfy: an international sector
+       asks for passport numbers typed into the form, never for an upload, so a
+       merchant who has filled the grid in can always go straight to Submit. */
+    const paxProblem = clFlagMissingPassengerFields(finalize && intl, enquiry.travel_date);
+    if (paxProblem) return clMsg(msg, paxProblem, 'err');
 
-  const passengers = cards.map(clPassengerPayload);
+    const cards = [...$('clBrPaxList').querySelectorAll('[data-cl-pax]')];
+    if (!cards.length) return clMsg(msg, 'Add at least one passenger.', 'err');
 
-  /* The party size the desk answered for is part of what was quoted, so a
-     mismatch is worth confirming rather than silently sending. Still worth
-     confirming on the direct path, where nothing was quoted: the merchant
-     stated a party size on the form a moment ago and a different number of
-     traveller rows is more likely a slip than a change of mind. */
-  if (passengers.length !== enquiry.passenger_count) {
-    const ok = await clConfirm(
-      (enquiry.direct_booking
-        ? `You asked for ${enquiry.passenger_count} passenger(s) and have entered `
-        : `The enquiry was for ${enquiry.passenger_count} passenger(s) and you have entered `)
-      + `${passengers.length}. Our team will re-check availability for the new party size. Continue?`,
-      'Continue');
-    if (!ok) return;
+    passengers = cards.map(clPassengerPayload);
+
+    /* The party size the desk answered for is part of what was quoted, so a
+       mismatch is worth confirming rather than silently sending. Still worth
+       confirming on the direct path, where nothing was quoted: the merchant
+       stated a party size on the form a moment ago and a different number of
+       traveller rows is more likely a slip than a change of mind. */
+    if (passengers.length !== enquiry.passenger_count) {
+      const ok = await clConfirm(
+        (enquiry.direct_booking
+          ? `You asked for ${enquiry.passenger_count} passenger(s) and have entered `
+          : `The enquiry was for ${enquiry.passenger_count} passenger(s) and you have entered `)
+        + `${passengers.length}. Our team will re-check availability for the new party size. Continue?`,
+        'Continue');
+      if (!ok) return;
+    }
   }
 
   submitBtn.disabled = true; draftBtn.disabled = true;
@@ -1041,8 +1144,10 @@ async function clSubmitBookingRequest(finalize) {
     if (clBookingDraft) {
       /* Resuming a saved draft: push whatever changed, then submit. Passengers
          are replaced wholesale because that is the endpoint's contract, and
-         because it is the only way a removed traveller actually disappears. */
-      await MerchantApi.replacePassengers(clBookingDraft.id, passengers);
+         because it is the only way a removed traveller actually disappears.
+         A group draft skips that call entirely — its travellers came from the
+         manifest and are not editable here, so there is nothing to replace. */
+      if (!isGroup) await MerchantApi.replacePassengers(clBookingDraft.id, passengers);
       request = await MerchantApi.updateDraft(clBookingDraft.id, {
         remarks, contact, specialRequests,
       });
@@ -1053,12 +1158,14 @@ async function clSubmitBookingRequest(finalize) {
          this creates the draft, /submit is still what reaches the desk. */
       request = await MerchantApi.createDirectBooking(clBookingDirect, {
         passengers, remarks, contact, international: intl, specialRequests,
+        groupImportId: groupImportId,
       });
     } else {
       /* First save: creates the draft against the enquiry. Only /submit puts
          it in front of the approvals team. */
       request = await MerchantApi.enquiryToBookingRequest(enquiry.id, {
         passengers, remarks, contact, international: intl, specialRequests,
+        groupImportId: groupImportId,
       });
     }
   } catch (err) {

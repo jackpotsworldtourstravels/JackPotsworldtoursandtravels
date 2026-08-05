@@ -8,15 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260804ui27">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260805ui28">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260804ui27">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260805ui28">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260804ui27">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260805ui28">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -910,17 +910,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260804ui27"></script>
-<script src="../components/toast.js?v=20260804ui27"></script>
-<script src="../components/spinner.js?v=20260804ui27"></script>
-<script src="../components/confirm-dialog.js?v=20260804ui27"></script>
-<script src="../components/focus-trap.js?v=20260804ui27"></script>
-<script src="../assets/js/auth.js?v=20260804ui27"></script>
+<script src="../shared/formatters.js?v=20260805ui28"></script>
+<script src="../components/toast.js?v=20260805ui28"></script>
+<script src="../components/spinner.js?v=20260805ui28"></script>
+<script src="../components/confirm-dialog.js?v=20260805ui28"></script>
+<script src="../components/focus-trap.js?v=20260805ui28"></script>
+<script src="../assets/js/auth.js?v=20260805ui28"></script>
 <script src="../assets/js/api.js"></script>
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260804ui27"></script>
+<script src="../assets/js/jp-login.js?v=20260805ui28"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -942,39 +942,39 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260804ui27"></script>
+<script src="../assets/js/admin.js?v=20260805ui28"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260805ui28"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-bookings.js?v=20260805ui28"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260805ui28"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260805ui28"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260805ui28"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260805ui28"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-analytics.js?v=20260805ui28"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260804ui27"></script>
-<script src="../assets/js/admin-logs.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-providers.js?v=20260805ui28"></script>
+<script src="../assets/js/admin-logs.js?v=20260805ui28"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260805ui28"></script>
 <!-- Dialog standard (jp-ds.css §15). Adds only the header close control, which
      is the one part of the standard CSS cannot supply — the rest is stylesheet.
      Loaded LAST so every overlay it observes already exists in the document. -->
-<script src="../assets/js/admin-dialog-standard.js?v=20260804ui27"></script>
+<script src="../assets/js/admin-dialog-standard.js?v=20260805ui28"></script>
 </body>
 </html>

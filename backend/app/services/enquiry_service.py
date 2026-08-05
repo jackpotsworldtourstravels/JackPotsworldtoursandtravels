@@ -69,6 +69,7 @@ from app.models_v2 import (
 from app.services import (
     activity_service,
     finance_service,
+    group_booking_service,
     lifecycle,
     merchant_service,
     notification_service,
@@ -179,6 +180,16 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         ],
     )
     db.add(enquiry)
+    db.flush()
+
+    # A group enquiry carries its manifest so the desk quoting it can see the
+    # party. The travellers are read back off this same row when the enquiry
+    # becomes a booking, which is what saves the merchant uploading twice.
+    if getattr(payload, "group_import_id", None) is not None:
+        group_booking_service.attach_to_request(
+            db, group_booking_service.get(db, actor, payload.group_import_id), enquiry
+        )
+
     db.commit()
     db.refresh(enquiry)
 
@@ -481,6 +492,7 @@ def to_booking_request(
     db: Session, actor: User, enquiry_id: int, *, passengers: list[dict],
     remarks: str | None = None, contact: dict | None = None,
     international: bool = False, special_requests: str | None = None,
+    group_import_id: int | None = None,
 ) -> ServiceRequest:
     """Create the draft booking the Request Ticket button leads to.
 
@@ -519,6 +531,20 @@ def to_booking_request(
                 f"{details.get('booking_request_number') or existing_id}"
             ),
         )
+    # A GROUP ENQUIRY ALREADY CARRIES ITS MANIFEST.
+    # The sheet was attached when the enquiry was raised, so the travellers are
+    # read off that row rather than re-uploaded — and the import stays pointed
+    # at the enquiry, which is what keeps the desk's view of what it quoted
+    # intact. `group_import_id` in the body is the fallback for a merchant that
+    # uploaded only at this step.
+    group_import = None
+    inherited = getattr(enquiry, "group_import", None)
+    if inherited is not None:
+        passengers = group_booking_service.passengers_of(inherited)
+    elif group_import_id is not None:
+        group_import = group_booking_service.get(db, actor, group_import_id)
+        passengers = group_booking_service.passengers_of(group_import)
+
     if not passengers:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -614,6 +640,9 @@ def to_booking_request(
             )
         )
 
+    if group_import is not None:
+        group_booking_service.attach_to_request(db, group_import, booking)
+
     # Stamp the link back so the enquiry listing shows the booking instead of
     # offering Request Ticket a second time.
     enquiry.travel_details = {
@@ -652,6 +681,10 @@ def _itinerary_details(payload) -> dict:
     """
     return {
         "trip_type": payload.trip_type,
+        # None on everything that is not a group booking — the schema refuses
+        # the pairing any other way round, so this key is present and null
+        # rather than absent, and every reader can treat it as a plain lookup.
+        "group_journey_type": getattr(payload, "group_journey_type", None),
         "origin": payload.origin.strip(),
         "origin_city": (payload.origin_city or "").strip() or None,
         "destination": payload.destination.strip(),
@@ -666,6 +699,34 @@ def _itinerary_details(payload) -> dict:
         "children": payload.children,
         "infants": payload.infants,
     }
+
+
+def _manifest_passengers(db: Session, actor: User, payload):
+    """Resolve a group booking's travellers from its uploaded manifest.
+
+    Returns ``(import_row, passengers)`` — both ``None``/``[]`` when the payload
+    carries no manifest, which is every booking that is not a group one.
+
+    Shared by both booking paths so the gate is stated once: the import must be
+    wholly valid, must belong to this merchant, and must not already have been
+    spent on another booking. ``attach_to_request`` enforces all three; this
+    only fetches the row and shapes the passengers.
+    """
+    import_id = getattr(payload, "group_import_id", None)
+    if import_id is None:
+        return None, []
+
+    imp = group_booking_service.get(db, actor, import_id)
+    passengers = group_booking_service.passengers_of(imp)
+    if not passengers:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "That passenger list imported no travellers. Upload a corrected "
+                "sheet before raising the booking."
+            ),
+        )
+    return imp, passengers
 
 
 def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
@@ -704,7 +765,13 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Only merchant accounts can raise booking requests",
         )
-    passengers = [p.model_dump() for p in payload.passengers]
+    # A GROUP BOOKING TAKES ITS TRAVELLERS FROM THE UPLOADED MANIFEST.
+    # `_manifest_passengers` returns the import row as well, because it has to
+    # be bound to this booking once the row exists — and it refuses anything
+    # that is not a wholly valid import, so a sheet with outstanding errors
+    # cannot reach the approvals desk.
+    group_import, manifest = _manifest_passengers(db, actor, payload)
+    passengers = manifest if group_import else [p.model_dump() for p in payload.passengers]
     if not passengers:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
@@ -760,6 +827,12 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
             )
         )
 
+    # Bind the manifest to the booking it produced, inside the same transaction
+    # as the passengers it produced. A commit between the two would leave a
+    # booking whose travellers came from a sheet nothing points at.
+    if group_import is not None:
+        group_booking_service.attach_to_request(db, group_import, booking)
+
     db.commit()
     db.refresh(booking)
 
@@ -769,6 +842,21 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
         description=f"{actor.full_name} drafted {booking.request_number} without an enquiry",
         reference_id=booking.request_id, merchant_id=booking.merchant_id,
     )
+    if group_import is not None:
+        activity_service.log_activity(
+            db, actor.user_id, "booking_submitted",
+            activity_type="Booking", module="group_booking",
+            description=(
+                f"{booking.request_number} raised from {group_import.original_filename!r} "
+                f"with {group_import.passengers_imported} imported passenger(s)"
+            ),
+            reference_id=booking.request_id, merchant_id=booking.merchant_id,
+            details={
+                "import_id": group_import.import_id,
+                "journey_type": group_import.journey_type,
+                "passengers_imported": group_import.passengers_imported,
+            },
+        )
     return booking
 
 
