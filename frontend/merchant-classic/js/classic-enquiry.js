@@ -733,7 +733,7 @@ function clOpenEnquiryForm(direct = false) {
     <div class="cl-form cl-form-2">
       <div class="cl-field">
         <label for="clEnqAirline">Airline</label>
-        <div class="cl-combo">
+        <div class="cl-combo cl-combo-drop">
           <!-- Pre-filled with the open-enquiry text rather than left blank: an
                empty box invites the merchant to fill it, which is the opposite
                of the default being "we do not mind". clEnqForm.airline stays ''
@@ -1095,12 +1095,14 @@ function clWireEnquiryForm() {
   });
 
   /* ---- airline ---- */
+  /* openOnFocus: clicking the box shows all 18 carriers; typing filters them.
+     Without it the pre-filled "All Airlines" made this read as a text input. */
   clCombo($('clEnqAirline'), $('clEnqAirlineList'), clAirlineOptions, picked => {
     /* `picked.value` is '' for the All Airlines option — see clAirlineOptions —
        so an open enquiry and a cleared box reach the same state by design. */
     clEnqForm.airline = picked ? picked.value : '';
     clSyncAirlineHint();
-  });
+  }, { openOnFocus: true });
   /* Typing does not go through onPick, so the hint is refreshed on input too:
      a merchant who types over "All Airlines" should see the note stop claiming
      the enquiry is open the moment it stops being open. */
@@ -1792,17 +1794,42 @@ const CL_FLIGHT_RE = /^[A-Z0-9]{2,3}\s*\d{1,4}[A-Z]?$/i;
    so a merchant who has typed a carrier's name and changed their mind can get
    back to an open enquiry without clearing the box by hand. */
 function clAirlineOptions(query) {
-  const q = query.trim().toLowerCase();
+  /* THE LABEL IS NOT A SEARCH TERM. The box ships pre-filled with "All
+     Airlines", so without this the query on first focus is that literal string
+     — which matches no carrier, and the merchant is shown a one-row list and
+     concludes the field is free text. Treating it as empty is what makes
+     clicking the box show the airlines. */
+  const raw = query.trim();
+  const q = raw.toLowerCase() === CL_ANY_AIRLINE.toLowerCase() ? '' : raw.toLowerCase();
+
   const any = {
     value: CL_ANY_AIRLINE,
     label: CL_ANY_AIRLINE,
     sub: 'Open enquiry — we quote the best fare on any carrier',
     data: { value: '' },                 // '' is what "no airline" sends
   };
+  /* Uncapped: there are 18 carriers in CL_AIRLINES and the list scrolls, so a
+     slice only ever hid options the merchant was looking for. The cities combo
+     keeps its cap — that dataset is thousands of rows, not eighteen. */
   const matches = CL_AIRLINES
     .filter(a => !q || a.name.toLowerCase().includes(q) || a.code.toLowerCase().startsWith(q))
-    .slice(0, 8)
     .map(a => ({ value: a.name, label: a.name, sub: `Carrier code ${a.code}`, data: { value: a.name } }));
+
+  /* THE LIST IS NOT THE LIMIT, AND THE MERCHANT HAS TO BE ABLE TO SEE THAT.
+     CL_AIRLINES is eighteen carriers we happen to name; the field has always
+     accepted anything, and the desk can quote a carrier we never listed. Once
+     the box became a dropdown that stopped being obvious — type "Lufthansa" and
+     the only row offered is "All Airlines", which reads as a refusal. This adds
+     the typed text back as an explicit choice, so free entry is a visible
+     option rather than a thing you have to guess still works. */
+  if (raw && !matches.length) {
+    return [
+      { value: raw, label: `Use “${raw}” as typed`,
+        sub: 'Not one of our listed carriers — we will quote it as written',
+        data: { value: raw } },
+      any,
+    ];
+  }
   return [any, ...matches];
 }
 
@@ -1838,7 +1865,13 @@ function clSyncAirlineHint() {
    - Typing again CLEARS the pick, so an input edited down from "Hyderabad
      (HYD)" to "Hyd" can never still be secretly carrying HYD. The same trap
      mh-autocomplete.js documents on the Premium side. */
-function clCombo(input, list, optionsFor, onPick) {
+/* `openOnFocus` makes the control behave like a dropdown as well as a search
+   box: clicking it shows every option, and typing narrows them. Opt-in rather
+   than the default because the two datasets are nothing alike — 18 airlines are
+   worth showing unprompted, while `clCityOptions('')` over thousands of
+   airports would drop a meaningless list under the cursor the moment the field
+   is tabbed into. */
+function clCombo(input, list, optionsFor, onPick, { openOnFocus = false } = {}) {
   let options = [];
   let active = -1;
 
@@ -1886,7 +1919,15 @@ function clCombo(input, list, optionsFor, onPick) {
     if (input.dataset.clPicked) { delete input.dataset.clPicked; onPick(null); }
     render();
   });
-  input.addEventListener('focus', () => { if (input.value.trim()) render(); });
+  input.addEventListener('focus', () => { if (openOnFocus || input.value.trim()) render(); });
+  /* A second click on an already-focused input re-opens a list the merchant
+     just dismissed with Escape — without this, `focus` has already fired and
+     the box looks inert until they type. */
+  input.addEventListener('mousedown', () => {
+    if (openOnFocus && document.activeElement === input && !list.classList.contains('open')) {
+      setTimeout(render, 0);
+    }
+  });
   input.addEventListener('blur', () => setTimeout(close, 120));
   input.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

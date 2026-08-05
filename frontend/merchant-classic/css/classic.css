@@ -3183,6 +3183,23 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 
 /* ---- searchable dropdown ---- */
 .cl-combo{position:relative;}
+/* A COMBO THAT IS ALSO A DROPDOWN.
+   The airline field opens its full list on focus, so it has to LOOK openable —
+   a bare text box invites typing and nothing else, which is exactly how a
+   searchable field gets mistaken for free text. The caret is drawn rather than
+   an SVG so it inherits colour and needs no request, and it is click-through
+   (`pointer-events:none`) so pressing it still focuses the input underneath. */
+.cl-combo-drop::after{
+  content:""; position:absolute; right:14px; top:50%; width:8px; height:8px;
+  margin-top:-6px; border-right:2px solid var(--cl-text-muted);
+  border-bottom:2px solid var(--cl-text-muted); transform:rotate(45deg);
+  pointer-events:none; transition:transform .18s var(--cl-ease), border-color .18s var(--cl-ease);
+}
+.cl-combo-drop:focus-within::after{
+  border-color:var(--cl-orange); transform:rotate(-135deg); margin-top:-2px;
+}
+/* Room for the caret, so a long carrier name never runs under it. */
+.cl-combo-drop input{padding-right:34px;}
 .cl-combo-list{
   position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:70;
   background:var(--cl-surface); border:1px solid var(--cl-line);
