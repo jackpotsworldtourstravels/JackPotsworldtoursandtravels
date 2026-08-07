@@ -766,7 +766,40 @@ select{
   background-repeat:no-repeat;
   padding-right:34px;
 }
-:root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6);}
+/* A DATE INPUT FLASHED BLACK ON PICK BECAUSE NOBODY TOLD IT WHICH SCHEME IT IS.
+   ===========================================================================
+   The parts of `input[type=date]` these rules do NOT draw — the editable
+   dd/mm/yyyy spinners, the drop-down calendar, and the repaint the UA does the
+   moment a date is committed — are painted by the browser against its own
+   `color-scheme`. `select` was given one here long ago; the date inputs never
+   were, so they inherited the UA default while the control around them carried
+   a themed background. Committing a pick repainted those internals from the
+   default palette for a frame, which is the black flash reported on Profile &
+   Settings' Date of birth. Declaring the scheme makes that repaint use the
+   palette the control already has, so there is no frame that disagrees.
+
+   Both theming paths, per the note at the top of this file: Merchant and Admin
+   resolve to an explicit `data-theme`, Super Admin has no switcher and follows
+   the OS. `time` and `datetime-local` carry identical internals and the same
+   flash, so they are named here rather than left to be found later. */
+input[type=date], input[type=time], input[type="datetime-local"]{color-scheme:light;}
+:root[data-theme="dark"] input[type=date],
+:root[data-theme="dark"] input[type=time],
+:root[data-theme="dark"] input[type="datetime-local"]{color-scheme:dark;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) input[type=date],
+  :root:not([data-theme="light"]) input[type=time],
+  :root:not([data-theme="light"]) input[type="datetime-local"]{color-scheme:dark;}
+}
+/* OPACITY ONLY, NO INVERT — and dropping the invert is part of the fix above,
+   not a tidy-up. `filter:invert(1)` was written when the scheme was unset and
+   the UA therefore drew a DARK indicator on the dark control. Now that
+   `color-scheme:dark` applies, the UA already draws a LIGHT one, and inverting
+   that turns it dark-on-dark — the icon would disappear. */
+:root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:opacity(.75);}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) input[type=date]::-webkit-calendar-picker-indicator{filter:opacity(.75);}
+}
 
 /* Checkbox / radio pick up the accent instead of the browser blue. */
 input[type=checkbox], input[type=radio]{accent-color:var(--jp-accent);}

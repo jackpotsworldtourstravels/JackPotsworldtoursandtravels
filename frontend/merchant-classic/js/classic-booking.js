@@ -689,8 +689,9 @@ function clRenderBookingForm(e) {
         <!-- Special requests moved to the passenger cards above: a bassinet, a
              wheelchair and a Jain meal each belong to ONE traveller, and a
              single party-wide box made the desk guess which. See the Special
-             request field on each card, which rides that passenger's
-             special_services array to the Booking Operations desk. -->
+             requests CHECKLIST on each card — eight fixed options plus an
+             Other request box — which rides that passenger's special_services
+             array to the Booking Operations desk. -->
         <div class="cl-field">
           <label for="clBrRemarks">Remarks for our team</label>
           <textarea id="clBrRemarks" maxlength="1000"
@@ -957,8 +958,20 @@ const CL_PAX_TYPES = ['adult', 'child', 'infant'];
 
 /* One row per passenger, laid out as a compact grid. Not an accordion: a
    data-entry user wants every field on screen and reachable by Tab. */
+/* A DOM-UNIQUE SUFFIX, WHICH THE PASSENGER INDEX IS NOT.
+   The Add-passenger button passes the current card COUNT as the index
+   (clBrAddPax, above), so removing the middle of three and adding one back
+   hands out index 2 while a card already holds it — two elements with
+   id="clPaxSrOther2", and a label that focuses the wrong traveller's Other
+   request box. The visible "Passenger N" numbering still comes from the index
+   and is still renumbered by clRenumberPax; only the id/name suffix comes from
+   here, because it has to be unique for the life of the page rather than
+   correct in sequence. */
+let clPaxUid = 0;
+
 function clAddPaxCard(list, index, passengerType, saved = null) {
   const n = index + 1;
+  const uid = clPaxUid++;
   const el = document.createElement('div');
   el.dataset.clPax = String(index);
   // Carried so uploads can be tied to the passenger row that is already in the
@@ -972,6 +985,24 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
       ${index >= 1 ? `<button type="button" class="cl-btn cl-btn-sm cl-btn-link" data-cl-pax-remove>Remove</button>` : ''}
     </div>
     <div class="cl-form">
+      <!-- PASSPORT NUMBER FIRST, because it is the key that fills the rest.
+           clBindPassportLookup (below) fires on this field's change event and
+           auto-fills every other box from a traveller the merchant has booked
+           before. Sitting tenth in the tab order, it was reached only AFTER
+           the merchant had already typed by hand everything it would have
+           filled — the lookup worked and saved nobody anything. First, and
+           full width, so it reads as the step it is rather than one short box
+           among fifteen. Everything after it is unchanged, and a passport that
+           matches nothing simply leaves the merchant typing as before.
+           (No backticks in this comment — it is inside a template literal.) -->
+      <div class="cl-field cl-field-full cl-pax-passport">
+        <label>Passport no.</label>
+        <input type="text" data-field="passport_number" autocomplete="off"
+               placeholder="Enter the passport number to fill this traveller from a previous booking">
+        <small class="cl-pax-passport-hint">Optional. If this traveller has
+          booked with you before, their details fill in automatically — you can
+          edit anything after.</small>
+      </div>
       <div class="cl-field" style="max-width:88px;">
         <label>Title</label>
         <select data-field="title">${['', ...CL_TITLES_OPTS].map(t =>
@@ -1002,8 +1033,8 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
                  aria-expanded="false" aria-autocomplete="list" placeholder="e.g. Indian">
           <div class="cl-combo-list" data-cl-list="nationality" role="listbox"></div>
         </div></div>
-      <div class="cl-field"><label>Passport no.</label>
-        <input type="text" data-field="passport_number" autocomplete="off"></div>
+      <!-- Passport no. used to sit here. It now opens the card — see the top of
+           this form — because it is what fills the fields around it. -->
       <div class="cl-field"><label>Issuing country</label>
         <div class="cl-combo cl-combo-drop">
           <input type="text" data-field="passport_issue_country" autocomplete="off" role="combobox"
@@ -1026,20 +1057,38 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
       <!-- ONE PER TRAVELLER, replacing the single party-wide box that used to
            sit at the bottom of this screen. A special request is about a
            person — this passenger needs the wheelchair, that one the bassinet —
-           and the desk previously had to work out which from a paragraph. Full
-           width so it does not sit as a one-line box among the short fields.
+           and the desk previously had to work out which from a paragraph.
 
-           A TEXTAREA, AND ONE FIELD ONLY. Free text, deliberately: a traveller
-           asks for a wheelchair AND fifteen kilos of baggage AND a window seat,
-           and a fixed set of tick boxes can only ever cover the requests we
-           thought of first. One box takes every combination, in the merchant's
-           own words, and it reaches the Booking Operations desk as this
-           passenger's special_services entry either way. Multi-line, so the
-           four separate things a merchant wants to say can be four lines.
+           A CHECKLIST NOW, NOT A PARAGRAPH. The free-text box that stood here
+           put "wheelchair", "WCHR", "needs chair at gate" and "wheel chair pls"
+           into the same field, so the desk could not filter or count what it
+           had to arrange. Eight fixed boxes make the common requests a value
+           instead of a sentence. Other Request keeps the escape hatch, so a
+           request nobody anticipated is still expressible — which was the one
+           real virtue of the paragraph.
+
+           A FIELDSET, so a screen reader announces "Special requests" once and
+           then eight checkboxes, rather than eight unrelated boxes. The id and
+           name suffixes come from uid, NOT from the passenger index — see the
+           note on clPaxUid above; the index is reused after a removal and the
+           duplicate id sent the Other-request label to the wrong traveller.
            (No backticks in this comment — it is inside a template literal.) -->
-      <div class="cl-field cl-field-full"><label>Special request</label>
-        <textarea data-field="special_request" maxlength="300" rows="3"
-          placeholder="Anything this traveller needs, one per line — e.g. wheelchair assistance, extra 15 kg baggage, vegetarian meal, window seat."></textarea></div>
+      <fieldset class="cl-field cl-field-full cl-pax-sr">
+        <legend>Special requests</legend>
+        <div class="cl-pax-sr-grid">
+          ${CL_SPECIAL_REQUESTS.map(o => `
+            <label class="cl-pax-sr-opt">
+              <input type="checkbox" data-sr-code="${o.code}" name="sr_${uid}_${o.code}">
+              <span>${escapeHtml(o.label)}</span>
+            </label>`).join('')}
+        </div>
+        <div class="cl-pax-sr-other">
+          <label for="clPaxSrOther${uid}">Other request</label>
+          <input type="text" id="clPaxSrOther${uid}" data-field="special_request"
+                 maxlength="300"
+                 placeholder="Anything not covered above — in your own words">
+        </div>
+      </fieldset>
     </div>`;
   list.appendChild(el);
 
@@ -1055,10 +1104,12 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
          it. It is restored by name just below. */
       if (input && typeof value !== 'object') input.value = value;
     });
-    /* The traveller's own special request, back out of the array it travels
-       in. Written by clPassengerPayload; see clPassengerSpecialRequest. */
-    const special = el.querySelector('[data-field="special_request"]');
-    if (special) special.value = clReadSpecialRequest(saved.special_services);
+    /* The traveller's own special requests, back out of the array they travel
+       in — ticks the boxes and refills Other. Written by clPassengerPayload;
+       see clWritePassengerServices. Called unconditionally rather than only
+       when the array is non-empty, so a passenger saved with no requests
+       clears any box a previous render left ticked. */
+    clReadPassengerServices(el, saved.special_services);
   }
 
   el.querySelector('[data-cl-pax-remove]')?.addEventListener('click', () => {
@@ -1147,19 +1198,79 @@ function clNationalityOptions(query) {
    heading above it did not. */
 const CL_SPECIAL_REQUEST_CODE = 'special_request';
 
-function clWriteSpecialRequest(text) {
-  const t = String(text || '').trim();
-  return t ? [{ code: CL_SPECIAL_REQUEST_CODE, label: t }] : [];
+/* THE EIGHT FIXED OPTIONS. `code` is what is stored and what any later filter
+   or count would group by; `label` is what the desk reads. Both go into the
+   array — the code so the value survives a rewording of the label, the label
+   so every portal that already renders `s.label || s.code` prints a sentence
+   without needing this list.
+
+   The order is the order they are shown in. Baggage and wheelchair first
+   because they are the two the desk actually has to act on before departure. */
+const CL_SPECIAL_REQUESTS = [
+  { code: 'extra_baggage', label: 'Extra Baggage' },
+  { code: 'wheelchair_assistance', label: 'Wheelchair Assistance' },
+  { code: 'special_meal', label: 'Special Meal' },
+  { code: 'window_seat', label: 'Window Seat' },
+  { code: 'aisle_seat', label: 'Aisle Seat' },
+  { code: 'medical_assistance', label: 'Medical Assistance' },
+  { code: 'infant_assistance', label: 'Infant Assistance' },
+  { code: 'senior_citizen_assistance', label: 'Senior Citizen Assistance' },
+];
+
+const CL_SPECIAL_REQUEST_CODES = new Set(CL_SPECIAL_REQUESTS.map(o => o.code));
+
+/* Reads one passenger card into the array the API already accepts. The ticked
+   boxes first, in the order they are displayed, then Other Request last under
+   the SAME `special_request` code the free-text box used before this change —
+   which is what makes every booking saved by the old field still load into the
+   new one. Nothing about the payload's shape changed: it is the same
+   `[{code, label}]` list, just capable of holding more than one entry. */
+function clWritePassengerServices(card) {
+  const out = CL_SPECIAL_REQUESTS
+    .filter(o => card.querySelector(`[data-sr-code="${o.code}"]`)?.checked)
+    .map(o => ({ code: o.code, label: o.label }));
+
+  const other = String(card.querySelector('[data-field="special_request"]')?.value || '').trim();
+  if (other) out.push({ code: CL_SPECIAL_REQUEST_CODE, label: other });
+  return out;
 }
 
-/* The inverse, tolerant of anything else the array may carry: a row written by
-   another surface (or by a future ancillary) is read for its label rather than
-   dropped, so resuming a draft never silently empties a field it cannot parse.
-   Only OUR entry is editable here, and it is the one written back. */
+/* Restores a saved passenger into the checklist. Anything whose code is one of
+   the eight ticks its box; the `special_request` entry goes back into Other.
+
+   AN UNRECOGNISED ENTRY IS NOT DROPPED — it is appended to Other rather than
+   silently discarded, because the array is shared: a row written by another
+   portal, or by a future ancillary, would otherwise vanish the first time a
+   merchant opened the draft and saved it. Losing data on a screen the merchant
+   only looked at is the worst outcome available here. */
+function clReadPassengerServices(card, services) {
+  const list = Array.isArray(services) ? services.filter(Boolean) : [];
+
+  const codes = new Set(list.map(s => s.code).filter(c => CL_SPECIAL_REQUEST_CODES.has(c)));
+  CL_SPECIAL_REQUESTS.forEach(o => {
+    const box = card.querySelector(`[data-sr-code="${o.code}"]`);
+    if (box) box.checked = codes.has(o.code);
+  });
+
+  const other = list
+    .filter(s => !CL_SPECIAL_REQUEST_CODES.has(s.code))
+    .map(s => String(s.label || s.code || '').trim())
+    .filter(Boolean)
+    .join('; ');
+  const box = card.querySelector('[data-field="special_request"]');
+  if (box) box.value = other;
+}
+
+/* Kept for the Booking Details table, which prints a saved passenger's
+   requests as one line and has no card to read. Same tolerance as above: an
+   unrecognised entry still prints, by label. */
 function clReadSpecialRequest(services) {
   if (!Array.isArray(services)) return '';
-  const own = services.find(s => s && s.code === CL_SPECIAL_REQUEST_CODE);
-  return String(own?.label || '').trim();
+  return services
+    .filter(Boolean)
+    .map(s => String(s.label || s.code || '').trim())
+    .filter(Boolean)
+    .join(', ');
 }
 
 /* ============================================ passenger auto-fill by passport */
@@ -1341,10 +1452,10 @@ function clPassengerPayload(card) {
     passport_expiry: get('passport_expiry') || undefined,
     seat_preference: get('seat_preference') || undefined,
     meal_preference: get('meal_preference') || undefined,
-    /* This traveller's own special request. `[]` when there is none, which is
-       what every portal has always sent and what the column's array CHECK
-       requires — it is never omitted. */
-    special_services: clWriteSpecialRequest(get('special_request')),
+    /* This traveller's own special requests — the ticked boxes plus Other.
+       `[]` when there are none, which is what every portal has always sent and
+       what the column's array CHECK requires — it is never omitted. */
+    special_services: clWritePassengerServices(card),
   };
 }
 

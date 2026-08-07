@@ -63,6 +63,23 @@ function admLabel(s) {
   return String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/* One traveller's special requests, as one readable line.
+
+   `special_services` is a list of {code, label} written by the merchant's
+   passenger form — the eight-box checklist plus an "Other request". Read by
+   LABEL with the code as a fallback, which is the same rule opsPassengerCard
+   uses in the Booking Operations popup, so the desk sees the identical wording
+   on both screens. Falling back to the code (title-cased) means an entry
+   written by some other surface, without a label, still prints something
+   rather than silently vanishing from a review screen. */
+function admPaxRequests(p) {
+  return (p.special_services || [])
+    .filter(Boolean)
+    .map(s => String(s.label || '').trim() || admLabel(s.code))
+    .filter(Boolean)
+    .join(', ');
+}
+
 /* 24-HOUR, MATCHING WHAT THE MERCHANT TYPED.
    `preferred_time` is stored as "HH:MM" and is now entered as 24-hour on the
    merchant form, so rendering "02:30 PM" here made the desk and the merchant
@@ -349,7 +366,19 @@ function renderBookingReview(data) {
         <td>${escapeHtml([
           p.seat_preference ? `${admLabel(p.seat_preference)} seat` : null,
           p.meal_preference ? `${admLabel(p.meal_preference)} meal` : null,
-        ].filter(Boolean).join(', ') || '—')}</td>
+        ].filter(Boolean).join(', ') || '—')}${
+          /* THE TRAVELLER'S OWN SPECIAL REQUESTS, on the screen the desk
+             approves from. The merchant's passenger form now records these as
+             a checklist (Extra Baggage, Wheelchair Assistance, ...) plus a free
+             "Other request", and the Booking Operations popup already showed
+             them — but THIS table did not, so a wheelchair booked against
+             passenger 3 was invisible on the main review screen. A sub-line
+             under Preferences rather than a tenth column: the two are the same
+             kind of fact about the same traveller, and the header row here is
+             already nine wide. */
+          admPaxRequests(p)
+            ? `<div class="cell-sub">${escapeHtml(admPaxRequests(p))}</div>`
+            : ''}</td>
       </tr>`).join('') || '<tr><td colspan="9" class="empty-state">No passengers.</td></tr>'}
     </tbody></table></div>
 

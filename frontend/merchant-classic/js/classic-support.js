@@ -1810,6 +1810,12 @@ function clScOpenDrawer() {
     $('clScNewMsg').focus();
   });
   document.body.style.overflow = 'hidden';
+  /* Drives the CSS that hides the page's own topbar and breadcrumb while the
+     composer is up — see `body.cl-sc-composing` in classic.css. A class rather
+     than inline styles because it is two elements this file does not otherwise
+     know about, and the stylesheet is where "what the page looks like while
+     composing" belongs. Cleared in clScCloseDrawer. */
+  document.body.classList.add('cl-sc-composing');
 
   $('clScNewMsg').addEventListener('input', clScUploadState);
   /* Ctrl/Cmd+Enter sends, the same chord the composer uses. */
@@ -1842,6 +1848,7 @@ function clScCloseDrawer() {
   drawer.classList.remove('open');
   back.classList.remove('open');
   document.body.style.overflow = '';
+  document.body.classList.remove('cl-sc-composing');
   document.removeEventListener('keydown', clScDrawerEsc);
   /* Hand the file queue back to the composer. Leaving it pointed at the
      drawer's ids would leave the composer's paperclip drawing into elements

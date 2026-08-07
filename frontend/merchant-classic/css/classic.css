@@ -743,6 +743,79 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
 .cl-field-wide{grid-column:span 2;}
 .cl-field-full{grid-column:1 / -1;}
 
+/* ---- the passenger card's passport field, which now opens the card ---- */
+
+/* The one line under it that explains why it is first. Sits at the same muted
+   weight as a field hint elsewhere, so it reads as help rather than an error. */
+.cl-pax-passport-hint{
+  font-size:11px; line-height:1.5; color:var(--cl-text-muted); font-weight:500;
+}
+/* Full width but not full-width INPUT — a passport number is 8-9 characters and
+   a box stretched to 1200px invites the eye to expect a sentence. The field
+   keeps its column span (so the hint has room to sit on one line) while the
+   control itself stops at a plausible width. */
+.cl-pax-passport input{max-width:420px;}
+
+/* ---- per-passenger special requests ---- */
+
+/* A FIELDSET, so the eight boxes are announced under one name. Browsers give
+   fieldset a default border, padding and margin that would make this the only
+   boxed thing on a flat form, so they are cleared and the visual grouping is
+   done with a single top rule instead. */
+.cl-pax-sr{
+  border:0; padding:14px 0 0; margin:2px 0 0; min-width:0;
+  border-top:1px dashed var(--cl-line-2);
+  display:flex; flex-direction:column; gap:11px;
+}
+/* legend does not inherit the .cl-field label rule (it is not a label), so the
+   uppercase treatment is restated here to match every other field heading. */
+.cl-pax-sr legend{
+  padding:0; font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.07em; color:var(--cl-text-muted);
+}
+/* auto-fit rather than a fixed count: the same markup has to sit inside a
+   four-column form on a desktop and a single column on a phone, and the
+   options are eight labels of very different lengths. 210px is the width at
+   which "Senior Citizen Assistance" stays on one line. */
+.cl-pax-sr-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
+  gap:9px 16px;
+}
+/* TWO CLASSES, NOT ONE, AND THAT IS THE POINT.
+   These options are <label>s inside a container that carries `.cl-field`, so
+   `.cl-field label` — (0,1,1) — applies to them: 11px, uppercase, muted,
+   0.07em tracking. That is the treatment for a field HEADING, and it rendered
+   the checklist as "EXTRA BAGGAGE" in the same grey as the word above it.
+   A single `.cl-pax-sr-opt` is (0,1,0) and loses, so every declaration below
+   was silently discarded. Scoping to `.cl-pax-sr .cl-pax-sr-opt` makes it
+   (0,2,0), which wins on specificity rather than on source order — the latter
+   would break the moment this block moved or another sheet loaded after it. */
+.cl-pax-sr .cl-pax-sr-opt{
+  display:flex; align-items:center; gap:9px; min-width:0;
+  font-size:12.5px; font-weight:500; line-height:1.35;
+  color:var(--cl-text); cursor:pointer;
+  /* These are choices being read, not headings. */
+  text-transform:none; letter-spacing:normal;
+}
+/* 16px so the tap target clears the minimum on a phone, and flex-shrink:0 so a
+   long label can never squeeze the box into an ellipse. */
+.cl-pax-sr .cl-pax-sr-opt input[type=checkbox]{
+  width:16px; height:16px; min-height:0; flex-shrink:0; margin:0;
+  accent-color:var(--cl-orange); cursor:pointer;
+}
+.cl-pax-sr .cl-pax-sr-opt:hover{color:var(--cl-orange-700);}
+:root[data-theme="dark"] .cl-pax-sr .cl-pax-sr-opt:hover{color:var(--cl-text);}
+.cl-pax-sr .cl-pax-sr-other{display:flex; flex-direction:column; gap:7px; min-width:0;}
+/* Scoped for the same reason as the option rule above: unscoped this is
+   (0,1,1), an exact tie with `.cl-field label`, and a tie is decided by source
+   order — which is not something this block should depend on. Here the heading
+   treatment IS what we want, so the declarations match; the scope is what
+   guarantees they are the ones that land. */
+.cl-pax-sr .cl-pax-sr-other label{
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
+  color:var(--cl-text-muted);
+}
+
 .cl-field label{
   font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em;
   color:var(--cl-text-muted);
@@ -786,7 +859,15 @@ textarea{min-height:96px; resize:vertical; line-height:1.6; padding-top:12px;}
    One caret, defined once, themed by `--jp-text-muted`, so the two can no
    longer disagree. Only `cursor` stays here. */
 select{cursor:pointer;}
-:root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6);}
+/* THE DATE INPUT'S DARK-MODE TREATMENT IS jp-ds.css's, FOR THE SAME REASON THE
+   CARET ABOVE IS. This file used to repeat that sheet's
+   `::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6)}` verbatim.
+   Identical selector, identical specificity, and jp-ds.css links second — so
+   this copy never won anything, it just guaranteed the two would drift. It has
+   drifted now: jp-ds.css sets `color-scheme` on date inputs (which is what
+   stops the black flash on pick), and once the scheme is declared the UA draws
+   a light indicator that must NOT be inverted. Kept here as a pointer so the
+   next reader looks in one place. */
 
 input:hover:not(:disabled):not([readonly]),
 select:hover:not(:disabled), textarea:hover:not(:disabled){border-color:#CBD6E4;}
@@ -2876,10 +2957,31 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 
 /* ---- the new-conversation drawer ---- */
 
+/* THE SCRIM HAS TO ERASE THE PAGE, NOT TINT IT.
+   ===========================================================================
+   At rgba(...,0.52) over a 2px blur, the Support Center's own topbar heading
+   ("Support Center") and the breadcrumb above it stayed perfectly legible
+   behind the composer — so opening it read as two headers competing for the
+   same screen, which is the clutter this fixes. The drawer is 460px on the
+   right of a 1280px viewport, so 820px of dimmed-but-readable page sat beside
+   it. 0.82 with a 7px blur puts the page behind the panel out of reading
+   range while still showing enough shape to say "this is on top of that".
+   `saturate(.85)` stops the orange accents underneath from glowing through
+   the blur, which is what a pure opacity bump leaves behind. */
 .cl-sc-drawer-back{
   position:fixed; inset:0; z-index:500; display:none;
-  background:rgba(6,27,50,0.52); backdrop-filter:blur(2px);
+  background:rgba(6,27,50,0.82); backdrop-filter:blur(7px) saturate(.85);
 }
+/* AND THE PAGE CHROME GOES, which is the other half of the brief. `visibility`
+   rather than `display`: the topbar is sticky and the breadcrumb sits in the
+   normal flow, so removing either from layout would slide the whole page up
+   behind a translucent scrim — motion the merchant did not ask for on the way
+   into a compose panel. `visibility:hidden` takes the text off screen and
+   leaves every box exactly where it was, so closing the drawer restores the
+   page with no jump. Scoped to the flag the drawer sets, so nothing else on
+   the portal is affected. */
+body.cl-sc-composing .cl-top,
+body.cl-sc-composing .cl-crumb{visibility:hidden;}
 .cl-sc-drawer-back.open{display:block; animation:cl-fade .22s ease both;}
 .cl-sc-drawer{
   position:fixed; top:0; right:0; bottom:0; z-index:510;

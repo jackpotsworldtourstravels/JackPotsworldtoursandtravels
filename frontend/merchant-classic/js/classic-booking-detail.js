@@ -194,14 +194,17 @@ function clRenderBookingDetail() {
       <div class="cl-table-wrap">
         <table class="cl-table">
           <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
-            <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Special request</th></tr></thead>
+            <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Special requests</th></tr></thead>
           <!-- One passenger, one line — every cell nowrap, the wrapper scrolls.
-               The last column is the request that traveller made: special
+               The last column is the requests that traveller made: special
                requests are per-passenger as of this pass, and a booking whose
                only record of "wheelchair for passenger 3" was on the entry form
                would be a booking the merchant cannot check afterwards. Read out
-               of the same special_services array clWriteSpecialRequest fills.
-               NOT nowrap — it is a sentence, not a field.
+               of the same special_services array clWritePassengerServices fills
+               — now a checklist, so the cell holds a comma-separated list of
+               the ticked options with any Other request last, rather than the
+               single sentence the free-text box used to produce.
+               NOT nowrap — it is a list, not a field.
                (No backticks in this comment — it is in a template literal.) -->
           <tbody>${(r.passengers || []).length ? r.passengers.map((p, i) => `
             <tr>
