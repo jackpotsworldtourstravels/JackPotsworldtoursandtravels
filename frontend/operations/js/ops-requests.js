@@ -1292,10 +1292,12 @@ function opsRenderRequestForm() {
       <div class="ops-fieldset-body">
         <p style="margin:0;font-size:11.5px;color:var(--ops-ink-soft)">
           Travel-document data is captured per passenger above — passport number, issuing country,
-          issue date and expiry. <b>File upload is not available in this build:</b> the documents
-          module is listed as pending by <code>GET /api/status</code> and has no endpoint, so
-          there is nothing to upload to yet. A missing passport on an international sector will
-          delay ticketing even though it does not block this form.
+          issue date and expiry. <b>Passport must be valid for at least 6 months from the travel
+          date</b> — the server refuses an international submission on a shorter one, so it is
+          worth checking here rather than at submit. <b>File upload is not available in this
+          build:</b> the documents module is listed as pending by <code>GET /api/status</code> and
+          has no endpoint, so there is nothing to upload to yet. A missing passport on an
+          international sector will delay ticketing even though it does not block this form.
         </p>
       </div>
     </fieldset>

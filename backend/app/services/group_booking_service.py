@@ -60,7 +60,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import storage
+from app.services import passport_rules, storage
 
 # ---------------------------------------------------------------------------
 # What the template contains
@@ -693,11 +693,14 @@ def validate_sheet(rows: list[list[Any]], journey_type: str) -> dict[str, Any]:
                 row_errors.append(
                     _Err(excel_row, "Return Date is missing or invalid.", "Return Date")
                 )
-            elif travel_date and return_date <= travel_date:
+            elif travel_date and return_date < travel_date:
+                # Same day is allowed, matching the enquiry form and
+                # ``EnquiryCreate``: an out-and-back-in-a-day group charter is a
+                # real itinerary. Only a return before the outbound is refused.
                 row_errors.append(
                     _Err(
                         excel_row,
-                        "Return Date must be after the Travel Date.",
+                        "Return Date cannot be before the Travel Date.",
                         "Return Date",
                     )
                 )
@@ -753,11 +756,22 @@ def validate_sheet(rows: list[list[Any]], journey_type: str) -> dict[str, Any]:
             row_errors.append(
                 _Err(excel_row, "Passport Expiry is invalid.", "Passport Expiry")
             )
-        elif passport_expiry and travel_date and passport_expiry < travel_date:
+        elif (
+            passport_expiry
+            and travel_date
+            and not passport_rules.is_long_enough(passport_expiry, travel_date)
+        ):
+            # SIX CLEAR MONTHS, the same rule the typed form enforces. A
+            # manifest row used to pass on "expiry after the travel date"
+            # alone, so an eighty-passenger sheet could import clean and then
+            # have travellers turned away at the counter. ``passport_rules``
+            # holds the figure for every flow.
+            required_until = passport_rules.required_valid_until(travel_date)
             row_errors.append(
                 _Err(
                     excel_row,
-                    "Passport Expiry is before the Travel Date.",
+                    f"{passport_rules.SIX_MONTH_MESSAGE} This one needs to run to "
+                    f"{required_until:%d %b %Y} or later.",
                     "Passport Expiry",
                 )
             )

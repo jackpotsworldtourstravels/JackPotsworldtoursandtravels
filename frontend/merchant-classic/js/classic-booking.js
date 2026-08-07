@@ -544,15 +544,18 @@ function clRenderBookingForm(e) {
       </div>
     </div>
 
-    <!-- CONTACT IS OPTIONAL NOW, and none of these four carries the required
-         marker. It was the one thing on this screen a merchant could not skip,
-         and it is information we usually already hold against the account.
+    <!-- CONTACT IS OPTIONAL IN FULL, and nothing in this panel can refuse a
+         submission. None of the four carries the required marker; none of them
+         is checked in a way that stops the booking. It was once the only thing
+         on this screen a merchant could not skip, and it is information we
+         usually already hold against the account.
 
-         WHAT IS STILL ENFORCED, AND WHY IT HAS TO BE: BookingContact on the
-         server (schemas/enquiry.py) requires an email AND a phone whenever a
-         contact is sent at all. So the pair travels together — fill in both, or
-         neither. clFlagMissingContact says exactly that rather than letting a
-         half-filled panel reach the API and come back a 422.
+         WHAT THE SERVER STILL REQUIRES, AND WHAT WE DO ABOUT IT: BookingContact
+         (schemas/enquiry.py) requires an email AND a phone whenever a contact is
+         sent at all, so a half-filled panel is not something the API can take.
+         It is therefore left OFF the payload rather than blocked — see
+         clContactPayload — and clReviewContact says so in the panel, so the
+         merchant knows before and after submitting.
          (No backticks in this comment — it is inside a template literal.) -->
     <div class="cl-panel">
       <div class="cl-panel-head"><h2>Contact for this booking</h2></div>
@@ -568,23 +571,49 @@ function clRenderBookingForm(e) {
             <input type="email" id="clBrContactEmail" maxlength="255"
               value="${escapeHtml(contact.email || '')}" placeholder="bookings@yourcompany.com">
           </div>
-          <!-- DIGITS ONLY on both numbers, filtered as they are typed
-               (clDigitsOnly). The placeholder no longer shows a "+" or spaces:
-               it used to read "+91 90000 00000", which is exactly the entry the
-               field now refuses. Country code without the plus. -->
+          <!-- THE COUNTRY CODE IS PICKED, THE NUMBER IS TYPED.
+               The field used to be one box asking for the code and the number
+               run together — "919000000000" — which is not how anyone holds a
+               phone number, and left the merchant to work out that the plus was
+               unwelcome. The picker states the code; the box beside it takes
+               exactly ten digits and nothing else, filtered as they are typed
+               (clBindPhoneField), so a pasted "+91 90000 00000" becomes
+               "9000000000" under a "+91" the merchant can see.
+
+               WHAT IS SENT IS UNCHANGED: clContactPayload joins the two back
+               into the same digits string the API has always stored, so a
+               contact saved before this picker existed still round-trips —
+               splitDialCode puts the stored digits back into the two controls.
+               (No backticks in this comment — it is inside a template literal.) -->
           <div class="cl-field">
             <label for="clBrContactPhone">Phone</label>
-            <input type="tel" id="clBrContactPhone" maxlength="15" inputmode="numeric"
-              value="${escapeHtml(clDigits(contact.phone))}" placeholder="919000000000">
-            <small id="clBrContactPhoneHint">Numbers only, 7 to 15 digits. Include the country
-              code without a plus.</small>
+            <div class="cl-phone">
+              <select id="clBrContactPhoneCC" class="cl-phone-cc"
+                aria-label="Country code for the phone number">${clDialOptions(contact.phone)}</select>
+              <input type="tel" id="clBrContactPhone" class="cl-phone-num"
+                maxlength="10" inputmode="numeric" autocomplete="tel-national"
+                value="${escapeHtml(splitDialCode(contact.phone).number)}"
+                placeholder="9000000000">
+            </div>
+            <small id="clBrContactPhoneHint">${CL_PHONE_HINT}</small>
           </div>
           <div class="cl-field">
             <label for="clBrContactAlt">Alternate phone</label>
-            <input type="tel" id="clBrContactAlt" maxlength="15" inputmode="numeric"
-              value="${escapeHtml(clDigits(contact.alternate_phone))}" placeholder="Optional">
+            <div class="cl-phone">
+              <select id="clBrContactAltCC" class="cl-phone-cc"
+                aria-label="Country code for the alternate phone number">${
+                  clDialOptions(contact.alternate_phone)}</select>
+              <input type="tel" id="clBrContactAlt" class="cl-phone-num"
+                maxlength="10" inputmode="numeric" autocomplete="tel-national"
+                value="${escapeHtml(splitDialCode(contact.alternate_phone).number)}"
+                placeholder="Optional">
+            </div>
+            <small id="clBrContactAltHint">${CL_PHONE_HINT}</small>
           </div>
         </div>
+        <!-- Says what a half-filled panel will do, rather than refusing it.
+             Written by clReviewContact and empty the rest of the time. -->
+        <div class="cl-msg" id="clBrContactMsg"></div>
       </div>
       <div class="cl-panel-note">
         One contact for the whole party — this is who our team and the airline reach
@@ -609,8 +638,9 @@ function clRenderBookingForm(e) {
       <div class="cl-panel-body" id="clBrPaxList"${isGroup ? ' data-cl-readonly="1"' : ''}></div>
       <div class="cl-panel-note">
         ${intl
-          ? 'This is an international sector, so every traveller needs a passport number and an '
-            + 'expiry after the travel date. No documents need to be uploaded.'
+          ? 'This is an international sector, so every traveller needs a passport number and a '
+            + 'passport valid for at least 6 months from the travel date. No documents need to '
+            + 'be uploaded.'
           : 'First and last name are required for every passenger. Passport details are optional '
             + 'on a domestic sector and can be supplied later.'}
       </div>
@@ -698,12 +728,23 @@ function clRenderBookingForm(e) {
   }
 
   /* Both contact numbers take digits and nothing else, filtered as they are
-     typed rather than judged at submit — a merchant who pastes
-     "+91 90000 00000" sees it become "919000000000" and knows what the field
-     wants. Length is checked at submit by clFlagPhoneLength; there is nothing
-     to say about "9190" until they have stopped typing it. */
-  clDigitsOnly($('clBrContactPhone'), 15);
-  clDigitsOnly($('clBrContactAlt'), 15);
+     typed — a merchant who pastes "+91 90000 00000" sees it become
+     "9000000000" beside the "+91" they picked. The length is judged on every
+     keystroke too now that the country code is not sharing the box: "9 of 10
+     digits" is a useful thing to say while someone is typing, where the old
+     7-to-15 rule had nothing to offer until submit. */
+  clBindPhoneField('clBrContactPhone', 'clBrContactPhoneHint', 'clBrContactPhoneCC');
+  clBindPhoneField('clBrContactAlt', 'clBrContactAltHint', 'clBrContactAltCC');
+
+  /* The panel's own verdict, kept current as the merchant fills it in. Without
+     this the "will not be attached" note would only appear on submit — which is
+     the one moment it is least useful, because the booking has already gone. */
+  ['clBrContactEmail', 'clBrContactPhone', 'clBrContactAlt'].forEach(id => {
+    $(id)?.addEventListener('blur', clReviewContact);
+  });
+  ['clBrContactPhoneCC', 'clBrContactAltCC'].forEach(id => {
+    $(id)?.addEventListener('change', clReviewContact);
+  });
 
   $('clBrAddPax')?.addEventListener('click', () => {
     clAddPaxCard(list, list.querySelectorAll('[data-cl-pax]').length);
@@ -968,10 +1009,19 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
            sit at the bottom of this screen. A special request is about a
            person — this passenger needs the wheelchair, that one the bassinet —
            and the desk previously had to work out which from a paragraph. Full
-           width so it does not sit as a one-line box among the short fields. -->
+           width so it does not sit as a one-line box among the short fields.
+
+           A TEXTAREA, AND ONE FIELD ONLY. Free text, deliberately: a traveller
+           asks for a wheelchair AND fifteen kilos of baggage AND a window seat,
+           and a fixed set of tick boxes can only ever cover the requests we
+           thought of first. One box takes every combination, in the merchant's
+           own words, and it reaches the Booking Operations desk as this
+           passenger's special_services entry either way. Multi-line, so the
+           four separate things a merchant wants to say can be four lines.
+           (No backticks in this comment — it is inside a template literal.) -->
       <div class="cl-field cl-field-full"><label>Special request</label>
-        <input type="text" data-field="special_request" maxlength="300" autocomplete="off"
-               placeholder="Wheelchair assistance, bassinet, seat together with passenger 2…"></div>
+        <textarea data-field="special_request" maxlength="300" rows="3"
+          placeholder="Anything this traveller needs, one per line — e.g. wheelchair assistance, extra 15 kg baggage, vegetarian meal, window seat."></textarea></div>
     </div>`;
   list.appendChild(el);
 
@@ -1280,14 +1330,50 @@ function clPassengerPayload(card) {
   };
 }
 
+/* THE SIX-MONTH PASSPORT RULE, and the one sentence that states it.
+   ===========================================================================
+   Written once and used by every surface that judges an expiry — the booking
+   form here, and the scan panel's own warning in classic-passport-ocr.js — so
+   the merchant is never told the rule in two different forms of words.
+   `CL_PASSPORT_VALIDITY_MONTHS` matches `settings.passport_validity_months`
+   server-side; the server is the authority and refuses the submission, this
+   only saves the round trip. */
+const CL_PASSPORT_VALIDITY_MONTHS = 6;
+const CL_PASSPORT_SIX_MONTH_MSG =
+  'Passport must be valid for at least 6 months from the travel date.';
+
+/* The earliest expiry that clears the rule for a given travel date, as a plain
+   "YYYY-MM-DD" so it compares directly against a date input's value.
+
+   CALENDAR MONTHS, CLAMPED — deliberately not "+183 days". 31 August plus six
+   months is 28 (or 29) February, not "31 February", and JavaScript's Date would
+   quietly roll that forward into March and demand a day more validity than the
+   rule does. Mirrors `_add_months` in passport_ocr_service.py so the two cannot
+   disagree about a month end. */
+function clPassportValidUntil(travelDate, months = CL_PASSPORT_VALIDITY_MONTHS) {
+  if (!travelDate) return null;
+  const base = new Date(`${String(travelDate).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return null;
+  const index = base.getMonth() + months;
+  const year = base.getFullYear() + Math.floor(index / 12);
+  const month = ((index % 12) + 12) % 12;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const day = Math.min(base.getDate(), lastDay);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 /* First and last name on every passenger, plus passport *details* — a number
-   and a usable expiry — when the route is international. No attachment is
-   involved: a merchant can complete this screen entirely by typing. The
-   offending field is focused and outlined rather than described in prose.
-   Returns an error string, or null when clean. */
+   and an expiry with six clear months on it — when the route is international.
+   No attachment is involved: a merchant can complete this screen entirely by
+   typing. The offending field is focused and outlined rather than described in
+   prose. Returns an error string, or null when clean. */
 function clFlagMissingPassengerFields(intl, travelDate) {
   let firstBad = null;
   let problem = null;
+  /* Every passport number on the form, for the cross-card duplicate pass below.
+     Collected during the per-card walk because the check cannot be made inside
+     it: a duplicate is a relationship between two cards, not a property of one. */
+  const passports = [];
   const mark = (el, bad) => {
     if (!el) return;
     el.style.borderColor = bad ? 'var(--cl-coral-dark)' : '';
@@ -1313,13 +1399,45 @@ function clFlagMissingPassengerFields(intl, travelDate) {
     mark(num, !num.value.trim());
     if (!num.value.trim()) {
       problem = problem || 'This is an international sector — every traveller needs a passport number.';
+    } else {
+      passports.push({ el: num, key: num.value.replace(/\s/g, '').toUpperCase() });
     }
 
+    /* SIX MONTHS BEYOND THE TRAVEL DATE, not merely "after it".
+       Airlines and immigration authorities almost universally refuse to carry
+       on a passport with less than six months left at the point of travel, so
+       a document that satisfied the old "expires after the travel date" rule
+       could still be turned away at the counter — after the money had moved.
+       The server enforces the same figure (ticket_service, from
+       settings.passport_validity_months), and this is the copy that saves the
+       merchant a round trip to find out. */
     const exp = card.querySelector('[data-field="passport_expiry"]');
-    const expired = exp.value && travelDate && exp.value <= travelDate;
-    mark(exp, !!expired);
-    if (expired) {
-      problem = problem || 'A passport expires on or before the travel date.';
+    const required = clPassportValidUntil(travelDate);
+    const short = exp.value && required && exp.value < required;
+    mark(exp, !!short);
+    if (short) {
+      problem = problem || CL_PASSPORT_SIX_MONTH_MSG;
+    }
+  });
+
+  /* TWO TRAVELLERS CANNOT SHARE A PASSPORT, and scanning is what made that easy
+     to do by accident: one file dropped onto three passenger cards fills all
+     three identically. The server refuses this too — the rule lives in
+     ticket_service._validate_classic_submission and that is the one that counts
+     — but a merchant should not have to press Submit to be told, so the second
+     card carrying a number is outlined here the same way a missing one is.
+
+     Normalised exactly as the server normalises it (spaces out, uppercased), so
+     the two cannot disagree about whether "z1234567" and "Z123 4567" are the
+     same document. */
+  const seen = new Map();
+  passports.forEach(({ el, key }) => {
+    if (seen.has(key)) {
+      mark(el, true);
+      problem = problem
+        || `Passport ${key} is entered for more than one traveller. Each traveller needs their own passport.`;
+    } else {
+      seen.set(key, el);
     }
   });
 
@@ -1327,69 +1445,171 @@ function clFlagMissingPassengerFields(intl, travelDate) {
   return problem;
 }
 
-/* CONTACT IS OPTIONAL, AND ALL-OR-NOTHING.
+/* THE CONTACT PANEL CANNOT REFUSE A BOOKING. (2026-08-07)
    ===========================================================================
-   It used to be the one thing on this screen a merchant could not skip. It is
-   not required any more — a booking with no contact panel filled in is sent
-   with no contact at all, and our desk uses what it holds against the account.
+   It was the one thing on this screen a merchant could not skip; then it became
+   optional-but-all-or-nothing, which is not the same as optional. A merchant
+   who typed a contact name and no email was still stopped — by a panel whose
+   own note said it could be left blank.
 
-   What has NOT changed is the server's rule: `BookingContact` requires both an
-   email and a phone whenever a contact object is present, so a panel with only
-   one of them cannot be sent. Rather than let that surface as a 422 four
-   sections later, the pair is checked here and named as a pair. The format
-   checks still only run on a value that exists.
+   The server's rule is unchanged and cannot be worked around from here:
+   `BookingContact` requires both an email and a phone whenever a contact object
+   is sent at all, so a half-filled panel is not something the API can accept.
+   What changed is what we DO about that. Rather than block, an incomplete or
+   unusable contact is simply not attached — clContactPayload already returns
+   undefined for exactly that case — and this function says so on screen, in the
+   panel, so nothing is dropped silently. The booking goes through; our desk
+   uses the details it holds against the account, which is what the note under
+   the panel has promised all along.
 
-   Returns an error string, or null when the panel is either complete or
-   entirely blank. */
-function clFlagMissingContact() {
+   Returns nothing. It exists for the message it paints, and every caller is a
+   side-effect caller — there is no failure to hand back any more. */
+function clReviewContact() {
   const email = $('clBrContactEmail');
   const phone = $('clBrContactPhone');
   const alt = $('clBrContactAlt');
-  [email, phone, alt].forEach(el => { if (el) el.style.borderColor = ''; });
+  const out = $('clBrContactMsg');
+  if (!email || !phone || !alt) return;
+  [email, phone, alt].forEach(el => {
+    el.style.borderColor = '';
+    el.classList.remove('cl-input-err');
+  });
+  if (out) { out.textContent = ''; out.className = 'cl-msg'; }
 
-  const hasEmail = !!email.value.trim();
-  const hasPhone = !!phone.value.trim();
+  const address = email.value.trim();
+  const hasEmail = !!address;
+  const hasPhone = !!clDigits(phone.value);
 
-  /* Nothing typed at all — a legitimate, complete answer now. */
-  if (!hasEmail && !hasPhone && !alt.value.trim()) return null;
+  // Nothing typed at all — a complete answer, and nothing to report.
+  if (!hasEmail && !hasPhone && !clDigits(alt.value)) return;
 
+  /* Everything that would make the contact unusable, gathered rather than
+     returned one at a time: the merchant is being told what will happen, not
+     walked through a queue of refusals. */
+  const problems = [];
   if (!hasEmail || !hasPhone) {
-    const bad = hasEmail ? phone : email;
-    bad.style.borderColor = 'var(--cl-coral-dark)';
-    bad.focus();
-    return 'A contact needs both an email and a phone — fill in both, or leave the whole '
-      + 'contact panel blank.';
+    (hasEmail ? phone : email).classList.add('cl-input-err');
+    problems.push('a contact needs both an email and a phone');
   }
-
-  /* Digits only reach these boxes (clDigitsOnly), so what is left to judge is
-     the length. Seven to fifteen is E.164's own range: shorter is not a
-     dialable number and longer cannot be one. */
-  const phoneProblem = clFlagPhoneLength(phone, 'phone number')
-    || clFlagPhoneLength(alt, 'alternate phone number');
-  if (phoneProblem) return phoneProblem;
-
   // Deliberately loose: the backend is the authority, and an over-strict
   // pattern here would reject valid addresses the desk can actually use.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
-    email.style.borderColor = 'var(--cl-coral-dark)';
-    email.focus();
-    return 'That contact email does not look right.';
+  if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    email.classList.add('cl-input-err');
+    problems.push('that email address does not look right');
   }
-  return null;
+  const lengthProblem = clFlagPhoneLength(phone, 'phone number')
+    || clFlagPhoneLength(alt, 'alternate phone number');
+  if (lengthProblem) problems.push(lengthProblem);
+
+  if (!problems.length || !out) return;
+  out.className = 'cl-msg cl-msg-warn';
+  out.textContent = `This contact will not be attached to the booking — ${
+    problems.join(', and ')}. You can still submit: we will use the details we hold `
+    + 'for your account.';
 }
 
-/* Seven to fifteen digits, or nothing. Blank is always fine — both numbers are
-   optional now — so this only judges a value that is actually there. Marks the
-   box and returns the sentence, or null. */
+/* ============================================================ phone numbers */
+
+/* EXACTLY TEN DIGITS, after the country code. The old rule was "7 to 15
+   digits including the code", which was the only rule possible while the code
+   and the number shared one box — and it accepted "9190" as readily as a real
+   number. With the code picked separately the number itself has a length worth
+   stating, and the merchant is told it while typing rather than at submit. */
+const CL_PHONE_DIGITS = 10;
+const CL_PHONE_HINT = `Numbers only — ${CL_PHONE_DIGITS} digits, without the country code.`;
+
+/* The picker's options, with `stored` (a digits string that may already carry a
+   code) deciding which is selected. */
+function clDialOptions(stored) {
+  const picked = splitDialCode(stored).code;
+  return DIAL_CODES.map(d =>
+    `<option value="${escapeHtml(d.code)}"${d.code === picked ? ' selected' : ''}>+${
+      escapeHtml(d.code)} ${escapeHtml(d.country)}</option>`).join('');
+}
+
+/* Digits only, capped at ten, judged on every keystroke.
+   The message appears as soon as the box holds something that cannot become a
+   phone number and clears itself the moment it can, so submit never says
+   anything the field has not already said. Blank is silent: "you have not
+   filled this in yet" is not a complaint worth making while someone is typing,
+   and the whole panel is optional anyway. */
+function clBindPhoneField(numId, hintId, ccId) {
+  const el = $(numId);
+  if (!el) return;
+  clDigitsOnly(el, CL_PHONE_DIGITS);
+
+  /* A PASTED NUMBER MAY BRING ITS COUNTRY CODE WITH IT, and dropping it would
+     be worse than useless — it would leave a plausible-looking wrong number.
+     "+91 98765 43210" is twelve digits: the box caps at ten, so without this
+     the last two would simply be cut off and the merchant would be none the
+     wiser. Split instead, and move the code into the picker beside it.
+
+     A PASTE EVENT, NOT the input handler, deliberately. The same arithmetic run
+     on every keystroke would see the eleventh digit typed into a full box, find
+     a leading "1", and silently reassign the number to the United States. A
+     paste is the only moment a whole number arrives at once, and it is the only
+     moment this should fire. Anything the split does not recognise falls
+     through to the ordinary digits-only path, unchanged. */
+  el.addEventListener('paste', e => {
+    const pasted = clDigits(e.clipboardData?.getData('text') || '');
+    if (pasted.length <= CL_PHONE_DIGITS) return;
+    const split = splitDialCode(pasted);
+    if (split.number.length !== CL_PHONE_DIGITS) return;
+    e.preventDefault();
+    el.value = split.number;
+    const cc = ccId && $(ccId);
+    if (cc && [...cc.options].some(o => o.value === split.code)) cc.value = split.code;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const judge = () => {
+    const digits = clDigits(el.value);
+    const short = digits.length > 0 && digits.length < CL_PHONE_DIGITS;
+    el.classList.toggle('cl-input-err', short);
+    const hint = $(hintId);
+    if (!hint) return;
+    hint.textContent = short
+      ? `${digits.length} of ${CL_PHONE_DIGITS} digits.`
+      : CL_PHONE_HINT;
+    hint.classList.toggle('cl-hint-err', short);
+  };
+  el.addEventListener('input', judge);
+  el.addEventListener('blur', judge);
+}
+
+/* The two controls, back as the one digits string the API stores. Empty when
+   the number box is empty — a country code on its own is not a phone number,
+   and sending "91" would be a contact nobody can call.
+
+   AND EMPTY WHEN THE NUMBER IS THE WRONG LENGTH, which is the half that keeps
+   clReviewContact honest. That panel tells the merchant a short number means
+   "this contact will not be attached"; if a seven-digit number were sent
+   anyway the note would be describing something that did not happen, and the
+   desk would hold a number it cannot dial. The rule is stated in one place and
+   obeyed in the same place. */
+function clPhoneValue(ccId, numId) {
+  const digits = clDigits($(numId)?.value);
+  if (digits.length !== CL_PHONE_DIGITS) return '';
+  return `${clDigits($(ccId)?.value) || defaultDialCode()}${digits}`;
+}
+
+/* Ten digits, or nothing. Blank is always fine — both numbers are optional —
+   so this only judges a value that is actually there. Marks the box and returns
+   the sentence, or null.
+
+   It does NOT move the focus. It used to, back when it was part of a refusal
+   that sent the merchant to the offending box; it is now called to describe a
+   contact that will not be attached, and stealing the caret out from under
+   someone mid-sentence to make a remark is not the same thing at all. */
 function clFlagPhoneLength(el, what) {
   if (!el) return null;
   const digits = clDigits(el.value);
   if (!digits) return null;
-  if (digits.length >= 7 && digits.length <= 15) return null;
-  el.style.borderColor = 'var(--cl-coral-dark)';
-  el.focus();
-  return `That ${what} is ${digits.length} digit${digits.length === 1 ? '' : 's'} — `
-    + 'a phone number is between 7 and 15.';
+  if (digits.length === CL_PHONE_DIGITS) return null;
+  el.classList.add('cl-input-err');
+  /* A clause, not a sentence — clReviewContact joins these with "and", so a
+     fragment that reads on its own inside a list is what is wanted here. */
+  return `the ${what} is ${digits.length} digit${digits.length === 1 ? '' : 's'}, `
+    + `not ${CL_PHONE_DIGITS}`;
 }
 
 /* Every non-digit stripped. Used both when a stored contact is rendered back
@@ -1408,8 +1628,10 @@ function clDigits(value) {
 function clContactPayload() {
   const name = ($('clBrContactName').value || '').trim();
   const email = ($('clBrContactEmail').value || '').trim();
-  const phone = clDigits($('clBrContactPhone').value);
-  const alt = clDigits($('clBrContactAlt').value);
+  /* Country code and number rejoined — the same digits string this field has
+     always sent, so nothing downstream had to change for the picker. */
+  const phone = clPhoneValue('clBrContactPhoneCC', 'clBrContactPhone');
+  const alt = clPhoneValue('clBrContactAltCC', 'clBrContactAlt');
   if (!email || !phone) return undefined;
   return {
     name: name || undefined,
@@ -1428,8 +1650,10 @@ async function clSubmitBookingRequest(finalize) {
 
   const intl = clIsInternational(enquiry);
 
-  const contactProblem = clFlagMissingContact();
-  if (contactProblem) return clMsg(msg, contactProblem, 'err');
+  /* Not a gate. The contact panel is optional in full — an incomplete one is
+     left off the payload and reported in the panel, and the booking proceeds.
+     See clReviewContact. */
+  clReviewContact();
 
   /* A GROUP BOOKING SENDS ITS MANIFEST ID, NOT A PASSENGER ARRAY.
      Every check below reads the traveller cards, and a group booking has none

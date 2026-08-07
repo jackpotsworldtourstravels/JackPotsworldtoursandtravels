@@ -187,8 +187,13 @@ CASES = [
     ("passenger count not a number", {"Adults": "many"}, "must be a whole number"),
     ("name has no surname", {"Passenger Name": "Prince"}, "first name and a surname"),
     ("gender unrecognised", {"Gender": "Yes"}, "not a valid Gender"),
+    # SIX CLEAR MONTHS after travel, not merely "after travel" (2026-08-07).
+    # `FUTURE + 30 days` used to import clean; it is now short of the rule, and
+    # that is the point of the case.
+    ("passport expires inside six months of travel",
+     {"Passport Expiry": FUTURE + datetime.timedelta(days=30)}, "at least 6 months"),
     ("passport expires before travel",
-     {"Passport Expiry": FUTURE - datetime.timedelta(days=1)}, "before the Travel Date"),
+     {"Passport Expiry": FUTURE - datetime.timedelta(days=1)}, "at least 6 months"),
 ]
 for label, override, expect in CASES:
     r = track(upload(sheet("one_way_group", [row(**override)])))
@@ -311,8 +316,19 @@ r = track(upload(sheet("round_trip_group", [
            "Return Date": FUTURE - datetime.timedelta(days=1)}),
 ]), "round_trip_group"))
 check("a return before departure is faulted",
-      any("after the Travel Date" in e["message"] for e in r.json()["imported"]["errors"]),
+      any("before the Travel Date" in e["message"] for e in r.json()["imported"]["errors"]),
       r.text[:160])
+
+# ...but the SAME DAY is a legitimate round trip and must import cleanly. This
+# is the half of the rule the "after the Travel Date" wording used to refuse.
+r = track(upload(sheet("round_trip_group", [
+    row(**{"Passenger Name": "Same Day", "Passport Number": "RT-4",
+           "Return Date": FUTURE}),
+]), "round_trip_group"))
+check("a same-day return is accepted",
+      r.status_code == 201
+      and not any("Return Date" in e["message"] for e in r.json()["imported"]["errors"]),
+      r.text[:200])
 
 
 # ---------------------------------------------------------------------------

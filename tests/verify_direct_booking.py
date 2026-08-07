@@ -185,6 +185,19 @@ if r.status_code == 201:
           (rt.get("details") or {}).get("return_preferred_time") == "18:45",
           str((rt.get("details") or {}).get("return_preferred_time")))
 
+# A SAME-DAY RETURN IS A ROUND TRIP. The rule was ``return_date <= travel_date``
+# until 2026-08-07, which refused the morning-out/evening-back itinerary and
+# made the merchant raise two one-way requests for one journey. Only a return
+# genuinely earlier than the departure is refused now — which is what the
+# ``ck_sr_date_order`` check constraint had always said.
+r = create(trip_type="round_trip", return_date=str(TRAVEL), return_preferred_time="21:00")
+check("a same-day return is accepted", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+
+r = create(trip_type="round_trip",
+           return_date=str(TRAVEL - datetime.timedelta(days=1)), return_preferred_time="21:00")
+check("a return BEFORE the departure is still refused", r.status_code == 422,
+      f"{r.status_code} {r.text[:200]}")
+
 
 # ------------------------------------------------------------ 3. authorisation
 print("\n=== 3. Only a merchant can raise one ===")
@@ -203,11 +216,16 @@ print("\n=== 4. Submitting is no easier than on the enquiry-led path ===")
 # The rules used to be reached by loading the parent and checking its type. A
 # direct booking has no parent, so if the predicate were not the track marker
 # these would all quietly pass.
+# THE CONTACT IS OPTIONAL (2026-08-07). This asserted a refusal until the
+# change request that made the panel genuinely optional — the merchant form had
+# described it as optional, and promised the account's own details as the
+# fallback, for some time before the server agreed. A domestic booking with a
+# named passenger and no contact is now a complete submission.
 r = create(contact=None)
 nc = r.json()["id"]
 r = requests.post(f"{BASE}/api/requests/{nc}/submit", headers=H(mtok))
-check("a booking with no contact is refused at submit", r.status_code == 400,
-      f"{r.status_code} {r.text[:200]}")
+check("a booking with no contact at all is accepted at submit",
+      r.status_code in (200, 201), f"{r.status_code} {r.text[:200]}")
 
 r = create(destination="DXB", destination_city="Dubai", airline="Emirates",
            flight_number="EK525", international=True)
@@ -243,7 +261,13 @@ with SessionLocal() as db:
         "SELECT COUNT(*) FROM service_requests "
         "WHERE travel_details->>'direct_booking' = 'true'"), {}).scalar_one()
 
-r = create(submit=True, contact=None)
+# INCOMPLETE FOR THE PASSPORT REASON, not the contact one. This was
+# `create(submit=True, contact=None)` until the contact became optional
+# (2026-08-07) — which would now be a perfectly complete booking and would
+# prove nothing about the one-shot's rollback. An international sector with no
+# passport is the rule that still refuses.
+r = create(submit=True, destination="DXB", destination_city="Dubai",
+           airline="Emirates", flight_number="EK525", international=True)
 check("submit:true still refuses an incomplete booking", r.status_code == 400,
       f"{r.status_code} {r.text[:200]}")
 
@@ -259,7 +283,18 @@ check("...and leaves NO booking behind — a refused one-shot creates nothing",
 
 # The two-step path is the one that keeps an incomplete draft, and must still:
 # the merchant has typed a form and is being told what is missing from it.
-survivor = requests.get(f"{BASE}/api/requests/{nc}", headers=H(mtok))
+#
+# ON ITS OWN BOOKING, raised here rather than reusing one from section 4. This
+# used to lean on `nc` — the no-contact booking — being left a draft by its
+# refusal, and that refusal is gone (the contact is optional since 2026-08-07).
+# An international sector with no passport is the rule that still refuses, so
+# that is what a draft is now made to survive.
+r = create(destination="DXB", destination_city="Dubai", airline="Emirates",
+           flight_number="EK525", international=True)
+refused = r.json()["id"]
+r = requests.post(f"{BASE}/api/requests/{refused}/submit", headers=H(mtok))
+check("a refused submit answers 400", r.status_code == 400, f"{r.status_code} {r.text[:150]}")
+survivor = requests.get(f"{BASE}/api/requests/{refused}", headers=H(mtok))
 check("...while a two-step draft survives its own refused submit",
       survivor.status_code == 200 and survivor.json()["request"]["status"] == "draft",
       f"{survivor.status_code} {survivor.text[:150]}")

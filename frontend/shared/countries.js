@@ -203,3 +203,94 @@ function searchNationalities(query, limit = 8) {
     .filter(r => !seen.has(r.country));
   return [...direct, ...byCountry].slice(0, limit);
 }
+
+
+/* ===========================================================================
+   DIALLING CODES — the country-code half of a phone field.
+   ===========================================================================
+   A SEPARATE TABLE FROM WORLD_COUNTRIES, on purpose. That list exists to name
+   a passport's issuing country and covers 130-odd of them; this one exists so
+   a merchant can pick the prefix in front of a contact number, and the useful
+   set is much smaller — the markets this desk actually sells to. Merging them
+   would mean either scrolling a 130-row dropdown to reach "+91" or carrying a
+   `dial` key that is null on most rows.
+
+   The code is stored WITHOUT the plus, because that is the shape the API has
+   always held: `BookingContact.phone` is a digits string, and every reader
+   (invoices, the Booking Operations desk, the airline handover) already prints
+   it that way. The plus is presentation and lives in the label only.
+
+   `default: true` marks the one selected when there is nothing stored to
+   restore — India, which is the overwhelming majority of this platform's
+   traffic. Nothing here narrows what the API accepts: a number already stored
+   under a code not on this list still renders (see clSplitDialCode, which
+   falls back to showing the whole stored value in the number box). */
+const DIAL_CODES = [
+  { code: '91', country: 'India', default: true },
+  { code: '971', country: 'United Arab Emirates' },
+  { code: '966', country: 'Saudi Arabia' },
+  { code: '974', country: 'Qatar' },
+  { code: '968', country: 'Oman' },
+  { code: '965', country: 'Kuwait' },
+  { code: '973', country: 'Bahrain' },
+  { code: '65', country: 'Singapore' },
+  { code: '60', country: 'Malaysia' },
+  { code: '66', country: 'Thailand' },
+  { code: '94', country: 'Sri Lanka' },
+  { code: '977', country: 'Nepal' },
+  { code: '880', country: 'Bangladesh' },
+  { code: '960', country: 'Maldives' },
+  { code: '44', country: 'United Kingdom' },
+  { code: '1', country: 'United States / Canada' },
+  { code: '61', country: 'Australia' },
+  { code: '64', country: 'New Zealand' },
+  { code: '49', country: 'Germany' },
+  { code: '33', country: 'France' },
+  { code: '39', country: 'Italy' },
+  { code: '34', country: 'Spain' },
+  { code: '31', country: 'Netherlands' },
+  { code: '41', country: 'Switzerland' },
+  { code: '46', country: 'Sweden' },
+  { code: '47', country: 'Norway' },
+  { code: '353', country: 'Ireland' },
+  { code: '351', country: 'Portugal' },
+  { code: '90', country: 'Turkey' },
+  { code: '20', country: 'Egypt' },
+  { code: '27', country: 'South Africa' },
+  { code: '254', country: 'Kenya' },
+  { code: '234', country: 'Nigeria' },
+  { code: '81', country: 'Japan' },
+  { code: '82', country: 'South Korea' },
+  { code: '86', country: 'China' },
+  { code: '852', country: 'Hong Kong' },
+  { code: '84', country: 'Vietnam' },
+  { code: '63', country: 'Philippines' },
+  { code: '62', country: 'Indonesia' },
+  { code: '7', country: 'Russia / Kazakhstan' },
+  { code: '55', country: 'Brazil' },
+  { code: '52', country: 'Mexico' },
+];
+
+/** The code selected when nothing is stored — "91". */
+function defaultDialCode() {
+  return (DIAL_CODES.find(d => d.default) || DIAL_CODES[0]).code;
+}
+
+/** Split a stored digits-only number into its dialling code and the rest.
+ *
+ * LONGEST CODE FIRST, which is the whole reason this is not a one-liner: "91"
+ * and "971" are both real codes and a naive scan would read every Emirati
+ * number as an Indian one with a leading 1. Falls back to the default code and
+ * the whole stored value in the number box when nothing matches — an existing
+ * contact saved before this field had a picker is then shown intact rather than
+ * silently truncated.
+ */
+function splitDialCode(stored) {
+  const digits = String(stored ?? '').replace(/\D+/g, '');
+  if (!digits) return { code: defaultDialCode(), number: '' };
+  const match = [...DIAL_CODES]
+    .sort((a, b) => b.code.length - a.code.length)
+    .find(d => digits.startsWith(d.code) && digits.length > d.code.length);
+  if (!match) return { code: defaultDialCode(), number: digits };
+  return { code: match.code, number: digits.slice(match.code.length) };
+}

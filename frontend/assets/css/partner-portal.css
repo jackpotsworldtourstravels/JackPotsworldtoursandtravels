@@ -93,9 +93,21 @@ h1,h2{font-weight:800; color:var(--text-primary); letter-spacing:-.01em;}
 
 .form-field{margin-bottom:16px; max-width:340px;}
 .form-field label{display:block; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:6px;}
+/* `background-color`, not the `background` shorthand. The shorthand also resets
+   `background-image`, and in the Super Admin portal — which loads this file and
+   then jp-ds.css — that wiped the dropdown caret jp-ds paints on `select`,
+   while jp-ds's `appearance:none` still removed the native one. The result was
+   a dropdown with no arrow at all, in both themes. This selector is (0,1,1) and
+   jp-ds's `select` is (0,0,1), so the shorthand won and nothing above it could
+   put the caret back. */
 .form-field input, .form-field select, .form-field textarea{
-  width:100%; padding:11px 13px; border-radius:10px; border:1.5px solid var(--border-color); font-size:14px; color:var(--text-primary); background:var(--card-bg); transition:border-color .15s var(--ease), box-shadow .15s var(--ease);
+  width:100%; padding:11px 13px; border-radius:10px; border:1.5px solid var(--border-color); font-size:14px; color:var(--text-primary); background-color:var(--card-bg); transition:border-color .15s var(--ease), box-shadow .15s var(--ease);
 }
+/* Room for that caret. The padding above is (0,1,1) too, so jp-ds's own
+   `padding-right:34px` never reached these and the longest option ran under the
+   arrow. Harmless in the Premium merchant portal, which loads this file without
+   jp-ds and keeps the native arrow — that sits in the padding either way. */
+.form-field select{padding-right:32px;}
 .form-field input:hover, .form-field select:hover{border-color:rgba(10,46,82,0.25);}
 .form-field input:focus, .form-field select:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft);}
 .form-field input:disabled{opacity:.55;}
@@ -224,7 +236,10 @@ h1,h2{font-weight:800; color:var(--text-primary); letter-spacing:-.01em;}
 .filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px;}
 .filter-bar input[type="text"], .filter-bar input[type="date"]{padding:9px 12px; border-radius:10px; border:1.5px solid var(--border-color); font-size:13px; background:var(--card-bg); color:var(--text-primary); min-width:150px; transition:border-color .15s var(--ease);}
 .filter-bar input:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft);}
-.status-select{padding:8px 10px; border-radius:8px; border:1.5px solid var(--border-color); font-size:12.5px; background:var(--card-bg); color:var(--text-primary);}
+/* `background-color`, not the shorthand: the shorthand resets the dropdown
+   caret jp-ds.css paints as a background image on `select`. This file is loaded
+   by the Super Admin portal, which takes its caret from there. */
+.status-select{padding:8px 10px; padding-right:30px; border-radius:8px; border:1.5px solid var(--border-color); font-size:12.5px; background-color:var(--card-bg); color:var(--text-primary);}
 
 /* ---------- Ticket Enquiry ---------- */
 .te-trip-type{display:inline-flex; background:var(--hover-bg); border-radius:var(--radius-pill); padding:4px; gap:2px; margin-bottom:18px;}

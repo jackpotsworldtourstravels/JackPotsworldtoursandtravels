@@ -1756,11 +1756,18 @@ function clScOpenDrawer() {
 
   drawer.hidden = false;
   drawer.innerHTML = `
+    <!-- NO SECOND PAGE HEADER. This bar used to carry an 18px "Start a
+         conversation" heading over a sentence of explanation — the same weight
+         and shape as the Support Center's own page header, three inches above
+         it, so opening the composer read as though the page had reloaded into
+         a narrower copy of itself. The panel is doing one thing and the button
+         that opened it already said what that is; all it needs is a way out.
+         The heading survives as the drawer's accessible name, which is what
+         aria-labelledby on the aside points at, so a screen reader still
+         announces the dialog by name.
+         (No backticks in this comment — it is inside a template literal.) -->
     <div class="cl-sc-drawer-head">
-      <div>
-        <h2 id="clScDrawerTitle">Start a conversation</h2>
-        <p>Tell us what has happened. That alone opens a tracked ticket.</p>
-      </div>
+      <h2 id="clScDrawerTitle" class="cl-sr-only">Start a conversation</h2>
       <button type="button" class="cl-sc-x" id="clScDrawerX" aria-label="Close">
         ${clIco('x', { size: 17 })}
       </button>

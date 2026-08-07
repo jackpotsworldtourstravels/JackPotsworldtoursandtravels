@@ -556,6 +556,11 @@ function clAddDays(iso, days) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/* The resting text under the return-date box, and the one place it is written.
+   clValidateReturnDate puts it back after clearing an error, so a literal in
+   two places would let the box end up describing a rule it is not enforcing. */
+const CL_RETURN_DATE_HINT = 'On or after the departure date — a same-day return is fine.';
+
 /* Cabin classes offered on the form (CR-5).
    ===========================================================================
    Was a free-text box. The four below are what airlines actually sell as a
@@ -735,10 +740,13 @@ function clOpenEnquiryForm(direct = false) {
       <div class="cl-form cl-form-2">
         <div class="cl-field">
           <label for="clEnqReturnDate">Return date<span class="cl-req">*</span></label>
-          <input type="date" id="clEnqReturnDate" min="${clAddDays(today, 1)}">
+          <!-- The floor is the departure date, not the day after it: a
+               same-day return is allowed. clSyncReturnMin moves it as the
+               outbound date changes. -->
+          <input type="date" id="clEnqReturnDate" min="${today}">
           <!-- Answered the moment the field is left, not at submit — see
                clValidateReturnDate. -->
-          <small id="clEnqReturnDateHint">Must be after the departure date.</small>
+          <small id="clEnqReturnDateHint">${CL_RETURN_DATE_HINT}</small>
         </div>
         <div class="cl-field">
           <label for="clEnqReturnTimeHour">Return preferred time<span class="cl-req">*</span></label>
@@ -827,11 +835,16 @@ function clOpenEnquiryForm(direct = false) {
          omitting it there leaves this value standing.
 
          Grouped as it is typed: 1000 becomes 1,000. See clBindMoneyField.
+
+         NO SECTION HEADING. The legend above this used to read "Your
+         customer's fare", which said the same thing as the label a line below
+         it and made a one-field section look like a new part of the form. The
+         currency moved into the label instead, so the field states what it
+         wants on its own: Client Fare (INR).
          (No backticks in this comment — it is inside a template literal.) -->
-    <div class="cl-form-legend">Your customer&rsquo;s fare</div>
-    <div class="cl-form cl-form-2">
+    <div class="cl-form cl-form-2" style="margin-top:26px;">
       <div class="cl-field">
-        <label for="clEnqClientFare">Client Fare</label>
+        <label for="clEnqClientFare">Client Fare (INR)</label>
         <!-- TEXT, NOT number, and only because of the grouping. A number input
              cannot hold "20,000" — the browser reads a comma as invalid and
              hands back "" — so the separators the spec asks for are impossible
@@ -1667,16 +1680,20 @@ function clSyncReturnRoute() {
   clPaintRoute('clEnqReturnRoute', clEnqForm.to, clEnqForm.from);
 }
 
-/* A return cannot be on or before the departure, so the picker's floor moves
-   with the outbound date and an already-chosen invalid date is cleared rather
-   than left sitting there looking accepted. */
+/* A return cannot be BEFORE the departure, so the picker's floor moves with the
+   outbound date and an already-chosen invalid date is cleared rather than left
+   sitting there looking accepted.
+
+   THE FLOOR IS THE DEPARTURE DATE ITSELF, not the day after. A same-day return
+   is a real journey — the morning flight out and the evening flight back is one
+   of the commonest corporate itineraries there is — and refusing it made the
+   merchant raise two one-way enquiries for one trip. */
 function clSyncReturnMin() {
   const dep = $('clEnqDate').value;
   const ret = $('clEnqReturnDate');
   if (!dep || !ret) return;
-  const floor = clAddDays(dep, 1);
-  ret.min = floor;
-  if (ret.value && ret.value < floor) ret.value = '';
+  ret.min = dep;
+  if (ret.value && ret.value < dep) ret.value = '';
 }
 
 /* THE RETURN DATE IS JUDGED WHEN IT IS LEFT, NOT AT SUBMIT.
@@ -1702,19 +1719,17 @@ function clValidateReturnDate() {
   const dep = $('clEnqDate')?.value || '';
   const value = ret.value || '';
 
+  /* ONE RULE, AND SAME-DAY PASSES IT. The return may not be EARLIER than the
+     departure; equal is fine. The separate "not the same day" branch that used
+     to sit here is gone with the day-after floor in clSyncReturnMin. */
   let problem = null;
   if (hasReturn && value && dep && value < dep) {
     problem = 'The return date cannot be before the departure date.';
-  } else if (hasReturn && value && dep && value === dep) {
-    /* Same-day is refused by `min` (departure + 1) and by submit, so it is
-       named separately — "cannot be before" would read as though it were
-       allowed. */
-    problem = 'The return date must be after the departure date, not the same day.';
   }
 
   ret.classList.toggle('cl-input-err', !!problem);
   if (hint) {
-    hint.textContent = problem || 'Must be after the departure date.';
+    hint.textContent = problem || CL_RETURN_DATE_HINT;
     hint.classList.toggle('cl-hint-err', !!problem);
   }
   return !problem;
@@ -2197,7 +2212,7 @@ async function clSubmitEnquiry() {
        stated once rather than two that can drift. */
     if (!clValidateReturnDate()) {
       return fail($('clEnqReturnDateHint')?.textContent
-        || 'The return date must be after the departure date.', 'clEnqReturnDate');
+        || 'The return date cannot be before the departure date.', 'clEnqReturnDate');
     }
     returnTime = clReadTimeField('clEnqReturnTime') || f.retTime;
   }

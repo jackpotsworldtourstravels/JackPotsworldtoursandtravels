@@ -297,10 +297,22 @@ def main():
     check("one traveller now has no passport document at all",
           p1 not in passport_coverage() and p2 in passport_coverage(), str(passport_coverage()))
 
-    # blank the contact and confirm it is required
-    requests.put(f"{BASE}/api/requests/{rid}", headers=H(mtok), json={"contact": {}})
-    r = requests.post(SUB, headers=H(mtok))
-    check("missing contact -> 400", r.status_code == 400 and "contact" in r.text.lower(), f"{r.status_code} {r.text[:250]}")
+    # THE CONTACT IS OPTIONAL (2026-08-07). This used to blank the contact,
+    # submit, and expect a 400 — while the merchant form described the panel as
+    # optional and promised to fall back to the account's details. The rule was
+    # removed rather than the promise.
+    #
+    # NOT re-asserted by submitting THIS booking. The old check relied on the
+    # refusal leaving the request a draft; now that a blank contact is accepted,
+    # submitting here would carry `rid` out of draft and every step below —
+    # which is the passenger-cascade sequence this script exists for — would
+    # fail on a request it can no longer edit. The acceptance is proved on a
+    # throwaway booking in verify_direct_booking.py instead. All that is checked
+    # here is that a blank contact still SAVES, which is the state the old
+    # refusal made unreachable.
+    r = requests.put(f"{BASE}/api/requests/{rid}", headers=H(mtok), json={"contact": {}})
+    check("a booking may hold no contact at all", r.status_code == 200,
+          f"{r.status_code} {r.text[:250]}")
     requests.put(f"{BASE}/api/requests/{rid}", headers=H(mtok),
                  json={"contact": {"name": "Arjun M", "email": "arjun@example.com", "phone": "+919812345678"}})
 

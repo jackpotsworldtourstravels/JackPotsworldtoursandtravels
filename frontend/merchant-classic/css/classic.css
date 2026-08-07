@@ -749,6 +749,12 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
   display:flex; align-items:center; gap:5px;
 }
 .cl-field label .cl-req{color:var(--cl-orange); margin-left:1px; font-size:13px; line-height:1;}
+/* The accent is a text-safe 4.62:1 on white and only 3.76:1 on the dark
+   surface, so the required marker — which is text, and the only thing saying a
+   field cannot be skipped — fell under AA in dark mode alone. A lighter tint of
+   the same hue takes it to 6.39:1 without changing what the marker looks like
+   it means. Light mode is untouched. */
+:root[data-theme="dark"] .cl-field label .cl-req{color:#A78BFA;}
 .cl-field small{
   font-size:11.5px; color:var(--cl-text-muted); font-weight:500; line-height:1.45;
 }
@@ -767,15 +773,19 @@ input[type=search], select, textarea{
 input::placeholder, textarea::placeholder{color:var(--cl-text-muted); opacity:.8; font-weight:500;}
 textarea{min-height:96px; resize:vertical; line-height:1.6; padding-top:12px;}
 
-/* A caret we control, so the field looks the same in every browser. */
-select{
-  cursor:pointer; padding-right:38px;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236C7F99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat:no-repeat; background-position:right 13px center;
-}
-:root[data-theme="dark"] select{
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238496B2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-}
+/* THE CARET IS jp-ds.css's, NOT THIS FILE'S — and that is the fix for the
+   tiled-chevron artifact in dark mode, not merely a tidy-up.
+   ===========================================================================
+   This file used to draw its own single-layer chevron here, and a dark-mode
+   override of it at `:root[data-theme="dark"] select` — specificity (0,2,1).
+   jp-ds.css draws a TWO-layer triangle with two background-positions and two
+   background-sizes. A one-layer image under a two-layer position list is a
+   mismatch CSS resolves by truncation, so whichever file won `background-image`
+   was left wearing the other's geometry. In dark mode that meant a 14px chevron
+   with `repeat` and `0% 0%` — tiled edge to edge across the control.
+   One caret, defined once, themed by `--jp-text-muted`, so the two can no
+   longer disagree. Only `cursor` stays here. */
+select{cursor:pointer;}
 :root[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.6);}
 
 input:hover:not(:disabled):not([readonly]),
@@ -843,7 +853,12 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
    so a screen reader hears "Preferred departure time — hour" and not "combo
    box" three times. */
 .cl-timesel{display:flex; align-items:center; gap:6px; min-width:0;}
-.cl-timesel select{min-width:0; padding-right:30px; background-position:right 9px center;}
+/* No `background-position` here any more: the caret is jp-ds's two-layer
+   triangle and a single position would collapse both halves onto one point.
+   (This rule matches nothing today — the time field has been two text inputs
+   since the 12-hour selects were replaced — but a stale override that breaks
+   the shared caret is not worth leaving loaded.) */
+.cl-timesel select{min-width:0; padding-right:30px;}
 .cl-timesel-h, .cl-timesel-m{flex:1 1 62px; text-align:center;}
 .cl-timesel-p{flex:1 1 76px;}
 .cl-timesel-sep{
@@ -887,6 +902,20 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 .cl-input-err:focus{box-shadow:0 0 0 3px rgba(220,38,38,.14) !important;}
 .cl-hint-err{color:var(--cl-danger) !important; font-weight:700;}
 
+/* A phone number: the dialling code picked, the number typed.
+   `min-width:0` on the number is not optional — the base control rule sets
+   `width:100%`, and a flex item honours that literally unless it is allowed to
+   shrink below its content, which is what made the date filters stretch to
+   435px and stack (see the Wallet History note). The code column is sized to
+   fit "+971 United Arab Emirates" collapsed, not expanded: a select shows only
+   the chosen option, so the label length costs nothing at rest. */
+.cl-phone{display:flex; gap:8px; align-items:stretch;}
+.cl-phone-cc{flex:0 0 128px; min-width:0;}
+.cl-phone-num{flex:1 1 auto; min-width:0;}
+@media (max-width:480px){
+  .cl-phone-cc{flex-basis:104px;}
+}
+
 /* Checkbox / radio */
 .cl-check{
   display:flex; align-items:center; gap:10px;
@@ -914,13 +943,20 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
   margin-top:22px; padding-top:20px; border-top:1px solid var(--cl-line-2);
 }
 
-/* A sub-heading between field groups inside a form. */
+/* A sub-heading between field groups inside a form.
+
+   NO RULE ABOVE IT (2026-08-07). This carried `border-top:1px solid` and drew a
+   full-width line across every form between one section and the next. The
+   headings already separate the groups — the line on top of them cut a single
+   form into what looked like several — so it is gone from all three portals in
+   one pass. The 20px of padding stays, deliberately: it is holding the spacing
+   the line used to sit in, so nothing above or below moves. */
 .cl-form-legend{
-  margin:26px 0 14px; padding-top:20px; border-top:1px solid var(--cl-line-2);
+  margin:26px 0 14px; padding-top:20px;
   font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em;
   color:var(--cl-text-muted);
 }
-.cl-form-legend:first-child{margin-top:0; padding-top:0; border-top:none;}
+.cl-form-legend:first-child{margin-top:0; padding-top:0;}
 
 /* Filter bar. Sits at the head of a panel, above its table. */
 .cl-toolbar{
@@ -2854,15 +2890,21 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 }
 .cl-sc-drawer.open{transform:none;}
 .cl-sc-drawer[hidden]{display:none;}
+/* Just a way out, sitting above the composer. The visible heading and its
+   sentence of explanation are gone — they restated the page header the drawer
+   opens on top of — so this is a close button and the padding that keeps it off
+   the edge, not a header. `justify-content:flex-end` because the button is the
+   only thing left in it. */
 .cl-sc-drawer-head{
-  display:flex; align-items:flex-start; gap:12px; flex-shrink:0;
-  padding:20px 20px 16px; border-bottom:1px solid var(--cl-line-2);
+  display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-shrink:0;
+  padding:14px 16px 6px;
 }
-.cl-sc-drawer-head h2{font-size:18px; font-weight:800; color:var(--cl-text); margin:0;}
-.cl-sc-drawer-head p{
-  margin:4px 0 0; font-size:12.5px; font-weight:500; line-height:1.55; color:var(--cl-text-2);
+/* Kept for a screen reader — it is the drawer's accessible name (the aside's
+   aria-labelledby points at it) — and taken out of the visual flow. */
+.cl-sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;
 }
-.cl-sc-drawer-head > div{flex:1; min-width:0;}
 .cl-sc-drawer-body{flex:1; overflow-y:auto; padding:18px 20px; min-height:0;}
 .cl-sc-drawer-foot{
   display:flex; gap:10px; justify-content:flex-end; flex-shrink:0;

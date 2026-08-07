@@ -711,11 +711,27 @@ table tbody tr:last-child td{border-bottom:none;}
    7. FORMS
    ========================================================================== */
 
+/* `background-color`, NEVER the `background` shorthand, on any rule that reaches
+   a bare `select` — and this is not a style preference, it is the bug that put
+   a row of tiled chevrons across every dropdown in dark mode.
+   ===========================================================================
+   The shorthand resets `background-image`, `-repeat`, `-position` and `-size`
+   to their initial values. This selector list contains `.cl-field select`,
+   which is (0,1,1) — higher than the `select{…}` caret rule below (0,0,1) — so
+   it won BOTH and every dropdown lost its caret. In dark mode classic.css's
+   `:root[data-theme="dark"] select` is (0,2,1), high enough to put a
+   `background-image` back, but `repeat` and `0% 0%` stayed reset: a 14px
+   chevron TILED across the whole control, which is what the "^^^^^^" in the
+   bug report was. Light mode merely lost the caret, so nobody caught it.
+   Same family as the merchant primary button that rendered white in 2026-08:
+   an equal-or-higher-specificity shorthand quietly clearing longhands set
+   elsewhere. Four files had it — this one, admin.css (three rules) and
+   partner-portal.css — and all five are `background-color` now. */
 .form-field input, .form-field select, .form-field textarea,
 .cl-field input, .cl-field select, .cl-field textarea,
 input[type=text], input[type=email], input[type=password], input[type=number],
 input[type=date], input[type=search], input[type=tel], select, textarea{
-  background:var(--jp-surface-2);
+  background-color:var(--jp-surface-2);
   color:var(--jp-text);
   border:1px solid var(--jp-border);
   border-radius:var(--jp-r-sm);
@@ -725,10 +741,12 @@ input[type=date], input[type=search], input[type=tel], select, textarea{
 input:hover:not(:disabled):not([readonly]), select:hover:not(:disabled), textarea:hover:not(:disabled){
   border-color:var(--jp-border-strong);
 }
+/* `background-color` here for the same reason as the rule above: the shorthand
+   made the caret vanish the moment a dropdown took focus. */
 .form-field input:focus, .form-field select:focus, .form-field textarea:focus,
 input:focus, select:focus, textarea:focus{
   outline:none;
-  background:var(--jp-surface);
+  background-color:var(--jp-surface);
   border-color:var(--jp-accent);
   box-shadow:var(--jp-focus);
 }
@@ -1600,24 +1618,25 @@ table{ width:100%; }
 .jp-admin .modal-card .form-section-title{
   margin:32px 0 16px;
   padding-top:20px;
-  border-top:1px solid var(--jp-border);
   font-size:12px; font-weight:800;
   text-transform:uppercase; letter-spacing:.05em;
   color:var(--jp-text-muted);
 }
 .jp-admin .modal-card .form-section-title:first-child{
-  margin-top:0; padding-top:0; border-top:none;
+  margin-top:0; padding-top:0;
 }
 /* …but a title that is only first inside a `.form-section` WRAPPER is not the
    first section in the form — it is the second or third, and it still needs its
-   rule and its space above. Without this the payment dialog's swapped method
-   section lost its divider the moment it was put in a wrapper so heading and
-   grid could be replaced together. Higher specificity than the rule above, so
-   it wins regardless of order. */
+   space above. Without this the payment dialog's swapped method section lost
+   its separation the moment it was put in a wrapper so heading and grid could
+   be replaced together. Higher specificity than the rule above, so it wins
+   regardless of order.
+
+   The `border-top` this used to carry went with every other in-form divider on
+   2026-08-07; only the spacing does the separating now. */
 .jp-admin .modal-card .form-section > .form-section-title:first-child{
   margin-top:32px;
   padding-top:20px;
-  border-top:1px solid var(--jp-border);
 }
 
 /* ---- footer --------------------------------------------------------------
@@ -1836,13 +1855,12 @@ table{ width:100%; }
    18/10px, so a form does not change shape when it moves between the two. */
 .jp-admin .panel .form-section-title{
   margin:32px 0 16px; padding-top:20px;
-  border-top:1px solid var(--jp-border);
   font-size:12px; font-weight:800;
   text-transform:uppercase; letter-spacing:.05em;
   color:var(--jp-text-muted);
 }
 .jp-admin .panel .form-section-title:first-child{
-  margin-top:0; padding-top:0; border-top:none;
+  margin-top:0; padding-top:0;
 }
 
 

@@ -45,6 +45,7 @@ from app.services import (
     manager_approval,
     merchant_service,
     notification_service,
+    passport_rules,
 )
 
 #: Request types a merchant raises against a booking.
@@ -521,12 +522,23 @@ def _validate_classic_submission(request: ServiceRequest) -> None:
     """
     details = request.travel_details or {}
 
-    contact = details.get("contact") or {}
-    if not (contact.get("email") or "").strip() or not (contact.get("phone") or "").strip():
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="A contact email and phone are required before submitting this booking",
-        )
+    # THE CONTACT IS OPTIONAL (2026-08-07, by change request).
+    #
+    # A booking may be submitted with no contact panel filled in at all. This
+    # used to raise "A contact email and phone are required before submitting
+    # this booking", which made the panel mandatory in fact while the form said
+    # it was optional and its own note promised we would fall back to the
+    # merchant's account details. The desk holds those details against the
+    # merchant either way, which is what the note has always described.
+    #
+    # ``BookingContact`` is unchanged and still requires an email AND a phone
+    # whenever a contact object IS sent — a half-filled contact is not something
+    # the API can store — so the merchant portal leaves an incomplete panel off
+    # the payload and says so in the panel rather than blocking (see
+    # clContactPayload / clReviewContact in classic-booking.js). Every reader of
+    # ``travel_details["contact"]`` already copes with it being absent;
+    # ``invoice_service`` has read it as ``d.get("contact") or {}`` from the
+    # start.
 
     missing_names = [
         p.passenger_id for p in request.passengers
@@ -555,12 +567,31 @@ def _validate_classic_submission(request: ServiceRequest) -> None:
                     "international booking"
                 ),
             )
-        if p.passport_expiry and p.passport_expiry <= request.travel_date:
+        # SIX CLEAR MONTHS BEYOND TRAVEL, not merely "after the travel date".
+        #
+        # The old rule here was ``<= travel_date``, and the six-month figure
+        # lived alongside it as an ADVISORY warning on the scan panel only
+        # (``passport_ocr_service.assess_passport``). That split meant the
+        # platform knew a passport would be refused at the counter and let the
+        # booking through anyway — after which the money has moved and the
+        # remedy is a cancellation. Requested 2026-08-07: the six-month rule
+        # now refuses the submission, on every path that reaches this function.
+        #
+        # The figure and the arithmetic live in ``passport_rules`` — the same
+        # module the scan panel's assessment reads, so raising or lowering it
+        # moves both together, and a month end is clamped (31 Aug + 6 months is
+        # 28 or 29 Feb, never "31 Feb").
+        if p.passport_expiry and not passport_rules.is_long_enough(
+            p.passport_expiry, request.travel_date
+        ):
+            required_until = passport_rules.required_valid_until(request.travel_date)
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"{p.full_name}'s passport expires on {p.passport_expiry:%d %b %Y}, "
-                    "on or before the travel date"
+                    f"{p.full_name}'s passport expires on "
+                    f"{p.passport_expiry:%d %b %Y}. "
+                    f"{passport_rules.SIX_MONTH_MESSAGE} "
+                    f"It needs to run to {required_until:%d %b %Y} or later"
                 ),
             )
 

@@ -236,8 +236,15 @@ class EnquiryCreate(BaseModel):
         if has_return_leg:
             if self.return_date is None:
                 raise ValueError("A round trip needs a return date")
-            if self.return_date <= self.travel_date:
-                raise ValueError("Return date must be after the departure date")
+            # SAME DAY IS A VALID ROUND TRIP. The rule used to be ``<=``, which
+            # refused the out-and-back-in-a-day itinerary that is one of the
+            # commonest things a corporate desk books, and pushed the merchant
+            # into raising two one-way enquiries for one journey. Only a return
+            # genuinely EARLIER than the departure is refused — which is also
+            # exactly what ``ck_sr_date_order`` has always said in the database
+            # (``return_date >= travel_date``), so the two now agree.
+            if self.return_date < self.travel_date:
+                raise ValueError("Return date cannot be before the departure date")
         else:
             # A one-way enquiry that carries return details would store a
             # return leg nobody asked for, and ck_sr_date_order would then
