@@ -224,52 +224,105 @@ function searchNationalities(query, limit = 8) {
    restore — India, which is the overwhelming majority of this platform's
    traffic. Nothing here narrows what the API accepts: a number already stored
    under a code not on this list still renders (see clSplitDialCode, which
-   falls back to showing the whole stored value in the number box). */
+   falls back to showing the whole stored value in the number box).
+
+   `len` IS THE NATIONAL NUMBER LENGTH, WITHOUT THE CODE AND WITHOUT THE TRUNK
+   "0" — a number where the country has one, `[min, max]` where it genuinely
+   varies. This started life as a single global constant of 10, which is right
+   for India and wrong for most of the rest of this list: a UAE mobile is 9
+   digits and a Qatari number is 8, so the form refused numbers the desk dials
+   every day. Ranges are used only where a country really does vary (the UK's
+   9-digit landlines beside 10-digit mobiles, Germany's 10-and-11), because a
+   range wide enough to be safe everywhere would accept any typo. Where a code
+   is not on this list at all, `dialLengths` answers with a deliberately loose
+   fallback rather than guessing — see below. */
 const DIAL_CODES = [
-  { code: '91', country: 'India', default: true },
-  { code: '971', country: 'United Arab Emirates' },
-  { code: '966', country: 'Saudi Arabia' },
-  { code: '974', country: 'Qatar' },
-  { code: '968', country: 'Oman' },
-  { code: '965', country: 'Kuwait' },
-  { code: '973', country: 'Bahrain' },
-  { code: '65', country: 'Singapore' },
-  { code: '60', country: 'Malaysia' },
-  { code: '66', country: 'Thailand' },
-  { code: '94', country: 'Sri Lanka' },
-  { code: '977', country: 'Nepal' },
-  { code: '880', country: 'Bangladesh' },
-  { code: '960', country: 'Maldives' },
-  { code: '44', country: 'United Kingdom' },
-  { code: '1', country: 'United States / Canada' },
-  { code: '61', country: 'Australia' },
-  { code: '64', country: 'New Zealand' },
-  { code: '49', country: 'Germany' },
-  { code: '33', country: 'France' },
-  { code: '39', country: 'Italy' },
-  { code: '34', country: 'Spain' },
-  { code: '31', country: 'Netherlands' },
-  { code: '41', country: 'Switzerland' },
-  { code: '46', country: 'Sweden' },
-  { code: '47', country: 'Norway' },
-  { code: '353', country: 'Ireland' },
-  { code: '351', country: 'Portugal' },
-  { code: '90', country: 'Turkey' },
-  { code: '20', country: 'Egypt' },
-  { code: '27', country: 'South Africa' },
-  { code: '254', country: 'Kenya' },
-  { code: '234', country: 'Nigeria' },
-  { code: '81', country: 'Japan' },
-  { code: '82', country: 'South Korea' },
-  { code: '86', country: 'China' },
-  { code: '852', country: 'Hong Kong' },
-  { code: '84', country: 'Vietnam' },
-  { code: '63', country: 'Philippines' },
-  { code: '62', country: 'Indonesia' },
-  { code: '7', country: 'Russia / Kazakhstan' },
-  { code: '55', country: 'Brazil' },
-  { code: '52', country: 'Mexico' },
+  { code: '91', country: 'India', default: true, len: 10 },
+  { code: '971', country: 'United Arab Emirates', len: [8, 9] },
+  { code: '966', country: 'Saudi Arabia', len: 9 },
+  { code: '974', country: 'Qatar', len: 8 },
+  { code: '968', country: 'Oman', len: 8 },
+  { code: '965', country: 'Kuwait', len: 8 },
+  { code: '973', country: 'Bahrain', len: 8 },
+  { code: '65', country: 'Singapore', len: 8 },
+  { code: '60', country: 'Malaysia', len: [9, 10] },
+  { code: '66', country: 'Thailand', len: [8, 9] },
+  { code: '94', country: 'Sri Lanka', len: 9 },
+  { code: '977', country: 'Nepal', len: 10 },
+  { code: '880', country: 'Bangladesh', len: 10 },
+  { code: '960', country: 'Maldives', len: 7 },
+  { code: '44', country: 'United Kingdom', len: [9, 10] },
+  { code: '1', country: 'United States / Canada', len: 10 },
+  { code: '61', country: 'Australia', len: 9 },
+  { code: '64', country: 'New Zealand', len: [8, 10] },
+  { code: '49', country: 'Germany', len: [10, 11] },
+  { code: '33', country: 'France', len: 9 },
+  { code: '39', country: 'Italy', len: [9, 10] },
+  { code: '34', country: 'Spain', len: 9 },
+  { code: '31', country: 'Netherlands', len: 9 },
+  { code: '41', country: 'Switzerland', len: 9 },
+  { code: '46', country: 'Sweden', len: [7, 9] },
+  { code: '47', country: 'Norway', len: 8 },
+  { code: '353', country: 'Ireland', len: 9 },
+  { code: '351', country: 'Portugal', len: 9 },
+  { code: '90', country: 'Turkey', len: 10 },
+  { code: '20', country: 'Egypt', len: 10 },
+  { code: '27', country: 'South Africa', len: 9 },
+  { code: '254', country: 'Kenya', len: 9 },
+  { code: '234', country: 'Nigeria', len: 10 },
+  { code: '81', country: 'Japan', len: 10 },
+  { code: '82', country: 'South Korea', len: [9, 10] },
+  { code: '86', country: 'China', len: 11 },
+  { code: '852', country: 'Hong Kong', len: 8 },
+  { code: '84', country: 'Vietnam', len: 9 },
+  { code: '63', country: 'Philippines', len: 10 },
+  { code: '62', country: 'Indonesia', len: [9, 12] },
+  { code: '7', country: 'Russia / Kazakhstan', len: 10 },
+  { code: '55', country: 'Brazil', len: [10, 11] },
+  { code: '52', country: 'Mexico', len: 10 },
 ];
+
+/** What to accept for a code this table does not carry.
+ *
+ * Wide on purpose. It is reached only when something outside the picker asks —
+ * a number stored years ago under a code since removed, say — and the right
+ * answer there is "do not stand in the way", not a guess at a country. The
+ * server's own bound is `min_length=5, max_length=30` on the joined string, so
+ * nothing here can let through something it would refuse.
+ */
+const DIAL_LEN_FALLBACK = [6, 13];
+
+/** The accepted national-number length for a dialling code, as `{min, max}`.
+ *
+ * Takes the code with or without its plus and with or without spaces, because
+ * callers hold it variously as a `<select>` value, a stored digits string and a
+ * literal.
+ */
+function dialLengths(code) {
+  const digits = String(code ?? '').replace(/\D+/g, '');
+  const entry = DIAL_CODES.find(d => d.code === digits);
+  const len = entry ? entry.len : DIAL_LEN_FALLBACK;
+  return Array.isArray(len) ? { min: len[0], max: len[1] } : { min: len, max: len };
+}
+
+/** The length as the merchant reads it: "10", or "8 to 9" when it is a range.
+ *
+ * Just the quantity, no noun — the callers put it inside "… digits", "N of …
+ * digits" and "is N digits, not …", and a helper that returned the whole
+ * sentence would have to know which of those it was writing.
+ */
+function dialLengthText(code) {
+  const { min, max } = dialLengths(code);
+  return min === max ? `${min}` : `${min} to ${max}`;
+}
+
+/** Is `digits` an acceptable national number for `code`? Blank is not judged. */
+function dialLengthOk(code, digits) {
+  const n = String(digits ?? '').replace(/\D+/g, '').length;
+  if (!n) return true;
+  const { min, max } = dialLengths(code);
+  return n >= min && n <= max;
+}
 
 /** The code selected when nothing is stored — "91". */
 function defaultDialCode() {
@@ -284,13 +337,24 @@ function defaultDialCode() {
  * the whole stored value in the number box when nothing matches — an existing
  * contact saved before this field had a picker is then shown intact rather than
  * silently truncated.
+ *
+ * LENGTH BREAKS THE REMAINING TIES, now that each code carries one. Longest
+ * match alone is not always right: "8801712345678" starts with both "880"
+ * (Bangladesh) and "88", and the longest match is only the correct one because
+ * the remainder is then 10 digits, which is what a Bangladeshi number is. So
+ * the codes are tried longest first and the first one whose remainder is a
+ * VALID LENGTH for it wins; if none qualifies the longest match is still used,
+ * which is exactly the old behaviour. That keeps a number the table cannot
+ * explain visible and editable rather than reshaped into a wrong country.
  */
 function splitDialCode(stored) {
   const digits = String(stored ?? '').replace(/\D+/g, '');
   if (!digits) return { code: defaultDialCode(), number: '' };
-  const match = [...DIAL_CODES]
+  const candidates = [...DIAL_CODES]
     .sort((a, b) => b.code.length - a.code.length)
-    .find(d => digits.startsWith(d.code) && digits.length > d.code.length);
-  if (!match) return { code: defaultDialCode(), number: digits };
+    .filter(d => digits.startsWith(d.code) && digits.length > d.code.length);
+  if (!candidates.length) return { code: defaultDialCode(), number: digits };
+  const fits = candidates.find(d => dialLengthOk(d.code, digits.slice(d.code.length)));
+  const match = fits || candidates[0];
   return { code: match.code, number: digits.slice(match.code.length) };
 }

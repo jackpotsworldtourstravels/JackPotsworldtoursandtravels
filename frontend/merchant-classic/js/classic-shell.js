@@ -127,13 +127,20 @@ function clPickerOnly(input) {
 /* Digits and nothing else, capped at `max` of them. Applied on `input` so a
    pasted "+91 (900) 000-0000" is cleaned the moment it lands rather than
    rejected at submit, and the caret is put back where it was — rewriting
-   `.value` otherwise sends it to the end mid-edit. */
+   `.value` otherwise sends it to the end mid-edit.
+
+   `max` MAY BE A FUNCTION, and the phone fields need it to be: their cap is the
+   selected country's number length, which changes under the field every time
+   the merchant picks a different code. Read at event time rather than closed
+   over at bind time, so a picker change takes effect on the very next keystroke
+   without rebinding the listener (rebinding would stack a second one). */
 function clDigitsOnly(input, max) {
   if (!input) return;
   input.addEventListener('input', () => {
+    const cap = typeof max === 'function' ? max() : max;
     const before = input.value;
     const caret = input.selectionStart ?? before.length;
-    const cleaned = before.replace(/\D+/g, '').slice(0, max);
+    const cleaned = before.replace(/\D+/g, '').slice(0, cap);
     if (cleaned === before) return;
     /* Digits are the fixed point across the rewrite: count how many stood
        before the caret, and put it back after that many in the cleaned value.

@@ -449,6 +449,13 @@ function clRenderBookingForm(e) {
   const originCountry = typeof travelCountryForCode === 'function' ? travelCountryForCode(e.origin) : null;
   const destCountry = typeof travelCountryForCode === 'function' ? travelCountryForCode(e.destination) : null;
   const contact = (clBookingDraft?.details?.contact) || {};
+  /* Which country each stored number belongs to, resolved once. Both phone
+     fields need it three times over — the picker's selection, the cap on the
+     box and the sentence under it — and splitDialCode is already doing the work
+     for the value, so doing it here keeps the markup from calling it six times
+     and from being the place that decides what a length is. */
+  const phoneCode = splitDialCode(contact.phone).code;
+  const altCode = splitDialCode(contact.alternate_phone).code;
 
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head">
@@ -575,10 +582,20 @@ function clRenderBookingForm(e) {
                The field used to be one box asking for the code and the number
                run together — "919000000000" — which is not how anyone holds a
                phone number, and left the merchant to work out that the plus was
-               unwelcome. The picker states the code; the box beside it takes
-               exactly ten digits and nothing else, filtered as they are typed
-               (clBindPhoneField), so a pasted "+91 90000 00000" becomes
-               "9000000000" under a "+91" the merchant can see.
+               unwelcome. The picker states the code; the box beside it takes as
+               many digits as that country's numbers have and nothing else,
+               filtered as they are typed (clBindPhoneField), so a pasted
+               "+91 90000 00000" becomes "9000000000" under a "+91" the merchant
+               can see.
+
+               THE LENGTH FOLLOWS THE PICKER. It was ten for every country,
+               which refused a nine-digit Emirati number and an eight-digit
+               Qatari one under the very codes this dropdown offers. The cap,
+               the hint and the counter all come from the selected code now — see
+               dialLengths in shared/countries.js — and they are re-read when the
+               code changes, not frozen at render. There is no example number in
+               the box because there is no one shape to show: the sentence below
+               it states the country's own length instead.
 
                WHAT IS SENT IS UNCHANGED: clContactPayload joins the two back
                into the same digits string the API has always stored, so a
@@ -591,11 +608,11 @@ function clRenderBookingForm(e) {
               <select id="clBrContactPhoneCC" class="cl-phone-cc"
                 aria-label="Country code for the phone number">${clDialOptions(contact.phone)}</select>
               <input type="tel" id="clBrContactPhone" class="cl-phone-num"
-                maxlength="10" inputmode="numeric" autocomplete="tel-national"
-                value="${escapeHtml(splitDialCode(contact.phone).number)}"
-                placeholder="9000000000">
+                maxlength="${dialLengths(phoneCode).max}" inputmode="numeric"
+                autocomplete="tel-national"
+                value="${escapeHtml(splitDialCode(contact.phone).number)}">
             </div>
-            <small id="clBrContactPhoneHint">${CL_PHONE_HINT}</small>
+            <small id="clBrContactPhoneHint">${clPhoneHint(phoneCode)}</small>
           </div>
           <div class="cl-field">
             <label for="clBrContactAlt">Alternate phone</label>
@@ -604,11 +621,12 @@ function clRenderBookingForm(e) {
                 aria-label="Country code for the alternate phone number">${
                   clDialOptions(contact.alternate_phone)}</select>
               <input type="tel" id="clBrContactAlt" class="cl-phone-num"
-                maxlength="10" inputmode="numeric" autocomplete="tel-national"
+                maxlength="${dialLengths(altCode).max}" inputmode="numeric"
+                autocomplete="tel-national"
                 value="${escapeHtml(splitDialCode(contact.alternate_phone).number)}"
                 placeholder="Optional">
             </div>
-            <small id="clBrContactAltHint">${CL_PHONE_HINT}</small>
+            <small id="clBrContactAltHint">${clPhoneHint(altCode)}</small>
           </div>
         </div>
         <!-- Says what a half-filled panel will do, rather than refusing it.
@@ -1497,8 +1515,8 @@ function clReviewContact() {
     email.classList.add('cl-input-err');
     problems.push('that email address does not look right');
   }
-  const lengthProblem = clFlagPhoneLength(phone, 'phone number')
-    || clFlagPhoneLength(alt, 'alternate phone number');
+  const lengthProblem = clFlagPhoneLength(phone, 'phone number', 'clBrContactPhoneCC')
+    || clFlagPhoneLength(alt, 'alternate phone number', 'clBrContactAltCC');
   if (lengthProblem) problems.push(lengthProblem);
 
   if (!problems.length || !out) return;
@@ -1510,13 +1528,38 @@ function clReviewContact() {
 
 /* ============================================================ phone numbers */
 
-/* EXACTLY TEN DIGITS, after the country code. The old rule was "7 to 15
-   digits including the code", which was the only rule possible while the code
-   and the number shared one box — and it accepted "9190" as readily as a real
-   number. With the code picked separately the number itself has a length worth
-   stating, and the merchant is told it while typing rather than at submit. */
-const CL_PHONE_DIGITS = 10;
-const CL_PHONE_HINT = `Numbers only — ${CL_PHONE_DIGITS} digits, without the country code.`;
+/* THE LENGTH BELONGS TO THE COUNTRY, NOT TO THE FORM.
+   ==========================================================================
+   This was one constant, 10, applied to every code in the picker. That is
+   right for India and wrong for most of the list beside it: a UAE mobile is 9
+   digits, a Qatari or Singaporean number 8, a Maldivian one 7, a Chinese one
+   11. The form refused all of them — and it refused them *after* the picker
+   had been offered, which is the worst version of the mistake, because the
+   merchant had just been invited to choose that country.
+
+   The figure now comes from the selected dialling code, and there is exactly
+   one source for it: `dialLengths` / `dialLengthText` / `dialLengthOk` in
+   shared/countries.js, beside the codes themselves. Everything that quotes a
+   length asks those — the hint, the live counter, the cap on the box, the
+   read-back in clPhoneValue and the note in clReviewContact — so the field
+   cannot disagree with itself the way it would if any of them kept a copy.
+
+   Ranges exist because some countries genuinely have them (a UK landline is 9
+   digits and a UK mobile 10), so "the length" is a min and a max that are
+   usually equal. */
+
+/* The sentence under the box, for whichever code is selected. */
+function clPhoneHint(code) {
+  return `Numbers only — ${dialLengthText(code)} digits, without the country code.`;
+}
+
+/* The dialling code a phone field's picker is holding right now.
+   Falls back to the default rather than returning empty: every caller is about
+   to measure a number against it, and measuring against nothing would silently
+   accept anything. */
+function clPhoneCode(ccId) {
+  return clDigits($(ccId)?.value) || defaultDialCode();
+}
 
 /* The picker's options, with `stored` (a digits string that may already carry a
    code) deciding which is selected. */
@@ -1527,7 +1570,8 @@ function clDialOptions(stored) {
       escapeHtml(d.code)} ${escapeHtml(d.country)}</option>`).join('');
 }
 
-/* Digits only, capped at ten, judged on every keystroke.
+/* Digits only, capped at the selected country's length, judged on every
+   keystroke and again whenever that country changes.
    The message appears as soon as the box holds something that cannot become a
    phone number and clears itself the moment it can, so submit never says
    anything the field has not already said. Blank is silent: "you have not
@@ -1536,7 +1580,11 @@ function clDialOptions(stored) {
 function clBindPhoneField(numId, hintId, ccId) {
   const el = $(numId);
   if (!el) return;
-  clDigitsOnly(el, CL_PHONE_DIGITS);
+  /* A GETTER, NOT A NUMBER. The cap is the current country's maximum, and the
+     merchant can change country after this runs — see the note on `max` in
+     clDigitsOnly. Passing `dialLengths(...).max` here would freeze whichever
+     country happened to be selected when the form was drawn. */
+  clDigitsOnly(el, () => dialLengths(clPhoneCode(ccId)).max);
 
   /* A PASTED NUMBER MAY BRING ITS COUNTRY CODE WITH IT, and dropping it would
      be worse than useless — it would leave a plausible-looking wrong number.
@@ -1552,9 +1600,17 @@ function clBindPhoneField(numId, hintId, ccId) {
      through to the ordinary digits-only path, unchanged. */
   el.addEventListener('paste', e => {
     const pasted = clDigits(e.clipboardData?.getData('text') || '');
-    if (pasted.length <= CL_PHONE_DIGITS) return;
+    if (!pasted) return;
     const split = splitDialCode(pasted);
-    if (split.number.length !== CL_PHONE_DIGITS) return;
+    /* Take over only when a code was really stripped AND what is left is a
+       length that country actually has. The length test is what keeps a plain
+       local number safe: "9198765432" is ten digits of Indian number that
+       happens to begin "91", and splitting it would leave eight — not a length
+       India has — so it falls through to the ordinary digits-only path and is
+       entered whole. Under the old single length this was a blunter test
+       against ten, which could only ever be right for one country. */
+    if (split.number === pasted) return;
+    if (!dialLengthOk(split.code, split.number)) return;
     e.preventDefault();
     el.value = split.number;
     const cc = ccId && $(ccId);
@@ -1562,54 +1618,82 @@ function clBindPhoneField(numId, hintId, ccId) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const judge = () => {
+    const code = clPhoneCode(ccId);
+    const { min, max } = dialLengths(code);
     const digits = clDigits(el.value);
-    const short = digits.length > 0 && digits.length < CL_PHONE_DIGITS;
-    el.classList.toggle('cl-input-err', short);
+    /* Kept in step with the country, so the browser stops the merchant in the
+       right place after a picker change rather than at whatever the box was
+       built with. */
+    el.maxLength = max;
+    /* TOO LONG IS REACHABLE NOW, WHICH IT WAS NOT UNDER ONE FIXED LENGTH:
+       switching from India to Qatar leaves ten digits in a box that takes
+       eight. The number is deliberately NOT truncated — quietly dropping two
+       digits of a number someone typed is worse than saying so — so both ends
+       are checked and the counter reports whichever way it is wrong. */
+    const wrong = digits.length > 0 && (digits.length < min || digits.length > max);
+    el.classList.toggle('cl-input-err', wrong);
     const hint = $(hintId);
     if (!hint) return;
-    hint.textContent = short
-      ? `${digits.length} of ${CL_PHONE_DIGITS} digits.`
-      : CL_PHONE_HINT;
-    hint.classList.toggle('cl-hint-err', short);
+    hint.textContent = wrong
+      ? `${digits.length} of ${dialLengthText(code)} digits.`
+      : clPhoneHint(code);
+    hint.classList.toggle('cl-hint-err', wrong);
   };
   el.addEventListener('input', judge);
   el.addEventListener('blur', judge);
+  /* THE PICKER IS PART OF THE FIELD. Changing the country changes what counts
+     as valid, so the number beside it is re-judged there and then. Without
+     this, a merchant who corrects a mismatch the obvious way — by choosing the
+     country the number actually belongs to — would be left staring at a red box
+     and a counter quoting the old country's length.
+     Not called once at bind: the field opens unmarked, as it always has, and
+     the markup renders the right hint and cap for the stored code. */
+  const cc = ccId && $(ccId);
+  if (cc) cc.addEventListener('change', judge);
 }
 
 /* The two controls, back as the one digits string the API stores. Empty when
    the number box is empty — a country code on its own is not a phone number,
    and sending "91" would be a contact nobody can call.
 
-   AND EMPTY WHEN THE NUMBER IS THE WRONG LENGTH, which is the half that keeps
-   clReviewContact honest. That panel tells the merchant a short number means
-   "this contact will not be attached"; if a seven-digit number were sent
-   anyway the note would be describing something that did not happen, and the
-   desk would hold a number it cannot dial. The rule is stated in one place and
-   obeyed in the same place. */
+   AND EMPTY WHEN THE NUMBER IS THE WRONG LENGTH FOR ITS COUNTRY, which is the
+   half that keeps clReviewContact honest. That panel tells the merchant a
+   mis-sized number means "this contact will not be attached"; if a seven-digit
+   Indian number were sent anyway the note would be describing something that
+   did not happen, and the desk would hold a number it cannot dial. The rule is
+   stated in one place and obeyed in the same place — and the length it obeys
+   is the selected country's, so this no longer throws away a perfectly good
+   nine-digit Emirati number. */
 function clPhoneValue(ccId, numId) {
+  const code = clPhoneCode(ccId);
   const digits = clDigits($(numId)?.value);
-  if (digits.length !== CL_PHONE_DIGITS) return '';
-  return `${clDigits($(ccId)?.value) || defaultDialCode()}${digits}`;
+  if (!digits || !dialLengthOk(code, digits)) return '';
+  return `${code}${digits}`;
 }
 
-/* Ten digits, or nothing. Blank is always fine — both numbers are optional —
-   so this only judges a value that is actually there. Marks the box and returns
-   the sentence, or null.
+/* A length the selected country has, or nothing. Blank is always fine — both
+   numbers are optional — so this only judges a value that is actually there.
+   Marks the box and returns the sentence, or null.
+
+   TAKES THE PICKER'S ID, because the answer depends on it: the same ten digits
+   are a valid Indian number and an impossible Qatari one, and a version of this
+   that looked only at the number box could not tell them apart.
 
    It does NOT move the focus. It used to, back when it was part of a refusal
    that sent the merchant to the offending box; it is now called to describe a
    contact that will not be attached, and stealing the caret out from under
    someone mid-sentence to make a remark is not the same thing at all. */
-function clFlagPhoneLength(el, what) {
+function clFlagPhoneLength(el, what, ccId) {
   if (!el) return null;
   const digits = clDigits(el.value);
   if (!digits) return null;
-  if (digits.length === CL_PHONE_DIGITS) return null;
+  const code = clPhoneCode(ccId);
+  if (dialLengthOk(code, digits)) return null;
   el.classList.add('cl-input-err');
   /* A clause, not a sentence — clReviewContact joins these with "and", so a
      fragment that reads on its own inside a list is what is wanted here. */
   return `the ${what} is ${digits.length} digit${digits.length === 1 ? '' : 's'}, `
-    + `not ${CL_PHONE_DIGITS}`;
+    + `not ${dialLengthText(code)}`;
 }
 
 /* Every non-digit stripped. Used both when a stored contact is rendered back
