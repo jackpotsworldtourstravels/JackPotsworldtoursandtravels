@@ -396,6 +396,15 @@ def system_activity(
             "ip_address": str(log.ip_address) if log.ip_address else None,
             "browser": log.browser,
             "device": log.device,
+            # Additive. `os` and `local_ip` live in extra_data (see
+            # services/activity_service.log_activity) and are surfaced here so
+            # the Admin System Logs screen can show the connection a row was
+            # written from rather than a bare address. Both are null on rows
+            # written before this shipped, and on any browser that does not
+            # send the client hints — the UI omits the line rather than
+            # inventing one.
+            "os": (log.extra_data or {}).get("os"),
+            "local_ip": (log.extra_data or {}).get("local_ip"),
             "status": log.status,
             "created_at": log.created_at,
         }

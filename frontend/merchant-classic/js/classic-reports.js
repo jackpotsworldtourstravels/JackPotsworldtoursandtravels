@@ -80,7 +80,7 @@ function clInitReports() {
         <div class="cl-field">
           <label for="clRepStatus">Status</label>
           <select id="clRepStatus" data-cl-status-filter>
-            <option value="">All statuses</option>
+            <option value="">All</option>
             ${MERCHANT_REQUEST_STATUSES.map(s =>
               `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clLabel(s)}</option>`).join('')}
           </select>

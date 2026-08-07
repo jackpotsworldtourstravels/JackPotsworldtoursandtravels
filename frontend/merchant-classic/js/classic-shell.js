@@ -80,6 +80,72 @@ function clError(err, fallback) {
   return err?.message || fallback || 'Something went wrong.';
 }
 
+/* ---- shared input behaviours ----
+   Two of them: `clPickerOnly` for the travel dates, `clDigitsOnly` for the
+   contact numbers and the two halves of a time. They live here rather than in
+   either module because a rule about how a date or a phone number is entered
+   must not be able to differ between two screens that ask for the same thing —
+   the enquiry form and the Booking Request screen both use them. */
+
+/* A DATE THAT CAN ONLY BE PICKED, NEVER TYPED.
+   ===========================================================================
+   A native `input[type=date]` opens its calendar only from the small indicator
+   at the right edge; a click anywhere else lands in the segmented text and
+   invites typing, which is the reported "I chose a date and the field did not
+   update" — the merchant was editing one segment of a partly-typed value and
+   the box never reached a complete date.
+
+   So: every click on the field opens the picker, and the keyboard cannot write
+   into it. Navigation keys stay live (Tab, Escape, and the arrows the platform
+   uses to step a highlighted segment), because taking those away would leave
+   the control unreachable without a mouse — Enter and Space open the picker
+   instead.
+
+   `showPicker()` throws if it is called outside a user gesture or twice in a
+   row; both are harmless here and both are swallowed. Where the browser has no
+   `showPicker` (older WebKit) the field simply keeps its native behaviour, and
+   the typing block still holds. */
+const CL_DATE_NAV_KEYS = ['Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+function clPickerOnly(input) {
+  if (!input) return;
+  const open = () => {
+    try {
+      if (typeof input.showPicker === 'function') input.showPicker();
+    } catch { /* not a user gesture, or already open — nothing to report */ }
+  };
+  input.addEventListener('mousedown', e => { e.preventDefault(); input.focus(); open(); });
+  input.addEventListener('click', open);
+  input.addEventListener('keydown', e => {
+    if (CL_DATE_NAV_KEYS.includes(e.key) || e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    if (e.key === 'Enter' || e.key === ' ') open();
+  });
+  return input;
+}
+
+/* Digits and nothing else, capped at `max` of them. Applied on `input` so a
+   pasted "+91 (900) 000-0000" is cleaned the moment it lands rather than
+   rejected at submit, and the caret is put back where it was — rewriting
+   `.value` otherwise sends it to the end mid-edit. */
+function clDigitsOnly(input, max) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const before = input.value;
+    const caret = input.selectionStart ?? before.length;
+    const cleaned = before.replace(/\D+/g, '').slice(0, max);
+    if (cleaned === before) return;
+    /* Digits are the fixed point across the rewrite: count how many stood
+       before the caret, and put it back after that many in the cleaned value.
+       Anything discarded from before the caret shifts it left by itself. */
+    const digitsBefore = before.slice(0, caret).replace(/\D+/g, '').length;
+    input.value = cleaned;
+    const at = Math.min(cleaned.length, digitsBefore);
+    input.setSelectionRange(at, at);
+  });
+  return input;
+}
+
 /* ---- table states ----
    A skeleton, not a spinner: it holds the shape of the answer while the answer
    is on its way, so the table does not collapse to one line and then jump back

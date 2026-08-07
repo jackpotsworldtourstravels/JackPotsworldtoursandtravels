@@ -82,7 +82,7 @@ async function loadAuditLogs(page = 1) {
     try {
       const { data } = await axios.get(`${API_BASE}/api/super-admin/audit-logs/tables`,
                                        { headers: authHeaders() });
-      tableFilter.innerHTML = '<option value="">All tables</option>' +
+      tableFilter.innerHTML = '<option value="">All</option>' +
         data.tables.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
     } catch (err) { /* filter stays at "All tables" — not worth failing the screen */ }
   }
@@ -150,8 +150,45 @@ function adminShowAuditDetail(id) {
 
 let adminSysLogPage = 1;
 
+/* THE CONNECTION COLUMN — what replaced "Origin".
+   ==========================================================================
+   "Origin" was `ip · browser · device` crushed onto one grey line, and for most
+   rows it was empty: only the four endpoints in routers/auth.py ever recorded a
+   connection, because every other action is logged from a service function that
+   has no Request in scope. An HTTP middleware now binds the connection for the
+   whole request (app/main.py::request_metadata), so every row has one.
+
+   FOUR FACTS, STACKED, IN THE ORDER SOMEONE READS THEM:
+     line 1  the address the request came from (public where a proxy forwarded
+             one), with the LAN address beside it when one was visible
+     line 2  the operating system, with its version where the client told us
+     line 3  the browser and its major version
+     line 4  the device type
+
+   NOTHING HERE IS A PLACEHOLDER. Windows froze its User-Agent at "NT 10.0", so
+   Windows 10 and 11 are only distinguishable from the client hints the server
+   asks for via `Accept-CH`; Firefox and Safari send none of them. When a fact
+   was not reported, its line is omitted — an absent OS is honest, an invented
+   one is not. A row with nothing at all says so once, in words. */
+function adminSysLogConnection(l) {
+  /* "Other" IS NOT A VALUE, IT IS A SENTINEL — the parser wrote it until
+     2026-08-06 for anything it could not identify, and rows from before then
+     still carry it. Printed, it reads as a browser called Other; dropped, the
+     line is simply absent, which is what "we do not know" looks like. */
+  const real = v => (v && v !== 'Other' ? v : null);
+  const lines = [];
+  if (l.ip_address) {
+    lines.push(`<span class="sl-ip">${escapeHtml(l.ip_address)}</span>${l.local_ip
+      ? ` <span class="sl-local" title="LAN address reported by a proxy">· local ${escapeHtml(l.local_ip)}</span>`
+      : ''}`);
+  }
+  [real(l.os), real(l.browser), real(l.device)]
+    .filter(Boolean).forEach(v => lines.push(escapeHtml(v)));
+  if (!lines.length) return '<span class="sl-none">Not recorded</span>';
+  return `<div class="sl-conn">${lines.map(x => `<span>${x}</span>`).join('')}</div>`;
+}
+
 function adminSysLogRow(l) {
-  const where = [l.ip_address, l.browser, l.device].filter(Boolean).join(' · ') || '—';
   const ok = (l.status || '').toLowerCase();
   const badge = ok === 'success' ? 'active' : (ok === 'failed' || ok === 'failure' ? 'suspended' : 'inactive');
   return `
@@ -162,7 +199,7 @@ function adminSysLogRow(l) {
       <td>${escapeHtml(l.module || '—')}</td>
       <td>${escapeHtml(l.action || '—')}</td>
       <td>${escapeHtml(l.description || '—')}</td>
-      <td><small style="color:var(--text-muted);">${escapeHtml(where)}</small></td>
+      <td>${adminSysLogConnection(l)}</td>
       <td>${l.status ? `<span class="badge ${badge}">${escapeHtml(statusLabel(l.status))}</span>` : '—'}</td>
     </tr>`;
 }
@@ -179,9 +216,9 @@ async function loadSystemLogs(page = 1) {
     try {
       const { data } = await axios.get(`${API_BASE}/api/super-admin/activity/filters`,
                                        { headers: authHeaders() });
-      actionSel.innerHTML = '<option value="">All actions</option>' +
+      actionSel.innerHTML = '<option value="">All</option>' +
         (data.actions || []).map(a => `<option value="${escapeHtml(a)}">${escapeHtml(statusLabel(a))}</option>`).join('');
-      moduleSel.innerHTML = '<option value="">All modules</option>' +
+      moduleSel.innerHTML = '<option value="">All</option>' +
         (data.modules || []).map(m => `<option value="${escapeHtml(m)}">${escapeHtml(statusLabel(m))}</option>`).join('');
     } catch (err) { /* both stay at "All" */ }
   }

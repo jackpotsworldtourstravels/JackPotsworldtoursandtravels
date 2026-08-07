@@ -83,7 +83,7 @@ function clInitHistory() {
         <div class="cl-field">
           <label for="clHistStatus">Outcome</label>
           <select id="clHistStatus" data-cl-status-filter>
-            <option value="">All closed bookings</option>
+            <option value="">All</option>
             ${CL_HISTORY_STATUSES.map(s =>
               `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${CL_HISTORY_LABELS[s]}</option>`).join('')}
           </select>
@@ -91,8 +91,8 @@ function clInitHistory() {
         <div class="cl-field">
           <label for="clHistType">Type</label>
           <select id="clHistType">
+            <option value="">All</option>
             <option value="booking">Bookings</option>
-            <option value="">Everything</option>
             ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
               `<option value="${t}">${clLabel(t)}</option>`).join('')}
           </select>
@@ -174,9 +174,13 @@ function clInitHistory() {
   clChips('clHistStatus', 'Outcome');
 
   $('clHistApply').addEventListener('click', () => clLoadHistory({ resetPage: true }));
+  /* Reset clears EVERY filter to All, including Type. It used to put Type back
+     to "Bookings", which was this screen's old default — leaving it there once
+     All became the default would have made Reset the only control on the page
+     that narrowed the results instead of widening them. */
   $('clHistReset').addEventListener('click', () => {
-    ['clHistStatus', 'clHistFrom', 'clHistTo', 'clHistSearch'].forEach(id => { $(id).value = ''; });
-    $('clHistType').value = 'booking';
+    ['clHistStatus', 'clHistType', 'clHistFrom', 'clHistTo', 'clHistSearch']
+      .forEach(id => { $(id).value = ''; });
     clSyncChips('clHistStatus');
     clLoadHistory({ resetPage: true });
   });
@@ -657,19 +661,32 @@ async function clDocFetch(btn, { id, reference, kind, docId, fileName, mode }) {
 
 /* The export runs the SAME filters the table is showing, through
    /api/reports/export, which builds its rows server-side. It is not limited by
-   the per-status fetch ceiling above — that is a display cap, this is a query. */
+   the per-status fetch ceiling above — that is a display cap, this is a query.
+
+   EVERY FILTER GOES, INCLUDING THE TWO THAT USED TO BE DROPPED.
+   Outcome, Type, the travel-date range and the search box are all on screen, so
+   all four belong in the file. Two of them had no way through and were quietly
+   discarded: `request_type`, because the export's own `type=bookings` already
+   meant "bookings", and the outcome when it was All, because the endpoint took
+   one status and four could not be said. An export that silently widens to
+   every stage — including live bookings the archive deliberately excludes — is
+   the reporting bug worth most: nobody reads a spreadsheet expecting rows the
+   screen that produced it was not showing.
+
+   `request_type=any` and `statuses=` (comma-separated) close both. `any` is not
+   the same as omitting the parameter: omitting it keeps the endpoint's historical
+   bookings-only default, which is still what the Reports screen wants. */
 async function clExportHistory(format) {
   const msg = $('clHistMsg');
   clMsg(msg, `Preparing the ${format.toUpperCase()} export…`, 'muted');
   try {
     const params = { type: 'bookings', format, ...clHistoryParams() };
-    /* `request_type` is the table's own filter name; the export takes a status
-       and the same date range. A single chosen outcome is passed through; "all
-       closed" cannot be expressed as one status, so the export then covers the
-       full range and the message says so. */
-    delete params.request_type;
+    /* The table's Type filter, verbatim — "All" means every request type here,
+       not bookings alone, and the file has to say the same thing. */
+    params.request_type = params.request_type || 'any';
     const chosen = $('clHistStatus').value;
     if (chosen) params.status = chosen;
+    else params.statuses = CL_HISTORY_STATUSES.join(',');
 
     const blob = await MerchantApi.exportReport(params);
     const url = URL.createObjectURL(blob);
@@ -680,9 +697,18 @@ async function clExportHistory(format) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
-    clMsg(msg, chosen
-      ? `${format.toUpperCase()} export downloaded — ${CL_HISTORY_LABELS[chosen]} bookings only.`
-      : `${format.toUpperCase()} export downloaded. It covers every booking in the date range, not only the closed ones — pick an outcome above to narrow it.`,
+    /* The caveat that used to live here — "it covers every booking in the date
+       range, not only the closed ones" — was true and is not any more. The file
+       is the table, so the message names the filters rather than apologising for
+       them. */
+    const term = $('clHistSearch').value.trim();
+    const narrowed = [
+      chosen ? CL_HISTORY_LABELS[chosen] : 'All outcomes',
+      params.request_type === 'any' ? 'all types' : clLabel(params.request_type),
+      term ? `matching “${term}”` : null,
+    ].filter(Boolean).join(' · ');
+    clMsg(msg,
+      `${format.toUpperCase()} export downloaded — ${narrowed}. It holds exactly the rows shown above.`,
       'ok');
   } catch (err) {
     clMsg(msg, clError(err, 'Failed to export.'), 'err');

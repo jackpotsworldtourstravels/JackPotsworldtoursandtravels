@@ -17,7 +17,7 @@ import datetime
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,12 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 ReportType = Literal["bookings", "service_requests", "payments"]
 ExportFormat = Literal["csv", "xlsx", "pdf"]
+
+#: ``request_type=any`` — "do not filter by type at all", which is a different
+#: instruction from omitting the parameter (that keeps each report's own
+#: historical default). Spelled as a value rather than as a second boolean flag
+#: so one parameter carries the whole three-way choice; see ``_booking_rows``.
+ANY_TYPE = "any"
 
 #: Hard cap on the rows any one report may contain. Named rather than repeated
 #: at each call site, because ``/summary`` reports it back to the screen: a page
@@ -55,9 +61,23 @@ _SERVICE_REQUEST_TYPES = (
 )
 
 
-def _booking_rows(db: Session, actor: User, **filters) -> tuple[list[tuple[str, str]], list[dict]]:
+def _booking_rows(
+    db: Session, actor: User, *, request_type: str | None = None, **filters
+) -> tuple[list[tuple[str, str]], list[dict]]:
+    # ``request_type`` narrows WITHIN this report, and has three meanings:
+    # absent keeps the historical default (bookings only, so every existing
+    # caller is byte-for-byte unchanged), ``ANY_TYPE`` drops the filter entirely,
+    # and a concrete type selects just that one. The third case is what lets a
+    # screen whose own Type filter is "all request types" export what it shows
+    # instead of silently exporting bookings.
+    if request_type is None:
+        chosen = RequestType.BOOKING
+    elif request_type == ANY_TYPE:
+        chosen = None
+    else:
+        chosen = RequestType(request_type)
     items, _ = ticket_service.list_requests(
-        db, actor, page=1, page_size=ROW_CAP, request_type=RequestType.BOOKING, **filters
+        db, actor, page=1, page_size=ROW_CAP, request_type=chosen, **filters
     )
     columns = [
         ("reference", "Reference"), ("request_number", "Request Number"),
@@ -83,9 +103,16 @@ def _booking_rows(db: Session, actor: User, **filters) -> tuple[list[tuple[str, 
     return columns, rows
 
 
-def _service_request_rows(db: Session, actor: User, **filters) -> tuple[list[tuple[str, str]], list[dict]]:
+def _service_request_rows(
+    db: Session, actor: User, *, request_type: str | None = None, **filters
+) -> tuple[list[tuple[str, str]], list[dict]]:
+    # One concrete type narrows to it; absent or ANY_TYPE keeps all seven, which
+    # is what this report has always meant.
+    wanted = _SERVICE_REQUEST_TYPES
+    if request_type is not None and request_type != ANY_TYPE:
+        wanted = (RequestType(request_type),)
     all_rows: list = []
-    for rtype in _SERVICE_REQUEST_TYPES:
+    for rtype in wanted:
         items, _ = ticket_service.list_requests(
             db, actor, page=1, page_size=ROW_CAP, request_type=rtype, **filters
         )
@@ -158,6 +185,8 @@ def _rows_for(
     date_to,
     search,
     status,
+    statuses=None,
+    request_type=None,
     merchant_id,
 ) -> tuple[list[tuple[str, str]], list[dict]]:
     """The one place a report's rows are built.
@@ -170,14 +199,74 @@ def _rows_for(
     filters = dict(
         merchant_id=merchant_id if actor.is_platform_staff else None,
         search=search, date_from=date_from, date_to=date_to, request_status=status,
+        request_statuses=statuses or None,
     )
     if report_type == "bookings":
-        return _booking_rows(db, actor, **filters)
+        return _booking_rows(db, actor, request_type=request_type, **filters)
     if report_type == "service_requests":
-        return _service_request_rows(db, actor, **filters)
+        return _service_request_rows(db, actor, request_type=request_type, **filters)
     return _payment_rows(
         db, actor, date_from=date_from, date_to=date_to, merchant_id=merchant_id
     )
+
+
+def _parse_statuses(raw: str | None) -> list[RequestStatus] | None:
+    """``statuses=ticket_issued,completed`` → the enum members, or a 400.
+
+    Comma-separated rather than a repeated query parameter because the portals
+    reach this through one shared axios wrapper that serialises arrays as
+    ``statuses[]=``; a string keeps the transport layer out of it. Unknown values
+    are refused rather than dropped — silently ignoring one would hand back a
+    file that is wrong in exactly the way this parameter exists to prevent.
+    """
+    if raw is None:
+        return None
+    out: list[RequestStatus] = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+        try:
+            out.append(RequestStatus(value))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unknown status '{value}'. Expected one of: "
+                    + ", ".join(s.value for s in RequestStatus)
+                ),
+            ) from None
+    return out or None
+
+
+def _parse_request_type(raw: str | None) -> str | None:
+    """``request_type`` as a concrete type, ``any``, or absent. 400 on anything else."""
+    if raw is None or raw == ANY_TYPE:
+        return raw
+    try:
+        RequestType(raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unknown request type '{raw}'. Expected '{ANY_TYPE}' or one of: "
+                + ", ".join(t.value for t in RequestType)
+            ),
+        ) from None
+    return raw
+
+
+#: Shared wording for the two filters below, so /export and /summary cannot
+#: describe them differently.
+_STATUSES_DOC = (
+    "Comma-separated statuses, e.g. `ticket_issued,completed`. Use it when the screen "
+    "being exported shows more than one status at once; `status` (single) still works "
+    "and the two intersect."
+)
+_REQUEST_TYPE_DOC = (
+    "Narrow within the report: a request type, or `any` to drop the type filter "
+    "entirely. Omit it to keep each report's own default (`bookings` = bookings only)."
+)
 
 
 @router.get(
@@ -199,6 +288,8 @@ def report_summary(
     date_to: datetime.date | None = None,
     search: str | None = None,
     status: RequestStatus | None = None,
+    statuses: str | None = Query(None, description=_STATUSES_DOC),
+    request_type: str | None = Query(None, description=_REQUEST_TYPE_DOC),
     merchant_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.REPORT_VIEW)),
@@ -206,7 +297,8 @@ def report_summary(
     _, rows = _rows_for(
         db, current_user, type,
         date_from=date_from, date_to=date_to, search=search,
-        status=status, merchant_id=merchant_id,
+        status=status, statuses=_parse_statuses(statuses),
+        request_type=_parse_request_type(request_type), merchant_id=merchant_id,
     )
     # ``amount`` is the money column on both report types that carry one; the
     # service-request export carries none, so the field is omitted rather than
@@ -233,7 +325,9 @@ def report_summary(
     description=(
         "Requires `report.export`. `type=bookings|service_requests` filters follow the same "
         "date/search semantics as `GET /api/requests`; `type=payments` filters by `date_from`/"
-        "`date_to` against the payment's created date."
+        "`date_to` against the payment's created date. `statuses` and `request_type` let a "
+        "screen whose own filters do not reduce to one status or one type — Booking History "
+        "is four terminal statuses merged — export exactly the rows it is showing."
     ),
 )
 def export_report(
@@ -243,6 +337,8 @@ def export_report(
     date_to: datetime.date | None = None,
     search: str | None = None,
     status: RequestStatus | None = None,
+    statuses: str | None = Query(None, description=_STATUSES_DOC),
+    request_type: str | None = Query(None, description=_REQUEST_TYPE_DOC),
     merchant_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require(P.REPORT_EXPORT)),
@@ -250,7 +346,8 @@ def export_report(
     columns, rows = _rows_for(
         db, current_user, type,
         date_from=date_from, date_to=date_to, search=search,
-        status=status, merchant_id=merchant_id,
+        status=status, statuses=_parse_statuses(statuses),
+        request_type=_parse_request_type(request_type), merchant_id=merchant_id,
     )
 
     title = f"{type.replace('_', ' ').title()} Report"

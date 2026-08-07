@@ -91,6 +91,13 @@ const sectionTitles = {
   notifications: 'Communication', profile: 'Profile',
   /* Moved here from the Super Admin Portal; see assets/js/admin-logs.js. */
   audit: 'Audit Logs', 'system-logs': 'System Logs',
+  /* THESE TWO WERE MISSING, AND THE TOPBAR WENT BLANK ON THEM. Every other
+     section is keyed here, so `sectionTitles[name]` returned undefined for
+     Provider Management and Wallet & Top-ups and `textContent = undefined`
+     emptied the h1 — the page kept the date underneath it and lost its name.
+     Found by walking all seventeen sections and reading the title each time,
+     which is not something a screenshot of one screen shows. */
+  providers: 'Provider Management', 'wallet-desk': 'Wallet & Top-ups',
 };
 const loadedSections = new Set();
 
@@ -100,7 +107,9 @@ const loadedSections = new Set();
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${name}`));
-  document.getElementById('pageTitle').textContent = sectionTitles[name];
+  /* `|| ''` so a section added to the markup without a title here empties the
+     heading rather than writing the string "undefined" into it. */
+  document.getElementById('pageTitle').textContent = sectionTitles[name] || '';
   if (!loadedSections.has(name)) {
     loadedSections.add(name);
     Promise.resolve(loadSection(name)).then(() => onArrive?.());
@@ -846,7 +855,76 @@ function showMerchantView(view) {
   document.getElementById('merchantDetailPanel').style.display = view === 'detail' ? '' : 'none';
 }
 
-/* ---------- Active Users ---------- GET /api/admin/users (API_CONTRACT.md §4.1). */
+/* ---------- Active Users ---------- GET /api/admin/users (API_CONTRACT.md §4.1).
+
+   WHO IS ACTUALLY USING THE PLATFORM, AND FROM WHERE. Every row carries a
+   presence badge and the connection its most recent session came from. All of
+   it is served by the endpoint — see schemas/accounts.py::AccountResponse —
+   so nothing here is computed from a clock the browser owns.
+
+   FOUR STATES, AND WHY NEVER LOGGED IN IS ONE OF THEM. An account that exists
+   but has never been signed into is a real and actionable thing: an invitation
+   that never landed, a starter password never used. Rendering it as an empty
+   Last Login cell made it indistinguishable from a column that failed to load,
+   so it says so in words.
+
+   EVERY UNKNOWN IS SHOWN AS "—" AND NEVER INVENTED. A browser that sends no
+   client hints genuinely does not tell us its OS version, and a user on the
+   public internet has no LAN address we can see. Those lines are omitted
+   rather than filled with a plausible-looking guess. */
+const AU_PRESENCE = {
+  /* The badge classes are admin.css's existing status vocabulary — this screen
+     does not introduce a parallel set of chips for four states. */
+  online:          { cls: 'active',    dot: '#16a34a', label: 'Online' },
+  recently_active: { cls: 'pending',   dot: '#d97706', label: 'Recently Active' },
+  offline:         { cls: 'inactive',  dot: '#94a3b8', label: 'Offline' },
+  never_logged_in: { cls: 'cancelled', dot: '#dc2626', label: 'Never Logged In' },
+};
+
+function auPresenceBadge(u) {
+  const spec = AU_PRESENCE[u.presence] || AU_PRESENCE.offline;
+  const seen = u.last_seen_at ? ` — last seen ${fmtDateTime(u.last_seen_at)}` : '';
+  return `<span class="badge ${spec.cls} au-presence" title="${escapeHtml(spec.label + seen)}">
+    <span class="au-dot" style="background:${spec.dot}"></span>${escapeHtml(u.presence_label || spec.label)}
+  </span>`;
+}
+
+/* "Other" IS NOT A VALUE, IT IS A SENTINEL. The user-agent parser wrote it
+   until 2026-08-06 for anything it did not recognise, and rows from before then
+   still carry it. On screen it is indistinguishable from a browser genuinely
+   called Other, so it is dropped exactly like a missing field — declining to
+   print "unknown" is not the same as inventing something. The parser no longer
+   produces it (services/activity_service.py::_browser_name). */
+const auReal = v => (v && v !== 'Other' ? v : null);
+
+/* Two lines: what they signed in on, and what they browsed with. Both are
+   absent for an account that has never had a session, which is the one case
+   where "Never Logged In" is the honest answer in every column. */
+function auDeviceCell(u) {
+  if (!u.presence || u.presence === 'never_logged_in') return '<span class="au-none">Never Logged In</span>';
+  const parts = [auReal(u.last_login_device), auReal(u.last_login_os)].filter(Boolean);
+  const browser = auReal(u.last_login_browser);
+  if (!parts.length && !browser) return '<span class="au-none">Not recorded</span>';
+  return `${parts.length ? escapeHtml(parts.join(' · ')) : 'Not recorded'}
+    ${browser ? `<br><small class="au-sub">${escapeHtml(browser)}</small>` : ''}`;
+}
+
+function auIpCell(u) {
+  if (!u.presence || u.presence === 'never_logged_in') return '<span class="au-none">Never Logged In</span>';
+  if (!u.last_login_ip) return '<span class="au-none">Not recorded</span>';
+  return `${escapeHtml(u.last_login_ip)}${u.last_login_local_ip
+    ? `<br><small class="au-sub" title="LAN address reported by a proxy">Local ${escapeHtml(u.last_login_local_ip)}</small>`
+    : ''}`;
+}
+
+/* `last_login_at` is the session row's own timestamp — the login the device and
+   IP beside it belong to. `users.last_login` agrees with it, but a cell that
+   describes one session must not date itself from another. */
+function auLastLoginCell(u) {
+  const when = u.last_login_at || u.last_login;
+  return when ? fmtDateTime(when) : '<span class="au-none">Never Logged In</span>';
+}
+
 let activeUsersPage = 1;
 let auSearchTimer;
 function activeUsersFiltersWired() { return document.getElementById('auSearch').dataset.wired === '1'; }
@@ -858,11 +936,11 @@ async function loadActiveUsers(page = activeUsersPage) {
       clearTimeout(auSearchTimer);
       auSearchTimer = setTimeout(() => loadActiveUsers(1), 350);
     });
-    document.getElementById('auStatusFilter').addEventListener('change', () => loadActiveUsers(1));
-    document.getElementById('auRoleFilter').addEventListener('change', () => loadActiveUsers(1));
+    ['auPresenceFilter', 'auStatusFilter', 'auRoleFilter'].forEach(id =>
+      document.getElementById(id)?.addEventListener('change', () => loadActiveUsers(1)));
   }
   const tbody = document.querySelector('#activeUsersTable tbody');
-  tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Loading…</td></tr>`;
   try {
     const { data } = await axios.get(`${API_BASE}/api/admin/users`, {
       headers: authHeaders(),
@@ -870,21 +948,27 @@ async function loadActiveUsers(page = activeUsersPage) {
         search: document.getElementById('auSearch').value || undefined,
         status: document.getElementById('auStatusFilter').value || undefined,
         role: document.getElementById('auRoleFilter').value || undefined,
+        /* Presence is filtered SERVER-side. Dropping non-matching rows from the
+           page here would return four users under a total that counted forty. */
+        presence: document.getElementById('auPresenceFilter')?.value || undefined,
         page, page_size: PAGE_SIZE,
       },
     });
     renderPagination('activeUsersPagination', data.page, data.total_pages, data.total, loadActiveUsers);
     tbody.innerHTML = data.items.map(u => `
       <tr>
-        <td>${escapeHtml(u.full_name)} ${u.is_online ? '<span class="status-dot-inline online" title="Online now"></span>' : ''}</td>
-        <td title="${escapeHtml(u.email)}">${escapeHtml(usernameOf(u.email))}</td>
+        <td>${escapeHtml(u.full_name)}</td>
+        <td><span class="au-ellipsis" title="${escapeHtml(u.email)}">${escapeHtml(usernameOf(u.email))}</span></td>
         <td style="text-transform:capitalize">${escapeHtml((u.role || '').replace(/_/g, ' '))}</td>
         <td>${u.merchant_id ? `MRC-${u.merchant_id}` : '—'}</td>
-        <td>${u.last_login ? fmtDateTime(u.last_login) : 'Never'}</td>
+        <td>${auPresenceBadge(u)}</td>
+        <td>${auLastLoginCell(u)}</td>
+        <td>${auDeviceCell(u)}</td>
+        <td>${auIpCell(u)}</td>
       </tr>
-    `).join('') || `<tr><td colspan="5" class="empty-state">No users found.</td></tr>`;
+    `).join('') || `<tr><td colspan="8" class="empty-state">No users found.</td></tr>`;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">Failed to load users.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Failed to load users.</td></tr>`;
   }
 }
 
@@ -958,6 +1042,21 @@ async function loadApprovalQueue(page = aqPage) {
         </td>
       </tr>`;
     }).join('') : `<tr><td colspan="6" class="empty-state">Nothing awaiting approval.</td></tr>`;
+
+    /* THE PAGE CONTROLS WERE NEVER RENDERED. `#aqPagination` has been in the
+       markup since this screen shipped and nothing ever wrote to it, so the
+       Approval Queue showed the newest ten rows and offered no way to reach the
+       eleventh — measured here at 10 rows shown out of 386. Every other list in
+       the portal calls this; this one was simply missed.
+       The endpoint has always paged (`page`/`page_size` above), so this is the
+       one missing line rather than a new capability.
+       CAVEAT, PRE-EXISTING: with the type filter on "Merchant Onboarding" the
+       rows are narrowed in the browser (the server has no such request_type),
+       so a page can show fewer rows than the count promises. That was already
+       true of the table; it is now visible instead of hidden behind a dead
+       control. */
+    renderPagination('aqPagination', data.page, data.total_pages, data.total, loadApprovalQueue);
+
     /* Three different backends share this one queue: a merchant approval, a booking's own
        approve/reject (walks Pending -> Under Review -> Approved -> Payment Pending), and a
        service request's resolve (walks Pending -> Under Review -> Approved, no payment step —

@@ -41,7 +41,7 @@ from app.routers import (
     payment_admin,
     wallet,
 )
-from app.services import booking_completion_service, user_service
+from app.services import activity_service, booking_completion_service, user_service
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("jackpots.startup")
@@ -116,6 +116,37 @@ async def security_headers(request, call_next):
         # setdefault semantics: a route that deliberately sets its own value —
         # the document download's Cache-Control, for instance — keeps it.
         response.headers.setdefault(header, value)
+    return response
+
+
+@app.middleware("http")
+async def request_metadata(request, call_next):
+    """Bind who-connected-from-where for the whole request, and ask for more.
+
+    WHY THIS EXISTS. ``system_logs`` has always had ip/browser/device columns,
+    but only the four endpoints in ``routers/auth.py`` ever filled them — every
+    other action was logged from a service function with no ``Request`` in
+    scope, so the Admin portal's System Logs screen showed an empty Origin for
+    all of them. Binding the connection once here means the ~60 existing
+    ``log_activity`` calls record it without a single signature change.
+
+    ``Accept-CH`` is what makes "Windows 11" and "Chrome 139" possible rather
+    than "Windows" and "Chrome". Chromium froze ``Windows NT`` at 10.0, so the
+    User-Agent genuinely cannot distinguish Windows 10 from 11; the versions
+    live in the high-entropy client hints, which a browser only sends once the
+    server has asked for them. This is the ask. It is request-scoped
+    (``Critical-CH`` is deliberately not sent — forcing a retry of every request
+    to gain a version string on the *first* one is not worth a round trip), so
+    the first row a new browser writes says "Windows" and the rest say
+    "Windows 11". Firefox and Safari implement none of this and are read from
+    the User-Agent, which for them still carries what we need.
+    """
+    activity_service.bind_request(activity_service.request_context(request))
+    try:
+        response = await call_next(request)
+    finally:
+        activity_service.bind_request(None)
+    response.headers.setdefault("Accept-CH", activity_service.ACCEPT_CH)
     return response
 
 

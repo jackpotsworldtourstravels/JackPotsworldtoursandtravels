@@ -46,6 +46,32 @@ function moneyStr(value, { currency = '₹', dash = '—' } = {}) {
   return `${negative ? '-' : ''}${currency}${grouped}${fraction ? '.' + fraction : ''}`;
 }
 
+/* ---------------------------------------------------------------------------
+   groupThousands / moneyIntl — the INTERNATIONAL grouping, three digits at a
+   time: 1,000 · 10,000 · 100,000 · 1,000,000 · 10,000,000.
+
+   `moneyStr` above groups the Indian way (10,00,000) and stays the portal's
+   default for every amount we bill, hold or settle — those are rupee figures
+   read by an Indian desk. This pair exists for the **client fare**: what a
+   merchant charges its own end customer, which the spec asks to be shown in the
+   international convention wherever it appears, in both portals.
+
+   Same string-in, string-out discipline as `moneyStr`: nothing here parses,
+   rounds or sums, so a Decimal that crossed the wire as a string keeps every
+   paise it was sent with.
+   --------------------------------------------------------------------------- */
+function groupThousands(digits) {
+  return String(digits ?? '').replace(/\B(?=(\d{3})+$)/g, ',');
+}
+
+function moneyIntl(value, { currency = '₹', dash = '—' } = {}) {
+  if (value === null || value === undefined || value === '') return dash;
+  const raw = String(value).trim();
+  const negative = raw.startsWith('-');
+  const [whole, fraction = ''] = (negative ? raw.slice(1) : raw).split('.');
+  return `${negative ? '-' : ''}${currency}${groupThousands(whole)}${fraction ? '.' + fraction : ''}`;
+}
+
 /* Is a decimal string greater than zero, without parsing it? Used to decide
    whether to show a figure at all — never to compare two amounts. */
 function moneyIsPositive(value) {

@@ -116,9 +116,16 @@ function clInitWallet() {
     <div class="cl-panel">
       <div class="cl-panel-head">
         <h2>Wallet History</h2>
+        <!-- The two pickers and their two buttons are one bar on one line. The
+             en dash between them is decorative and hidden from assistive tech —
+             each field still carries its own off-screen label, so the control
+             is announced as "From date" and "To date" and not as two unnamed
+             boxes. Sizing and alignment live in classic.css, on
+             .cl-panel-head .cl-panel-tools. -->
         <div class="cl-panel-tools">
           <label class="cl-sr" for="clWalletFrom">From date</label>
           <input type="date" id="clWalletFrom">
+          <span class="cl-datefilter-sep" aria-hidden="true">&ndash;</span>
           <label class="cl-sr" for="clWalletTo">To date</label>
           <input type="date" id="clWalletTo">
           <button type="button" class="cl-btn cl-btn-sm" id="clWalletApply">Apply</button>
@@ -163,20 +170,11 @@ function clInitWallet() {
       </div>
     </div>
 
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>${clIco('info')}How your account works</h2></div>
-      <div class="cl-panel-body">
-        <ol style="margin:0;padding-left:20px;font-size:13px;color:var(--cl-text-2);line-height:1.85;">
-          <li>You book as usual. Nothing is charged while a booking is being arranged.</li>
-          <li>When we issue the ticket, its fare is <b>debited from this wallet</b>.</li>
-          <li>The balance may go <b>negative</b> — that is simply what you owe. You can keep
-              booking while it is, within whatever headroom your account carries.</li>
-          <li>Money reaches this account through a payment request our team raises.
-              You settle it and upload proof on <b>Payment Management</b>; the wallet
-              is credited once that payment has been approved.</li>
-        </ol>
-      </div>
-    </div>`;
+    <!-- The "How your account works" explainer that used to close this screen
+         was removed on request: the screen carries the account information, and
+         the four steps it narrated are stated where they are acted on — the
+         wallet strip above, and Payment Management. Nothing else moved.
+         (No backticks in this comment: it sits inside a template literal.) -->`;
 
   /* No Add-money and no top-up table on this screen any more, so neither
      control is bound and clLoadTopups is not called from here. */

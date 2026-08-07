@@ -77,7 +77,7 @@ function clInitRequests() {
         <div class="cl-field">
           <label for="clReqStatus">Stage</label>
           <select id="clReqStatus" data-cl-status-filter>
-            <option value="">All active work</option>
+            <option value="">All</option>
             ${CL_ACTIVE_STATUSES.map(s =>
               `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clStageName(s)}</option>`).join('')}
           </select>
@@ -85,7 +85,7 @@ function clInitRequests() {
         <div class="cl-field">
           <label for="clReqType">Type</label>
           <select id="clReqType">
-            <option value="">All types</option>
+            <option value="">All</option>
             <option value="booking">Booking</option>
             <option value="ticket_enquiry">Booking enquiry</option>
             ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
@@ -582,8 +582,34 @@ async function clOpenRequestDetail(id) {
       clGo('booking-detail');
       return clRenderBookingDetail();
     }
-    const passengers = r.passengers || data.passengers || [];
-    const history = r.status_history || data.status_history || [];
+    /* PASSENGERS COME FROM THE BOOKING, NOT FROM THE REQUEST.
+       ---------------------------------------------------------------------
+       A service request is its own `service_requests` row with its own (empty)
+       passenger list — the travellers belong to the booking it was raised
+       against, which is `parent_request_id`. Reading the request's own list and
+       printing "No passengers recorded" was therefore true of the row and
+       useless to the reader: every cancellation, date change and ancillary said
+       it, on bookings with a full manifest.
+
+       The parent is fetched only when the request carries none of its own, so a
+       booking or an enquiry costs no extra call. A failure here is non-fatal —
+       the rest of the dialog is worth showing without it. */
+    let passengers = r.passengers || data.passengers || [];
+    let paxBooking = null;
+    if (!passengers.length && r.parent_request_id) {
+      try {
+        const parent = await MerchantApi.getRequest(r.parent_request_id);
+        const booking = parent.request || parent;
+        passengers = booking.passengers || parent.passengers || [];
+        if (passengers.length) paxBooking = booking;
+      } catch {
+        // Leave the list empty; the message below says which booking to look on.
+      }
+    }
+    /* `status_history` on the request, `timeline` on the envelope — the detail
+       endpoint returns the second, so reading only the first meant Activity
+       never rendered on any of these rows. */
+    const history = r.status_history || data.status_history || data.timeline || [];
     const d = r.travel_details || r.details || {};
     const stage = clStageOf(r);
 
@@ -608,6 +634,9 @@ async function clOpenRequestDetail(id) {
            longer push a traveller onto a second visual row — which made three
            passengers look like six at narrow widths. -->
       <h3 class="cl-form-legend">Passengers (${passengers.length})</h3>
+      ${paxBooking ? `<p class="cl-kpi-sub" style="margin:-4px 0 8px;">
+        Travelling on <b class="cl-ref">${escapeHtml(paxBooking.request_number || '')}</b>, the booking
+        this request was raised against.</p>` : ''}
       <div class="cl-table-wrap"><table class="cl-table">
         <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Passport</th><th>Seat</th><th>Meal</th></tr></thead>
         <tbody>${passengers.length ? passengers.map((p, i) => `<tr>
@@ -617,16 +646,38 @@ async function clOpenRequestDetail(id) {
           <td class="cl-ref cl-nowrap">${escapeHtml(p.passport_number || '—')}</td>
           <td class="cl-nowrap">${escapeHtml(clLabel(p.seat_preference) || '—')}</td>
           <td class="cl-nowrap">${escapeHtml(clLabel(p.meal_preference) || '—')}</td>
-        </tr>`).join('') : clEmptyRow(6, 'No passengers recorded.')}</tbody>
+        </tr>`).join('') : clEmptyRow(6, r.parent_request_id
+          ? 'The booking behind this request could not be read just now.'
+          : 'No passengers recorded.')}</tbody>
       </table></div>
 
+      ${clRequestConversationShell()}
+
+      <!-- The timeline is what has happened AND what is still to come, each
+           entry saying which it is (lifecycle.timeline: state done / pending)
+           and carrying its own track-aware label. Marking the last entry
+           "current" and every other one "done" — right for a bare
+           status_history, which is what this used to read — puts the live dot
+           on the last PROJECTED step and dates every future one as "—". The
+           current step is the last done one.
+           (No backticks in this comment: it sits inside a template literal.) -->
       ${history.length ? `
         <h3 class="cl-form-legend">Activity</h3>
-        <ul class="cl-timeline">${history.map((h, i) => `<li class="cl-timeline-item${i === history.length - 1 ? ' current' : ' done'}">
-          <div class="cl-timeline-label">${escapeHtml(clLabel(h.status || h.to_status))}</div>
-          <div class="cl-timeline-meta">${escapeHtml(fmtDateTime(h.at || h.changed_at || h.timestamp))}</div>
-          ${h.remarks || h.note ? `<div class="cl-timeline-note">${escapeHtml(h.remarks || h.note)}</div>` : ''}
-        </li>`).join('')}</ul>` : ''}`;
+        <ul class="cl-timeline">${(() => {
+          const done = history.map(h => h.state !== 'pending');
+          const current = done.lastIndexOf(true);
+          return history.map((h, i) => {
+            const at = h.at || h.changed_at || h.timestamp;
+            const state = !done[i] ? 'pending' : i === current ? 'current' : 'done';
+            return `<li class="cl-timeline-item ${state}">
+              <div class="cl-timeline-label">${escapeHtml(h.label || clLabel(h.status || h.to_status))}</div>
+              ${at ? `<div class="cl-timeline-meta">${escapeHtml(fmtDateTime(at))}${
+                h.by ? ` · ${escapeHtml(h.by)}` : ''}</div>` : ''}
+              ${h.reason || h.remarks || h.note ? `<div class="cl-timeline-note">${
+                escapeHtml(h.reason || h.remarks || h.note)}</div>` : ''}
+            </li>`;
+          }).join('');
+        })()}</ul>` : ''}`;
 
     const foot = [];
     if (r.status === 'draft') {
@@ -647,10 +698,191 @@ async function clOpenRequestDetail(id) {
     $('clModalFoot').querySelector('[data-cl-modal-pay]')?.addEventListener('click', () => {
       clCloseModal(); clOpenPayModal(r);
     });
+
+    clLoadRequestConversation(r);
   } catch (err) {
     $('clModalBody').innerHTML = `<div class="cl-msg cl-msg-err" style="margin-top:0">${
       escapeHtml(clError(err, 'Could not load this request.'))}</div>`;
     $('clModalFoot').innerHTML = '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>';
+  }
+}
+
+/* ======================================================== the conversation
+
+   THE OTHER HALF OF "VIEW", AND THE WHOLE OF WHAT "DISCUSS" USED TO BE.
+   ===========================================================================
+   Service Requests used to carry a Discuss button beside View, which navigated
+   to the Support Center and pre-filled a new conversation with the reference in
+   the subject. Two buttons, two screens, for one question — and the merchant
+   who wanted to ask about a request had to leave the request to do it. The
+   thread now lives in this dialog, under the request it is about.
+
+   IT IS THE SAME BACKEND, unchanged: support threads (chat_service.py), the
+   ones the Support Center already shows. Nothing here is a second messaging
+   feature — a thread opened from this dialog appears in Support Center like any
+   other, and one opened there appears here if it is linked to this request.
+
+   `related_request_id` is what links them, and it takes any request in the
+   caller's own scope (chat_service._linked_booking) — a service request as
+   readily as a booking. Threads raised by the old Discuss button carry no link
+   at all, only the reference in their title, so those are matched on the title
+   too and nothing that was said before this change is orphaned.
+
+   WHAT IT DELIBERATELY DOES NOT DO: act on the request. Only
+   `lifecycle.transition` moves a service_requests row. A conversation must
+   never look like a way to approve, reject or withdraw one — the decision
+   belongs to the manager and then to our desk, and this is a place to ask about
+   it, not a fourth way around it. */
+
+/* The dialog is rebuilt on every open, so these only ever describe the thread
+   on screen right now. `clReqConvFor` is the guard: a fetch that lands after
+   the merchant has closed the dialog or opened another request must not paint
+   into it. */
+let clReqConvFor = null;
+let clReqConvThread = null;
+
+/* Markup only — the state is claimed by clLoadRequestConversation() below, so
+   that a reader of the dialog's template is not looking at a side effect. */
+function clRequestConversationShell() {
+  return `<h3 class="cl-form-legend">Conversation with the desk</h3>
+    <div class="cl-conv" id="clReqConv">
+      <div class="cl-conv-loading"><span class="cl-spin"></span> Looking for messages about this request…</div>
+    </div>`;
+}
+
+/* Which thread is this request's? Preferring the link, falling back to the
+   reference in the title for anything raised before the link existed. The
+   search is server-side (`q` matches subject, reference and message bodies), so
+   this is one narrow query rather than a scan of the merchant's whole support
+   history. */
+async function clLoadRequestConversation(r) {
+  /* Claimed synchronously, before the first await: opening request B while A's
+     lookup is still in flight must leave A's result with a stale token. */
+  const token = String(r.id);
+  clReqConvFor = token;
+  clReqConvThread = null;
+  const ref = r.request_number || '';
+  try {
+    const data = await MerchantApi.listSupportThreads({ q: ref || undefined, pageSize: 20 });
+    if (clReqConvFor !== token) return;
+
+    const mine = (data.items || []).filter(t =>
+      String(t.related_request_id || '') === token
+      || (ref && (t.title || '').includes(ref)));
+    /* Newest conversation wins when a request has been asked about twice. */
+    mine.sort((a, b) =>
+      new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at));
+
+    if (!mine.length) return clRenderRequestConversation(r, null, []);
+
+    const detail = await MerchantApi.getSupportThread(mine[0].id);
+    if (clReqConvFor !== token) return;
+    clReqConvThread = detail.thread;
+    clRenderRequestConversation(r, detail.thread, detail.messages || []);
+    /* getSupportThread marks the DESK's messages read, so the Support Center's
+       rail badge has just gone down. clLoadSupportBadge, not clLoadUnreadCount:
+       the latter is the notifications bell, which a chat does not touch. */
+    clLoadSupportBadge();
+  } catch (err) {
+    if (clReqConvFor !== token) return;
+    const box = $('clReqConv');
+    if (box) {
+      box.innerHTML = `<div class="cl-msg cl-msg-err" style="margin:0">${
+        escapeHtml(clError(err, 'Could not load the conversation.'))}</div>`;
+    }
+  }
+}
+
+function clRenderRequestConversation(r, thread, messages) {
+  const box = $('clReqConv');
+  if (!box) return;
+  const resolved = thread && thread.status === 'completed';
+
+  box.innerHTML = `
+    ${thread ? `<div class="cl-conv-head">
+      <span class="cl-conv-ref">${escapeHtml(thread.request_number || '')}</span>
+      <span class="cl-tag${resolved ? ' cl-tag-ok' : ' cl-tag-info'}">${
+        escapeHtml(thread.status_label || '')}</span>
+      <span class="cl-kpi-sub">${escapeHtml(thread.title || '')}</span>
+    </div>` : ''}
+
+    <div class="cl-conv-log">${messages.length
+      ? messages.map(m => {
+        /* `direction` is the PLATFORM's point of view: a merchant's own message
+           is stored as inbound. Read literally in a merchant-facing screen that
+           is backwards — see clScIsMine() in classic-support.js. */
+        const mine = String(m.direction || '').toLowerCase() === 'inbound';
+        return `<div class="cl-conv-msg${mine ? ' mine' : ''}">
+          <div class="cl-conv-who">${escapeHtml(
+            mine ? (m.sender_name || 'You') : (m.sender_name || 'Partner support desk'))}</div>
+          <div class="cl-conv-text">${escapeHtml(m.message || '')}</div>
+          <div class="cl-conv-when">${escapeHtml(fmtDateTime(m.created_at))}</div>
+        </div>`;
+      }).join('')
+      : `<p class="cl-conv-none">${thread
+        ? 'No messages on this conversation yet.'
+        : 'Nothing has been asked about this request yet. Write below and the desk will pick it up.'}</p>`}
+    </div>
+
+    ${resolved
+      ? `<div class="cl-msg cl-msg-info" style="margin:0">This conversation has been resolved.
+          Reopen it from the <b>Support Center</b> if there is more to say.</div>`
+      : `<div class="cl-conv-write">
+          <textarea id="clReqConvMsg" rows="2" placeholder="${escapeHtml(thread
+            ? 'Reply to the desk…'
+            : `Ask the desk about ${r.request_number || 'this request'}…`)}"
+            ${clActionAttrs('chat.create', CL_NO_CHAT)}></textarea>
+          <button type="button" class="cl-btn cl-btn-primary" id="clReqConvSend"
+            ${clActionAttrs('chat.create', CL_NO_CHAT)}>
+            ${clIco('send', { size: 14 })} ${thread ? 'Send' : 'Start conversation'}
+          </button>
+        </div>
+        <div class="cl-msg" id="clReqConvMsgErr"></div>`}`;
+
+  const send = $('clReqConvSend');
+  if (send) send.addEventListener('click', () => clSendRequestMessage(r));
+  /* Ctrl/Cmd+Enter sends, the same chord the Support Center's composer uses. */
+  $('clReqConvMsg')?.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') clSendRequestMessage(r);
+  });
+}
+
+async function clSendRequestMessage(r) {
+  const box = $('clReqConvMsg');
+  const err = $('clReqConvMsgErr');
+  const btn = $('clReqConvSend');
+  const message = (box?.value || '').trim();
+  if (!message) {
+    clMsg(err, 'Write a message first.', 'err');
+    box?.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  clMsg(err, '');
+  try {
+    /* An existing thread is replied to; a new one is opened AND LINKED, so the
+       desk lands on the request instead of asking for a reference the merchant
+       already had on screen. Both endpoints return the whole thread, which is
+       what is rendered — the desk may have replied since this dialog opened. */
+    const data = clReqConvThread
+      ? await MerchantApi.sendSupportMessage(clReqConvThread.id, message)
+      : await MerchantApi.openSupportThread({
+        subject: `About ${r.request_number || 'a request'}`,
+        message,
+        relatedRequestId: r.id,
+      });
+    clReqConvThread = data.thread;
+    clRenderRequestConversation(r, data.thread, data.messages || []);
+    /* The Support Center holds its own copy of this list, and a thread that did
+       not exist a moment ago has to be in it the next time it is opened. */
+    clInvalidate('support');
+    clLoadSupportBadge();
+  } catch (e2) {
+    clMsg(err, clError(e2, 'Could not send the message.'), 'err');
+    btn.disabled = false;
+    btn.classList.remove('loading');
   }
 }
 

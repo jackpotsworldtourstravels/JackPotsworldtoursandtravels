@@ -128,6 +128,13 @@ def list_requests(
     page_size: int = 20,
     request_type: RequestType | None = None,
     request_status: S | None = None,
+    #: SEVERAL statuses at once, for a caller whose screen shows more than one.
+    #: Booking History is four terminal statuses merged, and an export of it had
+    #: no way to say so — it could pass one status or none, and "none" quietly
+    #: widened the file to every stage including the live ones. Combines with
+    #: ``request_status`` by intersection, so passing both narrows rather than
+    #: contradicting; passing neither is unchanged.
+    request_statuses: list[S] | None = None,
     travel_type: TravelType | None = None,
     merchant_id: int | None = None,
     search: str | None = None,
@@ -141,6 +148,8 @@ def list_requests(
         conditions.append(ServiceRequest.request_type == request_type)
     if request_status is not None:
         conditions.append(ServiceRequest.status == request_status)
+    if request_statuses:
+        conditions.append(ServiceRequest.status.in_(request_statuses))
     if travel_type is not None:
         conditions.append(ServiceRequest.travel_type == travel_type)
     if merchant_id is not None and actor.is_platform_staff:
@@ -180,7 +189,11 @@ def list_requests(
     total = db.scalar(select(func.count()).select_from(ServiceRequest).where(where)) or 0
     stmt = (
         select(ServiceRequest)
-        .options(selectinload(ServiceRequest.passengers))
+        # `parent` because RequestResponse names it (parent_request_number): a
+        # lazy self-referential load would be one extra query PER service request
+        # on a list that is nothing but service requests. selectinload makes it
+        # one query for the page, and none at all when no row has a parent.
+        .options(selectinload(ServiceRequest.passengers), selectinload(ServiceRequest.parent))
         .where(where)
         .order_by(ServiceRequest.created_at.desc())
         .limit(page_size)

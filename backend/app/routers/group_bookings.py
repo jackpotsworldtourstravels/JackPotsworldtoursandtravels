@@ -76,9 +76,11 @@ def _log(
     status: str = "success",
     details: dict | None = None,
 ) -> None:
-    # `request_context` also returns `os`, which `log_activity` does not accept —
-    # the three keys are named explicitly here for that reason, exactly as
-    # routers/auth.py does. Splatting the dict raises a TypeError.
+    # `request_context` returns more keys than `log_activity` takes (`user_agent`),
+    # so the ones wanted are named explicitly rather than splatted — splatting
+    # the dict raises a TypeError. `os` and `local_ip` are omitted on purpose:
+    # the HTTP middleware has already bound this same connection, and
+    # `log_activity` fills them from there.
     meta = activity_service.request_context(request)
     activity_service.log_activity(
         db,

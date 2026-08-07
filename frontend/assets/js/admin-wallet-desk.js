@@ -239,18 +239,29 @@ async function wdOpenReview(topupId) {
         <div class="ops-row"><span class="ops-label">Decided</span>
           <span class="ops-value">${wdEsc(wdDateTime(t.reviewed_at))}</span></div>` : ''}
 
+      ${/* The field, the message and the buttons are three blocks — the same
+            split the Booking Operations dialog now uses, and for the same
+            reason: `.ops-actions` held all three, so the footer could not be
+            right-aligned without dragging the remarks box into the button row.
+            A `.form-grid` around the single field is what puts it on the
+            portal's 24px rhythm; `.span-2` makes it full width, which is what
+            it always was via the inline `max-width:none` this replaces.
+            wdRemarks / wdVerifyBtn / wdRejectBtn / wdReviewMsg all keep their
+            ids and their handlers below. */''}
       ${decidable ? `
-        <div class="form-field" style="max-width:none; margin-top:16px;">
-          <label for="wdRemarks">Remarks</label>
-          <textarea id="wdRemarks" rows="2"
-                    placeholder="Optional when verifying — required when rejecting."></textarea>
+        <div class="form-grid">
+          <div class="form-field span-2">
+            <label for="wdRemarks">Remarks</label>
+            <textarea id="wdRemarks" rows="2"
+                      placeholder="Optional when verifying — required when rejecting."></textarea>
+          </div>
         </div>
-        <div class="ops-actions">
-          <button type="button" class="btn btn-coral" id="wdVerifyBtn">Verify &amp; credit wallet</button>
+        <div class="msg" id="wdReviewMsg" aria-live="polite"></div>
+        <div class="modal-actions">
           <button type="button" class="btn" id="wdRejectBtn">Reject</button>
-          <div class="msg" id="wdReviewMsg" aria-live="polite"></div>
+          <button type="button" class="btn btn-coral" id="wdVerifyBtn">Verify &amp; credit wallet</button>
         </div>` : `
-        <div class="ops-actions"><span class="ops-sub">This claim has already been decided.</span></div>`}
+        <p class="ops-sub">This claim has already been decided.</p>`}
     </div>`;
 
   document.getElementById('wdReviewClose').addEventListener('click', wdCloseReview);

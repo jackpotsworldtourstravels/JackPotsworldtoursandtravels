@@ -1331,6 +1331,19 @@ table{ width:100%; }
   padding:0;                             /* header/body/footer pad themselves */
   overflow-y:auto;
   overscroll-behavior:contain;
+  /* RESERVE THE SCROLLBAR WHETHER OR NOT IT APPEARS.        (2026-08-06)
+     The card is the scrollport (see the long note below), so a dialog whose
+     content grows past 90vh loses ~10px of content width to the bar — and a
+     dialog that swaps its fields, like Initiate Payment Request, gains and
+     loses that 10px as the picker changes. Measured: the same form rendered
+     484px columns for Bank Transfer (four fields, scrolls) and 489px for Cash
+     (two fields, does not), so every label shifted 5px on a dropdown change.
+     That is precisely the "different payment methods have inconsistent
+     layouts" complaint, and it is a scrollbar rather than a stylesheet.
+     `stable` reserves the gutter always, so the columns are identical for every
+     method and for every dialog whatever its length. Unsupported browsers get
+     exactly the previous behaviour. */
+  scrollbar-gutter:stable;
 }
 
 /* ---- `.modal-md` — a WIDTH MODIFIER on tier 2, not a third design ---------
@@ -1478,6 +1491,49 @@ table{ width:100%; }
   grid-column:1 / -1;
 }
 
+/* ---- THE GAP BETWEEN BLOCKS, WHICH WAS ZERO             (2026-08-06) ------
+   THE BUG THIS FIXES, AND WHY IT LOOKED LIKE OVERLAPPING LABELS. The rule
+   above ends in `margin-bottom:0` — correct, because a grid that is the last
+   thing before the sticky footer must not push a 24px hole under itself. But it
+   is the ONLY vertical spacing `.form-grid` had, and admin.css's `margin-bottom:14px`
+   is what it replaced. So any builder that writes TWO field blocks in a row —
+   two grids, or a grid then a loose `.form-field` — got them flush: the second
+   block's uppercase labels sat hard against the bottom edge of the first
+   block's 42px inputs, with nothing between them.
+
+   That is the Initiate Payment Request dialog exactly. It writes the request
+   fields as one grid and the method-specific fields as a second, so the reported
+   "labels overlap fields / spacing is uneven / form sections look broken" was
+   one missing margin, and it changed shape with the payment method because each
+   method contributes a different number of fields to the second grid.
+
+   Spacing the SIBLINGS rather than restoring `margin-bottom` is what keeps the
+   last-child case fixed: nothing is added after the final block, so the footer
+   still sits where §15 put it.
+
+   THREE EXCLUSIONS, ALL BECAUSE THE ELEMENT ALREADY OWNS ITS SPACING:
+   `.form-section-title` sets 32px (the section rhythm, which is deliberately
+   bigger than the field rhythm), `.modal-actions` sets 24px plus the sticky
+   footer geometry, and `.form-section` is a bare grouping wrapper whose FIRST
+   CHILD is a section title — a builder that has to swap a heading and its grid
+   together needs one element to write into, and charging that wrapper a margin
+   would add 24px on top of the title's own 32px. Without the `:not()`s this
+   rule wins on specificity and silently flattens all three. */
+.jp-admin .modal-card > form > * + *:not(.form-section-title):not(.form-section):not(.modal-actions),
+.jp-admin .modal-card:has(.form-grid) > *:not(h2) + *:not(form):not(.form-section-title):not(.form-section):not(.modal-actions),
+.jp-admin .modal-card.modal-lg > *:not(h2) + *:not(form):not(.form-section-title):not(.form-section):not(.modal-actions){
+  margin-top:24px;
+}
+/* The wrapper itself contributes nothing — it exists only so its heading and
+   its grid can be replaced as one unit. */
+.jp-admin .modal-card .form-section{display:block; margin:0;}
+/* A `.form-field` written loose, one under another, outside any grid — the
+   narrow tier-1 dialogs do this. Scoped by the PARENT not being a grid, so a
+   real grid item keeps `gap` as its only spacing and never gets 24 + 24. */
+.jp-admin .modal-card *:not(.form-grid) > .form-field + .form-field{
+  margin-top:24px;
+}
+
 /* ---- one input, one height ----------------------------------------------
    The "stretched and compressed inputs" complaint is mostly this: inputs took
    `padding:10px 12px` and selects added `padding-right:34px` for their arrow,
@@ -1551,6 +1607,17 @@ table{ width:100%; }
 }
 .jp-admin .modal-card .form-section-title:first-child{
   margin-top:0; padding-top:0; border-top:none;
+}
+/* …but a title that is only first inside a `.form-section` WRAPPER is not the
+   first section in the form — it is the second or third, and it still needs its
+   rule and its space above. Without this the payment dialog's swapped method
+   section lost its divider the moment it was put in a wrapper so heading and
+   grid could be replaced together. Higher specificity than the rule above, so
+   it wins regardless of order. */
+.jp-admin .modal-card .form-section > .form-section-title:first-child{
+  margin-top:32px;
+  padding-top:20px;
+  border-top:1px solid var(--jp-border);
 }
 
 /* ---- footer --------------------------------------------------------------
@@ -1631,3 +1698,215 @@ table{ width:100%; }
   .jp-admin .modal-card .modal-actions{gap:10px;}
   .jp-admin .modal-card .modal-actions .btn{flex:1 1 auto; justify-content:center;}
 }
+
+
+/* ==========================================================================
+   16. THE SAME FORM STANDARD, ON THE PAGE                       (2026-08-06)
+   ==========================================================================
+   §15 standardised every DIALOG in the Admin Portal and stopped at the card,
+   because that is where the reported mess was. The forms that live directly on
+   a page — Reports, Profile, Change Password, Broadcast Notification — were
+   left on admin.css's defaults, and those are a different design:
+
+                        admin.css (page)        §15 (dialog)
+     grid columns       auto-fit min 180px      2, fixed
+     grid gap           12px                    24px
+     control size       padding 10/12, 13.5px   height 42px, 14px
+     label gap          5px                     8px
+     radius             10px                    var(--jp-r-sm)
+
+   So the Change Password panel and the Set Amount dialog were visibly two
+   products. This section closes that: the FIELD VOCABULARY is now identical
+   everywhere in the portal, which is what "one shared form layout" has to mean
+   if it is to mean anything measurable.
+
+   WHAT DELIBERATELY STILL DIFFERS: the column COUNT. A dialog is capped at
+   1060px, so two columns is the answer there and §15 fixes it. A page form is
+   as wide as the screen, and forcing Reports' four controls into two columns
+   would leave half a 1440px monitor empty while making the form taller. Columns
+   therefore fit to the space (same 24px gutter, same minimum), which is the
+   same rule §15's own 900px breakpoint applies — responsive, not inconsistent.
+
+   SCOPED TO `.jp-admin .panel`, for the reason the whole of §15 is scoped: this
+   stylesheet is shared with Super Admin, which uses `.form-grid`/`.form-field`
+   too and was not part of the brief. `.panel` also keeps it off the filter bars
+   and the login shell, which are not forms.
+   ========================================================================== */
+
+.jp-admin .panel .form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+  gap:24px;
+  margin-bottom:0;                       /* siblings space themselves, as in §15 */
+}
+/* The §15 rhythm, on the page. Same 24px between blocks, same exclusions. */
+.jp-admin .panel form > * + *:not(.form-section-title):not(.form-section):not(.modal-actions),
+.jp-admin .panel .form-grid + .form-grid,
+.jp-admin .panel .form-grid + .form-field{
+  margin-top:24px;
+}
+.jp-admin .panel *:not(.form-grid) > .form-field + .form-field{margin-top:24px;}
+
+/* Fields that earn the full row, matched the same way §15 matches them — on
+   what the field CONTAINS, so no builder has to opt in. The `name=` list is
+   §15's, repeated rather than shared because the two selectors are scoped to
+   different containers; keeping them in step is the point of listing them
+   identically. */
+.jp-admin .panel .form-field:has(textarea),
+.jp-admin .panel .form-field:has(select[multiple]),
+.jp-admin .panel .form-field:has(input[type=checkbox]),
+.jp-admin .panel .form-field:has(input[name="address"]),
+.jp-admin .panel .form-field:has(input[name="remarks"]),
+.jp-admin .panel .form-field:has(input[name="notes"]),
+.jp-admin .panel .form-field:has(input[name="note"]),
+.jp-admin .panel .form-field:has(input[name="description"]),
+.jp-admin .panel .form-field:has(input[name="message"]),
+.jp-admin .panel .form-field:has(input[name="reason"]),
+.jp-admin .panel .form-field:has(input[name="comments"]),
+.jp-admin .panel .form-field.span-2{
+  grid-column:1 / -1;
+}
+
+/* A form that is a short column of fields should not be stretched across a
+   1440px monitor just because its panel can be. `.panel-narrow` replaces the
+   `style="max-width:480px"` the two profile panels carried — 560px because a
+   42px control needs more room than a 34px one did, and the panels sit in a
+   column so the cap is the readable measure rather than a layout constraint. */
+.jp-admin .panel.panel-narrow{max-width:560px;}
+
+/* One control height and one label rhythm, matching §15 exactly. Written with
+   the same `:not([type=checkbox])` carve-out, because a 42px checkbox is a
+   button. */
+.jp-admin .panel .form-field input:not([type=checkbox]):not([type=radio]),
+.jp-admin .panel .form-field select{
+  width:100%; height:42px; padding:0 14px; font-size:14px;
+  border-radius:var(--jp-r-sm);
+}
+.jp-admin .panel .form-field select{padding-right:34px;}
+.jp-admin .panel .form-field textarea{
+  width:100%; min-height:96px; padding:12px 14px; font-size:14px;
+  border-radius:var(--jp-r-sm); resize:vertical;
+}
+.jp-admin .panel .form-field input[type=checkbox],
+.jp-admin .panel .form-field input[type=radio]{width:auto; height:auto;}
+.jp-admin .panel .form-field label{
+  display:block; margin-bottom:8px;
+  font-size:11.5px; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase;
+  color:var(--jp-text-muted);
+}
+/* A label that IS a checkbox row is a control, not a caption — it must not be
+   uppercased away from the words next to the box. */
+.jp-admin .panel .form-field label:has(input[type=checkbox]),
+.jp-admin .panel .form-field label:has(input[type=radio]){
+  display:flex; align-items:center; gap:8px;
+  margin-bottom:0; text-transform:none; letter-spacing:0;
+  font-size:13.5px; font-weight:600; color:var(--jp-text);
+}
+.jp-admin .panel .form-field > .cell-sub,
+.jp-admin .panel .form-field > .ops-sub,
+.jp-admin .panel .form-field > small{
+  display:block; margin:7px 0 0;
+  font-size:11.5px; font-weight:500; line-height:1.45;
+  color:var(--jp-text-muted);
+}
+.jp-admin .panel .form-field label .cell-sub{
+  display:inline; margin:0; font-size:inherit; font-weight:inherit;
+  text-transform:none; letter-spacing:0; opacity:.75;
+}
+
+/* ---- one button row --------------------------------------------------------
+   The three page forms each ended with a bare `<button>` sitting hard under the
+   last input with no separation, and Reports wrapped its four buttons in an
+   inline-styled div with its own margins. `.form-actions` is the page's
+   counterpart to `.modal-actions`: same 12px gap, same wrap, separated from the
+   fields by the same 24px. NOT right-aligned — a dialog's footer is a decision
+   bar with a Cancel beside it, while a page form has one primary action and
+   left-aligning it keeps it under the fields the eye just finished reading. */
+.jp-admin .panel .form-actions{
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+  margin-top:24px;
+}
+/* Whatever follows the button row — a status message, a summary block, a
+   results table — keeps clear of it. Written as `+ *` rather than per element
+   because Reports puts a summary there and the profile forms put a `.msg`. */
+.jp-admin .panel .form-actions + *{margin-top:18px;}
+
+/* Section headings on a page match the dialog's rhythm rather than admin.css's
+   18/10px, so a form does not change shape when it moves between the two. */
+.jp-admin .panel .form-section-title{
+  margin:32px 0 16px; padding-top:20px;
+  border-top:1px solid var(--jp-border);
+  font-size:12px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.05em;
+  color:var(--jp-text-muted);
+}
+.jp-admin .panel .form-section-title:first-child{
+  margin-top:0; padding-top:0; border-top:none;
+}
+
+
+/* ==========================================================================
+   17. ACTIVE USERS PRESENCE & SYSTEM LOGS CONNECTION            (2026-08-06)
+   ==========================================================================
+   Two table cells that carry more than one fact each, and the whole reason
+   they are cells rather than columns: a device is "Desktop · Windows 11 ·
+   Chrome 139" and an address may have a LAN address behind it. Six columns of
+   two words is how a table stops fitting on a laptop.
+   ========================================================================== */
+
+/* ---- the presence badge --------------------------------------------------
+   Reuses `.badge`'s existing shape and colour vocabulary and adds one thing:
+   a dot, so the four states are separable at a glance without the reader
+   parsing the word. COLOUR IS NEVER THE ONLY CARRIER — every badge still spells
+   its state out, which is what keeps it readable for a colour-blind operator
+   and in a printed export. */
+.jp-admin .au-presence{display:inline-flex; align-items:center; gap:7px; white-space:nowrap;}
+.jp-admin .au-dot{
+  width:8px; height:8px; border-radius:50%; flex:none;
+  /* The ring is drawn with a shadow rather than a border so it does not change
+     the dot's box and shift the text beside it. */
+  box-shadow:0 0 0 3px rgba(255,255,255,0.35);
+}
+/* "Not recorded" / "Never Logged In" in a data cell. Muted and italic, because
+   it is the ABSENCE of a value — rendering it in the same weight as a real one
+   is how a reader comes away believing a device was called "Never". */
+.jp-admin .au-none,
+.jp-admin .sl-none{color:var(--jp-text-muted); font-style:italic; font-size:12.5px;}
+.jp-admin .au-sub{color:var(--jp-text-muted); font-weight:500;}
+
+/* ---- the System Logs connection cell -------------------------------------
+   A stack, not a sentence: four short facts read faster down than strung
+   together with separators, and each line stands alone when one is missing. */
+.jp-admin .sl-conn{display:flex; flex-direction:column; gap:2px; line-height:1.35;}
+.jp-admin .sl-conn > span:first-child{font-weight:600; color:var(--jp-text);}
+.jp-admin .sl-conn > span{font-size:12px; color:var(--jp-text-muted);}
+.jp-admin .sl-ip{font-variant-numeric:tabular-nums;}
+.jp-admin .sl-local{font-weight:500;}
+
+/* Neither cell should be the reason a table starts wrapping mid-address. */
+.jp-admin #adminSysLogTable td:nth-child(6){min-width:150px;}
+.jp-admin #activeUsersTable td:nth-child(7),
+.jp-admin #activeUsersTable td:nth-child(8){min-width:130px;}
+
+/* ---- keeping the eight columns inside the panel --------------------------
+   Active Users grew from five columns to eight, and measured 1041px inside a
+   997px scroller on a 1440px screen — 44px of horizontal scroll for a table
+   that very nearly fits. The cause was one column: the username is the local
+   part of an email address and a service account's runs to 23 characters,
+   which took 203px and pushed the last column out.
+
+   THE CAP IS ON A SPAN, NOT THE CELL. A `max-width` on a `<td>` is advisory
+   under `table-layout:auto` — the browser is free to ignore it, and switching
+   the table to `fixed` to make it binding is the trap that has bitten this
+   portal before (every column then needs an explicit width or the layout
+   collapses on resize). An inline-block inside the cell is bound by it. The
+   full address is already on the span's `title`, so nothing is lost. */
+.jp-admin .au-ellipsis{
+  display:inline-block; max-width:150px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  vertical-align:bottom;
+}
+/* A timestamp broken across two lines is what made the rows three different
+   heights ("5 Aug 2026," / "9:52 pm"). It is one value; keep it on one line. */
+.jp-admin #activeUsersTable td:nth-child(6){white-space:nowrap;}

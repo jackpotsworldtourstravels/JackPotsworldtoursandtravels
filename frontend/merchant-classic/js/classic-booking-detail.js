@@ -130,7 +130,7 @@ function clRenderBookingDetail() {
         <div class="cl-kpi"><div class="cl-kpi-label">You saved</div>
           <div class="cl-kpi-value">${escapeHtml(moneyStr(r.saved_amount))}</div>
           <div class="cl-kpi-sub">against your client fare of ${
-            escapeHtml(moneyStr(r.client_fare))}</div></div>` : ''}
+            escapeHtml(moneyIntl(r.client_fare))}</div></div>` : ''}
     </div>
 
     <!-- Where this booking has got to, as one rail. Same timeline payload as
@@ -194,8 +194,15 @@ function clRenderBookingDetail() {
       <div class="cl-table-wrap">
         <table class="cl-table">
           <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
-            <th>Nationality</th><th>Passport</th><th>Expiry</th></tr></thead>
-          <!-- One passenger, one line — every cell nowrap, the wrapper scrolls. -->
+            <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Special request</th></tr></thead>
+          <!-- One passenger, one line — every cell nowrap, the wrapper scrolls.
+               The last column is the request that traveller made: special
+               requests are per-passenger as of this pass, and a booking whose
+               only record of "wheelchair for passenger 3" was on the entry form
+               would be a booking the merchant cannot check afterwards. Read out
+               of the same special_services array clWriteSpecialRequest fills.
+               NOT nowrap — it is a sentence, not a field.
+               (No backticks in this comment — it is in a template literal.) -->
           <tbody>${(r.passengers || []).length ? r.passengers.map((p, i) => `
             <tr>
               <td>${i + 1}</td>
@@ -206,7 +213,8 @@ function clRenderBookingDetail() {
               <td class="cl-nowrap">${escapeHtml(p.nationality || '—')}</td>
               <td class="cl-nowrap">${escapeHtml(p.passport_number || '—')}</td>
               <td class="cl-nowrap">${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
-            </tr>`).join('') : clEmptyRow(8, 'No passengers recorded.')}</tbody>
+              <td>${escapeHtml(clReadSpecialRequest(p.special_services) || '—')}</td>
+            </tr>`).join('') : clEmptyRow(9, 'No passengers recorded.')}</tbody>
         </table>
       </div>
     </div>

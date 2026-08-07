@@ -339,12 +339,29 @@ GET /api/reports/export
   ?type=bookings|service_requests|payments
   &format=csv|xlsx|pdf
   &date_from=<date>&date_to=<date>&search=<str>&status=<RequestStatus>&merchant_id=<int>
+  &statuses=<comma-separated RequestStatus>          (2026-08-06)
+  &request_type=<RequestType>|any                    (2026-08-06)
 → 200, file stream (Content-Disposition: attachment)
 Permission: P.REPORT_EXPORT
 ```
 
 Each export also writes one `SystemLog(module='reports', action='export')` row (mirrors the
 legacy `report_generation_log` table per `docs/SCHEMA_V2.md:98`).
+
+**`statuses` and `request_type` (both also on `/summary`, both optional and additive).** A screen
+whose filters do not reduce to one status or one type could not export what it was showing.
+Booking History is **four terminal statuses merged**, and its Type filter spans every request
+type — so passing one `status` was too narrow and passing none silently widened the file to every
+stage, live bookings included. `statuses=ticket_issued,completed,cancelled,rejected` says the
+first; `request_type=any` says the second.
+
+- `statuses` intersects with `status`; unknown values are a **400**, never dropped, because a
+  quietly-ignored filter is exactly the wrong-file bug these parameters exist to prevent.
+- `request_type` is three-way: **omitted** keeps each report's historical default (`bookings`
+  means bookings only — still what the Reports screen wants), **`any`** drops the type filter,
+  and a concrete type selects that one. Omitting is therefore *not* the same as `any`.
+- Comma-separated rather than a repeated parameter: every portal reaches this through one shared
+  axios wrapper that serialises arrays as `statuses[]=`.
 
 ### 6.2a Merchant paperwork downloads (M2, consumed in M7)
 

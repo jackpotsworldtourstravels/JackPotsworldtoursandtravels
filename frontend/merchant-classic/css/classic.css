@@ -851,15 +851,14 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
   padding-bottom:1px; user-select:none;
 }
 
-/* THE 24-HOUR VARIANT — two typed number inputs and a trailing "24h" marker.
+/* THE 24-HOUR VARIANT — two typed two-digit inputs and a trailing "24h" marker.
    The parts are inputs now rather than selects, so they need the centring and
    the flex basis stated for `input` too; the rules above only reach `select`.
 
-   `appearance:textfield` removes the spinner arrows. They are kept off
-   deliberately: the arrows halve the usable width of a two-character field, and
-   stepping to 23:00 one click at a time is not how anyone enters a time. The
-   value is still typed, still clamped on blur, and the arrow keys still step it
-   because the input remains type=number. */
+   They are `type=text` as of this pass, so that `maxlength="2"` is real — it is
+   inert on a number input, which is how "123" and "2A" used to reach the field.
+   The spinner rules below are kept: they cost nothing on a text input and are
+   what stops the arrows reappearing if either part is ever a number again. */
 .cl-timesel-24 input{
   min-width:0; flex:1 1 64px; text-align:center;
   -moz-appearance:textfield; appearance:textfield;
@@ -1159,6 +1158,21 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 .cl-table tr.cl-subrow:hover{background:transparent;}
 .cl-table tr.cl-subrow + tr td{border-top:none;}
 
+/* ONE RECORD, ONE BLOCK.
+   ===========================================================================
+   The banding above already knows a continuation row belongs to the row over
+   it — that is what the `:not(.cl-subrow)` in the zebra selector is for — but
+   two things still cut the pair in half. The parent row drew its own
+   bottom hairline, so a rule ran BETWEEN a request and the very line
+   explaining it, making one record read as two; and only the half under the
+   pointer lit up, so a record never highlighted as the single thing it is.
+
+   `:has(+ tr.cl-subrow)` is the "is followed by a continuation" test — the
+   parent keeps its hairline everywhere else, and loses it only where the next
+   row is its own. */
+.cl-table tbody tr:has(+ tr.cl-subrow) td{border-bottom:none;}
+.cl-table tbody tr:hover + tr.cl-subrow{background:var(--cl-hover);}
+
 /* A clickable row. Whole-row targets need to say so. */
 .cl-table tr.cl-clickable{cursor:pointer;}
 .cl-table tbody tr.cl-clickable:hover{background:var(--cl-accent-soft);}
@@ -1279,6 +1293,19 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 }
 .cl-seg button:hover{color:var(--cl-text);}
 .cl-seg button.active{background:var(--cl-surface); color:var(--cl-text); box-shadow:var(--cl-sh-xs);}
+
+/* The second-level choice inside a request tab — which extra is being asked
+   for (Service Requests: Extra baggage / Meal / Seat). Labelled, because a bare
+   segmented control above a form reads as a filter over it rather than as the
+   question that decides which form it is. */
+.cl-anc-pick{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin:0 0 14px;
+}
+.cl-anc-label{
+  font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--cl-text-muted); flex-shrink:0;
+}
 
 /* ---- filter chips ----
    The primary facet of a table, promoted out of a <select> and onto the
@@ -1565,7 +1592,57 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 .cl-panel-head .cl-panel-tools{
   margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;
 }
-.cl-panel-head .cl-panel-tools input[type=date]{min-height:36px; padding:6px 12px; font-size:12.5px;}
+
+/* A DATE RANGE IN A PANEL HEAD, ALIGNED WITH THE BUTTONS BESIDE IT.
+   ===========================================================================
+   The base control rule sets `width:100%` on every input, which a flex item
+   honours literally: each date box claimed the whole row, so the two pickers
+   and their Apply/Clear buttons stacked into three rows of one item each —
+   the "Date Range filter is misaligned" on Wallet History. Widths are fixed
+   here and the buttons are brought up to the pickers' height, so the four
+   controls read as one bar at one baseline, the way every other filter in the
+   portal does.
+
+   `flex:0 0 auto` rather than a bare width: without it the wrap that follows on
+   a phone would still leave one stretched box on its own line. */
+.cl-panel-head .cl-panel-tools input[type=date]{
+  flex:0 0 auto; width:auto; min-width:152px;
+  min-height:36px; padding:6px 12px; font-size:12.5px;
+}
+.cl-panel-head .cl-panel-tools .cl-btn-sm{min-height:36px;}
+.cl-datefilter-sep{
+  flex:0 0 auto; color:var(--cl-text-muted); font-weight:700; font-size:12.5px;
+  user-select:none;
+}
+
+/* At phone widths the four controls cannot share a line at those metrics, so
+   the pair of pickers takes one row and the buttons the next — still two equal
+   halves rather than the three ragged rows this replaced. */
+@media (max-width:560px){
+  .cl-panel-head .cl-panel-tools input[type=date]{flex:1 1 42%; min-width:0;}
+  .cl-datefilter-sep{display:none;}
+}
+/* A PANEL THAT HAS BOTH A HEADING AND A FILTER BAR.
+   ===========================================================================
+   `.cl-panel-head` carries no bottom padding because it is written to be
+   followed by `.cl-panel-body`, which brings its own top padding. Put a
+   `.cl-toolbar` between them — the one place in the portal that does is Service
+   Requests' "Requests you have raised" — and the heading ends up sitting
+   directly on the toolbar's tinted edge, with its descenders in the filter bar.
+
+   The head gets the space it was relying on the body for. The toolbar's own
+   left/right padding is matched to the head's at every width, so the heading,
+   the filters and the table's first column all start on one line: they were
+   22/22 on desktop but 16/14 below 768px, which put the chips a couple of
+   pixels left of the title they belong to. */
+.cl-panel-head:has(+ .cl-toolbar){padding-bottom:15px;}
+.cl-panel-head + .cl-toolbar{border-top:1px solid var(--cl-line-2);}
+
+/* The count beside a panel heading. `.cl-kpi-sub` carries a 3px top margin for
+   its usual home under a KPI figure; in a head that is `align-items:center` it
+   is 3px of deliberate misalignment against the title it annotates. */
+.cl-panel-head .cl-kpi-sub{margin-top:0;}
+
 .cl-panel-sub{
   padding:4px 22px 0; font-size:12.5px; color:var(--cl-text-muted); font-weight:500;
 }
@@ -1709,6 +1786,78 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   font-size:12px; font-weight:500; color:var(--cl-text-2); margin-top:7px;
   padding:9px 12px; border-radius:var(--cl-r-xs);
   background:var(--cl-canvas-2); border:1px solid var(--cl-line-2);
+}
+
+/* ---- conversation inside a request dialog ----
+   ===========================================================================
+   The support thread about a request, read and answered where the request is —
+   see the note above clRequestConversationShell() in classic-requests.js for
+   why it is here rather than behind a second button.
+
+   DELIBERATELY NOT THE SUPPORT CENTER'S CHAT. That is a full messaging
+   workspace — avatars, day dividers, read receipts, attachments, presence,
+   polling — and reproducing it inside a dialog would be a second implementation
+   of the same screen, free to drift from the first. This is a transcript and a
+   reply box: enough to ask and to read the answer, with the Support Center
+   still the place to work a conversation properly. */
+.cl-conv{
+  border:1px solid var(--cl-line-2); border-radius:var(--cl-r-sm);
+  background:var(--cl-canvas-2); overflow:hidden;
+}
+.cl-conv-loading{padding:16px 14px; font-size:12.5px; color:var(--cl-text-muted); font-weight:500;}
+.cl-conv-head{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  padding:11px 14px; border-bottom:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2);
+}
+.cl-conv-ref{
+  font-family:var(--cl-mono); font-size:11.5px; font-weight:700; color:var(--cl-text-2);
+}
+.cl-conv-head .cl-kpi-sub{margin:0; min-width:0; flex:1 1 140px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+/* Capped and scrollable: a thread of forty messages must not push the reply box
+   and everything under it off the end of the dialog. */
+.cl-conv-log{
+  max-height:260px; overflow-y:auto;
+  padding:12px 14px; display:flex; flex-direction:column; gap:10px;
+}
+/* `--cl-text-2`, not `--cl-text-muted`: muted is tuned for the page surface and
+   lands at 4.18:1 on this panel's recessed fill, under the 4.5:1 AA floor for
+   text this size. Same reason on the two metadata lines below. */
+.cl-conv-none{margin:0; font-size:12.5px; color:var(--cl-text-2); font-weight:500;}
+
+.cl-conv-msg{
+  max-width:min(86%, 460px); align-self:flex-start;
+  padding:9px 12px; border-radius:var(--cl-r-sm);
+  background:var(--cl-surface); border:1px solid var(--cl-line-2);
+}
+.cl-conv-msg.mine{align-self:flex-end; background:var(--cl-accent-soft); border-color:transparent;}
+.cl-conv-who{font-size:11px; font-weight:700; color:var(--cl-text-2); margin-bottom:3px;}
+/* `pre-wrap` so a message typed over several lines reads the way it was
+   written — and the markup must therefore keep NO indentation of its own, or
+   every line arrives padded by the template literal. */
+.cl-conv-text{
+  font-size:13px; font-weight:500; color:var(--cl-text); line-height:1.55;
+  white-space:pre-wrap; overflow-wrap:anywhere;
+}
+.cl-conv-when{font-size:10.5px; font-weight:500; color:var(--cl-text-2); margin-top:4px;}
+
+.cl-conv-write{
+  display:flex; gap:9px; align-items:flex-end;
+  padding:11px 14px; border-top:1px solid var(--cl-line-2); background:var(--cl-surface-2);
+}
+.cl-conv-write textarea{
+  flex:1 1 auto; min-width:0; min-height:44px; resize:vertical;
+  font-size:13px; padding:10px 12px;
+}
+.cl-conv-write .cl-btn{flex:0 0 auto;}
+.cl-conv + .cl-msg{margin-top:9px;}
+
+@media (max-width:560px){
+  .cl-conv-msg{max-width:100%;}
+  .cl-conv-write{flex-wrap:wrap;}
+  .cl-conv-write .cl-btn{width:100%;}
 }
 
 /* ---- skeleton loading ---- */
@@ -3250,12 +3399,20 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   font-variant-numeric:tabular-nums; color:var(--cl-text);
 }
 
-/* ---- return journey block ---- */
-.cl-return{
+/* ---- journey blocks: departure and return ----
+   ONE TREATMENT FOR BOTH LEGS, AND IT IS NO LONGER A HIGHLIGHT.
+   This was `.cl-return`, a shaded dashed panel that only the return leg wore —
+   which made the return look like an aside attached to the form while the
+   outbound, the leg every enquiry has, had no heading of its own at all. Both
+   legs are now the same block, and the tint and the dashed rule are gone on
+   request: a plain white section with a hairline, so it reads as part of the
+   form rather than as something called out of it. */
+.cl-journey{
   margin-top:8px; padding:18px; border-radius:var(--cl-r-md);
-  background:var(--cl-surface-2); border:1px dashed var(--cl-line);
+  background:var(--cl-surface); border:1px solid var(--cl-line);
 }
-.cl-return-head{
+.cl-journey + .cl-journey{margin-top:14px;}
+.cl-journey-head{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;
   font-size:13.5px; font-weight:700; color:var(--cl-text);
 }
@@ -3492,6 +3649,9 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
 
   .cl-panel{border-radius:var(--cl-r-md); margin-bottom:16px;}
   .cl-panel-head{padding:16px 16px 0;}
+  /* Same left edge as the heading above it — see the note by
+     `.cl-panel-head:has(+ .cl-toolbar)`. */
+  .cl-panel-head + .cl-toolbar{padding-left:16px; padding-right:16px;}
   .cl-panel-head h2{font-size:15px;}
   .cl-panel-body{padding:16px;}
   .cl-panel-note, .cl-pager{padding-left:16px; padding-right:16px;}
@@ -3533,7 +3693,7 @@ button.cl-kpi:hover .cl-kpi-arrow{opacity:1; transform:none; color:var(--cl-oran
   .cl-trip{display:flex; width:100%;}
   .cl-trip-opt{flex:1; justify-content:center; padding:10px 10px;}
   .cl-pax-grid{grid-template-columns:1fr;}
-  .cl-return{padding:14px;}
+  .cl-journey{padding:14px;}
   .cl-donut{justify-content:center;}
   .cl-charts{grid-template-columns:1fr; gap:16px;}
   .cl-tabs{gap:0; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none;}

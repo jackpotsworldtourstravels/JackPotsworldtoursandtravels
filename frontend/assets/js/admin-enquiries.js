@@ -295,8 +295,13 @@ async function openEnquiryReview(enquiryId) {
             and the desk could not previously see that it was about to.
             Rendered only when recorded — null means "not recorded", and a
             dash is honest where a zero would be a claim. */ ''}
+      ${/* `moneyIntl`, not `moneyStr`: the client fare is grouped in threes
+            (1,000,000) wherever it appears, in this portal and the merchant's
+            alike, which is what the merchant typed into the box. Every figure
+            WE bill — the quotation, the saving below — stays on the portal's
+            Indian grouping. */ ''}
       ${r.client_fare != null
-        ? enqDetailRow('Client fare', `<span class="mono">${escapeHtml(moneyStr(r.client_fare))}</span>
+        ? enqDetailRow('Client fare', `<span class="mono">${escapeHtml(moneyIntl(r.client_fare))}</span>
              <span class="cell-sub">what the merchant sold at</span>`)
         : ''}
       ${r.saved_amount != null

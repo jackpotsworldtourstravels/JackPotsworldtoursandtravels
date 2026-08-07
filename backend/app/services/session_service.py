@@ -29,10 +29,34 @@ from app.services.activity_service import clean_ip
 
 ONLINE_THRESHOLD_MINUTES = 2
 
+#: How long after their last heartbeat a user is still described as *Recently
+#: Active* rather than *Offline*.
+#:
+#: The online window is deliberately tiny — two minutes, so "🟢 Online" means
+#: someone is at the keyboard right now — but that makes it a poor answer on its
+#: own: a user who closed a tab ninety seconds ago and one who has not signed in
+#: for a month both read as Offline, and an admin looking at the list cannot
+#: tell them apart. Fifteen minutes is the usual idle-session convention and is
+#: short enough that "recently" still means it.
+RECENTLY_ACTIVE_MINUTES = 15
+
 SESSION_MODULE = "Auth"
 SESSION_ACTION = "Session"
 STATUS_ACTIVE = "active"
 STATUS_ENDED = "ended"
+
+#: The four presence states the Admin Active Users screen shows and filters on.
+PRESENCE_ONLINE = "online"
+PRESENCE_RECENT = "recently_active"
+PRESENCE_OFFLINE = "offline"
+PRESENCE_NEVER = "never_logged_in"
+
+PRESENCE_LABELS = {
+    PRESENCE_ONLINE: "Online",
+    PRESENCE_RECENT: "Recently Active",
+    PRESENCE_OFFLINE: "Offline",
+    PRESENCE_NEVER: "Never Logged In",
+}
 
 
 def _now() -> datetime.datetime:
@@ -74,7 +98,16 @@ def start_session(db: Session, user: User, meta: dict) -> SystemLog:
         session_token=secrets.token_urlsafe(32),
         session_expires_at=now + datetime.timedelta(minutes=ONLINE_THRESHOLD_MINUTES),
         status=STATUS_ACTIVE,
-        extra_data={"os": meta.get("os"), "current_page": None},
+        # `local_ip` joins `os` in the blob for the same reason it does in
+        # activity_service: system_logs has one INET column and it holds the
+        # address the user actually connected from. A LAN address is only ever
+        # present when the client is on this network or a proxy forwarded it,
+        # so it is stored when it exists and simply absent when it does not.
+        extra_data={
+            "os": meta.get("os"),
+            "local_ip": clean_ip(meta.get("local_ip")),
+            "current_page": None,
+        },
     )
     db.add(session)
     db.commit()
@@ -138,6 +171,72 @@ def online_user_ids(db: Session, user_ids: list[int]) -> set[int]:
         and_(_online_filter(), SystemLog.user_id.in_(user_ids))
     ).distinct()
     return set(db.scalars(stmt).all())
+
+
+def latest_sessions(db: Session, user_ids: list[int]) -> dict[int, SystemLog]:
+    """The newest session row for each of these users, keyed by user id.
+
+    One query for a whole page of the Active Users list. ``DISTINCT ON`` is
+    PostgreSQL's idiom for "the newest row per group" and does it in a single
+    index scan over ``ix_syslog_user_id`` — the alternative, a window function
+    or a correlated subquery per row, is N+1 dressed up.
+    """
+    if not user_ids:
+        return {}
+    stmt = (
+        select(SystemLog)
+        .where(and_(_session_filter(), SystemLog.user_id.in_(user_ids)))
+        .distinct(SystemLog.user_id)
+        .order_by(SystemLog.user_id, SystemLog.created_at.desc())
+    )
+    return {row.user_id: row for row in db.scalars(stmt).all()}
+
+
+def last_seen_at(session: SystemLog | None) -> datetime.datetime | None:
+    """When this session last showed a sign of life.
+
+    ``session_expires_at`` is the heartbeat plus :data:`ONLINE_THRESHOLD_MINUTES`
+    (see the module docstring), so the heartbeat itself is that value minus the
+    same offset. A session with no heartbeat at all has only ever been seen at
+    login.
+    """
+    if session is None:
+        return None
+    if session.session_expires_at is None:
+        return session.created_at
+    return session.session_expires_at - datetime.timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+
+
+def presence_of(user, session: SystemLog | None) -> str:
+    """Which of the four states this user is in.
+
+    ``last_login`` rather than the session row decides *Never Logged In*: the
+    sessions table is ``system_logs``, which is prunable operational data, while
+    ``users.last_login`` is the durable record of whether an account has ever
+    been used. Reading presence off the log would turn a housekeeping job into
+    "nobody has ever signed in".
+    """
+    if getattr(user, "last_login", None) is None and session is None:
+        return PRESENCE_NEVER
+    if session is None:
+        return PRESENCE_OFFLINE
+    now = _now()
+    if session.status == STATUS_ACTIVE and (session.session_expires_at or now) >= now:
+        return PRESENCE_ONLINE
+    seen = last_seen_at(session)
+    if seen and (now - seen) <= datetime.timedelta(minutes=RECENTLY_ACTIVE_MINUTES):
+        return PRESENCE_RECENT
+    return PRESENCE_OFFLINE
+
+
+def online_user_ids_stmt():
+    """A SELECT of every user id with a live heartbeat, for use as a subquery.
+
+    Exposed so the Active Users listing can filter on presence *inside* the
+    paginated query. Filtering it in Python after the page was fetched would
+    return a short page and a total that disagrees with it.
+    """
+    return select(SystemLog.user_id).where(_online_filter())
 
 
 def heartbeat(db: Session, user_id: int, current_page: str | None) -> SystemLog | None:

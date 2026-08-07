@@ -6,6 +6,28 @@ one sortable table instead of switching between two screens. Implemented as two 
 in Python rather than a SQL UNION: the two row shapes come from different tables with
 different columns, and the result sets here are small (bounded by page_size) so there's no
 performance reason to push the merge into SQL.
+
+NOTHING REACHES THIS QUEUE BEFORE THE MERCHANT'S OWN MANAGER HAS RELEASED IT.
+The merchant signs off its staff's work first, and only then is the decision ours::
+
+    raised -> merchant's manager reviews -> manager approves -> THIS QUEUE -> admin decides
+
+The queue used to list a request from the moment it was raised, so a row could be
+worked here while its own company was still deciding whether to ask for it at all.
+The service layer never allowed that — ``manager_approval.guard_ready_for_staff``
+answers 409 on a request the manager has not released, and
+``manager_service`` owns the Classic Tours booking track for the same reason — so
+the queue was advertising an Approve button the server would refuse. This is a
+**visibility** rule and only that: what happens *after* a manager approves is
+unchanged, and no status, transition, permission or endpoint moved.
+
+Two kinds of row are unaffected, both correctly:
+
+* a **pending merchant** has no manager stage — the company being onboarded has
+  no staff to sign anything off, and its approval is the platform's alone;
+* a request **raised before manager sign-off existed** carries no block, and
+  ``manager_approval.is_approved`` reads a missing block as approved, so nothing
+  already sitting on the desk vanished when this shipped.
 """
 import datetime
 
@@ -14,7 +36,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models_v2 import Merchant, MerchantStatus, RequestStatus, RequestType, User
-from app.services import lifecycle, ticket_service
+from app.services import lifecycle, manager_approval, ticket_service
 from app.services.lifecycle import SPEC_LABELS
 
 #: Ticket/service-request statuses still awaiting an Admin decision.
@@ -96,6 +118,15 @@ def list_approval_queue(
             # service layer refuses by track — the queue must not advertise an
             # action the server will not take.
             if lifecycle.is_classic_track(r):
+                continue
+            # THE SAME RULE, FOR THE OTHER APPROVAL STAGE. See the module
+            # docstring: a request the merchant's own manager has not released
+            # is not ours yet, and ``manager_approval.guard_ready_for_staff``
+            # already refuses to settle it — so listing it here was an offer of
+            # an action the server would 409. Rows raised before the manager
+            # stage existed carry no block at all and ``is_approved`` reads
+            # those as approved, so nothing that predates CR-3 disappears.
+            if not manager_approval.is_approved(r):
                 continue
             if ticket_status is None and not _awaits_admin(r):
                 continue

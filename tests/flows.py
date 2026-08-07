@@ -321,13 +321,27 @@ def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
         assert r.status_code == 200, f"approve: {r.status_code} {r.text[:300]}"
 
     if want >= ORDER.index("paid"):
+        txn = f"TXN-{rid}-VERIFY"
         r = requests.post(f"{BASE}/api/requests/{rid}/pay", headers=H(mtok),
                           json={"amount": amount, "method": "bank_transfer",
-                                "transaction_id": f"TXN-{rid}-VERIFY"})
+                                "transaction_id": txn})
         assert r.status_code == 200, f"pay: {r.status_code} {r.text[:300]}"
-        pend = requests.get(f"{BASE}/api/admin/payments/pending?page_size=100", headers=H(atok)).json()
-        mine = [p for p in pend.get("items", []) if p.get("request_id") == rid]
-        assert mine, f"no pending payment found for {rid}"
+
+        # FOUND BY ITS TRANSACTION ID, NOT BY READING THE TOP OF THE QUEUE.
+        # This used to fetch /admin/payments/pending?page_size=100 and scan it
+        # for our request. That queue is ordered OLDEST FIRST and page_size is
+        # capped at 100 by the endpoint, so once a hundred payments were sitting
+        # unverified on the dev database, a payment created one second ago was
+        # on page two and this asserted "no pending payment found" — a fixture
+        # failing on the size of a queue it does not own, in five scripts at
+        # once. The general payments list filters on transaction_id, and the id
+        # written just above is unique per request, so the lookup is exact
+        # however long the backlog gets.
+        found = requests.get(
+            f"{BASE}/api/admin/payments?status=pending&page_size=100&search={txn}",
+            headers=H(atok)).json()
+        mine = [p for p in found.get("items", []) if p.get("request_id") == rid]
+        assert mine, f"no pending payment found for {rid} (searched {txn})"
         r = requests.post(f"{BASE}/api/admin/payments/{mine[0]['id']}/verify", headers=H(atok),
                           json={"approve": True})
         assert r.status_code == 200, f"verify payment: {r.status_code} {r.text[:300]}"

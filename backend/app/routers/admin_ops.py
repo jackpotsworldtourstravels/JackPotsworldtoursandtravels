@@ -2,6 +2,7 @@
 (API_CONTRACT.md §4.1-§4.4, Phase 3).
 """
 import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -146,24 +147,44 @@ def refund_payment(
     "/users",
     response_model=Page[AccountResponse],
     summary="Active Users — cross-merchant user list",
-    description="Requires `merchant_user.manage`. Filterable by status, role, merchant, search.",
+    description=(
+        "Requires `merchant_user.manage`. Filterable by status, role, merchant, search and "
+        "**presence** — `online`, `offline` or `never_logged_in`. Every row carries the "
+        "connection its most recent session came from: IP, device, browser, OS and the times "
+        "it started and was last seen. An account that has never signed in reports "
+        "`presence=never_logged_in` and nulls throughout, rather than empty strings."
+    ),
 )
 def list_active_users(
     status: UserStatus | None = None,
     role: UserRole | None = None,
     merchant_id: int | None = None,
     search: str | None = None,
+    presence: Literal["online", "offline", "never_logged_in"] | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _: User = Depends(require(P.MERCHANT_USER_MANAGE)),
 ):
     users, total = account_service.list_all_users(
-        db, page, page_size, status=status, role=role, merchant_id=merchant_id, search=search
+        db, page, page_size, status=status, role=role, merchant_id=merchant_id,
+        search=search, presence=presence,
     )
-    online_ids = session_service.online_user_ids(db, [u.user_id for u in users])
+    # Two queries for the whole page rather than two per row: the live-heartbeat
+    # set and the newest session per user, both keyed by the ids we already have.
+    user_ids = [u.user_id for u in users]
+    online_ids = session_service.online_user_ids(db, user_ids)
+    sessions = session_service.latest_sessions(db, user_ids)
     return Page.build(
-        [AccountResponse.of(u, online=u.user_id in online_ids) for u in users],
+        [
+            AccountResponse.of(
+                u,
+                online=u.user_id in online_ids,
+                session=sessions.get(u.user_id),
+                presence=session_service.presence_of(u, sessions.get(u.user_id)),
+            )
+            for u in users
+        ],
         total, page, page_size,
     )
 

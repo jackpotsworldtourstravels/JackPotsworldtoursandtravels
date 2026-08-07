@@ -47,12 +47,26 @@ const PR_BUCKETS = [
   ['rejected', 'Rejected'],
 ];
 
-/* The three methods the desk may request. UPI and QR are absent on purpose:
-   those are the merchant's own Add Money rails, where it chooses an account we
-   published. A request names where *we* want the money sent. */
+/* The three methods the desk may request, and the ONLY three the API accepts —
+   `RaisePaymentRequest.method` is `Literal["bank_transfer", "cash", "crypto"]`
+   (backend/app/schemas/payment_admin.py) and `payment_admin_service.REQUEST_METHODS`
+   is the allowlist its instruction keys are filtered against. UPI and QR are
+   absent on purpose and are NOT a gap in this screen: those are the merchant's
+   own Add Money rails, where it pays into an account we published, while a
+   payment request names where *we* want the money sent.
+
+   ADDING A METHOD IS ONE ENTRY HERE PLUS ONE ON THE SERVER. Everything below
+   is driven off this table — the picker, the section heading, the fields, the
+   payload — so a fourth method inherits the identical layout by construction
+   rather than by somebody remembering to match it. `type` is optional and
+   defaults to a text input; `options` makes it a select. */
 const PR_METHODS = {
   bank_transfer: {
     label: 'Bank Transfer',
+    /* The heading over the method's own fields. Written per method rather than
+       as "Payment Details" for all three, because the section is answering
+       "where do we want it sent", and that reads differently for cash. */
+    section: 'Bank account to pay into',
     fields: [
       ['bank_name', 'Bank Name'],
       ['account_number', 'Account Number'],
@@ -62,6 +76,7 @@ const PR_METHODS = {
   },
   cash: {
     label: 'Cash',
+    section: 'Cash handover details',
     fields: [
       ['token_details', 'Token Details'],
       ['note_number', 'Unique Note Number'],
@@ -69,14 +84,13 @@ const PR_METHODS = {
   },
   crypto: {
     label: 'Crypto',
+    section: 'Wallet to send to',
     fields: [
       ['wallet_address', 'Wallet Address'],
-      ['network', 'Network'],
+      ['network', 'Network', { options: ['TRC20', 'ERC20', 'BEP20'] }],
     ],
   },
 };
-
-const PR_NETWORKS = ['TRC20', 'ERC20', 'BEP20'];
 
 let prBucket = 'requests';
 let prPage = 1;
@@ -241,20 +255,42 @@ async function loadPaymentRequests(page = prPage) {
   }
 }
 
-/* ---------- Raising a request ---------- */
-function prMethodFields(method) {
+/* ---------- Raising a request ----------
+   ONE LAYOUT FOR EVERY METHOD, GENERATED RATHER THAN REPEATED.
+   The method's fields used to be built by a function with a hardcoded `if
+   (name === 'network')` branch, and they were written into a bare second
+   `.form-grid` directly under the first — which, with §15's
+   `.form-grid{margin-bottom:0}`, meant the two blocks touched. Every method had
+   its own shape underneath: bank transfer contributed four fields, cash and
+   crypto two, so where the seam fell moved with the picker and no two methods
+   looked alike.
+
+   Now every method renders through the same builder into the same section, so
+   they are identical by construction: a heading, a two-column grid, the same
+   42px controls, the same 24px rhythm. A method with an odd number of fields
+   leaves the second column of its last row empty — which is what a two-column
+   grid is supposed to do, and is stable rather than reflowing. */
+function prField(name, label, opts = {}) {
+  const id = `pr-${name}`;
+  const control = opts.options
+    ? `<select id="${id}" name="${name}" required>
+         ${opts.options.map(o => `<option value="${prEsc(o)}">${prEsc(o)}</option>`).join('')}
+       </select>`
+    : `<input id="${id}" name="${name}" type="${opts.type || 'text'}"
+              required maxlength="120" autocomplete="off">`;
+  return `<div class="form-field">
+    <label for="${id}">${prEsc(label)}</label>${control}</div>`;
+}
+
+/* The heading + grid for whichever method is selected, replaced as one block so
+   the section title can never describe the fields under a different method. */
+function prMethodSection(method) {
   const spec = PR_METHODS[method];
   if (!spec) return '';
-  return spec.fields.map(([name, label]) => {
-    if (name === 'network') {
-      return `<div class="form-field"><label>${label}</label>
-        <select name="network" required>
-          ${PR_NETWORKS.map(n => `<option value="${n}">${n}</option>`).join('')}
-        </select></div>`;
-    }
-    return `<div class="form-field"><label>${label}</label>
-      <input name="${name}" required maxlength="120" autocomplete="off"></div>`;
-  }).join('');
+  return `<div class="form-section-title">${prEsc(spec.section || 'Payment details')}</div>
+    <div class="form-grid">
+      ${spec.fields.map(([name, label, opts]) => prField(name, label, opts || {})).join('')}
+    </div>`;
 }
 
 async function openRaisePaymentRequestModal() {
@@ -278,33 +314,48 @@ async function openRaisePaymentRequestModal() {
      Nothing is credited until you approve the proof." — was removed on request.
      The workflow it described is unchanged: this endpoint still only *asks*,
      and a wallet is still credited nowhere but the top-up verify endpoint. */
+  /* THREE SECTIONS, EACH A HEADING OVER ONE TWO-COLUMN GRID. Every field in the
+     dialog now sits inside a `.form-grid`, including the note — which reaches
+     full width through §15's `.form-field:has(textarea)` rule rather than by
+     being written outside the grid, so it lines up with the columns above it
+     instead of merely happening to be the same width. */
   body.innerHTML = `
     <h2>Initiate Payment Request</h2>
     <form id="prRaiseForm">
+      <div class="form-section-title">Who is being asked, and for how much</div>
       <div class="form-grid">
-        <div class="form-field"><label>Merchant Company</label>
-          <select name="merchant_id" required>
+        <div class="form-field"><label for="prMerchantSel">Merchant Company</label>
+          <select id="prMerchantSel" name="merchant_id" required>
             <option value="">Select a company…</option>
             ${merchants.map(m => `<option value="${m.id}">${prEsc(m.merchant_name || m.company_name)}</option>`).join('')}
           </select>
         </div>
-        <div class="form-field"><label>Merchant Manager</label>
-          <select name="manager_id" required disabled>
+        <div class="form-field"><label for="prManagerSel">Merchant Manager</label>
+          <select id="prManagerSel" name="manager_id" required disabled>
             <option value="">Select a company first</option>
           </select>
         </div>
-        <div class="form-field"><label>Amount (₹)</label>
-          <input name="amount" type="number" min="0.01" step="0.01" required>
+        <div class="form-field"><label for="prAmountInput">Amount (₹)</label>
+          <input id="prAmountInput" name="amount" type="number" min="0.01" step="0.01" required>
         </div>
-        <div class="form-field"><label>Payment Method</label>
-          <select name="method" required>
-            ${Object.entries(PR_METHODS).map(([v, s]) => `<option value="${v}">${s.label}</option>`).join('')}
+        <div class="form-field"><label for="prMethodSel">Payment Method</label>
+          <select id="prMethodSel" name="method" required>
+            ${Object.entries(PR_METHODS).map(([v, s]) => `<option value="${v}">${prEsc(s.label)}</option>`).join('')}
           </select>
         </div>
       </div>
-      <div class="form-grid" id="prMethodFields">${prMethodFields('bank_transfer')}</div>
-      <div class="form-field"><label>Note to the manager (optional)</label>
-        <textarea name="note" rows="2" maxlength="500"></textarea>
+      <!-- form-section marks this as a bare grouping wrapper: it holds a heading
+           and its grid so the two can be swapped together, and jp-ds.css §15
+           gives it no spacing of its own (the heading inside already sets the
+           32px section rhythm). NO BACKTICKS IN THIS COMMENT: it sits inside a
+           template literal, and a backtick here closes it — which is a runtime
+           ReferenceError that node --check still calls valid syntax. -->
+      <div class="form-section" id="prMethodFields">${prMethodSection('bank_transfer')}</div>
+      <div class="form-section-title">Anything the manager should know</div>
+      <div class="form-grid">
+        <div class="form-field"><label for="prNoteInput">Note to the manager <span class="cell-sub">(optional)</span></label>
+          <textarea id="prNoteInput" name="note" rows="2" maxlength="500"></textarea>
+        </div>
       </div>
       <div class="msg" id="prRaiseMsg"></div>
       <div class="modal-actions">
@@ -343,8 +394,10 @@ async function openRaisePaymentRequestModal() {
     }
   });
 
+  /* Heading and fields are swapped together, as one block — replacing only the
+     fields would leave "Bank account to pay into" over a crypto wallet. */
   form.method.addEventListener('change', () => {
-    document.getElementById('prMethodFields').innerHTML = prMethodFields(form.method.value);
+    document.getElementById('prMethodFields').innerHTML = prMethodSection(form.method.value);
   });
 
   form.addEventListener('submit', async e => {
@@ -573,7 +626,7 @@ function initPaymentRequests() {
   const filter = document.getElementById('prMerchantFilter');
   if (filter) {
     prMerchants().then(list => {
-      filter.innerHTML = '<option value="">All companies</option>' + list.map(
+      filter.innerHTML = '<option value="">All</option>' + list.map(
         m => `<option value="${m.id}">${prEsc(m.merchant_name || m.company_name)}</option>`
       ).join('');
     }).catch(() => {});

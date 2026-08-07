@@ -321,11 +321,15 @@ function opsPassengerCard(p, i) {
     <div class="ops-pax-item"><span class="ops-pax-label">${label}</span>
       <span class="ops-pax-value">${value}</span></div>`;
 
-  /* Every portal that creates a traveller posts `special_services: []`, so
-     today this renders on nobody. It is here because that array is the only
-     per-passenger request the schema carries, and a screen promising complete
-     passenger information must not be the reason one goes unseen. Party-wide
-     special requests are a booking field and are shown below the list. */
+  /* This used to render on nobody — every portal posted `special_services: []`
+     and the array was carried for the day something filled it. The Classic
+     merchant portal now does: its passenger cards ask each traveller for a
+     special request and write it here as a single `{code, label}`, so the
+     wheelchair is attached to the person who needs it instead of being one
+     sentence in a party-wide paragraph the desk had to attribute by hand.
+     `s.label || s.code` already prints it as typed; nothing here changed.
+     Party-wide special requests remain a booking field, shown below the list —
+     older bookings and the other portals still populate that one. */
   const services = (p.special_services || [])
     .map(s => [s.label || s.code, s.category].filter(Boolean).join(' · '))
     .filter(Boolean);
@@ -651,30 +655,50 @@ function opsRenderWork() {
         </div>
       </div>
 
-      <div class="ops-actions">
-        ${canIssue && needsFare ? `
-          <div class="ops-fare">
-            <label for="opsFareInput">Fare paid to the airline (₹)</label>
-            <input type="number" id="opsFareInput" min="0.01" step="0.01" inputmode="decimal"
-                   placeholder="0.00" aria-describedby="opsFareHelp">
-            <p class="ops-sub" id="opsFareHelp">
-              This becomes the booking amount and is debited from the merchant's wallet
-              when the ticket is issued.
-            </p>
-          </div>` : ''}
-        ${canIssue ? opsProviderFields(providers) : ''}
-        ${canIssue ? `<button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>` : ''}
-        ${ticketed ? `<span class="ops-sub">
-            Ticketed. This booking completes on its own once the scheduled travel
-            has finished${opsJourneyEndLabel(r, d)} — there is nothing further to do here.
-          </span>` : ''}
-        ${!canIssue && !ticketed
-          ? `<span class="ops-sub">${classic
-              ? 'Nothing to do here until a manager approves this booking.'
-              : 'This booking is waiting on payment before a ticket can be issued.'}</span>`
-          : ''}
-        <div class="msg" id="opsActionMsg" aria-live="polite"></div>
-      </div>
+      ${/* THE FIELDS AND THE BUTTONS ARE NOW TWO BLOCKS, NOT ONE.
+            This dialog was the last holdout from the portal-wide form standard.
+            Everything below used to live inside a single `.ops-actions` flex
+            row — the fare input, the two provider pickers, the Issue button and
+            the status message together — which is why it could not simply be
+            right-aligned like every other footer: doing that dragged a
+            full-width number input into the button row.
+
+            Splitting it is the fix the alignment needed. The fields become
+            ordinary `.form-field`s in a `.form-grid`, so they inherit the same
+            42px controls, uppercase labels and 24px gutters as every other
+            dialog in the portal, and `.modal-actions` is left holding only what
+            it is for. NO ID CHANGED — opsFareInput, opsProviderSelect,
+            opsProviderUserSelect, opsIssueBtn and opsActionMsg are all read by
+            handlers further down this file, and every one of them still
+            resolves. Nothing about issuing a ticket moved. */''}
+      ${canIssue ? `
+        <div class="form-grid">
+          ${needsFare ? `
+            <div class="form-field">
+              <label for="opsFareInput">Fare paid to the airline (₹)</label>
+              <input type="number" id="opsFareInput" min="0.01" step="0.01" inputmode="decimal"
+                     placeholder="0.00" aria-describedby="opsFareHelp">
+              <p class="ops-sub" id="opsFareHelp">
+                This becomes the booking amount and is debited from the merchant's wallet
+                when the ticket is issued.
+              </p>
+            </div>` : ''}
+          ${opsProviderFields(providers)}
+        </div>` : ''}
+      ${ticketed ? `<p class="ops-sub">
+          Ticketed. This booking completes on its own once the scheduled travel
+          has finished${opsJourneyEndLabel(r, d)} — there is nothing further to do here.
+        </p>` : ''}
+      ${!canIssue && !ticketed
+        ? `<p class="ops-sub">${classic
+            ? 'Nothing to do here until a manager approves this booking.'
+            : 'This booking is waiting on payment before a ticket can be issued.'}</p>`
+        : ''}
+      <div class="msg" id="opsActionMsg" aria-live="polite"></div>
+      ${canIssue ? `
+        <div class="modal-actions">
+          <button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>
+        </div>` : ''}
     </div>`;
 
   document.getElementById('opsWorkClose').addEventListener('click', opsCloseWork);
@@ -804,34 +828,40 @@ async function opsAddNote(id) {
    the two need different wording, because one is a broken request and the other
    is an empty Provider Management screen. Neither offers a control that cannot
    be filled in. */
+/* TWO FIELDS, NOT ONE BLOCK OF TWO. These used to be a single `.ops-fare`
+   container stacking both pickers with a hand-written `margin-top:10px` between
+   them; as two `.form-field`s they sit in the shared grid beside the fare and
+   take the portal's control metrics without any styling of their own.
+   `.span-2` on the two failure cases because a message is not a column. */
 function opsProviderFields(providers) {
   if (providers === null) {
-    return `<div class="ops-fare">
+    return `<div class="form-field span-2">
       <div class="msg error" style="margin:0;">Could not load the provider list, so this ticket
       cannot be attributed yet. Reopen this booking to try again.</div>
     </div>`;
   }
   if (!providers.length) {
-    return `<div class="ops-fare">
+    return `<div class="form-field span-2">
       <div class="msg info" style="margin:0;">No active providers are set up yet. Add the supplier
       you booked through in <b>Provider Management</b>, then issue this ticket.</div>
     </div>`;
   }
 
-  return `<div class="ops-fare">
-    <label for="opsProviderSelect">Provider</label>
-    <select id="opsProviderSelect" aria-describedby="opsProviderHelp">
-      <option value="">— Select the supplier —</option>
-      ${providers.map(p => `<option value="${p.id}">${escapeHtml(p.provider_name)} (${escapeHtml(p.provider_code)})</option>`).join('')}
-    </select>
-    <p class="ops-sub" id="opsProviderHelp">Who this ticket was bought from.</p>
-
-    <label for="opsProviderUserSelect" style="margin-top:10px;display:block;">Provider User</label>
-    <select id="opsProviderUserSelect" disabled aria-describedby="opsProviderUserHelp">
-      <option value="">— Choose a provider first —</option>
-    </select>
-    <p class="ops-sub" id="opsProviderUserHelp">The person there who made the booking.</p>
-  </div>`;
+  return `<div class="form-field">
+      <label for="opsProviderSelect">Provider</label>
+      <select id="opsProviderSelect" aria-describedby="opsProviderHelp">
+        <option value="">— Select the supplier —</option>
+        ${providers.map(p => `<option value="${p.id}">${escapeHtml(p.provider_name)} (${escapeHtml(p.provider_code)})</option>`).join('')}
+      </select>
+      <p class="ops-sub" id="opsProviderHelp">Who this ticket was bought from.</p>
+    </div>
+    <div class="form-field">
+      <label for="opsProviderUserSelect">Provider User</label>
+      <select id="opsProviderUserSelect" disabled aria-describedby="opsProviderUserHelp">
+        <option value="">— Choose a provider first —</option>
+      </select>
+      <p class="ops-sub" id="opsProviderUserHelp">The person there who made the booking.</p>
+    </div>`;
 }
 
 /* The dependent half. Repopulated from the provider's own `users`, which came

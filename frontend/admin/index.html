@@ -8,15 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260805ui34">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260806ui39">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260805ui34">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260806ui39">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260805ui34">
+<link rel="stylesheet" href="../assets/css/jp-login.css?v=20260806ui39">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -222,10 +222,12 @@
         <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
         <span class="nav-label">Profile</span>
       </a>
-      <a href="../index.html" class="nav-item">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-        <span class="nav-label">Back to site</span>
-      </a>
+      <!-- "Back to site" was removed on request. It linked to ../index.html,
+           the public landing page, which is not part of this portal's work and
+           is one click away from signing an operator out of context by
+           accident. Profile and Sign Out are the whole Account group now.
+           Nothing else references that link — admin.js routes on
+           `data-section`, and this anchor carried none. -->
       <a href="#" class="nav-item logout" id="logoutBtn">
         <svg class="icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         <span class="nav-label">Sign Out</span>
@@ -312,7 +314,7 @@
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="merchantSearch" placeholder="Search merchant, email, contact, or phone…">
           <select id="merchantStatusFilter" class="status-select">
-            <option value="">All statuses</option>
+            <option value="">All</option>
             <option value="active">Active</option>
             <option value="pending_approval">Pending Approval</option>
             <option value="suspended">Suspended</option>
@@ -335,36 +337,58 @@
       <div id="merchantCreateUserPanel" style="display:none;"></div>
     </section>
 
+    <!-- ============== Active Users ==============
+         This screen used to be a list of accounts with a Last Login column,
+         which answered "does this account exist" — a question nobody opens a
+         portal to ask. It now answers "who is actually using the platform, and
+         from where": a presence badge per row, and the connection the last
+         session came from.
+
+         PRESENCE IS DERIVED, NOT STORED. A session is a `system_logs` row with
+         a heartbeat (services/session_service.py); the four states are read off
+         it and off `users.last_login`. NEVER LOGGED IN IS ITS OWN STATE and not
+         an empty cell — an account created and never used is a fact worth
+         seeing, and a blank looks like a loading bug. -->
     <section class="section" id="section-active-users">
       <div class="panel">
         <div class="panel-head"><h2>Active Users</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="auSearch" placeholder="Search name or email…">
-          <select id="auStatusFilter" class="status-select">
+          <!-- LOGIN PRESENCE, not account status — the two are different
+               questions and both are here. "Offline" covers Recently Active
+               too: an admin filtering for who is not around wants everyone who
+               is not around, and the badge still tells the two apart per row. -->
+          <select id="auPresenceFilter" class="status-select" aria-label="Filter by login status">
+            <option value="">All</option>
+            <option value="online">Online</option>
+            <option value="offline" title="Signed in before, but not connected now">Offline</option>
+            <option value="never_logged_in">Never Logged In</option>
+          </select>
+          <select id="auStatusFilter" class="status-select" aria-label="Filter by account status">
+            <option value="">All</option>
             <option value="active">Active</option>
-            <option value="">All statuses</option>
             <option value="suspended">Suspended</option>
             <option value="pending_approval">Pending Approval</option>
           </select>
-          <select id="auRoleFilter" class="status-select">
-            <option value="">All roles</option>
+          <select id="auRoleFilter" class="status-select" aria-label="Filter by role">
+            <option value="">All</option>
             <option value="super_admin">Super Admin</option>
             <option value="admin">Admin</option>
             <option value="merchant_admin">Merchant Admin</option>
             <option value="merchant_user">Merchant User</option>
           </select>
         </div>
-        <!-- Status column removed on request — the status FILTER above stays,
-             because it is what makes this "Active Users" rather than "Users",
-             and with it defaulting to Active the column only ever repeated the
-             filter back.
-
-             "Username" is the local part of the sign-in email. THERE IS NO
+        <!-- "Username" is the local part of the sign-in email. THERE IS NO
              `username` COLUMN on the users table — this platform authenticates
              by email (see models_v2.User), so that is the username. The full
-             address is kept in the cell's title so nothing is lost. -->
+             address is kept in the cell's title so nothing is lost.
+
+             Device, browser and OS share one column: they describe a single
+             thing (what the user signed in on) and three columns of two words
+             each is how a table stops fitting. Same for the two addresses. -->
         <div class="table-wrap"><table id="activeUsersTable"><thead><tr>
-          <th>Name</th><th>Username</th><th>Role</th><th>Merchant</th><th>Last Login</th>
+          <th>Name</th><th>Username</th><th>Role</th><th>Merchant</th>
+          <th>Status</th><th>Last Login</th><th>Login Device</th><th>Login IP Address</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="activeUsersPagination"></div>
       </div>
@@ -382,12 +406,15 @@
             </select>
           </div>
           <div class="form-field"><label>Merchant</label>
-            <select id="repAdminMerchant" class="status-select"><option value="">All merchants</option></select>
+            <select id="repAdminMerchant" class="status-select"><option value="">All</option></select>
           </div>
           <div class="form-field"><label>Date From</label><input type="date" id="repAdminFrom"></div>
           <div class="form-field"><label>Date To</label><input type="date" id="repAdminTo"></div>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        <!-- `.form-actions` is the page's counterpart to a dialog's
+             `.modal-actions` — see jp-ds.css §16. It replaces an inline-styled
+             flex row whose 10px gap and 18px margin were this screen's alone. -->
+        <div class="form-actions">
           <button class="btn btn-coral" id="repAdminGenerateBtn">Generate Report</button>
           <button class="btn btn-navy" id="repAdminExportPdfBtn">Export PDF</button>
           <button class="btn btn-navy" id="repAdminExportExcelBtn">Export Excel</button>
@@ -402,22 +429,45 @@
       <div id="analyticsBody"></div>
     </section>
 
+    <!-- Profile — two panels, one form standard.
+         The fields were loose `.form-field`s with a `max-width:none` inline
+         style each (a leftover: `.form-field` carries a max-width in
+         partner-portal.css, which this portal does not load), the submit button
+         sat hard against the last input with no separation, and the panels were
+         pinned to 480px by an inline style while every other panel on the page
+         is full width. All three are now the shared vocabulary: a `.form-grid`
+         for the fields, `.form-actions` for the button, and `.panel-narrow` for
+         the width — see jp-ds.css §16. -->
     <section class="section" id="section-profile">
-      <div class="panel" style="max-width:480px;">
-        <h2>My profile</h2>
+      <div class="panel panel-narrow">
+        <div class="panel-head"><h2>My profile</h2></div>
         <form id="adminProfileForm">
-          <div class="form-field" style="max-width:none;"><label>Full Name</label><input id="adminProfileName" type="text" required></div>
-          <div class="form-field" style="max-width:none;"><label>Email</label><input id="adminProfileEmail" type="email" disabled></div>
-          <button type="submit" class="btn btn-coral">Save Changes</button>
+          <div class="form-grid">
+            <div class="form-field"><label for="adminProfileName">Full Name</label>
+              <input id="adminProfileName" type="text" required></div>
+            <div class="form-field"><label for="adminProfileEmail">Email</label>
+              <input id="adminProfileEmail" type="email" disabled>
+              <small>Your sign-in address. Changing it is a Super Admin action.</small></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-coral">Save Changes</button>
+          </div>
           <div class="msg" id="adminProfileMsg"></div>
         </form>
       </div>
-      <div class="panel" style="max-width:480px;">
-        <h2>Change password</h2>
+      <div class="panel panel-narrow">
+        <div class="panel-head"><h2>Change password</h2></div>
         <form id="adminPasswordForm">
-          <div class="form-field" style="max-width:none;"><label>Current Password</label><input id="adminCurrentPassword" type="password" required></div>
-          <div class="form-field" style="max-width:none;"><label>New Password</label><input id="adminNewPassword" type="password" required minlength="8"></div>
-          <button type="submit" class="btn btn-navy">Change Password</button>
+          <div class="form-grid">
+            <div class="form-field"><label for="adminCurrentPassword">Current Password</label>
+              <input id="adminCurrentPassword" type="password" required autocomplete="current-password"></div>
+            <div class="form-field"><label for="adminNewPassword">New Password</label>
+              <input id="adminNewPassword" type="password" required minlength="8" autocomplete="new-password">
+              <small>At least 8 characters.</small></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-navy">Change Password</button>
+          </div>
           <div class="msg" id="adminPasswordMsg"></div>
         </form>
       </div>
@@ -438,7 +488,7 @@
           <input type="text" id="prSearch" placeholder="Search reference or UTR…"
                  aria-label="Search payment requests by reference or UTR">
           <select id="prMerchantFilter" class="status-select" aria-label="Filter by company">
-            <option value="">All companies</option>
+            <option value="">All</option>
           </select>
         </div>
         <div class="table-wrap"><table id="prTable"><thead><tr>
@@ -468,7 +518,7 @@
           <input type="text" id="wdSearch" placeholder="Search reference or UTR…"
                  aria-label="Search top-ups by reference or UTR">
           <select id="wdMerchantFilter" class="status-select" aria-label="Filter by merchant">
-            <option value="">All merchants</option>
+            <option value="">All</option>
           </select>
         </div>
         <div class="table-wrap"><table id="wdTable"><thead><tr>
@@ -500,9 +550,21 @@
           <span class="panel-sub" id="enqQueueSummary"></span>
         </div>
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="enqStatusFilter" class="status-select">
-            <option value="awaiting">Awaiting response</option>
-            <option value="">All statuses</option>
+          <!-- "All" is first and is the default, as every filter in both
+               portals now is. This screen used to open pre-filtered on
+               "Awaiting response", which meant an enquiry the desk had already
+               answered could not be found without first noticing that a
+               dropdown had been narrowed for you. The count of what IS awaiting
+               a response is still on the panel header beside the title. -->
+          <!-- "Awaiting Quotation", the merchant portal's own words for the
+               same rows: an enquiry we have not yet priced. It read "Awaiting
+               response" here while the merchant's filter said something else
+               for the identical set, which is one queue described two ways.
+               The value is untouched — `awaiting` is still the grouping
+               enqLoad narrows into two server-side calls. -->
+          <select id="enqStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All</option>
+            <option value="awaiting">Awaiting Quotation</option>
             <option value="pending_approval">Pending</option>
             <option value="in_review">Under Review</option>
             <option value="approved">Available</option>
@@ -526,11 +588,15 @@
       <div class="panel">
         <div class="panel-head"><h2>Approval Queue</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="aqStatusFilter" class="status-select">
-            <!-- "Awaiting action" means awaiting *ours*: Pending Approval and
-                 Under Review, plus any booking approved without a fare, which
-                 sits in Payment Pending with nothing the merchant can pay. -->
-            <option value="">Awaiting action</option>
+          <!-- "All" is everything IN THIS QUEUE, which is not the same as every
+               request on the platform — this screen is the desk's inbox, and it
+               holds what is awaiting *our* decision: Pending Approval, Under
+               Review, and any booking approved without a fare, which sits in
+               Payment Pending with nothing the merchant can pay. Nothing
+               reaches it before the merchant's own manager has released it
+               (services/approval_service.py). -->
+          <select id="aqStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All</option>
             <option value="pending_approval">Pending Approval</option>
             <option value="in_review">Under Review</option>
             <option value="payment_pending">Payment Pending</option>
@@ -540,7 +606,7 @@
                to cancel — so the backend refuses them and they are settled on
                the Cancellations & Reschedules screen instead. -->
           <select id="aqTypeFilter" class="status-select">
-            <option value="">All types</option>
+            <option value="">All</option>
             <option value="merchant">Merchant Onboarding</option>
             <option value="booking">Ticket Booking</option>
             <option value="refund">Refund</option>
@@ -571,7 +637,7 @@
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="opsSearch" placeholder="Request no., booking ref, PNR or ticket no.">
           <select id="opsAssignFilter" class="status-select" aria-label="Assignment">
-            <option value="">Everyone</option>
+            <option value="">All</option>
             <option value="mine">Assigned to me</option>
             <option value="unassigned">Unassigned</option>
           </select>
@@ -602,7 +668,7 @@
              the row decides that from its type. -->
         <div class="filter-bar" style="margin-bottom:16px;">
           <select id="srmTypeFilter" class="status-select" aria-label="Filter by request type">
-            <option value="">All types</option>
+            <option value="">All</option>
             <option value="cancellation">Cancellation</option>
             <option value="date_change">Date Change</option>
             <option value="passenger_modification">Passenger Modification</option>
@@ -616,8 +682,8 @@
                difference is whose approval is outstanding. Filtered client-side
                on the manager_state the API returns. -->
           <select id="srmStageFilter" class="status-select" aria-label="Filter by stage">
+            <option value="">All</option>
             <option value="actionable">Manager Approved — ready to action</option>
-            <option value="">All stages</option>
             <option value="awaiting_manager">Under Manager Approval</option>
             <option value="in_review">Under Review</option>
             <option value="approved">Approved</option>
@@ -652,7 +718,7 @@
             <input type="search" id="provSearch" aria-label="Search providers"
                    placeholder="Provider code, name, or a person there">
             <select id="provStatusFilter" class="status-select" aria-label="Filter by status">
-              <option value="">All statuses</option>
+              <option value="">All</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
@@ -681,8 +747,13 @@
       <div class="panel">
         <div class="panel-head"><h2>Support Management — Live Chat</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="supportStatusFilter" class="status-select">
-            <option value="">Open + In Progress</option>
+          <!-- The empty value was labelled "Open + In Progress", which was not
+               what it did: /api/support/threads applies no status filter when
+               none is sent (chat_service.list_threads), so it has always
+               returned resolved threads too. "All" is the accurate label as
+               well as the standard one. -->
+          <select id="supportStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All</option>
             <option value="submitted">Open</option>
             <option value="in_review">In Progress</option>
             <option value="completed">Resolved</option>
@@ -696,26 +767,36 @@
     </section>
 
     <section class="section" id="section-notifications">
+      <!-- Broadcast — every field is now in one grid, so Title and Message are
+           one width instead of two, and the audience checkbox reads as a
+           control rather than as a caption (jp-ds.css §16 stops uppercasing a
+           label that contains its own checkbox). The four inline `style=`
+           attributes this form carried are gone; the multi-select keeps a
+           height, which is the one thing CSS cannot infer from `size`. -->
       <div class="panel">
-        <h2>Broadcast Notification</h2>
+        <div class="panel-head"><h2>Broadcast Notification</h2></div>
         <form id="broadcastForm">
-          <div class="form-field" style="max-width:none;">
-            <label><input type="checkbox" id="bcAllMerchants" checked style="width:15px;height:15px;vertical-align:middle;margin-right:6px;">Send to all active merchants</label>
-          </div>
-          <div class="form-field" id="bcMerchantPickerField" style="max-width:none;display:none;">
-            <label>Merchants</label>
-            <select id="bcMerchantPicker" multiple size="5" style="width:100%;padding:8px;border-radius:10px;border:1.5px solid var(--border-color);"></select>
-          </div>
           <div class="form-grid">
-            <div class="form-field"><label>Title</label><input name="title" type="text" required></div>
+            <div class="form-field span-2">
+              <label for="bcAllMerchants"><input type="checkbox" id="bcAllMerchants" checked>Send to all active merchants</label>
+            </div>
+            <div class="form-field span-2" id="bcMerchantPickerField" style="display:none;">
+              <label for="bcMerchantPicker">Merchants</label>
+              <select id="bcMerchantPicker" multiple size="5" style="height:auto;"></select>
+            </div>
+            <div class="form-field"><label for="bcTitle">Title</label>
+              <input id="bcTitle" name="title" type="text" required></div>
+            <div class="form-field"><label for="bcMessage">Message</label>
+              <input id="bcMessage" name="message" type="text" required></div>
           </div>
-          <div class="form-field" style="max-width:none;"><label>Message</label><input name="message" type="text" required></div>
-          <button type="submit" class="btn btn-coral">Send Broadcast</button>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-coral">Send Broadcast</button>
+          </div>
           <div class="msg" id="broadcastMsg"></div>
         </form>
       </div>
       <div class="panel">
-        <h2>My Notifications</h2>
+        <div class="panel-head"><h2>My Notifications</h2></div>
         <div class="table-wrap"><table id="notificationsTable"><thead><tr><th>Title</th><th>Message</th><th>Status</th><th>Date</th></tr></thead><tbody></tbody></table></div>
       </div>
       <!-- M5 — the requirement that a failed send is visible rather than
@@ -742,9 +823,9 @@
              recorded" and System Logs is where the acting user is. Removed with
              the rest of the page descriptions; the behaviour is unchanged. -->
         <div class="filter-bar" style="margin-bottom:16px;">
-          <select id="adminAuditTableFilter" class="status-select" aria-label="Table"><option value="">All tables</option></select>
+          <select id="adminAuditTableFilter" class="status-select" aria-label="Table"><option value="">All</option></select>
           <select id="adminAuditOpFilter" class="status-select" aria-label="Operation">
-            <option value="">All operations</option>
+            <option value="">All</option>
             <option value="INSERT">Insert</option>
             <option value="UPDATE">Update</option>
             <option value="DELETE">Delete</option>
@@ -768,11 +849,15 @@
         <div class="panel-head"><h2>System Logs</h2></div>
         <div class="filter-bar" style="margin-bottom:16px;">
           <input type="text" id="adminSysLogSearch" placeholder="Search user, action or description…" aria-label="Search system logs">
-          <select id="adminSysLogActionFilter" class="status-select" aria-label="Action"><option value="">All actions</option></select>
-          <select id="adminSysLogModuleFilter" class="status-select" aria-label="Module"><option value="">All modules</option></select>
+          <select id="adminSysLogActionFilter" class="status-select" aria-label="Action"><option value="">All</option></select>
+          <select id="adminSysLogModuleFilter" class="status-select" aria-label="Module"><option value="">All</option></select>
         </div>
+        <!-- "Origin" was one grey line of `ip · browser · device`, empty on
+             most rows because only the auth endpoints ever recorded one.
+             "Connection" is the real request metadata, stacked — see
+             adminSysLogConnection() in assets/js/admin-logs.js. -->
         <div class="table-wrap"><table id="adminSysLogTable"><thead><tr>
-          <th>When</th><th>User</th><th>Module</th><th>Action</th><th>Description</th><th>Origin</th><th>Status</th>
+          <th>When</th><th>User</th><th>Module</th><th>Action</th><th>Description</th><th>Connection</th><th>Status</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="adminSysLogPagination"></div>
       </div>
@@ -959,17 +1044,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="../shared/formatters.js?v=20260805ui34"></script>
-<script src="../components/toast.js?v=20260805ui34"></script>
-<script src="../components/spinner.js?v=20260805ui34"></script>
-<script src="../components/confirm-dialog.js?v=20260805ui34"></script>
-<script src="../components/focus-trap.js?v=20260805ui34"></script>
-<script src="../assets/js/auth.js?v=20260805ui34"></script>
+<script src="../shared/formatters.js?v=20260806ui39"></script>
+<script src="../components/toast.js?v=20260806ui39"></script>
+<script src="../components/spinner.js?v=20260806ui39"></script>
+<script src="../components/confirm-dialog.js?v=20260806ui39"></script>
+<script src="../components/focus-trap.js?v=20260806ui39"></script>
+<script src="../assets/js/auth.js?v=20260806ui39"></script>
 <script src="../assets/js/api.js"></script>
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
      binds must already be in the document. -->
-<script src="../assets/js/jp-login.js?v=20260805ui34"></script>
+<script src="../assets/js/jp-login.js?v=20260806ui39"></script>
 <script>
   jpLoginMount('adminAuthShell', {
     title: 'Admin Login',
@@ -991,39 +1076,39 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260805ui34"></script>
+<script src="../assets/js/admin.js?v=20260806ui39"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260806ui39"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
-<script src="../assets/js/admin-bookings.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-bookings.js?v=20260806ui39"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260806ui39"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260806ui39"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260806ui39"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260806ui39"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
-<script src="../assets/js/admin-analytics.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-analytics.js?v=20260806ui39"></script>
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260805ui34"></script>
-<script src="../assets/js/admin-logs.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-providers.js?v=20260806ui39"></script>
+<script src="../assets/js/admin-logs.js?v=20260806ui39"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260806ui39"></script>
 <!-- Dialog standard (jp-ds.css §15). Adds only the header close control, which
      is the one part of the standard CSS cannot supply — the rest is stylesheet.
      Loaded LAST so every overlay it observes already exists in the document. -->
-<script src="../assets/js/admin-dialog-standard.js?v=20260805ui34"></script>
+<script src="../assets/js/admin-dialog-standard.js?v=20260806ui39"></script>
 </body>
 </html>

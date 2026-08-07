@@ -29,7 +29,7 @@ from app.models_v2 import (
     UserRole,
     UserStatus,
 )
-from app.services import activity_service, notification_service
+from app.services import activity_service, notification_service, session_service
 
 #: Roles a merchant may assign to its own staff.
 MERCHANT_ASSIGNABLE_ROLES = (UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
@@ -146,8 +146,21 @@ def list_all_users(
     role: UserRole | None = None,
     merchant_id: int | None = None,
     search: str | None = None,
+    presence: str | None = None,
 ):
-    """Cross-merchant Active Users view for the Admin Portal (API_CONTRACT.md §4.1)."""
+    """Cross-merchant Active Users view for the Admin Portal (API_CONTRACT.md §4.1).
+
+    ``presence`` narrows by login state — ``online`` / ``offline`` /
+    ``never_logged_in``. It is applied **in SQL**, not to the page after it has
+    been fetched: presence is a property of the whole table, so filtering the
+    twenty rows a page happens to contain would return a short page under a
+    total that counted everyone.
+
+    ``offline`` means "has signed in before, but has no live session now", which
+    includes the *Recently Active* shade the row badge distinguishes. The screen
+    offers three states and the badge four, deliberately: an admin filtering for
+    who is not around wants everyone who is not around.
+    """
     conditions = []
     if status is not None:
         conditions.append(User.status == status)
@@ -158,6 +171,13 @@ def list_all_users(
     if search:
         pattern = f"%{search}%"
         conditions.append(or_(User.full_name.ilike(pattern), User.email.ilike(pattern)))
+    if presence == session_service.PRESENCE_NEVER:
+        conditions.append(User.last_login.is_(None))
+    elif presence == session_service.PRESENCE_ONLINE:
+        conditions.append(User.user_id.in_(session_service.online_user_ids_stmt()))
+    elif presence == session_service.PRESENCE_OFFLINE:
+        conditions.append(User.last_login.is_not(None))
+        conditions.append(User.user_id.not_in(session_service.online_user_ids_stmt()))
     where = and_(*conditions) if conditions else True
 
     total = db.scalar(select(func.count()).select_from(User).where(where)) or 0

@@ -101,13 +101,13 @@ function clInitEnquiry() {
         <div class="cl-field">
           <label for="clEnqStatus">Status</label>
           <select id="clEnqStatus" data-cl-status-filter>
-            <option value="">All statuses</option>
+            <option value="">All</option>
             <!-- A grouped option, not a status. "No fare yet" is the question a
                  merchant actually asks, and it spans Pending and Under Review —
                  the difference between them is which desk has it, which is our
                  problem and not theirs. Handled in clLoadEnquiries: the API
                  takes one status at a time, so this one is narrowed here. -->
-            <option value="__awaiting" data-cl-chip-tone="warn">Awaiting quotation</option>
+            <option value="__awaiting" data-cl-chip-tone="warn">Awaiting Quotation</option>
             ${CL_ENQUIRY_STATUSES.map(s =>
               `<option value="${s}" data-cl-chip-tone="${CL_STATUS_TONE[s] || ''}">${clEnquiryStatusLabel(s)}</option>`).join('')}
           </select>
@@ -115,19 +115,13 @@ function clInitEnquiry() {
         <div class="cl-field">
           <!-- CR-5: labelled "Search", not "Find". The behaviour is unchanged —
                it still narrows the rows already loaded — but "Find" was the only
-               place in the product using that word for it. -->
+               place in the product using that word for it.
+               The copy-to-clipboard button that used to sit beside this box was
+               removed on request: it copied what had been TYPED rather than any
+               result, which is a thing the merchant already has. The search
+               itself is untouched. -->
           <label for="clEnqSearch">Search</label>
-          <div style="display:flex; gap:6px; align-items:stretch;">
-            <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no."
-                   style="flex:1 1 auto; min-width:0;">
-            <!-- Copies what is in the box, not the results. A merchant looking a
-                 reference up here is usually about to paste it into an email or
-                 a chat with our desk, and selecting text inside a search input
-                 on a phone is the fiddliest part of that. -->
-            <button type="button" class="cl-btn cl-btn-sm" id="clEnqCopy"
-                    title="Copy the search text" aria-label="Copy the search text"
-                    style="flex:0 0 auto;">${clIco('copy', { size: 15 })}</button>
-          </div>
+          <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no.">
         </div>
         <div class="cl-field" style="min-width:0;">
           <label>&nbsp;</label>
@@ -157,57 +151,6 @@ function clInitEnquiry() {
   $('clEnqRefresh').addEventListener('click', () => clLoadEnquiries());
   $('clEnqStatus').addEventListener('change', () => clLoadEnquiries());
   $('clEnqSearch').addEventListener('input', () => clRenderEnquiryRows());
-
-  /* Feedback is the button itself, not a toast: Classic deliberately does not
-     load components/toast.js (see classic-approvals.js), and a copy that gives
-     no sign it worked is a copy the merchant does twice. */
-  $('clEnqCopy').addEventListener('click', async () => {
-    const btn = $('clEnqCopy');
-    const box = $('clEnqSearch');
-    const value = box.value.trim();
-
-    const flash = (icon, label) => {
-      btn.innerHTML = clIco(icon, { size: 15 });
-      btn.title = label;
-      btn.setAttribute('aria-label', label);
-      setTimeout(() => {
-        btn.innerHTML = clIco('copy', { size: 15 });
-        btn.title = 'Copy the search text';
-        btn.setAttribute('aria-label', 'Copy the search text');
-      }, 1400);
-    };
-
-    if (!value) { box.focus(); return flash('alert', 'Type something to copy first'); }
-
-    /* Two paths, and the fallback runs when the modern one REJECTS as well as
-       when it is missing. navigator.clipboard needs a secure context, so it is
-       absent over plain http on a LAN address — which is exactly how this
-       portal is reached in testing — and even where it exists it rejects with
-       NotAllowedError whenever the document is not focused. Treating a
-       rejection as failure meant the button reported "could not copy" in the
-       ordinary case. execCommand is deprecated but works in both. */
-    const viaSelection = () => {
-      box.select();
-      const ok = document.execCommand('copy');
-      box.setSelectionRange(value.length, value.length);
-      return ok;
-    };
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(value);
-        } catch {
-          if (!viaSelection()) throw new Error('copy refused');
-        }
-      } else if (!viaSelection()) {
-        throw new Error('copy refused');
-      }
-      flash('check', 'Copied');
-    } catch {
-      flash('alert', 'Could not copy — select the text and copy it manually');
-    }
-  });
 
   return clLoadEnquiries();
 }
@@ -517,11 +460,15 @@ function clQuotationPanel(r) {
             here. Absent when no client fare was recorded — null means "not
             recorded", and "You saved 0" would be a claim the merchant never
             made. */ ''}
+      ${/* The client fare — and only it — is printed with `moneyIntl`, the
+            three-digit international grouping the spec asks for on this one
+            figure. The saving beside it is OUR arithmetic on OUR quotation and
+            stays on `moneyStr` with every other billed amount in the portal. */ ''}
       ${r.saved_amount != null ? `
         <div style="font-size:13px;margin-top:8px;font-weight:700;">
           You saved ${escapeHtml(moneyStr(r.saved_amount))}
           <span style="font-weight:600;opacity:.85;">against your client fare of
-            ${escapeHtml(moneyStr(r.client_fare))}</span>
+            ${escapeHtml(moneyIntl(r.client_fare))}</span>
         </div>` : ''}
     </div>`;
 }
@@ -751,24 +698,37 @@ function clOpenEnquiryForm(direct = false) {
         <label for="clEnqFlight">Airline Number</label>
         <input type="text" id="clEnqFlight" autocomplete="off" placeholder="Optional — e.g. AI217"
                maxlength="20" style="text-transform:uppercase;">
-        <small>Leave blank if you do not have a specific flight in mind.</small>
+        <small>Leave blank if you do not have a specific flight number in mind.</small>
       </div>
     </div>
 
-    <div class="cl-form-legend">Departure</div>
-    <div class="cl-form cl-form-2">
-      <div class="cl-field">
-        <label for="clEnqDate">Travel date<span class="cl-req">*</span></label>
-        <input type="date" id="clEnqDate" min="${today}" value="${today}">
+    <!-- THE TWO LEGS NOW READ THE SAME WAY. The outbound used to be a bare
+         "Departure" legend over two fields while the return got a headed panel
+         naming its route, so the one journey the merchant had actually chosen
+         was the one never shown back to them. Both are cl-journey panels now,
+         same head, same route pill — and neither is tinted any more (the return
+         panel's shaded, dashed treatment is gone) so they sit in the form as
+         plainly as every other section.
+         (No backticks in this comment — it is inside a template literal.) -->
+    <div class="cl-journey" id="clEnqDepart">
+      <div class="cl-journey-head">
+        Departure journey
+        <span class="cl-route cl-route-empty" id="clEnqDepartRoute">Pick From and To first</span>
       </div>
-      <div class="cl-field">
-        <label for="clEnqTimeHour">Preferred time<span class="cl-req">*</span></label>
-        ${clTimeField('clEnqTime', '09:00', 'Preferred departure time')}
+      <div class="cl-form cl-form-2">
+        <div class="cl-field">
+          <label for="clEnqDate">Travel date<span class="cl-req">*</span></label>
+          <input type="date" id="clEnqDate" min="${today}" value="${today}">
+        </div>
+        <div class="cl-field">
+          <label for="clEnqTimeHour">Preferred time<span class="cl-req">*</span></label>
+          ${clTimeField('clEnqTime', '09:00', 'Preferred departure time')}
+        </div>
       </div>
     </div>
 
-    <div class="cl-return cl-hidden" id="clEnqReturn">
-      <div class="cl-return-head">
+    <div class="cl-journey cl-hidden" id="clEnqReturn">
+      <div class="cl-journey-head">
         Return journey
         <span class="cl-route cl-route-empty" id="clEnqReturnRoute">Pick From and To first</span>
       </div>
@@ -776,6 +736,9 @@ function clOpenEnquiryForm(direct = false) {
         <div class="cl-field">
           <label for="clEnqReturnDate">Return date<span class="cl-req">*</span></label>
           <input type="date" id="clEnqReturnDate" min="${clAddDays(today, 1)}">
+          <!-- Answered the moment the field is left, not at submit — see
+               clValidateReturnDate. -->
+          <small id="clEnqReturnDateHint">Must be after the departure date.</small>
         </div>
         <div class="cl-field">
           <label for="clEnqReturnTimeHour">Return preferred time<span class="cl-req">*</span></label>
@@ -850,28 +813,34 @@ function clOpenEnquiryForm(direct = false) {
       </div>
     </div>
 
-    <!-- CLIENT FARE — OPTIONAL, AND OFFERED AT BOTH STAGES (migration 0040).
+    <!-- CLIENT FARE — OPTIONAL, AND NOW ASKED FOR EXACTLY ONCE (migration 0040).
          What the merchant has quoted its OWN end customer. Never used for
          settlement; it only produces the "You Saved" figure on the enquiry, on
          the booking, in Reports and on the Dashboard's Total Savings tile.
 
-         It is asked for HERE and again on Booking Request, deliberately. A
-         merchant who already knows what it is charging can say so while the
-         enquiry is fresh; one who would rather see our quotation first can
-         leave this blank and fill it in there, where our fare is on the screen
-         above it. Neither is required.
+         THIS IS THE ONLY PLACE IT IS COLLECTED. The Booking Request screen used
+         to offer it a second time, after our quotation was on the page; that
+         panel was removed on request, so what a merchant charges its customer
+         is stated here, with the journey, and carried forward. The server side
+         is untouched — to_booking_request still prefers a client fare in its
+         payload and falls back to the enquiry's — which is precisely why
+         omitting it there leaves this value standing.
 
-         The two cannot fight: to_booking_request takes the Booking Request
-         value when one is supplied and falls back to whatever the enquiry
-         carried, so filling this in early is never overwritten by leaving the
-         later box empty. See clBrClientFare in classic-booking.js.
+         Grouped as it is typed: 1000 becomes 1,000. See clBindMoneyField.
          (No backticks in this comment — it is inside a template literal.) -->
     <div class="cl-form-legend">Your customer&rsquo;s fare</div>
     <div class="cl-form cl-form-2">
       <div class="cl-field">
         <label for="clEnqClientFare">Client Fare</label>
-        <input type="number" id="clEnqClientFare" min="0" step="0.01"
-               inputmode="decimal" placeholder="e.g. 20000">
+        <!-- TEXT, NOT number, and only because of the grouping. A number input
+             cannot hold "20,000" — the browser reads a comma as invalid and
+             hands back "" — so the separators the spec asks for are impossible
+             while it stays type=number. Digits (and one decimal point) are the
+             only characters clBindMoneyField lets through, and clParseMoney
+             strips the commas again on the way out, so what is SENT is the same
+             plain number it always was. -->
+        <input type="text" id="clEnqClientFare" inputmode="decimal" autocomplete="off"
+               placeholder="e.g. 20,000">
         <small>What you have quoted your customer. Optional — leave it blank and you
                can add it when you raise the booking, once we have quoted you.</small>
       </div>
@@ -1003,22 +972,27 @@ function clTimeField(id, value, label) {
   const t = clNormaliseTime(value) || '09:00';
   const [hh, mm] = t.split(':');
 
-  /* TYPED, NOT PICKED. Both parts are number inputs rather than selects: the
-     merchant reads a departure time off an airline schedule and types it, and a
-     24-hour <select> would be 24 options beside 60 more. `inputmode="numeric"`
-     brings up the digit keypad on a phone, and the pattern keeps a stray letter
-     out on the browsers that honour it.
+  /* TYPED, NOT PICKED. Both parts are typed rather than selects: the merchant
+     reads a departure time off an airline schedule and types it, and a 24-hour
+     <select> would be 24 options beside 60 more. `inputmode="numeric"` brings
+     up the digit keypad on a phone.
 
-     `maxlength` is deliberately absent on a number input — it does nothing
-     there. Range is enforced on blur by `clWireTimeField`, which is the only
-     place that can clamp "27" back to something real. */
+     TWO DIGITS, AND EXACTLY TWO. These were `type=number`, on which `maxlength`
+     does nothing at all — so "123" and "2A" both went in, and the only thing
+     standing between them and a stored time was the blur clamp. They are text
+     inputs now, which makes `maxlength="2"` real; `clBindTimeField` strips any
+     non-digit as it is typed, and still pads and clamps on the way out, so "9"
+     leaves the field as "09" and "27" as "23".
+
+     The arrow keys no longer step the value — that was `type=number`'s doing —
+     which is the one thing given up for a field that cannot hold "123". */
   return `<div class="cl-timesel cl-timesel-24" id="${id}">
-    <input type="number" id="${id}Hour" class="cl-timesel-h" value="${hh}"
-           min="0" max="23" step="1" inputmode="numeric" pattern="[0-9]*"
+    <input type="text" id="${id}Hour" class="cl-timesel-h" value="${hh}"
+           maxlength="2" inputmode="numeric" pattern="[0-9]{2}" autocomplete="off"
            aria-label="${escapeHtml(label)} — hour, 00 to 23">
     <span class="cl-timesel-sep" aria-hidden="true">:</span>
-    <input type="number" id="${id}Min" class="cl-timesel-m" value="${mm}"
-           min="0" max="59" step="1" inputmode="numeric" pattern="[0-9]*"
+    <input type="text" id="${id}Min" class="cl-timesel-m" value="${mm}"
+           maxlength="2" inputmode="numeric" pattern="[0-9]{2}" autocomplete="off"
            aria-label="${escapeHtml(label)} — minute, 00 to 59">
     <span class="cl-timesel-hint" aria-hidden="true">24h</span>
   </div>`;
@@ -1037,17 +1011,29 @@ function clReadTimeField(id) {
 /* Keeps the form's state object in step with whichever part was just changed,
    and normalises what the merchant sees on the way out of the field.
 
-   CLAMP ON BLUR, NOT ON KEYSTROKE. Typing "1" on the way to "18" would be
-   rewritten to "01" mid-entry if this ran on `input`, and a merchant who then
-   types the "8" gets "018" -> "18" only by luck. `change` fires on blur, on
-   Enter and on the spinner, which is when the value is actually meant. */
+   TWO PASSES, AND THEY DO DIFFERENT JOBS.
+   `input` filters: anything that is not a digit never appears, and a third
+   digit is refused — so "AA", "2A" and "123" cannot be typed at all. It does
+   NOT pad or clamp, because rewriting "1" to "01" mid-entry leaves a merchant
+   heading for 18:00 typing the "8" into a full field.
+   `change` settles: it fires on blur and on Enter, which is when the value is
+   actually meant, and that is where "9" becomes "09" and "27" becomes "23". */
 function clBindTimeField(id, onChange) {
   ['Hour', 'Min'].forEach(part => {
     const el = $(`${id}${part}`);
     if (!el) return;
+
+    /* maxlength stops a third *typed* character; this also stops a pasted one,
+       and is what keeps letters out of a field that is no longer type=number. */
+    clDigitsOnly(el, 2);
+
     el.addEventListener('change', () => {
       const max = part === 'Hour' ? 23 : 59;
-      let n = Number(el.value);
+      const raw = String(el.value ?? '').trim();
+      /* An emptied box reverts to 00 rather than being left blank: the time is
+         required, and clReadTimeField would return null for "" — which submit
+         reads as "use the last good value", silently ignoring the clearing. */
+      let n = raw === '' ? 0 : Number(raw);
       if (!Number.isFinite(n)) n = 0;
       n = Math.min(max, Math.max(0, Math.trunc(n)));
       el.value = String(n).padStart(2, '0');
@@ -1115,8 +1101,22 @@ function clWireEnquiryForm() {
   clBindTimeField('clEnqTime', v => { clEnqForm.depTime = v; });
   clBindTimeField('clEnqReturnTime', v => { clEnqForm.retTime = v; });
 
-  /* ---- dates ---- */
-  $('clEnqDate').addEventListener('change', clSyncReturnMin);
+  /* ---- dates ----
+     Picked, never typed (clPickerOnly in classic-shell.js), on both legs. The
+     return leg is then judged the moment it is left rather than at submit: a
+     merchant who picks a return before the departure should be told there and
+     then, while the picker they used is still the thing they are thinking
+     about. `change` covers the pick itself, `blur` covers a field left in a
+     state the pick never produced. */
+  clPickerOnly($('clEnqDate'));
+  clPickerOnly($('clEnqReturnDate'));
+
+  $('clEnqDate').addEventListener('change', () => {
+    clSyncReturnMin();
+    clValidateReturnDate();
+  });
+  $('clEnqReturnDate').addEventListener('change', clValidateReturnDate);
+  $('clEnqReturnDate').addEventListener('blur', clValidateReturnDate);
 
   /* ---- passenger steppers ---- */
   $('clModalBody').querySelectorAll('[data-cl-step]').forEach(card => {
@@ -1139,6 +1139,9 @@ function clWireEnquiryForm() {
     e.target.value = e.target.value.toUpperCase();
     e.target.setSelectionRange(pos, pos);
   });
+
+  /* ---- client fare: grouped as it is typed (1000 -> 1,000) ---- */
+  clBindMoneyField($('clEnqClientFare'));
 
   /* ---- booking class: exactly one A-Z letter ----
      Filtered on the way in rather than validated on the way out, because there
@@ -1632,12 +1635,12 @@ function fmtBytes(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/* The return leg is the outbound reversed, shown rather than asked for — the
-   spec's "automatically display To City -> From City". */
-function clSyncReturnRoute() {
-  const el = $('clEnqReturnRoute');
-  if (!el || !clEnqForm) return;
-  const from = clEnqForm.to, to = clEnqForm.from;
+/* One route pill, painted from whichever pair of cities the caller names.
+   Both legs use it, so "Hyderabad → Colombo" is built once and the outbound and
+   the return cannot end up formatted differently. */
+function clPaintRoute(elId, from, to) {
+  const el = $(elId);
+  if (!el) return;
   if (!from || !to) {
     el.className = 'cl-route cl-route-empty';
     el.textContent = 'Pick From and To first';
@@ -1645,6 +1648,23 @@ function clSyncReturnRoute() {
   }
   el.className = 'cl-route';
   el.innerHTML = `${escapeHtml(from.city)} <span>→</span> ${escapeHtml(to.city)}`;
+}
+
+/* The outbound leg, shown back exactly as the return one is. It is the journey
+   the merchant just chose, so unlike the return there is nothing to derive —
+   this only echoes it, which is the point: a route stated once in two combo
+   boxes is easy to mis-read, and easy to check against a pill. */
+function clSyncDepartRoute() {
+  if (!clEnqForm) return;
+  clPaintRoute('clEnqDepartRoute', clEnqForm.from, clEnqForm.to);
+}
+
+/* The return leg is the outbound reversed, shown rather than asked for — the
+   spec's "automatically display To City -> From City". */
+function clSyncReturnRoute() {
+  if (!clEnqForm) return;
+  clSyncDepartRoute();
+  clPaintRoute('clEnqReturnRoute', clEnqForm.to, clEnqForm.from);
 }
 
 /* A return cannot be on or before the departure, so the picker's floor moves
@@ -1657,6 +1677,47 @@ function clSyncReturnMin() {
   const floor = clAddDays(dep, 1);
   ret.min = floor;
   if (ret.value && ret.value < floor) ret.value = '';
+}
+
+/* THE RETURN DATE IS JUDGED WHEN IT IS LEFT, NOT AT SUBMIT.
+   ===========================================================================
+   `min` on the input is a suggestion the picker honours and a typed or
+   programmatically set value ignores, and clSyncReturnMin only runs when the
+   DEPARTURE moves — so a return date earlier than the departure survived on
+   screen, looking accepted, until submit refused it several sections later.
+
+   Says the same thing submit says, in the same words, beside the field. Returns
+   true when the leg is usable, so the message and the outline can never
+   disagree with what the form will actually accept.
+
+   Silent when there is no return leg to judge, and when the field is simply
+   empty: "required" is submit's job, and accusing a merchant of an omission
+   they are two seconds into making is the reason validation gets ignored. */
+function clValidateReturnDate() {
+  const ret = $('clEnqReturnDate');
+  const hint = $('clEnqReturnDateHint');
+  if (!ret || !clEnqForm) return true;
+
+  const hasReturn = !$('clEnqReturn')?.classList.contains('cl-hidden');
+  const dep = $('clEnqDate')?.value || '';
+  const value = ret.value || '';
+
+  let problem = null;
+  if (hasReturn && value && dep && value < dep) {
+    problem = 'The return date cannot be before the departure date.';
+  } else if (hasReturn && value && dep && value === dep) {
+    /* Same-day is refused by `min` (departure + 1) and by submit, so it is
+       named separately — "cannot be before" would read as though it were
+       allowed. */
+    problem = 'The return date must be after the departure date, not the same day.';
+  }
+
+  ret.classList.toggle('cl-input-err', !!problem);
+  if (hint) {
+    hint.textContent = problem || 'Must be after the departure date.';
+    hint.classList.toggle('cl-hint-err', !!problem);
+  }
+  return !problem;
 }
 
 function clStepPax(key, delta, min) {
@@ -1966,11 +2027,65 @@ function clHighlight(text, query) {
 
 /* ================================================================ submit == */
 
+/* AN AMOUNT THAT READS THE WAY IT IS WRITTEN DOWN: 1,000 · 10,000 · 1,000,000.
+   ===========================================================================
+   Grouped in threes — the international convention the spec names — rather than
+   `moneyStr`'s Indian grouping, which is what every *billed* figure in this
+   portal uses. The two live side by side deliberately: this is the merchant's
+   own selling price to its own customer, and it is the one number the spec asks
+   to be shown that way in both portals. `moneyIntl` in shared/formatters.js
+   renders it back on every screen that displays it.
+
+   Formatting happens on `input`, so the separators appear as the digits do.
+   Only the INTEGER part is grouped while typing — regrouping the fraction would
+   fight a merchant halfway through "1234.5" — and at most two decimals are
+   accepted, which is what the Decimal column stores.
+
+   The caret is restored by counting digits rather than characters: inserting a
+   comma shifts every position after it, and `.value = ...` alone drops the
+   cursor at the end mid-edit. */
+function clFormatMoneyInput(raw) {
+  const t = String(raw ?? '');
+  /* One decimal point survives; everything that is not a digit goes. */
+  const cleaned = t.replace(/[^\d.]/g, '').replace(/\.(?=.*\.)/g, '');
+  if (!cleaned) return '';
+  const [whole, fraction] = cleaned.split('.');
+  const grouped = groupThousands(whole.replace(/^0+(?=\d)/, ''));
+  if (fraction === undefined) return grouped;
+  return `${grouped || '0'}.${fraction.slice(0, 2)}`;
+}
+
+function clBindMoneyField(input) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const before = input.value;
+    const caret = input.selectionStart ?? before.length;
+    const after = clFormatMoneyInput(before);
+    if (after === before) return;
+    /* Digits (and the point) before the caret are the fixed point across a
+       reformat; the caret goes back after the same count of them. */
+    const kept = before.slice(0, caret).replace(/[^\d.]/g, '').length;
+    input.value = after;
+    let seen = 0;
+    let at = after.length;
+    for (let i = 0; i < after.length; i += 1) {
+      if (after[i] !== ',') seen += 1;
+      if (seen === kept) { at = i + 1; break; }
+    }
+    input.setSelectionRange(kept === 0 ? 0 : at, kept === 0 ? 0 : at);
+  });
+}
+
 /* An optional money input. Returns null for blank/garbage so the field is
    omitted rather than sent as 0, and never returns a negative — the column has
-   a CHECK constraint and a 422 on a typo is a worse experience than clamping. */
+   a CHECK constraint and a 422 on a typo is a worse experience than clamping.
+
+   COMMAS ARE STRIPPED HERE, which is what keeps the grouping above a display
+   concern only: `Number("20,000")` is NaN, so without this every fare the
+   merchant could now see would have been sent as null. What reaches the API is
+   the same plain number it always was. */
 function clParseMoney(raw) {
-  const t = String(raw ?? '').trim();
+  const t = String(raw ?? '').replace(/,/g, '').trim();
   if (!t) return null;
   const n = Number(t);
   if (!Number.isFinite(n) || n < 0) return null;
@@ -2077,7 +2192,13 @@ async function clSubmitEnquiry() {
   if (hasReturn) {
     returnDate = $('clEnqReturnDate').value;
     if (!returnDate) return fail('Choose the return date.', 'clEnqReturnDate');
-    if (returnDate <= date) return fail('The return date must be after the departure date.', 'clEnqReturnDate');
+    /* The same check the field already ran when it was left, so the sentence
+       under the box and the sentence at the bottom of the form are one rule
+       stated once rather than two that can drift. */
+    if (!clValidateReturnDate()) {
+      return fail($('clEnqReturnDateHint')?.textContent
+        || 'The return date must be after the departure date.', 'clEnqReturnDate');
+    }
     returnTime = clReadTimeField('clEnqReturnTime') || f.retTime;
   }
 

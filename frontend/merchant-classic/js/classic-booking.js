@@ -544,6 +544,16 @@ function clRenderBookingForm(e) {
       </div>
     </div>
 
+    <!-- CONTACT IS OPTIONAL NOW, and none of these four carries the required
+         marker. It was the one thing on this screen a merchant could not skip,
+         and it is information we usually already hold against the account.
+
+         WHAT IS STILL ENFORCED, AND WHY IT HAS TO BE: BookingContact on the
+         server (schemas/enquiry.py) requires an email AND a phone whenever a
+         contact is sent at all. So the pair travels together — fill in both, or
+         neither. clFlagMissingContact says exactly that rather than letting a
+         half-filled panel reach the API and come back a 422.
+         (No backticks in this comment — it is inside a template literal.) -->
     <div class="cl-panel">
       <div class="cl-panel-head"><h2>Contact for this booking</h2></div>
       <div class="cl-panel-body">
@@ -554,25 +564,32 @@ function clRenderBookingForm(e) {
               value="${escapeHtml(contact.name || '')}" placeholder="Who we should ask for">
           </div>
           <div class="cl-field">
-            <label for="clBrContactEmail">Email<span class="cl-req">*</span></label>
+            <label for="clBrContactEmail">Email</label>
             <input type="email" id="clBrContactEmail" maxlength="255"
               value="${escapeHtml(contact.email || '')}" placeholder="bookings@yourcompany.com">
           </div>
+          <!-- DIGITS ONLY on both numbers, filtered as they are typed
+               (clDigitsOnly). The placeholder no longer shows a "+" or spaces:
+               it used to read "+91 90000 00000", which is exactly the entry the
+               field now refuses. Country code without the plus. -->
           <div class="cl-field">
-            <label for="clBrContactPhone">Phone<span class="cl-req">*</span></label>
-            <input type="tel" id="clBrContactPhone" maxlength="30"
-              value="${escapeHtml(contact.phone || '')}" placeholder="+91 90000 00000">
+            <label for="clBrContactPhone">Phone</label>
+            <input type="tel" id="clBrContactPhone" maxlength="15" inputmode="numeric"
+              value="${escapeHtml(clDigits(contact.phone))}" placeholder="919000000000">
+            <small id="clBrContactPhoneHint">Numbers only, 7 to 15 digits. Include the country
+              code without a plus.</small>
           </div>
           <div class="cl-field">
             <label for="clBrContactAlt">Alternate phone</label>
-            <input type="tel" id="clBrContactAlt" maxlength="30"
-              value="${escapeHtml(contact.alternate_phone || '')}" placeholder="Optional">
+            <input type="tel" id="clBrContactAlt" maxlength="15" inputmode="numeric"
+              value="${escapeHtml(clDigits(contact.alternate_phone))}" placeholder="Optional">
           </div>
         </div>
       </div>
       <div class="cl-panel-note">
         One contact for the whole party — this is who our team and the airline reach
         about schedule changes, so it should be a monitored address and number.
+        Optional: leave it blank and we will use the details we hold for your account.
       </div>
     </div>
 
@@ -599,53 +616,33 @@ function clRenderBookingForm(e) {
       </div>
     </div>
 
-    <!-- PRE-FILLED FROM THE DRAFT FIRST, THEN FROM THE ENQUIRY. The second
-         source is the backward-compatible one: an enquiry raised before this
-         field moved may already carry a client fare, and showing it here lets
-         the merchant confirm or correct it rather than wonder where it went.
-         Submitting sends whatever is in the box, so the value is preserved by
-         being re-sent rather than by the server's fallback — which stays in
-         place for a caller that omits the field entirely.
+    <!-- THE CLIENT FARE PANEL THAT USED TO SIT HERE IS GONE, on request.
+         ===================================================================
+         It was the second of two boxes asking the same question — the Booking
+         Enquiry form and the Book Directly form both collect Client Fare, and
+         this one restated it after the fact. What the merchant charges its own
+         customer is now stated once, at the point the journey is described.
 
-         CLIENT FARE — THE SECOND OF TWO OPTIONAL CHANCES TO STATE IT.
-         What the merchant is charging its own end customer. The enquiry form
-         asks for it too and neither is required: a merchant who already knows
-         its selling price can say so there, and one who would rather see our
-         quotation first fills it in here, where the quoted fare sits on the
-         page directly above. Never used for settlement — it only produces the
-         "You Saved" figure on the booking, in Reports and on the Dashboard.
+         NOTHING ABOUT THE DATA CHANGED. to_booking_request prefers a client
+         fare in its payload and falls back to the one the enquiry carried
+         (an "is not None" test, because 0 is a real fare), so omitting the
+         field here means the enquiry's value stands — which is why "You Saved"
+         on the Dashboard, in Reports and on the booking detail keeps working.
+         The direct path carries its own value through the itinerary payload;
+         see clSubmitBookingRequest, which no longer overwrites it.
 
-         PRE-FILLED FROM THE ENQUIRY when one was given, which is what stops
-         this screen reading as though the earlier entry was lost. Editing it
-         here overrides; leaving it alone re-sends the same number. -->
-    <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Your customer&rsquo;s fare</h2></div>
-      <div class="cl-panel-body">
-        <div class="cl-form cl-form-2">
-          <div class="cl-field">
-            <label for="clBrClientFare">Client Fare</label>
-            <input type="number" id="clBrClientFare" min="0" step="0.01"
-              inputmode="decimal" placeholder="e.g. 20000"
-              value="${(clBookingDraft?.client_fare ?? e.client_fare) != null
-                ? escapeHtml(String(clBookingDraft?.client_fare ?? e.client_fare)) : ''}">
-            <small>${e.quoted_fare != null
-              ? `We quoted <b>${escapeHtml(moneyStr(e.quoted_fare))}</b>. Enter what you are
-                 charging your customer and we will show you the saving.`
-              : `Enter what you are charging your customer. We compare our fare against it
-                 once the ticket is priced.`} Optional.</small>
-          </div>
-        </div>
-      </div>
-    </div>
+         The API is untouched: client_fare remains accepted by both
+         EnquiryToBooking and UpdateDraftRequest, and merchant-api.js still
+         forwards it when a caller supplies one.
+         (No backticks in this comment — it is inside a template literal.) -->
 
     <div class="cl-panel">
       <div class="cl-panel-body">
-        <div class="cl-field">
-          <label for="clBrSpecial">Special requests</label>
-          <textarea id="clBrSpecial" maxlength="1000"
-            placeholder="Wheelchair assistance, bassinet, dietary needs, seating together…">${
-              escapeHtml(clBookingDraft?.details?.special_requests || '')}</textarea>
-        </div>
+        <!-- Special requests moved to the passenger cards above: a bassinet, a
+             wheelchair and a Jain meal each belong to ONE traveller, and a
+             single party-wide box made the desk guess which. See the Special
+             request field on each card, which rides that passenger's
+             special_services array to the Booking Operations desk. -->
         <div class="cl-field">
           <label for="clBrRemarks">Remarks for our team</label>
           <textarea id="clBrRemarks" maxlength="1000"
@@ -699,6 +696,14 @@ function clRenderBookingForm(e) {
   } else {
     clSeedPassengerRows(list, e);
   }
+
+  /* Both contact numbers take digits and nothing else, filtered as they are
+     typed rather than judged at submit — a merchant who pastes
+     "+91 90000 00000" sees it become "919000000000" and knows what the field
+     wants. Length is checked at submit by clFlagPhoneLength; there is nothing
+     to say about "9190" until they have stopped typing it. */
+  clDigitsOnly($('clBrContactPhone'), 15);
+  clDigitsOnly($('clBrContactAlt'), 15);
 
   $('clBrAddPax')?.addEventListener('click', () => {
     clAddPaxCard(list, list.querySelectorAll('[data-cl-pax]').length);
@@ -917,7 +922,7 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
         <input type="text" data-field="first_name" autocomplete="off"></div>
       <div class="cl-field"><label>Last name<span class="cl-req">*</span></label>
         <input type="text" data-field="last_name" autocomplete="off"></div>
-      <div class="cl-field"><label>Type</label>
+      <div class="cl-field"><label>Passenger Type</label>
         <select data-field="passenger_type">${CL_PAX_TYPES.map(t =>
           `<option value="${t}"${t === (passengerType || 'adult') ? ' selected' : ''}>${clLabel(t)}</option>`).join('')}</select></div>
       <div class="cl-field"><label>Gender</label>
@@ -925,12 +930,27 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
           <option value="male">Male</option><option value="female">Female</option>
           <option value="other">Other</option></select></div>
       <div class="cl-field"><label>Date of birth</label><input type="date" data-field="dob"></div>
+      <!-- SEARCHABLE, NOT FREE TEXT — and the two boxes ask for different words
+           for the same fact: nationality is the demonym ("Indian"), the
+           passport's issuing country is the country ("India"). Typed as free
+           text they arrived as "IND", "indian", "Bharat" and blanks, none of
+           which the desk can check a passport against. Both combos still accept
+           anything typed (the list offers it back explicitly), so a passport
+           from a country not in countries.js is still enterable. -->
       <div class="cl-field"><label>Nationality</label>
-        <input type="text" data-field="nationality" placeholder="e.g. Indian"></div>
+        <div class="cl-combo cl-combo-drop">
+          <input type="text" data-field="nationality" autocomplete="off" role="combobox"
+                 aria-expanded="false" aria-autocomplete="list" placeholder="e.g. Indian">
+          <div class="cl-combo-list" data-cl-list="nationality" role="listbox"></div>
+        </div></div>
       <div class="cl-field"><label>Passport no.</label>
         <input type="text" data-field="passport_number" autocomplete="off"></div>
       <div class="cl-field"><label>Issuing country</label>
-        <input type="text" data-field="passport_issue_country"></div>
+        <div class="cl-combo cl-combo-drop">
+          <input type="text" data-field="passport_issue_country" autocomplete="off" role="combobox"
+                 aria-expanded="false" aria-autocomplete="list" placeholder="e.g. India">
+          <div class="cl-combo-list" data-cl-list="passport_issue_country" role="listbox"></div>
+        </div></div>
       <div class="cl-field"><label>Issue date</label>
         <input type="date" data-field="passport_issue_date"></div>
       <div class="cl-field"><label>Expiry</label>
@@ -944,6 +964,14 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
           <option value="veg">Vegetarian</option><option value="non_veg">Non-vegetarian</option>
           <option value="vegan">Vegan</option><option value="jain">Jain</option>
           <option value="kosher">Kosher</option><option value="halal">Halal</option></select></div>
+      <!-- ONE PER TRAVELLER, replacing the single party-wide box that used to
+           sit at the bottom of this screen. A special request is about a
+           person — this passenger needs the wheelchair, that one the bassinet —
+           and the desk previously had to work out which from a paragraph. Full
+           width so it does not sit as a one-line box among the short fields. -->
+      <div class="cl-field cl-field-full"><label>Special request</label>
+        <input type="text" data-field="special_request" maxlength="300" autocomplete="off"
+               placeholder="Wheelchair assistance, bassinet, seat together with passenger 2…"></div>
     </div>`;
   list.appendChild(el);
 
@@ -954,8 +982,15 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
     Object.entries(saved).forEach(([field, value]) => {
       if (value === null || value === undefined) return;
       const input = el.querySelector(`[data-field="${field}"]`);
-      if (input) input.value = value;
+      /* Skip anything that is not a plain scalar — `special_services` is an
+         array and would stringify to "[object Object]" in the box that reads
+         it. It is restored by name just below. */
+      if (input && typeof value !== 'object') input.value = value;
     });
+    /* The traveller's own special request, back out of the array it travels
+       in. Written by clPassengerPayload; see clPassengerSpecialRequest. */
+    const special = el.querySelector('[data-field="special_request"]');
+    if (special) special.value = clReadSpecialRequest(saved.special_services);
   }
 
   el.querySelector('[data-cl-pax-remove]')?.addEventListener('click', () => {
@@ -963,12 +998,100 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
     clRenumberPax(list);
   });
 
+  clBindPassengerCombos(el);
   clBindPassportLookup(el);
   /* Passport scanning (classic-passport-ocr.js). Renders nothing at all unless
      the deployment has an OCR provider configured, so a card looks exactly as
      it did before this shipped when it does not. Guarded so the booking screen
      still works if that file fails to load. */
   if (typeof clOcrAttach === 'function') clOcrAttach(el);
+}
+
+/* ================================ nationality and issuing country, searchable */
+
+/* Both combos are the enquiry form's `clCombo` (classic-enquiry.js), which
+   loads before this file and is the portal's one dropdown implementation —
+   same keyboard handling, same "typing clears the pick" rule, same markup.
+   Nothing is stored beyond the input's own value: unlike the city fields there
+   is no code to remember, so `onPick` is a no-op and free text and a picked row
+   reach clPassengerPayload by the identical route.
+
+   `openOnFocus` on both, for the reason the airline combo has it: an empty box
+   that shows nothing until you type reads as free text, and the whole point of
+   the change is that these two fields have a list. */
+function clBindPassengerCombos(card) {
+  const wire = (field, optionsFor) => {
+    const input = card.querySelector(`[data-field="${field}"]`);
+    const list = card.querySelector(`[data-cl-list="${field}"]`);
+    if (input && list) clCombo(input, list, optionsFor, () => {}, { openOnFocus: true });
+  };
+  wire('nationality', clNationalityOptions);
+  wire('passport_issue_country', clCountryOptions);
+}
+
+/* The typed text, offered back as an explicit row when it matches nothing.
+   Same shape as clAirlineOptions' free-text fallback and for the same reason:
+   the list is what we happen to name, not what the field accepts, and a combo
+   that answers "no match" reads as a refusal.
+
+   ONLY when nothing matched, exactly as the airline combo does it. Offering it
+   alongside real matches put "Use “indi” as typed" under "Indian" on the way to
+   typing "Indian" — a row nobody wants, on every keystroke. A merchant whose
+   answer is genuinely off-list can still simply leave it in the box: this combo
+   never forces a pick, and blur keeps whatever is typed. */
+function clFreeTextOption(raw) {
+  return {
+    value: raw,
+    label: `Use “${raw}” as typed`,
+    sub: 'Not on our list — we will record it as written',
+    data: null,
+  };
+}
+
+function clCountryOptions(query) {
+  const raw = String(query || '').trim();
+  const rows = (typeof searchCountries === 'function' ? searchCountries(raw, 8) : [])
+    .map(r => ({ value: r.country, label: r.country, sub: r.nationality, data: null }));
+  return raw && !rows.length ? [clFreeTextOption(raw)] : rows;
+}
+
+function clNationalityOptions(query) {
+  const raw = String(query || '').trim();
+  const rows = (typeof searchNationalities === 'function' ? searchNationalities(raw, 8) : [])
+    .map(r => ({ value: r.nationality, label: r.nationality, sub: `Passport of ${r.country}`, data: null }));
+  return raw && !rows.length ? [clFreeTextOption(raw)] : rows;
+}
+
+/* ================================= the traveller's own special request ====== */
+
+/* WHERE A PER-PASSENGER REQUEST LIVES, AND WHY IT IS NOT A NEW COLUMN.
+   ===========================================================================
+   `PassengerInput.special_services` is a `list[dict]` that every portal has
+   been posting as `[]` since it was added — it is the schema's own per-traveller
+   slot, it is already returned by `PassengerResponse`, and the Booking
+   Operations desk already renders it (opsPassengerCard reads `label` and
+   `category`). So the field the spec asks for fits an existing shape exactly:
+   no migration, no API change, and the desk sees it the day it ships.
+
+   One entry, one shape, so a reader never has to guess which key holds the
+   text. `category` is deliberately omitted — the desk's renderer joins it onto
+   the label with a middot, and "Wheelchair · Special request" says nothing the
+   heading above it did not. */
+const CL_SPECIAL_REQUEST_CODE = 'special_request';
+
+function clWriteSpecialRequest(text) {
+  const t = String(text || '').trim();
+  return t ? [{ code: CL_SPECIAL_REQUEST_CODE, label: t }] : [];
+}
+
+/* The inverse, tolerant of anything else the array may carry: a row written by
+   another surface (or by a future ancillary) is read for its label rather than
+   dropped, so resuming a draft never silently empties a field it cannot parse.
+   Only OUR entry is editable here, and it is the one written back. */
+function clReadSpecialRequest(services) {
+  if (!Array.isArray(services)) return '';
+  const own = services.find(s => s && s.code === CL_SPECIAL_REQUEST_CODE);
+  return String(own?.label || '').trim();
 }
 
 /* ============================================ passenger auto-fill by passport */
@@ -1150,7 +1273,10 @@ function clPassengerPayload(card) {
     passport_expiry: get('passport_expiry') || undefined,
     seat_preference: get('seat_preference') || undefined,
     meal_preference: get('meal_preference') || undefined,
-    special_services: [],
+    /* This traveller's own special request. `[]` when there is none, which is
+       what every portal has always sent and what the column's array CHECK
+       requires — it is never omitted. */
+    special_services: clWriteSpecialRequest(get('special_request')),
   };
 }
 
@@ -1201,18 +1327,46 @@ function clFlagMissingPassengerFields(intl, travelDate) {
   return problem;
 }
 
-/* Contact is required on every enquiry-led booking — it is who the airline and
-   our desk reach about a schedule change. */
+/* CONTACT IS OPTIONAL, AND ALL-OR-NOTHING.
+   ===========================================================================
+   It used to be the one thing on this screen a merchant could not skip. It is
+   not required any more — a booking with no contact panel filled in is sent
+   with no contact at all, and our desk uses what it holds against the account.
+
+   What has NOT changed is the server's rule: `BookingContact` requires both an
+   email and a phone whenever a contact object is present, so a panel with only
+   one of them cannot be sent. Rather than let that surface as a 422 four
+   sections later, the pair is checked here and named as a pair. The format
+   checks still only run on a value that exists.
+
+   Returns an error string, or null when the panel is either complete or
+   entirely blank. */
 function clFlagMissingContact() {
   const email = $('clBrContactEmail');
   const phone = $('clBrContactPhone');
-  let bad = null;
-  [email, phone].forEach(el => {
-    const empty = !el.value.trim();
-    el.style.borderColor = empty ? 'var(--cl-coral-dark)' : '';
-    if (empty && !bad) bad = el;
-  });
-  if (bad) { bad.focus(); return 'Enter a contact email and phone for this booking.'; }
+  const alt = $('clBrContactAlt');
+  [email, phone, alt].forEach(el => { if (el) el.style.borderColor = ''; });
+
+  const hasEmail = !!email.value.trim();
+  const hasPhone = !!phone.value.trim();
+
+  /* Nothing typed at all — a legitimate, complete answer now. */
+  if (!hasEmail && !hasPhone && !alt.value.trim()) return null;
+
+  if (!hasEmail || !hasPhone) {
+    const bad = hasEmail ? phone : email;
+    bad.style.borderColor = 'var(--cl-coral-dark)';
+    bad.focus();
+    return 'A contact needs both an email and a phone — fill in both, or leave the whole '
+      + 'contact panel blank.';
+  }
+
+  /* Digits only reach these boxes (clDigitsOnly), so what is left to judge is
+     the length. Seven to fifteen is E.164's own range: shorter is not a
+     dialable number and longer cannot be one. */
+  const phoneProblem = clFlagPhoneLength(phone, 'phone number')
+    || clFlagPhoneLength(alt, 'alternate phone number');
+  if (phoneProblem) return phoneProblem;
 
   // Deliberately loose: the backend is the authority, and an over-strict
   // pattern here would reject valid addresses the desk can actually use.
@@ -1224,12 +1378,44 @@ function clFlagMissingContact() {
   return null;
 }
 
+/* Seven to fifteen digits, or nothing. Blank is always fine — both numbers are
+   optional now — so this only judges a value that is actually there. Marks the
+   box and returns the sentence, or null. */
+function clFlagPhoneLength(el, what) {
+  if (!el) return null;
+  const digits = clDigits(el.value);
+  if (!digits) return null;
+  if (digits.length >= 7 && digits.length <= 15) return null;
+  el.style.borderColor = 'var(--cl-coral-dark)';
+  el.focus();
+  return `That ${what} is ${digits.length} digit${digits.length === 1 ? '' : 's'} — `
+    + 'a phone number is between 7 and 15.';
+}
+
+/* Every non-digit stripped. Used both when a stored contact is rendered back
+   into the boxes and when one is read out of them, so a number saved before
+   these fields were digits-only ("+91 90000 00000") is shown, and re-sent, in
+   the one shape the form now accepts. */
+function clDigits(value) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
+/* THE WHOLE CONTACT, OR NOTHING AT ALL.
+   `undefined` when the panel is blank, which merchant-api.js turns into an
+   omitted `contact` key — the server then leaves whatever it holds alone. The
+   alternative, sending an object of empty strings, is exactly what
+   BookingContact's min_length rejects. */
 function clContactPayload() {
+  const name = ($('clBrContactName').value || '').trim();
+  const email = ($('clBrContactEmail').value || '').trim();
+  const phone = clDigits($('clBrContactPhone').value);
+  const alt = clDigits($('clBrContactAlt').value);
+  if (!email || !phone) return undefined;
   return {
-    name: ($('clBrContactName').value || '').trim() || undefined,
-    email: ($('clBrContactEmail').value || '').trim(),
-    phone: ($('clBrContactPhone').value || '').trim(),
-    alternate_phone: ($('clBrContactAlt').value || '').trim() || undefined,
+    name: name || undefined,
+    email,
+    phone,
+    alternate_phone: alt || undefined,
   };
 }
 
@@ -1335,13 +1521,23 @@ async function clSubmitBookingRequest(finalize) {
   clMsg(msg, finalize ? 'Submitting for approval…' : 'Saving draft…', 'muted');
 
   const remarks = ($('clBrRemarks').value || '').trim();
-  const specialRequests = ($('clBrSpecial').value || '').trim();
   const contact = clContactPayload();
-  /* 0040. null when blank, NEVER 0 — the column distinguishes "not recorded"
-     from "sold at zero", and a 0 would drop a zero-saving booking into the
-     merchant's savings average. Reuses the enquiry form's parser so the two
-     screens cannot disagree about what a blank box means. */
-  const clientFare = clParseMoney($('clBrClientFare')?.value);
+
+  /* NEITHER A BOOKING-LEVEL SPECIAL REQUEST NOR A CLIENT FARE IS READ HERE ANY
+     MORE, and both absences are deliberate:
+
+       special_requests  moved to the passenger cards, where each traveller's
+                         request rides its own `special_services`. Not sent at
+                         all now, so the API's optional field simply goes
+                         unused by this screen.
+       client_fare       stated once, on the form that describes the journey.
+                         Omitting it is what makes the server keep the value the
+                         enquiry carried; the direct path carries its own
+                         through the itinerary payload below.
+
+     Both fields remain on the API and on merchant-api.js's signatures — this
+     screen has stopped supplying them, which is not the same as removing
+     them. */
 
   /* THREE try BLOCKS, NOT ONE.
      These steps fail in different ways and must be reported differently. When
@@ -1358,29 +1554,37 @@ async function clSubmitBookingRequest(finalize) {
          A group draft skips that call entirely — its travellers came from the
          manifest and are not editable here, so there is nothing to replace. */
       if (!isGroup) await MerchantApi.replacePassengers(clBookingDraft.id, passengers);
-      request = await MerchantApi.updateDraft(clBookingDraft.id, {
-        remarks, contact, specialRequests, clientFare,
-      });
+      /* `contact ?? {}` — and the empty object is the point. Now that the panel
+         may be left blank, a merchant editing a draft has to be able to REMOVE
+         a contact they entered earlier, and `undefined` means "leave it alone"
+         to updateDraft. An empty object is what clears it: UpdateDraftRequest
+         takes a plain dict here (not BookingContact), so `{}` is accepted and
+         every reader already resolves it to "no contact recorded".
+
+         The two CREATE paths below must NOT do this — their schemas type
+         `contact` as BookingContact, which requires an email and a phone, so an
+         empty object would be a 422 where `undefined` is simply omitted. */
+      request = await MerchantApi.updateDraft(clBookingDraft.id, { remarks, contact: contact ?? {} });
       request = request.request || request;
     } else if (clBookingDirect) {
       /* First save, direct path: the journey goes up with the travellers,
          because there is no enquiry holding it. Same two-step shape as below —
-         this creates the draft, /submit is still what reaches the desk. */
-      request = await MerchantApi.createDirectBooking(
-        /* The direct payload is the itinerary the form produced; the client
-           fare is collected on THIS screen now, so it is layered on here
-           rather than carried through the enquiry form's state. */
-        { ...clBookingDirect, client_fare: clientFare },
-        {
-          passengers, remarks, contact, international: intl, specialRequests,
-          groupImportId: groupImportId,
-        });
+         this creates the draft, /submit is still what reaches the desk.
+
+         `clBookingDirect` is spread untouched: it already carries the client
+         fare the Book Directly form collected, and the line that used to
+         overwrite it from this screen went with that screen's fare panel. */
+      request = await MerchantApi.createDirectBooking(clBookingDirect, {
+        passengers, remarks, contact, international: intl,
+        groupImportId: groupImportId,
+      });
     } else {
       /* First save: creates the draft against the enquiry. Only /submit puts
-         it in front of the approvals team. */
+         it in front of the approvals team. No client fare is sent, so the
+         server keeps the one the enquiry recorded. */
       request = await MerchantApi.enquiryToBookingRequest(enquiry.id, {
-        passengers, remarks, contact, international: intl, specialRequests,
-        groupImportId: groupImportId, clientFare,
+        passengers, remarks, contact, international: intl,
+        groupImportId: groupImportId,
       });
     }
   } catch (err) {

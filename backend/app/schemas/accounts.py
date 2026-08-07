@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models_v2 import MerchantRole, UserRole, UserStatus
+from app.services import session_service
 
 
 class AccountResponse(BaseModel):
@@ -25,10 +26,40 @@ class AccountResponse(BaseModel):
     is_online: bool = False
     created_at: datetime.datetime
 
+    # ---- the login-session picture (additive; every field defaults) --------
+    # An account list that only says "Active" answers a question nobody asked:
+    # `status` is whether the account is *permitted* to sign in, which is a
+    # different fact from whether anyone has. These describe the most recent
+    # session and are all None for an account that has never had one.
+    #
+    # They are OPTIONAL WITH DEFAULTS on purpose. This schema is also returned
+    # by the Super Admin, merchant-team and account-creation endpoints, which
+    # have no session to report; leaving them unset there keeps one schema
+    # rather than forking it, and every existing consumer is unaffected.
+    #: One of session_service.PRESENCE_* — online / recently_active / offline /
+    #: never_logged_in. Derived, never stored.
+    presence: str | None = None
+    presence_label: str | None = None
+    #: The address the last session connected FROM (public where a proxy
+    #: forwarded one), and a LAN address if one was visible. `local_ip` is
+    #: genuinely absent most of the time — see activity_service.client_addresses.
+    last_login_ip: str | None = None
+    last_login_local_ip: str | None = None
+    #: "Desktop" / "Mobile" / "Tablet", the browser with its major version, and
+    #: the operating system with its version where the client would tell us.
+    last_login_device: str | None = None
+    last_login_browser: str | None = None
+    last_login_os: str | None = None
+    #: When that session started, and when it last showed a sign of life. The
+    #: second is what "Recently Active" is measured from.
+    last_login_at: datetime.datetime | None = None
+    last_seen_at: datetime.datetime | None = None
+
     model_config = {"from_attributes": True}
 
     @classmethod
-    def of(cls, user, *, online: bool = False) -> "AccountResponse":
+    def of(cls, user, *, online: bool = False, session=None, presence: str | None = None):
+        extra = (getattr(session, "extra_data", None) or {}) if session else {}
         return cls(
             id=user.user_id,
             full_name=user.full_name,
@@ -43,6 +74,19 @@ class AccountResponse(BaseModel):
             last_login=user.last_login,
             login_count=user.login_count or 0,
             created_at=user.created_at,
+            presence=presence,
+            presence_label=session_service.PRESENCE_LABELS.get(presence or ""),
+            last_login_ip=str(session.ip_address) if session and session.ip_address else None,
+            last_login_local_ip=extra.get("local_ip"),
+            last_login_device=session.device if session else None,
+            last_login_browser=session.browser if session else None,
+            last_login_os=extra.get("os"),
+            # The session row's own timestamp, not `users.last_login`: they
+            # agree, but this one is the login THESE device/IP fields belong to,
+            # and a row that describes one session must not date itself from
+            # another.
+            last_login_at=session.created_at if session else None,
+            last_seen_at=session_service.last_seen_at(session),
         )
 
 

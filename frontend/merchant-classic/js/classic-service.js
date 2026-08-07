@@ -27,6 +27,10 @@
    it. Every type is raised the same way, appears in the same list, and is
    approved by the same two people.
 
+   The six are offered as FOUR choices — meal and seat sit inside Extra baggage,
+   which is the ancillary flow. See CL_SR_TABS. That is navigation and nothing
+   more: all six are still their own request_type on the wire.
+
    EVERY REQUEST IS APPROVED TWICE, IN THIS ORDER
    The merchant's own manager first, then our desk. A request is raised into
    "Under Manager Approval" and our team cannot see or settle it until that
@@ -58,10 +62,28 @@ const CL_SR_ELIGIBLE = ['approved', 'payment_pending', 'paid', 'ticket_issued', 
 const CL_CANCEL_ELIGIBLE = CL_SR_ELIGIBLE;
 const CL_RESCHEDULE_ELIGIBLE = ['approved', 'payment_pending', 'paid', 'ticket_issued', 'ticketed'];
 
+/* FOUR TOP-LEVEL TYPES, AND MEAL/SEAT ARE NOT AMONG THEM.
+   ===========================================================================
+   Six tabs meant a merchant who clicked Select to cancel a booking was offered
+   Meal and Seat in the same breath — three requests that change what somebody
+   eats or where they sit, sitting level with the one that ends the trip and
+   settles the money. The two are now reached through Extra baggage, which is
+   the ancillary flow: pick Extra baggage, then say which extra.
+
+   This is navigation only. All three remain their own `request_type` on the
+   wire, with their own payloads and their own approvals — nothing about how
+   they are raised, priced or settled has moved. */
 const CL_SR_TABS = [
   { id: 'cancellation', label: 'Cancellation' },
   { id: 'date_change', label: 'Date change' },
   { id: 'passenger_modification', label: 'Passenger correction' },
+  { id: 'extra_baggage', label: 'Extra baggage' },
+];
+
+/* The second-level choice inside the Extra baggage tab. `extra_baggage` leads
+   because it names the tab: opening it must show the form the label promised,
+   not a menu the merchant has to answer before seeing anything. */
+const CL_SR_ANCILLARIES = [
   { id: 'extra_baggage', label: 'Extra baggage' },
   { id: 'meal', label: 'Meal' },
   { id: 'seat', label: 'Seat' },
@@ -75,6 +97,8 @@ const CL_SR_TABS = [
 
 let clSrBooking = null;
 let clSrTab = 'cancellation';
+/* Which extra is being asked for, while the Extra baggage tab is open. */
+let clSrAncillary = 'extra_baggage';
 let clSrBookings = [];
 let clSrRequests = [];
 /* Modal mode: the form, or the read-only look at what was booked. */
@@ -151,7 +175,7 @@ function clInitServiceRequest() {
           <div class="cl-field">
             <label for="clSrType">Type</label>
             <select id="clSrType">
-              <option value="">All types</option>
+              <option value="">All</option>
               ${MERCHANT_SERVICE_REQUEST_TYPES.map(t =>
                 `<option value="${t}">${clLabel(t)}</option>`).join('')}
             </select>
@@ -218,13 +242,30 @@ function clSwitchSrPageTab(tab) {
    status_label ("Under Manager Approval" / "Manager Approved"), the pricing our
    desk quoted, and the manager_approval block. Narrowing here rather than
    server-side because the API filters on a single request_type at a time. */
+const CL_SR_FETCH = 100;
+
+/* True when the window above did not reach the end of the merchant's requests,
+   so the rows in hand are a slice rather than the lot. Read by the count line,
+   which must not call a slice a total. */
+let clSrCapped = false;
+
 async function clLoadServiceRequests() {
   const body = $('clSrList');
   if (!body) return;
   body.innerHTML = clLoadingRow(7, 'Loading your service requests…');
   try {
-    const data = await MerchantApi.listRequests({ page_size: 100 });
-    clSrRequests = (data.items || []).filter(
+    const data = await MerchantApi.listRequests({ page_size: CL_SR_FETCH });
+    const items = data.items || [];
+    /* THE WINDOW IS EVERY REQUEST TYPE, AND THE FILTER RUNS AFTERWARDS.
+       One unfiltered page of 100 comes back and the six service types are
+       picked out of it here, so on an account with many bookings the 100 most
+       recent rows can hold only a handful of service requests — or none. The
+       count line said "2 in total" on an account with nineteen. It cannot be
+       fixed by reading data.total either: that counts EVERY type, bookings
+       included, so it is not this list's total in the other direction.
+       Saying which of the two the figure is costs nothing and is true. */
+    clSrCapped = items.length >= CL_SR_FETCH && (data.total ?? 0) > items.length;
+    clSrRequests = items.filter(
       r => MERCHANT_SERVICE_REQUEST_TYPES.includes(r.request_type));
     // The fuller list is now local — refresh the cancellation guard from it
     // rather than firing the narrower query clLoadSrBookings() otherwise uses.
@@ -242,10 +283,15 @@ function clRenderServiceRequests() {
   const rows = type ? clSrRequests.filter(r => r.request_type === type) : clSrRequests;
 
   body.innerHTML = rows.length
+    /* A REFERENCE NEVER WRAPS. Every other cell in this table is nowrap
+       already; these two were not, so "SRQ-2026-001825" broke over three lines
+       and the row grew to 86px while its neighbours sat at 67 — the ragged row
+       heights on this list. The wrapper scrolls sideways, which is the pattern
+       the passenger tables already use for exactly this. */
     ? rows.map(r => `<tr>
-        <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
+        <td class="cl-ref cl-nowrap">${escapeHtml(r.request_number || '—')}</td>
         <td class="cl-nowrap">${escapeHtml(clLabel(r.request_type))}</td>
-        <td class="cl-ref">${escapeHtml((r.details || {}).booking_request_number || '—')}</td>
+        <td class="cl-ref cl-nowrap">${escapeHtml(clSrBookingRef(r))}</td>
         <td>${clSrStatusTag(r)}</td>
         <td class="cl-num">${clSrAmount(r)}</td>
         <td class="cl-nowrap">${escapeHtml(fmtDate(r.created_at))}</td>
@@ -256,7 +302,9 @@ function clRenderServiceRequests() {
     : clEmptyRow(7, type
       ? `No ${clLabel(type).toLowerCase()} requests.`
       : 'No service requests raised yet.',
-      type ? ' Choose “All types” to see everything you have raised.' : '');
+      /* Names the chip exactly as it reads on screen — it was relabelled from
+         "All types" to "All" and this hint kept pointing at the old wording. */
+      type ? ' Choose “All” to see everything you have raised.' : '');
 
   /* The count describes what is on screen. `awaiting` stays whole-list: it is
      the thing a manager has to act on, and a type filter must not hide two
@@ -264,7 +312,7 @@ function clRenderServiceRequests() {
   const awaiting = clSrRequests.filter(r => r.manager_state === 'pending').length;
   const scope = type
     ? `${rows.length} of ${clSrRequests.length}`
-    : `${rows.length} in total`;
+    : clSrCapped ? `${rows.length} most recent` : `${rows.length} in total`;
   $('clSrCounts').textContent = clSrRequests.length
     ? `${scope}${awaiting ? ` · ${awaiting} awaiting a manager` : ''}`
     : '';
@@ -277,21 +325,24 @@ function clRenderServiceRequests() {
        there is nothing further for you to do, and a request cannot be taken back. <b>Amount</b>
        is filled in by our team when they settle it.`;
 
+  /* Said on the screen, not only in the count line — the same honesty every
+     other capped list in this portal owes its reader. */
+  if (clSrCapped) {
+    $('clSrListNote').innerHTML += ` This account has more than ${CL_SR_FETCH} requests of all
+      kinds, so this list holds the service requests among the ${CL_SR_FETCH} most recent. Older
+      ones are on <a href="#" data-cl-nav-history>Booking History</a>.`;
+    $('clSrListNote').querySelector('[data-cl-nav-history]')?.addEventListener('click', e => {
+      e.preventDefault();
+      clGo('booking-history');
+    });
+  }
+
   body.querySelectorAll('[data-cl-sr-open]').forEach(b =>
     b.addEventListener('click', () => clOpenRequestDetail(b.dataset.clSrOpen)));
   body.querySelectorAll('[data-cl-sr-approve]').forEach(b =>
     b.addEventListener('click', () => clManagerDecide(b.dataset.clSrApprove, true)));
   body.querySelectorAll('[data-cl-sr-reject]').forEach(b =>
     b.addEventListener('click', () => clManagerDecide(b.dataset.clSrReject, false)));
-  body.querySelectorAll('[data-cl-sr-chat]').forEach(b =>
-    b.addEventListener('click', () => clGo('support', () => {
-      clOpenNewChat();
-      const subject = $('clNewChatSubject');
-      if (subject) {
-        subject.value = `Question about ${b.dataset.clSrChat}`;
-        $('clNewChatMessage')?.focus();
-      }
-    })));
 }
 
 /* The manager stage is not a status — it is a fact about a request that is
@@ -310,6 +361,22 @@ function clSrStatusTag(r) {
     return '<span class="cl-tag cl-tag-err">Rejected by manager</span>';
   }
   return clTag(r.status);
+}
+
+/* WHICH BOOKING THIS REQUEST IS AGAINST.
+   ===========================================================================
+   Two sources, and the order matters. `parent_request_number` is derived from
+   the row's own parent link and is therefore right for every type and every
+   row, however old. `details.booking_request_number` is a copy written at
+   creation time — but only by the two M3 paths (cancellation, date change), so
+   the four that go through the generic hook never had one and this column read
+   "—" on them, on requests that plainly do have a booking.
+
+   The copy is kept as the fallback rather than deleted: it is what the Admin
+   and operations screens still read, and a request whose parent has since been
+   removed keeps the reference it was raised against. */
+function clSrBookingRef(r) {
+  return r.parent_request_number || (r.details || {}).booking_request_number || '—';
 }
 
 /* Blank rather than 0.00 while unpriced: a zero here reads as "nothing to
@@ -359,20 +426,27 @@ function clSrDetailRow(r) {
 
 /* View is always offered. Approve and Reject only to a manager, and only on a
    request that is actually waiting for one — the server refuses anything else,
-   so offering it would be offering a 403. */
+   so offering it would be offering a 403.
+
+   DISCUSS IS GONE, AND ITS JOB MOVED INTO VIEW.
+   It used to sit here as a third button that navigated to the Support Center
+   and pre-filled a new conversation. Two rows of buttons to reach two halves of
+   the same question — what was asked for, and what was said about it — when the
+   detail dialog View already opens is the natural home for both. The
+   conversation is now a section of that dialog: the thread is read there,
+   replied to there, and started there if there is not one yet, all against the
+   same reference and without leaving the screen. See clOpenRequestDetail() in
+   classic-requests.js.
+
+   It also no longer worked. The Support Center redesign removed clOpenNewChat()
+   and the ids this handler wrote into, so every click had been throwing a
+   ReferenceError and landing the merchant on an empty Support Center. */
 function clSrRowActions(r) {
   const out = [`<button type="button" class="cl-btn cl-btn-sm" data-cl-sr-open="${r.id}">View</button>`];
   if (clIsManager() && r.manager_state === 'pending') {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-approve="${r.id}">Approve</button>`);
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-sr-reject="${r.id}">Reject</button>`);
   }
-  /* Discuss opens a real support conversation with the reference already in the
-     subject, so a question about a service request does not become an email
-     nobody can find later. It does NOT act on the request itself: only
-     `lifecycle.transition` may move a service_requests row, and a chat thread
-     must never look like a fourth way to change one. */
-  out.push(`<button type="button" class="cl-btn cl-btn-sm" data-cl-sr-chat="${escapeHtml(r.request_number || '')}"
-              title="Ask the desk about this request">Discuss</button>`);
   return out.join('');
 }
 
@@ -484,7 +558,7 @@ async function clLoadSrBookings() {
            takes its place, so the row still says why. */
         const hasCancellation = cancelled.has(String(r.id));
         return `<tr data-cl-sr-row="${r.id}">
-          <td class="cl-ref">${escapeHtml(r.request_number || '—')}</td>
+          <td class="cl-ref cl-nowrap">${escapeHtml(r.request_number || '—')}</td>
           <td>${escapeHtml(r.title || '—')}</td>
           <td>${clTag(r.status)}</td>
           <td class="cl-num">${money(r.total_amount)}</td>
@@ -514,6 +588,7 @@ async function clLoadSrBookings() {
    scroll to find out that anything had. */
 async function clPickSrBooking(id) {
   clSrTab = 'cancellation';
+  clSrAncillary = 'extra_baggage';
   clSrViewing = false;
 
   clOpenModal('Raise a service request',
@@ -672,9 +747,11 @@ function clRenderSrTabBody(pax) {
   submit.style.display = '';
   submit.disabled = false;
 
-  /* Four of the six forms name a passenger, and none of them can be filled in
-     against a booking with no passenger records. */
-  const needsPax = ['passenger_modification', 'extra_baggage', 'meal', 'seat'];
+  /* Passenger correction and all three ancillaries name a passenger, and none
+     of them can be filled in against a booking with no passenger records. Meal
+     and Seat are inside the Extra baggage tab now, so naming that tab covers
+     all three. */
+  const needsPax = ['passenger_modification', 'extra_baggage'];
   if (!pax.length && needsPax.includes(clSrTab)) {
     return clSrLockSubmit(`<div class="cl-msg cl-msg-info" style="margin-top:0">
       This booking has no passenger records, so there is nothing to change.</div>`);
@@ -763,29 +840,51 @@ function clRenderSrTabBody(pax) {
     submit.textContent = 'Request correction';
     submit.onclick = clSubmitSrModification;
 
-  } else if (clSrTab === 'extra_baggage') {
+  } else {
+    /* THE ANCILLARY TAB. One passenger-level extra, chosen from three.
+       The selector is rendered first and the form under it, so switching
+       between Baggage, Meal and Seat repaints only the form — the choice
+       itself never moves, which is what stops it reading as a fourth tab
+       strip. */
     body.innerHTML = `
-      <div class="cl-form cl-form-2">
-        <div class="cl-field">
-          <label for="clSrBagPax">Passenger<span class="cl-req">*</span></label>
-          <select id="clSrBagPax">${clPaxOptions(pax)}</select>
-        </div>
-        <div class="cl-field">
-          <label for="clSrBagKg">Extra baggage (kg)<span class="cl-req">*</span></label>
-          <input type="number" id="clSrBagKg" min="1" max="100" step="1" placeholder="e.g. 20">
-        </div>
-        <div class="cl-field cl-field-full">
-          <label for="clSrBagRemarks">Notes<span class="cl-req">*</span></label>
-          <textarea id="clSrBagRemarks" placeholder="Anything the desk should know."></textarea>
+      <div class="cl-anc-pick">
+        <span class="cl-anc-label" id="clSrAncLbl">What do you need?</span>
+        <div class="cl-seg" role="radiogroup" aria-labelledby="clSrAncLbl">
+          ${CL_SR_ANCILLARIES.map(a => `<button type="button" role="radio"
+            class="${a.id === clSrAncillary ? 'active' : ''}"
+            aria-checked="${a.id === clSrAncillary ? 'true' : 'false'}"
+            data-cl-sr-anc="${a.id}">${a.label}</button>`).join('')}
         </div>
       </div>
-      <p class="cl-kpi-sub" style="margin:8px 0 0;">
-        The airline prices excess baggage; our team confirms the amount when they settle this.
-      </p>`;
-    submit.textContent = 'Request extra baggage';
-    submit.onclick = clSubmitSrBaggage;
+      <div id="clSrAncBody"></div>`;
 
-  } else if (clSrTab === 'meal') {
+    const picks = [...body.querySelectorAll('[data-cl-sr-anc]')];
+    picks.forEach(t =>
+      t.addEventListener('click', () => {
+        if (t.dataset.clSrAnc === clSrAncillary) return;
+        clSrAncillary = t.dataset.clSrAnc;
+        picks.forEach(p => {
+          const on = p.dataset.clSrAnc === clSrAncillary;
+          p.classList.toggle('active', on);
+          p.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        /* Only the form below is rebuilt. Re-rendering the whole tab body would
+           replace the control the merchant just clicked, which loses focus
+           mid-keyboard-use and makes the selector flicker under the pointer. */
+        clRenderSrAncillaryForm(pax, submit);
+      }));
+
+    clRenderSrAncillaryForm(pax, submit);
+  }
+}
+
+/* The three ancillary forms. Each is exactly what it was as a tab of its own —
+   same fields, same ids, same submit handler — so nothing about the request
+   they raise has changed with the move. */
+function clRenderSrAncillaryForm(pax, submit) {
+  const body = $('clSrAncBody');
+
+  if (clSrAncillary === 'meal') {
     body.innerHTML = `
       <div class="cl-form cl-form-2">
         <div class="cl-field">
@@ -813,8 +912,10 @@ function clRenderSrTabBody(pax) {
       </div>`;
     submit.textContent = 'Request meal';
     submit.onclick = clSubmitSrMeal;
+    return;
+  }
 
-  } else {
+  if (clSrAncillary === 'seat') {
     body.innerHTML = `
       <div class="cl-form cl-form-2">
         <div class="cl-field">
@@ -841,7 +942,29 @@ function clRenderSrTabBody(pax) {
       </p>`;
     submit.textContent = 'Request seat';
     submit.onclick = clSubmitSrSeat;
+    return;
   }
+
+  body.innerHTML = `
+    <div class="cl-form cl-form-2">
+      <div class="cl-field">
+        <label for="clSrBagPax">Passenger<span class="cl-req">*</span></label>
+        <select id="clSrBagPax">${clPaxOptions(pax)}</select>
+      </div>
+      <div class="cl-field">
+        <label for="clSrBagKg">Extra baggage (kg)<span class="cl-req">*</span></label>
+        <input type="number" id="clSrBagKg" min="1" max="100" step="1" placeholder="e.g. 20">
+      </div>
+      <div class="cl-field cl-field-full">
+        <label for="clSrBagRemarks">Notes<span class="cl-req">*</span></label>
+        <textarea id="clSrBagRemarks" placeholder="Anything the desk should know."></textarea>
+      </div>
+    </div>
+    <p class="cl-kpi-sub" style="margin:8px 0 0;">
+      The airline prices excess baggage; our team confirms the amount when they settle this.
+    </p>`;
+  submit.textContent = 'Request extra baggage';
+  submit.onclick = clSubmitSrBaggage;
 }
 
 /* ================================================================ submits */

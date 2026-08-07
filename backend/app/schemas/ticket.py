@@ -363,6 +363,15 @@ class RequestResponse(BaseModel):
     #: "upload tickets" instead of "awaiting payment".
     workflow: Literal["classic_tours", "standard"] = "standard"
     parent_request_id: int | None = None
+    #: The parent's reference, resolved so a client can PRINT the relationship it
+    #: already receives the id for. A service request's parent is the booking it
+    #: was raised against, and every screen that lists one wants to name it — the
+    #: merchant portal's Service Requests table had a "Booking" column showing a
+    #: dash on four of the six types, because only the two M3 paths happened to
+    #: copy the number into ``travel_details`` on creation. Derived here instead,
+    #: so it is right for rows written before anyone thought to copy it.
+    #: ``ChatThreadResponse.related_request_number`` is the same idea.
+    parent_request_number: str | None = None
     merchant_id: int | None = None
     merchant_name: str | None = None
     raised_by: str | None = None
@@ -421,6 +430,14 @@ class RequestResponse(BaseModel):
             manager_approval=manager_approval.block(r),
             workflow="classic_tours" if classic else "standard",
             parent_request_id=r.parent_request_id,
+            # Guarded on the id, exactly as `provider_name` below is: `parent` is
+            # a lazy relationship, and reaching for it unconditionally would emit
+            # a query per row on every list that serialises through here. A
+            # booking or an enquiry has no parent, so most rows cost no SQL at
+            # all; `list_requests` eager-loads the rest in one go.
+            parent_request_number=(
+                r.parent.request_number if r.parent_request_id and r.parent else None
+            ),
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,
             raised_by=r.user.full_name if r.user else None,
