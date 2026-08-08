@@ -709,6 +709,12 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .drawer-section-title:first-child{margin-top:0;}
 @media (max-width:640px){ .drawer-panel{width:100%;} }
 
+/* The merchant's contact address on the Live Chat header. Same type as the
+   status line above it (.bm2-head-sub) — only a hair of leading separates the
+   two — and break-all so a long address wraps inside the drawer instead of
+   widening the header row. */
+.sc-head-email{margin-top:2px; word-break:break-all;}
+
 /* ---- support: the desk's triage panel ----------------------------------
    Collapsed by default. These controls are how a thread gets a category and a
    priority now that the merchant no longer supplies either, but the reply box

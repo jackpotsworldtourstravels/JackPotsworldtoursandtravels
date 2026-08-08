@@ -134,6 +134,11 @@ class ChatThreadResponse(BaseModel):
     title: str | None = None
     merchant_id: int | None = None
     merchant_name: str | None = None
+    #: The merchant company's own contact address, so the desk can reach the
+    #: account without leaving the conversation. Deliberately the *merchant's*
+    #: address and not the opener's: staff answer the account, and the person who
+    #: happened to type the first message may be on leave by the time we reply.
+    merchant_email: str | None = None
     opened_by: str | None = None
     assigned_admin: int | None = None
     assigned_admin_name: str | None = None
@@ -175,6 +180,7 @@ class ChatThreadResponse(BaseModel):
             title=t.title,
             merchant_id=t.merchant_id,
             merchant_name=t.merchant.company_name if t.merchant else None,
+            merchant_email=t.merchant.email if t.merchant else None,
             opened_by=t.user.full_name if t.user else None,
             assigned_admin=t.assigned_admin,
             assigned_admin_name=assigned_admin_name,

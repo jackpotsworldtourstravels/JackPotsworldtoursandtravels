@@ -1941,11 +1941,16 @@ async function openSupportChat(threadId) {
   currentChatThreadId = threadId;
   document.getElementById('supportChatDrawerOverlay').classList.add('open');
   document.getElementById('supportChatTitle').textContent = 'Loading…';
+  /* Blanked, not left showing the last thread's: the drawer is reused, and an
+     address from the previous conversation sitting under a spinner is worse
+     than no address — an operator could copy it while the real one loads. */
+  document.getElementById('supportChatSubtitle').textContent = '';
+  document.getElementById('supportChatMerchantEmail').textContent = '';
   document.getElementById('supportChatMessages').innerHTML = rowsSkeleton(4);
   try {
     const { data } = await axios.get(`${API_BASE}/api/support/threads/${threadId}`, { headers: authHeaders() });
     document.getElementById('supportChatTitle').textContent = `${data.thread.request_number} — ${data.thread.merchant_name || 'Merchant'}`;
-    document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
+    applySupportChatHeader(data.thread);
     renderChatMessages(data.messages, data.documents);
     applySupportChatState(data.thread);
     renderSupportTriage(data.thread);
@@ -1953,6 +1958,17 @@ async function openSupportChat(threadId) {
   } catch (err) {
     document.getElementById('supportChatTitle').textContent = 'Failed to load chat';
   }
+}
+
+/* The two lines under the drawer title, in one place for the same reason
+   applySupportChatState is: the opener and the reply handler both rewrite this
+   header, and a field added to one and not the other silently vanishes the
+   moment an operator sends a message. */
+function applySupportChatHeader(thread) {
+  document.getElementById('supportChatSubtitle').textContent =
+    `${thread.status_label} · opened by ${thread.opened_by || '—'}`;
+  document.getElementById('supportChatMerchantEmail').textContent =
+    thread.merchant_email || 'Email not available';
 }
 
 /* Which of claim / resolve / reopen apply, in one place. This was duplicated
@@ -1982,7 +1998,7 @@ document.getElementById('supportChatReplyForm').addEventListener('submit', async
        keeps the list it already has when it is absent, so a reply never blanks
        the file cards already on screen. */
     renderChatMessages(data.messages, data.documents);
-    document.getElementById('supportChatSubtitle').textContent = `${data.thread.status_label} · opened by ${data.thread.opened_by || '—'}`;
+    applySupportChatHeader(data.thread);
     applySupportChatState(data.thread);
   } catch (err) {
     alert(err.response?.data?.detail || 'Failed to send message.');
