@@ -330,6 +330,22 @@ class DocumentVerification(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class OcrStatus(str, enum.Enum):
+    """Where one passport extraction has got to.
+
+    ``FAILED`` is a first-class outcome rather than an error state to be tidied
+    away: a passport that could not be read is the ordinary result of a dark
+    photograph, and the row records which document it was, why the read failed
+    and when — so the merchant is told to type the details rather than left
+    watching a spinner, and the desk can see the attempt happened at all.
+    """
+
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 def _pg_enum(python_enum: type[enum.Enum], name: str) -> SAEnum:
     """Bind to an existing PostgreSQL ENUM by value, without re-creating it."""
     return SAEnum(
@@ -961,6 +977,13 @@ class PassengerData(Base):
 
     passport_number: Mapped[Optional[str]] = mapped_column(String(40))
     passport_issue_country: Mapped[Optional[str]] = mapped_column(String(100))
+    #: Both added by 0043 and both read off the passport rather than typed. The
+    #: place of birth is printed on the page but is NOT in the machine-readable
+    #: zone, so it arrives at a lower confidence than the fields beside it; the
+    #: type is the zone's first two characters — "P" for an ordinary passport,
+    #: "PD"/"PS"/"PO" for diplomatic, service and official.
+    place_of_birth: Mapped[Optional[str]] = mapped_column(String(120))
+    passport_type: Mapped[Optional[str]] = mapped_column(String(2))
     passport_issue_date: Mapped[Optional[dt.date]] = mapped_column(Date)
     passport_expiry: Mapped[Optional[dt.date]] = mapped_column(Date)
     nationality: Mapped[Optional[str]] = mapped_column(String(100))
@@ -1815,6 +1838,137 @@ class ProviderUser(Base):
         return f"<ProviderUser {self.user_name} @{self.provider_id}>"
 
 
+# =====================================================================
+# Passport information extraction (0042)
+# =====================================================================
+class PassportOcrExtraction(Base):
+    """One attempt to read one uploaded passport.
+
+    THE ROW IS THE RESULT, not a cache of it. Extraction runs on a worker
+    thread while the request that started it may already have answered with a
+    job id, so there is no in-memory place for the outcome to live: the poll,
+    the Admin panel and the audit all read this row, very often from a process
+    that is not the one that filled it in.
+
+    ``normalized`` is this platform's own vocabulary — ``passenger_data`` column
+    names, each with the confidence the engine attached — while ``raw_response``
+    keeps what the engine actually said. Two columns rather than one because a
+    normalisation bug has to be diagnosable without asking a merchant to upload
+    their passport a second time.
+
+    ``provider`` IS EVIDENCE, NOT DECORATION. Rows written before the
+    fabricating development provider was removed still carry
+    ``provider = "simulated"``, and the values in them were invented from the
+    file's checksum rather than read off the document. Every screen that shows
+    an extraction checks this column for exactly that reason.
+    """
+
+    __tablename__ = "passport_ocr_extractions"
+
+    extraction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("merchants.merchant_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Both nullable and both only ever LABELS. A merchant scans a passport
+    #: before there is a booking to attach it to — that is the whole point of
+    #: the shortcut — and these are filled in later, if the scan becomes a
+    #: passenger at all. SET NULL rather than CASCADE: deleting a draft booking
+    #: must not silently destroy the record that a passport was read.
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+    passenger_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("passenger_data.passenger_id", ondelete="SET NULL")
+    )
+
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    status: Mapped[OcrStatus] = mapped_column(
+        _pg_enum(OcrStatus, "ocr_status_enum"),
+        nullable=False,
+        server_default=text("'queued'"),
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    provider_model: Mapped[Optional[str]] = mapped_column(String(100))
+    provider_api_version: Mapped[Optional[str]] = mapped_column(String(40))
+
+    raw_response: Mapped[Optional[dict]] = mapped_column(JSONB)
+    normalized: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    #: The MEAN of the scored fields, for sorting and for the desk's summary.
+    #: The per-field numbers in ``normalized`` are what a merchant acts on — one
+    #: document-level score hides the single field that needed checking.
+    overall_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4))
+    processing_ms: Mapped[Optional[int]] = mapped_column(Integer)
+
+    error_code: Mapped[Optional[str]] = mapped_column(String(60))
+    error_detail: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=text("now()")
+    )
+    completed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    edits: Mapped[list["PassportOcrFieldEdit"]] = relationship(
+        back_populates="extraction",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    def __repr__(self) -> str:
+        return f"<PassportOcrExtraction {self.extraction_id} {self.status}>"
+
+
+class PassportOcrFieldEdit(Base):
+    """One field where the merchant's saved value differs from what was read.
+
+    ONLY THE DIFFERENCES ARE ROWS. "The engine read JOHN and the merchant saved
+    JOHNN" is the question an investigation asks; a row per unchanged field
+    would bury it under eleven that say nothing. The database enforces that as
+    well as this service does, so a client posting its whole form cannot fill
+    the audit with noise.
+
+    Both values are nullable and both are kept, which is the point of the table:
+    a field the engine could not read and the merchant typed, and a field the
+    engine read and the merchant corrected, are different events and the desk
+    needs to tell them apart.
+    """
+
+    __tablename__ = "passport_ocr_field_edits"
+
+    edit_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    extraction_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("passport_ocr_extractions.extraction_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    field_name: Mapped[str] = mapped_column(String(60), nullable=False)
+    ocr_value: Mapped[Optional[str]] = mapped_column(Text)
+    edited_value: Mapped[Optional[str]] = mapped_column(Text)
+    ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4))
+    edited_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False
+    )
+    edited_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=text("now()")
+    )
+
+    extraction: Mapped["PassportOcrExtraction"] = relationship(back_populates="edits")
+
+    def __repr__(self) -> str:
+        return f"<PassportOcrFieldEdit {self.field_name} @{self.extraction_id}>"
+
+
 __all__ = [
     "Base",
     "User",
@@ -1858,4 +2012,7 @@ __all__ = [
     "Provider",
     "ProviderUser",
     "ProviderStatus",
+    "OcrStatus",
+    "PassportOcrExtraction",
+    "PassportOcrFieldEdit",
 ]

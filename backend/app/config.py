@@ -129,6 +129,63 @@ class Settings(BaseSettings):
     #: only to turn "10 Aug, 09:30" into an instant.
     booking_local_utc_offset_minutes: int = 330
 
+    # -----------------------------------------------------------------------
+    # Passport information extraction.
+    # -----------------------------------------------------------------------
+    # Which engine reads an uploaded passport. Two are implemented:
+    #
+    #   "local"  (default) reads the document on this server with no vendor, no
+    #            credentials and no network call. It renders the page, OCRs it,
+    #            and takes its answer from the machine-readable zone, whose ICAO
+    #            9303 check digits it verifies arithmetically.
+    #   "azure"  Azure Document Intelligence, for deployments that would rather
+    #            pay a vendor. Needs the endpoint and key below.
+    #   "none"   No scanning offered at all; the merchant portal renders no
+    #            control rather than a button that fails.
+    #
+    # THERE IS NO PROVIDER THAT INVENTS DATA. One used to exist for development
+    # and was removed: every value on this form is now read off the document the
+    # merchant uploaded, or is absent and flagged for them to fill in. A field
+    # nobody can read is a field the merchant types, and that is a far smaller
+    # problem than a plausible name nobody entered reaching a ticket.
+    ocr_provider: str = "local"
+
+    #: Whole-call budget for one extraction. Generous next to a cloud API's,
+    #: because the local engine does the work on this server's CPU: rendering a
+    #: 300-dpi page and running a detection and a recognition pass over it is
+    #: seconds, not milliseconds, and a scan that is merely slow must not be
+    #: reported to the merchant as a scan that failed.
+    ocr_timeout_seconds: int = 60
+    #: How long the upload request itself waits for an answer before handing
+    #: back a job id for the client to poll. Under this, the merchant's form
+    #: fills from the single upload response and never polls at all.
+    ocr_inline_wait_seconds: float = 8.0
+
+    #: How long a passport should stay valid AFTER the travel date, in months.
+    #: Six is the near-universal carrier and immigration requirement. Advisory
+    #: only: it warns on the form and still submits, because turning it into a
+    #: refusal would change submit behaviour for every international booking on
+    #: the platform. The hard rule — expiry must be after the travel date — is
+    #: enforced separately at submission and is not this setting's business.
+    passport_validity_months: int = 6
+
+    # Local engine ----------------------------------------------------------
+    #: Render resolution for PDF pages. The MRZ is small print, and below about
+    #: 250 the recogniser starts losing the `<` fillers that delimit its fields.
+    ocr_local_dpi: int = 300
+    #: Pages read from a multi-page PDF. The data page is the first or second of
+    #: every passport scan seen in practice; reading further is time spent on
+    #: visa pages that carry nothing this form wants.
+    ocr_local_max_pages: int = 2
+
+    # Azure Document Intelligence (only when ocr_provider="azure") -----------
+    ocr_azure_endpoint: str | None = None
+    ocr_azure_key: str | None = None
+    #: Pinned rather than "latest": a model that changes under a running
+    #: deployment changes what merchants see with no deploy to point at.
+    ocr_azure_model: str = "prebuilt-idDocument"
+    ocr_azure_api_version: str = "2024-11-30"
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

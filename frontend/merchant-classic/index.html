@@ -399,6 +399,12 @@
 <script src="js/classic-dashboard.js?v=20260807ui53"></script>
 <script src="js/classic-enquiry.js?v=20260807ui53"></script>
 <script src="js/classic-booking.js?v=20260807ui53"></script>
+<!-- Passport information extraction. Defines clOcrAttach, which classic-booking.js
+     calls behind a `typeof` guard for every passenger card it renders — so the
+     booking screen keeps working if this file fails to load, and renders no scan
+     control at all on a deployment with OCR_PROVIDER=none. Its absence from this
+     list is what made the whole feature invisible with nothing in the console. -->
+<script src="js/classic-passport-ocr.js?v=20260807ui53"></script>
 <script src="js/classic-booking-detail.js?v=20260807ui53"></script>
 <script src="js/classic-requests.js?v=20260807ui53"></script>
 <script src="js/classic-history.js?v=20260807ui53"></script>

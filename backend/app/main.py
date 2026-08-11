@@ -20,6 +20,8 @@ from app.routers import (
     auth,
     booking_ops,
     change_requests,
+    customer_auth,
+    customer_profile,
     dashboard,
     documents,
     enquiries,
@@ -32,6 +34,7 @@ from app.routers import (
     merchant_team,
     merchants,
     notifications_v2,
+    passport_ocr,
     profile,
     providers,
     reports,
@@ -42,6 +45,10 @@ from app.routers import (
     wallet,
 )
 from app.services import activity_service, booking_completion_service, user_service
+# Aliased: `passport_ocr` is already the ROUTER above, and the two modules are a
+# router and the engine behind it. Importing both under one name is how the
+# startup check silently becomes an attribute error on a FastAPI router.
+from app.services import passport_ocr as passport_ocr_engine
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("jackpots.startup")
@@ -188,6 +195,10 @@ PORTED_MODULES = [
     # The merchant's own sign-off in front of ours. No migration: the state is
     # a JSONB sub-field on service_requests.travel_details.
     "manager_approval",
+    # V1 — the B2C Customer Portal (migration 0044). Listed here because it is
+    # a live module, but it is not part of the v2 B2B port: it has its own seven
+    # tables, its own models Base, and shares no row with anything above.
+    "customer_portal",
 ]
 PENDING_MODULES = [
     "catalog_management",  # deliberately deferred — see docs/SCHEMA_V2.md; not in the approved spec
@@ -213,6 +224,11 @@ app.include_router(support_tickets.router)
 # and there must not be: booking documents are passport and visa scans, served
 # only through documents.py's authenticated, merchant-scoped download route.
 app.include_router(documents.router)
+# Passport information extraction. Sits beside documents.router because it is
+# the same class of data — a passenger's identity document — and is served under
+# the same rule: the scan itself is never mounted as a static file and comes
+# back only through an authenticated, merchant-scoped endpoint.
+app.include_router(passport_ocr.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
 # The merchant's manager signing off the service requests its own staff raised,
@@ -256,6 +272,15 @@ app.include_router(analytics.router)
 # service with the merchant, wallet or payment modules, which is what keeps
 # recording a purchase source from being able to move money.
 app.include_router(providers.router)
+# V1 — the B2C Customer Portal (migration 0044). Last, and deliberately set
+# apart: every router above reads `users`/`merchants`, and these two read the
+# `customer_*` tables and nothing else. The separation is enforced by the token
+# scope rather than by convention — a customer token is refused by all of the
+# routers above (get_current_user rejects any scoped token), and a merchant or
+# admin token is refused by these two (get_current_customer requires
+# scope="customer"). Neither direction needed a change to the other side.
+app.include_router(customer_auth.router)
+app.include_router(customer_profile.router)
 
 
 @app.on_event("startup")
@@ -276,6 +301,19 @@ def ensure_default_admin_exists():
             )
     finally:
         db.close()
+
+
+@app.on_event("startup")
+def report_passport_extraction_state() -> None:
+    """Say in the log which engine will read passports, or why none will.
+
+    A log line and never a raise. Passport extraction is a shortcut over a
+    booking form that is complete without it, so a broken engine must not stop
+    the platform taking bookings — but it must also not be discovered only
+    because a merchant mentioned the button was missing, which is exactly how
+    the last outage of this feature was found.
+    """
+    passport_ocr_engine.check_configuration_at_startup()
 
 
 # ---------------------------------------------------------------------------

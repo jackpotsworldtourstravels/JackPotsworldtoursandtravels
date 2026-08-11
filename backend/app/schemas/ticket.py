@@ -76,6 +76,8 @@ class PassengerInput(BaseModel):
     passenger_type: PassengerType = PassengerType.ADULT
     passport_number: str | None = Field(default=None, max_length=40)
     passport_issue_country: str | None = Field(default=None, max_length=100)
+    place_of_birth: str | None = Field(default=None, max_length=120)
+    passport_type: str | None = Field(default=None, max_length=2)
     passport_issue_date: datetime.date | None = None
     passport_expiry: datetime.date | None = None
     nationality: str | None = Field(default=None, max_length=100)
@@ -100,6 +102,8 @@ class PassengerResponse(PassengerInput):
             passenger_type=p.passenger_type,
             passport_number=p.passport_number,
             passport_issue_country=p.passport_issue_country,
+            place_of_birth=p.place_of_birth,
+            passport_type=p.passport_type,
             passport_issue_date=p.passport_issue_date,
             passport_expiry=p.passport_expiry,
             nationality=p.nationality,
@@ -135,6 +139,8 @@ class PassengerLookupResponse(BaseModel):
     passenger_type: PassengerType | None = None
     passport_number: str | None = None
     passport_issue_country: str | None = None
+    place_of_birth: str | None = None
+    passport_type: str | None = None
     passport_issue_date: datetime.date | None = None
     passport_expiry: datetime.date | None = None
     nationality: str | None = None
@@ -158,6 +164,8 @@ class PassengerLookupResponse(BaseModel):
             passenger_type=p.passenger_type,
             passport_number=p.passport_number,
             passport_issue_country=p.passport_issue_country,
+            place_of_birth=p.place_of_birth,
+            passport_type=p.passport_type,
             passport_issue_date=p.passport_issue_date,
             passport_expiry=p.passport_expiry,
             nationality=p.nationality,

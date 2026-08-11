@@ -1041,6 +1041,18 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
                  aria-expanded="false" aria-autocomplete="list" placeholder="e.g. India">
           <div class="cl-combo-list" data-cl-list="passport_issue_country" role="listbox"></div>
         </div></div>
+      <!-- Both read off the passport rather than typed, which is why they sit
+           with the passport fields and not with the name. Place of birth is
+           printed on the page but is NOT in the machine-readable zone, so a
+           scan fills it at a lower confidence than the fields around it and
+           the badge says so. Type is the zone's first characters: P for an
+           ordinary passport, PD/PS/PO for diplomatic, service and official. -->
+      <div class="cl-field"><label>Place of birth</label>
+        <input type="text" data-field="place_of_birth" autocomplete="off"
+               placeholder="e.g. Mumbai"></div>
+      <div class="cl-field"><label>Passport type</label>
+        <input type="text" data-field="passport_type" autocomplete="off"
+               maxlength="2" placeholder="P"></div>
       <div class="cl-field"><label>Issue date</label>
         <input type="date" data-field="passport_issue_date"></div>
       <div class="cl-field"><label>Expiry</label>
@@ -1289,6 +1301,8 @@ const CL_LOOKUP_FIELDS = {
   dob: 'Date of birth',
   nationality: 'Nationality',
   passport_issue_country: 'Issuing country',
+  place_of_birth: 'Place of birth',
+  passport_type: 'Passport type',
   passport_issue_date: 'Passport issue date',
   passport_expiry: 'Passport expiry',
   seat_preference: 'Seat preference',
@@ -1448,6 +1462,8 @@ function clPassengerPayload(card) {
     nationality: get('nationality') || undefined,
     passport_number: get('passport_number') || undefined,
     passport_issue_country: get('passport_issue_country') || undefined,
+    place_of_birth: get('place_of_birth') || undefined,
+    passport_type: get('passport_type') || undefined,
     passport_issue_date: get('passport_issue_date') || undefined,
     passport_expiry: get('passport_expiry') || undefined,
     seat_preference: get('seat_preference') || undefined,

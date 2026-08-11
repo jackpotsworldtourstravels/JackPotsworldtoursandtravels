@@ -67,6 +67,14 @@ SUITE = [
     # the whole endpoint and is asserted against a second real merchant.
     ("verify_passenger_lookup.py",
      "Passenger auto-fill: passport lookup, newest record wins, writes nothing, cross-tenant scope"),
+    # Beside the lookup script, because both fill the same passenger card from
+    # something other than typing. Its absence from this list is not a trivium:
+    # passport extraction was completely unwired — no router, no settings, no
+    # script tag — for days, and the ONE script that would have said so was
+    # never invoked by the suite. A verification script nobody runs is a
+    # verification script that does not exist.
+    ("verify_passport_ocr.py",
+     "Passport extraction: real values off the document, never fabricated, confidence, duplicates, audit"),
     # Straight after the direct booking script, because a group booking IS a
     # direct or enquiry-led booking whose passengers arrived as a spreadsheet —
     # if that path is broken, every failure here is a symptom of it. It also
@@ -101,6 +109,14 @@ SUITE = [
     # other way round.
     ("verify_providers.py",
      "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
+    # Customer Portal V1 (0044). Late, because its central assertion is that a
+    # merchant/admin/manager/super-admin token and their credentials are ALL
+    # refused by the customer API — so it signs each of them in, and a failure
+    # in those portals' own scripts above explains a failure here rather than
+    # the other way round. It signs in five times, so it must stay ahead of
+    # verify_m8, which spends what is left of the rate-limit budget.
+    ("verify_customer_portal.py",
+     "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
     # The only script that opens a browser, and the only one asserting anything
     # about layout. It signs in three times, so it sits after the API scripts
     # (their failures explain its failures, never the reverse) and before M8,

@@ -30,3 +30,12 @@ xlrd>=2.0
 # deployment never loads it — but it ships in the image so the same image can
 # run either way.
 boto3>=1.35
+
+# Passport information extraction (OCR_PROVIDER=local). Both are pure wheels
+# with no system package behind them — deliberately, so the same image runs on
+# a laptop and in the container without an apt line that only one of them has.
+# rapidocr-onnxruntime carries its own detection and recognition models and
+# runs them on CPU via onnxruntime; nothing here calls out to a network.
+# Imported lazily, so a deployment with OCR_PROVIDER=none never loads them.
+pymupdf>=1.24
+rapidocr-onnxruntime>=1.3
