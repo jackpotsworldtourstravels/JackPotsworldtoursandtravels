@@ -483,7 +483,7 @@ async function openPaymentRequestModal(topupId) {
 
   body.innerHTML = `
     <h2>${prEsc(r.topup_number)}</h2>
-    <p class="ops-sub" style="margin:-6px 0 16px;">
+    <p class="ops-sub">
       ${prEsc(r.merchant_name || '')} · ${prStatusChip(r.status)}
     </p>
 

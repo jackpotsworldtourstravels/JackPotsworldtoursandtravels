@@ -49,6 +49,13 @@ function showAdminPortal() {
   document.getElementById('adminChipRole').textContent = 'Administrator';
   document.getElementById('adminAvatar').textContent = (name.trim()[0] || 'A').toUpperCase();
   document.getElementById('adminName').textContent = name;
+  /* Keep the header profile menu in step — this runs AFTER initAdminChip() on a
+     fresh sign-in, so without it the menu would show the pre-login placeholder. */
+  const menuName = document.getElementById('adminProfileMenuName');
+  if (menuName) {
+    menuName.textContent = name;
+    document.getElementById('adminProfileMenuEmail').textContent = user.email || '';
+  }
   startAdminPolling();
 }
 function isAdminLoggedIn() { return !!localStorage.getItem('jwt_access'); }
@@ -162,83 +169,21 @@ function rowsSkeleton(count = 5) {
   return `<div class="skeleton-rows">${Array.from({ length: count }).map(() => '<div class="skeleton"></div>').join('')}</div>`;
 }
 
-/* ---------- Global search ---------- */
-/* Federates the list endpoints that already support server-side `search` —
-   merchants, requests (bookings + service requests), payment requests — no new
-   backend endpoint.
+/* ---------- Global search — REMOVED (2026-08-10) ----------
+   The header search box was removed from the Admin Portal on request, so the
+   ~75 lines that fed it went with it: `runGlobalSearch`, its debounce timer,
+   its `#globalSearchInput` / `#globalSearchDropdown` handles and the
+   document-level click that closed the dropdown.
 
-   The third group used to search /api/admin/payments and jump to the
-   per-booking payment table. That table no longer exists (0041), so the group
-   now searches the payment requests that replaced it and lands on the screen
-   that can actually show the row. A result that navigates somewhere it cannot
-   be displayed is worse than no result. */
-let globalSearchTimer;
-const gsInput = document.getElementById('globalSearchInput');
-const gsDropdown = document.getElementById('globalSearchDropdown');
-async function runGlobalSearch(q) {
-  gsDropdown.innerHTML = rowsSkeleton(3);
-  gsDropdown.classList.add('open');
-  try {
-    const [merchants, requests, payments] = await Promise.all([
-      axios.get(`${API_BASE}/api/admin/merchants`, { headers: authHeaders(), params: { search: q, page: 1, page_size: 4 } }).catch(() => null),
-      axios.get(`${API_BASE}/api/requests`, { headers: authHeaders(), params: { search: q, page: 1, page_size: 4 } }).catch(() => null),
-      axios.get(`${API_BASE}/api/admin/wallet/topups`, { headers: authHeaders(), params: { search: q, bucket: 'all', page: 1, page_size: 4 } }).catch(() => null),
-    ]);
-    const groups = [];
-    if (merchants?.data?.items?.length) {
-      groups.push({ label: 'Merchants', rows: merchants.data.items.map(m => ({
-        title: m.company_name, meta: `${m.merchant_code} · ${m.email}`,
-        action: () => navigateToSection('users', () => {
-          document.getElementById('merchantSearch').value = m.company_name; loadMerchants(1);
-        }),
-      })) });
-    }
-    if (requests?.data?.items?.length) {
-      groups.push({ label: 'Requests', rows: requests.data.items.map(r => ({
-        title: `${r.request_number} — ${(r.request_type || '').replace(/_/g, ' ')}`,
-        meta: `${r.merchant_name || ''} · ${r.status_label || r.status}`,
-        action: () => navigateToSection('service-requests-mgmt'),
-      })) });
-    }
-    if (payments?.data?.items?.length) {
-      groups.push({ label: 'Payments', rows: payments.data.items.map(p => ({
-        title: `${p.topup_number} — ${p.merchant_name || ''}`,
-        meta: `${moneyStr(p.amount)} · ${String(p.status).replace(/_/g, ' ')}`,
-        action: () => navigateToSection('payments', () => {
-          const box = document.getElementById('prSearch');
-          if (box) { box.value = p.topup_number; box.dispatchEvent(new Event('input')); }
-        }),
-      })) });
-    }
-    if (!groups.length) {
-      gsDropdown.innerHTML = '<div class="empty-state">No matches.</div>';
-      return;
-    }
-    gsDropdown.innerHTML = groups.map(g => `
-      <div class="gs-group-label">${g.label}</div>
-      ${g.rows.map((r, i) => `<div class="gs-result-item" data-group="${g.label}" data-idx="${i}"><span class="gs-title">${escapeHtml(r.title)}</span><span class="gs-meta">${escapeHtml(r.meta || '')}</span></div>`).join('')}
-    `).join('');
-    gsDropdown.querySelectorAll('[data-group]').forEach(el => {
-      const group = groups.find(g => g.label === el.dataset.group);
-      el.addEventListener('click', () => {
-        group.rows[Number(el.dataset.idx)].action();
-        gsDropdown.classList.remove('open');
-        gsInput.value = '';
-      });
-    });
-  } catch (err) {
-    gsDropdown.innerHTML = '<div class="empty-state">Search failed.</div>';
-  }
-}
-gsInput.addEventListener('input', () => {
-  clearTimeout(globalSearchTimer);
-  const q = gsInput.value.trim();
-  if (q.length < 2) { gsDropdown.classList.remove('open'); return; }
-  globalSearchTimer = setTimeout(() => runGlobalSearch(q), 350);
-});
-document.addEventListener('click', e => {
-  if (!e.target.closest('#globalSearchWrap')) gsDropdown.classList.remove('open');
-});
+   THIS BLOCK COULD NOT SIMPLY BE LEFT IN PLACE. `gsInput` and `gsDropdown` were
+   resolved at parse time and `gsInput.addEventListener` ran unconditionally, so
+   with the markup gone this file would have thrown a TypeError before it
+   reached the dashboard — taking every screen after it down with it.
+
+   NO ENDPOINT CHANGED. It only ever called list endpoints that already support
+   `search` (`/api/admin/merchants`, `/api/requests`,
+   `/api/admin/wallet/topups`), and each of those screens still has its own
+   filter bar calling the same parameter. Nothing became unsearchable. */
 
 /* ---------- Admin Dashboard ---------- GET /api/admin/dashboard (API_CONTRACT.md §6.1). */
 async function loadReports() {
@@ -393,7 +338,22 @@ async function openOnboardMerchantModal(merchantId) {
 
      `span-2` on Company Name is what makes three fields read as a balanced
      form rather than a two-column grid with a hole in it: the name gets its own
-     full-width row, then Email and Phone pair off underneath. */
+     full-width row, then Email and Phone pair off underneath.
+
+     EMAIL IS EDITABLE ON EDIT TOO, as of 2026-08-10. It used to carry
+     `disabled` whenever `m` was set, which meant a company that came in with a
+     typo in its address could never be corrected from this portal — Name and
+     Phone could be, the address could not. What made it possible is
+     `UpdateMerchantRequest.email` plus the uniqueness check in
+     `merchant_service.update_merchant`; no new endpoint was added and the PUT
+     this form already used is the one that carries it.
+
+     THE HELPER LINE UNDER IT SAYS SOMETHING DIFFERENT ON EDIT, AND THAT IS THE
+     POINT. On create, this address really does seed the first admin login, so
+     it says so. On edit it does NOT: that login is a `users` row of its own by
+     then and has diverged from this field, so telling an admin they are
+     changing a login when they are changing a contact address would be wrong in
+     the one direction that costs somebody their sign-in. */
   body.innerHTML = `
     <h2>${m ? 'Edit Merchant' : 'Onboard Merchant'}</h2>
     <form id="onboardMerchantForm">
@@ -403,8 +363,11 @@ async function openOnboardMerchantModal(merchantId) {
                  value="${escapeHtml(v('company_name'))}" placeholder="e.g. Skyline Travel Services">
         </div>
         <div class="form-field"><label>Email</label>
-          <input name="email" type="email" required value="${escapeHtml(v('email'))}" ${m ? 'disabled' : ''}>
-          ${m ? '' : '<span class="cell-sub">Also becomes the first admin login for this merchant.</span>'}
+          <input name="email" type="email" required maxlength="255" autocomplete="off"
+                 value="${escapeHtml(v('email'))}">
+          <span class="cell-sub">${m
+            ? 'The company’s contact address. Sign-in emails are managed under Users.'
+            : 'Also becomes the first admin login for this merchant.'}</span>
         </div>
         <div class="form-field"><label>Phone</label><input name="phone" value="${escapeHtml(v('phone'))}"></div>
       </div>
@@ -422,23 +385,61 @@ async function openOnboardMerchantModal(merchantId) {
     const f = e.target.elements;
     const msg = document.getElementById('onboardMerchantMsg');
     const companyName = f.company_name.value.trim();
+    const email = f.email.value.trim();
+
+    /* VALIDATED HERE AS WELL AS SERVER-SIDE, because the two answer different
+       questions. `required` + `type=email` in the markup is the browser's check
+       and it never runs on a `disabled` field — which is exactly why this needed
+       adding the moment the field became editable. The server's `EmailStr` is
+       the authority and returns 422; that is a correct rejection but a poor
+       message, so the obvious cases are named in the dialog instead.
+
+       The pattern is the same one the platform's other email inputs use: one
+       `@`, at least one dot in the domain, no whitespace. Deliberately loose —
+       anything stricter starts rejecting addresses that genuinely deliver, and
+       the server has the real parser. DUPLICATES ARE NOT CHECKED HERE: only the
+       database knows, and `update_merchant` already answers with a 400 whose
+       `detail` this handler surfaces verbatim. */
+    if (!email) {
+      msg.textContent = 'Email is required.';
+      msg.className = 'msg error';
+      f.email.focus();
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      msg.textContent = 'Enter a valid email address, e.g. accounts@company.com.';
+      msg.className = 'msg error';
+      f.email.focus();
+      return;
+    }
+
     /* EDIT SENDS ONLY WHAT THE FORM STILL ASKS FOR.
        UpdateMerchantRequest changes only the fields present in the body, so
        omitting company_type / credit_limit / address / city / country here
        LEAVES THE EXISTING VALUES ALONE. Sending them as null instead would wipe
        the address of every merchant onboarded before this change. `merchant_name`
        is omitted for the same reason: renaming the company should not silently
-       overwrite a trading name somebody set deliberately. */
-    const payload = { company_name: companyName, phone: f.phone.value.trim() || null };
+       overwrite a trading name somebody set deliberately.
+
+       `email` IS now one of the fields it asks for, so it is sent on edit as
+       well as on create — the same key, into the same PUT, handled by the same
+       `UpdateMerchantRequest`. Sent unconditionally rather than only when it
+       changed: the server compares against the stored value before it touches
+       the uniqueness constraint, so an unchanged address is a no-op there and
+       the client does not have to track dirtiness to stay correct. */
+    const payload = {
+      company_name: companyName,
+      email,
+      phone: f.phone.value.trim() || null,
+    };
     if (!m) {
       /* Create needs the three the schema marks required. The form's 150-char
          cap on Company Name is not cosmetic — it is `merchant_name`'s and
          `contact_person`'s limit (company_name itself allows 200), so a name
          that fits the input always fits everything derived from it. */
-      payload.email = f.email.value.trim();
       payload.merchant_name = companyName;
       payload.contact_person = companyName;
-      payload.contact_email = f.email.value.trim();
+      payload.contact_email = email;   /* `email` itself is already on the payload */
       /* company_type and credit_limit are left off entirely: the schema
          defaults them to `business_partner` and 0, and both are editable
          afterwards through the API. */
@@ -447,7 +448,19 @@ async function openOnboardMerchantModal(merchantId) {
       if (m) {
         await axios.put(`${API_BASE}/api/admin/merchants/${merchantId}`, payload, { headers: authHeaders() });
         overlay.classList.remove('open');
-        loadMerchants();
+        /* SAVING FROM THE DETAIL PAGE RETURNS TO THE DETAIL PAGE. This used to
+           call `loadMerchants()` unconditionally, which swaps the pane back to
+           the list — so the one screen showing the field you just edited was the
+           one you were sent away from, and the only way to see the new address
+           was to find the row again. Edit is only reachable from the detail
+           view, so `openMerchantDetail` re-fetches and re-renders it with the
+           saved values; the list is still refreshed when Edit was opened from
+           there (it cannot be today, but the branch is what makes that safe). */
+        if (document.getElementById('merchantDetailPanel')?.style.display !== 'none') {
+          openMerchantDetail(merchantId);
+        } else {
+          loadMerchants();
+        }
       } else {
         const { data } = await axios.post(`${API_BASE}/api/admin/merchants`, payload, { headers: authHeaders() });
         overlay.classList.remove('open');
@@ -672,7 +685,9 @@ function openMerchantUserModal(merchantId, companyName) {
   const body = document.getElementById('merchantUserModalBody');
   body.innerHTML = `
     <h2>Add User</h2>
-    <p style="font-size:13px;color:var(--text-muted);font-weight:600;margin:-10px 0 16px;">
+    <!-- The -10px this used to carry pulled the line up through the header's
+         divider and under the sticky title; §15 owns the gap now. -->
+    <p style="font-size:13px;color:var(--text-muted);font-weight:600;">
       New login for ${escapeHtml(companyName)}.
     </p>
     <form id="merchantUserForm">
@@ -1945,7 +1960,7 @@ async function openSupportChat(threadId) {
      address from the previous conversation sitting under a spinner is worse
      than no address — an operator could copy it while the real one loads. */
   document.getElementById('supportChatSubtitle').textContent = '';
-  document.getElementById('supportChatMerchantEmail').textContent = '';
+  document.getElementById('supportChatOpenedByEmail').textContent = '';
   document.getElementById('supportChatMessages').innerHTML = rowsSkeleton(4);
   try {
     const { data } = await axios.get(`${API_BASE}/api/support/threads/${threadId}`, { headers: authHeaders() });
@@ -1967,8 +1982,11 @@ async function openSupportChat(threadId) {
 function applySupportChatHeader(thread) {
   document.getElementById('supportChatSubtitle').textContent =
     `${thread.status_label} · opened by ${thread.opened_by || '—'}`;
-  document.getElementById('supportChatMerchantEmail').textContent =
-    thread.merchant_email || 'Email not available';
+  /* The opener's own login address, not the merchant company's — two people at
+     the same merchant open different threads, and this line has to follow the
+     name on the line above it. */
+  document.getElementById('supportChatOpenedByEmail').textContent =
+    thread.opened_by_email || 'Email not available';
 }
 
 /* Which of claim / resolve / reopen apply, in one place. This was duplicated
@@ -2137,6 +2155,14 @@ async function loadNotificationsAdmin() {
   document.getElementById('adminChipRole').textContent = roleVal;
   const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'A';
   document.getElementById('adminAvatar').textContent = initials;
+  /* The profile menu repeats the name and adds the email, which the chip has no
+     room for. Read from the stored portal user — no extra request. */
+  const menuName = document.getElementById('adminProfileMenuName');
+  if (menuName) {
+    menuName.textContent = name;
+    document.getElementById('adminProfileMenuEmail').textContent =
+      (getPortalUser('admin') || {}).email || '';
+  }
 })();
 
 (function initClock() {
@@ -2170,15 +2196,14 @@ async function loadNotificationsAdmin() {
   });
 })();
 
-(function initSidebarCollapse() {
-  const COLLAPSE_KEY = 'admin_sidebar_collapsed';
-  const layout = document.getElementById('layoutRoot');
-  if (localStorage.getItem(COLLAPSE_KEY) === '1') layout.classList.add('collapsed');
-  document.getElementById('sidebarCollapseBtn').addEventListener('click', () => {
-    const collapsed = layout.classList.toggle('collapsed');
-    localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
-  });
-})();
+/* THE COLLAPSED RAIL IS GONE, AND THE SAVED PREFERENCE HAS TO GO WITH IT.
+   `initSidebarCollapse` read `admin_sidebar_collapsed` on every load and applied
+   `.collapsed` before binding the button. Deleting only the button would have
+   left anyone who had ever collapsed the rail stuck in an 80px icon strip with
+   no control to escape it and no rules left in admin.css to style it — a worse
+   bug than the button. So the key is cleared once, here, and the state is never
+   applied again. Nothing else reads it. */
+localStorage.removeItem('admin_sidebar_collapsed');
 
 (function initMobileNav() {
   const layout = document.getElementById('layoutRoot');
@@ -2218,12 +2243,56 @@ async function loadNotifBell() {
 }
 document.getElementById('notifBellBtn').addEventListener('click', e => {
   e.stopPropagation();
+  closeProfileMenu();                    /* only one menu in this row at a time */
   document.getElementById('notifDropdown').classList.toggle('open');
 });
 document.addEventListener('click', e => {
   const dropdown = document.getElementById('notifDropdown');
   if (dropdown.classList.contains('open') && !e.target.closest('.icon-btn-wrap')) dropdown.classList.remove('open');
 });
+
+/* ---------- Header profile menu ----------
+   The identity chip used to be inert. It opens the menu now, and BOTH of its
+   items delegate to code that already existed rather than reimplementing it:
+   Profile routes through navigateToSection('profile') — the same call the
+   sidebar's Profile item makes — and Sign Out clicks the sidebar's own
+   `#logoutBtn`, so the confirmation prompt, the token revocation and the
+   redirect all stay in the single handler that owns them (admin.js:71). No new
+   endpoint, no duplicated sign-out path. */
+function closeProfileMenu() {
+  const menu = document.getElementById('adminProfileMenu');
+  if (!menu) return;
+  menu.classList.remove('open');
+  document.getElementById('adminProfileBtn').setAttribute('aria-expanded', 'false');
+}
+(function initProfileMenu() {
+  const btn = document.getElementById('adminProfileBtn');
+  const menu = document.getElementById('adminProfileMenu');
+  if (!btn || !menu) return;
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('notifDropdown').classList.remove('open');
+    const open = menu.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', e => {
+    if (menu.classList.contains('open') && !e.target.closest('.admin-chip-wrap')) closeProfileMenu();
+  });
+  /* A menu you can open with the keyboard has to be closable with it too. */
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && menu.classList.contains('open')) { closeProfileMenu(); btn.focus(); }
+  });
+
+  document.getElementById('adminProfileMenuProfile').addEventListener('click', () => {
+    closeProfileMenu();
+    navigateToSection('profile');
+  });
+  document.getElementById('adminProfileMenuLogout').addEventListener('click', () => {
+    closeProfileMenu();
+    document.getElementById('logoutBtn').click();
+  });
+})();
 
 /* ---------- Presence heartbeat: reports this admin as "online" for the Active Users list ----------
    POST /api/profile/heartbeat (app/routers/profile.py) — extends this session's online window in

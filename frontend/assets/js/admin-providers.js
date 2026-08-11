@@ -185,6 +185,13 @@ async function openProvider(id) {
     return;
   }
 
+  /* The Provider Users table's last column — the one holding its row button —
+     used to be headed by an empty `<th>`, making it the only action column in
+     the portal without a name; the provider LIST above already said "Action".
+     It says "Action" now. HEADING ONLY: the button, its label and its
+     `data-prov-edit-user` hook are exactly as they were, and so is what it
+     opens. Same correction was applied to the four other unnamed action columns
+     (wallet reconciliation, support threads, audit log, ticket attachments). */
   const p = data.provider;
   const s = data.stats;
   const inactive = p.status !== 'active';
@@ -236,7 +243,7 @@ async function openProvider(id) {
       </div>
       <div class="table-wrap"><table><thead><tr>
         <th>Name</th><th>Email</th><th>Phone</th><th class="num">Tickets Booked</th>
-        <th class="num">Total Amount</th><th>Status</th><th></th>
+        <th class="num">Total Amount</th><th>Status</th><th>Action</th>
       </tr></thead><tbody>
         ${data.users.length ? data.users.map(u => `
           <tr>

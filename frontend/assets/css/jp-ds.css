@@ -522,6 +522,23 @@ h1,h2,h3,h4{letter-spacing:-.015em;}
   border-radius:var(--jp-r-pill);
   font-weight:650;
   letter-spacing:.005em;
+  /* A TRANSPARENT BORDER SO AN UNVARIANT BUTTON IS THE SAME HEIGHT.
+     Every variant below — `.btn-coral`, `.btn-navy`, `.btn-ghost`,
+     `.btn-danger` — sets a 1px border, but the BASE `.btn` set none. A button
+     written without a variant class was therefore 2px shorter than the one
+     beside it: measured, `class="btn btn-sm"` came out 29px against 31px for
+     every `btn-ghost`/`btn-navy` in the portal.
+
+     That is not hypothetical — the Wallet & Top-ups desk writes exactly that
+     bare form on its Review/View action buttons and on its pagination, so one
+     whole screen's buttons sat 2px shorter than the identical buttons on
+     Merchant Management, Provider Management and Support.
+
+     Fixed here rather than by editing the wallet builder, because the defect is
+     the base rule's, and this reaches every bare `.btn` anywhere in any portal
+     at once. `transparent` adds no visible outline — it only reserves the two
+     pixels the variants were already taking. */
+  border:1px solid transparent;
   transition:background var(--jp-fast), color var(--jp-fast),
              border-color var(--jp-fast), box-shadow var(--jp-fast),
              transform var(--jp-fast), filter var(--jp-fast);
@@ -1296,12 +1313,11 @@ table{ width:100%; }
    varies between two deliberate tiers; radius, input metrics, label rhythm and
    button placement are identical everywhere.
 
-   These rules deliberately do NOT touch padding on the narrow tier. admin.css
-   pins its header and footer there with `margin:-32px` plus a `0 ±32px` spread
-   shadow keyed to its own 32px card padding, and that mechanism works. Changing
-   the padding without rewriting those offsets would tear the header off the
-   card — so the narrow tier keeps its padding and only gains the shared
-   vocabulary. */
+   THE NARROW TIER USED TO KEEP admin.css's OWN FRAME. It no longer does — see
+   "THE NARROW TIER'S FRAME" further down, which measures why that mechanism
+   could not stay. Both tiers now build the card the same way: `padding:0` on
+   the card, a sticky padded header, a sticky padded footer, and body blocks
+   that pad themselves. Only the WIDTH still differs. */
 .jp-admin .modal-card{border-radius:var(--jp-r-lg);}
 .jp-admin .modal-card .modal-actions{
   display:flex; flex-wrap:wrap; align-items:center;
@@ -1325,19 +1341,6 @@ table{ width:100%; }
 .jp-admin .modal-card .modal-actions > .btn-navy,
 .jp-admin .modal-card .modal-actions > .btn-danger{order:2;}
 
-/* The narrow tier's footer sticks too — but admin.css only pins a footer that
-   is a DIRECT child of the card, and dialogs like Send Notification nest theirs
-   inside the `<form>` they submit, so those had no sticky footer at all. The
-   ±32px here is not arbitrary: it is admin.css's own `.modal-card` padding,
-   bled out so the footer's border reaches both edges and its background covers
-   the card's bottom padding, exactly as the direct-child rule does. */
-.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > form > .modal-actions{
-  position:sticky; bottom:0; z-index:3;
-  background:var(--card-bg);
-  border-top:1px solid var(--jp-border);
-  margin:20px -32px -32px;
-  padding:16px 32px 32px;
-}
 .jp-admin .modal-card .form-field input:not([type=checkbox]):not([type=radio]),
 .jp-admin .modal-card .form-field select{
   width:100%; height:42px; padding:0 14px; font-size:14px;
@@ -1350,10 +1353,44 @@ table{ width:100%; }
   letter-spacing:.05em; text-transform:uppercase;
   color:var(--jp-text-muted);
 }
-/* A one-field dialog should not be a wide one, but it should not be a cramped
-   one either — this is the floor that keeps its input off both edges. */
+/* ---- THE NARROW TIER'S FRAME                             (2026-08-10) ------
+   MEASURED, AND IT WAS HIDING THE DIALOG'S ONLY SENTENCE. admin.css pins the
+   narrow tier's header with `margin-top:-32px` + `top:0` and its footer with
+   `margin-bottom:-32px` + `bottom:0`, each backed by a `0 ∓32px` spread shadow
+   that paints over the card's own 32px padding. The shadows work. The STICKY
+   OFFSETS do not, and this is why:
+
+   A sticky box is constrained by its MARGIN box, so `margin-top:-32px` puts the
+   margin edge 32px ABOVE the border edge, `top:0` refuses to let that edge leave
+   the scrollport, and the browser pushes the WHOLE HEADER DOWN 32px to comply.
+   Its painted box therefore ends 32px below where layout put it — over the top
+   of whatever follows. The footer does the identical thing upward.
+
+   Measured in this portal, 1280×800, on the `confirmDialog()` markup: header
+   painted 32px low, footer painted 32px high, and the 16px message line between
+   them covered from above at its 14th pixel and from below at its 12th. Every
+   `.modal-card` without a `.form-grid` — the confirm dialogs, the prompt dialog,
+   Send Notification, the service-request resolve dialog — was rendering its
+   message underneath its own chrome, at every scroll position, in both themes.
+   No negative margin can fix that: the offset IS the negative margin.
+
+   So the narrow tier stops using it and takes tier 2's frame instead — the one
+   that never had the bug, because there the card is `padding:0` and the header
+   pads itself, so nothing needs a negative margin in the first place. Under
+   this, `margin-top` is 0, the sticky offset is 0, and the painted box is the
+   layout box.
+
+   WHAT DID NOT CHANGE: the width. 480px is still the floor that keeps a
+   one-field dialog from being a huge empty box, and `.modal-md`/`.modal-lg`
+   still say when a dialog wants more. Only the frame is now shared. */
 .jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)){
+  --jp-dlg-pad-x:28px;
+  --jp-dlg-pad-y:22px;
   max-width:min(480px, 94vw);
+  padding:0;                             /* header/body/footer pad themselves */
+  /* Same reason as tier 2: reserve the gutter so a dialog that grows past its
+     cap does not lose ~10px of content width the moment it starts scrolling. */
+  scrollbar-gutter:stable;
 }
 
 /* ---- TIER 2: what counts as a WIDE form dialog ---------------------------
@@ -1468,6 +1505,103 @@ table{ width:100%; }
 }
 .jp-admin .modal-card > h2 > .jp-dlg-x:focus-visible{
   outline:none; border-color:var(--jp-accent); box-shadow:var(--jp-focus);
+}
+
+/* ---- THE HEADER DIVIDER, ON EVERY DIALOG                 (2026-08-10) ------
+   REPORTED AS "the line under Enquiry is hidden / overlaps the title", AND IT
+   WAS NOT ONLY THAT DIALOG. Two separate causes, both shared, both fixed here
+   rather than on the screen they were noticed on.
+
+   CAUSE 1 — THE SUBTITLE WAS PULLED UP OVER THE DIVIDER. Every review dialog
+   writes `<h2>` then a subtitle line, and that line carried a NEGATIVE top
+   margin (`.modal-sub` was `-8px`; three builders inline `-6px`/`-10px`). Those
+   were tuned against admin.css's `.modal-card h2{margin-bottom:18px}` — the
+   header the portal had BEFORE this section gave the h2 `margin:0` and a
+   `border-bottom`. Against the new geometry the negative margin drags the
+   subtitle back up through the divider and under the header's own opaque,
+   `z-index:3` sticky background, so the line reads as hidden or as touching the
+   title, and the first few pixels of the subtitle are clipped. The negatives are
+   gone from the builders; the gap is declared once, below.
+
+   CAUSE 2 — HALF THE DIALOGS HAD NO DIVIDER AT ALL. The rule above only reaches
+   tier 2 (`:has(.form-grid)` / `.modal-lg`). A tier-1 confirm dialog fell
+   through to admin.css, which gives its `<h2>` a sticky pin and no border, so
+   "are you sure?" and "Edit Merchant" were visibly two different objects. Tier 1
+   now gets the same divider — the same 1px, the same colour — while keeping the
+   -32px/32px sticky pinning admin.css needs there (see the long note at
+   admin.css `.modal-card:not(.modal-lg) > h2`; that mechanism is untouched).
+
+   The narrow tier's header/body/footer are declared below, against the
+   `padding:0` frame set in TIER 1. They are deliberately the same declarations
+   the wide tier gets a few rules up — same sticky, same 22/28/15 header pad,
+   same 1px divider, same 16px footer — because "one dialog standard" has to
+   mean the two tiers differ in ONE property (width) rather than in four. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > h2{
+  position:sticky; top:0; z-index:3;
+  display:flex; align-items:center; gap:12px;
+  margin:0;
+  padding:var(--jp-dlg-pad-y) var(--jp-dlg-pad-x) 15px;
+  background:var(--card-bg);
+  border-bottom:1px solid var(--jp-border);
+  /* RESET, not a default: admin.css paints a `0 -32px 0` spread here to cover
+     the card padding its negative margin used to reach through. There is no
+     negative margin now and no padding to cover, so the shadow would only be a
+     32px block of card colour hanging above a header that already starts at the
+     card's top edge — visible over the backdrop on a rounded corner. */
+  box-shadow:none;
+  font-size:18px; font-weight:700; letter-spacing:-0.01em;
+  color:var(--jp-text);
+}
+/* Everything between the header and the footer pads itself, because the card
+   no longer does. Two rules for the same reason tier 2 needs two: some builders
+   wrap their fields in a `<form>`, others write them loose into the card. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > *:not(h2):not(form):not(.modal-actions){
+  padding-left:var(--jp-dlg-pad-x);
+  padding-right:var(--jp-dlg-pad-x);
+}
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > form{
+  padding:22px var(--jp-dlg-pad-x) 0;
+}
+/* The footer, whether the builder wrote it as a child of the card or nested it
+   inside the `<form>` it submits — both shapes exist in this portal, and
+   admin.css only ever pinned the first, so the nested ones had no sticky footer
+   at all. Matching at any depth is what makes them one footer. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) .modal-actions{
+  position:sticky; bottom:0; z-index:3;
+  margin:24px 0 0;
+  padding:16px var(--jp-dlg-pad-x);
+  background:var(--card-bg);
+  border-top:1px solid var(--jp-border);
+  box-shadow:none;                       /* same reset as the header, downward */
+}
+/* Nested inside the padded form, it has to bleed back out to the card's edges
+   or its border stops 28px short on both sides of the header's. */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > form > .modal-actions{
+  margin-left:calc(-1 * var(--jp-dlg-pad-x));
+  margin-right:calc(-1 * var(--jp-dlg-pad-x));
+}
+/* A dialog whose last block is NOT a footer needs the bottom pad the card gave
+   up. Never on a `<form>`: a form carries its sticky footer inside itself, and a
+   sticky element cannot be pushed past its containing block's content edge — a
+   bottom pad here would lift the footer clear of the card and leave a strip of
+   fields showing under it. (Same carve-out, same reason, as tier 2.) */
+.jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > *:not(h2):not(form):not(.modal-actions):last-child{
+  padding-bottom:24px;
+}
+
+/* The subtitle line every review dialog writes directly under its title. One
+   declaration for all of them, whichever class the builder happened to use, so
+   the distance from the divider to the first line of content is the same in
+   every dialog in the portal. `> h2 +` keeps it to the header position — an
+   `.ops-sub` used as helper text under a field is spaced by its own rule. */
+.jp-admin .modal-card > h2 + .modal-sub,
+.jp-admin .modal-card > h2 + .ops-sub,
+.jp-admin .modal-card > h2 + p{
+  margin-top:16px;
+  /* Symmetrical, and it costs nothing on the wide tier: the 24px sibling rhythm
+     further down collapses with it rather than adding to it. On tier 1 there is
+     no such rhythm, and this is what keeps the first field off the subtitle. */
+  margin-bottom:16px;
 }
 
 /* ---- body ----------------------------------------------------------------
@@ -1622,6 +1756,39 @@ table{ width:100%; }
   color:var(--jp-text-muted);
 }
 
+/* ---- REQUIRED FIELDS SAY SO                              (2026-08-10) ------
+   The forms already mark their mandatory controls with the `required`
+   attribute — Company Name and Email on Edit Merchant, Full Name / Email /
+   Phone on Add User, and so on — so the browser blocks the submit and the
+   server validates. But NOTHING SAID SO BEFORE YOU PRESSED SAVE: every label
+   read exactly like an optional one, and the only way to learn a field was
+   mandatory was to be refused.
+
+   Driven off the control's own `required` attribute via `:has()`, deliberately,
+   rather than by adding a `<span class="req">*</span>` to seventeen builders.
+   That means it can never fall out of step with the validation: a field that
+   stops being required loses its marker in the same edit, and a new required
+   field gets one for free. No JS, no markup, nothing for a builder to remember.
+
+   `aria-hidden` is not available on a pseudo-element, and it does not need to
+   be: the asterisk is decoration layered on top of the `required` attribute,
+   which is what a screen reader already announces. */
+.jp-admin .modal-card .form-field:has(> input:required) > label::after,
+.jp-admin .modal-card .form-field:has(> select:required) > label::after,
+.jp-admin .modal-card .form-field:has(> textarea:required) > label::after,
+.jp-admin .panel .form-field:has(> input:required) > label::after,
+.jp-admin .panel .form-field:has(> select:required) > label::after,
+.jp-admin .panel .form-field:has(> textarea:required) > label::after{
+  content:'*';
+  margin-left:3px;
+  color:var(--jp-accent-ink);
+  font-weight:800;
+}
+/* A checkbox row's label IS the control's caption and sits beside the box, not
+   above it — an asterisk there reads as part of the sentence. */
+.jp-admin .form-field label:has(input[type=checkbox])::after,
+.jp-admin .form-field label:has(input[type=radio])::after{content:none;}
+
 /* ---- helper text under a field -------------------------------------------
    Builders write this three different ways — `<span class="cell-sub">`,
    `<p class="ops-sub">`, and a bare `<small>` — and each carries its own
@@ -1733,8 +1900,12 @@ table{ width:100%; }
   }
 }
 @media (max-width:600px){
+  /* The narrow tier is listed here too, as of 2026-08-10. It now uses the same
+     `--jp-dlg-pad-*` frame, so leaving it out would have been the one dialog
+     shape still carrying 28px side padding on a 360px phone. */
   .jp-admin .modal-card:has(.form-grid),
-  .jp-admin .modal-card.modal-lg{
+  .jp-admin .modal-card.modal-lg,
+  .jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)){
     --jp-dlg-pad-x:18px;
     --jp-dlg-pad-y:17px;
     /* 90vh still holds on a phone. An earlier draft used `calc(100vh - 24px)`
@@ -1745,7 +1916,8 @@ table{ width:100%; }
     border-radius:var(--jp-r-md);
   }
   .jp-admin .modal-card:has(.form-grid) > h2,
-  .jp-admin .modal-card.modal-lg > h2{font-size:16.5px;}
+  .jp-admin .modal-card.modal-lg > h2,
+  .jp-admin .modal-card:not(.modal-lg):not(:has(.form-grid)) > h2{font-size:16.5px;}
   /* A wrapped footer must not stack two full-width buttons on a phone. */
   .jp-admin .modal-card .modal-actions{gap:10px;}
   .jp-admin .modal-card .modal-actions .btn{flex:1 1 auto; justify-content:center;}

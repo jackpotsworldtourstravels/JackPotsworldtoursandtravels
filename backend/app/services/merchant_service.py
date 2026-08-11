@@ -187,6 +187,24 @@ def get_merchant(db: Session, merchant_id: int) -> Merchant:
 
 def update_merchant(db: Session, actor: User, merchant_id: int, **fields) -> Merchant:
     merchant = get_merchant(db, merchant_id)
+
+    # `merchants.email` carries `UniqueConstraint("email", name="uq_merchants_email")`,
+    # so an address already on another company would come back from the loop
+    # below as an IntegrityError at commit — a 500 with a database message in it.
+    # Checked here instead, which produces the same 400 and the same wording
+    # `create_merchant` gives for the same collision.
+    #
+    # `!= merchant_id` matters: re-saving the form without touching the email
+    # sends the merchant its own current address, and that must not be rejected.
+    new_email = fields.get("email")
+    if new_email is not None and new_email != merchant.email:
+        clash = db.scalar(select(Merchant).where(Merchant.email == new_email))
+        if clash and clash.merchant_id != merchant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A merchant with that email already exists",
+            )
+
     for key, value in fields.items():
         if value is not None and hasattr(merchant, key):
             setattr(merchant, key, value)

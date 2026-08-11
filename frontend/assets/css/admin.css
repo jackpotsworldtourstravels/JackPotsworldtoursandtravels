@@ -11,7 +11,7 @@
   --radius:16px; --radius-sm:14px; --ff:'Montserrat', sans-serif;
 
   --sidebar-bg:#0B3C6D; --sidebar-bg-2:#0A2F55; --sidebar-text:rgba(255,255,255,0.65); --sidebar-text-hover:#fff;
-  --sidebar-w:264px; --sidebar-w-collapsed:80px;
+  --sidebar-w:264px;
   --card-bg:#fff; --page-bg:var(--bg); --text-primary:var(--ink); --text-muted:var(--muted);
   --border-color:var(--line); --hover-bg:rgba(11,60,109,0.04);
 }
@@ -47,21 +47,24 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
    table scrolls inside its own box and the page does not. Measured at 768px:
    Merchant Management was 830px wide against a 768px viewport before this. */
 .main{flex:1; min-width:0; padding:32px 40px; max-width:1280px; margin-left:var(--sidebar-w); transition:margin-left .25s ease;}
-.layout.collapsed .sidebar{width:var(--sidebar-w-collapsed) !important;}
-.layout.collapsed .main{margin-left:var(--sidebar-w-collapsed) !important;}
-.layout.collapsed .nav-item span.nav-label, .layout.collapsed .brand-text, .layout.collapsed .sidebar-collapse-btn span{display:none;}
-.layout.collapsed .nav-item{justify-content:center; padding:13px 0;}
-.layout.collapsed .sidebar .brand{justify-content:center; padding:0 0 20px;}
+/* THE COLLAPSED RAIL IS GONE                                     (2026-08-10)
+   The sidebar collapse button was removed on request, so every `.layout.collapsed`
+   rule that used to live here and further down this file went with it — there is
+   nothing left in the portal that can set that class, and rules for a state that
+   cannot be entered are only a thing to trip over later. The rail is always
+   `--sidebar-w` wide and `.main` is always offset by it.
+   admin.js clears the stale `admin_sidebar_collapsed` preference on load, so a
+   browser that had it saved is not stranded in a rail that no longer has styles. */
 
 .sidebar .brand{display:flex; align-items:center; gap:10px; padding:0 22px 20px; font-size:16.5px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:10px; white-space:nowrap;}
 .sidebar .brand-mark{width:34px; height:34px; border-radius:10px; background:var(--coral); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; flex-shrink:0;}
 .brand-logo-full{height:38px; width:auto; object-fit:contain; flex-shrink:0;}
+/* Kept, and deliberately never shown: admin/index.html still renders the
+   compact mark beside the full logo, so re-introducing a narrow rail is a
+   stylesheet change rather than a markup one. */
 .brand-logo-collapsed{display:none; height:32px; width:32px; object-fit:contain; border-radius:8px; flex-shrink:0;}
-.layout.collapsed .brand-logo-full{display:none;}
-.layout.collapsed .brand-logo-collapsed{display:block;}
 .sidebar .brand span.accent{color:var(--gold);}
 .nav-group-label{padding:16px 22px 6px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,0.32); white-space:nowrap;}
-.layout.collapsed .nav-group-label{display:none;}
 
 /* ==========================================================================
    SIDEBAR GROUPS — Admin only                                    (2026-08-04)
@@ -138,14 +141,6 @@ body.jp-admin{--sidebar-w:308px;}
 /* See the block header: unscoped on purpose. */
 .sidebar{overflow-x:hidden;}
 
-/* Collapsed to the icon rail the headings are gone, so a border is the only
-   thing left saying where one group ends — without it seventeen icons read as
-   one undifferentiated column. */
-.layout.collapsed .nav-group{margin-top:0;}
-.layout.collapsed .nav-group + .nav-group{
-  margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08);
-}
-
 /* Account sits after `.spacer`, which is `flex:1` and normally supplies all the
    separation it needs — but it collapses to nothing once the nav is taller than
    the viewport and starts scrolling. The border is what keeps the group legible
@@ -155,7 +150,6 @@ body.jp-admin{--sidebar-w:308px;}
   margin-top:10px; padding-top:12px;
   border-top:1px solid rgba(255,255,255,0.08);
 }
-.layout.collapsed .nav-group-last{margin-top:10px;}
 .nav-item{display:flex; align-items:center; gap:12px; padding:11px 22px; margin:2px 12px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--sidebar-text); transition:background .18s ease, color .18s ease; white-space:nowrap; position:relative;}
 .nav-item:hover{background:rgba(255,255,255,0.07); color:var(--sidebar-text-hover);}
 .nav-item.active{background:rgba(255,77,77,0.16); color:#fff;}
@@ -163,14 +157,37 @@ body.jp-admin{--sidebar-w:308px;}
 .nav-item .icon{opacity:.85;}
 .nav-item.active .icon{opacity:1; color:var(--coral);}
 .nav-badge{margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--coral); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center;}
-.layout.collapsed .nav-badge{display:none;}
 .sidebar .spacer{flex:1;}
 .sidebar .nav-item.logout{color:#ffb4b4; margin-top:4px;}
 .sidebar .nav-item.logout:hover{background:rgba(255,77,77,0.14); color:#fff;}
-.sidebar-collapse-btn{display:flex; align-items:center; gap:10px; margin:10px 20px 4px; padding:9px 10px; border-radius:10px; color:var(--sidebar-text); font-size:12px; font-weight:700; background:rgba(255,255,255,0.05);}
-.sidebar-collapse-btn:hover{background:rgba(255,255,255,0.1); color:#fff;}
-.sidebar-collapse-btn .icon{transition:transform .25s ease;}
-.layout.collapsed .sidebar-collapse-btn .icon{transform:rotate(180deg);}
+
+/* ---- rail rhythm, with the collapse button gone            (2026-08-10) ----
+   Scoped to `body.jp-admin` because this stylesheet is also the Manager
+   Portal's, and that portal never had the button, never had `.nav-group`, and
+   was not part of this pass.
+
+   ONE NUMBER, AND IT IS A CORRECTION RATHER THAN A RESTYLE. The button used to
+   occupy the gap between the brand divider and the first heading; removing it
+   left the brand's own 10px bottom margin plus `.nav-group{margin-top:18px}`,
+   so "Overview" sat 28px below the divider while every other heading sits 18px
+   below the group before it. The first group is the one group whose spacing was
+   being set by something that is no longer there.
+
+   The item metrics themselves — 11px/22px padding, 12px gap, 13.5px label,
+   18px icon, 10px radius, the coral rail on `.active` — are deliberately
+   untouched. They are already the "rounded highlighted background" the brief
+   describes, and every one of them is load-bearing for the 34px icon column the
+   headings align to (see `.nav-group .nav-group-label` above).
+
+   `.brand + .nav-group`, NOT `.nav-group:first-of-type`. `:first-of-type` keys
+   on the ELEMENT NAME, and `.brand` is a `<div>` as well — so it is the first
+   div in the rail and that selector matches nothing at all. The adjacent
+   sibling form says what is actually meant: the group that follows the logo.
+   (The margins do not collapse into one another either way — `.sidebar` is a
+   flex column, and flex items never collapse margins — so the gap really is
+   the brand's 10px plus whatever the group asks for.) */
+body.jp-admin .sidebar .brand + .nav-group{margin-top:8px;}
+
 .mobile-topbar{display:none;}
 
 .env-banner{
@@ -208,21 +225,42 @@ body.jp-admin{--sidebar-w:308px;}
    The ORDER in which things give way is now declared rather than left to
    whichever element happens to have the loosest content:
 
-     1. the search box, which is `flex:1` and allowed below its content width;
-     2. the page title beside it, which can now break anywhere (see `.topbar h1`);
-     3. nothing else. The theme switch, the bell and the identity chip are the
+     1. the page title, which can break anywhere (see `.topbar h1`);
+     2. nothing else. The theme switch, the bell and the identity chip are the
         controls that say who is signed in and how to sign out, and they keep
         their size.
 
+   THE SEARCH BOX USED TO BE STEP 1, and removing it made the row LESS likely to
+   overflow, not more: it was the widest item on the right at up to 340px, and
+   the ~570px figure above is now ~230px. `.topbar` is `space-between`, so the
+   slack the search used to absorb with `flex:1` is simply the gap between the
+   title and these controls — which is why no spacer replaced it.
+
    `flex-shrink:0` STAYS ON THE ROW ITSELF, and that is the pairing that matters:
-   its three remaining children cannot shrink, so a row that could shrink would
-   simply have them spill out of it instead — which is exactly what happened when
-   this was tried the other way round. The row holds its width and the title
-   yields, which is why the title needed to become able to. */
-.topbar-right{display:flex; align-items:center; gap:8px; flex-shrink:0; min-width:0;}
+   its three children cannot shrink, so a row that could shrink would simply have
+   them spill out of it instead — which is exactly what happened when this was
+   tried the other way round. The row holds its width and the title yields, which
+   is why the title needed to become able to.
+
+   `gap:10px` (was 8px): with the search gone the row is three controls rather
+   than four, and 8px was the value that kept a 340px box in the row at 1100px.
+   The extra 2px is even spacing between the switch, the bell and the chip — the
+   same rhythm the chip's own 4px left margin was compensating for, which is why
+   that margin goes with it. */
+.topbar-right{display:flex; align-items:center; gap:10px; flex-shrink:0; min-width:0;}
+/* BOTH `.admin-chip-wrap` AND `.admin-chip`, and both are load-bearing.
+   In THIS portal the chip gained a positioned wrapper when it became the
+   profile menu, so it is a GRANDCHILD of this row now and `> .admin-chip`
+   stopped matching it. But THIS STYLESHEET IS ALSO THE MANAGER PORTAL'S, and
+   manager/index.html still writes `<div class="admin-chip">` as a direct child
+   here (manager/index.html:182) — so replacing the selector rather than adding
+   to it would have quietly removed that portal's shrink protection and let its
+   identity chip collapse in a narrow window. Two selectors, two portals. */
+.topbar-right > .topbar-date,
 .topbar-right > .theme-selector,
 .topbar-right > .icon-btn-wrap,
-.topbar-right > .admin-chip{flex-shrink:0;}
+.topbar-right > .admin-chip,
+.topbar-right > .admin-chip-wrap{flex-shrink:0;}
 .icon-btn{display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:12px; background:var(--hover-bg); color:var(--text-primary); position:relative; transition:background .18s ease;}
 .icon-btn:hover{background:var(--hover-control);}
 .theme-selector{display:flex; align-items:center; gap:2px; background:var(--hover-bg); border-radius:12px; padding:3px;}
@@ -238,7 +276,55 @@ body.jp-admin{--sidebar-w:308px;}
   background:var(--coral); border:1.5px solid var(--card-bg); color:#fff; font-size:10px; font-weight:800;
   display:flex; align-items:center; justify-content:center; line-height:1;
 }
-.admin-chip{display:flex; align-items:center; gap:10px; padding:6px 12px 6px 6px; border-radius:100px; background:var(--hover-bg); margin-left:4px;}
+/* ---------- the date pill in the control row ----------
+   Same 38px height as `.icon-btn` and `.theme-selector` beside it, so the four
+   controls sit on one optical line rather than three. */
+.topbar-date{
+  display:flex; align-items:center; gap:8px; height:38px; padding:0 14px;
+  border-radius:12px; background:var(--hover-bg); color:var(--text-muted);
+  white-space:nowrap;
+}
+.topbar-date .icon{width:16px; height:16px;}
+.topbar-date .current-date{font-size:12.5px; font-weight:700; color:var(--text-primary);}
+
+/* `margin-left` dropped — the row's own `gap` is the spacing now, so the chip
+   sits the same distance from the bell as the bell does from the theme switch. */
+.admin-chip-wrap{position:relative;}
+.admin-chip{
+  display:flex; align-items:center; gap:10px; padding:6px 12px 6px 6px;
+  border-radius:100px; background:var(--hover-bg); text-align:left;
+  font-family:inherit; transition:background .18s ease;
+}
+.admin-chip:hover{background:var(--hover-control);}
+.admin-chip:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+.admin-chip[aria-expanded="true"]{background:var(--hover-control);}
+.admin-chip-caret{width:15px; height:15px; color:var(--text-muted); transition:transform .18s ease;}
+.admin-chip[aria-expanded="true"] .admin-chip-caret{transform:rotate(180deg);}
+
+/* Matches `.notif-dropdown` next to it — same offset, same radius, same shadow,
+   so the two menus in this row are one component with two contents. */
+.profile-dropdown{
+  position:absolute; top:calc(100% + 10px); right:0; width:250px;
+  background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-lg);
+  border:1px solid var(--border-color); z-index:400; display:none; padding:8px;
+}
+.profile-dropdown.open{display:block;}
+.profile-dropdown-head{
+  display:flex; flex-direction:column; gap:2px; padding:8px 12px 10px;
+  border-bottom:1px solid var(--border-color); margin-bottom:6px;
+}
+.profile-dropdown-head .pd-name{font-size:13px; font-weight:800; color:var(--text-primary);}
+.profile-dropdown-head .pd-email{font-size:11.5px; font-weight:600; color:var(--text-muted); overflow-wrap:anywhere;}
+.profile-dropdown-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:10px 12px; border-radius:10px; font-family:inherit;
+  font-size:13px; font-weight:700; color:var(--text-primary); text-align:left;
+}
+.profile-dropdown-item:hover{background:var(--hover-bg);}
+.profile-dropdown-item:focus-visible{outline:2px solid var(--coral); outline-offset:-2px;}
+.profile-dropdown-item .icon{width:16px; height:16px; color:var(--text-muted);}
+.profile-dropdown-item.danger{color:var(--coral-dark);}
+.profile-dropdown-item.danger .icon{color:var(--coral-dark);}
 .admin-avatar{width:34px; height:34px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0;}
 .admin-chip-text{display:flex; flex-direction:column; line-height:1.25;}
 .admin-chip-name{font-size:12.5px; font-weight:700; color:var(--text-primary);}
@@ -263,8 +349,32 @@ body.jp-admin{--sidebar-w:308px;}
 .stat-card .num.gold{color:#a06600;}
 :root[data-theme="dark"] .stat-card .num.gold{color:var(--gold);}
 .stat-card .num.coral{color:var(--coral-dark);}
-.stat-card .label{font-size:11.5px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-.stat-card .stat-sub{font-size:10.5px; color:var(--text-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+/* A KPI CAPTION WRAPS; IT DOES NOT GET TRUNCATED.        (2026-08-10)
+   Both of these carried `white-space:nowrap` + `text-overflow:ellipsis`, and on
+   the Dashboard that is not a safety net, it is the normal case: measured at
+   1440px the four cards are 252px wide and "Active Service Requests" (177px of
+   text in a 149px box) rendered as "ACTIVE SERVICE R…", "Active Support Chats"
+   as "ACTIVE SUPPORT …". Two of the four headline figures on the portal's front
+   screen did not say what they were counting.
+
+   Wrapping is safe for the row's geometry: jp-ds.css §11 sets `.stat-card` to
+   `height:100%` inside a `align-items:stretch` grid, so a caption that takes two
+   lines lifts every card in the row to the same height rather than making one
+   card taller than its neighbours. `min-height` on the label keeps a one-line
+   card and a two-line card the same height when they are NOT in the same row
+   (the 520px breakpoint stacks them 1-up).
+
+   `overflow-wrap:anywhere` stays as the true last resort — a single
+   unbreakable word longer than the card still has to give way somewhere. */
+.stat-card .label{
+  font-size:11.5px; color:var(--text-muted); font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; margin-top:4px;
+  line-height:1.35; overflow-wrap:anywhere;
+}
+.stat-card .stat-sub{
+  font-size:10.5px; color:var(--text-muted); margin-top:3px;
+  line-height:1.4; overflow-wrap:anywhere;
+}
 
 .panel{background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:24px; margin-bottom:22px; border:1px solid var(--border-color);}
 .panel h2{font-size:16px; margin-bottom:16px; color:var(--text-primary);}
@@ -286,7 +396,32 @@ tr:last-child td{border-bottom:none;}
 tbody tr{transition:background .15s ease;}
 tbody tr:hover{background:var(--hover-bg);}
 .table-wrap{overflow-x:auto; border-radius:12px;}
-.badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700;}
+
+/* NUMERIC COLUMNS RIGHT-ALIGN — AND UNTIL NOW NOTHING MADE THEM.  (2026-08-10)
+   Seventeen places across the portal write `class="num"` on a money or count
+   cell — Provider Management alone has eight (Total Tickets, Total Booking
+   Amount, Tickets Booked, Amount…) — and there was no `.num` rule anywhere in
+   either stylesheet. Every one of those columns rendered LEFT-aligned, so
+   "8,421,900.00" and "612,050.50" did not line up on their decimal point and the
+   header sat over the wrong edge of its own column.
+
+   SCOPED TO `th`/`td` ON PURPOSE. A bare `.num` would also catch
+   `.stat-card .num` — the 24px KPI figure on the Dashboard, on the Super Admin
+   dashboard and on the partner dashboard — and shove all of them to the right
+   edge of their cards. The element selector keeps this to tables, which is the
+   only place the class means "this is a number column".
+
+   `tabular-nums` is the other half of the job: with proportional figures a 1 is
+   narrower than an 8, so right-aligned columns still look ragged. */
+th.num, td.num{text-align:right; font-variant-numeric:tabular-nums;}
+
+/* A STATUS PILL IS ONE LINE. `.badge` is `inline-block` with no `white-space`,
+   so in a narrow column a two-word status broke across two lines INSIDE the
+   pill: measured, "Pending Approval" and "Under Review" rendered 34px tall
+   against 21px for every single-word status beside them, which also dragged
+   their whole table row taller than its neighbours. Nothing wraps now; a long
+   status widens its column instead, and `.table-wrap` already scrolls. */
+.badge{display:inline-block; padding:4px 10px; border-radius:100px; font-size:11.5px; font-weight:700; white-space:nowrap;}
 .badge.confirmed, .badge.success, .badge.active{background:rgba(18,183,106,0.12); color:var(--emerald);}
 .badge.pending{background:rgba(255,176,32,0.15); color:#8f5c00;}
 .badge.cancelled, .badge.failed, .badge.inactive{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
@@ -476,33 +611,13 @@ tbody tr:hover{background:var(--hover-bg);}
 .skeleton-rows .skeleton{height:16px; width:100%;}
 .skeleton-rows .skeleton:nth-child(3n+1){width:92%;} .skeleton-rows .skeleton:nth-child(3n+2){width:78%;} .skeleton-rows .skeleton:nth-child(3n){width:65%;}
 
-/* ---------- Global search ---------- */
-/* `min-width:0` is what actually lets it shrink: a flex item defaults to
-   `min-width:auto`, which is the input's min-content width, so `flex:1` alone
-   would still refuse to go below it and push the row wide. */
-.global-search{position:relative; flex:1 1 0; min-width:0; max-width:340px;}
-.global-search input{
-  width:100%; padding:9px 14px 9px 38px; border-radius:12px; border:1px solid var(--border-color); background:var(--hover-bg);
-  color:var(--text-primary); font-family:var(--ff); font-size:13.5px; outline:none; transition:border-color .18s ease, background .18s ease;
-}
-.global-search input:focus{border-color:var(--gold); background:var(--card-bg);}
-.global-search .gs-icon{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--text-muted); pointer-events:none;}
-.global-search-dropdown{
-  position:absolute; top:calc(100% + 10px); left:0; width:100%; min-width:320px; max-height:420px; overflow-y:auto;
-  background:var(--card-bg); border-radius:14px; box-shadow:var(--shadow-lg); border:1px solid var(--border-color); z-index:400; display:none; padding:8px;
-}
-.global-search-dropdown.open{display:block;}
-.gs-group-label{padding:8px 12px 4px; font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted);}
-.gs-result-item{display:flex; flex-direction:column; padding:9px 12px; border-radius:10px; font-size:13px; cursor:pointer;}
-.gs-result-item:hover{background:var(--hover-bg);}
-.gs-result-item .gs-title{font-weight:700; color:var(--text-primary);}
-.gs-result-item .gs-meta{color:var(--text-muted); font-size:11.5px; margin-top:2px;}
-/* Hidden from 1024px down, not 900px. Between those two the sidebar is still a
-   fixed 308px rail, so the search survives only by shrinking to a box too
-   narrow to read a placeholder in — and the rules above would happily let it.
-   Below 900px the sidebar becomes a drawer and the room comes back, but by then
-   the mobile topbar carries navigation instead, so the search stays away. */
-@media (max-width:1024px){.global-search{display:none;}}
+/* ---------- Global search — REMOVED (2026-08-10) ----------
+   The header search box was removed from the Admin Portal on request, so its
+   `.global-search`, `.global-search-dropdown` and `.gs-*` rules are gone with
+   the markup and the JS that fed them. Nothing else in either portal that loads
+   this stylesheet used those class names. The per-screen filter bars, which are
+   a different vocabulary (`.filter-bar input[type=search]`, further down), are
+   untouched — that is where searching lives now. */
 
 /* ---------- Quick Actions ---------- */
 .quick-actions-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px;}
@@ -911,6 +1026,24 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .mobile-topbar .brand{display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px;}
 .hamburger-btn{display:flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,0.08); color:#fff;}
 
+/* THE DATE PILL GOES BEFORE THE PAGE TITLE DOES.
+   The control row is `flex-shrink:0` end to end, so when it stops fitting the
+   only thing left to give is `.topbar-left` — and it gives completely: measured
+   at 1024px with the date pill in place, "Merchant Management" was squeezed to a
+   21px-wide column one character per line and the topbar stood 238px tall (494px
+   on "Service Request Management").
+
+   This is the same trade the global search used to make (it was hidden from
+   1024px down for exactly this reason); the date is now the least important
+   thing in the row, so it is the one that goes. 1200px, not 1024px, because the
+   rail is 308px here: the row needs ~740px of topbar to hold the date AND a
+   readable title, which is a ~1136px viewport, and 1200 leaves margin.
+
+   Nothing is lost — the date is ambient information, and it is still there the
+   moment the window is wide enough to show it without crushing the title. */
+@media (max-width:1200px){
+  .topbar-date{display:none;}
+}
 @media (max-width:1100px){
   .stat-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
   .charts-grid{grid-template-columns:1fr;}
@@ -920,13 +1053,11 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   .sidebar{transform:translateX(-100%); width:var(--sidebar-w) !important; box-shadow:var(--shadow-lg);}
   .layout.mobile-open .sidebar{transform:translateX(0);}
   .layout.mobile-open .sidebar-backdrop{display:block; position:fixed; inset:0; background:rgba(10,37,64,0.45); z-index:190;}
-  .layout.collapsed .nav-item span.nav-label{display:inline;}
-  .layout.collapsed .sidebar{width:var(--sidebar-w) !important;}
-  .sidebar-collapse-btn{display:none;}
   .main{margin-left:0; padding:20px 16px;}
   .topbar{position:static; flex-wrap:wrap;}
   .admin-chip-text{display:none;}
-  .topbar .current-date{display:none;}
+  .admin-chip-caret{display:none;}
+  /* (`.topbar-date` is already hidden from 1200px down — see the rule above.) */
 }
 @media (max-width:520px){
   .stat-grid{grid-template-columns:1fr 1fr;}
@@ -968,7 +1099,13 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .detail-note strong{font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);}
 .detail-note p{margin:4px 0 0; font-size:13px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}
 
-.modal-sub{margin:-8px 0 4px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
+/* NO NEGATIVE TOP MARGIN. It used to be `-8px`, tuned against the old header
+   where the `<h2>` carried `margin-bottom:18px` and no divider. Dialog headers
+   now end in a border (jp-ds.css §15), and a negative margin here pulls this
+   line back up THROUGH that border and under the header's opaque sticky
+   background — which is the "divider hidden / overlapping the title" report.
+   The gap under a header is declared once, in §15. */
+.modal-sub{margin:0 0 4px; font-size:12.5px; font-weight:600; color:var(--text-muted);}
 
 .enq-claim{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -1003,6 +1140,47 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
   padding:9px 12px; border-radius:10px; border:1.5px solid var(--line);
   font-size:13px; background:var(--card-bg); color:var(--text-primary);
   min-width:220px; font-family:inherit;
+}
+
+/* ---- ONE CONTROL HEIGHT ACROSS THE WHOLE FILTER BAR   (2026-08-10) --------
+   MEASURED, ON EVERY FILTER BAR IN THE PORTAL: a text/search box came out
+   36px, a date box 35px, a `.status-select` 29px and a `.btn-sm` 31px — four
+   different heights on one row, because each control was given its own padding
+   in a different place and none of them was given a height. They are all
+   vertically centred, so it does not read as misalignment; it reads as controls
+   of four different sizes, which is exactly the "inputs stretched and
+   compressed" complaint §15 fixed inside dialogs and never reached out here.
+
+   36px, not §15's 42px. A filter bar is a dense secondary row sitting directly
+   above a table, and matching the dialog's 42px form control would make the
+   filters compete with the data. What matters is that the four agree.
+
+   `height` + `padding:0 12px` rather than vertical padding, for the reason §15
+   gives: a select adds its own arrow padding, so equal padding still yields
+   unequal heights. `line-height:1` keeps the text centred inside the fixed box
+   in Safari, which otherwise centres on the font's own box.
+
+   Scoped to `.filter-bar` throughout, so nothing here reaches a dialog form
+   (§15, 42px) or a page form (§16, 42px). */
+.filter-bar input[type="text"],
+.filter-bar input[type="search"],
+.filter-bar input[type="date"],
+.filter-bar select,
+.filter-bar .status-select,
+.filter-bar .btn{
+  height:36px;
+  padding:0 12px;
+  line-height:1;
+}
+/* The caret jp-ds draws lives in the right 30px; keep the room or it sits on
+   top of the value. Matches the `.status-select` rule further up. */
+.filter-bar select,
+.filter-bar .status-select{padding-right:30px;}
+/* A button is a pill, not a box, and its label needs more side room than an
+   input's placeholder does. Height still comes from the rule above. */
+.filter-bar .btn{
+  padding:0 16px;
+  display:inline-flex; align-items:center; justify-content:center;
 }
 
 @media (max-width:640px){

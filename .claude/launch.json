@@ -12,6 +12,15 @@
       "runtimeExecutable": "backend/venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "//": "Attach-only: no command, so this connects to a uvicorn already",
+      "//2": "listening on 8000 instead of failing to bind the port a second",
+      "//3": "time. app.main mounts frontend/ at /, so this origin serves the",
+      "//4": "portals AND /api — same-origin, which the hardcoded API_BASE needs.",
+      "name": "backend-attach",
+      "url": "http://127.0.0.1:8000",
+      "port": 8000
     }
   ]
 }

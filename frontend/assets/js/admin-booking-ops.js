@@ -625,7 +625,7 @@ function opsRenderWork() {
         </div>
         <div class="msg" id="opsUploadMsg" aria-live="polite"></div>
         <div class="table-wrap" style="margin-top:12px;"><table><thead><tr>
-          <th>File</th><th>Type</th><th>Size</th><th>Uploaded</th><th></th>
+          <th>File</th><th>Type</th><th>Size</th><th>Uploaded</th><th>Action</th>
         </tr></thead><tbody>
           ${tickets.length ? tickets.map(t => `
             <tr>

@@ -96,6 +96,29 @@
 
   function init() {
     document.querySelectorAll('.modal-overlay').forEach(watch);
+
+    /* DIALOGS THAT DO NOT EXIST YET ALSO NEED THE BUTTON.       (2026-08-10)
+       The scan above only ever saw the overlays hard-coded in admin/index.html.
+       Two dialogs are BUILT AT CALL TIME and appended to <body> — confirmDialog()
+       in components/confirm-dialog.js and promptDialog() in admin-bookings.js —
+       so they were never watched and never decorated: every other dialog in the
+       portal had an X in its header and those two did not.
+
+       They open the instant they are appended (`class="modal-overlay open"`),
+       which is why they are decorated here directly as well as watched: the
+       class observer inside watch() only fires on a LATER change, and for these
+       two the class is already correct on arrival. */
+    new MutationObserver(function (records) {
+      records.forEach(function (rec) {
+        rec.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) return;
+          if (node.classList && node.classList.contains('modal-overlay')) {
+            watch(node);
+            if (node.classList.contains('open')) decorate(node);
+          }
+        });
+      });
+    }).observe(document.body, { childList: true });
   }
 
   if (document.readyState === 'loading') {

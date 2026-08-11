@@ -24,7 +24,7 @@ function confirmDialog({ title = 'Are you sure?', message = '', confirmText = 'C
     overlay.innerHTML = `
       <div class="modal-card" style="max-width:400px;">
         <h2>${escapeHtml(title)}</h2>
-        ${message ? `<p style="font-size:13.5px; color:var(--text-muted); margin:-6px 0 4px;">${escapeHtml(message)}</p>` : ''}
+        ${message ? `<p style="font-size:13.5px; color:var(--text-muted);">${escapeHtml(message)}</p>` : ''}
         <div class="modal-actions">
           <button type="button" class="btn ${danger ? 'btn-danger' : 'btn-coral'}" data-confirm>${escapeHtml(confirmText)}</button>
           <button type="button" class="btn btn-ghost" data-cancel>${escapeHtml(cancelText)}</button>

@@ -95,6 +95,18 @@ class UpdateMerchantRequest(BaseModel):
     merchant_name: str | None = Field(default=None, max_length=150)
     company_name: str | None = Field(default=None, max_length=200)
     company_type: CompanyType | None = None
+
+    #: The company's contact address, editable from the Admin Portal's Edit
+    #: Merchant form. ``EmailStr`` is the same validation ``CreateMerchantRequest``
+    #: applies, so a malformed address is a 422 here exactly as it is there.
+    #:
+    #: NOT A LOGIN. ``merchants.email`` is where the platform writes to the
+    #: company; the credentials its people sign in with are ``users.email`` rows,
+    #: managed separately under ``/merchants/{id}/users``. Changing this does not
+    #: change anybody's username, and deliberately so — the first user's login is
+    #: seeded from this address at creation and diverges from it afterwards.
+    email: EmailStr | None = None
+
     phone: str | None = Field(default=None, max_length=30)
     country: str | None = Field(default=None, max_length=100)
     country_code: str | None = Field(default=None, max_length=2)

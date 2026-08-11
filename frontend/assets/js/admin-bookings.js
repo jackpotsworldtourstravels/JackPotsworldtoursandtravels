@@ -503,7 +503,7 @@ function promptDialog({ title = 'Reason', message = '', placeholder = '', confir
     overlay.innerHTML = `
       <div class="modal-card" style="max-width:440px;">
         <h2>${escapeHtml(title)}</h2>
-        ${message ? `<p style="font-size:13.5px;color:var(--text-muted);margin:-6px 0 10px;">${escapeHtml(message)}</p>` : ''}
+        ${message ? `<p style="font-size:13.5px;color:var(--text-muted);">${escapeHtml(message)}</p>` : ''}
         <div class="form-field" style="max-width:none;">
           <input type="text" data-prompt-input placeholder="${escapeHtml(placeholder)}" maxlength="500">
         </div>

@@ -1,4 +1,10 @@
 backend/.env
+# Backups of the above, made by hand when switching configurations. They hold
+# the same DATABASE_URL, JWT_SECRET_KEY and SMTP password as the real file, so
+# the pattern matters: `backend/.env` alone does not match `backend/.env.x.bak`,
+# and a `git add -A` would commit them.
+backend/.env.*
+!backend/.env.example
 # Written on the server only: holds SITE_DOMAIN for the Caddy container.
 deploy/.env
 backend/__pycache__/
