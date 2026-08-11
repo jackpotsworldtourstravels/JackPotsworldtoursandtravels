@@ -48,6 +48,62 @@ function isSessionExpired(err) {
 }
 
 /* ---------------------------------------------------------------------
+   Customer Portal (V1) — separate namespace (jpc_*, not jwt_*).
+   ---------------------------------------------------------------------
+   WHY THE CUSTOMER IS NOT IN jwt_* WITH THE ADMIN.
+
+   The jwt_* block above is documented as "Customer/Admin (shared login)",
+   and that was true while both authenticated against /api/auth/login and
+   were told apart by `role`. They no longer share a backend: the customer
+   signs in against the Customer database (/api/customer/auth/*), the admin
+   against the platform `users` table.
+
+   Sharing the keys now would break the Admin Portal, not merely blur it.
+   admin.js decides a session exists with
+
+       function isAdminLoggedIn() { return !!localStorage.getItem('jwt_access'); }
+
+   — the key's PRESENCE, with no look at role or scope. A traveller signing
+   in on the landing page would write jwt_access and the Admin Portal would
+   consider itself logged in, then 401 on every call (the platform refuses
+   customer-scoped tokens by design). Hence a namespace of its own, which is
+   the same rule the Partner and Super Admin blocks already follow.
+
+   These deliberately mirror the jwt_* signatures one-for-one, so the landing
+   page's existing V1 code paths work unchanged when they are rebound in
+   app.js — see "THE LANDING PAGE'S STORED SESSION IS THE CUSTOMER'S" there.
+   --------------------------------------------------------------------- */
+const CUSTOMER_KEYS = {
+  access: 'jpc_access', refresh: 'jpc_refresh', name: 'jpc_user_name',
+  role: 'jpc_user_role', userId: 'jpc_user_id', remember: 'jpc_remember_identifier',
+};
+function getCustomerAuth() {
+  return {
+    access: localStorage.getItem(CUSTOMER_KEYS.access),
+    refresh: localStorage.getItem(CUSTOMER_KEYS.refresh),
+    name: localStorage.getItem(CUSTOMER_KEYS.name),
+    role: localStorage.getItem(CUSTOMER_KEYS.role),
+    userId: localStorage.getItem(CUSTOMER_KEYS.userId),
+  };
+}
+function setCustomerAuth(access, refresh, name, role, userId) {
+  localStorage.setItem(CUSTOMER_KEYS.access, access);
+  localStorage.setItem(CUSTOMER_KEYS.refresh, refresh);
+  localStorage.setItem(CUSTOMER_KEYS.name, name);
+  localStorage.setItem(CUSTOMER_KEYS.role, role || 'customer');
+  if (userId != null) localStorage.setItem(CUSTOMER_KEYS.userId, userId);
+}
+function clearCustomerAuth() {
+  /* `remember` is deliberately NOT cleared — it survives sign-out so the next
+     visit can prefill the address, which is the whole point of Remember Me. */
+  [CUSTOMER_KEYS.access, CUSTOMER_KEYS.refresh, CUSTOMER_KEYS.name,
+   CUSTOMER_KEYS.role, CUSTOMER_KEYS.userId].forEach(k => localStorage.removeItem(k));
+}
+function customerAuthHeaders() {
+  return { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_KEYS.access)}` };
+}
+
+/* ---------------------------------------------------------------------
    Partner Portal — separate namespace (partner_jwt_*, not jwt_*).
    --------------------------------------------------------------------- */
 const PARTNER_KEYS = {

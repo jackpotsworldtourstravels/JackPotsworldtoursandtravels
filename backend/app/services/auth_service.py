@@ -167,7 +167,21 @@ def is_token_revoked(user: User, payload: dict) -> bool:
 
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, str]:
     payload = decode_token(refresh_token)
-    if not payload or payload.get("type") != "refresh":
+    # The scope check is as load-bearing as the type check, and this endpoint is
+    # the one place it was missing.
+    #
+    # get_current_user() refuses any token carrying a `scope` claim (deps.py), but
+    # /api/auth/refresh is PUBLIC — the refresh token is itself the credential, so
+    # no dependency runs and nothing else looked at the scope. Without this line a
+    # CUSTOMER refresh token reached `db.get(User, sub)` below, and because
+    # customers.customer_id and users.user_id are INDEPENDENT SEQUENCES, a customer
+    # whose id happens to collide with an active users row was handed a full,
+    # unscoped token pair for that unrelated merchant. The ids collide routinely;
+    # this was found when the id landed on a real merchant admin.
+    #
+    # Unscoped (merchant/admin/manager) tokens are unaffected — they are what this
+    # endpoint is for. Super Admin already fails below on its `-1` sentinel sub.
+    if not payload or payload.get("type") != "refresh" or payload.get("scope") is not None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
