@@ -118,7 +118,12 @@ h1,h2{font-weight:800; color:var(--text-primary); letter-spacing:-.01em;}
 /* ---------- Portal layout ---------- */
 .layout{display:flex; min-height:100vh;}
 .sidebar{width:var(--sidebar-w); flex-shrink:0; background:linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%); color:var(--sidebar-text); padding:22px 0; display:flex; flex-direction:column; transition:width .25s var(--ease); position:relative;}
-.sidebar .brand{display:flex; align-items:center; gap:10px; padding:0 22px 20px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:12px;}
+/* Centred to match Admin (see the same rule in admin.css). The side padding was
+   already symmetric at 22px, so justify-content is the whole change — logo size
+   and the vertical rhythm above and below it are untouched. On Super Admin and
+   Merchant the brand also carries `.brand-badge`, so what is centred is the
+   logo-plus-badge pair, which is the brand block as designed. */
+.sidebar .brand{display:flex; align-items:center; justify-content:center; gap:10px; padding:0 22px 20px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:12px;}
 .sidebar .brand img{height:34px; width:auto;}
 .brand-badge{font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; background:rgba(201,150,44,0.18); color:#E7C976; padding:3px 9px; border-radius:var(--radius-pill); border:1px solid var(--gold-line);}
 .nav-group-label{padding:18px 22px 8px; font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,0.3);}

@@ -378,17 +378,34 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
 /* Brand. `.cl-side a.cl-brand` and not `.cl-brand`: this is an <a> inside the
    rail, so the nav-item rule below would otherwise win on specificity and
    stamp its padding and pill radius onto the logo. */
+/* THE BRAND IS OPAQUE, AND THAT IS THE FIX.
+   This header is `position:sticky`, so the nav scrolls UNDERNEATH it. Its fill
+   used to end at `rgba(10,37,64,0.92)` with `backdrop-filter:blur(8px)` — 8%
+   transparent, which meant menu items ghosted up through the header and past
+   the divider line as the rail scrolled. That is what read as the divider
+   sliding over the navigation: nothing moved, the items were simply visible
+   through it.
+   A flat `--cl-rail-top` rather than a gradient: the header is pinned to the
+   very top of the rail, which is exactly where the rail's own gradient starts,
+   so a solid fill of that same stop is seamless against it. The variable is
+   re-declared per theme, so this follows the theme rather than hard-coding a
+   hex. backdrop-filter is gone with it — blurring what is behind an opaque
+   surface only costs a compositing layer. */
 .cl-side a.cl-brand{
   display:flex; align-items:center; justify-content:center;
   position:sticky; top:0; z-index:2;
   padding:24px 22px 20px; margin:0 0 6px; border-radius:0;
   border-bottom:1px solid var(--cl-rail-line);
-  background:linear-gradient(178deg, var(--cl-rail-top) 0%, rgba(10,37,64,0.92) 100%);
-  backdrop-filter:blur(8px);
+  background:var(--cl-rail-top);
+}
+/* The hover fade is on the IMAGE, not the anchor. Fading the anchor would drop
+   the opacity of the whole sticky header and put the scrolled-under nav items
+   back on screen through it — the exact bug fixed above, re-armed on hover. */
+.cl-side a.cl-brand img{
+  height:66px; width:auto; max-width:100%; object-fit:contain;
   transition:opacity var(--cl-fast);
 }
-.cl-side a.cl-brand:hover{background:linear-gradient(178deg, var(--cl-rail-top) 0%, rgba(10,37,64,0.92) 100%); opacity:.86;}
-.cl-side a.cl-brand img{height:66px; width:auto; max-width:100%; object-fit:contain;}
+.cl-side a.cl-brand:hover img{opacity:.86;}
 
 .cl-side-group{
   padding:20px 24px 8px;

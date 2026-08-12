@@ -56,7 +56,11 @@ h1,h2,h3{font-weight:800; color:var(--text-primary);}
    admin.js clears the stale `admin_sidebar_collapsed` preference on load, so a
    browser that had it saved is not stranded in a rail that no longer has styles. */
 
-.sidebar .brand{display:flex; align-items:center; gap:10px; padding:0 22px 20px; font-size:16.5px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:10px; white-space:nowrap;}
+/* justify-content:center — the logo is centred in the rail rather than flush
+   left. The 22px side padding was already symmetric, so centring is the only
+   thing that was missing; nothing here changes the logo's size or the space
+   above and below it. Shared by Admin and Manager, which both load this file. */
+.sidebar .brand{display:flex; align-items:center; justify-content:center; gap:10px; padding:0 22px 20px; font-size:16.5px; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:10px; white-space:nowrap;}
 .sidebar .brand-mark{width:34px; height:34px; border-radius:10px; background:var(--coral); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; flex-shrink:0;}
 .brand-logo-full{height:38px; width:auto; object-fit:contain; flex-shrink:0;}
 /* Kept, and deliberately never shown: admin/index.html still renders the

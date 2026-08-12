@@ -38,12 +38,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260812bot3">
+<link rel="stylesheet" href="css/classic.css?v=20260812bot4">
 <!-- Shared design system — must stay last. It re-points classic.css's own
      `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
      contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
      text) so every AA measurement in this portal still holds. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260812bot3">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260812bot4">
+<!-- Shared sidebar brand block — see admin/index.html. Must follow classic.css,
+     whose `.cl-side a.cl-brand` it supersedes on source order. It declares only
+     its own --brand-* vars, so the `--cl-*` contract above is untouched, and the
+     mini-rail overrides outrank it on specificity and still win. -->
+<link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260812bot4">
+<!-- Admin's rail geometry — see the file header. Widens --cl-rail-w to 308px,
+     which the `.cl-app` grid column follows; the mini-rail keeps its 82px because
+     `.cl-app.cl-rail-mini` outranks the :root declaration. -->
+<link rel="stylesheet" href="../assets/css/sidebar-rail.css?v=20260812bot4">
 </head>
 <body>
 
@@ -212,6 +221,9 @@
     <nav class="cl-side" id="clSide" aria-label="Main navigation">
       <a class="cl-brand" href="../index.html" title="JackPots World Tours &amp; Travels">
         <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+        <!-- Role badge, matching the other portals. Inside the anchor so it
+             belongs to the same sticky header block as the logo. -->
+        <span class="brand-badge">Merchant</span>
       </a>
 
       <div class="cl-side-group">Overview</div>
@@ -517,37 +529,37 @@
      Order matters: axios, then formatters + auth (shared), then API_BASE via
      classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260812bot3"></script>
-<script src="../assets/js/auth.js?v=20260812bot3"></script>
+<script src="../shared/formatters.js?v=20260812bot4"></script>
+<script src="../assets/js/auth.js?v=20260812bot4"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
-<script src="../assets/js/travel-locations.js?v=20260812bot3"></script>
+<script src="../assets/js/travel-locations.js?v=20260812bot4"></script>
 <!-- Country names and their demonyms, for the passenger cards' Nationality and
      Issuing country combos. Same reason travel-locations.js is a UI table: the
      v2 API has no country reference, and both columns are free text server-side
      — this narrows what the form OFFERS, never what the API accepts. -->
-<script src="../shared/countries.js?v=20260812bot3"></script>
-<script src="js/classic-shell.js?v=20260812bot3"></script>
-<script src="../shared/merchant-api.js?v=20260812bot3"></script>
-<script src="js/classic-icons.js?v=20260812bot3"></script>
-<script src="js/classic-dashboard.js?v=20260812bot3"></script>
-<script src="js/classic-enquiry.js?v=20260812bot3"></script>
-<script src="js/classic-booking.js?v=20260812bot3"></script>
-<script src="js/classic-booking-detail.js?v=20260812bot3"></script>
-<script src="js/classic-requests.js?v=20260812bot3"></script>
-<script src="js/classic-history.js?v=20260812bot3"></script>
-<script src="js/classic-approvals.js?v=20260812bot3"></script>
-<script src="js/classic-wallet.js?v=20260812bot3"></script>
-<script src="js/classic-payments.js?v=20260812bot3"></script>
-<script src="js/classic-service.js?v=20260812bot3"></script>
-<script src="js/classic-reports.js?v=20260812bot3"></script>
-<script src="js/classic-account.js?v=20260812bot3"></script>
-<script src="js/classic-support.js?v=20260812bot3"></script>
+<script src="../shared/countries.js?v=20260812bot4"></script>
+<script src="js/classic-shell.js?v=20260812bot4"></script>
+<script src="../shared/merchant-api.js?v=20260812bot4"></script>
+<script src="js/classic-icons.js?v=20260812bot4"></script>
+<script src="js/classic-dashboard.js?v=20260812bot4"></script>
+<script src="js/classic-enquiry.js?v=20260812bot4"></script>
+<script src="js/classic-booking.js?v=20260812bot4"></script>
+<script src="js/classic-booking-detail.js?v=20260812bot4"></script>
+<script src="js/classic-requests.js?v=20260812bot4"></script>
+<script src="js/classic-history.js?v=20260812bot4"></script>
+<script src="js/classic-approvals.js?v=20260812bot4"></script>
+<script src="js/classic-wallet.js?v=20260812bot4"></script>
+<script src="js/classic-payments.js?v=20260812bot4"></script>
+<script src="js/classic-service.js?v=20260812bot4"></script>
+<script src="js/classic-reports.js?v=20260812bot4"></script>
+<script src="js/classic-account.js?v=20260812bot4"></script>
+<script src="js/classic-support.js?v=20260812bot4"></script>
 <!-- Last: it calls clGo/clInvalidate from the shell and MerchantApi, and is
      started by clShowApp() rather than on load — there is nothing for it to
      ask about until somebody is signed in. -->
-<script src="js/classic-assistant.js?v=20260812bot3"></script>
+<script src="js/classic-assistant.js?v=20260812bot4"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

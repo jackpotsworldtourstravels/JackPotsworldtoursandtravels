@@ -1,0 +1,126 @@
+/* ============================================================================
+   THE SIDEBAR BRAND BLOCK — one definition, every portal.
+   ============================================================================
+   Logo above a centred role badge, the pair centred in the rail:
+
+       +--------------------------+
+       |      [ JackPots logo ]   |
+       |          ADMIN           |
+       |--------------------------|   <- the divider belongs to .brand
+       |  Dashboard               |
+
+   WHY THIS FILE EXISTS
+   There is no shared sidebar *component* in this application — the portals
+   share markup conventions, not code. Admin and Manager are styled by
+   admin.css, Super Admin and Merchant by partner-portal.css, and Merchant
+   Classic is a separate implementation in classic.css using its own `.cl-`
+   namespace and its own design tokens. Before this file the brand block was
+   defined three times with three different logo heights (38px, 34px, 66px) and
+   two of the four portals had no role badge at all.
+
+   So the canonical numbers live here, once, and this stylesheet is linked by
+   every portal AFTER its own. Both selector families are handled below, which
+   is what lets one file cover a rail called `.sidebar .brand` and a rail called
+   `.cl-side a.cl-brand`. Changing a brand metric is now one edit, not three
+   that drift.
+
+   LOAD ORDER IS LOAD-BEARING. `.sidebar .brand` here has exactly the same
+   specificity as the rule it supersedes in admin.css / partner-portal.css, so
+   this file must come after them in <head>. It does, in all four portals.
+
+   WHAT IS DELIBERATELY NOT OVERRIDDEN
+   The rails' widths, colours, gradients and the divider colour all stay where
+   they were. This file sets layout, logo box and badge only. The collapsed-rail
+   and mini-rail rules in the portal stylesheets carry higher specificity
+   (`.layout.sidebar-collapsed …`, `.cl-app.cl-rail-mini …`) and therefore still
+   win, so the compact states are untouched by anything here.
+   ============================================================================ */
+
+:root{
+  /* One place for the proportions. Sized to the reference layout: a logo big
+     enough to read as the brand, not a favicon beside a word. */
+  --brand-logo-h:64px;
+  --brand-pad-top:24px;
+  --brand-pad-bottom:18px;
+  --brand-gap:10px;
+}
+
+/* ---- the block ---------------------------------------------------------- */
+/* Column, not row: the badge sits UNDER the logo rather than beside it, which
+   is the whole shape of the reference layout. `justify-content:center` centres
+   the pair vertically inside whatever height the block ends up with, and
+   `align-items:center` centres both children horizontally. */
+.sidebar .brand,
+.cl-side a.cl-brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:var(--brand-gap);
+  padding:var(--brand-pad-top) 18px var(--brand-pad-bottom);
+  text-align:center;
+}
+
+/* ---- the logo ----------------------------------------------------------- */
+/* height + width:auto + object-fit:contain is the aspect-ratio guarantee: the
+   intrinsic ratio drives the width, and `contain` means even a future logo with
+   a different ratio is letterboxed rather than stretched. max-width keeps a
+   wide wordmark inside the rail instead of forcing it to scroll sideways. */
+.sidebar .brand img,
+.sidebar .brand .brand-logo-full,
+.cl-side a.cl-brand img{
+  height:var(--brand-logo-h);
+  width:auto;
+  max-width:100%;
+  object-fit:contain;
+  flex-shrink:0;
+}
+
+/* The compact mark in the Admin rail stays hidden — admin/index.html renders it
+   beside the full logo so a narrow rail remains a stylesheet change, and the
+   selector above must not resurrect it. */
+.sidebar .brand .brand-logo-collapsed{display:none;}
+
+/* ---- the role badge ----------------------------------------------------- */
+/* Values copied from partner-portal.css so Super Admin and Merchant look
+   exactly as they did; Admin and Merchant Classic had no badge and inherit the
+   same look. The gold is given literally with a var() fallback because
+   classic.css is a separate token set and does not define --gold-line: the
+   badge has to render in the JackPots gold in every portal, not fall back to
+   an unstyled span in one of them. */
+.brand-badge{
+  display:inline-block;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  background:rgba(201,150,44,0.18);
+  color:#E7C976;
+  padding:3px 9px;
+  border-radius:var(--radius-pill, 999px);
+  border:1px solid var(--gold-line, rgba(201,150,44,0.35));
+}
+
+/* ---- compact rails hide the badge --------------------------------------- */
+/* An 82px mini rail cannot hold "MERCHANT" at 10px with letter-spacing and 9px
+   of side padding — `white-space:nowrap` would push it straight out of the rail.
+   Both compact states already blank their nav labels, so the badge follows the
+   same rule. Higher specificity than the `.brand-badge` block above, so these
+   win regardless of order. The `.layout.sidebar-collapsed` line duplicates one
+   in partner-portal.css on purpose: this file owns the badge, so it should not
+   depend on another stylesheet to keep it out of a collapsed rail. */
+.cl-app.cl-rail-mini .brand-badge,
+.layout.sidebar-collapsed .brand-badge{display:none;}
+
+/* ---- responsive --------------------------------------------------------- */
+/* The rails become slide-in drawers below 900px at full width, so the block
+   needs no width handling — only a little less vertical room, since screen
+   height is the scarce axis on a phone. */
+@media (max-width:900px){
+  :root{
+    --brand-logo-h:56px;
+    --brand-pad-top:18px;
+    --brand-pad-bottom:14px;
+  }
+}

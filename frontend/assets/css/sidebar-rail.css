@@ -1,0 +1,125 @@
+/* ============================================================================
+   THE SIDEBAR RAIL — Admin's rail, given to every portal.
+   ============================================================================
+   admin.css is the REFERENCE. Its `.sidebar` is a pinned 308px rail that scrolls
+   internally, with `.main` offset by the same width. Super Admin, Merchant and
+   Merchant Classic each had their own rail instead:
+
+     Admin            308px  position:fixed   internal scroll   custom scrollbar
+     Super Admin      270px  position:relative  scrolls with page
+     Merchant         264px  position:relative  scrolls with page
+     Merchant Classic 266px  position:sticky    internal scroll
+
+   This file brings the other three onto Admin's geometry and behaviour. It is
+   linked by those three portals only — Admin already has these rules natively in
+   admin.css, and re-declaring them there would risk regressing the rail that is
+   the reference. When a rail metric changes in admin.css, it changes here too;
+   the values below are a deliberate mirror, which is why each carries the
+   admin.css line it came from.
+
+   WIDTH GOES THROUGH THE EXISTING TOKENS, not a new one. `--sidebar-w` already
+   drives the collapsed-rail and mobile-drawer rules in partner-portal.css, and
+   `--cl-rail-w` already drives Merchant Classic's `grid-template-columns`, so
+   re-pointing those two is enough for every dependent rule to follow. Inventing
+   a third token would have left those rules on the old numbers.
+
+   WHY EVERYTHING IS SCOPED TO min-width:901px
+   This stylesheet loads AFTER each portal's own. Media queries add no
+   specificity, so an unscoped `.sidebar{position:fixed; z-index:200}` here would
+   also win inside partner-portal.css's `@media (max-width:900px)` block — which
+   sets `z-index:260` for the slide-in drawer against a `250` backdrop. The
+   drawer would have ended up *behind* its own scrim. Below 901px each portal
+   keeps its existing drawer untouched; parity is a desktop concern, because on a
+   phone every one of these rails is already a full-width overlay.
+   ============================================================================ */
+
+/* ---- width ---------------------------------------------------------------
+   308px, from admin.css:106 (`body.jp-admin{--sidebar-w:308px}`). Declared on
+   :root so it beats jp-ds.css's 270px and partner-portal.css's 264px on source
+   order. Merchant Classic's mini-rail sets --cl-rail-w on `.cl-app.cl-rail-mini`
+   and so outranks this — the 82px rail is unaffected.
+
+   OUTSIDE the media query below, unlike everything else here. A custom property
+   cannot affect stacking, so it carries none of the z-index hazard described
+   above, and the mobile drawers size themselves from these same tokens — Admin's
+   drawer is 308px wide (`width:var(--sidebar-w)!important`, admin.css:1057), so
+   leaving this scoped to desktop would have left the phone drawers at 270px and
+   264px while Admin's was 308px. */
+:root{
+  --sidebar-w:308px;
+  --cl-rail-w:308px;
+}
+
+@media (min-width:901px){
+
+  /* ---- the rail: Super Admin + Merchant --------------------------------- */
+  /* Mirrors admin.css:35-41. position:fixed is the visible change: the rail
+     stops scrolling away with the page and scrolls its own overflow instead.
+     overflow-x:hidden comes from admin.css:142 — it stops a long nav label from
+     producing a horizontal scrollbar inside the rail. */
+  .sidebar{
+    width:var(--sidebar-w);
+    position:fixed; top:0; left:0; height:100vh;
+    overflow-y:auto; overflow-x:hidden;
+    z-index:200;
+    padding:22px 0;
+    background:linear-gradient(180deg,var(--sidebar-bg),var(--sidebar-bg-2));
+    color:#fff;
+  }
+  /* admin.css:41 — the 6px rail scrollbar, instead of the OS default that was
+     eating ~11px of the rail's inner width. */
+  .sidebar::-webkit-scrollbar{width:6px;}
+  .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
+
+  /* A fixed rail is out of flow, so `.main` no longer sits beside it — it has to
+     be offset by hand, exactly as admin.css:49 does. `.layout > .main` outranks
+     partner-portal.css:154's bare `.main`. */
+  .layout > .main{
+    margin-left:var(--sidebar-w);
+    transition:margin-left .25s ease;
+  }
+
+  /* ---- the rail: Merchant Classic --------------------------------------- */
+  /* Already `position:sticky; height:100vh; overflow-y:auto` — behaviourally the
+     same pinned-with-internal-scroll as Admin's fixed rail, and it lives in a
+     CSS grid whose first column is --cl-rail-w, so the width above is the whole
+     geometry change. Only the scrollbar needs bringing into line. */
+  .cl-side::-webkit-scrollbar{width:6px;}
+  .cl-side::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15); border-radius:10px;}
+
+  /* ---- nav items -------------------------------------------------------- */
+  /* Geometry and hover from admin.css:157-158. `transform:none` cancels
+     partner-portal.css:131's `translateX(2px)` nudge, which Admin does not have,
+     and white-space:nowrap stops a long label wrapping to two lines.
+     `:not(.cl-brand)` keeps this off the Merchant Classic logo anchor, which is
+     an <a> inside the same rail. */
+  .nav-item,
+  .cl-side a:not(.cl-brand){
+    display:flex; align-items:center; gap:12px;
+    padding:11px 22px; margin:2px 12px;
+    border-radius:10px;
+    font-size:13.5px; font-weight:600;
+    white-space:nowrap;
+    transition:background .18s ease, color .18s ease;
+    position:relative;
+  }
+  .nav-item:hover,
+  .cl-side a:not(.cl-brand):hover{
+    background:rgba(255,255,255,0.07);
+    color:var(--sidebar-text-hover, #fff);
+    transform:none;
+  }
+
+  /* ---- group labels ----------------------------------------------------- */
+  /* admin.css:67. Merchant Classic's group heading is `.cl-side-group`. */
+  .nav-group-label,
+  .cl-side-group{
+    padding:16px 22px 6px;
+    font-size:10.5px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase;
+    white-space:nowrap;
+  }
+
+  /* admin.css:164 — the flexible gap that pushes sign-out to the bottom. */
+  .sidebar .spacer{flex:1;}
+}
