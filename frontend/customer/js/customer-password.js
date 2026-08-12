@@ -17,6 +17,20 @@ const CXP = {
   password: 'cxpPassword', confirm: 'cxpConfirm', sub: 'cxpSub',
 };
 
+/* WHERE "SIGN IN" GOES, AND WHY IT LEAVES THIS DIRECTORY.
+
+   The customer sign-in is the modal on the LANDING page. frontend/customer/
+   ships only these two password screens — they are the only pages the backend
+   links to in mail (/customer/reset-password.html?token=) — so there is no
+   index.html beside them to go back to, and a bare "index.html" here is a 404.
+
+   `?signin=1` and NOT `#login`: app.js's handleOperationsSignInHandoff()
+   claims the `#login` hash and forwards it to partner-login.html, which would
+   land a traveller on the MERCHANT sign-in. handleServicePageIntent() reads
+   this parameter on load, opens the login modal and strips it from the URL.
+   Same intent link the six service pages use — see service-shell.js. */
+const CXP_SIGNIN_URL = '../index.html?signin=1';
+
 /* -------------------------------------------------------------- forgot --- */
 function cxpForgotCard() {
   return `
@@ -27,7 +41,7 @@ function cxpForgotCard() {
                   'type="email" autocomplete="username" spellcheck="false" placeholder="Enter your registered email"')}
         <button type="submit" class="cx-btn">Send Reset Link ${cxIco('arrow')}</button>
         <div class="cx-msg" id="${CXP.msg}"></div>
-        <a class="cx-btn cx-btn-ghost" href="index.html">&larr; Back to Sign In</a>
+        <a class="cx-btn cx-btn-ghost" href="${CXP_SIGNIN_URL}">&larr; Back to Sign In</a>
       </form>
     </div>
 
@@ -35,7 +49,7 @@ function cxpForgotCard() {
       ${cxHead('check', 'Check Your Email',
                'If that address is registered we have sent a reset link to it.', { done: true })}
       <div class="cx-msg is-info" id="cxpSentNote"></div>
-      <a class="cx-btn" href="index.html">Go to Sign In ${cxIco('arrow')}</a>
+      <a class="cx-btn" href="${CXP_SIGNIN_URL}">Go to Sign In ${cxIco('arrow')}</a>
     </div>`;
 }
 
@@ -53,7 +67,7 @@ function cxpResetCard() {
                   { eye: true })}
         <button type="submit" class="cx-btn">Update Password ${cxIco('arrow')}</button>
         <div class="cx-msg" id="${CXP.msg}"></div>
-        <a class="cx-btn cx-btn-ghost" href="index.html">&larr; Back to Sign In</a>
+        <a class="cx-btn cx-btn-ghost" href="${CXP_SIGNIN_URL}">&larr; Back to Sign In</a>
       </form>
     </div>
 
@@ -61,7 +75,7 @@ function cxpResetCard() {
       ${cxHead('check', 'Password Updated',
                'Your password has been changed. For your security every other session has been signed out.',
                { done: true })}
-      <a class="cx-btn" href="index.html">Go to Sign In ${cxIco('arrow')}</a>
+      <a class="cx-btn" href="${CXP_SIGNIN_URL}">Go to Sign In ${cxIco('arrow')}</a>
     </div>`;
 }
 
