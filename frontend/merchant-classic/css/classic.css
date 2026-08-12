@@ -4058,3 +4058,376 @@ body.cl-sc-composing .cl-crumb{visibility:hidden;}
   background:var(--cl-surface); border-radius:8px; color:var(--cl-text);
 }
 .cl-ocr-mrz-foot{font-size:11px; color:var(--cl-muted);}
+
+/* ==========================================================================
+   PARTNER ASSISTANT                                             (2026-08-11)
+   ==========================================================================
+   The launcher and the conversation panel. Appended last, like the passport
+   OCR block above, so the `!important` 16px touch rule keeps winning — the
+   composer's textarea deliberately sets no font-size below that floor.
+
+   THE LAUNCHER AND THE PANEL MUST STAY DIRECT CHILDREN OF <body>.
+   `.cl-section.active` animates with `animation-fill-mode:both`, and the
+   retained `transform:none` at the end of `cl-enter` computes to the identity
+   matrix — a transform value, which establishes a containing block for
+   `position:fixed`. Anything fixed that lives inside a section is anchored to
+   the section, not the viewport, and lands short of the edge it was aimed at.
+   The Support Center hit this with four fixed children; see index.html, where
+   these two elements sit beside `#clDrawer` for the same reason.
+
+   COLOUR. `--cl-orange` is the 2.8:1 brand tone and carries no text anywhere
+   in here; every label on a filled surface sits on `--cl-orange-cta` or the
+   navy, both of which clear AA. The one place the bright tone appears is the
+   launcher's ring and the icon stroke, which are shapes.
+   ========================================================================== */
+
+/* ---- the launcher: a small robot -------------------------------------- */
+/* NO BUTTON CHROME. The robot IS the control, so the button is a transparent
+   box around it — a circular plate behind it would read as an ordinary support
+   widget with a picture on it, which is the thing this deliberately is not. */
+.cl-as-fab{
+  position:fixed; right:22px; bottom:22px; z-index:960;
+  width:56px; height:56px; padding:0; border:0;
+  background:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent;
+  /* Hover lives on the BUTTON and the float on the span inside it. Both are
+     transforms, and one element cannot hold a transition and a running
+     animation on the same property without the animation winning outright. */
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1), filter .2s ease;
+}
+.cl-as-fab[hidden]{display:none;}
+.cl-as-fab:hover{transform:scale(1.09);}
+.cl-as-fab:active{transform:scale(1.03);}
+.cl-as-fab:focus-visible{
+  outline:3px solid var(--cl-focus); outline-offset:4px; border-radius:var(--cl-r-md);
+}
+
+/* The float. Transform + opacity only, so it composites on the GPU and never
+   lays out. 1.5deg is enough to read as drift and small enough not to wobble. */
+.cl-as-bot{
+  display:block; width:100%; height:100%;
+  animation:cl-as-float 4.2s ease-in-out infinite;
+  will-change:transform;
+}
+.cl-as-bot svg{width:100%; height:100%; display:block; overflow:visible;}
+@keyframes cl-as-float{
+  0%,100%{transform:translateY(3px) rotate(-1.5deg);}
+  50%    {transform:translateY(-3px) rotate(1.5deg);}
+}
+
+/* --- the robot's parts --- */
+.cl-as-shell{fill:url(#clAsShell); stroke:#C4D2E2; stroke-width:.7;}
+.cl-as-visor{fill:url(#clAsVisor);}
+.cl-as-gloss{fill:none; stroke:rgba(255,255,255,.16); stroke-width:2.2; stroke-linecap:round;}
+.cl-as-ear{fill:#2E7DF6;}
+.cl-as-stalk{stroke:#C4D2E2; stroke-width:2.2; stroke-linecap:round;}
+.cl-as-tip-led{fill:#22D3EE;}
+/* The glow under it, and the aura on the antenna and eyes. A drop-shadow
+   filter on the cyan parts is what makes them read as EMITTING rather than
+   merely being cyan. */
+.cl-as-shadow{fill:rgba(34,211,238,.30);}
+.cl-as-tip-led, .cl-as-eye{filter:drop-shadow(0 0 3px rgba(34,211,238,.95));}
+.cl-as-fab:hover .cl-as-shadow{fill:rgba(34,211,238,.48);}
+.cl-as-fab:hover .cl-as-eye{filter:drop-shadow(0 0 5px rgba(34,211,238,1));}
+
+/* --- the eyes --- */
+/* transform-box:fill-box makes transform-origin:center mean THIS RECT's centre.
+   Without it the origin is the SVG canvas origin and a blink throws the eye
+   across the viewBox instead of squashing it in place. */
+.cl-as-eye{
+  fill:#22D3EE;
+  transform-box:fill-box; transform-origin:center;
+  transition:transform .085s ease-in;
+}
+/* The blink itself. Scaling Y to a sliver leaves the rounded ends showing, so
+   an open eye ( ● ) becomes a closed lid ( — ) rather than vanishing. */
+.cl-as-bot.is-blinking .cl-as-eye{transform:scaleY(.12); transition-duration:.07s;}
+/* The glance. Applied to the GROUP so both eyes move together — moving them
+   independently reads as a fault, not as looking. */
+.cl-as-eyes{
+  transform-box:fill-box; transform-origin:center;
+  transition:transform .5s cubic-bezier(.22,1,.36,1);
+}
+.cl-as-bot.look-l .cl-as-eyes{transform:translateX(-1.3px);}
+.cl-as-bot.look-r .cl-as-eyes{transform:translateX(1.3px);}
+
+/* --- greeting bubble --- */
+.cl-as-hello{
+  position:fixed; right:84px; bottom:30px; z-index:961;
+  max-width:196px; padding:10px 13px;
+  background:var(--cl-surface); color:var(--cl-text);
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-md);
+  box-shadow:var(--cl-sh-md);
+  font-size:12.5px; line-height:1.45;
+  opacity:0; transform:translateX(8px) scale(.96);
+  transition:opacity .32s ease, transform .32s cubic-bezier(.22,1,.36,1);
+  pointer-events:none;
+}
+.cl-as-hello[hidden]{display:none;}
+.cl-as-hello.show{opacity:1; transform:none;}
+.cl-as-hello b{display:block; font-weight:700; margin-bottom:1px;}
+.cl-as-hello span{color:var(--cl-text-2);}
+/* The pointer: a rotated square straddling the border, with the two edges the
+   bubble would otherwise hide left unpainted. */
+.cl-as-hello::after{
+  content:''; position:absolute; right:-6px; bottom:16px;
+  width:10px; height:10px; transform:rotate(45deg);
+  background:var(--cl-surface);
+  border-right:1px solid var(--cl-line); border-top:1px solid var(--cl-line);
+}
+
+.cl-as-tip{
+  position:fixed; right:86px; bottom:36px; z-index:960;
+  padding:7px 12px; border-radius:var(--cl-r-sm);
+  background:var(--cl-navy-900); color:#FFFFFF;
+  font-size:12.5px; font-weight:600; white-space:nowrap;
+  box-shadow:var(--cl-sh-md); pointer-events:none;
+  opacity:0; transform:translateX(6px); transition:opacity .16s ease, transform .16s ease;
+}
+.cl-as-fab:hover + .cl-as-tip, .cl-as-fab:focus-visible + .cl-as-tip{opacity:1; transform:none;}
+
+/* ---- the panel --------------------------------------------------------- */
+.cl-as-back{
+  position:fixed; inset:0; z-index:970;
+  background:rgba(6,27,50,.34); opacity:0; visibility:hidden;
+  transition:opacity .2s ease, visibility .2s ease;
+}
+.cl-as-back.open{opacity:1; visibility:visible;}
+
+.cl-as-panel{
+  position:fixed; right:24px; bottom:24px; z-index:980;
+  width:404px; max-width:calc(100vw - 32px);
+  height:min(640px, calc(100vh - 48px));
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--cl-surface); color:var(--cl-text);
+  border:1px solid var(--cl-line); border-radius:var(--cl-r-lg);
+  box-shadow:var(--cl-sh-xl);
+  opacity:0; visibility:hidden; transform:translateY(12px) scale(.98);
+  transition:opacity .2s ease, transform .2s cubic-bezier(.22,1,.36,1), visibility .2s ease;
+}
+.cl-as-panel.open{opacity:1; visibility:visible; transform:none;}
+
+.cl-as-head{
+  flex-shrink:0; display:flex; align-items:center; gap:10px;
+  padding:14px 14px 14px 16px;
+  background:linear-gradient(140deg, var(--cl-navy-800), var(--cl-navy-900));
+  color:#FFFFFF;
+}
+.cl-as-head-ic{
+  width:36px; height:36px; flex-shrink:0; border-radius:var(--cl-r-pill);
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,.12); color:#FFFFFF;
+}
+.cl-as-head-ic svg{width:20px; height:20px;}
+/* nowrap + ellipsis: a wrapped title costs the transcript ~40px of the little
+   height it has, and this header is only 64px to begin with. */
+.cl-as-head-txt{min-width:0; flex:1;}
+.cl-as-head-txt h2{
+  margin:0; font-size:14.5px; font-weight:700; color:#FFFFFF;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cl-as-status{
+  display:flex; align-items:center; gap:6px; margin-top:2px;
+  font-size:11.5px; color:rgba(233,240,250,.78);
+}
+.cl-as-dot{
+  width:7px; height:7px; border-radius:var(--cl-r-pill);
+  background:var(--cl-success); flex-shrink:0;
+}
+.cl-as-head-btn{
+  flex-shrink:0; width:32px; height:32px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border:0; border-radius:var(--cl-r-sm); cursor:pointer;
+  background:rgba(255,255,255,.10); color:#FFFFFF;
+  font-size:18px; line-height:1;
+  transition:background .15s ease;
+}
+.cl-as-head-btn:hover{background:rgba(255,255,255,.20);}
+.cl-as-head-btn:focus-visible{outline:2px solid #FFFFFF; outline-offset:1px;}
+
+/* ---- transcript -------------------------------------------------------- */
+.cl-as-log{
+  flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+  padding:16px; background:var(--cl-canvas);
+  display:flex; flex-direction:column; gap:12px;
+}
+/* align-items:flex-start is what makes a bubble the width of its own words —
+   a flex column stretches its children by default, so every reply would grow
+   to the width of the widest row in the log. */
+.cl-as-row{display:flex; flex-direction:column; align-items:flex-start; max-width:100%;}
+.cl-as-row.me{align-items:flex-end;}
+
+.cl-as-bub{
+  max-width:88%; padding:9px 13px; border-radius:var(--cl-r-md);
+  font-size:13.5px; line-height:1.55;
+  background:var(--cl-surface); color:var(--cl-text);
+  border:1px solid var(--cl-line);
+  box-shadow:var(--cl-sh-xs);
+}
+/* A bubble that sets a themed background MUST set a themed colour with it:
+   inheriting `--cl-text` onto a navy fill is 1.1:1 in dark mode. */
+.cl-as-row.me .cl-as-bub{
+  background:var(--cl-navy-800); color:#FFFFFF; border-color:var(--cl-navy-800);
+}
+/* pre-wrap lives on this span and NEVER on the bubble. The bubble's child
+   nodes include the newlines and indentation of the template literal that
+   renders it, and those are real text nodes — putting pre-wrap on the parent
+   renders them, and every bubble gains four phantom blank lines. */
+.cl-as-bub-txt{white-space:pre-wrap; display:block;}
+.cl-as-bub-txt strong{font-weight:700;}
+
+.cl-as-meta{margin-top:3px; font-size:10.5px; color:var(--cl-text-muted);}
+
+/* typing indicator */
+.cl-as-typing{display:flex; gap:4px; padding:12px 13px;}
+.cl-as-typing i{
+  width:6px; height:6px; border-radius:var(--cl-r-pill);
+  background:var(--cl-text-muted); display:block;
+  animation:cl-as-blink 1.2s ease-in-out infinite;
+}
+.cl-as-typing i:nth-child(2){animation-delay:.18s;}
+.cl-as-typing i:nth-child(3){animation-delay:.36s;}
+@keyframes cl-as-blink{0%,80%,100%{opacity:.28;} 40%{opacity:1;}}
+
+/* ---- data cards -------------------------------------------------------- */
+.cl-as-card{
+  width:100%; max-width:88%; margin-top:2px;
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); overflow:hidden; box-shadow:var(--cl-sh-xs);
+}
+.cl-as-card-h{
+  padding:9px 12px; border-bottom:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2);
+  font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--cl-text-2);
+}
+.cl-as-card-b{padding:11px 12px; font-size:13px; color:var(--cl-text);}
+.cl-as-figure{font-size:22px; font-weight:800; color:var(--cl-text); line-height:1.2;}
+.cl-as-figure.neg{color:var(--cl-danger-fg);}
+.cl-as-sub{font-size:11.5px; color:var(--cl-text-muted); margin-top:2px;}
+
+.cl-as-rowitem{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  padding:8px 0; border-top:1px solid var(--cl-line-2);
+}
+.cl-as-rowitem:first-child{border-top:0; padding-top:0;}
+.cl-as-rowitem-main{min-width:0;}
+.cl-as-rowitem-t{font-weight:700; font-size:12.5px; color:var(--cl-text);}
+.cl-as-rowitem-s{font-size:11.5px; color:var(--cl-text-muted); margin-top:1px;}
+.cl-as-rowitem-v{flex-shrink:0; text-align:right; font-size:12.5px; font-weight:700;}
+
+.cl-as-card-f{
+  padding:9px 12px; border-top:1px solid var(--cl-line-2);
+  background:var(--cl-surface-2); display:flex; flex-wrap:wrap; gap:8px;
+}
+
+/* ---- chips / actions --------------------------------------------------- */
+.cl-as-chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:4px; max-width:100%;}
+.cl-as-chip{
+  padding:7px 12px; border-radius:var(--cl-r-pill); cursor:pointer;
+  font-size:12.5px; font-weight:600; font-family:inherit;
+  background:var(--cl-surface); color:var(--cl-orange-700);
+  border:1px solid var(--cl-line);
+  transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+/* An opaque control gets an opaque hover — a translucent overlay on a solid
+   surface shifts the border and reads as a rendering fault. */
+.cl-as-chip:hover{background:var(--cl-orange-50); border-color:var(--cl-orange-cta); color:var(--cl-orange-700);}
+.cl-as-chip:focus-visible{outline:2px solid var(--cl-focus); outline-offset:1px;}
+.cl-as-chip.primary{
+  background:var(--cl-orange-cta); color:#FFFFFF; border-color:var(--cl-orange-cta);
+}
+.cl-as-chip.primary:hover{background:var(--cl-orange-cta-2); border-color:var(--cl-orange-cta-2); color:#FFFFFF;}
+
+/* ---- composer ---------------------------------------------------------- */
+.cl-as-foot{
+  flex-shrink:0; padding:10px 12px 12px;
+  background:var(--cl-surface); border-top:1px solid var(--cl-line);
+}
+.cl-as-form{display:flex; align-items:flex-end; gap:8px;}
+.cl-as-input{
+  /* min-height RESETS A GLOBAL, and without it this box opens at 96px.
+     Section 5 sets `textarea{min-height:96px}` for the portal's form fields,
+     where a remarks box wants room to write in. A chat composer is the
+     opposite: it should be one line until the merchant needs a second, which
+     the auto-grow in classic-assistant.js then gives them. 46px is exactly one
+     line of 16px text at this line-height plus the padding and border. */
+  flex:1; min-width:0; resize:none; min-height:46px; max-height:104px;
+  padding:10px 12px; border-radius:var(--cl-r-md);
+  border:1px solid var(--cl-line); background:var(--cl-canvas); color:var(--cl-text);
+  font-family:inherit; font-size:16px; line-height:1.45;
+}
+.cl-as-input:focus{outline:none; border-color:var(--cl-orange-cta); box-shadow:0 0 0 3px var(--cl-focus);}
+.cl-as-input::placeholder{color:var(--cl-text-muted);}
+.cl-as-send{
+  flex-shrink:0; width:42px; height:42px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border:0; border-radius:var(--cl-r-md); cursor:pointer;
+  background:var(--cl-orange-cta); color:#FFFFFF;
+  transition:background .15s ease;
+}
+.cl-as-send:hover:not(:disabled){background:var(--cl-orange-cta-2);}
+.cl-as-send:disabled{opacity:.45; cursor:not-allowed;}
+.cl-as-send:focus-visible{outline:2px solid var(--cl-focus); outline-offset:2px;}
+.cl-as-send svg{width:18px; height:18px;}
+.cl-as-hint{
+  margin-top:7px; font-size:10.5px; color:var(--cl-text-muted);
+  text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ---- dark ------------------------------------------------------------- */
+/* THE ACCENT'S TWO WEIGHTS COLLAPSE INTO ONE HERE, AND THAT IS WHY THIS BLOCK
+   NEEDS A TOKEN OF ITS OWN. In light the family is graded — `--cl-orange-700`
+   is the readable label tone and `--cl-orange-cta` the fill. By the time the
+   dark theme has resolved, `--cl-orange` and `--cl-orange-cta` are the SAME
+   value, so the "use the darker one for text" rule has nothing left to pick:
+   that shared tone measures 3.76:1 on `--cl-surface`, under AA. A lighter
+   label tone, scoped to this component so it cannot leak into anything else,
+   is the same narrow escape the chat labels took. Measured 6.26:1.
+   `:not(.primary)` IS LOAD-BEARING — `:root[data-theme="dark"] .cl-as-chip`
+   is (0,3,0) and `.cl-as-chip.primary` is (0,2,0), so without it this rule
+   wins and every primary chip silently renders as a plain one. */
+:root[data-theme="dark"]{--cl-as-chip-fg:#9B8EFF;}
+:root[data-theme="dark"] .cl-as-bub{background:var(--cl-surface); color:var(--cl-text);}
+:root[data-theme="dark"] .cl-as-row.me .cl-as-bub{background:var(--cl-navy-600); color:#FFFFFF; border-color:var(--cl-navy-600);}
+:root[data-theme="dark"] .cl-as-chip:not(.primary){background:var(--cl-surface); color:var(--cl-as-chip-fg);}
+:root[data-theme="dark"] .cl-as-chip:not(.primary):hover{background:var(--cl-canvas-2); border-color:var(--cl-as-chip-fg); color:var(--cl-as-chip-fg);}
+/* Restated at matching specificity so the fill survives the block above.
+   White on the resolved accent measures 4.62:1 in dark, so the fill is fine —
+   it was only ever the selector that was wrong. */
+:root[data-theme="dark"] .cl-as-chip.primary{background:var(--cl-orange-cta); color:#FFFFFF; border-color:var(--cl-orange-cta);}
+:root[data-theme="dark"] .cl-as-chip.primary:hover{background:var(--cl-orange-cta-2); border-color:var(--cl-orange-cta-2); color:#FFFFFF;}
+:root[data-theme="dark"] .cl-as-back{background:rgba(0,0,0,.55);}
+
+/* ---- small screens ----------------------------------------------------- */
+/* Viewport media query, never `container-type`: a container context is the
+   same containing-block trap as the animation above. */
+@media (max-width:640px){
+  .cl-as-panel{
+    right:0; left:0; bottom:0; top:0;
+    width:auto; max-width:none; height:100%;
+    border-radius:0; border-width:0;
+  }
+  .cl-as-fab{right:16px; bottom:16px; width:48px; height:48px;}
+  .cl-as-tip{display:none;}
+  .cl-as-hello{right:74px; bottom:22px; max-width:170px;}
+  .cl-as-bub, .cl-as-card{max-width:92%;}
+}
+
+/* REDUCED MOTION REDUCES, IT DOES NOT REMOVE THE ROBOT.
+   The float, the drift and the panel's slide all go — those are decoration and
+   they are what makes people motion-sick. The BLINK stays, at a gentler
+   duration: it is the one signal that the assistant is live rather than a
+   picture, it is a 90ms opacity-and-scale tick on a 12px shape, and taking it
+   away would leave a merchant who prefers less motion staring at a robot that
+   looks broken. JS also stretches the interval and drops double-blinks. */
+@media (prefers-reduced-motion:reduce){
+  .cl-as-fab, .cl-as-panel, .cl-as-back, .cl-as-tip, .cl-as-hello{transition:none;}
+  .cl-as-bot{animation:none;}
+  .cl-as-typing i{animation:none; opacity:1;}
+  .cl-as-fab:hover, .cl-as-fab:active{transform:none;}
+  .cl-as-panel.open{transform:none;}
+  .cl-as-eye{transition-duration:.14s;}
+  .cl-as-eyes{transition:none;}
+}

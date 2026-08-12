@@ -129,6 +129,43 @@ class Settings(BaseSettings):
     #: only to turn "10 Aug, 09:30" into an instant.
     booking_local_utc_offset_minutes: int = 330
 
+    # -----------------------------------------------------------------------
+    # Partner Assistant (services/assistant).
+    # -----------------------------------------------------------------------
+    # The merchant-facing assistant in the Classic portal. Same provider shape
+    # as passport OCR: a name here, a deterministic default that needs no
+    # vendor, and no vendor string outside services/assistant/.
+    #
+    #   none        the built-in keyword matcher. THE DEFAULT, and a complete
+    #               feature — every capability works, no key, no network call.
+    #   anthropic   Claude classifies the merchant's phrasing instead. Needs
+    #               ASSISTANT_API_KEY and the 'anthropic' package.
+    #
+    # WHAT THE MODEL IS FOR, AND WHY THIS IS SAFE TO TURN ON. It decides *what
+    # was asked*, never *what the answer is*: its whole output is one member of
+    # a Python enum plus, at most, a reference copied out of the merchant's own
+    # sentence. It is never shown a balance, a booking, a fare or a passenger,
+    # so it cannot state one wrongly. Every figure a merchant sees is fetched
+    # afterwards by the browser, under that merchant's own token, from the same
+    # endpoints the rest of the portal reads. Switching the provider off
+    # therefore costs some tolerance for unusual phrasing and cannot change a
+    # number on any screen.
+    assistant_enabled: bool = True
+    assistant_provider: str = "none"
+    assistant_api_key: str | None = None
+    #: Only consulted when the provider is 'anthropic'.
+    assistant_model: str = "claude-opus-5"
+    #: Kept short deliberately: this sits in front of a chat box, and falling
+    #: back to the keyword matcher is a better answer than a spinner.
+    assistant_timeout_seconds: float = 12.0
+    #: Messages per IP per minute. Low enough that a stuck client cannot bill an
+    #: afternoon of classifications, high enough for the way the panel is
+    #: actually used: the quick-action chips each cost a call, so a merchant who
+    #: opens the assistant and taps through half of them before typing anything
+    #: is already at a dozen inside a few seconds. 20 left almost no headroom
+    #: over that; 30 keeps two clear bursts and is still nowhere near a script.
+    assistant_rate_per_minute: int = 30
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

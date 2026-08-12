@@ -867,6 +867,30 @@ const MerchantApi = {
   markAllNotificationsRead() {
     return this._req('post', '/api/notifications/read-all', { data: {} });
   },
+
+  /* ---------------------------------------------------- partner assistant
+
+     Backed by app/routers/assistant.py. NEITHER CALL RETURNS BUSINESS DATA:
+     interpret takes a sentence and answers with an intent NAME, and the caller
+     then uses the ordinary methods above to fetch whatever that intent needs.
+     Keeping the two apart is what stops the assistant becoming a second, less
+     audited way to read a merchant's money — so if a balance or a booking ever
+     needs to appear in one of these responses, that is the signal to add a
+     handler in classic-assistant.js instead.
+
+     Both are merchant-only; a staff account gets a 400. */
+
+  assistantConfig() {
+    return this._req('get', '/api/assistant/config');
+  },
+
+  /* `history` is the merchant's OWN previous questions, oldest first — never
+     anything the portal rendered back to them. */
+  assistantInterpret({ message, page = null, history = [] } = {}) {
+    return this._req('post', '/api/assistant/interpret', {
+      data: { message, page: page || undefined, history },
+    });
+  },
 };
 
 /* Status vocabulary, shared so Classic labels and filters match what the

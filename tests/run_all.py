@@ -90,6 +90,12 @@ SUITE = [
     # upload path, so a failure there explains an attachment failure here.
     ("verify_support_center.py",
      "Support Center: categories, priority, attachments, search, receipts, notes, triage, reopen"),
+    # Immediately after the Support Center, which is where it escalates to. It
+    # asserts the wall between intent classification and the data: the endpoint
+    # answers with an intent name and never a figure, so a change that starts
+    # returning a balance fails here rather than in front of a merchant.
+    ("verify_assistant.py",
+     "Partner Assistant: intents, references, refusals, injection, and no business data in the reply"),
     # After every screen it probes. This one asserts that a Manager and a Data
     # Operator get the SAME answer from all of them, so it can only be read as
     # "the portal is one UI" once each of those endpoints is independently known

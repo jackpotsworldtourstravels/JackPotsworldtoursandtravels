@@ -38,12 +38,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260811ui60">
+<link rel="stylesheet" href="css/classic.css?v=20260812bot3">
 <!-- Shared design system — must stay last. It re-points classic.css's own
      `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
      contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
      text) so every AA measurement in this portal still holds. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260811ui60">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260812bot3">
 </head>
 <body>
 
@@ -378,37 +378,176 @@
   <div class="cl-drawer-list" id="clDrawerList"></div>
 </aside>
 
+<!-- ========================= PARTNER ASSISTANT ==========================
+     DIRECT CHILDREN OF <body>, LIKE THE DRAWER ABOVE, AND THEY MUST STAY
+     THAT WAY. `.cl-section.active` keeps `transform:none` from its entrance
+     animation (animation-fill-mode:both), and a retained transform — even the
+     identity matrix — establishes a containing block for `position:fixed`.
+     Moved inside a section, the launcher and panel would anchor to that
+     section instead of the viewport and sit short of the screen edge. The
+     Support Center lost four fixed children to exactly this.
+
+     The launcher starts `hidden` and is revealed by clAsBoot() only after
+     GET /api/assistant/config confirms the feature is on for this account, so
+     a deployment with the assistant disabled draws nothing at all. -->
+<!-- THE ROBOT IS STATIC MARKUP, NOT INJECTED BY JS — same rule the rail's own
+     icons follow: anything drawn once belongs in the HTML where it can be read.
+     What JS owns is only the LIFE: the blink timer and the occasional glance.
+
+     THE EYES MUST BE REAL ELEMENTS. `#clAsEyes` is a group JS can transform for
+     a glance, and each eye is its own rect that scales on its own centre to
+     blink. A single flat robot image cannot blink, and neither can an SVG whose
+     eyes are baked into one path. `transform-box:fill-box` is what makes
+     `transform-origin:center` mean the eye's own centre rather than the SVG
+     canvas origin — without it a blink flies off across the viewBox.
+
+     NO AIRPLANE, NO LOGO, NO EMOJI ON THE BODY. The robot is the mark. -->
+<button type="button" class="cl-as-fab" id="clAsFab" hidden
+        aria-label="Open AI Travel Assistant" aria-expanded="false"
+        aria-haspopup="dialog" aria-controls="clAsPanel">
+  <span class="cl-as-bot" id="clAsBot">
+    <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="clAsShell" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FFFFFF"/>
+          <stop offset="0.55" stop-color="#F2F6FB"/>
+          <stop offset="1" stop-color="#D7E1EC"/>
+        </linearGradient>
+        <linearGradient id="clAsVisor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#243349"/>
+          <stop offset="1" stop-color="#0D1626"/>
+        </linearGradient>
+      </defs>
+
+      <!-- the glow it floats above -->
+      <ellipse class="cl-as-shadow" cx="32" cy="58.5" rx="15" ry="3.2"/>
+
+      <!-- antenna -->
+      <path class="cl-as-stalk" d="M32 14.5V9.5"/>
+      <circle class="cl-as-tip-led" cx="32" cy="7" r="2.6"/>
+
+      <!-- side ear pieces -->
+      <rect class="cl-as-ear" x="5.5" y="27" width="5.4" height="11" rx="2.7"/>
+      <rect class="cl-as-ear" x="53.1" y="27" width="5.4" height="11" rx="2.7"/>
+
+      <!-- body -->
+      <rect class="cl-as-shell" x="11" y="14" width="42" height="38" rx="15"/>
+      <!-- glossy face plate -->
+      <rect class="cl-as-visor" x="16.5" y="20.5" width="31" height="23" rx="10.5"/>
+      <!-- a single soft highlight, so the face reads as glass rather than a hole -->
+      <path class="cl-as-gloss" d="M20.5 27.5c2.2-3.4 6.2-5.2 11-5.2"/>
+
+      <g id="clAsEyes" class="cl-as-eyes">
+        <rect class="cl-as-eye" x="22.6" y="28.2" width="6.2" height="7.4" rx="3.1"/>
+        <rect class="cl-as-eye" x="35.2" y="28.2" width="6.2" height="7.4" rx="3.1"/>
+      </g>
+    </svg>
+  </span>
+</button>
+<span class="cl-as-tip" aria-hidden="true">AI Travel Assistant</span>
+
+<!-- Greeting. `hidden` until JS shows it once, and it removes itself — a
+     permanent bubble beside a floating robot is an obstruction, not a welcome.
+     aria-hidden because the same words are the first line of the transcript. -->
+<div class="cl-as-hello" id="clAsHello" hidden aria-hidden="true">
+  <b>Hi! &#128075;</b>
+  <span>Need help with your trip?</span>
+</div>
+
+<div class="cl-as-back" id="clAsBack"></div>
+<section class="cl-as-panel" id="clAsPanel" role="dialog" aria-modal="false"
+         aria-labelledby="clAsTitle">
+  <header class="cl-as-head">
+    <!-- The same character as the launcher, reduced to a face. It is decorative
+         and does NOT blink: two robots blinking out of step on one screen reads
+         as a glitch, and this one is 20px — the blink would be a flicker. -->
+    <span class="cl-as-head-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 4.4V2.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="12" cy="2.2" r="1.15" fill="#22D3EE"/>
+        <rect x="1.9" y="10.4" width="2.3" height="4.6" rx="1.15" fill="#2E7DF6"/>
+        <rect x="19.8" y="10.4" width="2.3" height="4.6" rx="1.15" fill="#2E7DF6"/>
+        <rect x="4.6" y="4.6" width="14.8" height="14.2" rx="5.6" fill="currentColor" opacity=".95"/>
+        <rect x="7.1" y="7.6" width="9.8" height="8.2" rx="3.8" fill="#0D1626"/>
+        <circle cx="10.2" cy="11.7" r="1.35" fill="#22D3EE"/>
+        <circle cx="13.8" cy="11.7" r="1.35" fill="#22D3EE"/>
+      </svg>
+    </span>
+    <div class="cl-as-head-txt">
+      <h2 id="clAsTitle">Jackpot AI Assistant</h2>
+      <div class="cl-as-status"><span class="cl-as-dot"></span>Online</div>
+    </div>
+    <!-- Minimise keeps the conversation and hides the panel; close does the
+         same thing plus resets nothing. They differ in intent, not in data —
+         the transcript lives in memory either way and survives both. -->
+    <button type="button" class="cl-as-head-btn" id="clAsMin"
+            aria-label="Minimise the assistant">&minus;</button>
+    <button type="button" class="cl-as-head-btn" id="clAsClose"
+            aria-label="Close the assistant">&times;</button>
+  </header>
+
+  <div class="cl-as-log" id="clAsLog" role="log" aria-live="polite"></div>
+
+  <div class="cl-as-foot">
+    <form class="cl-as-form" id="clAsForm">
+      <!-- The placeholder is short enough to sit on ONE line: the composer is
+           ~210px wide and the text is 16px (the anti-iOS-zoom floor), so a
+           longer string wraps and an empty composer renders at twice the
+           height it needs. NOTE the comment sits OUTSIDE the tag — an HTML
+           comment inside a start tag is not a comment, it is parsed as a run
+           of bogus attributes, and it silently ate placeholder and aria-label
+           when it was written inline here. -->
+      <textarea class="cl-as-input" id="clAsInput" rows="1"
+                placeholder="Ask about your account"
+                aria-label="Message the Partner Assistant"></textarea>
+      <button type="submit" class="cl-as-send" id="clAsSend" disabled
+              aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.5 12h7"/><path d="M20 12 4.4 19.2 6.6 12 4.4 4.8z"/>
+        </svg>
+      </button>
+    </form>
+    <!-- Said once, where the answers are, rather than on every card. -->
+    <div class="cl-as-hint">Figures come from your live account</div>
+  </div>
+</section>
+
 <!-- ================================ SCRIPTS ==============================
      Order matters: axios, then formatters + auth (shared), then API_BASE via
      classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260811ui60"></script>
-<script src="../assets/js/auth.js?v=20260811ui60"></script>
+<script src="../shared/formatters.js?v=20260812bot3"></script>
+<script src="../assets/js/auth.js?v=20260812bot3"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
-<script src="../assets/js/travel-locations.js?v=20260811ui60"></script>
+<script src="../assets/js/travel-locations.js?v=20260812bot3"></script>
 <!-- Country names and their demonyms, for the passenger cards' Nationality and
      Issuing country combos. Same reason travel-locations.js is a UI table: the
      v2 API has no country reference, and both columns are free text server-side
      — this narrows what the form OFFERS, never what the API accepts. -->
-<script src="../shared/countries.js?v=20260811ui60"></script>
-<script src="js/classic-shell.js?v=20260811ui60"></script>
-<script src="../shared/merchant-api.js?v=20260811ui60"></script>
-<script src="js/classic-icons.js?v=20260811ui60"></script>
-<script src="js/classic-dashboard.js?v=20260811ui60"></script>
-<script src="js/classic-enquiry.js?v=20260811ui60"></script>
-<script src="js/classic-booking.js?v=20260811ui60"></script>
-<script src="js/classic-booking-detail.js?v=20260811ui60"></script>
-<script src="js/classic-requests.js?v=20260811ui60"></script>
-<script src="js/classic-history.js?v=20260811ui60"></script>
-<script src="js/classic-approvals.js?v=20260811ui60"></script>
-<script src="js/classic-wallet.js?v=20260811ui60"></script>
-<script src="js/classic-payments.js?v=20260811ui60"></script>
-<script src="js/classic-service.js?v=20260811ui60"></script>
-<script src="js/classic-reports.js?v=20260811ui60"></script>
-<script src="js/classic-account.js?v=20260811ui60"></script>
-<script src="js/classic-support.js?v=20260811ui60"></script>
+<script src="../shared/countries.js?v=20260812bot3"></script>
+<script src="js/classic-shell.js?v=20260812bot3"></script>
+<script src="../shared/merchant-api.js?v=20260812bot3"></script>
+<script src="js/classic-icons.js?v=20260812bot3"></script>
+<script src="js/classic-dashboard.js?v=20260812bot3"></script>
+<script src="js/classic-enquiry.js?v=20260812bot3"></script>
+<script src="js/classic-booking.js?v=20260812bot3"></script>
+<script src="js/classic-booking-detail.js?v=20260812bot3"></script>
+<script src="js/classic-requests.js?v=20260812bot3"></script>
+<script src="js/classic-history.js?v=20260812bot3"></script>
+<script src="js/classic-approvals.js?v=20260812bot3"></script>
+<script src="js/classic-wallet.js?v=20260812bot3"></script>
+<script src="js/classic-payments.js?v=20260812bot3"></script>
+<script src="js/classic-service.js?v=20260812bot3"></script>
+<script src="js/classic-reports.js?v=20260812bot3"></script>
+<script src="js/classic-account.js?v=20260812bot3"></script>
+<script src="js/classic-support.js?v=20260812bot3"></script>
+<!-- Last: it calls clGo/clInvalidate from the shell and MerchantApi, and is
+     started by clShowApp() rather than on load — there is nothing for it to
+     ask about until somebody is signed in. -->
+<script src="js/classic-assistant.js?v=20260812bot3"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

@@ -17,6 +17,7 @@ from app.models_v2 import User
 from app.routers import (
     admin_ops,
     analytics,
+    assistant,
     auth,
     booking_ops,
     change_requests,
@@ -209,6 +210,10 @@ app.include_router(reports.router)
 app.include_router(notifications_v2.router)
 app.include_router(admin_ops.router)
 app.include_router(support_tickets.router)
+# The Partner Assistant. Reads nothing and writes nothing — it turns a
+# merchant's sentence into an intent name, and the browser then calls the
+# ordinary merchant endpoints for the data. See routers/assistant.py.
+app.include_router(assistant.router)
 # Note there is no app.mount() for the upload directory anywhere in this file,
 # and there must not be: booking documents are passport and visa scans, served
 # only through documents.py's authenticated, merchant-scoped download route.

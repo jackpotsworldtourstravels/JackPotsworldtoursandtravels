@@ -179,13 +179,27 @@ async function clLoadPaymentRequests(bucket, { force = false } = {}) {
   }
 }
 
+/* THE MERCHANT-FACING NAME FOR A TOP-UP STATUS, IN ONE PLACE.
+   A payment request carries a raw `status` and no `status_label` — unlike a
+   booking, which ships its own label — so every screen that shows one has to
+   supply the wording. Hoisted out of clPrStatusTag because the Partner
+   Assistant shows these rows too, and two files each with their own idea of
+   what "submitted" is called is how the same row comes to be described two
+   different ways in the same portal. */
+const CL_PR_STATUS_TEXT = {
+  awaiting_payment: 'Awaiting your payment',
+  submitted: 'Pending approval',
+  verified: 'Approved',
+  rejected: 'Rejected',
+};
+
+function clPrStatusText(status) {
+  return CL_PR_STATUS_TEXT[status] || status;
+}
+
 function clPrStatusTag(status) {
   const tone = { awaiting_payment: '', submitted: 'warn', verified: 'ok', rejected: 'err' }[status] || '';
-  const text = {
-    awaiting_payment: 'Awaiting your payment', submitted: 'Pending approval',
-    verified: 'Approved', rejected: 'Rejected',
-  }[status] || status;
-  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(text)}</span>`;
+  return `<span class="cl-tag${tone ? ` cl-tag-${tone}` : ''}">${escapeHtml(clPrStatusText(status))}</span>`;
 }
 
 function clPrRow(r) {

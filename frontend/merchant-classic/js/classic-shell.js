@@ -678,6 +678,10 @@ async function clShowApp() {
   clGo(target);
   clLoadUnreadCount();
   clLoadSupportBadge();
+  /* The Partner Assistant. Guarded with typeof so a failed or absent module
+     cannot stop a merchant getting into the portal — it is an aid, not a
+     dependency of any screen, and clAsBoot swallows its own errors too. */
+  if (typeof clAsBoot === 'function') clAsBoot();
 }
 
 /* Identical contract to the other portals' auth — same helpers from auth.js,
