@@ -94,17 +94,13 @@ function activateTab(name) {
   switchHeroVideo(name);
 }
 tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
-/* THE data-tab-link HANDLER IS GONE, AND SO ARE THE ATTRIBUTES.
-
-   Those nav words used to be href="#" plus a script that switched the hero tab
-   and scrolled back to the hero — which only ever changed which search form was
-   on screen. Each service has its own page now (flights.html, hotels.html,
-   cruises.html, packages.html, visa.html, activities.html), so they are plain
-   links. A real href also means middle-click, "open in new tab" and a visible
-   status-bar target, none of which an href="#" gave.
-
-   The hero's tab BUTTONS still use data-tab and activateTab() above; they
-   switch the search panel in place and are unrelated to these. */
+document.querySelectorAll('[data-tab-link]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    activateTab(link.dataset.tabLink);
+    document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+  });
+});
 
 /* Swap From/To fields */
 document.querySelectorAll('.swap-btn').forEach(btn => {
@@ -346,13 +342,7 @@ function setReviewStars(n) {
 }
 reviewStarInput.querySelectorAll('span').forEach(s => s.addEventListener('click', () => setReviewStars(Number(s.dataset.star))));
 
-/* Was '★'.repeat(n) + '☆'.repeat(5-n) — two different glyphs whose shapes
-   and widths came from whatever font the OS had, and which some platforms drew
-   as full-colour emoji. jp-icons draws one star and dims the rest. */
-function starString(rating) {
-  return (typeof JPIcon !== 'undefined') ? JPIcon.stars(rating)
-    : '★'.repeat(rating) + '☆'.repeat(5 - rating);
-}
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
 
 async function openReviewsModal(type, id, label) {
   currentReviewItem = { type, id };
@@ -745,39 +735,20 @@ fabVoiceBtn.addEventListener('click', () => {
   try { recognition.start(); } catch (err) { fabVoiceBtn.classList.remove('listening'); }
 });
 
-/* ---------------------------------------------------------------------------
-   THE LANDING PAGE'S STORED SESSION IS THE CUSTOMER'S.
+/* Auth: JWT session helpers now live in assets/js/auth.js (getStoredAuth,
+   setStoredAuth, clearStoredAuth, authHeaders) -- loaded before this file. */
 
-   Session helpers live in assets/js/auth.js. This page used to read the jwt_*
-   pair it shared with admin.html, back when both signed in through
-   /api/auth/login and were told apart by `role`. The traveller now
-   authenticates against the CUSTOMER database instead, so the four accessors
-   are rebound here to the jpc_* namespace.
-
-   Rebinding, rather than editing ~37 call sites, is the point: renderAuthNav(),
-   the profile chip and the whole Account Center below are the original V1 code
-   and keep working untouched — only the drawer they read from changed.
-
-   This cannot affect another portal. app.js is loaded by index.html alone;
-   admin.js, partner-shared.js and super-admin-shared.js each read their own
-   namespace and never load this file.
-   --------------------------------------------------------------------------- */
-getStoredAuth = getCustomerAuth;
-setStoredAuth = setCustomerAuth;
-clearStoredAuth = clearCustomerAuth;
-authHeaders = customerAuthHeaders;
-
-/* THE PRESENCE HEARTBEAT IS GONE, AND MUST STAY GONE.
-
-   It posted to /api/users/heartbeat every 30s so the ADMIN's "Online Users"
-   widget could see whoever was browsing. That endpoint is the platform's, over
-   the `users` table, and a customer must never surface in it — a traveller
-   reading the homepage is not a merchant staff member at work, and mixing the
-   two is exactly the leak the Customer database is separated to prevent.
-
-   It would also simply fail: the platform refuses customer-scoped tokens, so
-   this was a 401 every 30 seconds, silenced by its own .catch(). If customer
-   presence is ever wanted, it needs an endpoint on the customer side. */
+/* Presence heartbeat — only sent while a logged-in user is browsing this page,
+   so the admin's Online Users widget can see them. */
+function sendHeartbeat() {
+  const { access } = getStoredAuth();
+  if (!access) return;
+  axios.post(`${API_BASE}/api/users/heartbeat`, { current_page: 'Home' }, {
+    headers: { Authorization: `Bearer ${access}` },
+  }).catch(() => {});
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 30000);
 
 const authNavPairs = [
   [document.getElementById('navLoginLink'), document.getElementById('navSignupLink')],
@@ -817,13 +788,8 @@ renderAuthNav();
 (function verifyStoredSession() {
   const { access } = getStoredAuth();
   if (!access) return;
-  axios.get(`${API_BASE}/api/customer/auth/me`, { headers: { Authorization: `Bearer ${access}` } })
-    .catch(err => {
-      /* Only a rejected TOKEN clears the session. A network blip or a 5xx must
-         not sign a traveller out — that used to be a bare .catch(), so the page
-         logged you out whenever the API hiccuped. */
-      if (err?.response?.status === 401) { clearStoredAuth(); renderAuthNav(); }
-    });
+  axios.get(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${access}` } })
+    .catch(() => { clearStoredAuth(); renderAuthNav(); });
 })();
 
 /* Auth modal: Sign Up / Login */
@@ -837,27 +803,12 @@ function openAuth(view) {
   signupView.style.display = view === 'login' ? 'none' : 'block';
   loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
-
-  /* Always open on the credentials step. Without this, closing the modal
-     mid-OTP and reopening it would show a code box for a challenge that is no
-     longer in flight. */
-  showCredsStep();
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  setModalMsg(document.getElementById('signupMsg'), '', 'muted');
-
+  /* Open clean. The OTP step this used to reset went to partner-login.html with
+     the rest of the merchant flow — the customer login is a single screen. */
   if (view === 'login') {
-    /* Remember Me: the address comes back, the password never does. */
-    const remembered = localStorage.getItem(CUSTOMER_KEYS.remember);
-    if (remembered) {
-      document.getElementById('liUser').value = remembered;
-      document.getElementById('liRemember').checked = true;
-    }
-    /* Land on whichever field still needs filling in. */
-    const first = remembered ? 'liPass' : 'liUser';
-    document.getElementById(first).focus();
-    return;
+    setModalMsg(document.getElementById('loginMsg'), '', 'muted');
   }
-  const firstInput = signupView.querySelector('input');
+  const firstInput = (view === 'login' ? loginView : signupView).querySelector('input');
   if (firstInput) firstInput.focus();
 }
 function closeAuth() {
@@ -873,18 +824,15 @@ document.querySelectorAll('[data-auth]').forEach(el => {
        into the Merchant Portal — just because someone at that desk had signed
        in earlier on the same browser — is the wrong product entirely.
        The two namespaces stay separate; My Partner is the merchant's route. */
-    const { access } = getStoredAuth();
+    const { access, role } = getStoredAuth();
     if (access) {
-      /* Signed in, so the "Sign Up" slot is the sign-out. (The old `role ===
-         'admin'` branch that forwarded to admin/ is gone with the shared jwt_*
-         namespace: this page only ever holds a customer session now, and the
-         Admin Portal is named nowhere on the public site.) */
       if (el.dataset.auth === 'signup') {
-        axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+        axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
         clearStoredAuth();
         wishlistMap = new Map();
         renderAuthNav();
       }
+      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/'; }
       return;
     }
     openAuth(el.dataset.auth);
@@ -896,17 +844,86 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
+/* ---------------------------------------------------------------------------
+   Merchant access request.
+
+   Merchants don't self-register: an Admin creates the company
+   (POST /api/admin/merchants) and it stays pending_approval until approved, so
+   there is no /api/auth/signup in the v2 API to post to. This collects the
+   details the team needs and tells the applicant plainly that registration is
+   approval-based, rather than pretending an account was created.
+   --------------------------------------------------------------------------- */
+document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
+  const company = document.getElementById('suCompany').value.trim();
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const phone = document.getElementById('suPhone').value.trim();
+  const msg = document.getElementById('signupMsg');
+  const fail = text => {
+    msg.textContent = text;
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  };
+
+  if (!company) return fail('Please tell us your company name.');
+  if (!name) return fail('Please tell us your name.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid work email.');
+
+  /* Holding state until the registration endpoint exists.
+     Partner registration is approval-based: an Admin creates the company and
+     it waits in pending_approval before it can trade, so there is nothing for
+     this form to POST to yet. Rather than fake a submission, say plainly how
+     onboarding works. When the registration module lands, replace this block
+     with the real call — the fields above are already the ones it needs, so
+     the swap is this handler only. */
+  msg.textContent = 'Partner registration is currently by approval. '
+    + 'Please contact our team or wait for the onboarding module.';
+  msg.style.color = 'var(--ink)';
+  msg.classList.add('show');
+});
+
+/* ---------------------------------------------------------------------------
+   CUSTOMER SIGN-IN — the site's "Login" is the traveller's login.
+
+   IT USED TO BE THE MERCHANT LOGIN. This modal posted portal:'merchant', ran
+   the password -> OTP flow and handed off to the Merchant Portal, which made
+   "Login" and "My Partner" two doors into the same B2B product and left the
+   platform's actual customers with nowhere to sign in.
+
+   The two audiences are separated now:
+
+     Login (here)   Customer / B2C. Opens the Account Center already built into
+                    this page, under the customer `jwt_*` namespace.
+     My Partner     Merchant / B2B -> partner-login.html, which is where the
+                    password -> OTP flow and MERCHANT_PORTAL_URL moved to.
+     Admin, Manager, Super Admin
+                    their own URLs. Named nowhere on this site.
+
+   THIS IS UI AHEAD OF ITS BACKEND, AND IT IS EXPLICIT ABOUT THAT.
+   There is no customer login endpoint: schemas/auth.py declares
+   Portal = Literal["super_admin","admin","manager","merchant"], the `customer`
+   role carries zero permissions, and the /api/auth/user/login this page's
+   legacy login.html still posts to was dropped in the V2 migration — it is not
+   in the live OpenAPI. So the form is wired end to end and gated behind ONE
+   flag. When the endpoint ships, set `enabled: true` and confirm `endpoint`;
+   nothing else here changes. Until then a traveller is told plainly, instead of
+   being handed a 404 or, worse, a silent failure.
+   --------------------------------------------------------------------------- */
+const CUSTOMER_AUTH = {
+  enabled: false,
+  /* The expected shape when it lands: { identifier, password } -> TokenResponse,
+     matching the contract the retired /api/auth/user/login had and which
+     auth_service.authenticate() still implements (it accepts the legacy "user"
+     alias for the v2 `customer` role). Confirm before flipping `enabled`. */
+  endpoint: '/api/auth/customer/login',
+};
+
 /* Where a MERCHANT lands once signed in. The sign-in itself lives on
    partner-login.html now; this constant stays because the Operations handoff
-   still sends merchants through. The merchant UI is the Classic portal —
-   merchant/ (Premium) redirects to it and its files are all still on disk. */
+   and the already-signed-in short-circuit above still send merchants through.
+   The merchant UI is the Classic portal — merchant/ (Premium) redirects to it
+   and its files are all still on disk. */
 const MERCHANT_PORTAL_URL = 'merchant-classic/';
-
-/* Where a traveller resets a forgotten password. The modal has no room for the
-   reset form, and the emailed link has to land on a real page, so both live on
-   their own: customer/forgot-password.html requests the link and
-   customer/reset-password.html consumes the token the backend mails out. */
-const CUSTOMER_RESET_URL = 'customer/forgot-password.html';
 
 function setModalMsg(el, text, tone) {
   el.textContent = text;
@@ -915,190 +932,40 @@ function setModalMsg(el, text, tone) {
   el.classList.toggle('show', !!text);
 }
 
-/* ===========================================================================
-   CUSTOMER AUTH — sign up, sign in, and stay right here.
-   ===========================================================================
-   Both /api/customer/auth/signup and /api/customer/auth/login answer with the
-   SAME CustomerLoginChallengeResponse: no session, just a challenge token and
-   a posted code. So registration and sign-in converge on one shared OTP step
-   (#loginStepOtp) instead of each carrying its own copy of it.
-
-   Nothing here navigates. On success the modal closes and renderAuthNav()
-   swaps the Login/Sign Up links for the profile chip — the traveller stays on
-   the page they were reading. That is the V1 behaviour this page was built
-   around, and the Account Center below is still the original V1 code.
-   =========================================================================== */
-
-/** The challenge in flight, and which form started it (copy only). */
-let otpChallenge = null;
-let otpOrigin = 'login';
-
-const loginStepCreds = document.getElementById('loginStepCreds');
-const loginStepOtp = document.getElementById('loginStepOtp');
-
-/** Move the login view to its code step. Signup borrows this too, which is why
- *  it makes sure the LOGIN view is the one on screen. */
-function showOtpStep(challenge, message, origin) {
-  otpChallenge = challenge.challenge_token;
-  otpOrigin = origin;
-  signupView.style.display = 'none';
-  loginView.style.display = 'block';
-  loginStepCreds.style.display = 'none';
-  loginStepOtp.style.display = 'block';
-  document.getElementById('loginOtpSub').textContent = message;
-  setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
-  showDevOtp(challenge.dev_otp);
-  const box = document.getElementById('liOtp');
-  box.value = '';
-  box.focus();
-}
-
-/** Show the code when there is no mail server to send it to.
- *  The API only returns `dev_otp` in DEV_MODE, so on a mail-configured server
- *  this is always a no-op. Text content, never innerHTML — the value is echoed
- *  from a response and has no business being parsed as markup. */
-function showDevOtp(code) {
-  const el = document.getElementById('liDevOtp');
-  if (!el) return;
-  el.textContent = code ? `Email is not configured on this server — your code is ${code}` : '';
-  el.className = code ? 'modal-devbox' : '';
-}
-
-/** Back to the credentials step, dropping the challenge. */
-function showCredsStep() {
-  otpChallenge = null;
-  loginStepOtp.style.display = 'none';
-  loginStepCreds.style.display = 'block';
-  document.getElementById('liOtp').value = '';
-}
-
-/** The one place a customer session is created. */
-function completeCustomerSignIn(data) {
-  const c = data.customer || {};
-  setStoredAuth(data.access_token, data.refresh_token, c.full_name || 'Traveller',
-                'customer', c.id);
-  otpChallenge = null;
-  renderAuthNav();
-  showCredsStep();
-  closeAuth();
-  showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
-}
-
-/* --- Registration ------------------------------------------------------- */
-document.getElementById('signupForm')?.addEventListener('submit', async e => {
-  e.preventDefault();
-  const name = document.getElementById('suName').value.trim();
-  const email = document.getElementById('suEmail').value.trim();
-  const mobile = document.getElementById('suMobile').value.trim();
-  const pass = document.getElementById('suPass').value;
-  const pass2 = document.getElementById('suPass2').value;
-  const msg = document.getElementById('signupMsg');
-  const fail = (text, focus) => {
-    setModalMsg(msg, text, 'error');
-    document.getElementById(focus)?.focus();
-  };
-
-  /* Checked here only so the traveller is told which field is wrong and lands
-     in it. The server validates all of this again — it is the authority. */
-  if (name.length < 2) return fail('Please enter your full name.', 'suName');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid email address.', 'suEmail');
-  if (!/^\d{10,15}$/.test(mobile.replace(/[\s-]/g, ''))) return fail('Please enter a valid mobile number.', 'suMobile');
-  if (pass.length < 8) return fail('Your password must be at least 8 characters.', 'suPass');
-  if (pass !== pass2) return fail('Both passwords must match.', 'suPass2');
-
-  setModalMsg(msg, 'Creating your account…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/signup`, {
-      full_name: name, email, mobile: mobile.replace(/[\s-]/g, ''),
-      password: pass, confirm_password: pass2,
-    });
-    setModalMsg(msg, '', 'muted');
-    showOtpStep(data, data.message || `A verification code was sent to ${email}.`, 'signup');
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not create your account.'), 'error');
-  }
-});
-
-/* --- Sign in, step 1: password ------------------------------------------ */
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const identifier = document.getElementById('liUser').value.trim();
+  const email = document.getElementById('liUser').value.trim();
   const pass = document.getElementById('liPass').value;
   const msg = document.getElementById('loginMsg');
-
-  if (!identifier) { setModalMsg(msg, 'Enter your email or mobile number.', 'error'); return; }
-  if (!pass) { setModalMsg(msg, 'Enter your password.', 'error'); return; }
-
-  /* Remember Me holds the ADDRESS only, never the password, and it outlives
-     sign-out on purpose — that is the feature. */
-  if (document.getElementById('liRemember').checked) {
-    localStorage.setItem(CUSTOMER_KEYS.remember, identifier);
-  } else {
-    localStorage.removeItem(CUSTOMER_KEYS.remember);
+  if (!email || !pass) {
+    setModalMsg(msg, 'Enter your email and password.', 'error');
+    return;
+  }
+  if (!CUSTOMER_AUTH.enabled) {
+    /* Said in the traveller's terms, not the API's. A merchant who lands here
+       out of habit is redirected by name rather than left guessing which of
+       the two logins is theirs. */
+    setModalMsg(msg, 'Customer accounts are not open yet — we are still building this. '
+      + 'If you are a travel agency, use My Partner to reach the Partner Portal.', 'error');
+    return;
   }
 
   setModalMsg(msg, 'Checking…', 'muted');
   try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/login`,
-      { identifier, password: pass });
-    setModalMsg(msg, '', 'muted');
-    document.getElementById('liPass').value = '';
-    showOtpStep(data, data.message || 'Enter the 6-digit code we just sent you.', 'login');
+    const { data } = await axios.post(`${API_BASE}${CUSTOMER_AUTH.endpoint}`,
+      { identifier: email, password: pass });
+    const me = await axios.get(`${API_BASE}/api/auth/me`,
+      { headers: { Authorization: `Bearer ${data.access_token}` } });
+    /* The customer namespace — deliberately NOT the merchant one. A traveller
+       signing in here must never overwrite a partner session open in the same
+       browser (auth.js keeps the two apart on purpose). */
+    setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role, me.data.id);
+    setModalMsg(msg, 'Signed in — welcome back.', 'ok');
+    renderAuthNav();
+    closeAuth();
   } catch (err) {
-    /* A merchant or admin address fails here exactly as an unknown one does —
-       the endpoint reads the customer database and nothing else. Saying so
-       would confirm the account exists somewhere, so the copy stays generic. */
-    setModalMsg(msg, apiErrorText(err, 'Those details did not match an account.'), 'error');
+    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
   }
-});
-
-/* --- Sign in, step 2: the code ------------------------------------------ */
-document.getElementById('liVerifyBtn').addEventListener('click', async () => {
-  const code = document.getElementById('liOtp').value.trim();
-  const msg = document.getElementById('loginOtpMsg');
-  if (!/^\d{4,8}$/.test(code)) { setModalMsg(msg, 'Enter the code we sent you.', 'error'); return; }
-  if (!otpChallenge) { setModalMsg(msg, 'That code has expired — please sign in again.', 'error'); return; }
-
-  setModalMsg(msg, 'Verifying…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/verify-otp`,
-      { challenge_token: otpChallenge, code });
-    completeCustomerSignIn(data);
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'That code was not right.'), 'error');
-  }
-});
-
-/* Enter submits the code, the same as the button. */
-document.getElementById('liOtp').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('liVerifyBtn').click(); }
-});
-
-document.getElementById('liResendBtn').addEventListener('click', async e => {
-  e.preventDefault();
-  const msg = document.getElementById('loginOtpMsg');
-  if (!otpChallenge) { setModalMsg(msg, 'Please sign in again.', 'error'); return; }
-  setModalMsg(msg, 'Sending a new code…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/resend-otp`,
-      { challenge_token: otpChallenge });
-    /* Resending issues a FRESH challenge; keeping the old token would verify
-       against a code that is no longer the live one. The displayed dev code
-       has to move with it for the same reason. */
-    if (data.challenge_token) otpChallenge = data.challenge_token;
-    showDevOtp(data.dev_otp);
-    document.getElementById('liOtp').value = '';
-    setModalMsg(msg, data.message || 'A new code is on its way.', 'ok');
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not send another code.'), 'error');
-  }
-});
-
-document.getElementById('liBackBtn').addEventListener('click', e => {
-  e.preventDefault();
-  showCredsStep();
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  document.getElementById('liUser').focus();
 });
 
 /* ---------------------------------------------------------------------------
@@ -1125,21 +992,29 @@ document.getElementById('liBackBtn').addEventListener('click', e => {
     + (reason ? `?ops_reason=${encodeURIComponent(reason)}` : ''));
 })();
 
-/* THE "FORGOT PASSWORD?" HANDLER USED TO LIVE HERE, AND IT WAS WRONG TWICE.
-
-   It POSTed the typed address to /api/auth/forgot-password — the PLATFORM
-   reset, which reads the `users` table. That is the merchant/admin side. For a
-   traveller it is the wrong system entirely, and it is precisely the kind of
-   cross-boundary call the Customer Portal was built to make impossible.
-
-   It also called e.preventDefault(), so once the link was pointed at the
-   portal's own reset page the navigation would have been swallowed and the
-   platform call made instead — the link would have looked right and behaved
-   wrong.
-
-   The customer reset is /api/customer/auth/forgot-password, reached through
-   customer/forgot-password.html. That is a plain <a href> in the markup now,
-   with no JavaScript in front of it, so there is nothing here to get wrong. */
+document.getElementById('forgotPasswordLink').addEventListener('click', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('loginMsg');
+  const email = document.getElementById('liUser').value;
+  if (!email) {
+    msg.textContent = 'Enter your email above first, then click Forgot Password.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+    return;
+  }
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/auth/forgot-password`, { email });
+    msg.textContent = data.reset_link
+      ? `Reset link generated (email delivery not yet configured): ${data.reset_link}`
+      : data.message;
+    msg.style.color = 'var(--emerald)';
+    msg.classList.add('show');
+  } catch (err) {
+    msg.textContent = 'Something went wrong — please try again.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  }
+});
 
 /* ================================================================
    ACCOUNT CENTER — replaces the old separate dashboard.html.
@@ -1215,7 +1090,7 @@ document.addEventListener('click', () => {
 
 function doAccountLogout() {
   const { access } = getStoredAuth();
-  axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+  axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
   clearStoredAuth();
   acctCurrentUser = null;
   acctLoadedTabs.clear();
@@ -1227,13 +1102,9 @@ document.getElementById('profileLogoutBtn').addEventListener('click', doAccountL
 document.getElementById('mobileLogoutLink').addEventListener('click', e => { e.preventDefault(); doAccountLogout(); });
 
 /* ---------- Profile (header + editable form) ---------- */
-/* The customer record names two of these differently from the old platform
-   `users` row this form was written against: `dob` is `date_of_birth`, and the
-   single `address` line is `address_line1`. Reading the old names returned
-   undefined and quietly blanked both fields on every load. */
 async function loadAcctHeaderProfile() {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
     acctCurrentUser = data;
     const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
     document.getElementById('acctHeaderAvatar').textContent = initials;
@@ -1243,41 +1114,34 @@ async function loadAcctHeaderProfile() {
 }
 async function loadAcctProfile() {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
     acctCurrentUser = data;
     document.getElementById('acctProfileName').value = data.full_name;
     document.getElementById('acctProfileEmail').value = data.email;
     document.getElementById('acctProfileMobile').value = data.mobile || '';
     document.getElementById('acctProfileGender').value = data.gender || '';
-    document.getElementById('acctProfileDob').value = data.date_of_birth || '';
+    document.getElementById('acctProfileDob').value = data.dob || '';
     document.getElementById('acctProfileCountry').value = data.country || '';
     document.getElementById('acctProfileState').value = data.state || '';
     document.getElementById('acctProfileCity').value = data.city || '';
-    document.getElementById('acctProfileAddress').value = data.address_line1 || '';
+    document.getElementById('acctProfileAddress').value = data.address || '';
   } catch (err) { /* fields stay blank */ }
 }
 document.getElementById('acctProfileForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = document.getElementById('acctProfileMsg');
   try {
-    /* PATCH, not PUT: every field on CustomerProfileUpdateRequest is optional
-       and only what is sent gets written, so the columns this form has no
-       input for (address_line2, postal_code, profile_photo) are left alone
-       rather than being nulled on every save.
-
-       The email is deliberately absent — it is the login identifier, and no
-       endpoint changes it. The field is `disabled` in the markup. */
-    const { data } = await axios.patch(`${API_BASE}/api/customer/profile`, {
+    const { data } = await axios.put(`${API_BASE}/api/users/me`, {
       full_name: document.getElementById('acctProfileName').value,
       mobile: document.getElementById('acctProfileMobile').value || null,
       gender: document.getElementById('acctProfileGender').value || null,
-      date_of_birth: document.getElementById('acctProfileDob').value || null,
+      dob: document.getElementById('acctProfileDob').value || null,
       country: document.getElementById('acctProfileCountry').value || null,
       state: document.getElementById('acctProfileState').value || null,
       city: document.getElementById('acctProfileCity').value || null,
-      address_line1: document.getElementById('acctProfileAddress').value || null,
+      address: document.getElementById('acctProfileAddress').value || null,
     }, { headers: authHeaders() });
-    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'customer', data.id);
+    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'user', data.id);
     renderAuthNav();
     loadAcctHeaderProfile();
     msg.textContent = 'Profile updated.';
@@ -1290,19 +1154,10 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
 document.getElementById('acctPasswordForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = document.getElementById('acctPasswordMsg');
-  const next = document.getElementById('acctNewPassword').value;
-  const confirm = document.getElementById('acctConfirmPassword').value;
-  if (next !== confirm) {
-    msg.textContent = 'Both new passwords must match.';
-    msg.className = 'acct-msg error';
-    document.getElementById('acctConfirmPassword').focus();
-    return;
-  }
   try {
-    await axios.post(`${API_BASE}/api/customer/auth/change-password`, {
+    await axios.post(`${API_BASE}/api/users/change-password`, {
       current_password: document.getElementById('acctCurrentPassword').value,
-      new_password: next,
-      confirm_password: confirm,
+      new_password: document.getElementById('acctNewPassword').value,
     }, { headers: authHeaders() });
     msg.textContent = 'Password changed successfully.';
     msg.className = 'acct-msg success';
@@ -1708,17 +1563,10 @@ async function loadAcctNotifications() {
     if (!data.length) {
       container.innerHTML = `
         <div class="acct-empty acct-empty-notif">
-          <!-- Was an emoji bell, which rendered as a different picture on every
-               OS and in full colour on most. jp-icons draws it in the current
-               text colour, so it matches the empty state around it. -->
-          <div class="aei">${typeof JPIcon !== 'undefined' ? JPIcon.html('bell') : ''}</div>
+          <div class="aei">🔔</div>
           <div class="aet">No notifications yet</div>
           <div class="aes">We'll notify you when something important happens.</div>
         </div>`;
-      /* Sized by .aei's own font-size (1.25em of 38px), so no jpi-* class here
-         — jpi-xl would have made it 95px. Armed explicitly because this renders
-         long after jp-icons.js mounted. */
-      if (typeof JPIcon !== 'undefined') JPIcon.mount(container);
       clearBar.style.display = 'none';
       return;
     }
@@ -1761,13 +1609,7 @@ document.getElementById('acctClearAllBtn').addEventListener('click', async () =>
 });
 
 /* ---------- Reviews ---------- */
-/* Was '★'.repeat(n) + '☆'.repeat(5-n) — two different glyphs whose shapes
-   and widths came from whatever font the OS had, and which some platforms drew
-   as full-colour emoji. jp-icons draws one star and dims the rest. */
-function starString(rating) {
-  return (typeof JPIcon !== 'undefined') ? JPIcon.stars(rating)
-    : '★'.repeat(rating) + '☆'.repeat(5 - rating);
-}
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
 async function loadAcctReviews() {
   const container = document.getElementById('acctReviewsList');
   try {
@@ -1810,9 +1652,7 @@ function openAcctReviewEdit(reviewId, rating, comment) {
   row.innerHTML = `
     <div class="ar-main" style="width:100%;">
       <div class="acct-star-input" id="acctEditStars-${reviewId}">
-        ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}" class="${n <= rating ? 'active' : ''}">`
-          + (typeof JPIcon !== 'undefined' ? JPIcon.html('star', { size: 'sm' }) : '★')
-          + `</span>`).join('')}
+        ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}" class="${n <= rating ? 'active' : ''}">★</span>`).join('')}
       </div>
       <input type="text" id="acctEditComment-${reviewId}" value="${escapeHtml(comment)}" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; margin-bottom:10px;">
       <div style="display:flex; gap:8px;">
@@ -1879,40 +1719,3 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
 });
 
 loadUpcomingJourney();
-
-/* ---------------------------------------------------------------------------
-   ARRIVING FROM A SERVICE PAGE.
-
-   flights.html and friends carry the header but not the sign-in modal or the
-   Account Center — duplicating a password -> OTP flow onto six more pages would
-   be six more things to keep correct. They link back here with an intent
-   instead.
-
-   ?signin=1        open the customer login modal
-   ?account=<tab>   open the Account Center on that tab
-
-   NOT `#login`: handleOperationsSignInHandoff() above claims that hash and
-   forwards it to partner-login.html, so a traveller sent there would land on
-   the MERCHANT sign-in.
-
-   Runs last so every function and const it touches is already initialised, and
-   the parameter is stripped afterwards — a bookmarked or refreshed URL should
-   not keep reopening a dialog the visitor has closed.
-   --------------------------------------------------------------------------- */
-(function handleServicePageIntent() {
-  const params = new URLSearchParams(location.search);
-  const signin = params.get('signin');
-  const account = params.get('account');
-  if (!signin && !account) return;
-
-  const { access } = getStoredAuth();
-  /* ?account= while signed out is still a request to reach the account, so it
-     opens the door rather than doing nothing. */
-  if (account && access) openAccountCenter(account);
-  else openAuth('login');
-
-  params.delete('signin');
-  params.delete('account');
-  const qs = params.toString();
-  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
-})();
