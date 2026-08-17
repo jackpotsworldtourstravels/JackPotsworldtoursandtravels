@@ -1054,7 +1054,7 @@ function clOpenEnquiryForm(direct = false) {
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
      <button type="button" class="cl-btn cl-btn-primary" id="clEnqSubmit">${
-       direct ? 'Continue to travellers' : 'Send Enquiry'}</button>`);
+       clDirectSubmitLabel(direct, clEnqForm.enquiryType)}</button>`);
 
   $('clModal').classList.add('cl-modal-form');
   /* The upload card in this modal writes to clEnqForm. Cleared on close so a
@@ -1389,6 +1389,16 @@ function clWireEnquiryForm() {
   clSyncPaxTotal();
 }
 
+/* What the primary button says on the direct-booking form — "travellers" for
+   Flight, "guests" for Hotel, matching the terminology the next screen
+   (classic-booking.js / classic-booking-hotel.js) actually uses. Non-direct
+   stays "Send Enquiry" regardless of type; only the direct form's copy
+   depends on which half of it is live. */
+function clDirectSubmitLabel(direct, type) {
+  if (!direct) return 'Send Enquiry';
+  return type === 'hotel' ? 'Continue to guests' : 'Continue to travellers';
+}
+
 /* Swaps which field block is visible — no modal close/reopen, and Flight's
    own markup/logic is never touched by this, only hidden. */
 function clSetEnquiryType(type) {
@@ -1401,6 +1411,8 @@ function clSetEnquiryType(type) {
   });
   $('clEnqFlightFields')?.classList.toggle('cl-hidden', type !== 'flight');
   $('clEnqHotelFields')?.classList.toggle('cl-hidden', type !== 'hotel');
+  const submitBtn = $('clEnqSubmit');
+  if (submitBtn) submitBtn.textContent = clDirectSubmitLabel(clEnqForm.direct, type);
   clMsg($('clEnqMsg'), '');
 }
 

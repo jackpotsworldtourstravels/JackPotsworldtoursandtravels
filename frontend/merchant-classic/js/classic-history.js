@@ -127,9 +127,14 @@ function clInitHistory() {
       <div class="cl-panel-body cl-flush">
         <div class="cl-table-wrap">
           <table class="cl-table">
+            <!-- One table renders both Flight and Hotel rows mixed together
+                 (clHistoryRow branches per row on travel_type), so these two
+                 headers say both nouns rather than picking one row type's
+                 word for a column every row shares. Every other header is
+                 already type-neutral. -->
             <thead><tr>
-              <th>Reference</th><th>Journey</th><th>Airline</th><th>PNR</th>
-              <th>Passengers</th><th>Travel date</th><th class="cl-num">Payment</th>
+              <th>Reference</th><th>Journey</th><th>Airline / Hotel</th><th>PNR</th>
+              <th>Passengers / Guests</th><th>Travel date</th><th class="cl-num">Payment</th>
               <th>Outcome</th><th class="cl-actions">Documents</th>
             </tr></thead>
             <tbody id="clHistBody"></tbody>
