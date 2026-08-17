@@ -1,8 +1,15 @@
 """merchant service access — which travel products a merchant may use
 
 Revision ID: 0045_merchant_service_access
-Revises: 0044_customer_portal
+Revises: 0042_group_booking_import
 Create Date: 2026-08-13
+
+RE-PARENTED 2026-08-15: originally written against 0044_customer_portal,
+which has since been reverted in full (customer portal backed out; see that
+revert commit). Chained onto 0042_group_booking_import instead — the new
+true head — so the migration graph resolves after both changes land
+together. Nothing in this migration ever touched a customer_* table, so the
+revert has no effect on what upgrade()/downgrade() actually do here.
 
 WHAT THIS IS FOR
 The Hotel module (and, later, Visa) must be something an Admin can grant or
@@ -43,7 +50,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0045_merchant_service_access"
-down_revision: Union[str, None] = "0044_customer_portal"
+down_revision: Union[str, None] = "0042_group_booking_import"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
