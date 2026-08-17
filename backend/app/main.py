@@ -21,8 +21,6 @@ from app.routers import (
     auth,
     booking_ops,
     change_requests,
-    customer_auth,
-    customer_profile,
     dashboard,
     documents,
     enquiries,
@@ -192,10 +190,6 @@ PORTED_MODULES = [
     # The merchant's own sign-off in front of ours. No migration: the state is
     # a JSONB sub-field on service_requests.travel_details.
     "manager_approval",
-    # V1 — the B2C Customer Portal (migration 0044). Listed here because it is
-    # a live module, but it is not part of the v2 B2B port: it has its own seven
-    # tables, its own models Base, and shares no row with anything above.
-    "customer_portal",
 ]
 PENDING_MODULES = [
     "catalog_management",  # deliberately deferred — see docs/SCHEMA_V2.md; not in the approved spec
@@ -272,15 +266,6 @@ app.include_router(analytics.router)
 # service with the merchant, wallet or payment modules, which is what keeps
 # recording a purchase source from being able to move money.
 app.include_router(providers.router)
-# V1 — the B2C Customer Portal (migration 0044). Last, and deliberately set
-# apart: every router above reads `users`/`merchants`, and these two read the
-# `customer_*` tables and nothing else. The separation is enforced by the token
-# scope rather than by convention — a customer token is refused by all of the
-# routers above (get_current_user rejects any scoped token), and a merchant or
-# admin token is refused by these two (get_current_customer requires
-# scope="customer"). Neither direction needed a change to the other side.
-app.include_router(customer_auth.router)
-app.include_router(customer_profile.router)
 
 
 @app.on_event("startup")

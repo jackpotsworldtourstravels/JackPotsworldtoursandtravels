@@ -50,59 +50,6 @@ def create_partner_refresh_token(partner_user_id: int) -> str:
     return _create_token(str(partner_user_id), delta, "refresh", extra_claims={"scope": "partner"})
 
 
-# Customer Portal (V1) tokens carry `scope: "customer"`, and that single claim
-# is the whole of the cross-login guarantee, in both directions:
-#
-#   * get_current_user (app/auth/deps.py) rejects ANY token with a scope claim,
-#     so a customer token is refused by all 176 merchant/admin endpoints —
-#     including ones written after this, with no change needed there.
-#   * get_current_customer (app/auth/customer_deps.py) REQUIRES scope ==
-#     "customer", so a merchant or admin token is refused by the customer API.
-#
-# The two subject spaces overlap — customers.customer_id 5 and users.user_id 5
-# both exist — which is exactly why the scope, not the id, is what separates
-# them. Same reasoning as the `partner` scope this replaces.
-CUSTOMER_SCOPE = "customer"
-
-
-def create_customer_access_token(customer_id: int) -> str:
-    delta = datetime.timedelta(minutes=settings.access_token_expire_minutes)
-    return _create_token(str(customer_id), delta, "access", extra_claims={"scope": CUSTOMER_SCOPE})
-
-
-def create_customer_refresh_token(customer_id: int) -> str:
-    delta = datetime.timedelta(days=settings.refresh_token_expire_days)
-    return _create_token(str(customer_id), delta, "refresh", extra_claims={"scope": CUSTOMER_SCOPE})
-
-
-#: The customer login is password -> OTP -> dashboard, same as the three B2B
-#: portals. Between the steps the caller holds this instead of a session. It is
-#: scoped `customer_otp_challenge`, so it is neither a customer session token
-#: nor spendable at the merchant side's /api/auth/verify-otp.
-CUSTOMER_OTP_CHALLENGE_SCOPE = "customer_otp_challenge"
-
-
-def create_customer_otp_challenge_token(customer_id: int) -> str:
-    delta = datetime.timedelta(minutes=OTP_CHALLENGE_TTL_MINUTES)
-    return _create_token(
-        str(customer_id), delta, "challenge",
-        extra_claims={"scope": CUSTOMER_OTP_CHALLENGE_SCOPE},
-    )
-
-
-def decode_customer_otp_challenge_token(token: str) -> int | None:
-    """Returns the customer id a challenge token refers to, or None."""
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "challenge":
-        return None
-    if payload.get("scope") != CUSTOMER_OTP_CHALLENGE_SCOPE:
-        return None
-    try:
-        return int(payload["sub"])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 SUPER_ADMIN_SENTINEL_SUB = "-1"  # never a real users.id / partner_user_id — see super_admin_deps.py
 
 
