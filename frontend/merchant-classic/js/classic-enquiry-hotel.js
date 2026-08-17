@@ -124,6 +124,23 @@ function clHotelFormFields() {
         <label for="clHtlNotes">Special Requirements</label>
         <textarea id="clHtlNotes" maxlength="1000" placeholder="Enter any additional hotel requirements — early check-in, late check-out, connecting rooms, high floor, non-smoking room, airport transfer…"></textarea>
       </div>
+    </div>
+
+    <!-- CLIENT FARE, STATED ONCE, HERE — mirrors classic-enquiry.js's own
+         clEnqClientFare exactly (same field id pattern, same clBindMoneyField/
+         clParseMoney treatment, same placement outside any section heading).
+         Carried forward automatically from here: hotel_booking_service.
+         to_booking_request prefers a value in its own payload and falls back
+         to this one, so leaving it off the Booking Request screen (see
+         classic-booking-hotel.js) is what makes this value stand. -->
+    <div class="cl-form cl-form-2" style="margin-top:26px;">
+      <div class="cl-field">
+        <label for="clHtlClientFare">Client Fare (INR)</label>
+        <input type="text" id="clHtlClientFare" inputmode="decimal" autocomplete="off"
+               placeholder="e.g. 20,000">
+        <small>What you have quoted your customer. Optional — leave it blank and you
+               can add it when you raise the booking, once we have quoted you.</small>
+      </div>
     </div>`;
 }
 
@@ -178,6 +195,7 @@ function clWireHotelEnquiryForm() {
     f.hotel.pan = e.target.value;
   });
   $('clHtlNotes').addEventListener('input', () => { f.hotel.specialRequirements = $('clHtlNotes').value; });
+  clBindMoneyField($('clHtlClientFare'));
 
   clWireRoomsGuests();
   clSyncHotelNights();
@@ -431,6 +449,7 @@ function clValidateAndBuildHotelStay(fail) {
     preferred_location: ($('clHtlLocation').value || '').trim() || null,
     pan: pan || null,
     special_requirements: ($('clHtlNotes').value || '').trim() || null,
+    client_fare: clParseMoney($('clHtlClientFare').value),
   };
 }
 

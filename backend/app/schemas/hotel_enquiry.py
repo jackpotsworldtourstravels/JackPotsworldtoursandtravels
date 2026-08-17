@@ -65,6 +65,11 @@ class HotelEnquiryCreate(BaseModel):
     preferred_location: str | None = Field(default=None, max_length=200)
     pan: str | None = Field(default=None, max_length=10)
     special_requirements: str | None = Field(default=None, max_length=1000)
+    #: What the merchant is charging its OWN customer — mirrors Flight's
+    #: EnquiryCreate.client_fare exactly, including the bound (guards the
+    #: Numeric(14, 2) column: 12 digits before the point). Never used for
+    #: settlement; it only ever produces the "You Saved" figure once quoted.
+    client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
 
     @field_validator("hotel_name", "room_type", "preferred_location", "special_requirements",
                       mode="before")
@@ -167,12 +172,12 @@ class HotelEnquiryResponse(BaseModel):
     quoted_fare: Decimal | None = None
     quotation_remarks: str | None = None
 
-    #: Hotel has no client-fare capture on the enquiry itself — that is
-    #: entered on the booking screen once raised (mirrors Flight's
-    #: EnquiryToBooking.client_fare). Present and always None here so the
-    #: shared row/detail renderers, which check this key for a flight row,
-    #: don't need a hotel-specific branch.
+    #: Migration 0050 — captured once, here, same shape as Flight's
+    #: EnquiryResponse.client_fare.
     client_fare: Decimal | None = None
+    #: DERIVED, never stored: client_fare - quoted_fare, only once both
+    #: exist. Same formula EnquiryResponse.of() uses, so the merchant portal,
+    #: Reports and the invoice never disagree about it.
     saved_amount: Decimal | None = None
     #: Set once Raise Booking has converted this enquiry (migration 0048) —
     #: the merchant/admin row renderers use this to swap Raise Booking for a
@@ -198,6 +203,10 @@ class HotelEnquiryResponse(BaseModel):
              "child_ages": [c.child_age for c in room.children_ages]}
             for room in r.rooms
         ]
+        saved = None
+        if r.client_fare is not None and r.quoted_fare is not None:
+            diff = r.client_fare - r.quoted_fare
+            saved = diff if diff > 0 else Decimal("0")
         return cls(
             id=r.id,
             reference_number=r.enquiry_reference,
@@ -222,6 +231,8 @@ class HotelEnquiryResponse(BaseModel):
             rejection_reason=r.rejection_reason,
             quoted_fare=r.quoted_fare,
             quotation_remarks=r.quotation_remarks,
+            client_fare=r.client_fare,
+            saved_amount=saved,
             booking_request_id=r.booking_request_id,
             booking_request_number=r.booking_request.request_number if r.booking_request else None,
             review_claimed_by=r.review_claimed_by,

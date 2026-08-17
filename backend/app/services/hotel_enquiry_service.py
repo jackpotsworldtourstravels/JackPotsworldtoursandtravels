@@ -97,6 +97,7 @@ def create(db: Session, actor: User, payload) -> HotelEnquiry:
         meal_plan=payload.meal_plan,
         special_requirements=payload.special_requirements,
         preferred_location=payload.preferred_location,
+        client_fare=payload.client_fare,
         status=S.PENDING_APPROVAL,
     )
     for i, room_in in enumerate(payload.rooms, start=1):

@@ -1945,6 +1945,11 @@ class HotelEnquiry(Base):
     #: grows a booking step. Nothing reads this into a booking today.
     quoted_fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
     quotation_remarks: Mapped[Optional[str]] = mapped_column(Text)
+    #: What the merchant charges its OWN customer (migration 0050) — Hotel's
+    #: equivalent of Flight's client_fare on service_requests. Captured once,
+    #: here, and carried forward: hotel_booking_service.to_booking_request
+    #: prefers a value in its own payload and falls back to this one.
+    client_fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
     admin_response: Mapped[Optional[str]] = mapped_column(Text)
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
     review_claimed_by: Mapped[Optional[int]] = mapped_column(

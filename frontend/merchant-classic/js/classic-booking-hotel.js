@@ -321,6 +321,24 @@ function clRenderHotelBookingForm(e) {
       </div>
     </div>
 
+    <!-- THE CLIENT FARE FIELD THAT USED TO SIT HERE IS GONE, on request —
+         mirrors Flight's own removal (see classic-booking.js's identical
+         comment). It was the second of two boxes asking the same question:
+         the Hotel Enquiry form now collects Client Fare too (classic-
+         enquiry-hotel.js), so what the merchant charges its own customer is
+         stated once, at the point the stay is described, not restated here.
+
+         NOTHING ABOUT THE DATA CHANGED. to_booking_request prefers a client
+         fare in its own payload and falls back to the one the enquiry
+         carried (an "is not None" test, because 0 is a real fare), so
+         omitting the field here means the enquiry's value stands. The
+         direct path carries its own value through the stay payload; see
+         clSubmitHotelBookingRequest, which no longer overwrites it.
+
+         The API is untouched: client_fare remains accepted by both
+         HotelEnquiryToBooking and UpdateDraftRequest, and merchant-api.js
+         still forwards it when a caller supplies one. -->
+
     <div class="cl-panel">
       <div class="cl-panel-body">
         <div class="cl-field">
@@ -328,14 +346,6 @@ function clRenderHotelBookingForm(e) {
           <textarea id="clHbRemarks" maxlength="1000"
             placeholder="Anything specific to this booking — early arrival, adjoining rooms…">${
               escapeHtml(clHotelBookingDraft?.remarks || '')}</textarea>
-        </div>
-        <div class="cl-field">
-          <label for="clHbClientFare">Client Fare (INR)</label>
-          <input type="text" id="clHbClientFare" inputmode="decimal" autocomplete="off"
-            placeholder="e.g. 20,000"
-            value="${escapeHtml(clFormatMoneyInput(clHotelBookingDraft?.client_fare ?? ''))}">
-          <small>What you have quoted your customer. Optional — leave it blank to keep the enquiry's
-            value, if one was entered there.</small>
         </div>
         <div class="cl-form-actions">
           <button type="button" class="cl-btn cl-btn-primary" id="clHbSubmitBtn"
@@ -369,8 +379,6 @@ function clRenderHotelBookingForm(e) {
   ['clHbContactPhoneCC', 'clHbContactAltCC'].forEach(id => {
     $(id)?.addEventListener('change', clHbReviewContact);
   });
-
-  clBindMoneyField($('clHbClientFare'));
 
   $('clHbViewEnquiry')?.addEventListener('click', () => clOpenEnquiryDetail(`hotel:${e.id}`));
   $('clHbCancel').addEventListener('click', async () => {
@@ -543,23 +551,31 @@ async function clSubmitHotelBookingRequest(finalize) {
 
   const remarks = ($('clHbRemarks').value || '').trim();
   const contact = clHbContactPayload();
-  const clientFare = clParseMoney($('clHbClientFare').value);
 
-  /* THREE try BLOCKS — see clSubmitBookingRequest (classic-booking.js) for
+  /* NEITHER A CLIENT FARE IS READ HERE ANY MORE, and the absence is
+     deliberate — see the module comment above the (removed) field. Stated
+     once, on the form that describes the stay. Omitting it is what makes
+     the server keep the value the enquiry carried; the direct path carries
+     its own through the stay payload below (clHotelBookingDirect already
+     has client_fare on it — see clStartDirectHotelBooking). Both fields
+     remain on the API — this screen has stopped supplying them, which is
+     not the same as removing them.
+
+     THREE try BLOCKS — see clSubmitBookingRequest (classic-booking.js) for
      why: create, submit and the cosmetic refresh fail in different ways and
      must be reported differently, so a throw from any bookkeeping after a
      successful save is never mistaken for the save itself failing. */
   let request;
   try {
     if (clHotelBookingDraft) {
-      request = await MerchantApi.updateDraft(clHotelBookingDraft.id, { remarks, contact: contact ?? {}, clientFare });
+      request = await MerchantApi.updateDraft(clHotelBookingDraft.id, { remarks, contact: contact ?? {} });
     } else if (clHotelBookingDirect) {
       request = await MerchantApi.createDirectHotelBooking(clHotelBookingDirect, {
-        guests, remarks, contact, clientFare,
+        guests, remarks, contact,
       });
     } else {
       request = await MerchantApi.createHotelBookingFromEnquiry(enquiry.id, {
-        guests, remarks, contact, clientFare,
+        guests, remarks, contact,
       });
     }
     request = request.request || request;

@@ -172,7 +172,13 @@ def to_booking_request(
         status=S.DRAFT,
         title=f"Hotel — {enquiry.destination_city}",
         remarks=remarks,
-        client_fare=client_fare,
+        # Prefer a value in THIS call's payload; fall back to the one the
+        # enquiry carried. `is not None`, not a truth test — 0 is a real
+        # client fare. Mirrors enquiry_service.to_booking_request exactly:
+        # Client Fare is stated once, on the form that describes the stay,
+        # and this is what makes omitting it here (see classic-booking-
+        # hotel.js) leave that value standing rather than clearing it.
+        client_fare=client_fare if client_fare is not None else enquiry.client_fare,
         # `hotel_enquiry_reference` is the CLASSIC_MARKER_KEYS entry
         # (lifecycle.py) that puts this booking on the no-payment,
         # Manager-approval-then-voucher track, same as Flight's
