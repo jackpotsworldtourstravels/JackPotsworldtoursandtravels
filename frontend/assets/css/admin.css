@@ -1471,3 +1471,72 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 @media (max-width:900px), (hover:none) and (pointer:coarse){
   input, select, textarea{font-size:16px !important;}
 }
+
+/* ==========================================================================
+   MERCHANT ONBOARD/EDIT — SERVICE / PRODUCT ACCESS
+   ==========================================================================
+   The Onboard/Edit Merchant dialog reflows to two columns once Service /
+   Product Access joins Merchant Information: roughly 65/35, on the same
+   900px breakpoint the standard's own `.form-grid` collapses at (jp-ds.css
+   §15) — below that a 1180px `.modal-lg` no longer has room for two readable
+   columns, so both stack instead. Uses the `--jp-*` tokens the rest of this
+   dialog already resolves through jp-ds.css, so dark mode needs no separate
+   override here. */
+.onboard-columns{
+  display:grid;
+  grid-template-columns:minmax(0,65fr) minmax(0,35fr);
+  gap:28px;
+  align-items:start;
+}
+@media (max-width:900px){
+  .onboard-columns{grid-template-columns:minmax(0,1fr); gap:22px;}
+}
+
+.onboard-col-side{
+  background:var(--jp-surface-2);
+  border:1px solid var(--jp-border);
+  border-radius:var(--jp-r-md);
+  padding:16px;
+}
+.onboard-col-side .form-section-title{margin-top:0;}
+.onboard-col-side > .cell-sub{
+  display:block;
+  margin:-4px 0 14px;
+  font-size:12.5px;
+  color:var(--jp-text-muted);
+}
+
+.svc-list{display:flex; flex-direction:column; gap:10px;}
+.svc-item{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:12px;
+  background:var(--jp-surface);
+  border:1px solid var(--jp-border);
+  border-radius:var(--jp-r-md);
+  cursor:pointer;
+  transition:border-color .15s ease;
+}
+.svc-item:hover{border-color:var(--jp-border-strong);}
+/* The label wraps the checkbox, so a click anywhere on the card toggles it —
+   consistent with how the rest of this dialog lets a checkbox's own label
+   carry the hit target (jp-ds.css §15's `label:has(input[type=checkbox])`). */
+.svc-item input[type=checkbox]{
+  width:auto; height:auto;
+  margin-top:3px;
+  flex:0 0 auto;
+}
+.svc-icon{
+  flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  width:32px; height:32px;
+  border-radius:var(--jp-r-md);
+  background:var(--jp-accent-soft);
+  color:var(--jp-accent-ink);
+}
+.svc-copy{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.svc-name{font-size:13.5px; color:var(--jp-text);}
+.svc-desc{font-size:12px; line-height:1.5; color:var(--jp-text-muted);}
+
+.svc-save-btn{width:100%; margin-top:14px;}

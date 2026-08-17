@@ -31,10 +31,12 @@ from app.schemas.merchant import (
     MerchantCreatedResponse,
     MerchantResponse,
     MerchantStatusRequest,
+    ServiceAccessResponse,
+    ServiceAccessUpdateRequest,
     UpdateMerchantRequest,
 )
 from app.schemas.pagination import Page
-from app.services import account_service, merchant_service
+from app.services import account_service, merchant_service, service_access_service
 
 router = APIRouter(prefix="/api/admin/merchants", tags=["admin · merchants"])
 
@@ -156,9 +158,12 @@ def create_merchant(
         credit_limit=payload.credit_limit,
         merchant_code=payload.merchant_code,
         reference_prefix=payload.reference_prefix,
+        service_access=payload.service_access.model_dump() if payload.service_access else None,
     )
     return MerchantCreatedResponse(
-        merchant=MerchantResponse.of(merchant, 1),
+        merchant=MerchantResponse.of(
+            merchant, 1, service_access=service_access_service.get_access_map(db, merchant.merchant_id)
+        ),
         first_user=AccountResponse.of(first_user),
         temporary_password=temp_password,
     )
@@ -175,7 +180,10 @@ def get_merchant(
     db: Session = Depends(get_db),
     _: User = Depends(require(P.MERCHANT_VIEW)),
 ):
-    return MerchantResponse.of(merchant_service.get_merchant(db, merchant_id))
+    merchant = merchant_service.get_merchant(db, merchant_id)
+    return MerchantResponse.of(
+        merchant, service_access=service_access_service.get_access_map(db, merchant_id)
+    )
 
 
 @router.put(
@@ -193,7 +201,34 @@ def update_merchant(
     merchant = merchant_service.update_merchant(
         db, current_user, merchant_id, **payload.model_dump(exclude_unset=True)
     )
-    return MerchantResponse.of(merchant)
+    return MerchantResponse.of(
+        merchant, service_access=service_access_service.get_access_map(db, merchant_id)
+    )
+
+
+@router.patch(
+    "/{merchant_id}/service-access",
+    response_model=ServiceAccessResponse,
+    summary="Set which products a merchant may use",
+    description=(
+        "Requires `merchant.edit` — the same code the main Edit form uses, since this is still "
+        "editing the merchant, just independently of its other fields. Only the keys present in "
+        "the body change; omit a key to leave it as it is. Takes effect immediately: the "
+        "merchant's next `POST /api/enquiries` is checked against the new value, with no need "
+        "to sign out and back in (though the cached session picks it up on next login/profile "
+        "refresh too — see `routers/auth.py`)."
+    ),
+)
+def set_merchant_service_access(
+    merchant_id: int,
+    payload: ServiceAccessUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.MERCHANT_EDIT)),
+):
+    access = service_access_service.set_access(
+        db, current_user, merchant_id, **payload.model_dump(exclude_unset=True)
+    )
+    return ServiceAccessResponse(merchant_id=merchant_id, **access)
 
 
 @router.post(

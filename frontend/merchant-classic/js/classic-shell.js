@@ -349,6 +349,10 @@ const CL_TITLES = {
   dashboard: 'Dashboard',
   enquiry: 'Booking Enquiry',
   'booking-request': 'Booking Request',
+  /* No sidebar entry — reached only from Raise Booking on a hotel enquiry row,
+     same posture as 'booking-detail' below. */
+  'hotel-booking-request': 'Hotel Booking Request',
+  visa: 'Visa',
   /* Reached from a row action rather than the rail — "the booking you just
      clicked" is not a destination you navigate to cold. */
   'booking-detail': 'Booking Request Details',
@@ -421,6 +425,9 @@ const CL_LOADERS = {
   dashboard: () => clInitDashboard(),
   enquiry: () => clInitEnquiry(),
   'booking-request': () => clInitBookingRequest(),
+  'hotel-booking-request': () => clInitHotelBookingRequest(),
+  visa: () => clInitVisa(),
+  holidays: () => clInitHolidays(),
   'booking-detail': () => clInitBookingDetail(),
   requests: () => clInitRequests(),
   'booking-history': () => clInitHistory(),
@@ -604,24 +611,27 @@ function clInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/* A session stored before the role was needed carries no role at all, and the
-   header would sit on a dash forever. /api/profile returns the same shape the
-   login did, so one call repairs it — and it is the same call Profile &
-   Settings already makes, so nothing new is being asked of the backend.
-
-   IT NOW REPAIRS A MISSING `permissions` ARRAY TOO, and that second condition
-   is the load-bearing one. clCan() answers false for a code it cannot find, so
-   a snapshot without the array does not degrade — it disables every action in
-   the portal at once, on an account that is entitled to all of them. Refetching
-   is the difference between a stale session and an unusable one. */
+/* ALWAYS refetches — this used to short-circuit when the cached snapshot
+   already had a role and a permissions array, which was right for the repair
+   this was written for (a session stored before either field existed) but
+   wrong for `service_access`: that value is Admin-controlled and can change
+   at any time *after* the merchant is already logged in, with nothing about
+   the cached snapshot ever looking "broken" to that check. A merchant whose
+   company had Flights turned on mid-session would refresh the page and still
+   render off the pre-change snapshot forever — the entitlement had changed
+   on the server, but nothing here ever asked it again. /api/profile returns
+   the same shape login did (service_access included, computed fresh from the
+   database on every call — see routers/auth.py's user_response), so one call
+   on every portal load keeps every product-gated element honest, not just
+   the ones that happen to run right after a fresh login. Costs a network
+   call on every load; worth it; it is the same call Profile & Settings
+   already makes on demand. */
 async function clRefreshRole() {
-  const user = clSessionUser();
-  if (clRoleLabel(user) && Array.isArray(user?.permissions)) return;
   try {
     const me = await MerchantApi.getProfile();
     localStorage.setItem('merchant_user_json', JSON.stringify(me));
     clPaintIdentity();
-  } catch { /* the header keeps the name; the role stays blank */ }
+  } catch { /* offline or a transient failure — the cached snapshot still renders */ }
 }
 
 /* One function owns every place the signed-in identity appears, so the header,
@@ -670,11 +680,33 @@ async function clShowApp() {
   const canApprove = clCanApprove();
   $('clNavApprovals').style.display = canApprove ? '' : 'none';
 
+  /* Visa and Holidays are service-access entitlements (Admin-controlled per
+     company), not user permissions — so they read
+     clSessionUser().service_access rather than clCan(). Default everything
+     but Flights to false if the cached session predates a field, same
+     conservative fallback clEnquiryAccess() uses in classic-enquiry.js. */
+  const svc = clSessionUser()?.service_access || { flights: true, hotels: false, visa: false, holidays: false };
+  $('clNavVisa').style.display = svc.visa ? '' : 'none';
+  $('clNavHolidays').style.display = svc.holidays ? '' : 'none';
+
+  /* Booking Enquiry and Booking Request both exist to work a Flight or a
+     Hotel booking — with neither product enabled (e.g. Visa-only), there is
+     nothing on either screen for the merchant to do, so both leave the rail
+     the same way Visa/Holidays do when THEIR product is off. */
+  const hasBookingProduct = svc.flights || svc.hotels;
+  $('clNavEnquiry').style.display = hasBookingProduct ? '' : 'none';
+  $('clNavBookingRequest').style.display = hasBookingProduct ? '' : 'none';
+
   /* Deep links survive a reload: #payments lands on Payments. A user without
      the permission who follows #approvals would otherwise render an empty
-     section with no way back. */
+     section with no way back. Same for #visa/#holidays and a company without
+     that entitlement, and for #enquiry/#booking-request with no booking
+     product enabled at all. */
   let target = (location.hash || '').replace('#', '') || 'dashboard';
   if (target === 'approvals' && !canApprove) target = 'dashboard';
+  if (target === 'visa' && !svc.visa) target = 'dashboard';
+  if (target === 'holidays' && !svc.holidays) target = 'dashboard';
+  if ((target === 'enquiry' || target === 'booking-request') && !hasBookingProduct) target = 'dashboard';
   clGo(target);
   clLoadUnreadCount();
   clLoadSupportBadge();

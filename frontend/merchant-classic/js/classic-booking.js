@@ -216,6 +216,12 @@ function clIsInternational(e) {
    two buttons called, and the table is a read of /api/requests filtered to
    bookings. Every row action is the same function My Requests binds. */
 function clRenderNoEnquiry() {
+  /* Direct Booking offers whichever of Flight/Hotel the merchant has — same
+     shared form as classic-enquiry.js's own Book Directly button opens (see
+     clOpenEnquiryForm). Omitted entirely, not just disabled, when neither
+     product is enabled — same posture as every other product-gated element
+     in this portal. */
+  const svc = clEnquiryAccess();
   $('cl-booking-request').innerHTML = `
     <div class="cl-page-head"><div>
       <h1>Booking Request</h1>
@@ -251,15 +257,16 @@ function clRenderNoEnquiry() {
             id="clBrToEnquiry">Go to Booking Enquiry ${clIco('arrowRight', { size: 15 })}</button>
         </div>
 
+        ${(svc.flights || svc.hotels) ? `
         <div class="cl-qa-card" data-cl-qa="direct">
-          <span class="cl-qa-ico">${clIco('plane', { size: 24 })}</span>
+          <span class="cl-qa-ico">${clIco(svc.flights ? 'plane' : 'building', { size: 24 })}</span>
           <div class="cl-qa-body">
             <div class="cl-qa-title"><h3>Direct Booking</h3></div>
             <p>Create a booking directly without requesting a quotation.</p>
           </div>
           <button type="button" class="cl-btn cl-btn-cta cl-btn-block"
             id="clBrToDirect">Book Directly ${clIco('arrowRight', { size: 15 })}</button>
-        </div>
+        </div>` : ''}
       </div>
     </section>
 

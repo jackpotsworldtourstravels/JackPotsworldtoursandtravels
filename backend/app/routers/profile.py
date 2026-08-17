@@ -31,8 +31,10 @@ class HeartbeatRequest(BaseModel):
     summary="Get my profile",
     description="Requires `profile.manage`. Same shape as `GET /api/auth/me`.",
 )
-def get_profile(current_user: User = Depends(require(P.PROFILE_MANAGE))):
-    return user_response(current_user)
+def get_profile(
+    current_user: User = Depends(require(P.PROFILE_MANAGE)), db: Session = Depends(get_db)
+):
+    return user_response(db, current_user)
 
 
 @router.put(
@@ -62,7 +64,7 @@ def update_profile(
 
     db.commit()
     db.refresh(current_user)
-    return user_response(current_user)
+    return user_response(db, current_user)
 
 
 @router.post(

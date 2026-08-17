@@ -312,6 +312,46 @@ document.getElementById('merchantSort')?.addEventListener('change', () => loadMe
    is still what the per-merchant Suspend/Reactivate in the detail view calls. */
 
 /* ---------- Onboard / Edit Merchant modal ---------- POST/PUT /api/admin/merchants (existing). */
+/* Service / Product Access — three rows, each a checkbox plus an icon
+   borrowed verbatim from Merchant Classic's icon table (classic-icons.js)
+   rather than inventing new glyphs. No dedicated Visa icon exists anywhere
+   yet, so it reuses `shield`, same as the Merchant Portal's own Visa nav
+   item will (see classic-shell.js). */
+const ADMIN_SERVICE_ICONS = {
+  flights: '<path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.4 3.4-2 2H3.5l-.7 1.4 3 1.6 1.6 3 1.4-.7v-2.2l2-2 3.4 3.4a.5.5 0 0 0 .8-.5z"/>',
+  hotels: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><line x1="8" y1="6" x2="8" y2="6.01"/><line x1="12" y1="6" x2="12" y2="6.01"/><line x1="16" y1="6" x2="16" y2="6.01"/><line x1="8" y1="10" x2="8" y2="10.01"/><line x1="12" y1="10" x2="12" y2="10.01"/><line x1="16" y1="10" x2="16" y2="10.01"/>',
+  visa: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  holidays: '<circle cx="12" cy="9" r="4"/><path d="M12 13v9"/><path d="M8 22h8"/><path d="M5 13c2-1 4.5-1.5 7-1.5s5 .5 7 1.5"/>',
+};
+function adminServiceIcon(code) {
+  return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"
+    >${ADMIN_SERVICE_ICONS[code]}</svg>`;
+}
+const SERVICE_ACCESS_COPY = [
+  { code: 'flights', label: 'Flights', desc: 'Search flights, create flight enquiries, manage bookings and issue tickets.' },
+  { code: 'hotels', label: 'Hotels', desc: 'Search hotels, create hotel enquiries and manage hotel bookings.' },
+  { code: 'visa', label: 'Visa', desc: 'Submit visa applications, upload documents and manage visa requests.' },
+  { code: 'holidays', label: 'Holidays', desc: 'Coming soon — reserves the merchant’s access ahead of the Holidays product shipping.' },
+];
+/* Renders the checkbox list. `access` is a {flights,hotels,visa,holidays} map
+   (or null for a brand-new merchant, which falls back to the same defaults
+   migration 0045/0049 seed server-side: Flights on, the newer products
+   opt-in). */
+function serviceAccessRows(access) {
+  const a = access || { flights: true, hotels: false, visa: false, holidays: false };
+  return SERVICE_ACCESS_COPY.map(s => `
+    <label class="svc-item">
+      <input type="checkbox" name="svc_${s.code}" ${a[s.code] ? 'checked' : ''}>
+      <span class="svc-icon">${adminServiceIcon(s.code)}</span>
+      <span class="svc-copy">
+        <strong class="svc-name">${s.label}</strong>
+        <span class="svc-desc">${s.desc}</span>
+      </span>
+    </label>
+  `).join('');
+}
+
 async function openOnboardMerchantModal(merchantId) {
   const overlay = document.getElementById('onboardMerchantModalOverlay');
   const body = document.getElementById('onboardMerchantModalBody');
@@ -357,19 +397,33 @@ async function openOnboardMerchantModal(merchantId) {
   body.innerHTML = `
     <h2>${m ? 'Edit Merchant' : 'Onboard Merchant'}</h2>
     <form id="onboardMerchantForm">
-      <div class="form-grid">
-        <div class="form-field span-2"><label>Company Name</label>
-          <input name="company_name" required maxlength="150" autocomplete="off"
-                 value="${escapeHtml(v('company_name'))}" placeholder="e.g. Skyline Travel Services">
+      <div class="onboard-columns">
+        <div class="onboard-col-main">
+          <div class="form-section-title">Merchant Information</div>
+          <div class="form-grid">
+            <div class="form-field span-2"><label>Company Name</label>
+              <input name="company_name" required maxlength="150" autocomplete="off"
+                     value="${escapeHtml(v('company_name'))}" placeholder="e.g. Skyline Travel Services">
+            </div>
+            <div class="form-field"><label>Email</label>
+              <input name="email" type="email" required maxlength="255" autocomplete="off"
+                     value="${escapeHtml(v('email'))}">
+              <span class="cell-sub">${m
+                ? 'The company’s contact address. Sign-in emails are managed under Users.'
+                : 'Also becomes the first admin login for this merchant.'}</span>
+            </div>
+            <div class="form-field"><label>Phone</label><input name="phone" value="${escapeHtml(v('phone'))}"></div>
+          </div>
         </div>
-        <div class="form-field"><label>Email</label>
-          <input name="email" type="email" required maxlength="255" autocomplete="off"
-                 value="${escapeHtml(v('email'))}">
-          <span class="cell-sub">${m
-            ? 'The company’s contact address. Sign-in emails are managed under Users.'
-            : 'Also becomes the first admin login for this merchant.'}</span>
+        <div class="onboard-col-side">
+          <div class="form-section-title">Service / Product Access</div>
+          <p class="cell-sub">Select which travel services this merchant is allowed to access.</p>
+          <div class="svc-list">${serviceAccessRows(m ? m.service_access : null)}</div>
+          ${m ? `
+            <div class="msg" id="serviceAccessMsg"></div>
+            <button type="button" class="btn btn-ghost svc-save-btn" id="saveServiceAccessBtn">Save Service Access</button>
+          ` : ''}
         </div>
-        <div class="form-field"><label>Phone</label><input name="phone" value="${escapeHtml(v('phone'))}"></div>
       </div>
       <div class="msg" id="onboardMerchantMsg"></div>
       <div class="modal-actions">
@@ -380,6 +434,33 @@ async function openOnboardMerchantModal(merchantId) {
   `;
   overlay.classList.add('open');
   document.getElementById('onboardMerchantCancelBtn').addEventListener('click', () => overlay.classList.remove('open'));
+  /* EDIT ONLY. Independent of the merchant-fields form: its own PATCH, its
+     own success message, and it never requires the merchant to be recreated
+     or the rest of the form to validate. */
+  document.getElementById('saveServiceAccessBtn')?.addEventListener('click', async () => {
+    const f = document.getElementById('onboardMerchantForm').elements;
+    const msg = document.getElementById('serviceAccessMsg');
+    const btn = document.getElementById('saveServiceAccessBtn');
+    const payload = {
+      flights: f.svc_flights.checked,
+      hotels: f.svc_hotels.checked,
+      visa: f.svc_visa.checked,
+      holidays: f.svc_holidays.checked,
+    };
+    btn.disabled = true;
+    msg.textContent = '';
+    msg.className = 'msg';
+    try {
+      await axios.patch(`${API_BASE}/api/admin/merchants/${merchantId}/service-access`, payload, { headers: authHeaders() });
+      msg.textContent = 'Merchant service access updated successfully.';
+      msg.className = 'msg success';
+    } catch (err) {
+      msg.textContent = err.response?.data?.detail || 'Failed to update service access.';
+      msg.className = 'msg error';
+    } finally {
+      btn.disabled = false;
+    }
+  });
   document.getElementById('onboardMerchantForm').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target.elements;
@@ -443,6 +524,17 @@ async function openOnboardMerchantModal(merchantId) {
       /* company_type and credit_limit are left off entirely: the schema
          defaults them to `business_partner` and 0, and both are editable
          afterwards through the API. */
+      /* Service access is CREATE-ONLY here. On edit, the boxes still render
+         (pre-checked from `m.service_access`) but changing them does nothing
+         until "Save Service Access" is clicked — that button, not this form,
+         owns updates after the merchant exists (see the independent PATCH
+         handler above). */
+      payload.service_access = {
+        flights: f.svc_flights.checked,
+        hotels: f.svc_hotels.checked,
+        visa: f.svc_visa.checked,
+        holidays: f.svc_holidays.checked,
+      };
     }
     try {
       if (m) {

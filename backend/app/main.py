@@ -28,6 +28,7 @@ from app.routers import (
     enquiries,
     finance,
     group_bookings,
+    hotel_enquiries,
     manager,
     manager_approvals,
     messages,
@@ -206,6 +207,10 @@ app.include_router(merchants.router)
 app.include_router(merchant_team.router)
 app.include_router(tickets.router)
 app.include_router(enquiries.router)
+# Hotel Enquiry — separate tables (migration 0047), separate router, same
+# ticket.* permission codes. See routers/hotel_enquiries.py.
+app.include_router(hotel_enquiries.router)
+app.include_router(hotel_enquiries.admin_router)
 # Group booking passenger manifests. Alongside enquiries because it is the same
 # workflow's upload step — it grants no new permission code, reusing
 # ticket.request/ticket.view exactly as the booking routes do.

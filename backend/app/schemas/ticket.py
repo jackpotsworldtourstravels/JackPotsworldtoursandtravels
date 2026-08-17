@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from app.schemas.document import DocumentResponse
+from app.schemas.hotel_booking import HotelGuestResponse
 from app.models_v2 import (
     Gender,
     PassengerType,
@@ -401,6 +402,12 @@ class RequestResponse(BaseModel):
     return_date: datetime.date | None = None
 
     passengers: list[PassengerResponse] = []
+    #: Hotel's equivalent of ``passengers`` (migration 0048) — always empty
+    #: for anything that isn't a hotel row. Guarded on ``travel_type`` rather
+    #: than reached for unconditionally: it's a lazy relationship, and
+    #: touching it on every Flight row would emit a query per row on every
+    #: list that serialises through here.
+    hotel_guests: list[HotelGuestResponse] = []
     #: 0039 — who this was bought from, once a ticket has been issued. Both
     #: default to None, so every response for a booking issued before providers
     #: existed is byte-for-byte what it was; no client has to know about them.
@@ -459,6 +466,9 @@ class RequestResponse(BaseModel):
             return_date=r.return_date,
             passengers=[PassengerResponse.of(p) for p in r.passengers]
             if include_passengers
+            else [],
+            hotel_guests=[HotelGuestResponse.of(g) for g in r.hotel_guests]
+            if include_passengers and r.travel_type is TravelType.HOTEL
             else [],
             provider_id=r.provider_id,
             # Guarded on the id rather than reached for unconditionally: these

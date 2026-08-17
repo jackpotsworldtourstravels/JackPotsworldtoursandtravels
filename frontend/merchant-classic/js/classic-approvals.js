@@ -185,20 +185,52 @@ async function clOpenApproval(requestId) {
   const d = r.details || {};
   const roundTrip = !!r.return_date;
   const decidable = !!data.can_decide;
+  const isHotel = r.travel_type === 'hotel';
 
   const body = `
     <h3>Booking</h3>
     <dl class="cl-dl">
       <div><dt>Raised by</dt><dd>${escapeHtml(r.raised_by || '—')}</dd></div>
       <div><dt>Booking reference</dt><dd class="cl-ref">${escapeHtml(r.booking_reference || '—')}</dd></div>
-      <div><dt>From enquiry</dt><dd class="cl-ref">${d.enquiry_reference
-        ? escapeHtml(d.enquiry_reference)
-        : (d.direct_booking ? 'Direct booking' : '—')}</dd></div>
+      <div><dt>From enquiry</dt><dd class="cl-ref">${
+        isHotel ? (d.hotel_enquiry_reference
+          ? escapeHtml(d.hotel_enquiry_reference)
+          : (d.direct_booking ? 'Direct booking' : '—'))
+        : (d.enquiry_reference
+          ? escapeHtml(d.enquiry_reference)
+          : (d.direct_booking ? 'Direct booking' : '—'))}</dd></div>
       <div><dt>Submitted</dt><dd>${escapeHtml(r.created_at ? fmtDateTime(r.created_at) : '—')}</dd></div>
-      <div><dt>Travellers</dt><dd>${(r.passengers || []).length}</dd></div>
+      <div><dt>${isHotel ? 'Guests' : 'Travellers'}</dt><dd>${
+        isHotel ? (r.hotel_guests || []).length : (r.passengers || []).length}</dd></div>
       <div><dt>Status</dt><dd>${clTag(r.status, r.status_label)}</dd></div>
     </dl>
 
+    ${isHotel ? `
+    <h3>Hotel Stay <span class="cl-muted">— agreed when the enquiry was answered</span></h3>
+    <dl class="cl-dl">
+      <div><dt>Destination</dt><dd>${escapeHtml(d.destination_city || '—')}</dd></div>
+      <div><dt>Hotel</dt><dd>${escapeHtml(d.hotel_name || '—')}</dd></div>
+      <div><dt>Star category</dt><dd>${d.star_category ? `${escapeHtml(d.star_category)} Star` : '—'}</dd></div>
+      <div><dt>Room type</dt><dd>${escapeHtml(d.room_type || '—')}</dd></div>
+      <div><dt>Check-in</dt><dd>${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}</dd></div>
+      <div><dt>Check-out</dt><dd>${escapeHtml(r.return_date ? fmtDate(r.return_date) : '—')}</dd></div>
+    </dl>
+
+    <h3>Guests</h3>
+    <div class="cl-table-wrap"><table class="cl-table">
+      <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Room</th><th>ID proof</th></tr></thead>
+      <tbody>
+        ${(r.hotel_guests || []).map((g, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml([g.title, g.first_name, g.last_name].filter(Boolean).join(' '))}${
+              g.is_lead_guest ? ' <span class="cl-tag">Lead</span>' : ''}</td>
+            <td>${escapeHtml(g.guest_type || 'adult')}</td>
+            <td>Room ${g.room_number}</td>
+            <td class="cl-ref">${escapeHtml(g.id_proof_number || '—')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table></div>` : `
     <h3>Itinerary <span class="cl-muted">— agreed when the enquiry was answered</span></h3>
     <dl class="cl-dl">
       <div><dt>Trip type</dt><dd>${roundTrip ? 'Round trip' : 'One way'}</dd></div>
@@ -230,7 +262,7 @@ async function clOpenApproval(requestId) {
             <td class="cl-nowrap">${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
           </tr>`).join('')}
       </tbody>
-    </table></div>
+    </table></div>`}
 
     ${d.special_requests
       ? `<h3>Special requests</h3><p>${escapeHtml(d.special_requests)}</p>` : ''}

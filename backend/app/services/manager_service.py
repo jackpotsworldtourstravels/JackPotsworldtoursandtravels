@@ -37,7 +37,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
 )
-from app.services import activity_service, finance_service, lifecycle, notification_service
+from app.services import activity_service, finance_service, lifecycle, notification_service, ticket_service
 
 #: Where a Booking Request sits while it is the Manager's problem.
 PENDING_STATUSES: tuple[S, ...] = (S.PENDING_APPROVAL, S.IN_REVIEW)
@@ -495,10 +495,11 @@ def approve(
                 "no longer awaiting manager approval."
             ),
         )
-    if not booking.passengers:
+    if not ticket_service._has_travellers(booking):
         # Belt and braces: submit_request already refuses this. A booking with
         # no travellers reaching the desk would be unbookable, and the Manager
-        # is the last person who can catch it.
+        # is the last person who can catch it. Covers both shapes a traveller
+        # takes — Flight's ``passengers`` and Hotel's ``hotel_guests``.
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=f"{booking.request_number} has no passengers and cannot be approved",

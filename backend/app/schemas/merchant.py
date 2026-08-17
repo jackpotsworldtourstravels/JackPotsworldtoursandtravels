@@ -8,6 +8,41 @@ from app.models_v2 import CompanyType, MerchantStatus
 from app.schemas.accounts import AccountResponse
 
 
+class ServiceAccessInput(BaseModel):
+    """The Onboard form's Service / Product Access card, at creation.
+
+    Defaults match ``service_access_service.DEFAULT_ACCESS``: Flights on,
+    the newer products opt-in.
+    """
+
+    flights: bool = True
+    hotels: bool = False
+    visa: bool = False
+    holidays: bool = False
+
+
+class ServiceAccessUpdateRequest(BaseModel):
+    """The Edit form's independent "Save Service Access" action.
+
+    All-optional, partial-update shape — same convention
+    ``UpdateMerchantRequest`` uses for the merchant-fields form: only a key
+    that is actually sent changes anything.
+    """
+
+    flights: bool | None = None
+    hotels: bool | None = None
+    visa: bool | None = None
+    holidays: bool | None = None
+
+
+class ServiceAccessResponse(BaseModel):
+    merchant_id: int
+    flights: bool
+    hotels: bool
+    visa: bool
+    holidays: bool
+
+
 class MerchantResponse(BaseModel):
     id: int
     merchant_code: str
@@ -33,6 +68,12 @@ class MerchantResponse(BaseModel):
     # what keeps this addition backward compatible for existing callers.
     tickets_issued: int = 0
     awaiting_verification: int = 0
+    #: Which products this merchant may use — {"flights": bool, "hotels": bool,
+    #: "visa": bool}. Empty dict on any caller that didn't compute it (same
+    #: backward-compatible convention as tickets_issued/awaiting_verification
+    #: above): the Admin list/detail screens populate it, other producers of
+    #: this schema don't need to and still validate.
+    service_access: dict[str, bool] = {}
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
@@ -44,6 +85,7 @@ class MerchantResponse(BaseModel):
         user_count: int | None = None,
         tickets_issued: int = 0,
         awaiting_verification: int = 0,
+        service_access: dict[str, bool] | None = None,
     ) -> "MerchantResponse":
         return cls(
             id=merchant.merchant_id,
@@ -65,6 +107,7 @@ class MerchantResponse(BaseModel):
             user_count=user_count if user_count is not None else len(merchant.users),
             tickets_issued=tickets_issued,
             awaiting_verification=awaiting_verification,
+            service_access=service_access or {},
             created_at=merchant.created_at,
         )
 
@@ -89,6 +132,12 @@ class CreateMerchantRequest(BaseModel):
     #: Auto-derived from the company name when omitted.
     merchant_code: str | None = Field(default=None, max_length=32)
     reference_prefix: str | None = Field(default=None, max_length=8)
+
+    #: The Onboard form's Service / Product Access card. ``None`` (the form
+    #: was never touched, or an older caller) keeps every default from
+    #: ``service_access_service.DEFAULT_ACCESS`` rather than disabling
+    #: everything.
+    service_access: ServiceAccessInput | None = None
 
 
 class UpdateMerchantRequest(BaseModel):

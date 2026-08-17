@@ -115,6 +115,16 @@ class RequestType(str, enum.Enum):
     EXTRA_BAGGAGE = "extra_baggage"
     MEAL = "meal"
     SEAT = "seat"
+    # --- added by migration 0048 for Hotel service requests (Phase 2) ---
+    # Not wired to any endpoint yet — grown here because ALTER TYPE ... ADD
+    # VALUE can't run in the same transaction that later uses it.
+    ROOM_UPGRADE = "room_upgrade"
+    ROOM_DOWNGRADE = "room_downgrade"
+    EARLY_CHECK_IN = "early_check_in"
+    LATE_CHECK_OUT = "late_check_out"
+    EXTRA_BED = "extra_bed"
+    AIRPORT_TRANSFER = "airport_transfer"
+    GUEST_NAME_CORRECTION = "guest_name_correction"
 
 
 class RequestStatus(str, enum.Enum):
@@ -160,6 +170,24 @@ class TravelType(str, enum.Enum):
     HOTEL = "hotel"
     CRUISE = "cruise"
     PACKAGE = "package"
+
+
+class ServiceCode(str, enum.Enum):
+    """A travel product an Admin may grant or withhold per merchant.
+
+    Orthogonal to :class:`TravelType`: this gates whether a merchant may use
+    a product at all (checked once, at the door); ``TravelType`` just tags
+    which product a given ``service_requests`` row belongs to once inside.
+    """
+
+    FLIGHTS = "flights"
+    HOTELS = "hotels"
+    VISA = "visa"
+    #: Added by migration 0049 — the entitlement ships before the product
+    #: does, same precedent Visa itself set in 0045. No enquiry/booking
+    #: feature exists behind this yet; the Merchant Portal gates a "coming
+    #: soon" placeholder page on it (classic-holidays.js).
+    HOLIDAYS = "holidays"
 
 
 class PaymentType(str, enum.Enum):
@@ -418,6 +446,11 @@ class Merchant(Base):
     )
     communication_settings: Mapped[Optional["CommunicationSettings"]] = relationship(
         back_populates="merchant", cascade="all, delete-orphan", uselist=False
+    )
+    #: One row per ServiceCode, not uselist=False — unlike communication
+    #: settings, a merchant has several of these (see MerchantServiceAccess).
+    service_access: Mapped[list["MerchantServiceAccess"]] = relationship(
+        back_populates="merchant", cascade="all, delete-orphan"
     )
     requests: Mapped[list["ServiceRequest"]] = relationship(back_populates="merchant")
 
@@ -764,6 +797,18 @@ class ServiceRequest(Base):
         cascade="all, delete-orphan",
         order_by="PassengerData.passenger_id",
     )
+    #: Guest manifest for a hotel booking (``travel_type='hotel'`` only) —
+    #: the hotel equivalent of ``passengers``, kept as a separate table and
+    #: relationship because a hotel guest's columns (room number, id-proof)
+    #: don't fit PassengerData's flight-shaped ones (seat, passport, meal).
+    #: Left lazy on purpose, same posture as ``group_import``: most listing
+    #: screens never touch it, and the screens that do (booking detail,
+    #: invoice rendering) eager-load it explicitly.
+    hotel_guests: Mapped[list["HotelBookingGuest"]] = relationship(
+        back_populates="booking_request",
+        cascade="all, delete-orphan",
+        order_by="HotelBookingGuest.id",
+    )
     payments: Mapped[list["Payment"]] = relationship(back_populates="request")
     documents: Mapped[list["RequestDocument"]] = relationship(
         back_populates="request",
@@ -1059,6 +1104,43 @@ class CommunicationSettings(Base):
 
     __table_args__ = (
         UniqueConstraint("merchant_id", name="uq_comm_settings_merchant"),
+    )
+
+
+class MerchantServiceAccess(Base):
+    """Whether a merchant may use one travel product. One row per
+    ``(merchant_id, service_code)`` — see migration 0045 for why this is a
+    table rather than booleans on ``Merchant``."""
+
+    __tablename__ = "merchant_service_access"
+
+    service_access_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("merchants.merchant_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    service_code: Mapped[ServiceCode] = mapped_column(
+        _pg_enum(ServiceCode, "service_code_enum"), nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped["Merchant"] = relationship(back_populates="service_access")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "merchant_id", "service_code", name="uq_merchant_service_access"
+        ),
+        Index("ix_merchant_service_access_merchant", "merchant_id"),
     )
 
 
@@ -1815,6 +1897,214 @@ class ProviderUser(Base):
         return f"<ProviderUser {self.user_name} @{self.provider_id}>"
 
 
+# =====================================================================
+# Hotel Enquiry — genuinely separate tables (migration 0047)
+# =====================================================================
+# Deliberately NOT part of the nine-table service_requests design: the
+# earlier Hotel Enquiry pass stored these as travel_type='hotel' rows there
+# (matching how Flight already works), but the product spec asked for real,
+# independently queryable tables — structured rooms and children, not a
+# JSONB array. See 0047's migration docstring for the full reasoning. Status
+# reuses RequestStatus/request_status_enum so the same label/tone maps the
+# rest of the app already has (ENQUIRY_LABELS, CL_STATUS_TONE, SPEC_LABELS)
+# apply here without a hotel-specific translation layer.
+class HotelEnquiry(Base):
+    """One merchant's request to be quoted a hotel stay."""
+
+    __tablename__ = "hotel_enquiries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("merchants.merchant_id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    enquiry_reference: Mapped[str] = mapped_column(String(40), nullable=False)
+    destination_city: Mapped[str] = mapped_column(String(120), nullable=False)
+    check_in_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    check_out_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    #: Denormalised at create time — see the migration docstring.
+    number_of_nights: Mapped[int] = mapped_column(Integer, nullable=False)
+    hotel_name: Mapped[Optional[str]] = mapped_column(String(200))
+    #: '3' | '4' | '5' — a CHECK constraint, not a foreign key to a rating
+    #: table that would exist to hold three rows.
+    star_category: Mapped[str] = mapped_column(String(1), nullable=False)
+    room_type: Mapped[Optional[str]] = mapped_column(String(120))
+    pan: Mapped[Optional[str]] = mapped_column(String(10))
+    meal_plan: Mapped[str] = mapped_column(String(20), nullable=False)
+    special_requirements: Mapped[Optional[str]] = mapped_column(Text)
+    preferred_location: Mapped[Optional[str]] = mapped_column(String(200))
+    status: Mapped[RequestStatus] = mapped_column(
+        _pg_enum(RequestStatus, "request_status_enum"),
+        nullable=False,
+        server_default=text("'pending_approval'"),
+    )
+    #: CR-5's binding-quotation pattern, carried over unchanged: the fare a
+    #: booking raised against this enquiry would be created at, if Hotel ever
+    #: grows a booking step. Nothing reads this into a booking today.
+    quoted_fare: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
+    quotation_remarks: Mapped[Optional[str]] = mapped_column(Text)
+    admin_response: Mapped[Optional[str]] = mapped_column(Text)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
+    review_claimed_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    review_claimed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    responded_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+    #: The service_requests row this enquiry became, once quoted and raised
+    #: as a booking (migration 0048). None until then. SET NULL on delete —
+    #: a booking being removed must not take the enquiry it came from with
+    #: it. At most one booking per enquiry: enforced by a partial unique
+    #: index in the DB and re-checked in hotel_booking_service before insert.
+    booking_request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    merchant: Mapped["Merchant"] = relationship(foreign_keys=[merchant_id])
+    user: Mapped[Optional["User"]] = relationship(foreign_keys=[user_id])
+    reviewer: Mapped[Optional["User"]] = relationship(foreign_keys=[review_claimed_by])
+    booking_request: Mapped[Optional["ServiceRequest"]] = relationship(
+        foreign_keys=[booking_request_id]
+    )
+    rooms: Mapped[list["HotelEnquiryRoom"]] = relationship(
+        back_populates="enquiry", cascade="all, delete-orphan",
+        order_by="HotelEnquiryRoom.room_number",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("enquiry_reference", name="uq_hotel_enquiries_reference"),
+        CheckConstraint("check_out_date > check_in_date", name="ck_hotel_enq_date_order"),
+        CheckConstraint("number_of_nights > 0", name="ck_hotel_enq_nights_positive"),
+        CheckConstraint("star_category IN ('3','4','5')", name="ck_hotel_enq_star_category"),
+        CheckConstraint(
+            "meal_plan IN ('breakfast','half_board','full_board')", name="ck_hotel_enq_meal_plan"
+        ),
+        Index("ix_hotel_enquiries_merchant", "merchant_id"),
+        Index("ix_hotel_enquiries_status", "status"),
+        Index("ix_hotel_enquiries_created_at", text("created_at DESC")),
+        Index("ix_hotel_enquiries_booking_request", "booking_request_id"),
+        Index(
+            "uq_hotel_enquiries_booking_request_id", "booking_request_id",
+            unique=True, postgresql_where=text("booking_request_id IS NOT NULL"),
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<HotelEnquiry {self.enquiry_reference} {self.destination_city!r}>"
+
+
+class HotelEnquiryRoom(Base):
+    """One room asked about on a hotel enquiry — a merchant may ask for several."""
+
+    __tablename__ = "hotel_enquiry_rooms"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    hotel_enquiry_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("hotel_enquiries.id", ondelete="CASCADE"), nullable=False
+    )
+    #: 1-based, per enquiry — what "Room 1"/"Room 2" render directly from.
+    room_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    adults: Mapped[int] = mapped_column(Integer, nullable=False)
+    children: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+    enquiry: Mapped["HotelEnquiry"] = relationship(back_populates="rooms")
+    children_ages: Mapped[list["HotelRoomChild"]] = relationship(
+        back_populates="room", cascade="all, delete-orphan", order_by="HotelRoomChild.id"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("hotel_enquiry_id", "room_number", name="uq_hotel_room_number"),
+        CheckConstraint("adults >= 1", name="ck_hotel_room_adults_positive"),
+        CheckConstraint("children >= 0", name="ck_hotel_room_children_non_negative"),
+        Index("ix_hotel_enquiry_rooms_enquiry", "hotel_enquiry_id"),
+    )
+
+
+class HotelRoomChild(Base):
+    """One child's age, within one room, on a hotel enquiry."""
+
+    __tablename__ = "hotel_room_children"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    room_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("hotel_enquiry_rooms.id", ondelete="CASCADE"), nullable=False
+    )
+    child_age: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+    room: Mapped["HotelEnquiryRoom"] = relationship(back_populates="children_ages")
+
+    __table_args__ = (
+        CheckConstraint("child_age BETWEEN 0 AND 17", name="ck_hotel_room_child_age_range"),
+        Index("ix_hotel_room_children_room", "room_id"),
+    )
+
+
+# =====================================================================
+# Hotel Booking Guests (migration 0048)
+# =====================================================================
+# A booking-stage table, not an enquiry-stage one: it hangs off the
+# service_requests row a hotel booking becomes (see ServiceRequest.hotel_guests
+# and hotel_booking_service.to_booking_request), not off HotelEnquiry. Kept
+# separate from PassengerData because a hotel guest's shape (room number,
+# id-proof) doesn't fit PassengerData's flight-shaped columns (seat
+# preference, passport fields, airline meal preference) — see 0048's
+# migration docstring for the full reasoning.
+class HotelBookingGuest(Base):
+    """One guest on a hotel booking, tied to the room they're staying in."""
+
+    __tablename__ = "hotel_booking_guests"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    booking_request_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="CASCADE"), nullable=False
+    )
+    #: Mirrors hotel_enquiry_rooms.room_number — which room (within the
+    #: booking) this guest belongs to.
+    room_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Exactly one lead guest per booking is app-enforced only (the
+    #: guest-capture screen only ever offers one lead-guest choice) — not a
+    #: DB constraint, same posture as other soft invariants in this schema.
+    is_lead_guest: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    title: Mapped[Optional[str]] = mapped_column(String(10))
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: Reuses PassengerType/passenger_type_enum — a hotel guest is either
+    #: kind exactly the way a flight passenger is.
+    guest_type: Mapped[PassengerType] = mapped_column(
+        _pg_enum(PassengerType, "passenger_type_enum"),
+        nullable=False,
+        server_default=text("'adult'"),
+    )
+    #: Child guests only — mirrors hotel_room_children.child_age.
+    age: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    id_proof_type: Mapped[Optional[str]] = mapped_column(String(40))
+    id_proof_number: Mapped[Optional[str]] = mapped_column(String(60))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    booking_request: Mapped["ServiceRequest"] = relationship(back_populates="hotel_guests")
+
+    __table_args__ = (
+        CheckConstraint("age IS NULL OR age BETWEEN 0 AND 17", name="ck_hotel_guest_age_range"),
+        CheckConstraint("room_number > 0", name="ck_hotel_guest_room_number_positive"),
+        Index("ix_hotel_booking_guests_request", "booking_request_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<HotelBookingGuest {self.first_name} {self.last_name} room={self.room_number}>"
+
+
 __all__ = [
     "Base",
     "User",
@@ -1858,4 +2148,8 @@ __all__ = [
     "Provider",
     "ProviderUser",
     "ProviderStatus",
+    "HotelEnquiry",
+    "HotelEnquiryRoom",
+    "HotelRoomChild",
+    "HotelBookingGuest",
 ]

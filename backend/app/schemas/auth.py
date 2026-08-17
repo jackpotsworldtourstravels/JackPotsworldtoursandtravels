@@ -76,6 +76,14 @@ class UserResponse(BaseModel):
     merchant_id: int | None = None
     merchant_name: str | None = None
     permissions: list[str] = []
+    #: Which products this user's merchant may use — {"flights": bool,
+    #: "hotels": bool, "visa": bool}. Empty on platform staff (no merchant to
+    #: have access rows) and on any caller of this schema that hasn't wired
+    #: it up. Populated once, in ``routers/auth.user_response()``, which is
+    #: what login, `/api/auth/me` and `/api/profile` all funnel through — so
+    #: this reaches the client the same instant `permissions` does, no extra
+    #: round trip.
+    service_access: dict[str, bool] = {}
     is_active: bool
     mobile: str | None = None
     first_name: str | None = None

@@ -622,10 +622,23 @@ def _validate_classic_submission(request: ServiceRequest) -> None:
         seen[key] = p.full_name
 
 
+def _has_travellers(request: ServiceRequest) -> bool:
+    """Does this request have at least one traveller, whatever shape they take?
+
+    A Flight booking's travellers are ``request.passengers``. A hotel
+    booking's are ``request.hotel_guests`` (migration 0048) — a separate
+    table, because a hotel guest's columns don't fit ``PassengerData``'s
+    flight-shaped ones. Both call sites that used to test
+    ``request.passengers`` directly now go through here instead, so a hotel
+    booking with guests but no passengers is not mistaken for an empty one.
+    """
+    return bool(request.passengers) or bool(request.hotel_guests)
+
+
 def submit_request(db: Session, actor: User, request_id: int) -> ServiceRequest:
     """Submit a draft for Admin approval, reserving inventory as it goes."""
     request = get_request(db, actor, request_id)
-    if not request.passengers:
+    if not _has_travellers(request):
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail="Add at least one passenger before submitting",

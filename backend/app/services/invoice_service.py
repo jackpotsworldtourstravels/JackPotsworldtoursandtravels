@@ -34,6 +34,7 @@ from app.models_v2 import (
     RequestStatus as S,
     RequestDocument,
     ServiceRequest,
+    TravelType,
     User,
 )
 from app.services import ticket_service
@@ -119,6 +120,20 @@ def _flight_label(details: dict) -> str:
     return " ".join(p for p in parts if p)
 
 
+def _hotel_label(details: dict) -> str:
+    """"Taj Exotica 5★", "Taj Exotica", "5★", or "" — Hotel's ``_flight_label``.
+
+    Same trap, same fix: ``hotel_name`` and ``star_category`` are both
+    optional-but-present-as-null on some rows, so ``or ""`` guards each one
+    individually rather than defaulting the whole expression.
+    """
+    parts = [
+        (details.get("hotel_name") or "").strip(),
+        (f"{details['star_category']}★" if details.get("star_category") else ""),
+    ]
+    return " ".join(p for p in parts if p)
+
+
 def _header(story, styles, heading: str, request: ServiceRequest, merchant):
     story.append(Paragraph("JackPots World Tours &amp; Travels", styles["title"]))
     story.append(Paragraph("B2B travel bookings", styles["sub"]))
@@ -185,21 +200,33 @@ def build_invoice(db: Session, actor: User, request_id: int) -> tuple[bytes, str
 
     story.append(Paragraph("Booking", styles["h"]))
     d = request.travel_details or {}
-    # `or ''` and not `.get(k, '')`: both keys are PRESENT AND NULL on an open
-    # enquiry (no carrier named), and a default only applies to a missing key —
-    # so the dict form would interpolate the string "None" onto an invoice.
-    flight = _flight_label(d)
+    is_hotel = request.travel_type is TravelType.HOTEL
     # A Paragraph, not a bare string: a plain table cell renders markup
     # literally, so the <br/> would print as the characters "<br/>".
-    description = Paragraph(
-        _sector(request) + (f"<br/>{flight}" if flight else ""), styles["cell"]
-    )
+    if is_hotel:
+        # Not `_sector(request)`: that always interpolates an arrow even with
+        # no origin to put before it, which is fine for a flight sector but
+        # wrong for a stay that never had an origin city at all.
+        stay = d.get("destination_city") or request.title or "—"
+        hotel = _hotel_label(d)
+        description = Paragraph(stay + (f"<br/>{hotel}" if hotel else ""), styles["cell"])
+        traveller_count = str(len(request.hotel_guests))
+    else:
+        # `or ''` and not `.get(k, '')`: both keys are PRESENT AND NULL on an
+        # open enquiry (no carrier named), and a default only applies to a
+        # missing key — so the dict form would interpolate the string "None"
+        # onto an invoice.
+        flight = _flight_label(d)
+        description = Paragraph(
+            _sector(request) + (f"<br/>{flight}" if flight else ""), styles["cell"]
+        )
+        traveller_count = str(len(request.passengers))
     story.append(_grid(
-        ["Description", "Travel date", "Passengers", "Amount"],
+        ["Description", "Check-in" if is_hotel else "Travel date", "Guests" if is_hotel else "Passengers", "Amount"],
         [[
             description,
             request.travel_date.strftime("%d %b %Y") if request.travel_date else "—",
-            str(len(request.passengers)),
+            traveller_count,
             f"{request.total_amount:,.2f}",
         ]],
         widths=(95 * mm, 30 * mm, 25 * mm, 45 * mm),
@@ -301,6 +328,7 @@ def build_confirmation(db: Session, actor: User, request_id: int) -> tuple[bytes
     request = _billable(db, actor, request_id)
     styles = _styles()
     d = request.travel_details or {}
+    is_hotel = request.travel_type is TravelType.HOTEL
 
     story = []
     _header(story, styles, "BOOKING CONFIRMATION", request, request.merchant)
@@ -313,28 +341,52 @@ def build_confirmation(db: Session, actor: User, request_id: int) -> tuple[bytes
         ("Status", request.status.value.replace("_", " ").title()),
     ], widths=(38 * mm, 120 * mm)))
 
-    story.append(Paragraph("Itinerary", styles["h"]))
-    story.append(_kv_table([
-        ("Route", _sector(request)),
-        ("Flight", _flight_label(d) or "All Airlines"),
-        ("Departure", request.travel_date.strftime("%d %b %Y") if request.travel_date else "—"),
-        ("Time", d.get("preferred_time") or "—"),
-        ("Return", request.return_date.strftime("%d %b %Y") if request.return_date else "—"),
-        ("Class", d.get("travel_class") or "—"),
-    ], widths=(38 * mm, 120 * mm)))
+    if is_hotel:
+        story.append(Paragraph("Hotel Stay", styles["h"]))
+        story.append(_kv_table([
+            ("Destination", d.get("destination_city") or "—"),
+            ("Hotel", _hotel_label(d) or "—"),
+            ("Room type", d.get("room_type") or "—"),
+            ("Meal plan", (d.get("meal_plan") or "").replace("_", " ").title() or "—"),
+            ("Check-in", request.travel_date.strftime("%d %b %Y") if request.travel_date else "—"),
+            ("Check-out", request.return_date.strftime("%d %b %Y") if request.return_date else "—"),
+        ], widths=(38 * mm, 120 * mm)))
 
-    story.append(Paragraph("Passengers", styles["h"]))
-    story.append(_grid(
-        ["#", "Name", "Type", "Passport", "Expiry"],
-        [[
-            str(i),
-            p.full_name,
-            p.passenger_type.value.title(),
-            p.passport_number or "—",
-            p.passport_expiry.strftime("%d %b %Y") if p.passport_expiry else "—",
-        ] for i, p in enumerate(request.passengers, start=1)],
-        widths=(10 * mm, 70 * mm, 25 * mm, 45 * mm, 45 * mm),
-    ))
+        story.append(Paragraph("Guests", styles["h"]))
+        story.append(_grid(
+            ["#", "Name", "Type", "Room", "ID Proof"],
+            [[
+                str(i),
+                f"{(g.title + ' ') if g.title else ''}{g.first_name} {g.last_name}",
+                g.guest_type.value.title(),
+                f"Room {g.room_number}" + (" (Lead)" if g.is_lead_guest else ""),
+                g.id_proof_number or "—",
+            ] for i, g in enumerate(request.hotel_guests, start=1)],
+            widths=(10 * mm, 60 * mm, 25 * mm, 40 * mm, 45 * mm),
+        ))
+    else:
+        story.append(Paragraph("Itinerary", styles["h"]))
+        story.append(_kv_table([
+            ("Route", _sector(request)),
+            ("Flight", _flight_label(d) or "All Airlines"),
+            ("Departure", request.travel_date.strftime("%d %b %Y") if request.travel_date else "—"),
+            ("Time", d.get("preferred_time") or "—"),
+            ("Return", request.return_date.strftime("%d %b %Y") if request.return_date else "—"),
+            ("Class", d.get("travel_class") or "—"),
+        ], widths=(38 * mm, 120 * mm)))
+
+        story.append(Paragraph("Passengers", styles["h"]))
+        story.append(_grid(
+            ["#", "Name", "Type", "Passport", "Expiry"],
+            [[
+                str(i),
+                p.full_name,
+                p.passenger_type.value.title(),
+                p.passport_number or "—",
+                p.passport_expiry.strftime("%d %b %Y") if p.passport_expiry else "—",
+            ] for i, p in enumerate(request.passengers, start=1)],
+            widths=(10 * mm, 70 * mm, 25 * mm, 45 * mm, 45 * mm),
+        ))
 
     contact = d.get("contact") or {}
     if contact:
@@ -367,9 +419,15 @@ def build_confirmation(db: Session, actor: User, request_id: int) -> tuple[bytes
 
     story.append(Spacer(1, 14))
     story.append(Paragraph(
-        "<b>This is a booking confirmation, not an airline ticket.</b> Carry the airline's own "
-        "e-ticket and a valid photo ID or passport for travel. Quote the PNR above with the "
-        "airline for any schedule change.",
+        (
+            "<b>This is a booking confirmation, not the hotel voucher.</b> Carry the issued "
+            "voucher and a valid photo ID at check-in. Quote the reference above with the hotel "
+            "for any change."
+        ) if is_hotel else (
+            "<b>This is a booking confirmation, not an airline ticket.</b> Carry the airline's own "
+            "e-ticket and a valid photo ID or passport for travel. Quote the PNR above with the "
+            "airline for any schedule change."
+        ),
         styles["small"],
     ))
 

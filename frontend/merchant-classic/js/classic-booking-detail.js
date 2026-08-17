@@ -75,13 +75,16 @@ function clRenderBookingDetail() {
   const classic = r.workflow === 'classic_tours';
   const returned = classic && r.status === 'draft' && d.manager_remarks;
   const ticketsReady = ['ticket_issued', 'completed'].includes(r.status);
+  const isHotel = r.travel_type === 'hotel';
 
   $('cl-booking-detail').innerHTML = `
     <div class="cl-page-head">
       <div>
         <h1>${escapeHtml(r.request_number)}</h1>
         <p>${escapeHtml(r.title || 'Booking request')}${
-          d.enquiry_reference ? ` · from enquiry <b class="cl-ref">${escapeHtml(d.enquiry_reference)}</b>` : ''}</p>
+          isHotel
+            ? (d.hotel_enquiry_reference ? ` · from enquiry <b class="cl-ref">${escapeHtml(d.hotel_enquiry_reference)}</b>` : '')
+            : (d.enquiry_reference ? ` · from enquiry <b class="cl-ref">${escapeHtml(d.enquiry_reference)}</b>` : '')}</p>
       </div>
       <div class="cl-page-actions">
         <button type="button" class="cl-btn" id="clBdBack">Back to My Requests</button>
@@ -115,13 +118,14 @@ function clRenderBookingDetail() {
                ? escapeHtml(moneyStr(r.total_amount)) : 'Awaiting amount'}</div>
              <div class="cl-kpi-sub">${d.enquiry_reference
                ? 'Confirmed by our team at approval' : ''}</div></div>`}
-      <div class="cl-kpi"><div class="cl-kpi-label">Travellers</div>
-        <div class="cl-kpi-value">${(r.passengers || []).length}</div>
-        <div class="cl-kpi-sub">${escapeHtml(d.travel_class || '')}</div></div>
+      <div class="cl-kpi"><div class="cl-kpi-label">${isHotel ? 'Guests' : 'Travellers'}</div>
+        <div class="cl-kpi-value">${isHotel ? (r.hotel_guests || []).length : (r.passengers || []).length}</div>
+        <div class="cl-kpi-sub">${escapeHtml(isHotel ? (d.room_type || '') : (d.travel_class || ''))}</div></div>
       <div class="cl-kpi"><div class="cl-kpi-label">Booking reference</div>
         <div class="cl-kpi-value cl-ref">${escapeHtml(r.booking_reference || '—')}</div>
-        <div class="cl-kpi-sub">${d.enquiry_reference
-          ? `From enquiry ${escapeHtml(d.enquiry_reference)}` : ''}</div></div>
+        <div class="cl-kpi-sub">${isHotel
+          ? (d.hotel_enquiry_reference ? `From enquiry ${escapeHtml(d.hotel_enquiry_reference)}` : '')
+          : (d.enquiry_reference ? `From enquiry ${escapeHtml(d.enquiry_reference)}` : '')}</div></div>
       ${/* 0040 — the margin the merchant made on THIS booking, carried over
             from the enquiry it came from. Rendered only when a client fare was
             recorded: saved_amount is null otherwise, and null means "not
@@ -150,8 +154,21 @@ function clRenderBookingDetail() {
     ${clQuotationPanelBd(r, d, classic)}
 
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Journey</h2></div>
+      <div class="cl-panel-head"><h2>${isHotel ? 'Hotel Stay' : 'Journey'}</h2></div>
       <div class="cl-panel-body">
+        ${isHotel ? `
+        <dl class="cl-dl">
+          <div><dt>Destination</dt><dd>${escapeHtml(d.destination_city || '—')}</dd></div>
+          <div><dt>Hotel</dt><dd>${escapeHtml(d.hotel_name || '—')}</dd></div>
+          <div><dt>Star category</dt><dd>${d.star_category ? `${escapeHtml(d.star_category)} Star` : '—'}</dd></div>
+          <div><dt>Room type</dt><dd>${escapeHtml(d.room_type || '—')}</dd></div>
+          <div><dt>Meal plan</dt><dd>${escapeHtml((d.meal_plan || '—').replace(/_/g, ' '))}</dd></div>
+          <div><dt>Check-in</dt><dd>${escapeHtml(fmtDate(r.travel_date))}</dd></div>
+          <div><dt>Check-out</dt><dd>${escapeHtml(fmtDate(r.return_date))}</dd></div>
+          <div><dt>Preferred location</dt><dd>${escapeHtml(d.preferred_location || '—')}</dd></div>
+          ${r.pnr ? `<div><dt>Confirmation number</dt><dd class="cl-ref">${escapeHtml(r.pnr)}</dd></div>` : ''}
+          ${r.booking_reference ? `<div><dt>Booking ref</dt><dd class="cl-ref">${escapeHtml(r.booking_reference)}</dd></div>` : ''}
+        </dl>` : `
         <dl class="cl-dl">
           <div><dt>Trip type</dt><dd>${tripTypeLabel(d.trip_type)}</dd></div>
           <div><dt>From</dt><dd>${escapeHtml([d.origin_city, d.origin].filter(Boolean).join(' · ') || '—')}</dd></div>
@@ -168,7 +185,7 @@ function clRenderBookingDetail() {
             : '<span class="cl-tag">Domestic</span>'}</dd></div>
           ${r.pnr ? `<div><dt>PNR</dt><dd class="cl-ref">${escapeHtml(r.pnr)}</dd></div>` : ''}
           ${r.booking_reference ? `<div><dt>Booking ref</dt><dd class="cl-ref">${escapeHtml(r.booking_reference)}</dd></div>` : ''}
-        </dl>
+        </dl>`}
       </div>
       ${d.admin_response ? `<div class="cl-panel-note"><b>Our response:</b> ${escapeHtml(d.admin_response)}</div>` : ''}
       ${r.rejection_reason ? `<div class="cl-panel-note"><b>Reason:</b> ${escapeHtml(r.rejection_reason)}</div>` : ''}
@@ -190,8 +207,21 @@ function clRenderBookingDetail() {
     </div>
 
     <div class="cl-panel">
-      <div class="cl-panel-head"><h2>Passengers</h2></div>
+      <div class="cl-panel-head"><h2>${isHotel ? 'Guests' : 'Passengers'}</h2></div>
       <div class="cl-table-wrap">
+        ${isHotel ? `
+        <table class="cl-table">
+          <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Room</th><th>ID proof</th></tr></thead>
+          <tbody>${(r.hotel_guests || []).length ? r.hotel_guests.map((g, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td class="cl-nowrap">${escapeHtml([g.title, g.first_name, g.last_name].filter(Boolean).join(' '))}${
+                g.is_lead_guest ? ' <span class="cl-tag">Lead</span>' : ''}</td>
+              <td class="cl-nowrap">${escapeHtml(clLabel(g.guest_type || 'adult'))}</td>
+              <td class="cl-nowrap">Room ${g.room_number}</td>
+              <td class="cl-nowrap">${escapeHtml(g.id_proof_number || '—')}</td>
+            </tr>`).join('') : clEmptyRow(5, 'No guests recorded.')}</tbody>
+        </table>` : `
         <table class="cl-table">
           <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Gender</th><th>Date of birth</th>
             <th>Nationality</th><th>Passport</th><th>Expiry</th><th>Special requests</th></tr></thead>
@@ -218,7 +248,7 @@ function clRenderBookingDetail() {
               <td class="cl-nowrap">${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
               <td>${escapeHtml(clReadSpecialRequest(p.special_services) || '—')}</td>
             </tr>`).join('') : clEmptyRow(9, 'No passengers recorded.')}</tbody>
-        </table>
+        </table>`}
       </div>
     </div>
 
@@ -440,7 +470,9 @@ function clQuotationPanelBd(r, d, classic) {
   const total = r.total_amount;
   const hasQuote = quoted != null && moneyIsPositive(quoted);
   const hasTotal = moneyIsPositive(total);
-  if (!hasQuote && !hasTotal && !d.enquiry_reference) return '';
+  const isHotel = r.travel_type === 'hotel';
+  const enquiryRef = isHotel ? d.hotel_enquiry_reference : d.enquiry_reference;
+  if (!hasQuote && !hasTotal && !enquiryRef) return '';
 
   /* The two figures are the same number on every booking raised the normal
      way. When they are NOT, the booking has been repriced since the quotation
@@ -451,8 +483,8 @@ function clQuotationPanelBd(r, d, classic) {
     <div class="cl-panel">
       <div class="cl-panel-head">
         <h2>${clIco('rupee')}Quotation</h2>
-        ${d.enquiry_reference ? `<div class="cl-panel-tools">
-          <span class="cl-kpi-sub">From enquiry <b class="cl-ref">${escapeHtml(d.enquiry_reference)}</b></span>
+        ${enquiryRef ? `<div class="cl-panel-tools">
+          <span class="cl-kpi-sub">From enquiry <b class="cl-ref">${escapeHtml(enquiryRef)}</b></span>
         </div>` : ''}
       </div>
       <div class="cl-panel-body">
@@ -472,9 +504,9 @@ function clQuotationPanelBd(r, d, classic) {
             <div class="cl-kpi-sub">Repriced since the quotation — the timeline says when</div>
           </div>` : ''}
           <div class="cl-kpi">
-            <div class="cl-kpi-label">Travellers</div>
-            <div class="cl-kpi-value">${(r.passengers || []).length}</div>
-            <div class="cl-kpi-sub">${escapeHtml(d.travel_class || 'All classes')}</div>
+            <div class="cl-kpi-label">${isHotel ? 'Guests' : 'Travellers'}</div>
+            <div class="cl-kpi-value">${isHotel ? (r.hotel_guests || []).length : (r.passengers || []).length}</div>
+            <div class="cl-kpi-sub">${escapeHtml(isHotel ? (d.room_type || 'All rooms') : (d.travel_class || 'All classes'))}</div>
           </div>
         </div>
       </div>

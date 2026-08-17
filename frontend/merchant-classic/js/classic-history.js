@@ -355,14 +355,19 @@ function clRenderHistoryRows(failedStages = 0) {
 
 function clHistoryRow(r) {
   const d = r.travel_details || r.details || {};
+  const isHotel = r.travel_type === 'hotel';
   const from = d.origin_city || d.origin;
   const to = d.destination_city || d.destination;
-  const route = from && to
-    ? `${escapeHtml(from)} <span style="color:var(--cl-text-muted)">→</span> ${escapeHtml(to)}`
-    : escapeHtml(r.title || '—');
-  const pax = r.passengers || [];
+  const route = isHotel
+    ? escapeHtml(d.destination_city || r.title || '—')
+    : (from && to
+      ? `${escapeHtml(from)} <span style="color:var(--cl-text-muted)">→</span> ${escapeHtml(to)}`
+      : escapeHtml(r.title || '—'));
+  const pax = isHotel ? (r.hotel_guests || []) : (r.passengers || []);
   const lead = pax.length
-    ? [pax[0].title, pax[0].first_name, pax[0].last_name].filter(Boolean).join(' ')
+    ? (isHotel
+      ? [pax.find(g => g.is_lead_guest) || pax[0]].map(g => [g.title, g.first_name, g.last_name].filter(Boolean).join(' '))[0]
+      : [pax[0].title, pax[0].first_name, pax[0].last_name].filter(Boolean).join(' '))
     : '';
   const ticketable = ['ticket_issued', 'completed'].includes(r.status);
 
@@ -371,8 +376,9 @@ function clHistoryRow(r) {
       ${r.booking_reference ? `<div class="cl-kpi-sub">${escapeHtml(r.booking_reference)}</div>` : ''}</td>
     <td><b>${route}</b>
       <div class="cl-kpi-sub">${escapeHtml(clLabel(r.request_type || r.travel_type || '—'))}</div></td>
-    <td class="cl-nowrap">${escapeHtml(fmtAirline(d.airline))}
-      ${d.flight_number ? `<div class="cl-kpi-sub">${escapeHtml(d.flight_number)}</div>` : ''}</td>
+    <td class="cl-nowrap">${isHotel ? escapeHtml(d.hotel_name || '—') : escapeHtml(fmtAirline(d.airline))}
+      ${!isHotel && d.flight_number ? `<div class="cl-kpi-sub">${escapeHtml(d.flight_number)}</div>` : ''}
+      ${isHotel && d.star_category ? `<div class="cl-kpi-sub">${escapeHtml(d.star_category)}★</div>` : ''}</td>
     <td class="cl-ref">${escapeHtml(r.pnr || '—')}
       ${r.ticket_number ? `<div class="cl-kpi-sub">${escapeHtml(r.ticket_number)}</div>` : ''}</td>
     <td>${pax.length ? `${pax.length}` : '—'}

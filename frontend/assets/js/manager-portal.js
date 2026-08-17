@@ -553,6 +553,7 @@ function mgrRenderReview(data) {
   const contact = d.contact || {};
   const roundTrip = d.trip_type === 'round_trip';
   const decidable = data.can_decide;
+  const isHotel = r.travel_type === 'hotel';
 
   $mg('mgrReviewBody').innerHTML = `
     <div class="mg-modal-head">
@@ -570,14 +571,50 @@ function mgrRenderReview(data) {
         <div><dt>Booking reference</dt><dd class="mg-ref">${escapeHtml(r.booking_reference || '—')}</dd></div>
         <!-- A booking on this queue arrived one of two ways. A dash here would
              read as missing data on a booking that never had an enquiry. -->
-        <div><dt>From enquiry</dt><dd class="mg-ref">${d.enquiry_reference
-          ? escapeHtml(d.enquiry_reference)
-          : (d.direct_booking ? 'Direct booking — not quoted' : '—')}</dd></div>
+        <div><dt>From enquiry</dt><dd class="mg-ref">${
+          isHotel ? (d.hotel_enquiry_reference
+            ? escapeHtml(d.hotel_enquiry_reference)
+            : (d.direct_booking ? 'Direct booking — not quoted' : '—'))
+          : (d.enquiry_reference
+            ? escapeHtml(d.enquiry_reference)
+            : (d.direct_booking ? 'Direct booking — not quoted' : '—'))}</dd></div>
         <div><dt>Submitted</dt><dd>${escapeHtml(fmtDateTime(r.created_at))}</dd></div>
-        <div><dt>Travellers</dt><dd>${(r.passengers || []).length}</dd></div>
+        <div><dt>${isHotel ? 'Guests' : 'Travellers'}</dt><dd>${
+          isHotel ? (r.hotel_guests || []).length : (r.passengers || []).length}</dd></div>
       </dl>
     </div>
 
+    ${isHotel ? `
+    <div class="mg-section">
+      <h3>Hotel Stay <span style="font-weight:600;text-transform:none;letter-spacing:0;">— locked from the answered enquiry</span></h3>
+      <dl class="mg-dl">
+        <div><dt>Destination</dt><dd>${escapeHtml(d.destination_city || '—')}</dd></div>
+        <div><dt>Hotel</dt><dd>${escapeHtml(d.hotel_name || '—')}</dd></div>
+        <div><dt>Star category</dt><dd>${d.star_category ? `${escapeHtml(d.star_category)} Star` : '—'}</dd></div>
+        <div><dt>Room type</dt><dd>${escapeHtml(d.room_type || '—')}</dd></div>
+        <div><dt>Meal plan</dt><dd>${escapeHtml((d.meal_plan || '—').replace(/_/g, ' '))}</dd></div>
+        <div><dt>Check-in</dt><dd>${escapeHtml(fmtDate(r.travel_date))}</dd></div>
+        <div><dt>Check-out</dt><dd>${escapeHtml(fmtDate(r.return_date))}</dd></div>
+        <div><dt>Preferred location</dt><dd>${escapeHtml(d.preferred_location || '—')}</dd></div>
+      </dl>
+    </div>
+
+    <div class="mg-section">
+      <h3>Guests</h3>
+      <div class="table-wrap"><table><thead><tr>
+        <th>#</th><th>Name</th><th>Type</th><th>Room</th><th>ID proof</th>
+      </tr></thead><tbody>
+        ${(r.hotel_guests || []).map((g, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml([g.title, g.first_name, g.last_name].filter(Boolean).join(' '))}${
+              g.is_lead_guest ? ' <span class="badge">Lead</span>' : ''}</td>
+            <td>${escapeHtml(g.guest_type || 'adult')}</td>
+            <td>Room ${g.room_number}</td>
+            <td class="mg-ref">${escapeHtml(g.id_proof_number || '—')}</td>
+          </tr>`).join('') || '<tr><td colspan="5" class="mg-empty">No guests recorded.</td></tr>'}
+      </tbody></table></div>
+    </div>` : `
     <div class="mg-section">
       <h3>Itinerary <span style="font-weight:600;text-transform:none;letter-spacing:0;">— locked from the answered enquiry</span></h3>
       <dl class="mg-dl">
@@ -616,7 +653,7 @@ function mgrRenderReview(data) {
             <td>${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
           </tr>`).join('') || '<tr><td colspan="8" class="mg-empty">No passengers recorded.</td></tr>'}
       </tbody></table></div>
-    </div>
+    </div>`}
 
     <div class="mg-section">
       <h3>Contact</h3>

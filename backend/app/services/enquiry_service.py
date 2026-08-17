@@ -62,6 +62,7 @@ from app.models_v2 import (
     PassengerData,
     RequestStatus as S,
     RequestType,
+    ServiceCode,
     ServiceRequest,
     TravelType,
     User,
@@ -73,8 +74,14 @@ from app.services import (
     lifecycle,
     merchant_service,
     notification_service,
+    service_access_service,
     ticket_service,
 )
+
+# NOTE: ServiceCode/service_access_service stay imported — Flight enquiries
+# are still gated by ServiceCode.FLIGHTS below. Hotel enquiries moved to their
+# own table and their own service (hotel_enquiry_service.py); this module no
+# longer branches on travel_type at all.
 
 logger = logging.getLogger("jackpots.enquiry")
 
@@ -146,6 +153,12 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Only merchant accounts can raise ticket enquiries",
         )
+    # THE GATE. Fires before anything is built, so a merchant whose company
+    # lacks Flights access never gets as far as allocating a reference number.
+    # Does not run in list_enquiries/get/respond/start_review — disabling a
+    # service must block new creation only, never hide or break what already
+    # exists (see migration 0045's docstring for the backfill this depends on).
+    service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
 
     now = _now()
     enquiry = ServiceRequest(
@@ -155,6 +168,7 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         request_type=RequestType.TICKET_ENQUIRY,
         # Flight-only by design: the form asks for an airline and a flight
         # number, neither of which a hotel or cruise enquiry would carry.
+        # Hotel enquiries are their own table now (hotel_enquiry_service.py).
         travel_type=TravelType.FLIGHT,
         status=S.PENDING_APPROVAL,
         title=_title(payload),
@@ -515,6 +529,15 @@ def to_booking_request(
     ``available_units`` is NULL, which it is on an enquiry — so submitting
     reserves nothing and cancelling releases nothing.
     """
+    # Gated on CURRENT access, not on whatever was true when the enquiry was
+    # raised: converting to a booking creates a brand-new service_requests
+    # row, so it is "new creation" exactly like raising the enquiry itself
+    # was — an Admin turning Flights off must stop a NEW booking from being
+    # drafted here, the same way it already stops a new enquiry. The enquiry
+    # and any booking already made from it are untouched; only this next
+    # step is blocked.
+    service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
+
     # Locked for the same reason the admin actions are: two Request Ticket
     # clicks landing together would both read booking_request_id as empty and
     # both raise a booking against one answer.
@@ -801,6 +824,11 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Only merchant accounts can raise booking requests",
         )
+    # Direct booking has always been Flight-only (no Hotel direct-booking
+    # path exists) — gated here the same way `create()` gates a Flight
+    # enquiry, closing the one path that could otherwise create a Flight
+    # booking for a merchant with Flights disabled.
+    service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
     # A GROUP BOOKING TAKES ITS TRAVELLERS FROM THE UPLOADED MANIFEST.
     # `_manifest_passengers` returns the import row as well, because it has to
     # be bound to this booking once the row exists — and it refuses anything

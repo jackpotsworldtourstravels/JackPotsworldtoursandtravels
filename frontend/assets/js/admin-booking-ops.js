@@ -364,6 +364,36 @@ function opsPassengerCard(p, i) {
     </article>`;
 }
 
+/* Hotel's opsPassengerCard — same card shape, over HotelGuestResponse's
+   fields instead of PassengerData's (no passport/seat/meal columns; room and
+   ID proof instead). */
+function opsGuestCard(g, i) {
+  const item = (label, value) => `
+    <div class="ops-pax-item"><span class="ops-pax-label">${label}</span>
+      <span class="ops-pax-value">${value}</span></div>`;
+
+  return `
+    <article class="ops-pax">
+      <header class="ops-pax-head">
+        <span class="ops-pax-num">${i + 1}</span>
+        <span class="ops-pax-name">${escapeHtml(
+          [g.title, g.first_name, g.last_name].filter(Boolean).join(' ') || `Guest ${i + 1}`)}</span>
+        <span class="badge read">${escapeHtml(opsLabel(g.guest_type || 'adult'))}</span>
+        ${g.is_lead_guest ? '<span class="badge read">Lead guest</span>' : ''}
+      </header>
+      <div class="ops-pax-grid">
+        ${item('Guest type', escapeHtml(opsLabel(g.guest_type || 'adult')))}
+        ${item('Title', escapeHtml(opsDash(g.title)))}
+        ${item('First name', escapeHtml(opsDash(g.first_name)))}
+        ${item('Last name', escapeHtml(opsDash(g.last_name)))}
+        ${item('Room', `Room ${g.room_number}`)}
+        ${g.age != null ? item('Age', String(g.age)) : ''}
+        ${item('ID proof type', escapeHtml(opsDash(g.id_proof_type)))}
+        ${item('ID proof number', escapeHtml(opsDash(g.id_proof_number)))}
+      </div>
+    </article>`;
+}
+
 /* THE UPLOADED PASSENGER LIST, FOR THE DESK (0042).
    ===========================================================================
    Three things the spec asks for, in one panel: download the file the merchant
@@ -445,6 +475,8 @@ function opsRenderWork() {
   const d = r.details || {};
   const contact = d.contact || {};
   const passengers = r.passengers || [];
+  const guests = r.hotel_guests || [];
+  const isHotel = r.travel_type === 'hotel';
   /* A Round Trip Group carries a return leg too, so the return rows key off
      whether one exists rather than off the trip type alone (0042). */
   const roundTrip = d.trip_type === 'round_trip'
@@ -499,11 +531,22 @@ function opsRenderWork() {
           ${cell('Booking reference', escapeHtml(opsDash(r.booking_reference)))}
           <!-- Load-bearing for this desk: a direct booking carries no
                quotation, so it is this desk that names the fare at issuance. -->
-          ${cell('Enquiry reference', escapeHtml(
-            d.enquiry_reference || (d.direct_booking ? 'Direct booking — not quoted' : '—')))}
+          ${cell(isHotel ? 'Hotel enquiry reference' : 'Enquiry reference', escapeHtml(
+            isHotel ? (d.hotel_enquiry_reference || (d.direct_booking ? 'Direct booking — not quoted' : '—'))
+              : (d.enquiry_reference || (d.direct_booking ? 'Direct booking — not quoted' : '—'))))}
           ${cell('Merchant', escapeHtml(opsDash(r.merchant_name)))}
           ${cell('Merchant user', escapeHtml(opsDash(r.raised_by)))}
           ${cell('Submitted', escapeHtml(fmtDateTime(r.created_at)))}
+          ${isHotel ? `
+          ${cell('Destination', escapeHtml(opsDash(d.destination_city)))}
+          ${cell('Hotel', escapeHtml(opsDash(d.hotel_name)))}
+          ${cell('Star category', d.star_category ? `${escapeHtml(d.star_category)} Star` : '—')}
+          ${cell('Room type', escapeHtml(opsDash(d.room_type)))}
+          ${cell('Meal plan', escapeHtml(d.meal_plan ? opsLabel(d.meal_plan) : '—'))}
+          ${cell('Check-in', escapeHtml(fmtDate(r.travel_date)))}
+          ${cell('Check-out', escapeHtml(fmtDate(r.return_date)))}
+          ${cell('Preferred location', escapeHtml(opsDash(d.preferred_location)))}
+          ${cell('Total guests', String(guests.length))}` : `
           ${cell('Journey type', isGroup && groupJourneyLabel(d.group_journey_type)
             ? `${tripTypeLabel(d.trip_type)} · ${groupJourneyLabel(d.group_journey_type)}`
             : tripTypeLabel(d.trip_type))}
@@ -521,7 +564,7 @@ function opsRenderWork() {
                is what the desk actually books against. "—" on a group booking
                and on anything raised before the field existed. -->
           ${cell('Booking Class', escapeHtml(opsDash(d.booking_class)))}
-          ${cell('Total passengers', String(passengers.length))}
+          ${cell('Total passengers', String(passengers.length))}`}
           ${/* The desk is about to spend the platform's money against this
                 figure, so it belongs on the screen where that happens. It was
                 absent entirely: the only money this modal ever showed was the
@@ -544,17 +587,21 @@ function opsRenderWork() {
       <div class="ops-section">
         ${/* Not "…and approved by the Manager": this queue also holds catalog-led
              bookings, which an Admin approves. True of both tracks or not said. */''}
-        <h3>Passenger information
+        <h3>${isHotel ? 'Guest information' : 'Passenger information'}
           <span class="ops-staff-note">as submitted by the merchant</span></h3>
         ${/* GROUP BOOKING (0042). The party arrived as a spreadsheet, so the
              desk gets the validation summary and the original file alongside
              the passenger cards. The cards themselves are unchanged — these
              are real passenger_data rows, created from the sheet at
              submission, so nothing here needs re-entering to issue tickets. */''}
-        ${isGroup ? '<div id="opsGroupImport" class="ops-sub">Loading the uploaded passenger list…</div>' : ''}
-        ${passengers.length
-          ? passengers.map(opsPassengerCard).join('')
-          : '<p class="ops-sub">No passengers recorded on this booking.</p>'}
+        ${!isHotel && isGroup ? '<div id="opsGroupImport" class="ops-sub">Loading the uploaded passenger list…</div>' : ''}
+        ${isHotel
+          ? (guests.length
+            ? guests.map(opsGuestCard).join('')
+            : '<p class="ops-sub">No guests recorded on this booking.</p>')
+          : (passengers.length
+            ? passengers.map(opsPassengerCard).join('')
+            : '<p class="ops-sub">No passengers recorded on this booking.</p>')}
         ${d.special_requests
           ? `<div class="detail-note"><strong>Special requests — whole party</strong>
                <p>${escapeHtml(d.special_requests)}</p></div>` : ''}
@@ -596,28 +643,28 @@ function opsRenderWork() {
             server's REFERENCE_STAGES, so the form is never offered where it
             would be refused. */''}
       <div class="ops-section">
-        <h3>Airline references
-          <span class="ops-staff-note">after booking with the airline</span></h3>
+        <h3>${isHotel ? 'Hotel references' : 'Airline references'}
+          <span class="ops-staff-note">after booking with the ${isHotel ? 'hotel' : 'airline'}</span></h3>
         <p class="ops-sub">Blank fields are left as they are — the server writes only what you send,
-          so correcting the PNR cannot wipe the ticket number.</p>
+          so correcting the ${isHotel ? 'confirmation number' : 'PNR'} cannot wipe the ticket number.</p>
         <div class="ops-grid-3">
-          <div class="form-field"><label for="opsPnr">Airline PNR</label>
-            <input id="opsPnr" value="${escapeHtml(r.pnr || '')}" placeholder="H4X9PQ"></div>
-          <div class="form-field"><label for="opsTicketNo">Ticket number</label>
+          <div class="form-field"><label for="opsPnr">${isHotel ? 'Confirmation number' : 'Airline PNR'}</label>
+            <input id="opsPnr" value="${escapeHtml(r.pnr || '')}" placeholder="${isHotel ? 'HB4X9PQ' : 'H4X9PQ'}"></div>
+          <div class="form-field"><label for="opsTicketNo">${isHotel ? 'Voucher number' : 'Ticket number'}</label>
             <input id="opsTicketNo" value="${escapeHtml(r.ticket_number || '')}"></div>
-          <div class="form-field"><label for="opsAirlineRef">Airline reference <span class="ops-sub">(if applicable)</span></label>
+          <div class="form-field"><label for="opsAirlineRef">${isHotel ? 'Supplier reference' : 'Airline reference'} <span class="ops-sub">(if applicable)</span></label>
             <input id="opsAirlineRef" value="${escapeHtml(d.airline_reference || '')}"></div>
         </div>
         <button type="button" class="btn btn-ghost btn-sm" id="opsRefsBtn">Save references</button>
         ${r.provider_name ? `<p class="ops-sub" style="margin-top:10px;">
           Bought from <b>${escapeHtml(r.provider_name)}</b>${
             r.provider_user_name ? ` via ${escapeHtml(r.provider_user_name)}` : ''}.
-          Recorded when the ticket was issued and not editable here.</p>` : ''}
+          Recorded when the ${isHotel ? 'voucher' : 'ticket'} was issued and not editable here.</p>` : ''}
       </div>
 
       <div class="ops-section">
-        <h3>Issued ticket documents</h3>
-        <p class="ops-sub">PDF, JPEG, PNG or WebP. Attach as many as the airline sent — the
+        <h3>${isHotel ? 'Issued voucher documents' : 'Issued ticket documents'}</h3>
+        <p class="ops-sub">PDF, JPEG, PNG or WebP. Attach as many as the ${isHotel ? 'hotel' : 'airline'} sent — the
           merchant downloads all of them.</p>
         <div class="ops-row">
           <input type="file" id="opsTicketFiles" multiple accept="application/pdf,image/jpeg,image/png,image/webp">
@@ -675,29 +722,31 @@ function opsRenderWork() {
         <div class="form-grid">
           ${needsFare ? `
             <div class="form-field">
-              <label for="opsFareInput">Fare paid to the airline (₹)</label>
+              <label for="opsFareInput">Fare paid to the ${isHotel ? 'hotel' : 'airline'} (₹)</label>
               <input type="number" id="opsFareInput" min="0.01" step="0.01" inputmode="decimal"
                      placeholder="0.00" aria-describedby="opsFareHelp">
               <p class="ops-sub" id="opsFareHelp">
                 This becomes the booking amount and is debited from the merchant's wallet
-                when the ticket is issued.
+                when the ${isHotel ? 'voucher' : 'ticket'} is issued.
               </p>
             </div>` : ''}
           ${opsProviderFields(providers)}
         </div>` : ''}
       ${ticketed ? `<p class="ops-sub">
-          Ticketed. This booking completes on its own once the scheduled travel
-          has finished${opsJourneyEndLabel(r, d)} — there is nothing further to do here.
+          ${isHotel ? 'Voucher issued' : 'Ticketed'}. This booking completes on its own once the
+          scheduled ${isHotel ? 'stay' : 'travel'} has finished${
+            opsJourneyEndLabel(r, d)} — there is nothing further to do here.
         </p>` : ''}
       ${!canIssue && !ticketed
         ? `<p class="ops-sub">${classic
             ? 'Nothing to do here until a manager approves this booking.'
-            : 'This booking is waiting on payment before a ticket can be issued.'}</p>`
+            : `This booking is waiting on payment before a ${isHotel ? 'voucher' : 'ticket'} can be issued.`}</p>`
         : ''}
       <div class="msg" id="opsActionMsg" aria-live="polite"></div>
       ${canIssue ? `
         <div class="modal-actions">
-          <button type="button" class="btn btn-coral" id="opsIssueBtn">Mark Ticket Issued</button>
+          <button type="button" class="btn btn-coral" id="opsIssueBtn">${
+            isHotel ? 'Mark Voucher Issued' : 'Mark Ticket Issued'}</button>
         </div>` : ''}
     </div>`;
 
@@ -895,8 +944,9 @@ async function opsLifecycle(id, action) {
   if (action === 'issue-ticket' && fareInput) {
     const fare = Number(fareInput.value);
     if (!(fare > 0)) {
+      const isHotel = opsCurrent?.detail?.request?.travel_type === 'hotel';
       msg.className = 'msg error';
-      msg.textContent = 'Enter the fare paid to the airline — it is what the merchant is billed.';
+      msg.textContent = `Enter the fare paid to the ${isHotel ? 'hotel' : 'airline'} — it is what the merchant is billed.`;
       fareInput.focus();
       return;
     }

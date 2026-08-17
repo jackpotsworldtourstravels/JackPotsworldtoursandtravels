@@ -3560,6 +3560,61 @@ body.cl-sc-composing .cl-crumb{visibility:hidden;}
   font-variant-numeric:tabular-nums; color:var(--cl-text);
 }
 
+/* ---- Rooms & Guests — Hotel Enquiry's popover selector ----
+   Trigger button reads like a filled field ("2 Rooms · 4 Adults · 1 Child");
+   the popover itself borrows `.cl-combo-list`'s anchored-box positioning
+   rather than inventing a second one, since the two are the same shape (a
+   panel hanging off a control, closed by default). Draft/commit state lives
+   in JS (classic-enquiry-hotel.js); this file only draws it. */
+.cl-rg{position:relative;}
+.cl-rg-trigger{
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:0 14px; height:44px; text-align:left;
+  background:var(--cl-surface); border:1.5px solid var(--cl-line);
+  border-radius:var(--cl-r-md); color:var(--cl-text);
+  font-size:13.5px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:border-color var(--cl-fast);
+}
+.cl-rg-trigger:hover{border-color:#CBD6E4;}
+.cl-rg-trigger:focus-visible{outline:none; border-color:var(--cl-orange);}
+.cl-rg-trigger svg{flex-shrink:0; color:var(--cl-text-muted); transition:transform .18s var(--cl-ease);}
+.cl-rg-trigger[aria-expanded="true"] svg{transform:rotate(180deg);}
+
+.cl-rg-pop{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:70;
+  width:min(360px, 92vw);
+  background:var(--cl-surface); border:1px solid var(--cl-line);
+  border-radius:var(--cl-r-md); box-shadow:var(--cl-sh-lg);
+  padding:14px; display:none;
+}
+.cl-rg-pop.open{display:block; animation:cl-enter .18s var(--cl-ease) both;}
+/* Clamped to the viewport's right edge on a narrow screen — an anchored
+   popover that overflows sideways is the most common way this shape breaks
+   on a phone. */
+@media (max-width:520px){
+  .cl-rg-pop{left:auto; right:0;}
+}
+.cl-rg-rooms{display:flex; flex-direction:column; gap:12px; max-height:50vh; overflow-y:auto;}
+.cl-rg-room{padding:12px; border:1px solid var(--cl-line); border-radius:var(--cl-r-sm);}
+.cl-rg-room-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px; font-size:13px; font-weight:700; color:var(--cl-text);
+}
+.cl-rg-remove{
+  width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:50%; border:none; background:transparent; color:var(--cl-text-muted); cursor:pointer;
+  transition:background var(--cl-fast), color var(--cl-fast);
+}
+.cl-rg-remove:hover{background:var(--cl-accent-soft); color:var(--cl-orange-700);}
+.cl-rg-pax-grid{grid-template-columns:1fr 1fr; gap:8px;}
+.cl-rg-pax-grid .cl-pax-card{padding:10px 12px;}
+.cl-rg-pax-grid .cl-pax-card b{font-size:12.5px;}
+.cl-rg-ages{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:8px; margin-top:10px;}
+.cl-rg-ages .cl-field{margin:0;}
+.cl-rg-ages label{font-size:11.5px;}
+.cl-rg-pop > .cl-btn{width:100%; justify-content:center; margin-top:12px;}
+.cl-rg-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:14px;}
+
 /* ---- journey blocks: departure and return ----
    ONE TREATMENT FOR BOTH LEGS, AND IT IS NO LONGER A HIGHLIGHT.
    This was `.cl-return`, a shaded dashed panel that only the return leg wore —

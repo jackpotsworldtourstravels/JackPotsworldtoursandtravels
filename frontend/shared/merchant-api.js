@@ -181,6 +181,61 @@ const MerchantApi = {
     return this._req('get', `/api/enquiries/${id}`);
   },
 
+  /* ------------------------------------------------------- hotel enquiry --
+     Separate tables, separate endpoints (backend migration 0047) — not a
+     travel_type on the flight enquiry above. The response shape still mirrors
+     EnquiryResponse's field names (reference_number, travel_date/return_date
+     for check-in/out, notes for special requirements, travel_type: 'hotel'),
+     so the merchant/admin row renderers barely branch between the two. */
+  createHotelEnquiry(payload) {
+    return this._req('post', '/api/hotel/enquiries', { data: payload });
+  },
+  listHotelEnquiries(params) {
+    return this._req('get', '/api/hotel/enquiries', { params });
+  },
+  getHotelEnquiry(id) {
+    return this._req('get', `/api/hotel/enquiries/${id}`);
+  },
+
+  /* Raise Booking: turns an APPROVED (quoted) hotel enquiry into a DRAFT
+     booking. Only the guests are sent — the stay itself (destination, hotel,
+     dates, room/child composition) is copied from the enquiry server-side, so
+     the booking is always the stay that was actually quoted. Returns the
+     booking as a RequestResponse (same shape /api/requests/{id} returns); it
+     still needs submitRequest() to reach the desk. 409 if this enquiry has
+     already been booked. */
+  createHotelBookingFromEnquiry(enquiryId, { guests, remarks, contact, specialRequests, clientFare }) {
+    return this._req('post', `/api/hotel/enquiries/${enquiryId}/booking-request`, {
+      data: {
+        guests,
+        remarks: remarks || undefined,
+        contact: contact || undefined,
+        special_requests: specialRequests || undefined,
+        /* `??`, not `||`: 0 is a real client fare. */
+        client_fare: clientFare ?? undefined,
+      },
+    });
+  },
+
+  /* Book Directly for Hotel — no enquiry, no quotation, in front first.
+     Mirrors createDirectBooking: `stay` is the identical stay object
+     clStartDirectHotelBooking built from the form, spread verbatim into the
+     body alongside the guests. No price is named — the booking is created
+     unquoted and our desk names the fare when it issues the voucher. */
+  createDirectHotelBooking(stay, { guests, remarks, contact, specialRequests, clientFare }) {
+    return this._req('post', '/api/hotel/bookings/direct', {
+      data: {
+        ...stay,
+        guests,
+        remarks: remarks || undefined,
+        contact: contact || undefined,
+        special_requests: specialRequests || undefined,
+        client_fare: clientFare ?? undefined,
+        submit: false,
+      },
+    });
+  },
+
   /* Request Ticket: turns an APPROVED enquiry into a DRAFT booking. Only the
      passengers are sent — every itinerary field is copied from the enquiry
      server-side, so the booking is always the journey that was answered.

@@ -38,21 +38,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260812bot4">
+<link rel="stylesheet" href="css/classic.css?v=20260815svc5">
 <!-- Shared design system — must stay last. It re-points classic.css's own
      `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
      contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
      text) so every AA measurement in this portal still holds. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260812bot4">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260815svc5">
 <!-- Shared sidebar brand block — see admin/index.html. Must follow classic.css,
      whose `.cl-side a.cl-brand` it supersedes on source order. It declares only
      its own --brand-* vars, so the `--cl-*` contract above is untouched, and the
      mini-rail overrides outrank it on specificity and still win. -->
-<link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260812bot4">
+<link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260815svc5">
 <!-- Admin's rail geometry — see the file header. Widens --cl-rail-w to 308px,
      which the `.cl-app` grid column follows; the mini-rail keeps its 82px because
      `.cl-app.cl-rail-mini` outranks the :root declaration. -->
-<link rel="stylesheet" href="../assets/css/sidebar-rail.css?v=20260812bot4">
+<link rel="stylesheet" href="../assets/css/sidebar-rail.css?v=20260815svc5">
 </head>
 <body>
 
@@ -242,13 +242,31 @@
            split that used to call this "Ticket Enquiry" on staff screens was
            dropped on request. Only the Premium portal still uses the old name.
            Same rows, same request_type either way. -->
-      <a href="#" data-cl-nav="enquiry">
+      <!-- Hidden by classic-shell.js when the merchant has neither Flights
+           nor Hotels enabled (e.g. Visa-only) — there is nothing for either
+           screen to offer without at least one booking product. -->
+      <a href="#" data-cl-nav="enquiry" id="clNavEnquiry">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.4 3.4-2 2H3.5l-.7 1.4 3 1.6 1.6 3 1.4-.7v-2.2l2-2 3.4 3.4a.5.5 0 0 0 .8-.5z"/></svg></span>
         <span class="cl-side-label">Booking Enquiry</span>
       </a>
-      <a href="#" data-cl-nav="booking-request">
+      <a href="#" data-cl-nav="booking-request" id="clNavBookingRequest">
         <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>
         <span class="cl-side-label">Booking Request</span>
+      </a>
+      <!-- Visa is service-access-only in this phase: a placeholder page, no
+           backend. Hidden by default; classic-shell.js reveals it once the
+           session's service_access says visa is enabled, same mechanism
+           clNavApprovals already uses for a permission-gated nav item. -->
+      <a href="#" data-cl-nav="visa" id="clNavVisa" style="display:none;">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+        <span class="cl-side-label">Visa</span>
+      </a>
+      <!-- Holidays: same posture as Visa above — service-access-only, no
+           backend feature yet. Hidden by default; classic-shell.js reveals it
+           once the session's service_access says holidays is enabled. -->
+      <a href="#" data-cl-nav="holidays" id="clNavHolidays" style="display:none;">
+        <span class="cl-side-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="4"/><path d="M12 13v9"/><path d="M8 22h8"/><path d="M5 13c2-1 4.5-1.5 7-1.5s5 .5 7 1.5"/></svg></span>
+        <span class="cl-side-label">Holidays</span>
       </a>
 
       <!-- MY REQUESTS IS NOT IN THIS RAIL, AND THE SCREEN IS STILL THERE.
@@ -350,6 +368,11 @@
         <section class="cl-section active" id="cl-dashboard" aria-label="Dashboard"></section>
         <section class="cl-section" id="cl-enquiry" aria-label="Booking Enquiry"></section>
         <section class="cl-section" id="cl-booking-request" aria-label="Booking Request"></section>
+        <!-- Hotel Booking Request. No sidebar entry: opened from Raise Booking
+             on a quoted hotel enquiry row, same posture as cl-booking-detail. -->
+        <section class="cl-section" id="cl-hotel-booking-request" aria-label="Hotel Booking Request"></section>
+        <section class="cl-section" id="cl-visa" aria-label="Visa Services"></section>
+        <section class="cl-section" id="cl-holidays" aria-label="Holidays"></section>
         <!-- Booking Request Details. No sidebar entry: opened from a row action
              on My Requests, Booking History, or the submit confirmation. -->
         <section class="cl-section" id="cl-booking-detail" aria-label="Booking Request Details"></section>
@@ -529,37 +552,41 @@
      Order matters: axios, then formatters + auth (shared), then API_BASE via
      classic-shell.js, then merchant-api.js, then the screen modules. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="../shared/formatters.js?v=20260812bot4"></script>
-<script src="../assets/js/auth.js?v=20260812bot4"></script>
+<script src="../shared/formatters.js?v=20260815svc5"></script>
+<script src="../assets/js/auth.js?v=20260815svc5"></script>
 <!-- Static city/airport reference data for the enquiry form's searchable From
      and To fields. There is no airport endpoint in the v2 API, so the table
      lives in the UI layer and is shared, unchanged, with the other frontends. -->
-<script src="../assets/js/travel-locations.js?v=20260812bot4"></script>
+<script src="../assets/js/travel-locations.js?v=20260815svc5"></script>
 <!-- Country names and their demonyms, for the passenger cards' Nationality and
      Issuing country combos. Same reason travel-locations.js is a UI table: the
      v2 API has no country reference, and both columns are free text server-side
      — this narrows what the form OFFERS, never what the API accepts. -->
-<script src="../shared/countries.js?v=20260812bot4"></script>
-<script src="js/classic-shell.js?v=20260812bot4"></script>
-<script src="../shared/merchant-api.js?v=20260812bot4"></script>
-<script src="js/classic-icons.js?v=20260812bot4"></script>
-<script src="js/classic-dashboard.js?v=20260812bot4"></script>
-<script src="js/classic-enquiry.js?v=20260812bot4"></script>
-<script src="js/classic-booking.js?v=20260812bot4"></script>
-<script src="js/classic-booking-detail.js?v=20260812bot4"></script>
-<script src="js/classic-requests.js?v=20260812bot4"></script>
-<script src="js/classic-history.js?v=20260812bot4"></script>
-<script src="js/classic-approvals.js?v=20260812bot4"></script>
-<script src="js/classic-wallet.js?v=20260812bot4"></script>
-<script src="js/classic-payments.js?v=20260812bot4"></script>
-<script src="js/classic-service.js?v=20260812bot4"></script>
-<script src="js/classic-reports.js?v=20260812bot4"></script>
-<script src="js/classic-account.js?v=20260812bot4"></script>
-<script src="js/classic-support.js?v=20260812bot4"></script>
+<script src="../shared/countries.js?v=20260815svc5"></script>
+<script src="js/classic-shell.js?v=20260815svc5"></script>
+<script src="../shared/merchant-api.js?v=20260815svc5"></script>
+<script src="js/classic-icons.js?v=20260815svc5"></script>
+<script src="js/classic-dashboard.js?v=20260815svc5"></script>
+<script src="js/classic-enquiry.js?v=20260815svc5"></script>
+<script src="js/classic-enquiry-hotel.js?v=20260815svc5"></script>
+<script src="js/classic-visa.js?v=20260815svc5"></script>
+<script src="js/classic-holidays.js?v=20260815svc5"></script>
+<script src="js/classic-booking.js?v=20260815svc5"></script>
+<script src="js/classic-booking-hotel.js?v=20260815svc5"></script>
+<script src="js/classic-booking-detail.js?v=20260815svc5"></script>
+<script src="js/classic-requests.js?v=20260815svc5"></script>
+<script src="js/classic-history.js?v=20260815svc5"></script>
+<script src="js/classic-approvals.js?v=20260815svc5"></script>
+<script src="js/classic-wallet.js?v=20260815svc5"></script>
+<script src="js/classic-payments.js?v=20260815svc5"></script>
+<script src="js/classic-service.js?v=20260815svc5"></script>
+<script src="js/classic-reports.js?v=20260815svc5"></script>
+<script src="js/classic-account.js?v=20260815svc5"></script>
+<script src="js/classic-support.js?v=20260815svc5"></script>
 <!-- Last: it calls clGo/clInvalidate from the shell and MerchantApi, and is
      started by clShowApp() rather than on load — there is nothing for it to
      ask about until somebody is signed in. -->
-<script src="js/classic-assistant.js?v=20260812bot4"></script>
+<script src="js/classic-assistant.js?v=20260815svc5"></script>
 <script>
   /* Boot last, once every module's init function exists. */
   clBoot();

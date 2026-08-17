@@ -61,6 +61,23 @@ const CL_AIRLINES = [
    from what was already fetched rather than re-querying per click. */
 let clEnquiryRows = [];
 
+/* Which travel products this merchant may raise an enquiry for.
+   ===========================================================================
+   Independent of `clCan('ticket.enquiry')`: that is a per-user permission
+   (may THIS person raise enquiries at all), this is a per-company entitlement
+   set by Admin (service_access_service on the backend). Falls back to
+   Flights-only-on when the session predates this field — the same default
+   migration 0045's backfill gave every existing merchant, so a stale cached
+   session degrades to "Flights still works" rather than locking anyone out
+   client-side. Enforcement is server-side regardless (enquiry_service.create
+   calls assert_enabled on every POST) — this only decides what the form
+   offers. */
+function clEnquiryAccess() {
+  return clSessionUser()?.service_access || { flights: true, hotels: false, visa: false, holidays: false };
+}
+const CL_NO_ENQUIRY_PRODUCT =
+  'Your company does not have access to Flights or Hotels enquiries. Contact your account manager.';
+
 /* Live state of the open form. Held here rather than read back off the DOM at
    submit time because the steppers, the time controls and the two combos each
    have a value that is not simply an input's .value. */
@@ -69,6 +86,9 @@ let clEnqForm = null;
 /* =============================================================== screen === */
 
 function clInitEnquiry() {
+  const svc = clEnquiryAccess();
+  const hasAnyProduct = svc.flights || svc.hotels;
+
   $('cl-enquiry').innerHTML = `
     <div class="cl-page-head">
       <div>
@@ -78,26 +98,52 @@ function clInitEnquiry() {
            Enquiry first is the primary button because a quoted booking is
            settled at a price the merchant agreed before it committed. Book
            Directly skips the quotation, so the fare is named by our desk at
-           ticket issuance — stated on the button's own title and again on the
-           form, rather than being a surprise on the wallet. -->
-      <!-- Both CTAs are always PRESENT; a role that may not raise work gets them
-           disabled with the reason on hover. The screen behind them is the same
-           for everyone — see the clCan note in classic-shell.js. -->
+           issuance instead — stated on the button's own title and again on
+           the form, rather than being a surprise on the wallet.
+
+           Book Directly offers whichever of Flight/Hotel the merchant has —
+           same shared form as New Booking Enquiry, just routed to Booking
+           Request instead of sent to the desk for a quote (see
+           clOpenEnquiryForm). OMITTED, not disabled-with-a-tooltip, when
+           neither product is enabled — a product-access gap hides the
+           control the same way every other product-gated element in this
+           portal does; only a ROLE gap (clCan) still shows
+           disabled-with-reason, because that is a fact about the merchant's
+           OWN staff, not about what their company may see at all. New
+           Booking Enquiry is not product-specific either way (its popup
+           adapts to whichever product IS enabled), so it keeps the
+           role/no-product disabled state — it is unreachable anyway once
+           neither product is enabled, since classic-shell.js hides this
+           whole page in that case. -->
       <div class="cl-page-actions">
         <button type="button" class="cl-btn cl-btn-primary" id="clEnqNew"
-          ${clCan('ticket.enquiry') ? '' : `disabled aria-disabled="true"
-          title="${escapeHtml(CL_NO_ENQUIRY)}"`}>+ New Booking Enquiry</button>
+          ${clCan('ticket.enquiry') && hasAnyProduct ? '' : `disabled aria-disabled="true"
+          title="${escapeHtml(hasAnyProduct ? CL_NO_ENQUIRY : CL_NO_ENQUIRY_PRODUCT)}"`}>+ New Booking Enquiry</button>
+        ${hasAnyProduct ? `
         <button type="button" class="cl-btn cl-btn-cta" id="clEnqDirect"
           ${clCan('ticket.request')
             ? 'title="Raise the booking straight away, without asking us to quote it first"'
             : `disabled aria-disabled="true" title="${escapeHtml(CL_NO_BOOKING)}"`}>
-          ${clIco('plane', { size: 15 })} Book Directly
-        </button>
+          ${clIco(svc.flights ? 'plane' : 'building', { size: 15 })} Book Directly
+        </button>` : ''}
       </div>
     </div>
 
     <div class="cl-panel">
       <div class="cl-toolbar">
+        <!-- Only worth offering when there are two products to choose
+             between — a merchant with just the one already sees nothing
+             else under "All", so a Type filter naming a product they don't
+             have would be the thing this whole feature exists to prevent. -->
+        ${(svc.flights && svc.hotels) ? `
+        <div class="cl-field">
+          <label for="clEnqType">Type</label>
+          <select id="clEnqType">
+            <option value="">All</option>
+            <option value="flight">Flights</option>
+            <option value="hotel">Hotels</option>
+          </select>
+        </div>` : ''}
         <div class="cl-field">
           <label for="clEnqStatus">Status</label>
           <select id="clEnqStatus" data-cl-status-filter>
@@ -121,7 +167,7 @@ function clInitEnquiry() {
                result, which is a thing the merchant already has. The search
                itself is untouched. -->
           <label for="clEnqSearch">Search</label>
-          <input type="search" id="clEnqSearch" placeholder="Reference, route or flight no.">
+          <input type="search" id="clEnqSearch" placeholder="Reference, destination or flight no.">
         </div>
         <div class="cl-field" style="min-width:0;">
           <label>&nbsp;</label>
@@ -145,11 +191,13 @@ function clInitEnquiry() {
     </div>`;
 
   clChips('clEnqStatus', 'Status');
+  if ($('clEnqType')) clChips('clEnqType', 'Type');
 
   $('clEnqNew').addEventListener('click', () => clOpenEnquiryForm());
-  $('clEnqDirect').addEventListener('click', () => clOpenEnquiryForm(true));
+  $('clEnqDirect')?.addEventListener('click', () => clOpenEnquiryForm(true));
   $('clEnqRefresh').addEventListener('click', () => clLoadEnquiries());
   $('clEnqStatus').addEventListener('change', () => clLoadEnquiries());
+  $('clEnqType')?.addEventListener('change', () => clLoadEnquiries());
   $('clEnqSearch').addEventListener('input', () => clRenderEnquiryRows());
 
   return clLoadEnquiries();
@@ -190,10 +238,33 @@ const CL_ENQUIRY_AWAITING = ['pending_approval', 'in_review'];
    cannot read as a complete answer. */
 let clEnquiryTotal = 0;
 
+/* Flight and Hotel are two different endpoints over two different tables
+   (backend migration 0047) — there is no single "all enquiries" query any
+   more. This fetches one status value from whichever of the two the type
+   filter allows (both, when it's "All") and merges the results, so the rest
+   of this screen can keep treating clEnquiryRows as one list. */
+async function clFetchEnquiryStatus(status, travelType) {
+  const calls = [];
+  if (!travelType || travelType === 'flight') {
+    calls.push(MerchantApi.listEnquiries({ page_size: 100, ...(status ? { status } : {}) })
+      .then(d => ({ items: d.items || [], total: d.total ?? 0 })));
+  }
+  if (!travelType || travelType === 'hotel') {
+    calls.push(MerchantApi.listHotelEnquiries({ page_size: 100, ...(status ? { status } : {}) })
+      .then(d => ({ items: d.items || [], total: d.total ?? 0 })));
+  }
+  const results = await Promise.all(calls);
+  return {
+    items: results.flatMap(r => r.items),
+    total: results.reduce((sum, r) => sum + r.total, 0),
+  };
+}
+
 async function clLoadEnquiries() {
   const body = $('clEnqBody');
   body.innerHTML = clLoadingRow(5, 'Loading enquiries…');
   const status = $('clEnqStatus').value;
+  const travelType = $('clEnqType')?.value || undefined;
 
   try {
     let rows;
@@ -206,16 +277,17 @@ async function clLoadEnquiries() {
          recent" and disagreed with the dashboard tile that linked to it. Two
          server-filtered calls instead, merged, with the totals added. */
       const [pending, review] = await Promise.all(
-        CL_ENQUIRY_AWAITING.map(s => MerchantApi.listEnquiries({ page_size: 100, status: s })));
-      rows = [...(pending.items || []), ...(review.items || [])]
+        CL_ENQUIRY_AWAITING.map(s => clFetchEnquiryStatus(s, travelType)));
+      rows = [...pending.items, ...review.items]
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      total = (pending.total ?? 0) + (review.total ?? 0);
+      total = pending.total + review.total;
     } else {
-      const data = await MerchantApi.listEnquiries({
-        page_size: 100, ...(status ? { status } : {}),
-      });
-      rows = data.items || [];
-      total = data.total ?? rows.length;
+      const data = await clFetchEnquiryStatus(status, travelType);
+      // Each endpoint's own page is sorted server-side; merging Flight's and
+      // Hotel's requires one more pass so the combined list still reads
+      // newest-first rather than "all of Flight's, then all of Hotel's".
+      rows = data.items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      total = data.total;
     }
     clEnquiryRows = rows;
     clEnquiryTotal = total;
@@ -260,6 +332,8 @@ function clRenderEnquiryRows() {
     b.addEventListener('click', () => clOpenEnquiryDetail(b.dataset.clEnqView)));
   body.querySelectorAll('[data-cl-enq-book]').forEach(b =>
     b.addEventListener('click', () => clRequestTicket(b.dataset.clEnqBook, b)));
+  body.querySelectorAll('[data-cl-enq-book-hotel]').forEach(b =>
+    b.addEventListener('click', () => clRequestHotelBooking(b.dataset.clEnqBookHotel, b)));
   body.querySelectorAll('[data-cl-enq-booking]').forEach(b =>
     b.addEventListener('click', () => clGo('requests', () => clOpenRequestDetail(b.dataset.clEnqBooking))));
 }
@@ -268,6 +342,7 @@ function clEnquiryHaystack(r) {
   return [
     r.reference_number, r.airline, r.flight_number, r.origin, r.destination,
     r.origin_city, r.destination_city, r.travel_class, r.booking_request_number,
+    r.hotel_name,
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -277,16 +352,38 @@ function clEnquiryRoute(r) {
   return `${from} ${tripTypeArrow(r.trip_type)} ${to}`;
 }
 
+/* Hotel's equivalent of clEnquiryRoute + its sub-line: destination and stay
+   dates head the cell, rooms/guests and hotel preferences follow — the same
+   two-line shape the flight row uses, with hotel-appropriate content. */
+function clHotelRoomsGuestsLabel(r) {
+  const rooms = r.rooms_count ?? 0;
+  const adults = r.adults_total ?? 0;
+  const children = r.children_total ?? 0;
+  const parts = [`${rooms} Room${rooms === 1 ? '' : 's'}`, `${adults} Adult${adults === 1 ? '' : 's'}`];
+  if (children > 0) parts.push(`${children} Child${children === 1 ? '' : 'ren'}`);
+  return parts.join(' · ');
+}
+
 function clEnquiryRow(r) {
+  const isHotel = r.travel_type === 'hotel';
   return `<tr>
     <td class="cl-ref">${escapeHtml(r.reference_number || '—')}</td>
     <td>
-      ${escapeHtml(clEnquiryRoute(r))}
-      <small style="display:block;color:var(--cl-text-muted);">
-        ${escapeHtml([fmtAirline(r.airline), r.flight_number].filter(Boolean).join(' '))}
-        · ${escapeHtml(fmtDate(r.travel_date))} ${escapeHtml(clTimeLabel(r.preferred_time) || '')}
-        · ${r.passenger_count} pax
-      </small>
+      ${isHotel
+        ? `${escapeHtml(r.destination_city || '—')}
+           <small style="display:block;color:var(--cl-text-muted);">
+             ${escapeHtml(fmtDate(r.travel_date))} → ${escapeHtml(fmtDate(r.return_date))}
+             ${r.nights != null ? `· ${r.nights} Night${r.nights === 1 ? '' : 's'}` : ''}
+             · ${escapeHtml(clHotelRoomsGuestsLabel(r))}
+             ${r.hotel_name ? `· ${escapeHtml(r.hotel_name)}` : ''}
+             ${r.star_category ? `· ${escapeHtml(r.star_category)}★` : ''}
+           </small>`
+        : `${escapeHtml(clEnquiryRoute(r))}
+           <small style="display:block;color:var(--cl-text-muted);">
+             ${escapeHtml([fmtAirline(r.airline), r.flight_number].filter(Boolean).join(' '))}
+             · ${escapeHtml(fmtDate(r.travel_date))} ${escapeHtml(clTimeLabel(r.preferred_time) || '')}
+             · ${r.passenger_count} pax
+           </small>`}
     </td>
     <td>
       ${clEnquiryTag(r.status)}
@@ -318,41 +415,85 @@ function clEnquiryRow(r) {
    dresses a past-tense fact ("Booking raised") as though it were an action. */
 function clEnquiryActions(r) {
   const out = [
-    `<button type="button" class="cl-btn cl-btn-sm" data-cl-enq-view="${r.id}">View Details</button>`,
+    `<button type="button" class="cl-btn cl-btn-sm" data-cl-enq-view="${r.travel_type}:${r.id}">View Details</button>`,
   ];
+  const isHotel = r.travel_type === 'hotel';
+  const icon = isHotel ? clIco('building', { size: 14 }) : clIco('plane', { size: 14 });
+  const bookAttr = isHotel ? 'data-cl-enq-book-hotel' : 'data-cl-enq-book';
+  /* Whether this row's OWN product is still enabled right now — not whether
+     it was enabled when the enquiry was raised. Raise Booking creates a
+     brand-new booking, so it is gated exactly like the backend gates it
+     (enquiry_service/hotel_booking_service.to_booking_request both call
+     assert_enabled). Omitted, not disabled-with-a-tooltip: a merchant whose
+     company no longer has this product should not discover an old Hotel
+     enquiry still has a working-looking button that only fails on click —
+     that IS the 403 this hides. View Details and View Booking are untouched:
+     this enquiry, and any booking already made from it, stay visible and
+     manageable either way. */
+  const svc = clEnquiryAccess();
+  const productEnabled = isHotel ? svc.hotels : svc.flights;
   if (r.booking_request_id) {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-quiet"
       data-cl-enq-booking="${r.booking_request_id}"
       title="Open ${escapeHtml(r.booking_request_number || 'the booking')}"
       >${clIco('external', { size: 13 })}View Booking</button>`);
+  } else if (!productEnabled) {
+    // Nothing appended — the row still shows (View Details above), only the
+    // create-a-new-booking action disappears.
   } else if (r.status === 'approved') {
     /* Quoted and not yet booked — the one state where this is a real action.
        A role without ticket.request still SEES it, disabled: the enquiry is
        ready and someone at the company needs to know that. */
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary cl-btn-cta"
-      data-cl-enq-book="${r.id}"${clCan('ticket.request')
+      ${bookAttr}="${r.id}"${clCan('ticket.request')
         ? ''
         : ` disabled aria-disabled="true" title="${escapeHtml(CL_NO_BOOKING)}"`}
-      >${clIco('plane', { size: 14 })}Raise Booking</button>`);
+      >${icon}Raise Booking</button>`);
   } else {
     out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-cta" disabled
       title="A booking can be raised once our team has quoted this enquiry"
-      >${clIco('plane', { size: 14 })}Raise Booking</button>`);
+      >${icon}Raise Booking</button>`);
   }
   return out.join('');
 }
 
 /* =============================================================== detail === */
 
-async function clOpenEnquiryDetail(id) {
+/* `key` is either a bare flight enquiry id (classic-booking.js's Booking
+   Request screen only ever links to a flight enquiry, so it calls this with
+   just the id, unprefixed) or "flight:<id>"/"hotel:<id>" — the shape
+   clEnquiryActions below writes, because Flight and Hotel are two different
+   tables now (migration 0047) and their own id sequences can collide, so the
+   bare id alone cannot say which table to read. */
+async function clOpenEnquiryDetail(key) {
+  const [type, id] = String(key).includes(':') ? String(key).split(':') : ['flight', key];
   clOpenModal('Enquiry details', '<p><span class="cl-spin"></span> Loading…</p>', '');
   try {
     /* Read fresh rather than from clEnquiryRows: the status is the whole point
        of this card, and it may have been answered since the table loaded. */
-    const r = await MerchantApi.getEnquiry(id);
+    const r = await (type === 'hotel' ? MerchantApi.getHotelEnquiry(id) : MerchantApi.getEnquiry(id));
     clUpsertEnquiryRow(r);
 
-    const rows = [
+    const isHotel = r.travel_type === 'hotel';
+    const rows = isHotel ? [
+      ['Reference number', r.reference_number],
+      ['Status', null],                                  // rendered as a tag below
+      ['Destination', r.destination_city],
+      ['Check-in', fmtDate(r.travel_date)],
+      ['Check-out', fmtDate(r.return_date)],
+      ['Nights', r.nights],
+      ['Rooms', r.rooms_count],
+      ['Adults', r.adults_total],
+      ['Children', r.children_total],
+      ['Hotel name', r.hotel_name],
+      ['Star category', r.star_category ? `${r.star_category} Star` : null],
+      ['Room type', r.room_type],
+      ['Meal plan', CL_MEAL_PLANS.find(m => m.value === r.meal_plan)?.label || r.meal_plan],
+      ['Preferred location', r.preferred_location],
+      ['PAN', r.pan],
+      ['Created', clDateTime24(r.created_at)],
+      ['Answered', r.responded_at ? clDateTime24(r.responded_at) : null],
+    ].filter(([k, v]) => k === 'Status' || (v != null && v !== '')) : [
       ['Reference number', r.reference_number],
       ['Status', null],                                  // rendered as a tag below
       ['Trip type', tripTypeLabel(r.trip_type)],
@@ -386,7 +527,7 @@ async function clOpenEnquiryDetail(id) {
       ['Booking request', r.booking_request_number],
     ].filter(([k, v]) => k === 'Status' || (v != null && v !== ''));
 
-    $('clModalTitle').textContent = `Enquiry ${r.reference_number || ''}`;
+    $('clModalTitle').textContent = `${isHotel ? 'Hotel enquiry' : 'Enquiry'} ${r.reference_number || ''}`;
     $('clModalBody').innerHTML = `
       ${clQuotationPanel(r)}
       <dl class="cl-dl">
@@ -394,23 +535,25 @@ async function clOpenEnquiryDetail(id) {
           k === 'Status' ? clEnquiryTag(r.status) : escapeHtml(String(v))
         }</dd></div>`).join('')}
       </dl>
-      ${r.notes ? `<h3 style="font-size:12px;margin:16px 0 6px;">Your notes</h3>
+      ${r.notes ? `<h3 style="font-size:12px;margin:16px 0 6px;">${
+          isHotel ? 'Special requirements' : 'Your notes'}</h3>
         <p style="margin:0;font-size:13px;">${escapeHtml(r.notes)}</p>` : ''}
       ${r.admin_response ? `<h3 style="font-size:12px;margin:16px 0 6px;">Our response</h3>
         <div class="cl-msg cl-msg-info" style="margin-top:0">${escapeHtml(r.admin_response)}</div>` : ''}
       ${r.rejection_reason ? `<h3 style="font-size:12px;margin:16px 0 6px;">Why it was declined</h3>
         <div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(r.rejection_reason)}</div>` : ''}
-      ${r.status === 'pending_approval' || r.status === 'in_review' ? `
-        <div class="cl-msg cl-msg-muted">Our team is checking this sector. You will be notified
-          the moment it is quoted, and Raise Booking becomes available here.</div>` : ''}`;
+      ${(r.status === 'pending_approval' || r.status === 'in_review') ? `
+        <div class="cl-msg cl-msg-muted">Our team is checking this ${isHotel ? 'stay' : 'sector'}.
+          You will be notified the moment it is quoted${isHotel ? '' : ', and Raise Booking becomes available here'}.</div>` : ''}`;
 
-    /* Same two controls as the row, same words. A merchant who opens Details to
+    /* Same controls as the row, same words. A merchant who opens Details to
        decide should meet the action they saw in the table, not a synonym. */
     const foot = [];
     if (r.status === 'approved' && !r.booking_request_id) {
-      foot.push(`<button type="button" class="cl-btn cl-btn-primary cl-btn-cta" data-cl-modal-book="${r.id}"
+      foot.push(`<button type="button" class="cl-btn cl-btn-primary cl-btn-cta"
+        ${isHotel ? `data-cl-modal-book-hotel="${r.id}"` : `data-cl-modal-book="${r.id}"`}
         ${clActionAttrs('ticket.request', CL_NO_BOOKING)}
-        >${clIco('plane', { size: 15 })}Raise Booking</button>`);
+        >${isHotel ? clIco('building', { size: 15 }) : clIco('plane', { size: 15 })}Raise Booking</button>`);
     }
     if (r.booking_request_id) {
       foot.push(`<button type="button" class="cl-btn" data-cl-modal-booking="${r.booking_request_id}"
@@ -426,6 +569,9 @@ async function clOpenEnquiryDetail(id) {
        row's own Raise Booking is where the loading state is worth having. */
     $('clModalFoot').querySelector('[data-cl-modal-book]')?.addEventListener('click', () => {
       clCloseModal(); clRequestTicket(r.id);
+    });
+    $('clModalFoot').querySelector('[data-cl-modal-book-hotel]')?.addEventListener('click', () => {
+      clCloseModal(); clRequestHotelBooking(r.id);
     });
     $('clModalFoot').querySelector('[data-cl-modal-booking]')?.addEventListener('click', () => {
       clCloseModal(); clGo('requests', () => clOpenRequestDetail(r.booking_request_id));
@@ -476,7 +622,11 @@ function clQuotationPanel(r) {
 /* Fold a freshly-read enquiry back into the table's data so the row reflects
    an answer that arrived after the list loaded, without a full refetch. */
 function clUpsertEnquiryRow(r) {
-  const i = clEnquiryRows.findIndex(x => String(x.id) === String(r.id));
+  // Flight and Hotel are two different tables with their own id sequences
+  // (migration 0047), so id alone can collide — travel_type disambiguates.
+  const i = clEnquiryRows.findIndex(
+    x => String(x.id) === String(r.id) && x.travel_type === r.travel_type
+  );
   if (i >= 0) clEnquiryRows[i] = r; else clEnquiryRows.unshift(r);
   if ($('cl-enquiry')?.classList.contains('active')) clRenderEnquiryRows();
 }
@@ -589,8 +739,20 @@ const CL_TRAVEL_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First Clas
    The button label and the banner are the only markup that branches. */
 function clOpenEnquiryForm(direct = false) {
   const today = clTodayIso();
+  /* Both modes read real access — Book Directly used to hard-code Flight
+     only, back when Hotel had no direct-booking path at all. Now it offers
+     whichever product(s) the merchant actually has, same as the enquiry-led
+     form. */
+  const svc = clEnquiryAccess();
+  const availableTypes = [svc.flights && 'flight', svc.hotels && 'hotel'].filter(Boolean);
+  if (!availableTypes.length) return;   // defensive — the button that opens this is disabled first
+
   clEnqForm = {
     direct: !!direct,
+    /* 'flight' or 'hotel' — which half of the form is live. Defaults to
+       Flight when both are offered, matching the segmented control's default
+       selection below. */
+    enquiryType: availableTypes[0],
     trip_type: 'one_way',
     /* Only sent when trip_type is group_trip — the server refuses the pairing
        any other way round. `group_import` holds the validated upload. */
@@ -609,15 +771,41 @@ function clOpenEnquiryForm(direct = false) {
     depTime: '09:00',
     retTime: '18:00',
     adults: 1, children: 0, infants: 0,
+    /* Hotel Enquiry's own state — see classic-enquiry-hotel.js. Built even
+       when Hotel isn't offered; it costs nothing and keeps this one object
+       the single source of truth for the whole form regardless of type. */
+    hotel: {
+      destination: null,                // { code, city, label } once picked
+      checkIn: clAddDays(today, 1),
+      checkOut: clAddDays(today, 2),
+      rooms: [{ adults: 1, children: 0, childAges: [] }],
+      hotelName: '', starCategory: '', roomType: '', mealPlan: '',
+      preferredLocation: '', pan: '', specialRequirements: '',
+    },
   };
 
   clOpenModal(direct ? 'Direct Booking Request' : 'New Booking Enquiry', `
     ${direct ? `<div class="cl-msg cl-msg-info" style="margin:0 0 16px;">
       <b>You are booking without a quotation.</b> We will not price this before you
-      commit to it — our team confirms the fare when the ticket is issued, and your
+      commit to it — our team confirms the fare once it is booked, and your
       wallet is charged that amount then. If you would rather see the fare first,
       close this and use <b>+ New Booking Enquiry</b> instead.
     </div>` : ''}
+    ${availableTypes.length > 1 ? `
+    <!-- ENQUIRY TYPE — only shown when the merchant's company has BOTH
+         products, direct or not. One of them only: the toggle would offer a
+         choice with one real answer, so the form defaults straight into it
+         instead (see availableTypes above). -->
+    <div class="cl-trip" id="clEnqTypeToggle" role="radiogroup" aria-label="${direct ? 'Booking type' : 'Enquiry type'}">
+      <label class="cl-trip-opt checked" data-cl-enqtype="flight">
+        <input type="radio" name="clEnqType" value="flight" checked>Flight ${direct ? 'Booking' : 'Enquiry'}
+      </label>
+      <label class="cl-trip-opt" data-cl-enqtype="hotel">
+        <input type="radio" name="clEnqType" value="hotel">Hotel ${direct ? 'Booking' : 'Enquiry'}
+      </label>
+    </div>
+    <p class="cl-hint" style="margin:-8px 0 18px;">Select ${direct ? 'booking' : 'enquiry'} type to show relevant fields.</p>` : ''}
+    <div id="clEnqFlightFields"${clEnqForm.enquiryType !== 'flight' ? ' class="cl-hidden"' : ''}>
     <!-- GROUP BOOKING IS OFFERED ON BOTH FORMS.
          It used to be direct-only, on the reasoning that a group fare is
          negotiated once the party is known rather than at the quotation stage.
@@ -858,6 +1046,10 @@ function clOpenEnquiryForm(direct = false) {
                can add it when you raise the booking, once we have quoted you.</small>
       </div>
     </div>
+    </div>
+    ${availableTypes.includes('hotel') ? `<div id="clEnqHotelFields"${clEnqForm.enquiryType !== 'hotel' ? ' class="cl-hidden"' : ''}>
+      ${clHotelFormFields()}
+    </div>` : ''}
 
     <div class="cl-msg" id="clEnqMsg"></div>`,
     `<button type="button" class="cl-btn" id="clEnqCancel">Cancel</button>
@@ -873,10 +1065,14 @@ function clOpenEnquiryForm(direct = false) {
     $('clModal').classList.remove('cl-modal-form');
     clEnqForm = null;
     clGbSetHost(null);
+    /* Drops the outside-click listener too — left live, it would fire against
+       whatever screen renders next. */
+    clCloseRoomsGuestsPopover();
   };
 
   clWireEnquiryForm();
-  $('clEnqFrom').focus();
+  if ($('clEnqHotelFields')) clWireHotelEnquiryForm();
+  (clEnqForm.enquiryType === 'hotel' ? $('clHtlDest') : $('clEnqFrom'))?.focus();
 
   /* Not awaited: the merchant is looking at the form now, and the ceiling is
      only needed by the time they have typed a group count. When it lands it
@@ -1070,6 +1266,12 @@ function clStepperCard(key, title, sub, value, min) {
 }
 
 function clWireEnquiryForm() {
+  /* ---- enquiry type: Flight vs Hotel — absent unless both are offered ---- */
+  $('clEnqTypeToggle')?.querySelectorAll('[data-cl-enqtype]').forEach(opt => {
+    opt.addEventListener('click', () => clSetEnquiryType(opt.dataset.clEnqtype));
+    opt.querySelector('input').addEventListener('change', () => clSetEnquiryType(opt.dataset.clEnqtype));
+  });
+
   /* ---- trip type ---- */
   $('clEnqTrip').querySelectorAll('[data-cl-trip]').forEach(opt => {
     opt.addEventListener('click', () => clSetTripType(opt.dataset.clTrip));
@@ -1185,6 +1387,21 @@ function clWireEnquiryForm() {
   $('clEnqSubmit').addEventListener('click', clSubmitEnquiry);
 
   clSyncPaxTotal();
+}
+
+/* Swaps which field block is visible — no modal close/reopen, and Flight's
+   own markup/logic is never touched by this, only hidden. */
+function clSetEnquiryType(type) {
+  if (!clEnqForm || clEnqForm.enquiryType === type) return;
+  clEnqForm.enquiryType = type;
+  $('clEnqTypeToggle')?.querySelectorAll('[data-cl-enqtype]').forEach(opt => {
+    const on = opt.dataset.clEnqtype === type;
+    opt.classList.toggle('checked', on);
+    opt.querySelector('input').checked = on;
+  });
+  $('clEnqFlightFields')?.classList.toggle('cl-hidden', type !== 'flight');
+  $('clEnqHotelFields')?.classList.toggle('cl-hidden', type !== 'hotel');
+  clMsg($('clEnqMsg'), '');
 }
 
 function clSetTripType(type) {
@@ -2108,10 +2325,18 @@ function clParseMoney(raw) {
 }
 
 async function clSubmitEnquiry() {
-  const msg = $('clEnqMsg');
-  const btn = $('clEnqSubmit');
   const f = clEnqForm;
   if (!f) return;
+  /* Hotel branches off to its own submit path (classic-enquiry-hotel.js) —
+     everything below this line is Flight's, and Flight's alone. Direct and
+     enquiry-led each get their own hotel submit function, same split Flight
+     already has between this function and clStartDirectBooking. */
+  if (f.enquiryType === 'hotel') {
+    return f.direct ? clSubmitDirectHotelBooking() : clSubmitHotelEnquiry();
+  }
+
+  const msg = $('clEnqMsg');
+  const btn = $('clEnqSubmit');
 
   /* Every required field, checked in the order they appear on the form so the
      first thing the merchant is sent back to is the first thing that is wrong. */
@@ -2218,6 +2443,10 @@ async function clSubmitEnquiry() {
   }
 
   const payload = {
+    /* Required since Hotel Enquiry shipped: schemas/enquiry.py's EnquiryCreate
+       is now a discriminated union keyed on this field, read before anything
+       else in the body is even parsed. */
+    travel_type: 'flight',
     trip_type: f.trip_type,
     /* null unless this is a group booking — the server refuses the pairing the
        other way round, so sending it unconditionally would 422 a one-way. */
@@ -2379,6 +2608,50 @@ async function clRequestTicket(enquiryId, btn) {
        Request screen that never rendered this enquiry — an empty form. */
     clLoaded.delete('booking-request');
     clGo('booking-request');
+  } catch (err) {
+    clOpenModal('Could not open the booking',
+      `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Please try again.'))}</div>`,
+      '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+  }
+}
+
+/* Hotel's clRequestTicket — same shape, over the hotel enquiry endpoints and
+   classic-booking-hotel.js's screen instead of classic-booking.js's. */
+async function clRequestHotelBooking(enquiryId, btn) {
+  if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+  try {
+    const enquiry = await MerchantApi.getHotelEnquiry(enquiryId);
+    clUpsertEnquiryRow(enquiry);
+
+    if (enquiry.booking_request_id) {
+      const detail = await MerchantApi.getRequest(enquiry.booking_request_id).catch(() => null);
+      const booking = detail?.request || detail;
+      if (booking && booking.status === 'draft') {
+        clStartHotelBookingRequest(enquiry, booking);
+        clLoaded.delete('hotel-booking-request');
+        return clGo('hotel-booking-request');
+      }
+      return clOpenModal('Already booked', `
+        <div class="cl-msg cl-msg-info" style="margin-top:0">
+          This enquiry has already been raised as
+          <b class="cl-ref">${escapeHtml(enquiry.booking_request_number || '')}</b>.
+        </div>`,
+        '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+    }
+    if (enquiry.status !== 'approved') {
+      return clOpenModal('Not available yet', `
+        <div class="cl-msg cl-msg-muted" style="margin-top:0">
+          This enquiry is <b>${escapeHtml(clEnquiryStatusLabel(enquiry.status))}</b>. A booking can
+          only be raised once our team has quoted it.
+        </div>`,
+        '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+    }
+
+    clStartHotelBookingRequest(enquiry);
+    clLoaded.delete('hotel-booking-request');
+    clGo('hotel-booking-request');
   } catch (err) {
     clOpenModal('Could not open the booking',
       `<div class="cl-msg cl-msg-err" style="margin-top:0">${escapeHtml(clError(err, 'Please try again.'))}</div>`,

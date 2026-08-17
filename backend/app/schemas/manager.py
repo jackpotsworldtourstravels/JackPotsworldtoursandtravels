@@ -56,14 +56,21 @@ class ManagerBookingSummary(BaseModel):
 
     @classmethod
     def of(cls, r) -> "ManagerBookingSummary":
+        from app.models_v2 import TravelType
         from app.services import lifecycle
 
         d = r.travel_details or {}
+        # Hotel writes its own key names in travel_details (no origin/trip_type
+        # concept, guests instead of passengers) — see
+        # hotel_booking_service.to_booking_request. Falling back to those here
+        # is what keeps a hotel row off "—" and "0" on this queue rather than
+        # asking every reader of ManagerBookingSummary to know both shapes.
+        is_hotel = r.travel_type is TravelType.HOTEL
         return cls(
             id=r.request_id,
             request_number=r.request_number,
             booking_reference=r.booking_reference,
-            enquiry_reference=d.get("enquiry_reference"),
+            enquiry_reference=d.get("hotel_enquiry_reference") if is_hotel else d.get("enquiry_reference"),
             status=r.status.value,
             status_label=lifecycle.label_of(r),
             merchant_id=r.merchant_id,
@@ -71,13 +78,13 @@ class ManagerBookingSummary(BaseModel):
             raised_by=r.user.full_name if r.user else None,
             title=r.title,
             origin=d.get("origin"),
-            destination=d.get("destination"),
+            destination=d.get("destination_city") if is_hotel else d.get("destination"),
             travel_date=r.travel_date.isoformat() if r.travel_date else None,
             return_date=r.return_date.isoformat() if r.return_date else None,
             trip_type=d.get("trip_type"),
             travel_class=d.get("travel_class"),
             international=bool(d.get("international")),
-            passenger_count=len(r.passengers),
+            passenger_count=len(r.hotel_guests) if is_hotel else len(r.passengers),
             reviewer_id=d.get("manager_claimed_by"),
             reviewer_name=d.get("manager_claimed_by_name"),
             submitted_at=r.created_at.isoformat() if r.created_at else None,

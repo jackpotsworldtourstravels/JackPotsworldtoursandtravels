@@ -212,15 +212,21 @@ _PAYMENT_STATUSES: frozenset[S] = frozenset({S.PAYMENT_PENDING, S.PAID})
 #: The ``travel_details`` keys that put a booking on the Classic Tours track.
 #:
 #: Two ways in, one workflow:
-#:   ``enquiry_reference``  the booking came from an answered enquiry (CR-2).
-#:   ``direct_booking``     the merchant raised it straight from the booking
-#:                          form, with no enquiry and therefore no quotation.
+#:   ``enquiry_reference``       the booking came from an answered enquiry (CR-2).
+#:   ``direct_booking``          the merchant raised it straight from the booking
+#:                               form, with no enquiry and therefore no quotation.
+#:   ``hotel_enquiry_reference`` the booking came from an answered hotel enquiry
+#:                               (migration 0048) — Hotel's equivalent of
+#:                               ``enquiry_reference``, written by
+#:                               ``hotel_booking_service.to_booking_request``.
+#:                               No Flight row ever writes this key, so adding
+#:                               it here is a no-op for every existing booking.
 #:
 #: Named here rather than written as literals at each call site because
 #: ``manager_service`` has to express the same predicate as a SQL term against
 #: JSONB, and the two drifting apart would mean a queue that lists a booking the
 #: state machine will not let a Manager decide.
-CLASSIC_MARKER_KEYS: tuple[str, ...] = ("enquiry_reference", "direct_booking")
+CLASSIC_MARKER_KEYS: tuple[str, ...] = ("enquiry_reference", "direct_booking", "hotel_enquiry_reference")
 
 
 def is_classic_track(request: ServiceRequest) -> bool:

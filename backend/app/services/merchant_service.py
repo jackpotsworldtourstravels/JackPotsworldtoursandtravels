@@ -34,7 +34,12 @@ from app.models_v2 import (
     User,
     UserRole,
 )
-from app.services import account_service, activity_service, notification_service
+from app.services import (
+    account_service,
+    activity_service,
+    notification_service,
+    service_access_service,
+)
 
 #: Statuses an Admin may set directly. ``pending_approval`` is only ever the
 #: creation default — you approve out of it, you don't move back into it.
@@ -88,6 +93,7 @@ def create_merchant(
     credit_limit: float = 0,
     merchant_code: str | None = None,
     reference_prefix: str | None = None,
+    service_access: dict[str, bool] | None = None,
 ) -> tuple[Merchant, User, str]:
     """Create a merchant plus its first admin login.
 
@@ -121,6 +127,7 @@ def create_merchant(
     db.flush()  # need merchant_id for the user and settings rows
 
     db.add(CommunicationSettings(merchant_id=merchant.merchant_id))
+    service_access_service.ensure_defaults(db, merchant, overrides=service_access)
 
     first_user, temp_password = account_service.create_merchant_user(
         db,

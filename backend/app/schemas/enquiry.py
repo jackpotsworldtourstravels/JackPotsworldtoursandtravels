@@ -355,18 +355,11 @@ class EnquiryRespond(BaseModel):
         return self
 
 
-class BookingContact(BaseModel):
-    """Who to reach about this booking.
-
-    Held on the request rather than per passenger: airlines and our own desk
-    contact one person about a party, and duplicating it onto every traveller
-    would just be four copies to keep in sync.
-    """
-
-    name: str | None = Field(default=None, max_length=120)
-    email: str = Field(min_length=3, max_length=255)
-    phone: str = Field(min_length=5, max_length=30)
-    alternate_phone: str | None = Field(default=None, max_length=30)
+#: Re-exported so every existing ``from app.schemas.enquiry import
+#: BookingContact`` keeps working. Moved to ``schemas/common.py`` to break a
+#: cycle ``schemas/hotel_booking.py`` introduced — see that module's
+#: docstring.
+from app.schemas.common import BookingContact  # noqa: E402,F401
 
 
 def _check_passenger_source(model):

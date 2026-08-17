@@ -30,11 +30,17 @@
    was not in scope. Nothing underneath moved — same rows, same `request_type`,
    and the section key is still `ticket-enquiries`.
 
-   ENDPOINTS — all pre-existing or added in Phase 2, none duplicated here:
-     GET  /api/enquiries                          list (platform staff see all)
-     GET  /api/enquiries/{id}                     detail
-     POST /api/admin/enquiries/{id}/review        claim: Pending -> Under Review
-     POST /api/admin/enquiries/{id}/respond       answer: quotation / decline
+   ENDPOINTS — Flight and Hotel are two different tables now (backend
+   migration 0047), so this screen merges two independent endpoint pairs into
+   one list rather than reading one combined feed:
+     GET  /api/enquiries                                 flight list
+     GET  /api/enquiries/{id}                             flight detail
+     POST /api/admin/enquiries/{id}/review                 claim (flight)
+     POST /api/admin/enquiries/{id}/respond                 answer (flight)
+     GET  /api/hotel/enquiries                            hotel list
+     GET  /api/hotel/enquiries/{id}                        hotel detail
+     POST /api/admin/hotel-enquiries/{id}/review            claim (hotel)
+     POST /api/admin/hotel-enquiries/{id}/respond            answer (hotel)
 
    Loaded after admin.js and reuses its helpers (API_BASE, authHeaders,
    escapeHtml, fmtDateTime, rowsSkeleton, navigateToSection, PAGE_SIZE) plus the
@@ -57,6 +63,11 @@ const ENQ_BADGE = {
   approved: 'confirmed',
   rejected: 'cancelled',
   cancelled: 'cancelled',
+};
+/* Matches CL_MEAL_PLANS in classic-enquiry-hotel.js — the value stored is the
+   API's own enum member, this is only the desk-facing label for it. */
+const ENQ_MEAL_LABELS = {
+  breakfast: 'Breakfast', half_board: 'Half Board', full_board: 'Full Board',
 };
 /* Still owed an answer. Kept as one list so the filter, the summary line and
    the nav badge cannot drift apart. */
@@ -90,6 +101,12 @@ function updateEnquiryNavBadge(count) {
 }
 
 function enqRoute(r) {
+  if (r.travel_type === 'hotel') {
+    return `<div>${escapeHtml(r.destination_city || '—')}</div>
+            <div class="cell-sub">${r.return_date ? `${fmtDate(r.travel_date)} → ${fmtDate(r.return_date)}` : ''}
+              ${r.nights != null ? ` · ${r.nights}N` : ''}${r.hotel_name ? ` · ${escapeHtml(r.hotel_name)}` : ''}
+              ${r.star_category ? ` · ${escapeHtml(r.star_category)}★` : ''}</div>`;
+  }
   const from = r.origin_city || r.origin || '—';
   const to = r.destination_city || r.destination || '—';
   const arrow = tripTypeArrow(r.trip_type);
@@ -103,6 +120,13 @@ function enqRoute(r) {
 }
 
 function enqPaxSummary(r) {
+  if (r.travel_type === 'hotel') {
+    const rooms = r.rooms_count ?? 0;
+    const parts = [`${rooms} room${rooms === 1 ? '' : 's'}`];
+    if (r.adults_total) parts.push(`${r.adults_total} adult${r.adults_total > 1 ? 's' : ''}`);
+    if (r.children_total) parts.push(`${r.children_total} child${r.children_total > 1 ? 'ren' : ''}`);
+    return parts.join(', ') || '—';
+  }
   const parts = [];
   if (r.adults) parts.push(`${r.adults} adult${r.adults > 1 ? 's' : ''}`);
   if (r.children) parts.push(`${r.children} child${r.children > 1 ? 'ren' : ''}`);
@@ -121,11 +145,32 @@ function enqTime(hhmm) {
   return `${String(h).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
 }
 
+/* One status value, from whichever of Flight/Hotel the type filter allows —
+   both, when it's "All services". Two different tables now (migration 0047),
+   so there is no single combined list endpoint to page through. */
+async function enqFetchStatus(status, typeValue, search) {
+  const params = { status, search: search || undefined, page: 1, page_size: 100 };
+  const calls = [];
+  if (!typeValue || typeValue === 'flight') {
+    calls.push(
+      axios.get(`${API_BASE}/api/enquiries`, { headers: authHeaders(), params })
+        .then(r => r.data.items || []).catch(() => [])
+    );
+  }
+  if (!typeValue || typeValue === 'hotel') {
+    calls.push(
+      axios.get(`${API_BASE}/api/hotel/enquiries`, { headers: authHeaders(), params })
+        .then(r => r.data.items || []).catch(() => [])
+    );
+  }
+  return (await Promise.all(calls)).flat();
+}
+
 async function loadTicketEnquiries(page = enqPage) {
   enqPage = page;
   if (!enqFiltersWired) {
     enqFiltersWired = true;
-    ['enqStatusFilter', 'enqDateFrom', 'enqDateTo'].forEach(id =>
+    ['enqTypeFilter', 'enqStatusFilter', 'enqDateFrom', 'enqDateTo'].forEach(id =>
       document.getElementById(id).addEventListener('change', () => loadTicketEnquiries(1)));
     document.getElementById('enqSearch').addEventListener('input', () => {
       clearTimeout(enqSearchTimer);
@@ -138,20 +183,17 @@ async function loadTicketEnquiries(page = enqPage) {
   tbody.innerHTML = `<tr><td colspan="8">${rowsSkeleton(4)}</td></tr>`;
 
   const statusValue = document.getElementById('enqStatusFilter').value;
+  const typeValue = document.getElementById('enqTypeFilter').value;
   const search = document.getElementById('enqSearch').value.trim();
   const dateFrom = document.getElementById('enqDateFrom').value;
   const dateTo = document.getElementById('enqDateTo').value;
 
   try {
-    /* "Awaiting response" spans two statuses and the endpoint takes one, so it
-       is fetched as two calls and merged — the same shape the Service Request
-       screen already uses for its multi-type filter. */
+    /* "Awaiting response" spans two statuses and each endpoint takes one, so
+       it is fetched as several calls and merged — the same shape the Service
+       Request screen already uses for its multi-type filter. */
     const statuses = statusValue === 'awaiting' ? ENQ_OPEN : [statusValue || undefined];
-    const pages = await Promise.all(statuses.map(st =>
-      axios.get(`${API_BASE}/api/enquiries`, {
-        headers: authHeaders(),
-        params: { status: st, search: search || undefined, page: 1, page_size: 100 },
-      }).then(r => r.data.items).catch(() => [])));
+    const pages = await Promise.all(statuses.map(st => enqFetchStatus(st, typeValue, search)));
 
     let items = pages.flat();
     /* Travel-date range is filtered client-side: the enquiry endpoint has no
@@ -175,8 +217,9 @@ async function loadTicketEnquiries(page = enqPage) {
         <td><span class="mono">${escapeHtml(r.reference_number)}</span></td>
         <td>${escapeHtml(r.merchant_name || '—')}<div class="cell-sub">${escapeHtml(r.raised_by || '')}</div></td>
         <td>${enqRoute(r)}</td>
-        <td>${r.travel_date ? fmtDate(r.travel_date) : '—'}<div class="cell-sub">${enqTime(r.preferred_time)}</div></td>
-        <td>${r.passenger_count}</td>
+        <td>${r.travel_date ? fmtDate(r.travel_date) : '—'}<div class="cell-sub">${
+          r.travel_type === 'hotel' ? '' : enqTime(r.preferred_time)}</div></td>
+        <td>${r.travel_type === 'hotel' ? escapeHtml(enqPaxSummary(r)) : r.passenger_count}</td>
         <td>
           <span class="badge ${ENQ_BADGE[r.status] || 'pending'}">${escapeHtml(enqLabel(r.status))}</span>
           ${heldByOther ? `<div class="cell-sub">with ${escapeHtml(holder)}</div>` : ''}
@@ -186,7 +229,7 @@ async function loadTicketEnquiries(page = enqPage) {
         </td>
         <td>${fmtDateTime(r.created_at)}</td>
         <td style="white-space:nowrap;">
-          <button class="btn btn-navy btn-sm" data-enq-open="${r.id}">
+          <button class="btn btn-navy btn-sm" data-enq-open="${r.travel_type}:${r.id}">
             ${ENQ_OPEN.includes(r.status) ? 'Review' : 'View'}
           </button>
           ${r.booking_request_number
@@ -238,7 +281,16 @@ function enqErrorText(err) {
   return detail || 'Could not record that answer.';
 }
 
-async function openEnquiryReview(enquiryId) {
+/* `key` is "flight:<id>" or "hotel:<id>" — data-enq-open writes this shape
+   because Flight and Hotel are two different tables now (migration 0047) and
+   their own id sequences can collide, so the id alone cannot say which
+   endpoint to read or answer through. */
+async function openEnquiryReview(key) {
+  const [enquiryType, enquiryId] = String(key).split(':');
+  const detailUrl = enquiryType === 'hotel'
+    ? `${API_BASE}/api/hotel/enquiries/${enquiryId}`
+    : `${API_BASE}/api/enquiries/${enquiryId}`;
+
   const overlay = document.getElementById('enqReviewModalOverlay');
   const body = document.getElementById('enqReviewModalBody');
   overlay.classList.add('open');
@@ -249,7 +301,7 @@ async function openEnquiryReview(enquiryId) {
     /* Always re-fetched rather than reused from the table: the row may have
        been answered or claimed by someone else since the list was rendered,
        and the modal should open on the truth. */
-    r = (await axios.get(`${API_BASE}/api/enquiries/${enquiryId}`, { headers: authHeaders() })).data;
+    r = (await axios.get(detailUrl, { headers: authHeaders() })).data;
   } catch (err) {
     body.innerHTML = `<h2>Booking Enquiry</h2>
       <div class="msg error">${escapeHtml(err.response?.data?.detail || 'Failed to load this enquiry.')}</div>
@@ -263,8 +315,9 @@ async function openEnquiryReview(enquiryId) {
   const heldByOther = r.status === 'in_review' && r.review_claimed_by && !mine;
   const canAnswer = open && !heldByOther;
 
+  const isHotel = r.travel_type === 'hotel';
   body.innerHTML = `
-    <h2>Enquiry ${escapeHtml(r.reference_number)}</h2>
+    <h2>${isHotel ? 'Hotel enquiry' : 'Enquiry'} ${escapeHtml(r.reference_number)}</h2>
     <p class="modal-sub">
       ${escapeHtml(r.merchant_name || '')}${r.raised_by ? ` · raised by ${escapeHtml(r.raised_by)}` : ''}
       · ${fmtDateTime(r.created_at)}
@@ -272,6 +325,19 @@ async function openEnquiryReview(enquiryId) {
 
     <div class="detail-grid">
       ${enqDetailRow('Status', `<span class="badge ${ENQ_BADGE[r.status] || 'pending'}">${escapeHtml(enqLabel(r.status))}</span>`)}
+      ${isHotel ? `
+      ${enqDetailRow('Destination', escapeHtml(r.destination_city || '—'))}
+      ${enqDetailRow('Check-in', r.travel_date ? fmtDate(r.travel_date) : '—')}
+      ${enqDetailRow('Check-out', r.return_date ? fmtDate(r.return_date) : '—')}
+      ${enqDetailRow('Nights', r.nights ?? '—')}
+      ${enqDetailRow('Rooms / Guests', escapeHtml(enqPaxSummary(r)))}
+      ${enqDetailRow('Hotel name', escapeHtml(r.hotel_name || '—'))}
+      ${enqDetailRow('Star category', r.star_category ? `${escapeHtml(r.star_category)} Star` : '—')}
+      ${enqDetailRow('Room type', escapeHtml(r.room_type || '—'))}
+      ${enqDetailRow('Meal plan', escapeHtml(ENQ_MEAL_LABELS[r.meal_plan] || r.meal_plan || '—'))}
+      ${enqDetailRow('Preferred location', escapeHtml(r.preferred_location || '—'))}
+      ${enqDetailRow('PAN', escapeHtml(r.pan || '—'))}
+      ` : `
       ${enqDetailRow('Trip type', tripTypeLabel(r.trip_type))}
       ${enqDetailRow('From', escapeHtml([r.origin_city, r.origin].filter(Boolean).join(' · ')))}
       ${enqDetailRow('To', escapeHtml([r.destination_city, r.destination].filter(Boolean).join(' · ')))}
@@ -289,6 +355,7 @@ async function openEnquiryReview(enquiryId) {
       ${enqDetailRow('Booking Class', escapeHtml(r.booking_class || '—'))}
       ${enqDetailRow('Passengers', `${r.passenger_count} — ${escapeHtml(enqPaxSummary(r))}`)}
       ${r.booking_request_number ? enqDetailRow('Booking raised', `<span class="mono">${escapeHtml(r.booking_request_number)}</span>`) : ''}
+      `}
       ${/* 0040 — what the merchant has already quoted its OWN customer. Shown
             to the desk BEFORE it prices this enquiry, which is the whole point:
             a quotation above the client fare wipes out the merchant's margin,
@@ -310,7 +377,7 @@ async function openEnquiryReview(enquiryId) {
         : ''}
     </div>
 
-    ${r.notes ? `<div class="detail-note"><strong>Merchant's notes</strong><p>${escapeHtml(r.notes)}</p></div>` : ''}
+    ${r.notes ? `<div class="detail-note"><strong>${isHotel ? 'Special requirements' : "Merchant's notes"}</strong><p>${escapeHtml(r.notes)}</p></div>` : ''}
     ${enqQuotationNote(r)}
     ${r.admin_response ? `<div class="detail-note"><strong>Our response</strong><p>${escapeHtml(r.admin_response)}</p></div>` : ''}
     ${r.rejection_reason ? `<div class="detail-note"><strong>Reason</strong><p>${escapeHtml(r.rejection_reason)}</p></div>` : ''}
@@ -368,15 +435,26 @@ function wireEnquiryModal(overlay, body, r) {
   const msg = document.getElementById('enqReviewMsg');
   const setMsg = (text, kind) => { if (msg) { msg.textContent = text; msg.className = `msg ${kind || ''}`; } };
 
+  // Same table split as the list/detail fetch above — review and respond
+  // each have a Flight endpoint and a Hotel endpoint (migration 0047).
+  const isHotel = r.travel_type === 'hotel';
+  const reviewUrl = isHotel
+    ? `${API_BASE}/api/admin/hotel-enquiries/${r.id}/review`
+    : `${API_BASE}/api/admin/enquiries/${r.id}/review`;
+  const respondUrl = isHotel
+    ? `${API_BASE}/api/admin/hotel-enquiries/${r.id}/respond`
+    : `${API_BASE}/api/admin/enquiries/${r.id}/respond`;
+  const reopenKey = `${r.travel_type}:${r.id}`;
+
   const startBtn = document.getElementById('enqStartReviewBtn');
   if (startBtn) {
     startBtn.addEventListener('click', async () => {
       startBtn.disabled = true;
       try {
-        await axios.post(`${API_BASE}/api/admin/enquiries/${r.id}/review`, {}, { headers: authHeaders() });
+        await axios.post(reviewUrl, {}, { headers: authHeaders() });
         showToast(`${r.reference_number} is now under your review.`);
         await loadTicketEnquiries(enqPage);
-        openEnquiryReview(r.id);          // reopen on the fresh state
+        openEnquiryReview(reopenKey);      // reopen on the fresh state
       } catch (err) {
         startBtn.disabled = false;
         setMsg(err.response?.data?.detail || 'Could not start the review.', 'error');
@@ -437,7 +515,7 @@ function wireEnquiryModal(overlay, body, r) {
     const buttons = ['enqAvailableBtn', 'enqNotAvailableBtn'].map(id => document.getElementById(id));
     buttons.forEach(b => b && (b.disabled = true));
     try {
-      await axios.post(`${API_BASE}/api/admin/enquiries/${r.id}/respond`,
+      await axios.post(respondUrl,
         {
           available,
           reason,

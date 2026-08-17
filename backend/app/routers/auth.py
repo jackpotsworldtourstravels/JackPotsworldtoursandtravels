@@ -45,6 +45,7 @@ from app.services import (
     auth_service,
     email_service,
     otp_service,
+    service_access_service,
     session_service,
     user_service,
 )
@@ -85,7 +86,7 @@ def _profile_date(profile: dict, key: str) -> datetime.date | None:
         return None
 
 
-def user_response(user: User) -> UserResponse:
+def user_response(db: Session, user: User) -> UserResponse:
     profile = user.profile or {}
     return UserResponse(
         id=user.user_id,
@@ -97,6 +98,12 @@ def user_response(user: User) -> UserResponse:
         merchant_id=user.merchant_id,
         merchant_name=user.merchant.company_name if user.merchant else None,
         permissions=sorted(effective_permissions(user)),
+        # Platform staff have no merchant to have access rows, so {} rather
+        # than a lookup that would just filter on merchant_id=None.
+        service_access=(
+            service_access_service.get_access_map(db, user.merchant_id)
+            if user.merchant_id else {}
+        ),
         is_active=user.is_active,
         mobile=user.phone,
         first_name=profile.get("first_name"),
@@ -250,7 +257,7 @@ def verify_otp(request: Request, payload: VerifyOtpRequest, db: Session = Depend
 
     access_token, refresh_token = auth_service.issue_tokens(user)
     return TokenResponse(
-        access_token=access_token, refresh_token=refresh_token, user=user_response(user)
+        access_token=access_token, refresh_token=refresh_token, user=user_response(db, user)
     )
 
 
@@ -394,5 +401,5 @@ def change_password(
         "so each portal can hide what the user may not do (the server enforces it regardless)."
     ),
 )
-def me(current_user: User = Depends(get_current_user)):
-    return user_response(current_user)
+def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user_response(db, current_user)

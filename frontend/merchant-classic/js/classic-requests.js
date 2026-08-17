@@ -441,7 +441,15 @@ function clRenderRequestRows(failedStages = 0) {
 /* Reopen a draft booking on the Booking Request screen.
    The row only carries a summary, so the full booking is re-read first —
    clResumeBookingDraft rebuilds the journey from its `details` and needs the
-   passengers, which the list response does not include. */
+   passengers, which the list response does not include.
+
+   TRAVEL_TYPE DECIDES WHICH SCREEN, AND THIS DID NOT USED TO CHECK. Before
+   this branch existed, every draft booking — Flight or Hotel — routed
+   through Flight's own clResumeBookingDraft, which opens the Flight Booking
+   Request screen regardless of what the draft actually is. Latent while
+   Hotel drafts were rare; Hotel Direct Booking's own Save as draft makes it
+   a normal-path bug rather than an edge case, so it is fixed here rather
+   than left for whoever hits it next. */
 async function clContinueBookingDraft(id, btn) {
   if (btn) { btn.disabled = true; btn.classList.add('loading'); }
   try {
@@ -459,7 +467,11 @@ async function clContinueBookingDraft(id, btn) {
     }
     /* The envelope goes too: a group draft's manifest id is on it rather than
        on `request`, and without it the screen would ask for the sheet again. */
-    clResumeBookingDraft(booking, detail);
+    if (booking.travel_type === 'hotel') {
+      clResumeHotelBookingDraft(booking, detail);
+    } else {
+      clResumeBookingDraft(booking, detail);
+    }
   } catch (err) {
     clOpenModal('Could not open this draft',
       `<div class="cl-msg cl-msg-err" style="margin-top:0">${
