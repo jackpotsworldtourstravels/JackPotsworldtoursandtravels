@@ -267,6 +267,26 @@ def set_merchant_status(
     return MerchantResponse.of(merchant)
 
 
+@router.delete(
+    "/{merchant_id}",
+    status_code=204,
+    summary="Delete a merchant",
+    description=(
+        "Requires `merchant.delete`. Soft-deletes the merchant and every one of its users "
+        "(hard deletion is unsafe — most tables referencing a merchant cascade on it, and "
+        "`wallet_transactions` restricts it outright). Every user is logged out immediately and "
+        "none of them, nor the merchant, can sign in again. The merchant stops appearing in "
+        "Merchant List/Search/Filters."
+    ),
+)
+def delete_merchant(
+    merchant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.MERCHANT_DELETE)),
+):
+    merchant_service.delete_merchant(db, current_user, merchant_id)
+
+
 @router.get(
     "/{merchant_id}/users",
     response_model=Page[AccountResponse],
@@ -378,3 +398,23 @@ def set_merchant_user_status(
         db, current_user, merchant_id, user_id, payload.status
     )
     return AccountResponse.of(user)
+
+
+@router.delete(
+    "/{merchant_id}/users/{user_id}",
+    status_code=204,
+    summary="Delete a merchant user",
+    description=(
+        "Requires `merchant_user.delete`. Deletes only this one user — hard-deleted when it has "
+        "no booking or hotel-enquiry history, soft-deleted (and logged out immediately) when it "
+        "does, so historical requests are never orphaned. Does not affect the merchant account, "
+        "other users, or existing bookings."
+    ),
+)
+def delete_merchant_user(
+    merchant_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.MERCHANT_USER_DELETE)),
+):
+    account_service.delete_merchant_user(db, current_user, merchant_id, user_id)

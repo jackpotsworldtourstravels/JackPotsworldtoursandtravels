@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
 from app.models_v2 import (
+    HotelEnquiry,
     MerchantRole,
     RequestType,
     ServiceRequest,
@@ -64,7 +65,14 @@ def _require_unique_email(db: Session, email: str, exclude_user_id: int | None =
 
 
 def _has_history(db: Session, user_id: int) -> bool:
-    return (
+    """True when deleting this user would orphan real activity.
+
+    Hotel Enquiry lives in its own table (``hotel_enquiries``), not
+    ``service_requests`` — a user who has only ever raised hotel enquiries
+    would otherwise look history-free and be hard-deleted, silently
+    detaching those enquiries from the person who raised them.
+    """
+    if (
         db.scalar(
             select(ServiceRequest.request_id)
             .where(
@@ -74,6 +82,13 @@ def _has_history(db: Session, user_id: int) -> bool:
                 )
             )
             .limit(1)
+        )
+        is not None
+    ):
+        return True
+    return (
+        db.scalar(
+            select(HotelEnquiry.id).where(HotelEnquiry.user_id == user_id).limit(1)
         )
         is not None
     )
@@ -528,7 +543,9 @@ def create_merchant_user(
 def list_merchant_users(
     db: Session, merchant_id: int, page: int, page_size: int, search: str | None = None
 ):
-    conditions = [User.merchant_id == merchant_id]
+    # A deleted user is gone as far as this table/search is concerned, unlike
+    # suspended/inactive which stay visible with a status badge.
+    conditions = [User.merchant_id == merchant_id, User.status != UserStatus.DELETED]
     if search:
         pattern = f"%{search}%"
         conditions.append(or_(User.full_name.ilike(pattern), User.email.ilike(pattern)))
@@ -602,6 +619,51 @@ def set_merchant_user_status(
         reference_id=user.user_id, merchant_id=merchant_id,
     )
     return user
+
+
+def delete_merchant_user(db: Session, actor: User, merchant_id: int, user_id: int) -> None:
+    """Delete one merchant user — hard if it has no history, soft otherwise.
+
+    Mirrors ``delete_admin``: ``users.user_id`` is only ever ``SET NULL`` on
+    delete, so removing a clean account is schema-safe. A user who has
+    raised bookings or hotel enquiries is kept (as ``DELETED``, logged out
+    immediately) rather than hard-deleted, so their historical requests are
+    never orphaned. Either way, only this one user is touched — the
+    merchant account and every other user are left alone.
+    """
+    user = get_merchant_user(db, merchant_id, user_id)
+    if user.user_id == actor.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account"
+        )
+
+    from app.services import session_service
+    from app.services.auth_service import logout as revoke_tokens
+
+    email = user.email
+    if _has_history(db, user_id):
+        user.status = UserStatus.DELETED
+        db.commit()
+        session_service.force_logout_all(db, user.user_id)
+        revoke_tokens(db, user)
+    else:
+        db.delete(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            user = get_merchant_user(db, merchant_id, user_id)
+            user.status = UserStatus.DELETED
+            db.commit()
+            session_service.force_logout_all(db, user.user_id)
+            revoke_tokens(db, user)
+
+    activity_service.log_activity(
+        db, actor.user_id, "Merchant user deleted",
+        activity_type="Account", module="Merchant Users",
+        description=f"{actor.full_name} deleted {email}",
+        merchant_id=merchant_id,
+    )
 
 
 def reset_merchant_user_password(

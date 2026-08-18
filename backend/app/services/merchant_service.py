@@ -33,6 +33,7 @@ from app.models_v2 import (
     ServiceRequest,
     User,
     UserRole,
+    UserStatus,
 )
 from app.services import (
     account_service,
@@ -170,6 +171,11 @@ def list_merchants(
         )
     if merchant_status is not None:
         conditions.append(Merchant.status == merchant_status)
+    else:
+        # A deleted merchant is gone as far as the List/Search/Filters screen
+        # is concerned; an explicit status filter (e.g. an internal audit
+        # view) can still ask for it directly.
+        conditions.append(Merchant.status != MerchantStatus.DELETED)
     if company_type is not None:
         conditions.append(Merchant.company_type == company_type)
     where = and_(*conditions) if conditions else True
@@ -284,6 +290,45 @@ def set_merchant_status(
             db, user.user_id, f"Your company account is now {new_status.value}",
             "Contact your account manager if you believe this is an error.",
         )
+    return merchant
+
+
+def delete_merchant(db: Session, actor: User, merchant_id: int) -> Merchant:
+    """Soft-delete a merchant and every one of its users.
+
+    A hard delete is unsafe here: most tables referencing ``merchant_id``
+    cascade, so dropping the row would silently take the merchant's entire
+    booking, document, and enquiry history with it, and
+    ``wallet_transactions`` RESTRICTs the delete outright for any merchant
+    that has ever transacted. Deletion is instead one more status, exactly
+    like ``suspended`` — login is already refused for any non-``active``
+    status, so this needs no new gate of its own.
+    """
+    merchant = get_merchant(db, merchant_id)
+    if merchant.status is MerchantStatus.DELETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Merchant is already deleted",
+        )
+    merchant.status = MerchantStatus.DELETED
+
+    from app.services import session_service
+    from app.services.auth_service import logout as revoke_tokens
+
+    for user in merchant.users:
+        user.status = UserStatus.DELETED
+        session_service.force_logout_all(db, user.user_id)
+        revoke_tokens(db, user)
+
+    db.commit()
+    db.refresh(merchant)
+
+    activity_service.log_activity(
+        db, actor.user_id, "Merchant deleted",
+        activity_type="Merchant", module="Merchant Management",
+        description=f"{actor.full_name} deleted merchant {merchant.company_name}",
+        reference_id=merchant.merchant_id, merchant_id=merchant.merchant_id,
+    )
     return merchant
 
 

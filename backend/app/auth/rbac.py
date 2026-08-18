@@ -54,11 +54,13 @@ class P:
     MERCHANT_APPROVE = "merchant.approve"
     MERCHANT_EDIT = "merchant.edit"
     MERCHANT_SUSPEND = "merchant.suspend"
+    MERCHANT_DELETE = "merchant.delete"
     MERCHANT_VIEW = "merchant.view"
 
     # Merchant's own staff (Merchant)
     MERCHANT_USER_CREATE = "merchant_user.create"
     MERCHANT_USER_MANAGE = "merchant_user.manage"
+    MERCHANT_USER_DELETE = "merchant_user.delete"
 
     # Tickets / bookings
     TICKET_ENQUIRY = "ticket.enquiry"
@@ -158,14 +160,14 @@ _SUPER_ADMIN: frozenset[str] = frozenset({
 
 _ADMIN: frozenset[str] = frozenset({
     P.MERCHANT_CREATE, P.MERCHANT_APPROVE, P.MERCHANT_EDIT,
-    P.MERCHANT_SUSPEND, P.MERCHANT_VIEW,
+    P.MERCHANT_SUSPEND, P.MERCHANT_DELETE, P.MERCHANT_VIEW,
     # Full lifecycle of a merchant's staff logins from the Admin portal: list,
     # create (POST /api/admin/merchants/{id}/users), and reset password. The
     # separate MERCHANT_USER_CREATE below stays a merchant-only code — it is
     # what lets a merchant add staff to its OWN company via /api/merchant/team,
     # and admins reach the same service through the merchant-scoped path above
     # rather than by holding it.
-    P.MERCHANT_USER_MANAGE,
+    P.MERCHANT_USER_MANAGE, P.MERCHANT_USER_DELETE,
     P.TICKET_VIEW, P.TICKET_APPROVE, P.TICKET_REJECT, P.TICKET_ISSUE,
     # Provider Management is an Admin module. Deliberately not granted to the
     # Super Admin (which holds merchant.view for visibility): what a supplier

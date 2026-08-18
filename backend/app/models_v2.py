@@ -65,6 +65,7 @@ class UserStatus(str, enum.Enum):
     INACTIVE = "inactive"
     BLOCKED = "blocked"
     SUSPENDED = "suspended"
+    DELETED = "deleted"
 
 
 class MerchantStatus(str, enum.Enum):
@@ -73,6 +74,7 @@ class MerchantStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
+    DELETED = "deleted"
 
 
 class MerchantRole(str, enum.Enum):

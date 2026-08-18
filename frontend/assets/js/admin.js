@@ -594,6 +594,7 @@ async function openMerchantDetail(merchantId) {
             ${st === 'pending_approval' ? `<button class="btn btn-coral btn-sm" id="approveMerchantBtn">Approve</button>` : ''}
             ${st === 'active' ? `<button class="btn btn-danger btn-sm" id="suspendMerchantBtn" data-next="suspended">Suspend</button>` : ''}
             ${st === 'suspended' ? `<button class="btn btn-coral btn-sm" id="suspendMerchantBtn" data-next="active">Reactivate</button>` : ''}
+            <button class="btn btn-danger btn-sm" id="deleteMerchantBtn">Delete</button>
             <button class="btn btn-ghost btn-sm" id="backToMerchantsBtn">← Back to Merchants</button>
           </div>
         </div>
@@ -639,7 +640,31 @@ async function openMerchantDetail(merchantId) {
         openMerchantDetail(merchantId);
       } catch (err) { alert(err.response?.data?.detail || 'Failed to update merchant.'); }
     });
-    loadMerchantUsersTable(merchantId);
+    document.getElementById('deleteMerchantBtn')?.addEventListener('click', async e => {
+      // Captured before the `await` below: the browser clears
+      // Event#currentTarget once synchronous dispatch finishes, so reading
+      // it after an await returns null.
+      const btn = e.currentTarget;
+      const ok = await confirmDialog({
+        title: `Delete ${m.company_name}?`,
+        message: 'This action will also remove all associated merchant users. This action cannot be undone.',
+        confirmText: 'Delete',
+        danger: true,
+      });
+      if (!ok) return;
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      try {
+        await axios.delete(`${API_BASE}/api/admin/merchants/${merchantId}`, { headers: authHeaders() });
+        showToast('Merchant deleted.');
+        loadMerchants(merchantsPage);
+      } catch (err) {
+        alert(err.response?.data?.detail || 'Failed to delete merchant.');
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    });
+    loadMerchantUsersTable(merchantId, m.company_name);
   } catch (err) {
     detailPanel.innerHTML = `<div class="panel"><div class="empty-state">Failed to load merchant.</div></div>`;
   }
@@ -861,7 +886,7 @@ function openMerchantUserModal(merchantId, companyName) {
   });
 }
 
-async function loadMerchantUsersTable(merchantId) {
+async function loadMerchantUsersTable(merchantId, merchantName) {
   const tbody = document.querySelector('#merchantUsersTable tbody');
   tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Loading…</td></tr>`;
   try {
@@ -892,7 +917,7 @@ async function loadMerchantUsersTable(merchantId) {
 
     const byId = new Map(data.items.map(u => [String(u.id), u]));
     tbody.querySelectorAll('[data-view-mu]').forEach(btn => {
-      btn.addEventListener('click', () => openMerchantUserDetail(merchantId, byId.get(btn.dataset.viewMu)));
+      btn.addEventListener('click', () => openMerchantUserDetail(merchantId, byId.get(btn.dataset.viewMu), merchantName));
     });
     tbody.querySelectorAll('[data-status-mu]').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -900,7 +925,7 @@ async function loadMerchantUsersTable(merchantId) {
           await axios.patch(
             `${API_BASE}/api/admin/merchants/${merchantId}/users/${btn.dataset.statusMu}/status`,
             { status: btn.dataset.next }, { headers: authHeaders() });
-          loadMerchantUsersTable(merchantId);
+          loadMerchantUsersTable(merchantId, merchantName);
         } catch (err) { alert(err.response?.data?.detail || 'Failed to update this user.'); }
       });
     });
@@ -912,7 +937,7 @@ async function loadMerchantUsersTable(merchantId) {
 /* One merchant user, read-only, plus the two actions that do not belong on a
    row: Reset Password (destructive, and the new password is shown once) and
    the status flip. Rendered into the same overlay the Add User form uses. */
-function openMerchantUserDetail(merchantId, u) {
+function openMerchantUserDetail(merchantId, u, merchantName) {
   if (!u) return;
   const overlay = document.getElementById('merchantUserModalOverlay');
   const isActive = u.status === 'active';
@@ -930,6 +955,7 @@ function openMerchantUserDetail(merchantId, u) {
       <button type="button" class="btn ${isActive ? 'btn-danger' : 'btn-coral'}" id="muDetailStatusBtn"
               data-next="${isActive ? 'inactive' : 'active'}">${isActive ? 'Deactivate' : 'Activate'}</button>
       <button type="button" class="btn btn-ghost" id="muDetailResetBtn">Reset Password</button>
+      <button type="button" class="btn btn-danger" id="muDetailDeleteBtn">Delete</button>
       <button type="button" class="btn btn-ghost" id="muDetailCloseBtn">Close</button>
     </div>`;
   overlay.classList.add('open');
@@ -942,7 +968,7 @@ function openMerchantUserDetail(merchantId, u) {
         `${API_BASE}/api/admin/merchants/${merchantId}/users/${u.id}/status`,
         { status: e.currentTarget.dataset.next }, { headers: authHeaders() });
       close();
-      loadMerchantUsersTable(merchantId);
+      loadMerchantUsersTable(merchantId, merchantName);
     } catch (err) { alert(err.response?.data?.detail || 'Failed to update this user.'); }
   });
   document.getElementById('muDetailResetBtn').addEventListener('click', async () => {
@@ -953,6 +979,30 @@ function openMerchantUserDetail(merchantId, u) {
         {}, { headers: authHeaders() });
       alert(`New password: ${r.temporary_password}\n\nShare this with the merchant user securely — it cannot be retrieved again.`);
     } catch (err) { alert('Failed to reset password.'); }
+  });
+  document.getElementById('muDetailDeleteBtn').addEventListener('click', async e => {
+    // Captured before the `await` below — see the matching note on the
+    // merchant delete handler above.
+    const btn = e.currentTarget;
+    const ok = await confirmDialog({
+      title: `Delete ${u.full_name}?`,
+      message: `Role: ${merchantRoleType(u)} · Merchant: ${merchantName || '—'}. This action cannot be undone.`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try {
+      await axios.delete(`${API_BASE}/api/admin/merchants/${merchantId}/users/${u.id}`, { headers: authHeaders() });
+      showToast('Merchant user deleted.');
+      close();
+      loadMerchantUsersTable(merchantId, merchantName);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete this user.');
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    }
   });
 }
 
