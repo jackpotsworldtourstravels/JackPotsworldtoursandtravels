@@ -405,10 +405,10 @@ def set_merchant_user_status(
     status_code=204,
     summary="Delete a merchant user",
     description=(
-        "Requires `merchant_user.delete`. Deletes only this one user — hard-deleted when it has "
-        "no booking or hotel-enquiry history, soft-deleted (and logged out immediately) when it "
-        "does, so historical requests are never orphaned. Does not affect the merchant account, "
-        "other users, or existing bookings."
+        "Requires `merchant_user.delete`. Soft-deletes only this one user — logged out "
+        "immediately, can no longer sign in, disappears from the Merchant Users table — so their "
+        "historical bookings and enquiries keep their attribution. Their email is freed for reuse "
+        "on a new account. Does not affect the merchant account, other users, or existing bookings."
     ),
 )
 def delete_merchant_user(

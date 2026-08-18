@@ -458,7 +458,14 @@ class Merchant(Base):
 
     __table_args__ = (
         UniqueConstraint("merchant_code", name="uq_merchants_code"),
-        UniqueConstraint("email", name="uq_merchants_email"),
+        # Partial, not a plain UniqueConstraint: a soft-deleted merchant must
+        # not keep its email out of circulation forever. Only one row with
+        # status != 'deleted' may hold a given email; any number of deleted
+        # rows may share one, unmangled, for history.
+        Index(
+            "ux_merchants_email_not_deleted", "email",
+            unique=True, postgresql_where=text("status != 'deleted'"),
+        ),
         UniqueConstraint("reference_prefix", name="uq_merchants_prefix"),
         # No non-negative constraint on wallet_balance: CR-4 (migration 0036)
         # made the wallet a running account, and a negative balance is the
@@ -569,7 +576,12 @@ class User(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("email", name="uq_users_email"),
+        # Partial, not a plain UniqueConstraint — see the matching note on
+        # Merchant.__table_args__ above; same reasoning, same technique.
+        Index(
+            "ux_users_email_not_deleted", "email",
+            unique=True, postgresql_where=text("status != 'deleted'"),
+        ),
         CheckConstraint(
             "jsonb_typeof(permissions) = 'array'", name="ck_users_permissions_is_array"
         ),

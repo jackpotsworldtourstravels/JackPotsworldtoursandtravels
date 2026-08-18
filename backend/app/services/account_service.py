@@ -57,7 +57,12 @@ def generate_temp_password(length: int = 14) -> str:
 
 
 def _require_unique_email(db: Session, email: str, exclude_user_id: int | None = None) -> None:
-    existing = db.scalar(select(User).where(User.email == email))
+    # A deleted user no longer holds its email — see the partial unique
+    # index on users.email (ux_users_email_not_deleted) that enforces the
+    # same rule at the database level.
+    existing = db.scalar(
+        select(User).where(User.email == email, User.status != UserStatus.DELETED)
+    )
     if existing and existing.user_id != exclude_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
@@ -179,6 +184,10 @@ def list_all_users(
     conditions = []
     if status is not None:
         conditions.append(User.status == status)
+    else:
+        # A deleted account is gone as far as this screen is concerned; an
+        # explicit status filter can still ask for it directly.
+        conditions.append(User.status != UserStatus.DELETED)
     if role is not None:
         conditions.append(User.role == role)
     if merchant_id is not None:
@@ -622,13 +631,15 @@ def set_merchant_user_status(
 
 
 def delete_merchant_user(db: Session, actor: User, merchant_id: int, user_id: int) -> None:
-    """Delete one merchant user — hard if it has no history, soft otherwise.
+    """Soft-delete one merchant user.
 
-    Mirrors ``delete_admin``: ``users.user_id`` is only ever ``SET NULL`` on
-    delete, so removing a clean account is schema-safe. A user who has
-    raised bookings or hotel enquiries is kept (as ``DELETED``, logged out
-    immediately) rather than hard-deleted, so their historical requests are
-    never orphaned. Either way, only this one user is touched — the
+    Always a status flip, never a row delete: a hard delete would ``SET
+    NULL`` the FK on every historical booking/enquiry the user raised,
+    which erases "who did this" from the audit trail even though the
+    request row itself survives. Soft delete keeps that attribution intact.
+    The email is freed for reuse by the partial unique index on
+    ``users.email`` (``ux_users_email_not_deleted``), not by this function —
+    a deleted row keeps its real email. Only this one user is touched — the
     merchant account and every other user are left alone.
     """
     user = get_merchant_user(db, merchant_id, user_id)
@@ -641,22 +652,10 @@ def delete_merchant_user(db: Session, actor: User, merchant_id: int, user_id: in
     from app.services.auth_service import logout as revoke_tokens
 
     email = user.email
-    if _has_history(db, user_id):
-        user.status = UserStatus.DELETED
-        db.commit()
-        session_service.force_logout_all(db, user.user_id)
-        revoke_tokens(db, user)
-    else:
-        db.delete(user)
-        try:
-            db.commit()
-        except IntegrityError:
-            db.rollback()
-            user = get_merchant_user(db, merchant_id, user_id)
-            user.status = UserStatus.DELETED
-            db.commit()
-            session_service.force_logout_all(db, user.user_id)
-            revoke_tokens(db, user)
+    user.status = UserStatus.DELETED
+    db.commit()
+    session_service.force_logout_all(db, user.user_id)
+    revoke_tokens(db, user)
 
     activity_service.log_activity(
         db, actor.user_id, "Merchant user deleted",

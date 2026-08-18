@@ -101,7 +101,12 @@ def create_merchant(
     Returns ``(merchant, first_user, plaintext_password)``. The password is
     shown once and never recoverable afterwards.
     """
-    if db.scalar(select(Merchant).where(Merchant.email == email)):
+    # A deleted merchant no longer holds its email — see the partial unique
+    # index on merchants.email (ux_merchants_email_not_deleted) that enforces
+    # the same rule at the database level.
+    if db.scalar(
+        select(Merchant).where(Merchant.email == email, Merchant.status != MerchantStatus.DELETED)
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A merchant with that email already exists",
@@ -211,7 +216,11 @@ def update_merchant(db: Session, actor: User, merchant_id: int, **fields) -> Mer
     # sends the merchant its own current address, and that must not be rejected.
     new_email = fields.get("email")
     if new_email is not None and new_email != merchant.email:
-        clash = db.scalar(select(Merchant).where(Merchant.email == new_email))
+        clash = db.scalar(
+            select(Merchant).where(
+                Merchant.email == new_email, Merchant.status != MerchantStatus.DELETED
+            )
+        )
         if clash and clash.merchant_id != merchant_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -387,7 +396,11 @@ def global_reports_summary(db: Session) -> list[dict]:
         ).all()
     )
 
-    merchants = db.scalars(select(Merchant).order_by(Merchant.company_name)).all()
+    merchants = db.scalars(
+        select(Merchant)
+        .where(Merchant.status != MerchantStatus.DELETED)
+        .order_by(Merchant.company_name)
+    ).all()
     rows = [
         {
             "merchant_id": m.merchant_id,
