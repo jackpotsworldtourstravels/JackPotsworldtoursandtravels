@@ -107,6 +107,14 @@ SUITE = [
     # other way round.
     ("verify_providers.py",
      "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
+    # Customer Portal V1 (0044). Late, because its central assertion is that a
+    # merchant/admin/manager/super-admin token and their credentials are ALL
+    # refused by the customer API — so it signs each of them in, and a failure
+    # in those portals' own scripts above explains a failure here rather than
+    # the other way round. It signs in five times, so it must stay ahead of
+    # verify_m8, which spends what is left of the rate-limit budget.
+    ("verify_customer_portal.py",
+     "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
     # The only script that opens a browser, and the only one asserting anything
     # about layout. It signs in three times, so it sits after the API scripts
     # (their failures explain its failures, never the reverse) and before M8,

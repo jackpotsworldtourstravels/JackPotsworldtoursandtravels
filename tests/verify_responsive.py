@@ -88,6 +88,16 @@ PUBLIC_PAGES = [
     ("merchant login", "/partner-login.html"),
     ("forgot password", "/forgot-password.html"),
     ("reset password", "/reset-password.html?token=demo"),
+    # One page per customer service. They share a shell and a stylesheet, so a
+    # regression in either shows up on all six at once — which is the point of
+    # listing them all rather than trusting one as a sample.
+    ("flights", "/flights.html"),
+    ("hotels", "/hotels.html"),
+    ("cruises", "/cruises.html"),
+    ("tour packages", "/packages.html"),
+    ("visa", "/visa.html"),
+    ("activities", "/activities.html"),
+    ("my bookings", "/my-bookings.html"),
 ]
 
 #: (label, path, portal whose token unlocks it). The portals are single-page

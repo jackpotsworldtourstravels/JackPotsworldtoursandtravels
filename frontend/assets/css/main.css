@@ -570,6 +570,17 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 }
 .modal-field input:focus{border-color:var(--coral);}
 .modal-forgot{display:inline-block; margin:-6px 0 18px; font-size:13px; font-weight:700; color:var(--coral);}
+/* Remember Me sits on the same line as Forgot Password. The checkbox is
+   deliberately OUTSIDE .modal-field: that rule sets width:100% on its inputs,
+   which would stretch a checkbox across the whole modal. */
+.modal-remember{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:-6px 0 18px;}
+.modal-remember .modal-forgot{margin:0;}
+.modal-remember label{display:flex; align-items:center; gap:8px; margin:0; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;}
+.modal-remember input[type="checkbox"]{width:16px; height:16px; margin:0; accent-color:var(--coral); cursor:pointer;}
+/* Dev-only code box on the OTP step. Empty (and classless) on any server that
+   has SMTP configured, so it occupies nothing in production. */
+.modal-devbox{margin:0 0 16px; padding:10px 14px; border-radius:10px; background:#fff5f2;
+  border:1px dashed var(--coral); font-size:13px; font-weight:600; color:var(--navy); line-height:1.5;}
 .modal-submit{width:100%; justify-content:center; margin-top:4px;}
 .modal-switch{text-align:center; margin-top:22px; font-size:14px; color:var(--muted);}
 .modal-switch a{color:var(--coral); font-weight:700;}
