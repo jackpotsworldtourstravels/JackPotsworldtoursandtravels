@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="../assets/css/partner-portal.css?v=20260812ui61">
 <link rel="stylesheet" href="../assets/css/super-admin.css?v=20260812ui61">
 <!-- Shared design system — must stay last, see admin/index.html for why. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260812ui61">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260819ui3">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
@@ -27,7 +27,11 @@
      partner-portal.css. -->
 <link rel="stylesheet" href="../assets/css/sidebar-rail.css?v=20260812ui61">
 </head>
-<body>
+<!-- `jp-admin` opts this portal into jp-ds.css's §15 dialog & form standard —
+     see admin/index.html's comment on the same hook. Same .modal-card /
+     .modal-actions / .btn-coral / .btn-navy / .btn-danger markup Admin uses,
+     so the footer alignment/ordering and dialog spacing rules apply here too. -->
+<body class="jp-admin">
 
 <!-- ============== AUTH VIEW ==============
      Login -> Password -> OTP -> Dashboard (docs/API_CONTRACT.md §1), against the live

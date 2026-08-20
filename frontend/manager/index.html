@@ -12,6 +12,8 @@
      modal; giving it its own design system would be two sets of table styles to
      keep in step for no visible gain. -->
 <link rel="stylesheet" href="../assets/css/admin.css?v=20260815svc1">
+<!-- Shared design system — must stay last, see admin/index.html for why. -->
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260819ui3">
 <style>
   /* The handful of rules this portal needs that admin.css has no reason to
      carry. Namespaced `mg-` so nothing here can reach the Admin screens. */
@@ -79,7 +81,11 @@
   @media (max-width:600px){ .mg-dl{grid-template-columns:1fr;} }
 </style>
 </head>
-<body>
+<!-- `jp-admin` opts this portal into jp-ds.css's §15 dialog & form standard —
+     see admin/index.html's comment on the same hook. This portal loads
+     admin.css directly, so its .modal-card / .modal-actions / .btn-* markup
+     already matches. -->
+<body class="jp-admin">
 <div class="mobile-topbar">
   <div class="brand"><img src="../assets/images/favicon-180.png" alt="JackPots World Tours &amp; Travels" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> JackPots Manager</div>
   <button type="button" class="hamburger-btn" id="mobileMenuBtn" aria-label="Open menu">

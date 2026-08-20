@@ -568,11 +568,20 @@ function opsRenderWork() {
           ${/* The desk is about to spend the platform's money against this
                 figure, so it belongs on the screen where that happens. It was
                 absent entirely: the only money this modal ever showed was the
-                fare input, which a quoted booking no longer renders. */''}
-          ${cell('Booking amount', moneyIsPositive(r.total_amount)
+                fare input, which a quoted booking no longer renders.
+                Named "Ticket amount", not "Booking amount" — that label now
+                belongs to Client Fare below, a different number (what the
+                merchant charges its own customer, not what it owes us). */''}
+          ${cell('Ticket amount', moneyIsPositive(r.total_amount)
             ? `<strong>${escapeHtml(moneyStr(r.total_amount))}</strong>${
                 classic ? ' <span class="ops-sub">settled from the wallet at ticketing</span>' : ''}`
             : '<span class="ops-sub">Not priced yet</span>')}
+          ${/* Read-only: this is what the merchant told its customer it would
+                cost, entered on their side (Enquiry/Booking Request form) —
+                nothing here writes it back. Not every booking has one. */''}
+          ${cell('Booking Amount', moneyIsPositive(r.client_fare)
+            ? `<strong>${escapeHtml(moneyStr(r.client_fare))}</strong>`
+            : '<span class="ops-sub">Not recorded</span>')}
           ${/* PNR, ticket number and airline reference are NOT repeated here.
                 They are editable in Airline references below, and a value shown
                 twice in one dialog is a value someone will eventually edit in

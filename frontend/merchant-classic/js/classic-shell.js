@@ -692,8 +692,18 @@ async function clShowApp() {
   /* Booking Enquiry and Booking Request both exist to work a Flight or a
      Hotel booking — with neither product enabled (e.g. Visa-only), there is
      nothing on either screen for the merchant to do, so both leave the rail
-     the same way Visa/Holidays do when THEIR product is off. */
-  const hasBookingProduct = svc.flights || svc.hotels;
+     the same way Visa/Holidays do when THEIR product is off.
+
+     The Manager sub-role also loses both, unconditionally — a deliberate,
+     narrow exception to gating by permission (like clIsManager() above):
+     this is not an authorization question (Manager still holds
+     ticket.enquiry/ticket.request server-side, unchanged), it is that a
+     Manager's job on this portal is signing off what others raised, not
+     raising it themselves, and the two menus are pure noise for that job.
+     Checked against merchant_role directly, on purpose — there is no
+     permission boundary this maps to. */
+  const hasBookingProduct = (svc.flights || svc.hotels)
+    && clSessionUser()?.merchant_role !== 'manager';
   $('clNavEnquiry').style.display = hasBookingProduct ? '' : 'none';
   $('clNavBookingRequest').style.display = hasBookingProduct ? '' : 'none';
 

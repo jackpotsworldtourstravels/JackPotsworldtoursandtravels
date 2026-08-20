@@ -129,7 +129,7 @@ async function openChangeRequest(requestId) {
     ${p.kind ? `<div class="detail-note"><strong>Settled</strong><p>${
       p.kind === 'cancellation'
         ? `Cancellation charge ${crMoney(p.cancellation_charge)} on a booking of ${crMoney(p.booking_amount)} — refund due <strong>${crMoney(p.refund_amount)}</strong>.`
-        : `Fare difference ${crMoney(p.fare_difference)} plus a change fee of ${crMoney(p.change_fee)} — payable <strong>${crMoney(p.total_payable)}</strong>.`
+        : `Fare difference ${crMoney(p.fare_difference)} plus a charge fee of ${crMoney(p.change_fee)} — payable <strong>${crMoney(p.total_payable)}</strong>.`
     }${p.quoted_by_name ? ` Quoted by ${escapeHtml(p.quoted_by_name)}.` : ''}</p></div>` : ''}
 
     ${heldByOther ? `<div class="msg warn">${escapeHtml(r.review_claimed_by_name)} is reviewing this request. Only they can settle it.</div>` : ''}
@@ -175,7 +175,7 @@ async function openChangeRequest(requestId) {
             produces a refund — if the merchant is owed money, they cancel instead.</span>
         </div>
         <div class="form-field" style="max-width:none;">
-          <label for="crFeeInput">Change fee (₹)</label>
+          <label for="crFeeInput">Charge fee (₹)</label>
           <input type="number" id="crFeeInput" min="0" step="0.01" placeholder="0.00">
           <span class="cell-sub" id="crPayablePreview">Our handling charge on top.</span>
         </div>`}

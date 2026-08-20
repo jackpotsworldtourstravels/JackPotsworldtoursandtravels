@@ -574,6 +574,60 @@ function clRequestActions(r) {
 
 /* ------------------------------------------------------------------ detail */
 
+/* The pricing / manager-approval facts that used to live in a cramped subrow
+   under each row on the Service Requests table (Previously Raised Requests) —
+   now shown here instead, where View already opens. Empty when there is
+   nothing service-request-specific to say: a plain booking never reaches
+   this (clOpenRequestDetail routes it to the booking-detail page below), and
+   a plain enquiry has no pricing or manager_approval, so it renders nothing.
+   clSrStatusTag() is the exact function the table's own Status column calls,
+   reused here so Approval Status never disagrees with what the row said. */
+function clSrApprovalDetails(r) {
+  const p = r.pricing || {};
+  const d = r.details || {};
+  const m = r.manager_approval || {};
+  const rows = [];
+
+  if (r.request_type === 'date_change' && d.new_travel_date) {
+    rows.push(['Date',
+      `${escapeHtml(fmtDate(d.current_travel_date))} → <b>${escapeHtml(fmtDate(d.new_travel_date))}</b>`]);
+  }
+  if (p.kind === 'cancellation') {
+    rows.push(['Cancellation Charge', money(p.cancellation_charge)]);
+    rows.push(['Refund Due', `<b>${money(p.refund_amount)}</b>`]);
+  } else if (p.kind === 'reschedule') {
+    rows.push(['Fare Difference', money(p.fare_difference)]);
+    rows.push(['Charge Fee', money(p.change_fee)]);
+    rows.push(['Payable', `<b>${money(p.total_payable)}</b>`]);
+  }
+  if (m.state || r.manager_state) {
+    rows.push(['Approval Status', clSrStatusTag(r)]);
+  }
+
+  let reason = '';
+  if (m.state === 'rejected') {
+    reason = `${escapeHtml(m.by_name || 'Your manager')}: ${escapeHtml(m.reason || 'no reason given')}`;
+  } else if (r.status === 'rejected' && r.rejection_reason) {
+    reason = escapeHtml(r.rejection_reason);
+  } else if (d.reason) {
+    reason = escapeHtml(d.reason);
+  }
+  if (reason) rows.push(['Reason', reason]);
+
+  if (m.requested_by_name && m.state === 'pending') {
+    rows.push(['Raised By', escapeHtml(m.requested_by_name)]);
+  }
+  if (m.state === 'approved' && m.by_name && !m.self_raised) {
+    rows.push(['Approved By', escapeHtml(m.by_name)]);
+  }
+
+  if (!rows.length) return '';
+  return `<h3 class="cl-form-legend">Request Details</h3>
+    <dl class="cl-dl" style="margin-bottom:18px;">
+      ${rows.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}
+    </dl>`;
+}
+
 /* Routes by request type rather than being replaced outright: a booking has a
    page of its own (itinerary, contact, timeline — too much for a dialog),
    while cancellations, refunds and ancillaries keep the modal that already
@@ -639,6 +693,8 @@ async function clOpenRequestDetail(id) {
         ${r.ticket_number ? `<div><dt>Ticket no.</dt><dd class="cl-ref">${escapeHtml(r.ticket_number)}</dd></div>` : ''}
       </dl>
 
+      ${clSrApprovalDetails(r)}
+
       ${clDetailFacts(d)}
 
       <!-- ONE PASSENGER, ONE LINE. Every cell is nowrap and the wrapper
@@ -701,6 +757,15 @@ async function clOpenRequestDetail(id) {
         ${clActionAttrs('payment.pay', CL_NO_PAY)}>Record payment</button>`);
     }
     foot.push('<button type="button" class="cl-btn" data-cl-modal-close>Close</button>');
+    /* Approve / Reject, moved here from the Service Requests row — same gate
+       clSrRowActions used (clIsManager() and manager_state === 'pending'),
+       same clManagerDecide() the row buttons called. Reject-left-of-Approve,
+       both right of Close: the footer is right-aligned, so DOM order is
+       reading order. */
+    if (clIsManager() && r.manager_state === 'pending') {
+      foot.push(`<button type="button" class="cl-btn cl-btn-danger" data-cl-modal-reject="${r.id}">Reject</button>`);
+      foot.push(`<button type="button" class="cl-btn cl-btn-primary" data-cl-modal-approve="${r.id}">Approve</button>`);
+    }
     $('clModalFoot').innerHTML = foot.join('');
 
     $('clModalFoot').querySelector('[data-cl-modal-close]')?.addEventListener('click', clCloseModal);
@@ -710,6 +775,8 @@ async function clOpenRequestDetail(id) {
     $('clModalFoot').querySelector('[data-cl-modal-pay]')?.addEventListener('click', () => {
       clCloseModal(); clOpenPayModal(r);
     });
+    $('clModalFoot').querySelector('[data-cl-modal-reject]')?.addEventListener('click', () => clManagerDecide(r.id, false));
+    $('clModalFoot').querySelector('[data-cl-modal-approve]')?.addEventListener('click', () => clManagerDecide(r.id, true));
 
     clLoadRequestConversation(r);
   } catch (err) {

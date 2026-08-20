@@ -8,11 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260815svc2">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260819ui1">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260815svc2">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260819ui3">
 <!-- The shared internal-portal login. MUST come after jp-ds.css: several of its
      rules tie on specificity with jp-ds's bare `input` / `.btn` styling, so
      source order is what decides them. -->
@@ -1160,9 +1160,9 @@
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
      into Service Request Management; this file now only owns the dialog that
      screen opens for those two types. Also after admin.js. -->
-<script src="../assets/js/admin-change-requests.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-change-requests.js?v=20260819ui1"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260819ui1"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
 <script src="../assets/js/admin-wallet-desk.js?v=20260815svc2"></script>

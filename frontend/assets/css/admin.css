@@ -417,7 +417,7 @@ tbody tr:hover{background:var(--hover-bg);}
 
    `tabular-nums` is the other half of the job: with proportional figures a 1 is
    narrower than an 8, so right-aligned columns still look ragged. */
-th.num, td.num{text-align:right; font-variant-numeric:tabular-nums;}
+th.num, td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
 
 /* A STATUS PILL IS ONE LINE. `.badge` is `inline-block` with no `white-space`,
    so in a narrow column a two-word status broke across two lines INSIDE the

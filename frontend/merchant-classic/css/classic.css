@@ -1276,7 +1276,12 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
 .cl-table tbody tr:last-child td:last-child{border-bottom-right-radius:var(--cl-r-md);}
 
 .cl-table .cl-actions{white-space:nowrap; text-align:right;}
-.cl-table .cl-actions .cl-btn{margin-left:6px;}
+/* Spacing between multiple buttons in an actions cell comes from jp-ds.css's
+   shared `table td:has(> .cl-btn + .cl-btn){display:flex; gap:8px; ...}` rule
+   now, not from a margin here — the two were stacking (6px margin PLUS 8px
+   flex gap, uneven and asymmetric on the first button), which is what made
+   e.g. Booking History's "View Booking"/"View Documents" pair look
+   misaligned against the Ticketed badge beside them. */
 /* `tbody` is in these two selectors to out-score the banding above — a
    selected row stays selected whether it landed on an odd stripe or an even
    one. */
