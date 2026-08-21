@@ -272,6 +272,12 @@ hr{border:none; border-top:1px solid var(--cl-line); margin:20px 0;}
 }
 .cl-nowrap{white-space:nowrap;}
 .cl-num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+/* `.cl-table th{text-align:left}` (specificity 0,1,1) otherwise beats a bare
+   `.cl-num` (0,1,0) on a header cell, so every `<th class="cl-num">` in the
+   portal silently stayed left-aligned while its `<td class="cl-num">` data
+   rendered right — the exact "header says one alignment, data renders
+   another" bug, just not visible from the markup alone. */
+.cl-table th.cl-num{text-align:right;}
 .cl-muted{color:var(--cl-text-muted); font-weight:500;}
 
 /* The micro-label that titles every small block in this system. */
@@ -3485,9 +3491,11 @@ body.cl-sc-composing .cl-crumb{visibility:hidden;}
   display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
   gap:10px; padding:12px 14px; font-size:13px;
 }
-.cl-gb-viewwrap{max-height:420px; overflow:auto;}
+/* Scroll/sticky-header now come from the shared .cl-table-wrap (classic.css
+   itself + jp-ds.css's table th{position:sticky}) — this table used to carry
+   its own, differently-sized (420px vs the shared min(70vh,640px)) copy of
+   the same behaviour. Only the font-size customisation is still local. */
 .cl-gb-view{width:100%; font-size:12.5px;}
-.cl-gb-view th{position:sticky; top:0; z-index:1; background:var(--cl-canvas-2);}
 
 @media (max-width:720px){
   .cl-gb-stats{grid-template-columns:repeat(2, minmax(0, 1fr));}

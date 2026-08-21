@@ -274,12 +274,12 @@ async function loadMerchants(page = merchantsPage) {
     tbody.innerHTML = data.items.map(m => `
       <tr>
         <td><strong>${escapeHtml(m.merchant_code)}</strong></td>
-        <td>${escapeHtml(m.merchant_name)}</td>
+        <td class="jp-truncate" title="${escapeHtml(m.merchant_name)}">${escapeHtml(m.merchant_name)}</td>
         <td>${escapeHtml(m.country_code || '—')}</td>
-        <td>${m.user_count}</td>
-        <td>${moneyStr(m.wallet_balance)}</td>
-        <td>${m.tickets_issued ?? 0}</td>
-        <td>${m.awaiting_verification
+        <td class="num">${m.user_count}</td>
+        <td class="num">${moneyStr(m.wallet_balance)}</td>
+        <td class="num">${m.tickets_issued ?? 0}</td>
+        <td class="num">${m.awaiting_verification
               ? `<span class="badge pending">${m.awaiting_verification}</span>`
               : '0'}</td>
         <td><span class="badge ${MERCHANT_STATUS_BADGE[m.status] || m.status}">${escapeHtml(statusLabel(m.status))}</span></td>
@@ -723,24 +723,24 @@ async function loadMerchantFinance(merchantId) {
         panel.innerHTML = `
           <div class="table-wrap"><table><thead><tr>
             <th>Date</th><th>Reference</th><th>Description</th>
-            <th>Debit</th><th>Credit</th><th>Balance</th>
+            <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
           </tr></thead><tbody>
             ${entries.length ? entries.map(en => `
               <tr>
                 <td>${escapeHtml(en.at ? fmtDate(en.at) : '—')}</td>
                 <td>${escapeHtml(en.reference || '—')}</td>
-                <td>${escapeHtml(en.description || en.kind)}</td>
-                <td>${moneyIsPositive(en.debit) ? escapeHtml(moneyStr(en.debit)) : ''}</td>
-                <td>${moneyIsPositive(en.credit) ? escapeHtml(moneyStr(en.credit)) : ''}</td>
-                <td>${escapeHtml(moneyStr(en.balance))}</td>
+                <td class="jp-truncate" title="${escapeHtml(en.description || en.kind)}">${escapeHtml(en.description || en.kind)}</td>
+                <td class="num">${moneyIsPositive(en.debit) ? escapeHtml(moneyStr(en.debit)) : ''}</td>
+                <td class="num">${moneyIsPositive(en.credit) ? escapeHtml(moneyStr(en.credit)) : ''}</td>
+                <td class="num">${escapeHtml(moneyStr(en.balance))}</td>
               </tr>`).join('')
               : '<tr><td colspan="6" class="empty-state">No ledger entries.</td></tr>'}
           </tbody>
           ${entries.length ? `<tfoot><tr>
             <td colspan="3"><strong>Totals</strong></td>
-            <td><strong>${escapeHtml(moneyStr(s.total_debits))}</strong></td>
-            <td><strong>${escapeHtml(moneyStr(s.total_credits))}</strong></td>
-            <td><strong>${escapeHtml(moneyStr(s.closing_balance))}</strong></td>
+            <td class="num"><strong>${escapeHtml(moneyStr(s.total_debits))}</strong></td>
+            <td class="num"><strong>${escapeHtml(moneyStr(s.total_credits))}</strong></td>
+            <td class="num"><strong>${escapeHtml(moneyStr(s.closing_balance))}</strong></td>
           </tr></tfoot>` : ''}
           </table></div>`;
       } catch (err) {
@@ -900,7 +900,7 @@ async function loadMerchantUsersTable(merchantId, merchantName) {
       return `
       <tr>
         <td>${escapeHtml(u.full_name)}</td>
-        <td>${escapeHtml(u.email)}</td>
+        <td class="jp-truncate" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}</td>
         <td>${escapeHtml(u.phone || '—')}</td>
         <td>${escapeHtml(merchantRoleType(u))}</td>
         <td><span class="badge ${isActive ? 'active' : 'inactive'}">${escapeHtml(statusLabel(u.status))}</span></td>
@@ -1181,8 +1181,8 @@ async function loadApprovalQueue(page = aqPage) {
       return `
       <tr>
         <td style="text-transform:capitalize">${i.kind === 'merchant' ? 'Merchant Onboarding' : escapeHtml((i.request_type || '').replace(/_/g, ' '))}</td>
-        <td>${escapeHtml(i.title)}</td>
-        <td>${escapeHtml(i.merchant_name || '—')}</td>
+        <td class="jp-truncate" title="${escapeHtml(i.title)}">${escapeHtml(i.title)}</td>
+        <td class="jp-truncate" title="${escapeHtml(i.merchant_name || '—')}">${escapeHtml(i.merchant_name || '—')}</td>
         <td><span class="badge ${aqStatusBadgeClass(i.status)}">${escapeHtml(i.status_label)}</span>
           ${unpriced ? `<div class="cell-sub">No amount set — the merchant cannot pay</div>` : ''}</td>
         <td>${fmtDateTime(i.submitted_at)}</td>
@@ -1416,7 +1416,8 @@ function srmAsk(r) {
     headline = escapeHtml(SRM_TYPE_LABELS[r.request_type] || r.request_type);
   }
   const reason = d.reason || r.remarks || '';
-  return `<div>${headline}</div>${reason ? `<div class="cell-sub">${escapeHtml(reason)}</div>` : ''}`;
+  return `<div>${headline}</div>${reason
+    ? `<div class="cell-sub jp-truncate" title="${escapeHtml(reason)}">${escapeHtml(reason)}</div>` : ''}`;
 }
 
 /* The settled figure, or nothing. A request nobody has priced shows a dash
@@ -1522,7 +1523,7 @@ function srmRender() {
     <tr>
       <td><span class="mono">${escapeHtml(r.request_number)}</span></td>
       <td>${escapeHtml(SRM_TYPE_LABELS[r.request_type] || admLabel(r.request_type))}</td>
-      <td>${escapeHtml(r.merchant_name || '—')}</td>
+      <td class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</td>
       <td><span class="mono">${escapeHtml((r.details || {}).booking_request_number || r.booking_reference || '—')}</span>
           <div class="cell-sub">${escapeHtml(r.pnr || '')}</div></td>
       <td>${srmAsk(r)}</td>
@@ -1697,24 +1698,27 @@ async function generateAdminReport() {
   const thead = document.querySelector('#repAdminTable thead');
   const tbody = document.querySelector('#repAdminTable tbody');
   const cols = REP_ADMIN_COLUMNS[type];
-  thead.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  thead.innerHTML = `<tr>${cols.map(c => `<th${c === 'Amount' ? ' class="num"' : ''}>${c}</th>`).join('')}</tr>`;
   tbody.innerHTML = `<tr><td colspan="${cols.length}">${rowsSkeleton(3)}</td></tr>`;
   renderAdminReportSummary(type);
   try {
     if (type === 'payments') {
       const { data } = await axios.get(`${API_BASE}/api/admin/payments`, { headers: authHeaders(), params: { ...repAdminFilterParams(), page_size: 100 } });
-      tbody.innerHTML = data.items.map(p => `<tr><td>${escapeHtml(p.transaction_id || '—')}</td><td>—</td><td>${moneyStr(p.amount)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.paid_date ? fmtDate(p.paid_date) : '—'}</td></tr>`).join('')
+      tbody.innerHTML = data.items.map(p => `<tr><td>${escapeHtml(p.transaction_id || '—')}</td><td>—</td><td class="num">${moneyStr(p.amount)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${p.paid_date ? fmtDate(p.paid_date) : '—'}</td></tr>`).join('')
         || `<tr><td colspan="5" class="empty-state">No results.</td></tr>`;
     } else if (type === 'bookings') {
       const { data } = await axios.get(`${API_BASE}/api/requests`, { headers: authHeaders(), params: { request_type: 'booking', ...repAdminFilterParams(), page_size: 100 } });
-      tbody.innerHTML = data.items.map(r => `<tr><td>${escapeHtml(r.booking_reference || '—')}</td><td>${escapeHtml(r.request_number)}</td><td>${r.passengers?.map(p => `${p.first_name} ${p.last_name}`).join(', ') || '—'}</td><td>${escapeHtml(r.merchant_name || '—')}</td><td>${moneyStr(r.total_amount)}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`).join('')
+      tbody.innerHTML = data.items.map(r => {
+        const pax = r.passengers?.map(p => `${p.first_name} ${p.last_name}`).join(', ') || '—';
+        return `<tr><td>${escapeHtml(r.booking_reference || '—')}</td><td>${escapeHtml(r.request_number)}</td><td class="jp-truncate" title="${escapeHtml(pax)}">${escapeHtml(pax)}</td><td class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</td><td class="num">${moneyStr(r.total_amount)}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`;
+      }).join('')
         || `<tr><td colspan="6" class="empty-state">No results.</td></tr>`;
     } else {
       const results = await Promise.all(SERVICE_REQUEST_TYPES.map(t => axios.get(`${API_BASE}/api/requests`, {
         headers: authHeaders(), params: { request_type: t, ...repAdminFilterParams(), page_size: 100 },
       }).then(r => r.data.items).catch(() => [])));
       const items = results.flat().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      tbody.innerHTML = items.map(r => `<tr><td>${escapeHtml(r.request_number)}</td><td style="text-transform:capitalize">${escapeHtml(r.request_type.replace(/_/g, ' '))}</td><td>${escapeHtml(r.booking_reference || '—')}</td><td>${escapeHtml(r.merchant_name || '—')}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`).join('')
+      tbody.innerHTML = items.map(r => `<tr><td>${escapeHtml(r.request_number)}</td><td style="text-transform:capitalize">${escapeHtml(r.request_type.replace(/_/g, ' '))}</td><td>${escapeHtml(r.booking_reference || '—')}</td><td class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</td><td><span class="badge ${r.status}">${escapeHtml(r.status_label)}</span></td></tr>`).join('')
         || `<tr><td colspan="5" class="empty-state">No results.</td></tr>`;
     }
   } catch (err) {
@@ -1814,8 +1818,8 @@ async function loadSupportQueue() {
     tbody.innerHTML = data.items.length ? data.items.map(t => `
       <tr>
         <td>${escapeHtml(t.request_number)}${t.title ? `<div style="font-size:11px;color:var(--text-muted);">${escapeHtml(t.title)}</div>` : ''}</td>
-        <td>${escapeHtml(t.merchant_name || '—')}</td>
-        <td>${escapeHtml(t.opened_by || '—')}</td>
+        <td class="jp-truncate" title="${escapeHtml(t.merchant_name || '—')}">${escapeHtml(t.merchant_name || '—')}</td>
+        <td class="jp-truncate" title="${escapeHtml(t.opened_by || '—')}">${escapeHtml(t.opened_by || '—')}</td>
         <td><span class="badge ${supportStatusBadgeClass(t.status_label)}">${escapeHtml(t.status_label)}</span></td>
         <td>${t.message_count}</td>
         <td>${t.last_message_at ? fmtDateTime(t.last_message_at) : fmtDateTime(t.created_at)}</td>
@@ -2272,12 +2276,13 @@ async function initNotificationForm() {
 
 async function loadNotificationsAdmin() {
   const tbody = document.querySelector('#notificationsTable tbody');
+  tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Loading…</td></tr>`;
   try {
     const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders(), params: { page_size: 20 } });
     tbody.innerHTML = data.items.map(n => `
       <tr>
-        <td>${escapeHtml(n.title || '—')}</td>
-        <td>${escapeHtml(n.message || '—')}</td>
+        <td class="jp-truncate" title="${escapeHtml(n.title || '—')}">${escapeHtml(n.title || '—')}</td>
+        <td class="jp-truncate" title="${escapeHtml(n.message || '—')}">${escapeHtml(n.message || '—')}</td>
         <td><span class="badge ${n.is_read ? 'read' : 'unread'}">${n.is_read ? 'Read' : 'Unread'}</span></td>
         <td>${fmtDate(n.created_at)}</td>
       </tr>

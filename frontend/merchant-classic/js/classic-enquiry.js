@@ -1819,7 +1819,7 @@ function clShowImported(d) {
     </tr>`).join('');
 
   clOpenModal(`Imported passengers — ${escapeHtml(d.original_filename)}`, `
-    <div class="cl-gb-viewwrap">
+    <div class="cl-table-wrap">
       <table class="cl-table cl-gb-view">
         <thead><tr>
           <th>#</th><th>Name</th><th>Type</th><th>Gender</th>

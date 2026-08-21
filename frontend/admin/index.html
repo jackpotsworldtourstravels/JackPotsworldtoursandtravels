@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260819ui1">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260820ui1">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -391,8 +391,8 @@
              nothing could put an id in the selection any more. The bulk
              endpoints are untouched; only this entry point is gone. -->
         <div class="table-wrap"><table id="merchantsTable"><thead><tr>
-          <th>Merchant ID</th><th>Merchant Name</th><th>Country Code</th><th>Users</th>
-          <th>Wallet Balance</th><th>Tickets Issued</th><th>Awaiting Verification</th>
+          <th>Merchant ID</th><th>Merchant Name</th><th>Country Code</th><th class="num">Users</th>
+          <th class="num">Wallet Balance</th><th class="num">Tickets Issued</th><th class="num">Awaiting Verification</th>
           <th>Status</th><th>Action</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="merchantsPagination"></div>
@@ -556,7 +556,7 @@
           </select>
         </div>
         <div class="table-wrap"><table id="prTable"><thead><tr>
-          <th>Reference</th><th>Company</th><th>Manager</th><th>Amount</th>
+          <th>Reference</th><th>Company</th><th>Manager</th><th class="num">Amount</th>
           <th>Method</th><th>UTR</th><th>Status</th><th>Action</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="prPagination"></div>
@@ -586,7 +586,7 @@
           </select>
         </div>
         <div class="table-wrap"><table id="wdTable"><thead><tr>
-          <th>Reference</th><th>Merchant</th><th>Amount</th><th>Method</th>
+          <th>Reference</th><th>Merchant</th><th class="num">Amount</th><th>Method</th>
           <th>UTR</th><th>Submitted</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="wdPagination"></div>
@@ -598,8 +598,8 @@
           <span class="ops-sub" id="wdReconStatus"></span>
         </div>
         <div class="table-wrap"><table id="wdReconTable"><thead><tr>
-          <th>Merchant</th><th>Wallet balance</th><th>Ledger balance</th><th>Drift</th>
-          <th>Outstanding</th><th>Credit limit</th><th>Pending top-ups</th><th>Action</th>
+          <th>Merchant</th><th class="num">Wallet balance</th><th class="num">Ledger balance</th><th class="num">Drift</th>
+          <th class="num">Outstanding</th><th class="num">Credit limit</th><th class="num">Pending top-ups</th><th>Action</th>
         </tr></thead><tbody></tbody></table></div>
       </div>
     </section>
@@ -647,7 +647,7 @@
         </div>
         <div class="table-wrap"><table id="enqTable"><thead><tr>
           <th>Reference No.</th><th>Merchant</th><th>Journey / Stay</th><th>Travel Date</th>
-          <th>Pax</th><th>Status</th><th>Raised</th><th>Actions</th>
+          <th class="num">Pax</th><th>Status</th><th>Raised</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="enqPagination"></div>
       </div>
@@ -712,7 +712,7 @@
           </select>
         </div>
         <div class="table-wrap"><table id="opsTable"><thead><tr>
-          <th>Booking</th><th>Merchant</th><th>Travellers</th><th>Travel date</th>
+          <th>Booking</th><th>Merchant</th><th class="num">Travellers</th><th>Travel date</th>
           <th>Stage</th><th>Assigned</th><th>Waiting</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="opsPagination"></div>
@@ -1151,10 +1151,10 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260818del2"></script>
+<script src="../assets/js/admin.js?v=20260820ui1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
-<script src="../assets/js/admin-enquiries.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
@@ -1162,12 +1162,12 @@
      screen opens for those two types. Also after admin.js. -->
 <script src="../assets/js/admin-change-requests.js?v=20260819ui1"></script>
 <!-- Booking Operations desk (CR-2, over the M1/M2 backend). Also after admin.js. -->
-<script src="../assets/js/admin-booking-ops.js?v=20260819ui1"></script>
+<script src="../assets/js/admin-booking-ops.js?v=20260820ui1"></script>
 <!-- CR-4d — the wallet desk: top-up verification queue, reconciliation,
      payment accounts. Loaded after admin.js and reuses its API_BASE/authHeaders. -->
-<script src="../assets/js/admin-wallet-desk.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-wallet-desk.js?v=20260820ui1"></script>
 <!-- M5 — delivery failures, on the Notifications section. -->
-<script src="../assets/js/admin-message-delivery.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-message-delivery.js?v=20260820ui1"></script>
 <!-- M6 — the Analytics section. Loaded after admin.js: reuses its API_BASE,
      authHeaders, escapeHtml and rowsSkeleton, and is reached through its
      loadSection switch rather than binding its own nav handler. -->
@@ -1175,12 +1175,12 @@
 <!-- 0039 — Provider Management. Loaded after admin.js and reuses its API_BASE,
      authHeaders, escapeHtml, fmtDate, rowsSkeleton, showToast and
      navigateToSection rather than restating any of them. -->
-<script src="../assets/js/admin-providers.js?v=20260815svc2"></script>
-<script src="../assets/js/admin-logs.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-providers.js?v=20260820ui1"></script>
+<script src="../assets/js/admin-logs.js?v=20260820ui1"></script>
 <!-- 0041 — Payment Management: the desk raises a request, the manager pays, the
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
-<script src="../assets/js/admin-payment-requests.js?v=20260815svc2"></script>
+<script src="../assets/js/admin-payment-requests.js?v=20260820ui1"></script>
 <!-- Dialog standard (jp-ds.css §15). Adds only the header close control, which
      is the one part of the standard CSS cannot supply — the rest is stylesheet.
      Loaded LAST so every overlay it observes already exists in the document. -->

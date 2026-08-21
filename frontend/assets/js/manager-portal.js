@@ -253,7 +253,7 @@ async function mgrLoadCounts() {
 
 async function mgrLoadQueue() {
   const body = $mg('mgrTable').querySelector('tbody');
-  body.innerHTML = `<tr><td colspan="7" class="mg-empty">Loading…</td></tr>`;
+  body.innerHTML = `<tr><td colspan="7" class="empty-state">Loading…</td></tr>`;
   mgrRenderTabs();
   mgrLoadCounts();
 
@@ -265,7 +265,7 @@ async function mgrLoadQueue() {
     const { data } = await axios.get(`${MGR_API}/api/manager/bookings?${params}`, { headers: managerAuthHeaders() });
     const rows = data.items || [];
     if (!rows.length) {
-      body.innerHTML = `<tr><td colspan="7" class="mg-empty">${
+      body.innerHTML = `<tr><td colspan="7" class="empty-state">${
         mgrSearch ? 'No booking requests match that search.' : 'Nothing here right now.'}</td></tr>`;
     } else {
       body.innerHTML = rows.map(r => `
@@ -274,12 +274,12 @@ async function mgrLoadQueue() {
             <div class="mg-ref"><strong>${escapeHtml(r.request_number)}</strong></div>
             ${r.enquiry_reference ? `<div style="font-size:11.5px;color:var(--text-muted);">from ${escapeHtml(r.enquiry_reference)}</div>` : ''}
           </td>
-          <td>${escapeHtml(r.merchant_name || '—')}
+          <td><div class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</div>
             ${r.raised_by ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.raised_by)}</div>` : ''}</td>
           <td>${escapeHtml([r.origin, r.destination].filter(Boolean).join(' → ') || r.title || '—')}
             ${r.international ? '<div style="font-size:11.5px;color:var(--text-muted);">International</div>' : ''}</td>
           <td>${escapeHtml(fmtDate(r.travel_date))}</td>
-          <td>${r.passenger_count}</td>
+          <td class="jp-num">${r.passenger_count}</td>
           <td><span class="badge ${MGR_STATUS_BADGE[r.status] || ''}">${escapeHtml(r.status_label)}</span>
             ${r.reviewer_name && r.status === 'in_review'
               ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.reviewer_name)}</div>` : ''}</td>
@@ -291,7 +291,7 @@ async function mgrLoadQueue() {
     }
     mgrRenderPagination(data.page || mgrPage, data.total_pages || 1, data.total || rows.length);
   } catch (err) {
-    body.innerHTML = `<tr><td colspan="7" class="mg-empty">${escapeHtml(mgrErr(err, 'Could not load booking requests.'))}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="empty-state">${escapeHtml(mgrErr(err, 'Could not load booking requests.'))}</td></tr>`;
   }
 }
 
@@ -530,7 +530,7 @@ function mgrCloseReview() {
 async function mgrOpenReview(id) {
   mgrOpenId = id;
   const overlay = $mg('mgrReviewOverlay');
-  $mg('mgrReviewBody').innerHTML = `<div class="mg-empty">Loading booking request…</div>`;
+  $mg('mgrReviewBody').innerHTML = `<div class="empty-state">Loading booking request…</div>`;
   overlay.classList.add('open');
   /* Trapped from the moment it opens, not after the fetch — otherwise Tab
      escapes into the page behind for as long as the request takes. */
@@ -612,7 +612,7 @@ function mgrRenderReview(data) {
             <td>${escapeHtml(g.guest_type || 'adult')}</td>
             <td>Room ${g.room_number}</td>
             <td class="mg-ref">${escapeHtml(g.id_proof_number || '—')}</td>
-          </tr>`).join('') || '<tr><td colspan="5" class="mg-empty">No guests recorded.</td></tr>'}
+          </tr>`).join('') || '<tr><td colspan="5" class="empty-state">No guests recorded.</td></tr>'}
       </tbody></table></div>
     </div>` : `
     <div class="mg-section">
@@ -651,7 +651,7 @@ function mgrRenderReview(data) {
             <td>${escapeHtml(p.nationality || '—')}</td>
             <td class="mg-ref">${escapeHtml(p.passport_number || '—')}</td>
             <td>${escapeHtml(p.passport_expiry ? fmtDate(p.passport_expiry) : '—')}</td>
-          </tr>`).join('') || '<tr><td colspan="8" class="mg-empty">No passengers recorded.</td></tr>'}
+          </tr>`).join('') || '<tr><td colspan="8" class="empty-state">No passengers recorded.</td></tr>'}
       </tbody></table></div>
     </div>`}
 

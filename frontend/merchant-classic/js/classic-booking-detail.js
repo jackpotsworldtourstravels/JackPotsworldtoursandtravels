@@ -785,14 +785,14 @@ async function clLoadTicketDocuments(requestId) {
       ${docs.length} document${docs.length === 1 ? '' : 's'} issued for this booking.
     </p>
     <div class="cl-table-wrap"><table class="cl-table">
-      <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Issued</th><th></th></tr></thead>
+      <thead><tr><th>File</th><th>Type</th><th class="cl-num">Size</th><th>Issued</th><th class="cl-actions"></th></tr></thead>
       <tbody>${docs.map(doc => `
         <tr>
-          <td>${escapeHtml(doc.original_filename)}</td>
+          <td class="cl-nowrap">${escapeHtml(doc.original_filename)}</td>
           <td>${escapeHtml(clLabel(doc.doc_type))}</td>
-          <td class="cl-nowrap">${Math.max(1, Math.round((doc.size_bytes || 0) / 1024))} KB</td>
+          <td class="cl-num cl-nowrap">${Math.max(1, Math.round((doc.size_bytes || 0) / 1024))} KB</td>
           <td class="cl-nowrap">${escapeHtml(fmtDateTime(doc.created_at))}</td>
-          <td><button type="button" class="cl-btn cl-btn-sm cl-btn-primary"
+          <td class="cl-actions"><button type="button" class="cl-btn cl-btn-sm cl-btn-primary"
                 data-cl-dl="${doc.id}" data-cl-dlname="${escapeHtml(doc.original_filename)}">Download</button></td>
         </tr>`).join('')}</tbody>
     </table></div>`;

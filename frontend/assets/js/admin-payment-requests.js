@@ -227,7 +227,7 @@ async function loadPaymentRequests(page = prPage) {
             r.resubmission_count
               ? `<div class="cell-sub">Resubmitted ×${r.resubmission_count}</div>` : ''
           }</td>
-          <td>${prEsc(r.merchant_name || '—')}</td>
+          <td class="jp-truncate" title="${prEsc(r.merchant_name || '—')}">${prEsc(r.merchant_name || '—')}</td>
           <td>${prEsc(r.assigned_manager_name || '—')}</td>
           <td class="num">${prMoney(r.amount)}</td>
           <td>${prEsc(PR_METHODS[r.method]?.label || r.method)}</td>

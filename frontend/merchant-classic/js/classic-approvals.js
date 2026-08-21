@@ -125,7 +125,7 @@ function clRenderApprovalRows(page) {
   $('clApprTable').innerHTML = `
     <thead><tr>
       <th>Request</th><th>Raised by</th><th>Route</th><th>Travel date</th>
-      <th>Pax</th><th>Status</th><th class="cl-actions"></th>
+      <th class="cl-num">Pax</th><th>Status</th><th class="cl-actions"></th>
     </tr></thead>
     <tbody>
       ${rows.map(r => `
@@ -139,9 +139,9 @@ function clRenderApprovalRows(page) {
           <td class="cl-nowrap">${escapeHtml(
             [r.origin, r.destination].filter(Boolean).join(' → ') || '—')}</td>
           <td class="cl-nowrap">${escapeHtml(r.travel_date ? fmtDate(r.travel_date) : '—')}</td>
-          <td>${r.passenger_count ?? '—'}</td>
+          <td class="cl-num">${r.passenger_count ?? '—'}</td>
           <td>${clTag(r.status, r.status_label)}</td>
-          <td class="cl-actions"><button type="button" class="cl-btn"
+          <td class="cl-actions"><button type="button" class="cl-btn cl-btn-sm"
                       data-cl-appr-open="${r.id}">Review</button></td>
         </tr>`).join('')}
     </tbody>`;

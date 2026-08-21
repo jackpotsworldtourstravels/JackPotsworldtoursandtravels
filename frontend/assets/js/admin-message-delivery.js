@@ -54,7 +54,7 @@ async function mdLoadCounts() {
 async function mdLoadFailed() {
   const tbody = document.querySelector('#mdFailTable tbody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading…</td></tr>';
   try {
     const { data } = await axios.get(
       `${API_BASE}/api/admin/messages/failed?page=${mdPage}&page_size=20`,
@@ -64,11 +64,11 @@ async function mdLoadFailed() {
       <tr>
         <td>${mdEsc(mdWhen(m.created_at))}</td>
         <td>${mdEsc(m.message_type)}</td>
-        <td>${mdEsc(m.recipient)}</td>
-        <td>${mdEsc(m.subject || '—')}</td>
-        <td class="ops-sub">${mdEsc(m.error_message || '—')}</td>
+        <td class="jp-truncate" title="${mdEsc(m.recipient)}">${mdEsc(m.recipient)}</td>
+        <td class="jp-truncate" title="${mdEsc(m.subject || '—')}">${mdEsc(m.subject || '—')}</td>
+        <td class="ops-sub jp-truncate" title="${mdEsc(m.error_message || '—')}">${mdEsc(m.error_message || '—')}</td>
       </tr>`).join('')
-      : '<tr><td colspan="5" class="ops-sub">No failed deliveries.</td></tr>';
+      : '<tr><td colspan="5" class="empty-state">No failed deliveries.</td></tr>';
 
     const pages = Math.max(1, Math.ceil(data.total / data.page_size));
     const pag = document.getElementById('mdFailPagination');
@@ -81,7 +81,7 @@ async function mdLoadFailed() {
     document.getElementById('mdNext')?.addEventListener('click', () => { mdPage++; mdLoadFailed(); });
   } catch (err) {
     const detail = err?.response?.data?.detail || 'Could not load delivery failures.';
-    tbody.innerHTML = `<tr><td colspan="5" class="msg error">${mdEsc(detail)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${mdEsc(detail)}</td></tr>`;
   }
 }
 

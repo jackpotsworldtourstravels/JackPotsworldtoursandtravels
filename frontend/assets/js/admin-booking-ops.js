@@ -225,8 +225,8 @@ async function loadBookingOps() {
           ${r.workflow === 'classic_tours'
             ? '<span class="badge read" style="margin-top:4px;">Classic Tours · no payment</span>' : ''}
         </td>
-        <td>${escapeHtml(r.merchant_name || '—')}</td>
-        <td>${r.passengers}${r.lead_passenger ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.lead_passenger)}</div>` : ''}</td>
+        <td class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</td>
+        <td class="num">${r.passengers}${r.lead_passenger ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.lead_passenger)}</div>` : ''}</td>
         <td>${escapeHtml(fmtDate(r.travel_date))}</td>
         <td><span class="badge ${OPS_BADGE[r.status] || ''}">${escapeHtml(r.status_label)}</span>
           ${r.has_ticket_documents ? '<div style="font-size:11.5px;color:var(--text-muted);">tickets attached</div>' : ''}</td>
