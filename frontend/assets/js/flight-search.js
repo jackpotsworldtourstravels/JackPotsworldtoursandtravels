@@ -9,9 +9,13 @@
 
    BUILT FROM THE PAGE'S OWN DESIGN SYSTEM. Every control reuses the tx-*
    classes already in travel-explore.css — tx-sf for a field, tx-btn for a
-   button, tx-chip for a pill. The three widgets that genuinely did not exist
-   (an airport picker, a calendar, a traveller popup) add tx-ap-*, tx-cal-* and
-   tx-pax-* in the same idiom rather than a new visual language.
+   button, tx-chip for a pill.
+
+   The listbox, the month grid and the inline-error helpers live in
+   search-widgets.js, because the Hotels panel needs exactly the same three and
+   a second copy would have drifted from this one within a week. What stays
+   here is what is particular to flights: airports as the data behind the
+   picker, trip types, and the traveller rules.
 
    NOTHING HERE SEARCHES. It validates, writes `state`, and calls onSearch().
    travel-explore decides what that means.
@@ -19,10 +23,10 @@
 
 const FlightSearch = (function () {
 
-  const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
+  const W = SearchWidgets;
+  const esc = W.esc;
   const $ = id => document.getElementById(id);
-  const iso = d => d.toISOString().slice(0, 10);
-  const today = () => iso(new Date());
+  const today = W.today;
 
   /* Airports the traveller has actually used, most recent first. Kept small:
      a "recent" list long enough to scroll is just the full list again. */
@@ -72,8 +76,8 @@ const FlightSearch = (function () {
       const recents = recentCodes();
       const popular = POPULAR.filter(c => TravelData.airports[c] && !recents.includes(c));
       return [
-        ...recents.map(c => ({ code: c, ...TravelData.airports[c], group: 'Recent searches' })),
-        ...popular.map(c => ({ code: c, ...TravelData.airports[c], group: 'Popular airports' })),
+        ...recents.map(c => row(c, 'Recent searches')),
+        ...popular.map(c => row(c, 'Popular airports')),
       ];
     }
     return all
@@ -83,7 +87,13 @@ const FlightSearch = (function () {
          city whose name happens to contain those letters. */
       .sort((a, b) => (b.code.toLowerCase().startsWith(q) ? 1 : 0) - (a.code.toLowerCase().startsWith(q) ? 1 : 0))
       .slice(0, 8)
-      .map(a => ({ ...a, group: '' }));
+      .map(a => row(a.code, ''));
+  }
+
+  /** One airport as the shared listbox wants it: key/label/sub/group. */
+  function row(code, group) {
+    const a = TravelData.airports[code];
+    return { key: code, code, label: a.city, sub: `${code} · ${a.country}`, group };
   }
 
   function code_matches(a, q) {
@@ -97,189 +107,24 @@ const FlightSearch = (function () {
     return a ? `${a.city} (${code})` : '';
   }
 
-  /** Wire one airport field. `onPick` fires with the chosen code. */
+  /** The picker itself is generic (search-widgets.js); this is only the part
+   *  that knows an airport from a hotel. */
   function mountAirport(inputId, onPick) {
-    const input = $(inputId);
-    const list = $(inputId + 'List');
-    if (!input || !list) return;
-    let active = -1;
-    let rows = [];
-
-    const close = () => {
-      list.hidden = true;
-      input.setAttribute('aria-expanded', 'false');
-      active = -1;
-    };
-
-    const paint = () => {
-      rows = matchAirports(input.value);
-      if (!rows.length) {
-        list.innerHTML = '<div class="tx-ap-empty">No airports match that.</div>';
-      } else {
-        let lastGroup = null;
-        list.innerHTML = rows.map((a, i) => {
-          const head = a.group && a.group !== lastGroup
-            ? `<div class="tx-ap-group">${esc(a.group)}</div>` : '';
-          lastGroup = a.group || lastGroup;
-          return `${head}<div class="tx-ap-opt${i === active ? ' is-active' : ''}" role="option"
-                 id="${esc(inputId)}Opt${i}" data-code="${esc(a.code)}" aria-selected="${i === active}">
-              <b>${esc(a.city)}</b><span>${esc(a.code)} · ${esc(a.country)}</span>
-            </div>`;
-        }).join('');
-      }
-      list.hidden = false;
-      input.setAttribute('aria-expanded', 'true');
-    };
-
-    const choose = i => {
-      const a = rows[i];
-      if (!a) return;
-      input.value = airportLabel(a.code);
-      input.dataset.code = a.code;
-      rememberAirport(a.code);
-      close();
-      clearError(inputId);
-      if (onPick) onPick(a.code);
-    };
-
-    input.addEventListener('focus', paint);
-    input.addEventListener('input', () => {
-      /* Typing invalidates the previous pick — otherwise a half-edited box
-         still carries the code it used to hold. */
-      input.dataset.code = '';
-      active = -1;
-      paint();
+    return W.mountAutocomplete(inputId, {
+      source: q => matchAirports(q),
+      emptyText: 'No airports match that.',
+      format: r => airportLabel(r.code),
+      onPick: r => { rememberAirport(r.code); if (onPick) onPick(r.code); },
     });
-
-    input.addEventListener('keydown', e => {
-      if (list.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { paint(); return; }
-      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, rows.length - 1); paint(); scrollActive(list); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); paint(); scrollActive(list); }
-      else if (e.key === 'Enter') {
-        if (!list.hidden && active > -1) { e.preventDefault(); choose(active); }
-      } else if (e.key === 'Escape') { close(); }
-      else if (e.key === 'Tab') { close(); }
-      input.setAttribute('aria-activedescendant', active > -1 ? `${inputId}Opt${active}` : '');
-    });
-
-    list.addEventListener('mousedown', e => {
-      /* mousedown, not click: blur would close the list first. */
-      const opt = e.target.closest('[data-code]');
-      if (!opt) return;
-      e.preventDefault();
-      choose(rows.findIndex(r => r.code === opt.dataset.code));
-    });
-
-    input.addEventListener('blur', () => setTimeout(close, 120));
   }
 
-  function scrollActive(list) {
-    const el = list.querySelector('.tx-ap-opt.is-active');
-    if (el) el.scrollIntoView({ block: 'nearest' });
-  }
-
-  /* ---------------------------------------------------------------------
-     Calendar
-
-     A rendered month rather than <input type=date>, because the spec asks for
-     things the native control cannot show: weekends marked, and a slot for a
-     fare under each day. The native input stays underneath as the value store,
-     so the form still works if this script fails to run.
-     --------------------------------------------------------------------- */
-  const MONTHS = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December'];
-  const DOW = ['Mo','Tu','We','Th','Fr','Sa','Su'];
-
-  /** Hook for real fares. Returns null today; when a fare API lands, this is
-   *  the only thing that changes to light the calendar up. */
+  /** Lowest-fare hook. Returns null until there is a fare-by-date source;
+   *  when there is one, this is the only thing that changes to light the
+   *  calendar up. Passed to the shared calendar as `noteFor`. */
   function fareFor(/* dateIso */) { return null; }
 
-  function monthGrid(year, month, opts) {
-    const first = new Date(year, month, 1);
-    /* Monday-first, which is how Indian calendars print. */
-    const lead = (first.getDay() + 6) % 7;
-    const days = new Date(year, month + 1, 0).getDate();
-    const min = opts.min || today();
-    const cells = [];
-
-    for (let i = 0; i < lead; i++) cells.push('<div class="tx-cal-cell is-empty"></div>');
-    for (let d = 1; d <= days; d++) {
-      const date = new Date(year, month, d);
-      const key = iso(date);
-      const dow = date.getDay();
-      const weekend = dow === 0 || dow === 6;
-      const disabled = key < min;
-      const selected = key === opts.value;
-      const fare = fareFor(key);
-      cells.push(`
-        <button type="button" class="tx-cal-cell${weekend ? ' is-weekend' : ''}${
-          selected ? ' is-selected' : ''}" data-date="${key}" ${disabled ? 'disabled' : ''}
-          aria-pressed="${selected}" aria-label="${esc(`${d} ${MONTHS[month]} ${year}`)}">
-          <span class="tx-cal-day">${d}</span>
-          ${fare ? `<span class="tx-cal-fare">${esc(fare)}</span>` : ''}
-        </button>`);
-    }
-    return cells.join('');
-  }
-
-  /** Wire one calendar field. `onPick` fires with the chosen ISO date. */
-  function mountCalendar(fieldId, onPick) {
-    const input = $(fieldId);            // hidden native input, the value store
-    const button = $(fieldId + 'Btn');   // what the traveller clicks
-    const pop = $(fieldId + 'Cal');
-    if (!input || !button || !pop) return;
-
-    let view = new Date(input.value || today());
-    view = new Date(view.getFullYear(), view.getMonth(), 1);
-
-    const label = () => {
-      button.textContent = input.value
-        ? new Date(input.value).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
-        : 'Select a date';
-      button.classList.toggle('is-empty', !input.value);
-    };
-
-    const paint = () => {
-      pop.innerHTML = `
-        <div class="tx-cal-head">
-          <button type="button" class="tx-cal-nav" data-nav="-1" aria-label="Previous month">&#8249;</button>
-          <b>${esc(MONTHS[view.getMonth()])} ${view.getFullYear()}</b>
-          <button type="button" class="tx-cal-nav" data-nav="1" aria-label="Next month">&#8250;</button>
-        </div>
-        <div class="tx-cal-dow">${DOW.map(d => `<span>${d}</span>`).join('')}</div>
-        <div class="tx-cal-grid" role="grid">${
-          monthGrid(view.getFullYear(), view.getMonth(), { min: input.min || today(), value: input.value })}</div>`;
-    };
-
-    const open = () => { paint(); pop.hidden = false; button.setAttribute('aria-expanded', 'true'); };
-    const close = () => { pop.hidden = true; button.setAttribute('aria-expanded', 'false'); };
-
-    button.addEventListener('click', () => (pop.hidden ? open() : close()));
-
-    pop.addEventListener('click', e => {
-      const nav = e.target.closest('[data-nav]');
-      if (nav) {
-        view = new Date(view.getFullYear(), view.getMonth() + Number(nav.dataset.nav), 1);
-        paint();
-        return;
-      }
-      const cell = e.target.closest('[data-date]');
-      if (!cell || cell.disabled) return;
-      input.value = cell.dataset.date;
-      label();
-      close();
-      clearError(fieldId);
-      if (onPick) onPick(input.value);
-    });
-
-    document.addEventListener('click', e => {
-      if (!pop.hidden && !pop.contains(e.target) && e.target !== button) close();
-    });
-    pop.addEventListener('keydown', e => { if (e.key === 'Escape') { close(); button.focus(); } });
-
-    label();
-    return { open, close, refresh: () => { label(); if (!pop.hidden) paint(); } };
-  }
+  const mountCalendar = (fieldId, onPick) =>
+    W.mountCalendar(fieldId, { onPick, noteFor: fareFor });
 
   /* ---------------------------------------------------------------------
      Traveller popup
@@ -294,20 +139,8 @@ const FlightSearch = (function () {
     return `${total} traveller${total === 1 ? '' : 's'} · ${cabin}`;
   }
 
-  function stepperRow(key, label, note, min, max) {
-    const v = state.pax[key];
-    return `
-      <div class="tx-pax-row">
-        <div><b>${esc(label)}</b><span>${esc(note)}</span></div>
-        <div class="tx-pax-step">
-          <button type="button" class="tx-pax-btn" data-pax="${key}" data-delta="-1"
-                  ${v <= min ? 'disabled' : ''} aria-label="One fewer ${esc(label)}">&minus;</button>
-          <output data-pax-out="${key}">${v}</output>
-          <button type="button" class="tx-pax-btn" data-pax="${key}" data-delta="1"
-                  ${v >= max ? 'disabled' : ''} aria-label="One more ${esc(label)}">+</button>
-        </div>
-      </div>`;
-  }
+  const stepperRow = (key, label, note, min, max) =>
+    W.stepperRow(key, label, note, state.pax[key], min, max);
 
   function paintPax() {
     const pop = $('txPaxPop');
@@ -350,9 +183,9 @@ const FlightSearch = (function () {
     });
 
     pop.addEventListener('click', e => {
-      const step = e.target.closest('[data-pax]');
+      const step = e.target.closest('[data-step-key]');
       if (step) {
-        const key = step.dataset.pax;
+        const key = step.dataset.stepKey;
         const delta = Number(step.dataset.delta);
         const limits = { adults: [1, 9], children: [0, 8], infants: [0, 8] }[key];
         const next = Math.min(limits[1], Math.max(limits[0], state.pax[key] + delta));
@@ -385,51 +218,20 @@ const FlightSearch = (function () {
      Inline validation. No toasts, no alerts — the message goes under the
      field it is about.
      --------------------------------------------------------------------- */
-  function setError(fieldId, message) {
-    const box = $(fieldId + 'Err');
-    const ctrl = $(fieldId + 'Btn') || $(fieldId);
-    if (box) box.textContent = message || '';
-    if (ctrl) {
-      ctrl.classList.toggle('is-invalid', !!message);
-      ctrl.setAttribute('aria-invalid', message ? 'true' : 'false');
-      if (message) ctrl.focus();
-    }
-    return !message;
-  }
-  const clearError = id => setError(id, '');
-  function clearAllErrors() {
-    document.querySelectorAll('#txSearchPanel .tx-err').forEach(e => { e.textContent = ''; });
-    document.querySelectorAll('#txSearchPanel .is-invalid').forEach(e => {
-      e.classList.remove('is-invalid'); e.setAttribute('aria-invalid', 'false');
-    });
-  }
+  const setError = W.setError;
+  const clearError = W.clearError;
+  const clearAllErrors = () => W.clearAllErrors('#txSearchPanel');
 
   /* ---------------------------------------------------------------------
      Markup
      --------------------------------------------------------------------- */
-  function airportField(id, label, value) {
-    return `
-      <div class="tx-sf tx-ap">
-        <label for="${id}">${esc(label)}</label>
-        <input id="${id}" type="text" class="tx-ap-input" autocomplete="off" role="combobox"
-               aria-autocomplete="list" aria-expanded="false" aria-controls="${id}List"
-               placeholder="City or airport" value="${esc(value ? airportLabel(value) : '')}"
-               data-code="${esc(value || '')}">
-        <div class="tx-ap-list" id="${id}List" role="listbox" aria-label="${esc(label)} suggestions" hidden></div>
-        <p class="tx-err" id="${id}Err" role="alert"></p>
-      </div>`;
-  }
+  const airportField = (id, label, value) => W.autocompleteField(id, label, {
+    placeholder: 'City or airport',
+    value: value ? airportLabel(value) : '',
+    key: value || '',
+  });
 
-  function dateField(id, label, value, min) {
-    return `
-      <div class="tx-sf tx-cal">
-        <label for="${id}Btn">${esc(label)}</label>
-        <input type="hidden" id="${id}" value="${esc(value || '')}" min="${esc(min || today())}">
-        <button type="button" class="tx-cal-btn" id="${id}Btn" aria-haspopup="dialog" aria-expanded="false"></button>
-        <div class="tx-cal-pop" id="${id}Cal" role="dialog" aria-label="${esc(label)}" hidden></div>
-        <p class="tx-err" id="${id}Err" role="alert"></p>
-      </div>`;
-  }
+  const dateField = (id, label, value, min) => W.calendarField(id, label, value, min);
 
   function segmentRow(i, seg, removable) {
     return `
@@ -569,7 +371,7 @@ const FlightSearch = (function () {
         const from = $('txFrom');
         const to = $('txTo');
         [from.value, to.value] = [to.value, from.value];
-        [from.dataset.code, to.dataset.code] = [to.dataset.code, from.dataset.code];
+        [from.dataset.key, to.dataset.key] = [to.dataset.key, from.dataset.key];
         [state.from, state.to] = [state.to, state.from];
         clearError('txFrom'); clearError('txTo');
       });
@@ -589,7 +391,7 @@ const FlightSearch = (function () {
     /* dataset.code is only set by picking from the list. A typed string that
        exactly names one airport is accepted too; anything else is not a
        choice, and is reported rather than guessed at. */
-    if (el.dataset.code) return el.dataset.code;
+    if (el.dataset.key) return el.dataset.key;
     const typed = el.value.trim().toLowerCase();
     if (!typed) return '';
     const hit = Object.entries(TravelData.airports)

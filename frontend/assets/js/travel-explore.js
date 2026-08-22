@@ -47,6 +47,7 @@ const TravelExplore = (function () {
   }
 
   let flights = [];
+  let allHotels = [];
   /* The rendered rows, kept so a Book Now click can find the object it belongs
      to. Reading the item back out of the DOM would mean re-parsing formatted
      prices, which is how a booking ends up costing "₹12,500" the string. */
@@ -375,35 +376,51 @@ const TravelExplore = (function () {
                          || String(h.name || '').toLowerCase().includes(needle));
   }
 
+  /** Destination and nightly rate together — the two things the panel filters
+   *  on. Kept beside hotelsMatching so "what a hotel search means" is one
+   *  place rather than spread between here and the panel. */
+  function hotelsFiltered(rows) {
+    let out = hotelsMatching(rows, state.dest);
+    if (state.priceRange && state.priceRange !== 'any' && typeof HotelSearch !== 'undefined') {
+      out = out.filter(h => HotelSearch.inPriceBand(h.pricePerNight, state.priceRange));
+    }
+    return out;
+  }
+
   function renderHotels(all) {
     const el = $('txHotelGrid');
     if (!el) return;
-    const dest = state.seededFromUrl ? state.dest : '';
-    const rows = hotelsMatching(all, dest);
+    allHotels = all;
+    const dest = state.dest || '';
+    const priced = state.priceRange && state.priceRange !== 'any';
+    const rows = hotelsFiltered(all);
 
-    if (dest && !rows.length) {
+    const head = $('txHotelsHead');
+    if (head) head.textContent = dest ? `Stays in ${dest}` : 'Hotels near the airport';
+
+    if (!rows.length) {
       catalogue.hotel = [];
+      /* Say which filter emptied the list. "No results" leaves the traveller
+         guessing whether it was the city or the price band. */
+      const because = dest && priced ? `in ${esc(dest)} in that price range`
+                    : dest ? `in ${esc(dest)}`
+                    : 'in that price range';
       el.innerHTML = `<div class="tx-empty">
-        <b>No stays in ${esc(dest)} yet</b>
-        We do not have hotels in that destination at the moment. Try another
-        city, or browse everything we do have.
+        <b>No stays ${because}</b>
+        Try another destination or a wider price range, or browse everything we do have.
         <button type="button" class="tx-btn tx-btn-primary" id="txShowAllHotels">Show all hotels</button>
       </div>`;
       const btn = $('txShowAllHotels');
       if (btn) btn.addEventListener('click', () => {
         state.dest = '';
+        state.priceRange = 'any';
         state.seededFromUrl = false;
+        if (typeof HotelSearch !== 'undefined') HotelSearch.mount();
         renderHotels(all);
       });
-      const head = $('txHotelsHead');
-      if (head) head.textContent = `Stays in ${dest}`;
       return;
     }
 
-    if (dest) {
-      const head = $('txHotelsHead');
-      if (head) head.textContent = `Stays in ${dest}`;
-    }
     catalogue.hotel = rows;
     el.innerHTML = rows.map(h => `<article class="tx-card">
       <div class="tx-media">${hotelImage(h)}
@@ -501,6 +518,23 @@ const TravelExplore = (function () {
    *  Falls back to nothing if the module is absent rather than throwing: the
    *  results list below still renders, which is more useful than a blank page.
    */
+  /** The Hotels panel, same arrangement as Flights: it owns the criteria and
+   *  hands back a request; this file re-filters and re-renders. Absent module
+   *  means no panel and the plain list, rather than a broken page. */
+  function mountHotelSearch(rows) {
+    if (typeof HotelSearch === 'undefined') return;
+    HotelSearch.init(state, rows, req => {
+      state.dest = req.destination;
+      state.checkIn = req.checkIn;
+      state.checkOut = req.checkOut;
+      state.rooms = req.rooms;
+      state.guests = req.adults + req.children;
+      state.priceRange = req.priceRange;
+      renderHotels(allHotels.length ? allHotels : rows);
+      $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   function mountSearch() {
     if (typeof FlightSearch === 'undefined') return;
     FlightSearch.init(state, req => {
@@ -697,7 +731,9 @@ const TravelExplore = (function () {
           renderFlights();
         }
       } else if (service === 'hotels') {
-        renderHotels(await TravelData.hotels());
+        const rows = await TravelData.hotels();
+        mountHotelSearch(rows);
+        renderHotels(rows);
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
       } else if (service === 'packages') {
