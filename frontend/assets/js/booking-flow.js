@@ -109,6 +109,27 @@ const BookingFlow = (function () {
     return ctx.pricing;
   }
 
+  /* Ask the server what this costs, when the product has a backend that can
+     answer. Flights do; the other four still price locally through recalc()
+     above, so this returns their local answer unchanged.
+
+     The local figure is painted first and replaced when the server responds:
+     the Fare Summary must never sit blank while a quote is in flight, and the
+     two agree anyway — the server's arithmetic is a port of the local one.
+     If the request fails the local total simply stands, so a dropped
+     connection cannot leave somebody unable to see a price. */
+  async function recalcAsync() {
+    recalc();
+    if (!flow.priceAsync) return ctx.pricing;
+    try {
+      const priced = await flow.priceAsync(ctx);
+      if (priced) ctx.pricing = priced;
+    } catch (err) {
+      ctx.pricing.note = 'Showing an estimate — could not reach the fare service.';
+    }
+    return ctx.pricing;
+  }
+
   function sideHtml() {
     const step = flow.steps[index];
     if (step.hideSummary) return '';
@@ -121,9 +142,131 @@ const BookingFlow = (function () {
       <div class="bk-price">
         <h3>Fare summary</h3>
         ${lines || '<p class="bk-price-empty">Choose an option to see the fare.</p>'}
-        <div class="bk-price-total"><span>Total</span><span>${esc(money(p.total))}</span></div>
-        <p class="bk-price-note">Demo booking — no payment is taken.</p>
+        <div class="bk-price-total"><span>Total amount</span><span>${esc(money(p.total))}</span></div>
+        ${couponHtml()}
+        ${p.note ? `<p class="bk-price-note">${esc(p.note)}</p>` : ''}
+        <p class="bk-price-note">No payment gateway is connected — nothing is charged.</p>
       </div>`;
+  }
+
+  /* ---------------------------------------------------------------------
+     Coupon entry, inside the Fare Summary card rather than beside it.
+
+     The discount itself is NOT rendered here — the server already returns it
+     as a line in `pricing.lines` ("Discount (FLYHIGH30)"), so it appears in
+     the breakdown above like every other line. This block is only the control
+     for entering, viewing and removing a code.
+
+     Nothing here does arithmetic. Applying sets ctx.couponCode and asks the
+     flow to re-price; the total that comes back is the server's.
+     --------------------------------------------------------------------- */
+  function couponHtml() {
+    if (!flow || !flow.supportsCoupons) return '';
+    const applied = ctx.couponCode;
+    if (applied) {
+      return `
+        <div class="bk-coupon is-applied">
+          <div class="bk-coupon-applied">
+            <span class="bk-coupon-tag">Coupon</span>
+            <b>${esc(applied)}</b>
+            <button type="button" class="bk-coupon-remove" id="bkCouponRemove">Remove</button>
+          </div>
+          ${ctx.couponTitle ? `<p class="bk-coupon-note">${esc(ctx.couponTitle)}</p>` : ''}
+        </div>`;
+    }
+    return `
+      <div class="bk-coupon">
+        <label class="bk-coupon-label" for="bkCouponInput">Have a coupon?</label>
+        <div class="bk-coupon-row">
+          <input type="text" id="bkCouponInput" placeholder="Enter coupon code"
+                 autocomplete="off" spellcheck="false" aria-describedby="bkCouponMsg">
+          <button type="button" class="bk-btn bk-btn-primary bk-coupon-apply" id="bkCouponApply">Apply</button>
+        </div>
+        <button type="button" class="bk-coupon-link" id="bkCouponView"
+                aria-expanded="false" aria-controls="bkCouponList">View available coupons</button>
+        <div class="bk-coupon-list" id="bkCouponList" hidden></div>
+        <p class="bk-coupon-msg" id="bkCouponMsg" role="status" aria-live="polite"></p>
+      </div>`;
+  }
+
+  /** Wire the coupon controls. Called after every side-panel render, because
+   *  re-pricing replaces the panel's markup along with its listeners. */
+  function mountSide() {
+    if (!flow || !flow.supportsCoupons) return;
+    const msg = document.getElementById('bkCouponMsg');
+    const say = (text, ok) => {
+      if (!msg) return;
+      msg.textContent = text || '';
+      msg.className = 'bk-coupon-msg' + (text ? (ok ? ' is-ok' : ' is-error') : '');
+    };
+
+    const remove = document.getElementById('bkCouponRemove');
+    if (remove) {
+      remove.addEventListener('click', async () => {
+        ctx.couponCode = null;
+        ctx.couponTitle = null;
+        await refreshPrice();
+      });
+      return;
+    }
+
+    const input = document.getElementById('bkCouponInput');
+    const apply = document.getElementById('bkCouponApply');
+    const view = document.getElementById('bkCouponView');
+    const list = document.getElementById('bkCouponList');
+
+    async function applyCode(raw) {
+      const code = (raw || '').trim().toUpperCase();
+      if (!code) { say('Enter a coupon code.', false); return; }
+      say('Checking…', true);
+      try {
+        /* Checked before it is applied, so an unusable code never sits on the
+           draft quietly failing on every later re-price. */
+        const res = await BookingApi.validateCoupon(
+          code, BookingApi.flightPayload(ctx), BookingApi.passengerTypes(ctx)
+        );
+        if (!res.applies) { say(res.message || 'That coupon cannot be used here.', false); return; }
+        ctx.couponCode = res.code;
+        ctx.couponTitle = res.title;
+        await refreshPrice();          // re-prices on the server and repaints
+      } catch (err) {
+        say(BookingApi.errorText(err, 'Could not check that coupon.'), false);
+      }
+    }
+
+    if (apply) apply.addEventListener('click', () => applyCode(input && input.value));
+    if (input) {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); applyCode(input.value); }
+      });
+    }
+
+    if (view && list) {
+      view.addEventListener('click', async () => {
+        const open = list.hasAttribute('hidden');
+        if (!open) { list.setAttribute('hidden', ''); view.setAttribute('aria-expanded', 'false'); return; }
+        list.removeAttribute('hidden');
+        view.setAttribute('aria-expanded', 'true');
+        list.innerHTML = '<p class="bk-coupon-note">Loading…</p>';
+        try {
+          const offers = await BookingApi.coupons('flight');
+          list.innerHTML = offers.length ? offers.map(c => `
+            <button type="button" class="bk-coupon-offer" data-code="${esc(c.code)}">
+              <b>${esc(c.code)}</b>
+              <span>${esc(c.title)}</span>
+            </button>`).join('')
+            : '<p class="bk-coupon-note">No coupons are available right now.</p>';
+          list.querySelectorAll('[data-code]').forEach(b => {
+            b.addEventListener('click', () => {
+              if (input) input.value = b.dataset.code;
+              applyCode(b.dataset.code);
+            });
+          });
+        } catch (err) {
+          list.innerHTML = `<p class="bk-coupon-note">${esc(BookingApi.errorText(err, 'Could not load coupons.'))}</p>`;
+        }
+      });
+    }
   }
 
   /* ---------------------------------------------------------------------
@@ -157,9 +300,10 @@ const BookingFlow = (function () {
       return;
     }
 
-    recalc();
+    await recalcAsync();
     main.innerHTML = step.render(ctx);
     document.getElementById('bkSide').innerHTML = sideHtml();
+    mountSide();
     if (step.mount) step.mount(main, ctx);
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
@@ -286,18 +430,40 @@ const BookingFlow = (function () {
   /** Recompute the fare and repaint the rail WITHOUT re-rendering the step.
    *  Ticking an add-on has to move the total immediately; re-rendering the
    *  step to achieve that would throw away scroll position and focus. */
-  function refreshPrice() {
+  async function refreshPrice() {
     if (!flow || !ctx) return;
-    recalc();
+    await recalcAsync();
     const side = document.getElementById('bkSide');
-    if (side) side.innerHTML = sideHtml();
+    if (side) { side.innerHTML = sideHtml(); mountSide(); }
     /* Some steps print the total in the body too (payment). Keep it in step. */
     document.querySelectorAll('[data-bk-total]').forEach(el => {
       el.textContent = money(ctx.pricing.total);
     });
   }
 
-  return { start, close, skeleton, money, esc, refreshPrice,
+  /** Re-render the current step in place. The traveller step calls this when
+   *  a traveller is added or removed: the card list changes shape, so a
+   *  re-render is the honest way to redraw it. The draft is read off the
+   *  screen first by the caller, so nothing typed is lost. */
+  function repaint() {
+    if (flow && ctx) paint(0);
+  }
+
+  /** Jump to a named step. Used by the Review step's Edit links.
+   *
+   *  Deliberately does NOT re-run validation on the way back: the draft is
+   *  already on ctx and the traveller is returning to change one thing, so
+   *  losing what they typed would be the opposite of what Edit promises. */
+  function goTo(stepId) {
+    if (!flow || !ctx) return;
+    const target = flow.steps.findIndex(s => s.id === stepId);
+    if (target < 0) return;
+    const back = target < index;
+    index = target;
+    paint(back ? -1 : 1);
+  }
+
+  return { start, close, skeleton, money, esc, refreshPrice, repaint, goTo,
            get context() { return ctx; },
            get stepIndex() { return index; } };
 })();

@@ -42,6 +42,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     func,
@@ -276,6 +277,274 @@ class CustomerAuditLog(Base):
     status: Mapped[CustomerAuditStatus] = mapped_column(
         _AUDIT_STATUS, nullable=False, default=CustomerAuditStatus.SUCCESS,
     )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+
+# =====================================================================
+# Flight booking (0053). The portal's booking flow finally has tables to
+# land in; everything below is rooted at `customers` and shares this Base.
+# =====================================================================
+
+_BOOKING_STATUS = SAEnum(
+    "pending", "confirmed", "cancelled", "completed",
+    name="customer_booking_status_enum", create_type=False,
+)
+_TRAVELLER_TYPE = SAEnum(
+    "adult", "child", "infant",
+    name="customer_traveller_type_enum", create_type=False,
+)
+_ADDON_TYPE = SAEnum(
+    "baggage", "meal", "service",
+    name="customer_addon_type_enum", create_type=False,
+)
+_PAYMENT_STATUS = SAEnum(
+    "pending", "authorized", "captured", "failed", "refunded",
+    name="customer_payment_status_enum", create_type=False,
+)
+
+
+class CustomerBookingStatus(str, enum.Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+
+
+class CustomerTravellerType(str, enum.Enum):
+    ADULT = "adult"
+    CHILD = "child"
+    INFANT = "infant"
+
+
+class CustomerAddonType(str, enum.Enum):
+    BAGGAGE = "baggage"
+    MEAL = "meal"
+    SERVICE = "service"
+
+
+class CustomerPaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    AUTHORIZED = "authorized"
+    CAPTURED = "captured"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+
+
+class CustomerTraveller(Base):
+    """One saved person in a traveller list.
+
+    Deliberately separate from ``CustomerBookingPassenger``: this row is a
+    reusable address-book entry the traveller may edit or delete, while the
+    passenger row is a frozen record of who actually flew. Editing a saved
+    traveller must never rewrite a ticket already issued.
+    """
+
+    __tablename__ = "customer_travellers"
+
+    customer_traveller_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    traveller_type: Mapped[str] = mapped_column(
+        _TRAVELLER_TYPE, nullable=False, default=CustomerTravellerType.ADULT.value,
+    )
+    title: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    date_of_birth: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    nationality: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    passport_number: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    passport_expiry: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    issuing_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    frequent_flyer_airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    frequent_flyer_number: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    mobile: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+
+class CustomerBooking(Base):
+    """One booking. The itinerary is a snapshot -- see migration 0053."""
+
+    __tablename__ = "customer_bookings"
+
+    customer_booking_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    booking_ref: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: NULL until an airline issues one. Never generated locally.
+    pnr: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="RESTRICT"), nullable=False,
+    )
+    product_type: Mapped[str] = mapped_column(String(20), nullable=False, default="flight")
+    status: Mapped[str] = mapped_column(
+        _BOOKING_STATUS, nullable=False, default=CustomerBookingStatus.PENDING.value,
+    )
+
+    airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    flight_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    origin_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    origin_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    destination_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    destination_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    travel_date: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    departure_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    arrival_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    duration_label: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    stops: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cabin_class: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    is_international: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    base_fare: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    taxes: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    seat_charges: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    baggage_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    meal_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    service_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    discount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
+    coupon_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
+    cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    passengers: Mapped[list["CustomerBookingPassenger"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+        order_by="CustomerBookingPassenger.passenger_index",
+    )
+    addons: Mapped[list["CustomerBookingAddon"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+    )
+    payments: Mapped[list["CustomerBookingPayment"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+        order_by="CustomerBookingPayment.customer_booking_payment_id",
+    )
+
+
+class CustomerBookingPassenger(Base):
+    """Who flew. Frozen at booking time; not a link to the saved list."""
+
+    __tablename__ = "customer_booking_passengers"
+
+    customer_booking_passenger_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_booking_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_bookings.customer_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    passenger_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    traveller_type: Mapped[str] = mapped_column(
+        _TRAVELLER_TYPE, nullable=False, default=CustomerTravellerType.ADULT.value,
+    )
+    title: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    date_of_birth: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    nationality: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    passport_number: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    passport_expiry: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    issuing_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    frequent_flyer_airline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    frequent_flyer_number: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    seat_number: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    seat_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    is_contact: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mobile: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    booking: Mapped["CustomerBooking"] = relationship(back_populates="passengers")
+
+
+class CustomerBookingAddon(Base):
+    """Baggage, a meal or a service actually bought on a booking."""
+
+    __tablename__ = "customer_booking_addons"
+
+    customer_booking_addon_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_booking_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_bookings.customer_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: NULL = the whole booking, not one traveller.
+    passenger_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    addon_type: Mapped[str] = mapped_column(_ADDON_TYPE, nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    booking: Mapped["CustomerBooking"] = relationship(back_populates="addons")
+
+
+class CustomerBookingPayment(Base):
+    """A payment attempt. See migration 0053 -- an attempt log, not a ledger."""
+
+    __tablename__ = "customer_booking_payments"
+
+    customer_booking_payment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_booking_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_bookings.customer_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    method: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(
+        _PAYMENT_STATUS, nullable=False, default=CustomerPaymentStatus.PENDING.value,
+    )
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
+    provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    provider_reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    booking: Mapped["CustomerBooking"] = relationship(back_populates="payments")
+
+
+class CustomerCoupon(Base):
+    """A discount the site actually offers. Seeded from the landing page."""
+
+    __tablename__ = "customer_coupons"
+
+    customer_coupon_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(400), nullable=True)
+    discount_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    discount_value: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    max_discount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    min_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    product_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    international_only: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    valid_from: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    valid_to: Mapped[Optional[dt.date]] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

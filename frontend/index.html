@@ -11,8 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260808bk1">
-<link rel="stylesheet" href="assets/css/main.css?v=20260808ic2">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260822bk3">
+<link rel="stylesheet" href="assets/css/main.css?v=20260822ic3">
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -596,110 +596,164 @@
 </div>
 
 <div class="modal-overlay" id="authOverlay">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <button class="modal-close" id="authCloseBtn" type="button" aria-label="Close">&times;</button>
 
-    <!-- CUSTOMER REGISTRATION — travellers self-register; agencies do not.
+    <!-- ===================================================================
+         ONE DOOR FOR TRAVELLERS — email first, branch later.
          ===================================================================
-         This view was "Partner registration": a form that collected a company
-         name and then posted NOWHERE, because merchants are onboarded by an
-         Admin (POST /api/admin/merchants) and start in pending_approval. It
-         only ever printed a holding message. Travel agencies reach their own
-         sign-in through "Travel agency?" in the login view and through the
-         My Partner button in the header, so no route is lost by giving this
-         view to the audience that can actually use it.
+         This modal used to be two views the traveller had to choose between:
+         "Login" and "Sign Up" opened different forms, and picking the wrong
+         one meant retyping everything in the other. Both header buttons now
+         open THIS, and the flow decides what to ask for.
 
-         Registration is real: POST /api/customer/auth/signup creates the
-         customer in the CUSTOMER database and returns the same OTP challenge
-         that /login does, so both paths finish on the one shared code step in
-         the login view rather than duplicating it here. -->
-    <div class="auth-view" id="signupView">
-      <h2 id="authTitle">Create your account</h2>
-      <p class="modal-sub">Book flights, hotels and holidays, and keep every trip in one place.</p>
-      <form id="signupForm" novalidate>
-        <div class="modal-field"><label for="suName">Full Name</label><input id="suName" type="text" autocomplete="name" required placeholder="Your full name"></div>
-        <div class="modal-field"><label for="suEmail">Email Address</label><input id="suEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
-        <div class="modal-field"><label for="suMobile">Mobile Number</label><input id="suMobile" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="9876543210"></div>
-        <div class="modal-field"><label for="suPass">Password</label><input id="suPass" type="password" autocomplete="new-password" required placeholder="Create a password"></div>
-        <div class="modal-field"><label for="suPass2">Confirm Password</label><input id="suPass2" type="password" autocomplete="new-password" required placeholder="Re-enter your password"></div>
-        <button type="submit" class="btn btn-coral modal-submit" id="suRequestBtn">Create Account</button>
-        <div class="modal-msg" id="signupMsg"></div>
+         WHY THE BRANCH IS OFFERED RATHER THAN DETECTED. The obvious version of
+         this asks the server "does an account exist for this email?" and jumps
+         straight to Login or Sign Up. That endpoint would be an account
+         enumeration oracle — anyone could test addresses one at a time — and
+         it is exactly what this API deliberately avoids elsewhere:
+         /forgot-password answers "if an account exists for that email…" for
+         precisely this reason (customer_auth.py). So the email step leads to
+         the password step, and a traveller with no account takes the "Create
+         your account" link, which carries the address they already typed. No
+         one types their email twice, and the server still refuses to say who
+         is registered.
+
+         Steps: email -> password -> (otp)  |  email -> signup -> (otp)
+                email -> forgot
+         The OTP step is shared, because /login and /signup both answer with
+         the same challenge. -->
+
+    <!-- STEP 1 ------------------------------------------------------------->
+    <div class="auth-view" id="authStepEmail">
+      <h2 id="authTitle">Welcome to JackPots World</h2>
+      <p class="modal-sub">Sign in or create an account to book flights, hotels and holidays — and keep every trip in one place.</p>
+      <form id="authEmailForm" novalidate>
+        <div class="modal-field">
+          <label for="authEmail">Email Address</label>
+          <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"
+                 aria-describedby="authEmailErr">
+          <p class="field-error" id="authEmailErr" role="alert"></p>
+        </div>
+        <button type="submit" class="btn btn-coral modal-submit">Continue</button>
+        <div class="modal-msg" id="authEmailMsg"></div>
       </form>
-      <div class="modal-switch">Already have an account? <a href="#" data-auth="login">Login</a></div>
+      <!-- "Continue with Google" and "Continue with Mobile" are deliberately
+           absent. Neither exists in this project — no OAuth client, no
+           endpoint, no column to hang a Google id on — and a button that fails
+           when pressed is worse than one that was never offered. -->
       <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
     </div>
 
-    <!-- ===================================================================
-         CUSTOMER (B2C) SIGN-IN — travellers, not travel agencies.
-         ===================================================================
-         This modal used to be the MERCHANT login: it posted portal:'merchant'
-         and handed off to the Merchant Portal, which meant the public site's
-         "Login" and its "My Partner" button were two routes to the same B2B
-         door and there was no customer sign-in at all.
-
-         The audiences are split now. Merchants sign in at partner-login.html
-         behind "My Partner"; this is the traveller's door, and it opens the
-         Account Center already built into this page (My Bookings, Wishlist,
-         Payment History, Reviews) under the customer `jwt_*` namespace.
-
-         IT SIGNS THE TRAVELLER IN HERE, AND LEAVES THEM ON THIS PAGE.
-         The customer authenticates against the Customer database via
-         /api/customer/auth/*, which is a two-step flow (password -> OTP), so
-         the second step below is the SAME markup this modal already used when
-         it was the merchant sign-in — restored rather than rewritten.
-
-         On success there is no redirect: the modal closes, renderAuthNav()
-         swaps the Login/Sign Up links for the profile chip, and the traveller
-         carries on browsing the page they were already on. That is the whole
-         point — this is a landing page with an account on it, not a doorway
-         to a dashboard.
-
-         "Forgot Password?" is a plain <a href>, deliberately with no id and no
-         JavaScript in front of it. It used to POST to
-         /api/auth/forgot-password — the PLATFORM endpoint over the `users`
-         table — which for a traveller is the wrong system entirely and is a
-         cross-boundary call the Customer database is built to prevent. -->
-    <div class="auth-view" id="loginView" style="display:none;">
-      <div id="loginStepCreds">
-        <h2>Welcome back</h2>
-        <p class="modal-sub">Sign in to manage your bookings, wishlist and reviews.</p>
-        <form id="loginForm" novalidate>
-          <div class="modal-field"><label for="liUser">Email or Mobile Number</label><input id="liUser" type="text" autocomplete="username" required placeholder="you@example.com or 9876543210"></div>
-          <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
-          <div class="modal-remember">
-            <label for="liRemember"><input id="liRemember" type="checkbox"> Remember me</label>
-            <a href="customer/forgot-password.html" class="modal-forgot">Forgot Password?</a>
+    <!-- STEP 2A — returning traveller ---------------------------------------->
+    <div class="auth-view" id="authStepPassword" hidden>
+      <h2>Welcome back</h2>
+      <p class="modal-sub">Enter your password to continue.</p>
+      <form id="loginForm" novalidate>
+        <div class="modal-field">
+          <label for="liUser">Email Address</label>
+          <div class="field-locked">
+            <input id="liUser" type="text" autocomplete="username" readonly>
+            <button type="button" class="field-change" data-step="email">Change</button>
           </div>
-          <button type="submit" class="btn btn-coral modal-submit">Continue</button>
-          <div class="modal-msg" id="loginMsg"></div>
-        </form>
-      </div>
-
-      <!-- Step 2. Restored from the merchant-login era of this same modal
-           (commit 5e3602a) — same ids, same classes, same copy shape. -->
-      <div id="loginStepOtp" style="display:none;">
-        <h2>Verify it's you</h2>
-        <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
-        <!-- Dev only. The API returns `dev_otp` ONLY when SMTP is unconfigured
-             (customer_otp_service.issue returns the plaintext in DEV_MODE and
-             None otherwise), so this renders nothing on a mail-configured
-             server. Without it the step is unusable locally while the server's
-             own message says "the code is shown here". -->
-        <div id="liDevOtp"></div>
-        <div class="modal-field"><label for="liOtp">One-Time Code</label><input id="liOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••"></div>
-        <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
-        <div class="modal-msg" id="loginOtpMsg"></div>
-        <div class="modal-switch">
-          <a href="#" id="liResendBtn">Resend code</a> &nbsp;·&nbsp;
-          <a href="#" id="liBackBtn">Use a different account</a>
         </div>
-      </div>
+        <div class="modal-field">
+          <label for="liPass">Password</label>
+          <input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"
+                 aria-describedby="liPassErr">
+          <p class="field-error" id="liPassErr" role="alert"></p>
+        </div>
+        <div class="modal-remember">
+          <label for="liRemember"><input id="liRemember" type="checkbox"> Remember me</label>
+          <button type="button" class="modal-forgot" data-step="forgot">Forgot Password?</button>
+        </div>
+        <button type="submit" class="btn btn-coral modal-submit">Login</button>
+        <div class="modal-msg" id="loginMsg"></div>
+      </form>
+      <div class="modal-switch">New here? <a href="#" data-step="signup">Create your account</a></div>
+    </div>
 
-      <div class="modal-switch">Need an account? <a href="#" data-auth="signup">Create a customer account</a></div>
-      <!-- The one pointer to the B2B side. It names the Partner Portal and
-           nothing else — no Admin, Manager or Super Admin appears anywhere on
-           this site. -->
-      <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
+    <!-- STEP 2B — new traveller ---------------------------------------------->
+    <div class="auth-view" id="authStepSignup" hidden>
+      <h2>Create your account</h2>
+      <p class="modal-sub">A few details and you are done — we will send a code to confirm it is you.</p>
+      <form id="signupForm" novalidate>
+        <div class="modal-field">
+          <label for="suName">Full Name</label>
+          <input id="suName" type="text" autocomplete="name" required placeholder="Your full name" aria-describedby="suNameErr">
+          <p class="field-error" id="suNameErr" role="alert"></p>
+        </div>
+        <div class="modal-field">
+          <label for="suEmail">Email Address</label>
+          <div class="field-locked">
+            <input id="suEmail" type="email" autocomplete="email" required readonly>
+            <button type="button" class="field-change" data-step="email">Change</button>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label for="suMobile">Mobile Number</label>
+          <input id="suMobile" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="9876543210" aria-describedby="suMobileErr">
+          <p class="field-error" id="suMobileErr" role="alert"></p>
+        </div>
+        <div class="modal-field">
+          <label for="suPass">Password</label>
+          <input id="suPass" type="password" autocomplete="new-password" required placeholder="At least 8 characters" aria-describedby="suPassErr">
+          <p class="field-error" id="suPassErr" role="alert"></p>
+        </div>
+        <div class="modal-field">
+          <label for="suPass2">Confirm Password</label>
+          <input id="suPass2" type="password" autocomplete="new-password" required placeholder="Re-enter your password" aria-describedby="suPass2Err">
+          <p class="field-error" id="suPass2Err" role="alert"></p>
+        </div>
+        <button type="submit" class="btn btn-coral modal-submit" id="suRequestBtn">Create Account</button>
+        <div class="modal-msg" id="signupMsg"></div>
+      </form>
+      <div class="modal-switch">Already have an account? <a href="#" data-step="password">Sign in instead</a></div>
+    </div>
+
+    <!-- STEP 3 — shared code step, reached from login AND signup -------------->
+    <div class="auth-view" id="loginStepOtp" hidden>
+      <h2>Verify it's you</h2>
+      <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
+      <!-- Dev only. The API returns `dev_otp` ONLY when SMTP is unconfigured
+           (customer_otp_service.issue returns the plaintext in DEV_MODE and
+           None otherwise), so this renders nothing on a mail-configured
+           server. Without it the step is unusable locally while the server's
+           own message says "the code is shown here". -->
+      <div id="liDevOtp"></div>
+      <div class="modal-field">
+        <label for="liOtp">One-Time Code</label>
+        <input id="liOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;"
+               aria-describedby="liOtpErr">
+        <p class="field-error" id="liOtpErr" role="alert"></p>
+      </div>
+      <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
+      <div class="modal-msg" id="loginOtpMsg"></div>
+      <div class="modal-switch">
+        <a href="#" id="liResendBtn">Resend code</a> &nbsp;&middot;&nbsp;
+        <a href="#" id="liBackBtn">Use a different account</a>
+      </div>
+    </div>
+
+    <!-- STEP 4 — forgot password --------------------------------------------->
+    <!-- The reset itself finishes on customer/reset-password.html, because the
+         API issues a LINK token rather than a code (/forgot-password ->
+         /reset-password takes `token`). Collecting an OTP here would mean
+         inventing a second reset mechanism the backend does not have. -->
+    <div class="auth-view" id="authStepForgot" hidden>
+      <h2>Reset your password</h2>
+      <p class="modal-sub">Tell us your email address and we will send you a link to set a new password.</p>
+      <form id="forgotForm" novalidate>
+        <div class="modal-field">
+          <label for="fpEmail">Email Address</label>
+          <input id="fpEmail" type="email" autocomplete="email" required placeholder="you@example.com" aria-describedby="fpEmailErr">
+          <p class="field-error" id="fpEmailErr" role="alert"></p>
+        </div>
+        <button type="submit" class="btn btn-coral modal-submit">Send reset link</button>
+        <div class="modal-msg" id="fpMsg"></div>
+        <div id="fpDevLink"></div>
+      </form>
+      <div class="modal-switch"><a href="#" data-step="password">Back to sign in</a></div>
     </div>
   </div>
 </div>
@@ -893,8 +947,8 @@
 <script src="assets/js/api.js?v=20260805ui34"></script>
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
-<script src="assets/js/jp-icons.js?v=20260808bk1"></script>
-<script src="assets/js/app.js?v=20260808ic2"></script>
+<script src="assets/js/jp-icons.js?v=20260822bk3"></script>
+<script src="assets/js/app.js?v=20260822ic3"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

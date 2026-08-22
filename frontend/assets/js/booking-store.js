@@ -13,6 +13,13 @@
    they survive a reload — a demo where My Bookings empties on refresh is not a
    demo of anything.
 
+   FLIGHTS NO LONGER GO THROUGH HERE. They are created by the server through
+   BookingApi, which returns a real booking reference from a sequence and a
+   NULL pnr, because there is no airline integration to issue one. makePnr()
+   below survives only for the four products that still have no backend; a
+   flight must never be given a locally generated PNR, because a traveller
+   would quote it at a check-in desk and be told it does not exist.
+
    THE BOOKING IS STAMPED, NOT INVENTED AT READ TIME. Reference, PNR, ticket
    numbers and the booked-at timestamp are written once at creation. Generating
    them in the renderer would give a different PNR every time the page painted.
@@ -112,13 +119,93 @@ const BookingStore = (function () {
    *                         passengers, items, addons, payment, meta }
    * @returns the stored booking, stamped with its references.
    */
+  /** A server booking, in the shape My Bookings already renders.
+   *
+   *  Deliberately a translation rather than a rewrite of the list UI: the card
+   *  layout, the filters and the detail view all work, and changing the shape
+   *  they read would have meant touching all three to gain nothing. */
+  function fromApi(b) {
+    const pax = b.passengers || [];
+    const seats = pax.map(p => p.seat_number).filter(Boolean);
+    return {
+      id: b.booking_ref,
+      ref: b.booking_ref,
+      kind: 'flight',
+      kindLabel: 'Flight',
+      icon: 'flights',
+      title: `${b.airline || ''} ${b.flight_number || ''}`.trim(),
+      subtitle: `${b.origin_city || b.origin_code || ''} \u2192 ${b.destination_city || b.destination_code || ''}`,
+      travelDate: b.travel_date,
+      departure: b.departure_time,
+      arrival: b.arrival_time,
+      durationLabel: b.duration_label,
+      stops: b.stops,
+      cabinClass: b.cabin_class,
+      isInternational: b.is_international,
+      /* Capitalised for the card, which reads "Confirmed" not "confirmed". */
+      status: b.status ? b.status.charAt(0).toUpperCase() + b.status.slice(1) : 'Pending',
+      /* Both are the server's, and pnr stays null until an airline issues
+         one. The confirmation screen says so rather than showing a blank. */
+      pnr: b.pnr,
+      ticketNumber: null,
+      bookedAt: b.created_at,
+      cancelledAt: b.cancelled_at,
+      total: Number(b.total_amount),
+      currency: b.currency || 'INR',
+      passengers: pax.map(p => ({
+        title: p.title, first: p.first_name, last: p.last_name,
+        gender: p.gender, dob: p.date_of_birth, kind: p.traveller_type,
+        seat: p.seat_number, seatPrice: Number(p.seat_price || 0),
+        passportNumber: p.passport_number, passportExpiry: p.passport_expiry,
+        nationality: p.nationality, issuingCountry: p.issuing_country,
+        frequentFlyerAirline: p.frequent_flyer_airline,
+        frequentFlyer: p.frequent_flyer_number,
+        mobile: p.mobile, email: p.email, isContact: p.is_contact,
+      })),
+      seats,
+      addons: (b.addons || []).map(a => ({
+        id: a.code, code: a.code, name: a.name, type: a.addon_type,
+        description: a.description, price: Number(a.unit_price), quantity: a.quantity,
+      })),
+      payments: (b.payments || []).map(p => ({
+        method: p.method, status: p.status, amount: Number(p.amount), at: p.created_at,
+      })),
+      pricing: {
+        lines: [
+          { label: 'Base fare', amount: Number(b.base_fare) },
+          { label: 'Taxes & surcharges', amount: Number(b.taxes) },
+          ...(Number(b.seat_charges) ? [{ label: 'Seat charges', amount: Number(b.seat_charges) }] : []),
+          ...(Number(b.baggage_total) ? [{ label: 'Baggage', amount: Number(b.baggage_total) }] : []),
+          ...(Number(b.meal_total) ? [{ label: 'Meals', amount: Number(b.meal_total) }] : []),
+          ...(Number(b.service_total) ? [{ label: 'Other services', amount: Number(b.service_total) }] : []),
+          ...(Number(b.discount) ? [{ label: `Discount${b.coupon_code ? ' (' + b.coupon_code + ')' : ''}`, amount: -Number(b.discount) }] : []),
+        ],
+        total: Number(b.total_amount),
+      },
+      couponCode: b.coupon_code,
+      demo: false,
+    };
+  }
+
+  /** True when this draft is one the server can take. */
+  function goesToServer(draft) {
+    return !!(draft && draft.apiPayload && typeof BookingApi !== 'undefined'
+              && BookingApi.isLive(draft.kind) && BookingApi.isSignedIn());
+  }
+
   async function create(draft) {
-    if (CONFIG.useLiveApi) {
-      return getJson(CONFIG.endpoints.create, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(typeof customerAuthHeaders === 'function' ? customerAuthHeaders() : {}) },
-        body: JSON.stringify(draft),
-      });
+    if (goesToServer(draft)) {
+      const created = await BookingApi.createBooking(draft.apiPayload);
+      /* Record the payment attempt against the booking just made. It is
+         recorded as pending and nothing is charged — see
+         customer_booking_service.record_payment. */
+      let latest = created;
+      if (draft.payment && draft.payment.method) {
+        try {
+          latest = await BookingApi.payBooking(created.booking_ref, draft.payment.method);
+        } catch { /* the booking exists; a failed attempt log must not lose it */ }
+      }
+      return fromApi(latest);
     }
 
     const now = new Date();
@@ -147,17 +234,24 @@ const BookingStore = (function () {
 
   /** Every booking for the signed-in customer, newest first. */
   async function list() {
-    if (CONFIG.useLiveApi) {
-      const body = await getJson(CONFIG.endpoints.list, {
-        headers: (typeof customerAuthHeaders === 'function' ? customerAuthHeaders() : {}),
-      });
-      return Array.isArray(body) ? body : (body.results || body.items || []);
+    /* Flights live on the server; hotels, cruises, packages and visa are still
+       local demo bookings. Both are shown, newest first, so a customer sees one
+       list rather than being asked to care where a row is stored. */
+    let server = [];
+    if (typeof BookingApi !== 'undefined' && BookingApi.isSignedIn()) {
+      try {
+        const body = await BookingApi.listBookings();
+        server = (Array.isArray(body) ? body : []).map(fromApi);
+      } catch { /* signed out mid-session, or offline: show what is local */ }
     }
     const me = currentCustomerId();
     /* A guest's demo bookings stay visible once they sign in — otherwise the
        booking someone just made vanishes the moment they log in to look at it,
        which in a demo reads as a bug. */
-    return readAll().filter(b => b.customerId === me || b.customerId === 'guest');
+    const local = readAll().filter(b => b.customerId === me || b.customerId === 'guest');
+    return [...server, ...local].sort(
+      (a, b) => new Date(b.bookedAt || 0) - new Date(a.bookedAt || 0)
+    );
   }
 
   async function get(id) {
@@ -166,11 +260,9 @@ const BookingStore = (function () {
 
   /** Demo cancellation: status only, and the row stays in the list. */
   async function cancel(id) {
-    if (CONFIG.useLiveApi) {
-      return getJson(CONFIG.endpoints.cancel.replace('{id}', encodeURIComponent(id)), {
-        method: 'POST',
-        headers: (typeof customerAuthHeaders === 'function' ? customerAuthHeaders() : {}),
-      });
+    /* Server references are JPB######; anything else is a local demo row. */
+    if (/^JPB\d+$/.test(String(id)) && typeof BookingApi !== 'undefined') {
+      return fromApi(await BookingApi.cancelBooking(id));
     }
     const all = readAll();
     const b = all.find(x => x.id === id);
@@ -185,5 +277,5 @@ const BookingStore = (function () {
   async function clearAll() { writeAll([]); }
 
   return { config: CONFIG, KINDS, create, list, get, cancel, clearAll,
-           makePnr, makeReference };
+           fromApi, makePnr, makeReference };
 })();

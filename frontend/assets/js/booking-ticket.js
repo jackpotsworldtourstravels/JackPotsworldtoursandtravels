@@ -43,7 +43,12 @@ const BookingTicket = (function () {
 
     const refs = [
       ['Booking reference', b.id],
-      b.pnr ? ['PNR', b.pnr] : null,
+      /* A server booking has no PNR until an airline issues one. Saying so
+         beats omitting the row: a ticket with no PNR line at all reads as
+         though one was forgotten, rather than as one that is genuinely
+         still to come. Local demo bookings keep their generated PNR. */
+      b.pnr ? ['PNR', b.pnr]
+            : (b.demo === false ? ['PNR', 'Pending — issued by the airline on ticketing'] : null),
       b.ticketNumber ? ['Ticket number', b.ticketNumber] : null,
       ['Status', b.status],
       ['Booked on', fmt(b.bookedAt, true)],

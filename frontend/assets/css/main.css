@@ -756,3 +756,106 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
 @media (max-width:900px), (hover:none) and (pointer:coarse){
   input, select, textarea{font-size:16px !important;}
 }
+/* ==========================================================================
+   Auth modal — step flow, inline errors, open/close motion
+   ==========================================================================
+   Additive: .modal-overlay / .modal-card / .modal-field keep every rule they
+   already had. Nothing here restyles the modal, it only adds the states the
+   stepped flow needs.
+   ========================================================================== */
+
+/* --- open / close motion -------------------------------------------------
+   The overlay already toggles display:none <-> flex, which cannot be
+   transitioned. Opacity and the card's lift are what animate; `display` is
+   still what shows it. */
+.modal-overlay.open{
+  opacity:1;
+  transition:opacity .22s ease;
+}
+.modal-overlay.open .modal-card{
+  animation:authCardIn .26s cubic-bezier(.22,1,.36,1);
+}
+.modal-overlay.closing{ opacity:0; }
+.modal-overlay.closing .modal-card{ transform:translateY(6px) scale(.985); transition:transform .18s ease; }
+
+@keyframes authCardIn{
+  from{ opacity:0; transform:translateY(14px) scale(.97); }
+  to  { opacity:1; transform:none; }
+}
+
+/* Someone who has asked for less motion gets the state change without the
+   movement — the modal still opens, it just does not slide. */
+@media (prefers-reduced-motion: reduce){
+  .modal-overlay.open,
+  .modal-overlay.closing,
+  .modal-overlay.open .modal-card,
+  .modal-overlay.closing .modal-card{
+    animation:none; transition:none; transform:none;
+  }
+}
+
+/* --- steps ---------------------------------------------------------------
+   One view at a time. `hidden` does the hiding; this only stops a hidden step
+   being laid out by the flex/grid rules around it. */
+.auth-view[hidden]{ display:none; }
+
+/* --- inline validation ---------------------------------------------------
+   The message sits under its own field. Nothing in this flow uses alert(). */
+.field-error{
+  margin:6px 0 0; font-size:12.5px; line-height:1.4; color:var(--coral-dark, #C0392B);
+  min-height:0;
+}
+.field-error:empty{ display:none; }
+
+.modal-field input.is-invalid{
+  border-color:var(--coral-dark, #C0392B);
+  background:rgba(192,57,43,.04);
+}
+.modal-field input.is-invalid:focus{ border-color:var(--coral-dark, #C0392B); }
+
+/* --- an address already given, shown but not re-typed --------------------- */
+.field-locked{ position:relative; display:flex; align-items:center; }
+.field-locked input{
+  flex:1; min-width:0;
+  /* room for the Change button, so a long address does not run under it */
+  padding-right:84px !important;
+  background:rgba(10,37,64,.04);
+  color:var(--muted);
+  cursor:default;
+}
+.field-locked input:focus{ border-color:rgba(10,37,64,.14); }
+.field-change{
+  position:absolute; right:10px;
+  padding:4px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; color:var(--coral);
+  background:transparent; border:1px solid transparent; cursor:pointer;
+}
+.field-change:hover{ background:rgba(255,77,77,.1); }
+.field-change:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+
+/* .modal-forgot is now a <button> rather than an <a> — it changes a step
+   rather than navigating. Kept visually identical to the link it replaced. */
+button.modal-forgot{
+  background:none; border:none; padding:0; cursor:pointer;
+  font:inherit; font-size:13px; font-weight:700; color:var(--coral);
+}
+button.modal-forgot:hover{ text-decoration:underline; }
+button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
+
+/* Debug-only reset link, shown when the API returns one because SMTP is off. */
+.modal-devlink{
+  display:inline-block; margin-top:10px; font-size:13px; font-weight:700;
+  color:var(--coral); text-decoration:underline; word-break:break-all;
+}
+
+/* --- responsive ----------------------------------------------------------
+   The card is already max-width:420px and scrolls at 90vh. At phone widths it
+   wants the full width and a little less padding, so the fields are not
+   squeezed into a column of their own. */
+@media (max-width:480px){
+  .modal-overlay{ padding:12px; }
+  .auth-card{ padding:28px 20px; border-radius:20px; max-height:94vh; }
+  .auth-card h2{ font-size:22px; }
+  .modal-remember{ gap:8px; }
+  .field-locked input{ padding-right:76px !important; }
+}

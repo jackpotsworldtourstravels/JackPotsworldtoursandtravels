@@ -20,36 +20,118 @@ const BookingFlows = (function () {
      FLIGHTS
      ===================================================================== */
 
-  /** The aircraft. Occupied seats come from BookingData and are stable. */
+  /** The aircraft, and who is sitting where.
+
+      SEATS BELONG TO A TRAVELLER, NOT TO THE BOOKING. The step used to say
+      "pick 2 seats" and collect them into a list, which meant the party knew
+      it had 12A and 12B but not which of them was in which. The backend has
+      always taken {passenger_index, seat_number}, so this now assigns against
+      that shape directly rather than inventing a second model.
+
+      An infant is not allocated a seat — they travel on an adult's lap — so
+      they are absent from the traveller strip rather than listed with nothing
+      to choose.
+   */
   const seatStep = {
     id: 'seats',
     label: 'Seats',
     async load(ctx) { ctx.seatMap = await BookingData.seatMap(ctx.item); },
     render(ctx) {
-      const pax = Math.max(1, ctx.paxCount || 1);
-      const chosen = new Set(ctx.seats.filter(Boolean).map(s => s.id));
+      /* Indexed by passenger, sparse, so seats[2] is traveller 3's whatever
+         travellers 1 and 2 have done. BookingApi.seatPayload() reads the index
+         off the position, which is why this must not be compacted. */
+      if (!Array.isArray(ctx.seats)) ctx.seats = [];
+
+      const kinds = ctx.paxKinds || [];
+      const seatable = (ctx.passengers || []).map((p, i) => ({ p, i }))
+        .filter(({ i }) => String(kinds[i] || 'Adult').toLowerCase() !== 'infant');
+      /* Before the traveller step has been filled in there are no names yet;
+         fall back to the party size so the map is still browsable. */
+      const people = seatable.length ? seatable
+        : Array.from({ length: Math.max(1, ctx.paxCount || 1) }, (_, i) => ({ p: null, i }));
+
+      if (ctx.activeSeatPax === undefined
+          || !people.some(x => x.i === ctx.activeSeatPax)) {
+        ctx.activeSeatPax = people[0].i;
+      }
+
+      const nameOf = (p, i) => {
+        const n = p ? `${p.first || ''} ${p.last || ''}`.trim() : '';
+        return n || `Traveller ${i + 1}`;
+      };
+
+      const strip = people.map(({ p, i }) => {
+        const seat = ctx.seats[i];
+        const active = i === ctx.activeSeatPax;
+        return `
+          <button type="button" class="bk-paxseat ${active ? 'is-active' : ''}"
+                  data-paxseat="${i}" aria-pressed="${active}">
+            <span class="bk-paxseat-who">
+              <b>Traveller ${i + 1}</b>
+              <span>${esc(nameOf(p, i))}${kinds[i] ? ' · ' + esc(kinds[i]) : ''}</span>
+            </span>
+            <span class="bk-paxseat-seat">
+              ${seat
+                ? `<b>${esc(seat.id)}</b><span>${seat.price ? esc(money(seat.price)) : 'Free'}</span>`
+                : '<span class="is-muted">No seat selected</span>'}
+            </span>
+          </button>`;
+      }).join('');
+
+      const mine = new Map();
+      ctx.seats.forEach((s, i) => { if (s) mine.set(s.id, i); });
+
       const rows = ctx.seatMap.rows.map(r => `
         <div class="bk-seatrow ${r.exit ? 'is-exit' : ''}">
           <span class="bk-seatno">${r.row}</span>
-          ${r.seats.map((s, i) => `${i === 3 ? '<span class="bk-aisle"></span>' : ''}
-            <button type="button" class="bk-seat is-${s.type} ${s.occupied ? 'is-taken' : ''} ${chosen.has(s.id) ? 'is-mine' : ''}"
-              data-seat="${esc(s.id)}" ${s.occupied ? 'disabled aria-label="Occupied"' : `aria-label="Seat ${esc(s.id)}, ${esc(s.type)}, ${esc(money(s.price))}"`}>
-              ${esc(s.letter)}</button>`).join('')}
+          ${r.seats.map((s, i) => {
+            const owner = mine.get(s.id);
+            const selected = owner !== undefined;
+            /* "Paid" is a seat that costs extra and is still free to take.
+               Selected wins over paid, because what the traveller most needs
+               to see on their own seat is that it is theirs. */
+            const paid = !s.occupied && !selected && s.price > 0;
+            const cls = [
+              'bk-seat',
+              s.occupied ? 'is-occupied' : '',
+              selected ? 'is-selected' : '',
+              paid ? 'is-paid' : '',
+            ].filter(Boolean).join(' ');
+            const label = s.occupied
+              ? 'Occupied'
+              : selected
+                ? `Seat ${s.id}, selected for traveller ${owner + 1}`
+                : `Seat ${s.id}, ${s.type}, ${s.price ? money(s.price) : 'no extra charge'}`;
+            return `${i === 3 ? '<span class="bk-aisle"></span>' : ''}
+            <button type="button" class="${cls}" data-seat="${esc(s.id)}"
+              ${s.occupied ? 'disabled' : ''} aria-label="${esc(label)}">
+              ${esc(s.letter)}</button>`;
+          }).join('')}
           ${r.exit ? '<span class="bk-exit-tag">Exit</span>' : ''}
         </div>`).join('');
+
+      /* The server sends its own legend; these are the four states it names.
+         Rendered from the response where there is one so the words on screen
+         and the words in the API cannot drift apart. */
+      const legend = (ctx.seatMap.legend && ctx.seatMap.legend.length
+        ? ctx.seatMap.legend
+        : [
+            { state: 'available', label: 'Available' },
+            { state: 'selected', label: 'Selected' },
+            { state: 'occupied', label: 'Occupied' },
+            { state: 'paid', label: 'Paid' },
+          ]
+      ).map(l => `<span><i class="bk-seat is-${esc(l.state)}"></i> ${esc(l.label)}</span>`).join('');
 
       return `<div class="bk-step">
           <h2 class="bk-step-title">Choose your seats</h2>
           <p class="bk-step-sub">${esc(ctx.seatMap.aircraft)} · ${esc(ctx.seatMap.layout)} ·
-             pick ${pax} ${pax === 1 ? 'seat' : 'seats'}. Skipping this assigns seats at check-in.</p>
+             choose a traveller, then tap a seat. Skipping this assigns seats at check-in.</p>
 
-          <div class="bk-seat-legend">
-            <span><i class="bk-seat is-window"></i> Window</span>
-            <span><i class="bk-seat is-middle"></i> Middle</span>
-            <span><i class="bk-seat is-aisle"></i> Aisle</span>
-            <span><i class="bk-seat is-taken"></i> Occupied</span>
-            <span><i class="bk-seat is-mine"></i> Yours</span>
-          </div>
+          <h3 class="bk-seat-forwho">Select seat for:</h3>
+          <div class="bk-paxseats">${strip}</div>
+
+          <div class="bk-seat-legend">${legend}</div>
 
           <div class="bk-cabin">
             <div class="bk-nose">Front of aircraft</div>
@@ -59,35 +141,53 @@ const BookingFlows = (function () {
         </div>`;
     },
     mount(root, ctx) {
-      const pax = Math.max(1, ctx.paxCount || 1);
+      const kinds = ctx.paxKinds || [];
+      const seatableCount = Math.max(1, (ctx.paxKinds || []).filter(
+        k => String(k || 'Adult').toLowerCase() !== 'infant').length || (ctx.paxCount || 1));
+
       const count = root.querySelector('#bkSeatCount');
       const paint = () => {
         const n = ctx.seats.filter(Boolean).length;
         count.textContent = n
-          ? `${n} of ${pax} selected — ${ctx.seats.filter(Boolean).map(s => s.id).join(', ')}`
+          ? `${n} of ${seatableCount} assigned — ` + ctx.seats
+              .map((s, i) => (s ? `Traveller ${i + 1}: ${s.id}` : null))
+              .filter(Boolean).join(', ')
           : 'No seats selected yet.';
       };
       paint();
+
+      root.querySelectorAll('[data-paxseat]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          ctx.activeSeatPax = Number(btn.dataset.paxseat);
+          BookingFlow.repaint();
+        });
+      });
 
       root.querySelectorAll('[data-seat]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.seat;
           const seat = ctx.seatMap.rows.flatMap(r => r.seats).find(s => s.id === id);
-          const already = ctx.seats.findIndex(s => s && s.id === id);
-          if (already > -1) {
-            ctx.seats.splice(already, 1);
-            btn.classList.remove('is-mine');
+          const active = ctx.activeSeatPax;
+          const ownerIdx = ctx.seats.findIndex(s => s && s.id === id);
+
+          if (ownerIdx === active) {
+            ctx.seats[active] = null;             // tapping your own seat frees it
+          } else if (ownerIdx > -1) {
+            /* Held by someone else on this booking. Moving it silently would
+               leave that traveller seatless without saying so. */
+            showToast(`Seat ${id} is already assigned to Traveller ${ownerIdx + 1}.`, true);
+            return;
           } else {
-            /* Silently swapping a seat when the limit is reached is worse than
-               saying so — the traveller loses a choice they made on purpose. */
-            if (ctx.seats.filter(Boolean).length >= pax) {
-              showToast(`You have already chosen ${pax} ${pax === 1 ? 'seat' : 'seats'}. Deselect one first.`, true);
+            /* An exit row is the one seat an infant's adult may not take. */
+            if (seat.infant_allowed === false
+                && String(kinds[active] || 'Adult').toLowerCase() === 'infant') {
+              showToast(`Seat ${id} is an exit row and cannot be used by an infant.`, true);
               return;
             }
-            ctx.seats.push(seat);
-            btn.classList.add('is-mine');
+            ctx.seats[active] = seat;
           }
-          paint();
+
+          BookingFlow.repaint();
           BookingFlow.refreshPrice();
         });
       });
@@ -105,27 +205,78 @@ const BookingFlows = (function () {
     ];
     return {
       kind: 'flight',
+      /* Flights are the only product with a coupon backend, so the Fare
+         Summary shows the coupon controls here and nowhere else. */
+      supportsCoupons: true,
       kicker: `${item.origin.code} → ${item.destination.code}`,
       title: `${item.airline} ${item.flightNumber}`,
+      /* Kept as the offline fallback and the first paint. The server's answer
+         below replaces it, and the two agree — customer_pricing_service.py is
+         a port of P.flightPrice, verified against it. */
       price: P.flightPrice,
+      /* WHAT THE FLIGHT ACTUALLY COSTS. The request names what was chosen —
+         the flight, the cabin, the party, seat ids, add-on codes, a coupon —
+         and carries no money at all, so the total cannot be dictated from
+         here. The same endpoint prices the real booking, which is what stops
+         the reviewed total and the charged total drifting apart. */
+      async priceAsync(ctx) {
+        if (typeof BookingApi === 'undefined' || !BookingApi.isLive('flight')) return null;
+        const q = await BookingApi.quote(
+          BookingApi.flightPayload(ctx),
+          BookingApi.passengerTypes(ctx),
+          BookingApi.seatPayload(ctx),
+          BookingApi.addonPayload(ctx),
+          ctx.couponCode || null,
+        );
+        /* Hold the server's own breakdown on the draft: the Review step and
+           the confirmation both read it rather than re-deriving anything. */
+        ctx.quote = q;
+        ctx.couponError = q.coupon_error || null;
+        return {
+          lines: (q.lines || []).map(l => ({ label: l.label, amount: Number(l.amount) })),
+          total: Number(q.total_amount),
+          note: q.coupon_error || null,
+        };
+      },
       steps: [
         P.travellersStep({ passport: true, frequentFlyer: true, noun: 'Traveller' }),
         seatStep,
         P.addonsStep('flight'),
-        P.summaryStep(ctx => `
-          <h3>Flight</h3>
+        /* The full journey, spelled out. The itinerary strip stays — it is the
+           fastest way to read a flight — and every field the review needs is
+           named beneath it rather than left to be inferred from it. */
+        P.summaryStep(ctx => {
+          const stops = ctx.item.stops
+            ? `${ctx.item.stops} stop${ctx.item.stops > 1 ? 's' : ''}`
+            : 'Non-stop';
+          const cabin = (BookingData.CABIN_CLASSES.find(c => c.id === ctx.cabin) || {}).label || 'Economy';
+          const facts = [
+            ['Airline', ctx.item.airline],
+            ['Flight number', ctx.item.flightNumber],
+            ['Departure airport', `${ctx.item.origin.city} (${ctx.item.origin.code})`],
+            ['Arrival airport', `${ctx.item.destination.city} (${ctx.item.destination.code})`],
+            ['Departure date', fmtDate(ctx.item.date)],
+            ['Departure time', ctx.item.departure || 'TBA'],
+            ['Arrival time', ctx.item.arrival || 'TBA'],
+            ['Flight duration', ctx.item.durationLabel || '—'],
+            ['Stops', stops],
+            ['Cabin class', cabin],
+            ['Fare type', ctx.item.fareType],
+          ];
+          return `
           <div class="bk-itin">
             <div><span>${esc(ctx.item.departure)}</span><b>${esc(ctx.item.origin.city)} (${esc(ctx.item.origin.code)})</b></div>
             <div class="bk-itin-mid">${icon('flights')}<span>${esc(ctx.item.durationLabel || 'Non-stop')}</span></div>
             <div class="is-end"><span>${esc(ctx.item.arrival || 'TBA')}</span><b>${esc(ctx.item.destination.city)} (${esc(ctx.item.destination.code)})</b></div>
           </div>
+          <dl class="bk-review-dl bk-journey">
+            ${facts.filter(([, v]) => v !== undefined && v !== null && v !== '')
+                   .map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}
+          </dl>
           <div class="bk-meta">
-            <span>${esc(ctx.item.airline)} ${esc(ctx.item.flightNumber)}</span>
-            <span>${esc(fmtDate(ctx.item.date))}</span>
-            <span>${esc((BookingData.CABIN_CLASSES.find(c => c.id === ctx.cabin) || {}).label || 'Economy')}</span>
-            <span>${esc(ctx.item.fareType)}</span>
             <span>Cabin ${esc(ctx.item.baggage.cabin)} · Check-in ${esc(ctx.item.baggage.checkIn)}</span>
-          </div>`),
+          </div>`;
+        }),
         P.paymentStep(),
         P.confirmationStep(),
       ],

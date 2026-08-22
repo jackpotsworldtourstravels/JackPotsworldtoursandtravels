@@ -105,6 +105,11 @@ const MyBookings = (function () {
 
   async function refresh() {
     rows = await BookingStore.list();
+    /* Flights are real server bookings now; the other four products are still
+       local demo rows. Label the list only when it actually contains one,
+       rather than calling a booking with a real reference a demo. */
+    const badge = document.getElementById('mbDemoBadge');
+    if (badge) badge.hidden = !rows.some(b => b.demo !== false);
     renderTabs();
     render();
   }

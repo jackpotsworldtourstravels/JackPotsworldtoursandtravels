@@ -250,11 +250,40 @@ const BookingData = (function () {
     config: CONFIG,
     TITLES, GENDERS, NATIONALITIES, CABIN_CLASSES,
 
+    /* Flights ask the server, which is now the authority on both the cabin
+       and what a seat costs — the local generator below is the fallback for
+       an offline demo, and produces the same aircraft because the Python is a
+       port of it. The other products have no backend and stay local. */
     async seatMap(flight) {
+      if (typeof BookingApi !== 'undefined' && BookingApi.isLive('flight')) {
+        try {
+          return await BookingApi.seatMap(String(flight.id || flight.flightNumberRaw), 30);
+        } catch { /* fall through to the local cabin */ }
+      }
       return load('seatMap', () => buildSeatMap(flight.flightNumberRaw || flight.id, 30),
                   { flight: flight.flightNumberRaw, date: flight.date });
     },
+    /** Flat list, the shape the add-ons step renders. The server groups them
+     *  (baggage / meal / service); the group is kept on each row so the step
+     *  can head them without a second request. */
     async addons(productType) {
+      if (productType === 'flight' && typeof BookingApi !== 'undefined'
+          && BookingApi.isLive('flight')) {
+        try {
+          const c = await BookingApi.addons('flight');
+          const flat = [];
+          ['baggage', 'meal', 'service'].forEach(group => {
+            (c[group] || []).forEach(a => flat.push({
+              id: a.code, code: a.code, name: a.name, price: a.price,
+              note: a.description, group,
+              per: a.per, icon: group === 'meal' ? 'activities'
+                    : group === 'baggage' ? 'transfers' : 'insurance',
+            }));
+          });
+          flat.included = c.included_baggage || [];
+          return flat;
+        } catch { /* fall through to the local catalogue */ }
+      }
       return load('addons', () => (ADDONS[productType] || []).slice(), { type: productType });
     },
     async rooms(hotel) {
