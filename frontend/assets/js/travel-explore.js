@@ -48,6 +48,7 @@ const TravelExplore = (function () {
 
   let flights = [];
   let allHotels = [];
+  let allPackages = [];
   /* The rendered rows, kept so a Book Now click can find the object it belongs
      to. Reading the item back out of the DOM would mean re-parsing formatted
      prices, which is how a booking ends up costing "₹12,500" the string. */
@@ -463,9 +464,47 @@ const TravelExplore = (function () {
     armIcons(el);
   }
 
-  function renderPackages(rows) {
+  function renderPackages(all) {
     const el = $('txPackageGrid');
     if (!el) return;
+    allPackages = all;
+    const live = typeof PackageSearch !== 'undefined';
+    const rows = live ? all.filter(p => PackageSearch.matches(p)) : all;
+
+    const head = $('txPkgHead');
+    if (head) {
+      head.textContent = state.pkgDest ? `Tour packages — ${state.pkgDest}` : 'Curated tour packages';
+    }
+
+    if (!rows.length) {
+      catalogue.package = [];
+      /* Name the filter that emptied it. With one shared departure calendar
+         a month with no Saturdays in it is the usual culprit, and "no
+         results" would leave that a mystery. */
+      const bits = [];
+      if (state.pkgDest) bits.push(`to ${esc(state.pkgDest)}`);
+      if (state.pkgMonth && state.pkgMonth !== 'any' && live) {
+        bits.push(`departing in ${esc(PackageSearch.monthLabel(state.pkgMonth))}`);
+      }
+      if (state.pkgBudget && state.pkgBudget !== 'any') bits.push('in that budget');
+      if (state.pkgDuration && state.pkgDuration !== 'any') bits.push('of that length');
+      el.innerHTML = `<div class="tx-empty">
+        <b>No packages ${bits.length ? bits.join(', ') : 'match that'}</b>
+        Try a different month, a wider budget or another destination.
+        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllPkgs">Show all packages</button>
+      </div>`;
+      const btn = $('txShowAllPkgs');
+      if (btn) btn.addEventListener('click', () => {
+        state.pkgDest = '';
+        state.pkgMonth = 'any';
+        state.pkgBudget = 'any';
+        state.pkgDuration = 'any';
+        if (live) PackageSearch.mount();
+        renderPackages(all);
+      });
+      return;
+    }
+
     catalogue.package = rows;
     el.innerHTML = rows.map(p => `<article class="tx-card">
       <div class="tx-media">${sceneSvg('package', p.name)}
@@ -518,6 +557,43 @@ const TravelExplore = (function () {
    *  Falls back to nothing if the module is absent rather than throwing: the
    *  results list below still renders, which is more useful than a blank page.
    */
+  /** The Packages panel.
+   *
+   *  The landing page speaks a different dialect: its Month is a bare name
+   *  ("July") and its Tour Package Type is a category, not a destination.
+   *  Both are translated here into what the panel uses — a real departure
+   *  month key, and a destination only when it names a package we sell.
+   *  Anything that does not translate is dropped rather than guessed at. */
+  async function mountPackageSearch(rows) {
+    if (typeof PackageSearch === 'undefined') return;
+
+    if (state.pkgType && !state.pkgDest) {
+      const hit = rows.find(p => p.name.toLowerCase() === String(state.pkgType).toLowerCase());
+      if (hit) state.pkgDest = hit.name;
+    }
+
+    await PackageSearch.init(state, rows, req => {
+      state.pkgDest = req.destination || '';
+      state.pkgMonth = req.departureMonth || 'any';
+      state.pkgBudget = req.budget;
+      state.pkgDuration = req.duration;
+      state.pkgTravellers = req.travellers;
+      renderPackages(allPackages.length ? allPackages : rows);
+      $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    /* A month NAME from the hero becomes the first real departure month that
+       matches it; if nothing departs then, the filter is left off rather than
+       silently emptying the page. */
+    if (state.pkgMonth && !/^\d{4}-\d{2}$/.test(state.pkgMonth) && state.pkgMonth !== 'any') {
+      const wanted = String(state.pkgMonth).toLowerCase();
+      const match = PackageSearch.availableMonths()
+        .find(k => PackageSearch.monthLabel(k).toLowerCase().startsWith(wanted));
+      state.pkgMonth = match || 'any';
+      PackageSearch.mount();
+    }
+  }
+
   /** The Hotels panel, same arrangement as Flights: it owns the criteria and
    *  hands back a request; this file re-filters and re-renders. Absent module
    *  means no panel and the plain list, rather than a broken page. */
@@ -737,7 +813,9 @@ const TravelExplore = (function () {
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
       } else if (service === 'packages') {
-        renderPackages(await TravelData.packages());
+        const rows = await TravelData.packages();
+        await mountPackageSearch(rows);
+        renderPackages(rows);
       }
     } catch (err) {
       const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
