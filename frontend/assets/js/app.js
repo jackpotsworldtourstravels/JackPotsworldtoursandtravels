@@ -584,18 +584,172 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    redesign — tour_packages no longer exists — so that call only ever 404'd and fell
    through to the hardcoded cards. Removed rather than left firing on every load. */
 
-/* The hero Search button has no API left to call. GET /api/flights|hotels|cruises|packages
-   went with the rest of the B2C surface in the V2 nine-table redesign, so every search
-   404'd and surfaced as "Search failed — please try again." — inviting a retry that could
-   never succeed. The request, the result-card renderer and the two form-reading helpers
-   only it used are gone; the button now says what is true. Restore from git history if
-   the catalog ever returns. */
+/* ===========================================================================
+   Hero search — collect, gate, hand over.
+   ===========================================================================
+   The button used to say "Live search isn't available", which was true when
+   the catalog endpoints were removed. It is not true any more: the travel
+   pages search TravelData and render results, so the hero's job is to carry
+   what the traveller typed to the page that can answer it.
+
+   AUTH IS THE GATE, NOT A SUGGESTION. A signed-out click opens the auth modal
+   and DOES NOT search. The criteria are parked first, so signing in resumes
+   the search the traveller asked for rather than dropping them on the landing
+   page to type it again.
+
+   Cruises are deliberately still on the old toast — the cruise page has no
+   search panel to hand criteria to, and a redirect that ignored them would be
+   worse than saying so.
+   =========================================================================== */
+
+/** Where each panel's criteria go, and how to read them. */
+const HERO_SEARCH = {
+  flights: {
+    page: 'flights.html',
+    read() {
+      const dep = nativeDate('fDep');
+      const ret = nativeDate('fRet');
+      /* "1 Passenger" / "5+ Passengers" -> a number. The hero only offers a
+         single count; the results page splits it into adults/children/infants,
+         so everyone here is an adult until told otherwise. */
+      const pax = parseInt((val('fPax') || '1').replace(/\D+/g, ''), 10) || 1;
+      return {
+        trip: ret ? 'round' : 'oneway',
+        from: airportCode('fFrom'),
+        to: airportCode('fTo'),
+        depart: dep,
+        ret: ret,
+        adults: pax,
+        children: 0,
+        infants: 0,
+        cabin: (val('fCabin') || 'Economy').toLowerCase().replace(/\s+/g, '-'),
+      };
+    },
+    validate(p) {
+      if (!p.from) return ['Choose where you are flying from.', 'fFrom'];
+      if (!p.to) return ['Choose where you are flying to.', 'fTo'];
+      if (p.from === p.to) return ['Origin and destination cannot be the same.', 'fTo'];
+      if (!p.depart) return ['Choose a departure date.', 'fDep'];
+      if (p.ret && p.ret < p.depart) return ['The return date cannot be before departure.', 'fRet'];
+      return null;
+    },
+  },
+  hotels: {
+    page: 'hotels.html',
+    read() {
+      return {
+        dest: val('hDest'),
+        checkIn: nativeDate('hIn'),
+        checkOut: nativeDate('hOut'),
+        guests: parseInt((val('hGuests') || '2').replace(/\D+/g, ''), 10) || 2,
+        rooms: parseInt((val('hRooms') || '1').replace(/\D+/g, ''), 10) || 1,
+      };
+    },
+    validate(p) {
+      if (!p.dest) return ['Tell us where you are going.', 'hDest'];
+      if (!p.checkIn) return ['Choose a check-in date.', 'hIn'];
+      if (!p.checkOut) return ['Choose a check-out date.', 'hOut'];
+      if (p.checkOut <= p.checkIn) return ['Check-out must be after check-in.', 'hOut'];
+      return null;
+    },
+  },
+  packages: {
+    page: 'packages.html',
+    read() {
+      return { type: val('pType'), month: val('pMonth') };
+    },
+    validate() { return null; },   // both fields are dropdowns with a default
+  },
+};
+
+const val = id => (document.getElementById(id) || {}).value?.trim() || '';
+
+/** The ISO value behind a formatted date field.
+ *  The visible input is a readonly display; the real value lives on the
+ *  type="date" sibling, which is what the results page needs. */
+function nativeDate(displayId) {
+  const field = document.getElementById(displayId)?.closest('.field-date');
+  return field?.querySelector('.date-native')?.value || '';
+}
+
+/** "Hyderabad (HYD)" -> "HYD". Falls back to the whole string so a hand-typed
+ *  city is still carried rather than silently dropped. */
+function airportCode(id) {
+  const v = val(id);
+  const m = /\(([A-Z]{3})\)/.exec(v);
+  return m ? m[1] : v;
+}
+
+/** Park a search so signing in can resume it. sessionStorage, not local: a
+ *  search is about this visit, and finding yesterday's criteria reapplied on
+ *  a new tab would be surprising. */
+const PENDING_SEARCH_KEY = 'jpc_pending_search';
+
+function storePendingSearch(kind, params) {
+  try { sessionStorage.setItem(PENDING_SEARCH_KEY, JSON.stringify({ kind, params })); }
+  catch { /* private mode — the traveller just re-runs the search */ }
+}
+
+function takePendingSearch() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_SEARCH_KEY);
+    sessionStorage.removeItem(PENDING_SEARCH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/** Send the traveller to the page that can answer, criteria in the URL. */
+function goToSearch(kind, params) {
+  const spec = HERO_SEARCH[kind];
+  if (!spec) return;
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+  );
+  window.location.href = `${spec.page}?${qs.toString()}`;
+}
+
 document.querySelectorAll('.search-go').forEach(btn => {
   btn.addEventListener('click', e => {
     e.preventDefault();
-    showToast("Live search isn't available — browse our featured packages below.", true);
+    const panel = btn.closest('.search-panel');
+    const kind = panel?.dataset.panel;
+    const spec = HERO_SEARCH[kind];
+
+    /* Cruises: no search page to hand criteria to yet. */
+    if (!spec) {
+      showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
+      return;
+    }
+
+    const params = spec.read();
+    const bad = spec.validate(params);
+    if (bad) {
+      const [message, focusId] = bad;
+      showToast(message, true);
+      document.getElementById(focusId)?.focus();
+      return;
+    }
+
+    /* THE GATE. Signed out: park the criteria, open the modal, search nothing.
+       The modal's success path picks the search back up. */
+    const { access } = getStoredAuth();
+    if (!access) {
+      storePendingSearch(kind, params);
+      openAuth();
+      return;
+    }
+
+    goToSearch(kind, params);
   });
 });
+
+/** Called once a session exists. Returns true if it navigated. */
+function resumePendingSearch() {
+  const pending = takePendingSearch();
+  if (!pending || !HERO_SEARCH[pending.kind]) return false;
+  goToSearch(pending.kind, pending.params);
+  return true;
+}
 
 /* AI chatbot */
 const chatPanel = document.getElementById('chatPanel');
@@ -838,59 +992,213 @@ renderAuthNav();
     });
 })();
 
-/* Auth modal: Sign Up / Login */
+/* ===========================================================================
+   Auth modal — one door, five steps.
+   ===========================================================================
+   Both header buttons open this. The traveller gives an email, then either a
+   password or the rest of a registration; the code step is shared because
+   /login and /signup answer with the same challenge.
+
+   THE FLOW NEVER ASKS THE SERVER WHO IS REGISTERED. See the comment on the
+   markup in index.html: an "is this email known?" endpoint would let anyone
+   enumerate customers, which this API avoids on purpose. So the email step
+   leads to the password step and offers "Create your account" beside it,
+   carrying the address across so nothing is typed twice.
+   =========================================================================== */
 const authOverlay = document.getElementById('authOverlay');
-const signupView = document.getElementById('signupView');
-const loginView = document.getElementById('loginView');
+const authCard = authOverlay.querySelector('.modal-card');
 const authCloseBtn = document.getElementById('authCloseBtn');
 
-function openAuth(view) {
+/** step name -> the element that is its view. */
+const AUTH_STEPS = {
+  email:    'authStepEmail',
+  password: 'authStepPassword',
+  signup:   'authStepSignup',
+  otp:      'loginStepOtp',
+  forgot:   'authStepForgot',
+};
+
+/** Where focus was before the modal took it, so it can be handed back. */
+let authReturnFocus = null;
+let authStep = 'email';
+
+function authView(name) { return document.getElementById(AUTH_STEPS[name]); }
+
+/** Show one step and put the caret in the field that still needs filling. */
+function showStep(name, opts) {
+  if (!AUTH_STEPS[name]) return;
+
+  /* The password and signup steps both show the address as a READONLY field,
+     because it was already given on the email step. Landing on either without
+     one leaves a locked, empty box and no way forward, so send them back to
+     the step that collects it. Guards openAuth('signup') from elsewhere on the
+     page as much as anything internal. */
+  if ((name === 'password' || name === 'signup') && !currentAuthEmail()) name = 'email';
+
+  authStep = name;
+  Object.keys(AUTH_STEPS).forEach(k => { authView(k).hidden = k !== name; });
+
+  /* Messages belong to the step that produced them. Carrying "that password
+     was wrong" onto the signup form would be nonsense. */
+  if (!(opts && opts.keepMessage)) {
+    ['authEmailMsg', 'loginMsg', 'signupMsg', 'loginOtpMsg', 'fpMsg']
+      .forEach(id => setModalMsg(document.getElementById(id), '', 'muted'));
+    clearFieldErrors();
+  }
+
+  const first = authView(name).querySelector('input:not([readonly]):not([type=checkbox])');
+  /* rAF so the field exists on screen before it is focused — focusing a
+     hidden element silently does nothing. */
+  if (first) requestAnimationFrame(() => first.focus());
+}
+
+/* --- inline validation ---------------------------------------------------
+   Every message lands beside its own field. There is not a single alert() or
+   confirm() in this flow, and the shared .modal-msg strip is reserved for what
+   the SERVER said — never for "you missed a field", which belongs on it. */
+function setFieldError(inputId, message) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(inputId + 'Err');
+  if (input) {
+    input.classList.toggle('is-invalid', !!message);
+    input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  }
+  if (box) box.textContent = message || '';
+  if (message && input) input.focus();
+  return !message;
+}
+
+function clearFieldErrors() {
+  authOverlay.querySelectorAll('.field-error').forEach(e => { e.textContent = ''; });
+  authOverlay.querySelectorAll('.is-invalid').forEach(e => {
+    e.classList.remove('is-invalid');
+    e.setAttribute('aria-invalid', 'false');
+  });
+}
+
+const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+/* --- password strength ---------------------------------------------------
+   The server's rule is length only (8..72, bcrypt's truncation point). This
+   adds a CLIENT-SIDE floor on top: eight characters drawn from at least two
+   of lowercase / uppercase / digit / symbol, so "password" and "12345678"
+   are refused at the form rather than accepted and regretted.
+
+   Deliberately not stricter than that. A rule the server does not share can
+   only ever be advisory — anyone posting straight to /signup bypasses it —
+   so it is set where it stops the genuinely weak without turning a booking
+   into a password-policy argument. */
+const PW_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
+
+function passwordScore(pw) {
+  if (!pw) return 0;
+  const classes = PW_CLASSES.filter(re => re.test(pw)).length;
+  if (pw.length < 8) return 0;
+  if (classes <= 1) return 1;                     // weak: one class only
+  if (classes === 2) return pw.length >= 12 ? 3 : 2;
+  return pw.length >= 12 ? 4 : 3;
+}
+
+const PW_LABELS = ['Too short', 'Too simple', 'Fair', 'Good', 'Strong'];
+
+/** Live strength readout under the signup password field. */
+function renderPasswordStrength() {
+  const input = document.getElementById('suPass');
+  const box = document.getElementById('suPassStrength');
+  if (!input || !box) return;
+  const pw = input.value;
+  if (!pw) { box.textContent = ''; box.className = 'pw-strength'; return; }
+  const score = passwordScore(pw);
+  box.textContent = PW_LABELS[score];
+  box.className = `pw-strength is-s${score}`;
+}
+const isMobile = v => /^\d{10,15}$/.test(String(v).replace(/[\s-]/g, ''));
+
+/* Clear a field's error the moment the traveller starts fixing it — leaving
+   it there while they type reads as though the correction is not registering. */
+authOverlay.addEventListener('input', e => {
+  if (e.target.matches('input') && e.target.classList.contains('is-invalid')) {
+    setFieldError(e.target.id, '');
+  }
+  if (e.target.id === 'suPass') renderPasswordStrength();
+});
+
+/* --- open / close --------------------------------------------------------- */
+function openAuth(step) {
+  /* Callers elsewhere on the page still say openAuth('login') / ('signup') —
+     the wishlist prompt, the review form, the account chip. Those are no
+     longer step names, and there is nothing to translate them into: the whole
+     point is that the traveller does not pick a side any more. Anything that
+     is not a real step opens the flow at the beginning. */
+  if (step && !AUTH_STEPS[step]) step = undefined;
+  authReturnFocus = document.activeElement;
+  authOverlay.classList.remove('closing');
   authOverlay.classList.add('open');
-  signupView.style.display = view === 'login' ? 'none' : 'block';
-  loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
+  otpChallenge = null;
 
-  /* Always open on the credentials step. Without this, closing the modal
-     mid-OTP and reopening it would show a code box for a challenge that is no
-     longer in flight. */
-  showCredsStep();
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  setModalMsg(document.getElementById('signupMsg'), '', 'muted');
-
-  if (view === 'login') {
-    /* Remember Me: the address comes back, the password never does. */
-    const remembered = localStorage.getItem(CUSTOMER_KEYS.remember);
-    if (remembered) {
-      document.getElementById('liUser').value = remembered;
-      document.getElementById('liRemember').checked = true;
-    }
-    /* Land on whichever field still needs filling in. */
-    const first = remembered ? 'liPass' : 'liUser';
-    document.getElementById(first).focus();
+  /* Remember Me gives back the address, never the password. With one on file
+     the email step has nothing left to ask, so it is skipped. */
+  const remembered = localStorage.getItem(CUSTOMER_KEYS.remember);
+  if (!step && remembered) {
+    document.getElementById('liUser').value = remembered;
+    document.getElementById('liRemember').checked = true;
+    showStep('password');
     return;
   }
-  const firstInput = signupView.querySelector('input');
-  if (firstInput) firstInput.focus();
+  if (remembered) {
+    document.getElementById('authEmail').value = remembered;
+    document.getElementById('liRemember').checked = true;
+  }
+  showStep(step || 'email');
 }
+
 function closeAuth() {
-  authOverlay.classList.remove('open');
-  document.body.style.overflow = '';
+  /* Animate out, then hide. The class is removed on transitionend rather than
+     a timer so the two cannot drift apart if the duration changes in CSS. */
+  authOverlay.classList.add('closing');
+  const done = () => {
+    authOverlay.classList.remove('open', 'closing');
+    document.body.style.overflow = '';
+    authOverlay.removeEventListener('transitionend', done);
+  };
+  authOverlay.addEventListener('transitionend', done);
+  /* Belt and braces: if the overlay has no transition (reduced motion),
+     transitionend never fires. */
+  setTimeout(done, 300);
+
+  otpChallenge = null;
+  clearFieldErrors();
+  if (authReturnFocus && document.contains(authReturnFocus)) authReturnFocus.focus();
+  authReturnFocus = null;
 }
+
+/* --- focus trap -----------------------------------------------------------
+   Tab must not walk out of a modal dialog and start operating the page behind
+   it, which is still there and still clickable to a screen reader otherwise. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+authOverlay.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || !authOverlay.classList.contains('open')) return;
+  const items = Array.from(authCard.querySelectorAll(FOCUSABLE))
+    .filter(el => el.offsetParent !== null);        // visible only
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+/* --- entry points --------------------------------------------------------- */
 document.querySelectorAll('[data-auth]').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
-    /* This used to forward a signed-in MERCHANT straight to their workspace,
-       because "Login" was the merchant login. It is the customer login now, so
-       a partner session is none of its business: forwarding a traveller's click
-       into the Merchant Portal — just because someone at that desk had signed
-       in earlier on the same browser — is the wrong product entirely.
-       The two namespaces stay separate; My Partner is the merchant's route. */
+    /* A partner session is none of this modal's business: forwarding a
+       traveller's click into the Merchant Portal — just because someone at
+       that desk signed in earlier on the same browser — is the wrong product.
+       My Partner is the merchant's route. */
     const { access } = getStoredAuth();
     if (access) {
-      /* Signed in, so the "Sign Up" slot is the sign-out. (The old `role ===
-         'admin'` branch that forwarded to admin/ is gone with the shared jwt_*
-         namespace: this page only ever holds a customer session now, and the
-         Admin Portal is named nowhere on the public site.) */
+      /* Signed in, so the "Sign Up" slot is the sign-out. */
       if (el.dataset.auth === 'signup') {
         axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
         clearStoredAuth();
@@ -899,13 +1207,86 @@ document.querySelectorAll('[data-auth]').forEach(el => {
       }
       return;
     }
-    openAuth(el.dataset.auth);
+    /* BOTH buttons open the same modal at the same step. Which one was
+       pressed no longer decides anything — the email does. */
+    openAuth();
   });
 });
+
+/* In-modal navigation: Change, Forgot Password, Create your account, Back. */
+authOverlay.addEventListener('click', e => {
+  const target = e.target.closest('[data-step]');
+  if (!target) return;
+  e.preventDefault();
+  const next = target.dataset.step;
+  /* Carry the address forward so it is never typed twice. */
+  if (next === 'signup') document.getElementById('suEmail').value = currentAuthEmail();
+  if (next === 'password') document.getElementById('liUser').value = currentAuthEmail();
+  if (next === 'forgot') document.getElementById('fpEmail').value = currentAuthEmail();
+  if (next === 'email') document.getElementById('authEmail').value = currentAuthEmail();
+  showStep(next);
+});
+
+/** Whichever step holds the address the traveller has given us. */
+function currentAuthEmail() {
+  const ids = ['authEmail', 'liUser', 'suEmail', 'fpEmail'];
+  for (const id of ids) {
+    const v = (document.getElementById(id) || {}).value;
+    if (v && v.trim()) return v.trim();
+  }
+  return '';
+}
+
 authCloseBtn.addEventListener('click', closeAuth);
 authOverlay.addEventListener('click', e => { if (e.target === authOverlay) closeAuth(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
+});
+
+/* --- step 1: the email ---------------------------------------------------- */
+document.getElementById('authEmailForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) return setFieldError('authEmail', 'Enter your email address.');
+  if (!isEmail(email)) return setFieldError('authEmail', 'That does not look like an email address.');
+  setFieldError('authEmail', '');
+
+  /* Straight to the password step. If they have no account they take the
+     "Create your account" link below it, which carries this address across. */
+  document.getElementById('liUser').value = email;
+  document.getElementById('suEmail').value = email;
+  showStep('password');
+});
+
+/* --- forgot password ------------------------------------------------------
+   Finishes on customer/reset-password.html, because the API issues a link
+   token rather than a code. The response is deliberately the same whether or
+   not the address is registered, and this shows it verbatim. */
+document.getElementById('forgotForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('fpEmail').value.trim();
+  const msg = document.getElementById('fpMsg');
+  const dev = document.getElementById('fpDevLink');
+  dev.textContent = '';
+  if (!email) return setFieldError('fpEmail', 'Enter your email address.');
+  if (!isEmail(email)) return setFieldError('fpEmail', 'That does not look like an email address.');
+  setFieldError('fpEmail', '');
+
+  setModalMsg(msg, 'Sending…', 'muted');
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/customer/auth/forgot-password`, { email });
+    setModalMsg(msg, data.message || 'If an account exists for that email, a reset link is on its way.', 'ok');
+    /* Debug builds return the link so a reset can be tested without SMTP. */
+    if (data.reset_link) {
+      const a = document.createElement('a');
+      a.href = data.reset_link;
+      a.textContent = 'Open the reset link (debug)';
+      a.className = 'modal-devlink';
+      dev.appendChild(a);
+    }
+  } catch (err) {
+    setModalMsg(msg, apiErrorText(err, 'We could not send a reset link just now.'), 'error');
+  }
 });
 
 /* Where a MERCHANT lands once signed in. The sign-in itself lives on
@@ -945,18 +1326,14 @@ function setModalMsg(el, text, tone) {
 let otpChallenge = null;
 let otpOrigin = 'login';
 
-const loginStepCreds = document.getElementById('loginStepCreds');
-const loginStepOtp = document.getElementById('loginStepOtp');
-
 /** Move the login view to its code step. Signup borrows this too, which is why
  *  it makes sure the LOGIN view is the one on screen. */
 function showOtpStep(challenge, message, origin) {
   otpChallenge = challenge.challenge_token;
   otpOrigin = origin;
-  signupView.style.display = 'none';
-  loginView.style.display = 'block';
-  loginStepCreds.style.display = 'none';
-  loginStepOtp.style.display = 'block';
+  /* keepMessage: the step machine would otherwise wipe the line the server
+     just gave us, which on this step is the whole instruction. */
+  showStep('otp', { keepMessage: true });
   document.getElementById('loginOtpSub').textContent = message;
   setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
   showDevOtp(challenge.dev_otp);
@@ -979,9 +1356,11 @@ function showDevOtp(code) {
 /** Back to the credentials step, dropping the challenge. */
 function showCredsStep() {
   otpChallenge = null;
-  loginStepOtp.style.display = 'none';
-  loginStepCreds.style.display = 'block';
   document.getElementById('liOtp').value = '';
+  /* Back to whichever form started the challenge, so "use a different
+     account" after a signup does not dump the traveller on a login form
+     they never asked for. */
+  showStep(otpOrigin === 'signup' ? 'signup' : 'password');
 }
 
 /** The one place a customer session is created. */
@@ -991,8 +1370,15 @@ function completeCustomerSignIn(data) {
                 'customer', c.id);
   otpChallenge = null;
   renderAuthNav();
-  showCredsStep();
   closeAuth();
+  /* Reset to the first step for next time, AFTER closing — doing it before
+     would flash the email form as the modal fades out. */
+  showStep('email');
+
+  /* If the traveller was stopped mid-search, resume it. The greeting is
+     skipped in that case: they are already navigating away, and a toast that
+     outlives its page is just a flicker. */
+  if (typeof resumePendingSearch === 'function' && resumePendingSearch()) return;
   showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
 }
 
@@ -1005,18 +1391,20 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   const pass = document.getElementById('suPass').value;
   const pass2 = document.getElementById('suPass2').value;
   const msg = document.getElementById('signupMsg');
-  const fail = (text, focus) => {
-    setModalMsg(msg, text, 'error');
-    document.getElementById(focus)?.focus();
-  };
 
-  /* Checked here only so the traveller is told which field is wrong and lands
-     in it. The server validates all of this again — it is the authority. */
-  if (name.length < 2) return fail('Please enter your full name.', 'suName');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid email address.', 'suEmail');
-  if (!/^\d{10,15}$/.test(mobile.replace(/[\s-]/g, ''))) return fail('Please enter a valid mobile number.', 'suMobile');
-  if (pass.length < 8) return fail('Your password must be at least 8 characters.', 'suPass');
-  if (pass !== pass2) return fail('Both passwords must match.', 'suPass2');
+  /* Inline, beside the field, never in an alert. Checked here only so the
+     traveller is told which field is wrong and lands in it — the server
+     validates all of this again and is the authority. */
+  clearFieldErrors();
+  if (name.length < 2) return setFieldError('suName', 'Enter your full name.');
+  if (!isEmail(email)) return setFieldError('suEmail', 'That does not look like an email address.');
+  if (!isMobile(mobile)) return setFieldError('suMobile', 'Enter a valid mobile number, 10 to 15 digits.');
+  if (pass.length < 8) return setFieldError('suPass', 'Use at least 8 characters.');
+  if (passwordScore(pass) < 2) {
+    return setFieldError('suPass',
+      'Mix in a capital, a number or a symbol — this one is too easy to guess.');
+  }
+  if (pass !== pass2) return setFieldError('suPass2', 'Both passwords must match.');
 
   setModalMsg(msg, 'Creating your account…', 'muted');
   try {

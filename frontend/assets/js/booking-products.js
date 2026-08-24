@@ -186,10 +186,22 @@ const BookingProducts = (function () {
     const needsPassport = ctx =>
       o.passport && !!(typeof BookingApi !== 'undefined' && BookingApi.isInternational(ctx.item));
 
+    /** A traveller counts as complete once the fields the airline actually
+     *  needs are on the draft — the same set validate() enforces, checked
+     *  here only to decide what the status pill says. */
+    function paxComplete(ctx, i, intl) {
+      const p = (ctx.passengers && ctx.passengers[i]) || {};
+      if (!p.first || !p.last || !p.gender) return false;
+      if (intl && (!p.passportNumber || !p.passportExpiry)) return false;
+      return true;
+    }
+
     function cardHtml(i, ctx) {
       const kind = (ctx.paxKinds && ctx.paxKinds[i]) || 'Adult';
       const intl = needsPassport(ctx);
       const p = `p${i}_`;
+      const open = !!(ctx.paxOpen && ctx.paxOpen[i]);
+      const complete = paxComplete(ctx, i, intl);
 
       const passportBody = `
         <p class="bk-disclose-note" id="${p}ppnote" role="status" aria-live="polite"></p>
@@ -197,27 +209,34 @@ const BookingProducts = (function () {
 
       const ffBody = `<div class="bk-grid">${frequentFlyerSpecs(i).map(field).join('')}</div>`;
 
-      return `<section class="bk-pax" data-pax="${i}">
+      return `<section class="bk-pax ${open ? 'is-open' : ''}" data-pax="${i}">
         <header class="bk-pax-head">
-          <h3>${esc(o.noun)} ${i + 1} <span class="bk-tag">${esc(kind)}</span></h3>
-          ${i === 0 ? '<span class="bk-pax-note">Contact details for the whole booking</span>' : ''}
+          <button type="button" class="bk-pax-toggle" data-pax-toggle="${i}"
+                  aria-expanded="${open}" aria-controls="pax${i}-body">
+            <span class="bk-pax-chev" aria-hidden="true">${icon('arrowUp')}</span>
+            <h3>${esc(o.noun)} ${i + 1} <span class="bk-tag">${esc(kind)}</span></h3>
+          </button>
+          <span class="bk-pax-status ${complete ? 'is-done' : ''}">${complete ? '&#10003; Details completed' : 'Details required'}</span>
           ${i > 0 ? `<button type="button" class="bk-pax-remove" data-remove="${i}"
                        aria-label="Remove ${esc(o.noun)} ${i + 1}">Remove</button>` : ''}
         </header>
 
-        <div class="bk-grid">${primarySpecs(i, o).map(field).join('')}</div>
+        <div class="bk-pax-body" id="pax${i}-body" ${open ? '' : 'hidden'}>
+          ${i === 0 ? '<p class="bk-pax-note">Contact details for the whole booking</p>' : ''}
+          <div class="bk-grid">${primarySpecs(i, o).map(field).join('')}</div>
 
-        ${o.frequentFlyer ? disclosure(
-          `${p}ff`, 'Frequent flyer number', 'Avail extra benefits & earn points', ffBody
-        ) : ''}
+          ${o.frequentFlyer ? disclosure(
+            `${p}ff`, 'Frequent flyer number', 'Avail extra benefits & earn points', ffBody
+          ) : ''}
 
-        ${o.passport ? `
-          <div class="bk-subcard">
-            <h4 class="bk-subcard-title">OTHER DETAILS</h4>
-            ${disclosure(`${p}pp`, 'Passport details',
-              intl ? 'Required for international travel' : 'Optional for domestic travel',
-              passportBody, { open: intl })}
-          </div>` : ''}
+          ${o.passport ? `
+            <div class="bk-subcard">
+              <h4 class="bk-subcard-title">OTHER DETAILS</h4>
+              ${disclosure(`${p}pp`, 'Passport details',
+                intl ? 'Required for international travel' : 'Optional for domestic travel',
+                passportBody, { open: intl })}
+            </div>` : ''}
+        </div>
       </section>`;
     }
 
@@ -232,6 +251,12 @@ const BookingProducts = (function () {
           ctx.paxKinds = Array.from({ length: Math.max(1, ctx.paxCount || 1) }, () => 'Adult');
         }
         ctx.paxCount = ctx.paxKinds.length;
+        /* Traveller 1 opens by default — there is always something to fill in.
+           Anyone already in the party beyond that starts collapsed, per the
+           reference; a traveller added just now via "+ Add" opens instead
+           (that push happens in mount(), not here). */
+        if (!Array.isArray(ctx.paxOpen)) ctx.paxOpen = [];
+        ctx.paxKinds.forEach((_, i) => { if (ctx.paxOpen[i] === undefined) ctx.paxOpen[i] = i === 0; });
 
         const cards = ctx.paxKinds.map((_, i) => cardHtml(i, ctx)).join('');
         const intl = needsPassport(ctx);
@@ -246,9 +271,9 @@ const BookingProducts = (function () {
             travel date.</p>` : ''}
           <div id="bkPaxList">${cards}</div>
           ${canAdd ? `<div class="bk-addpax">
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddAdult">+ ADD NEW ADULT</button>
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddChild">+ Add child</button>
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddInfant">+ Add infant</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddAdult">+ Add Adult</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddChild">+ Add Child</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddInfant">+ Add Infant</button>
           </div>` : ''}
           <label class="bk-check bk-savelist">
             <input type="checkbox" id="bkSaveTravellers" ${ctx.saveTravellers ? 'checked' : ''}>
@@ -270,6 +295,16 @@ const BookingProducts = (function () {
             panel.hidden = !open;
             btn.setAttribute('aria-expanded', String(open));
             wrap.querySelector('.bk-disclose-sign').innerHTML = open ? '&minus;' : '+';
+          });
+        });
+
+        /* --- collapse/expand a whole traveller card --- */
+        root.querySelectorAll('[data-pax-toggle]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.paxToggle);
+            readInto(ctx, root);                 // keep what is on screen in every card
+            ctx.paxOpen[i] = !ctx.paxOpen[i];
+            BookingFlow.repaint();
           });
         });
 
@@ -328,6 +363,7 @@ const BookingProducts = (function () {
         const add = kind => {
           readInto(ctx, root);                 // keep what is on screen
           ctx.paxKinds.push(kind);
+          ctx.paxOpen.push(true);              // open the one just added — it's empty
           ctx.paxCount = ctx.paxKinds.length;
           BookingFlow.repaint();
         };
@@ -344,6 +380,7 @@ const BookingProducts = (function () {
             const i = Number(btn.dataset.remove);
             ctx.paxKinds.splice(i, 1);
             (ctx.passengers || []).splice(i, 1);
+            if (Array.isArray(ctx.paxOpen)) ctx.paxOpen.splice(i, 1);
             /* A seat belonged to the traveller who just left, not to the
                position, so drop it rather than shifting it onto someone else. */
             if (Array.isArray(ctx.seats)) ctx.seats.splice(i, 1);
@@ -367,8 +404,20 @@ const BookingProducts = (function () {
           const el = root.querySelector('#' + id);
           if (el) {
             el.classList.add('is-invalid');
-            /* Open the panel the bad field is in, or the traveller is told to
-               fix something they cannot see. */
+            /* Open the traveller card itself first — a field inside a
+               collapsed card cannot be focused at all — then the disclosure
+               panel inside it, or the traveller is told to fix something
+               they cannot see. */
+            const card = el.closest('.bk-pax');
+            const body = card && card.querySelector('.bk-pax-body');
+            if (body && body.hidden) {
+              body.hidden = false;
+              card.classList.add('is-open');
+              const toggle = card.querySelector('.bk-pax-toggle');
+              if (toggle) toggle.setAttribute('aria-expanded', 'true');
+              const i = card.dataset.pax;
+              if (i != null && ctx.paxOpen) ctx.paxOpen[i] = true;
+            }
             const panel = el.closest('.bk-disclose-panel');
             if (panel && panel.hidden) {
               const wrap = panel.closest('.bk-disclose');
@@ -586,11 +635,10 @@ const BookingProducts = (function () {
           a => a.passengerIndex == null && a.per !== 'passenger');
 
         const travellers = (ctx.passengers || []).map((p, i) => {
-          const seat = ctx.seats && ctx.seats[i];
           const mine = addonsFor(i);
+          /* Seats get their own dedicated panel below (flights only), so this
+             card stays about who the traveller is, not where they sit. */
           const rows = [
-            ['Seat', seat ? `${esc(seat.id)} — ${seat.price ? esc(money(seat.price)) : 'No extra charge'}`
-                          : 'Assigned at check-in'],
             ...mine.map(a => [a.group === 'meal' ? 'Meal' : a.group === 'baggage' ? 'Baggage' : 'Service',
                               `${esc(a.name)} — ${a.price ? esc(money(a.price)) : 'Free'}`]),
           ];
@@ -630,17 +678,33 @@ const BookingProducts = (function () {
             <p class="bk-step-sub">Nothing is charged until you confirm on the next step.</p>
 
             <section class="bk-panel">
-              <div class="bk-panel-head"><h3>Journey details</h3></div>
+              <div class="bk-panel-head"><h3>${ctx.kind === 'flight' ? 'Flight' : 'Journey details'}</h3></div>
               ${describe(ctx)}
             </section>
 
             <section class="bk-panel">
               <div class="bk-panel-head">
                 <h3>${esc(ctx.passengers.length)} ${ctx.passengers.length === 1 ? 'traveller' : 'travellers'}</h3>
-                ${edit('travellers', 'travellers')}${edit('seats', 'seats')}
+                ${edit('travellers', 'travellers')}
               </div>
               <div class="bk-review-paxlist">${travellers}</div>
             </section>
+
+            ${ctx.kind === 'flight' ? `
+            <section class="bk-panel">
+              <div class="bk-panel-head"><h3>Seats</h3>${edit('seats', 'seats')}</div>
+              <div class="bk-review-seats">
+                ${(ctx.passengers || []).map((p, i) => {
+                  const seat = ctx.seats && ctx.seats[i];
+                  return `<div class="bk-review-seat">
+                      <span>Traveller ${i + 1}</span>
+                      ${seat
+                        ? `<b>${esc(seat.id)}</b><span>${seat.price ? esc(money(seat.price)) : 'No extra charge'}</span>`
+                        : '<span class="is-muted">Assigned at check-in</span>'}
+                    </div>`;
+                }).join('')}
+              </div>
+            </section>` : ''}
 
             <section class="bk-panel">
               <div class="bk-panel-head"><h3>Add-ons</h3>${edit('addons', 'add-ons')}</div>
@@ -866,10 +930,10 @@ const BookingProducts = (function () {
             </section>
 
             <div class="bk-done-actions">
-              <button type="button" class="bk-btn bk-btn-primary" data-act="download">Download ticket</button>
-              <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>
+              <a class="bk-btn bk-btn-primary" href="my-bookings.html">View booking</a>
+              <button type="button" class="bk-btn bk-btn-ghost" data-act="download">Download ticket</button>
               <button type="button" class="bk-btn bk-btn-ghost" data-act="email">Email ticket</button>
-              <a class="bk-btn bk-btn-ghost" href="my-bookings.html">View my bookings</a>
+              <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>
             </div>
             <p class="bk-demo-foot">${b.demo === false
               ? 'No payment gateway is connected, so nothing has been charged and no ticket has been issued by an airline yet. Your booking reference above is real and can be quoted to support.'

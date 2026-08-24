@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260824bk9">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260824bk11">
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260824bk9">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
@@ -48,6 +48,12 @@
       </div>
       <span class="tx-sample" title="Replaced automatically when the Hotel API is connected">Sample rates</span>
     </div>
+    <!-- Rendered by hotel-search.js from the hotel catalogue, so the
+         destination list cannot drift from what is bookable. -->
+    <div class="tx-search-panel" id="txSearchPanel"></div>
+
+    <div class="tx-toolbar" id="txResults"></div>
+
     <div class="tx-grid" id="txHotelGrid"></div>
   </section>
 </main>
@@ -66,10 +72,12 @@
 <script src="assets/js/booking-api.js?v=20260824bk9"></script>
 <script src="assets/js/booking-data.js?v=20260824bk9"></script>
 <script src="assets/js/booking-store.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flow.js?v=20260824bk9"></script>
-<script src="assets/js/booking-products.js?v=20260824bk9"></script>
+<script src="assets/js/booking-flow.js?v=20260824bk11"></script>
+<script src="assets/js/booking-products.js?v=20260824bk11"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flows.js?v=20260824bk9"></script>
+<script src="assets/js/booking-flows.js?v=20260824bk11"></script>
+<script src="assets/js/search-widgets.js?v=20260824sw2"></script>
+<script src="assets/js/hotel-search.js?v=20260824bk9"></script>
 <script src="assets/js/travel-explore.js?v=20260824bk9"></script>
 <script src="assets/js/jp-icons.js?v=20260824bk9"></script>
 <script src="assets/js/service-shell.js?v=20260824bk9"></script>

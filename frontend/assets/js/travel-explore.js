@@ -47,6 +47,8 @@ const TravelExplore = (function () {
   }
 
   let flights = [];
+  let allHotels = [];
+  let allPackages = [];
   /* The rendered rows, kept so a Book Now click can find the object it belongs
      to. Reading the item back out of the DOM would mean re-parsing formatted
      prices, which is how a booking ends up costing "₹12,500" the string. */
@@ -356,9 +358,70 @@ const TravelExplore = (function () {
   /* ---------------------------------------------------------------------
      Hotels / cruises / packages
      --------------------------------------------------------------------- */
-  function renderHotels(rows) {
+  /** Hotels matching the destination the traveller searched for.
+   *
+   *  Matched against `location` ("Banjara Hills, Hyderabad") as a substring,
+   *  which is as much as the sample data supports — there is no city field to
+   *  match exactly and inventing one here would be guessing. Phase 4's
+   *  destination search is where this becomes a real lookup over cities,
+   *  areas and landmarks.
+   *
+   *  An unmatched destination returns nothing rather than everything: showing
+   *  Hyderabad hotels to somebody who asked for Goa is worse than saying we
+   *  have none, because they would have to notice for themselves. */
+  function hotelsMatching(rows, dest) {
+    if (!dest) return rows;
+    const needle = dest.trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter(h => String(h.location || '').toLowerCase().includes(needle)
+                         || String(h.name || '').toLowerCase().includes(needle));
+  }
+
+  /** Destination and nightly rate together — the two things the panel filters
+   *  on. Kept beside hotelsMatching so "what a hotel search means" is one
+   *  place rather than spread between here and the panel. */
+  function hotelsFiltered(rows) {
+    let out = hotelsMatching(rows, state.dest);
+    if (state.priceRange && state.priceRange !== 'any' && typeof HotelSearch !== 'undefined') {
+      out = out.filter(h => HotelSearch.inPriceBand(h.pricePerNight, state.priceRange));
+    }
+    return out;
+  }
+
+  function renderHotels(all) {
     const el = $('txHotelGrid');
     if (!el) return;
+    allHotels = all;
+    const dest = state.dest || '';
+    const priced = state.priceRange && state.priceRange !== 'any';
+    const rows = hotelsFiltered(all);
+
+    const head = $('txHotelsHead');
+    if (head) head.textContent = dest ? `Stays in ${dest}` : 'Hotels near the airport';
+
+    if (!rows.length) {
+      catalogue.hotel = [];
+      /* Say which filter emptied the list. "No results" leaves the traveller
+         guessing whether it was the city or the price band. */
+      const because = dest && priced ? `in ${esc(dest)} in that price range`
+                    : dest ? `in ${esc(dest)}`
+                    : 'in that price range';
+      el.innerHTML = `<div class="tx-empty">
+        <b>No stays ${because}</b>
+        Try another destination or a wider price range, or browse everything we do have.
+        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllHotels">Show all hotels</button>
+      </div>`;
+      const btn = $('txShowAllHotels');
+      if (btn) btn.addEventListener('click', () => {
+        state.dest = '';
+        state.priceRange = 'any';
+        state.seededFromUrl = false;
+        if (typeof HotelSearch !== 'undefined') HotelSearch.mount();
+        renderHotels(all);
+      });
+      return;
+    }
+
     catalogue.hotel = rows;
     el.innerHTML = rows.map(h => `<article class="tx-card">
       <div class="tx-media">${hotelImage(h)}
@@ -401,9 +464,47 @@ const TravelExplore = (function () {
     armIcons(el);
   }
 
-  function renderPackages(rows) {
+  function renderPackages(all) {
     const el = $('txPackageGrid');
     if (!el) return;
+    allPackages = all;
+    const live = typeof PackageSearch !== 'undefined';
+    const rows = live ? all.filter(p => PackageSearch.matches(p)) : all;
+
+    const head = $('txPkgHead');
+    if (head) {
+      head.textContent = state.pkgDest ? `Tour packages — ${state.pkgDest}` : 'Curated tour packages';
+    }
+
+    if (!rows.length) {
+      catalogue.package = [];
+      /* Name the filter that emptied it. With one shared departure calendar
+         a month with no Saturdays in it is the usual culprit, and "no
+         results" would leave that a mystery. */
+      const bits = [];
+      if (state.pkgDest) bits.push(`to ${esc(state.pkgDest)}`);
+      if (state.pkgMonth && state.pkgMonth !== 'any' && live) {
+        bits.push(`departing in ${esc(PackageSearch.monthLabel(state.pkgMonth))}`);
+      }
+      if (state.pkgBudget && state.pkgBudget !== 'any') bits.push('in that budget');
+      if (state.pkgDuration && state.pkgDuration !== 'any') bits.push('of that length');
+      el.innerHTML = `<div class="tx-empty">
+        <b>No packages ${bits.length ? bits.join(', ') : 'match that'}</b>
+        Try a different month, a wider budget or another destination.
+        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllPkgs">Show all packages</button>
+      </div>`;
+      const btn = $('txShowAllPkgs');
+      if (btn) btn.addEventListener('click', () => {
+        state.pkgDest = '';
+        state.pkgMonth = 'any';
+        state.pkgBudget = 'any';
+        state.pkgDuration = 'any';
+        if (live) PackageSearch.mount();
+        renderPackages(all);
+      });
+      return;
+    }
+
     catalogue.package = rows;
     el.innerHTML = rows.map(p => `<article class="tx-card">
       <div class="tx-media">${sceneSvg('package', p.name)}
@@ -430,73 +531,99 @@ const TravelExplore = (function () {
      It filters the SAME client-side result set the facets do. When the live
      endpoint lands, `submit` becomes a call with these values instead — the
      rendering below it does not change either way. */
-  function mountSearch() {
-    const panel = $('txSearchPanel');
-    if (!panel) return;
+  /** Turn the current `state` into rendered results.
+   *
+   *  Shared by the Search button and by a search arriving in the URL, so the
+   *  two cannot drift — landing-page criteria produce exactly the result set
+   *  the button would have produced from the same values. */
+  function applySearch() {
+    /* Destination narrows the facet set, which is what "search" means
+       against a client-side result list. */
+    state.dests = state.to ? new Set([state.to]) : new Set();
+    state.shown = PAGE_SIZE;
+    renderFilters();
+    renderFlights();
+  }
 
-    const codes = Object.keys(TravelData.airports);
-    const opt = (c, sel) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${
-      esc(TravelData.airports[c].city)} (${esc(c)})</option>`;
-    const today = new Date().toISOString().slice(0, 10);
+  /** The search panel lives in flight-search.js.
+   *
+   *  Criteria and results were one 60-line function that rendered eight
+   *  controls and read them back; they are two files now. This one owns
+   *  RESULTS and hands the panel a callback — the panel validates, writes the
+   *  shared `state`, and says "go". Neither has to know how the other works,
+   *  which is what let the panel grow an airport picker, a calendar and a
+   *  traveller popup without this file changing shape.
+   *
+   *  Falls back to nothing if the module is absent rather than throwing: the
+   *  results list below still renders, which is more useful than a blank page.
+   */
+  /** The Packages panel.
+   *
+   *  The landing page speaks a different dialect: its Month is a bare name
+   *  ("July") and its Tour Package Type is a category, not a destination.
+   *  Both are translated here into what the panel uses — a real departure
+   *  month key, and a destination only when it names a package we sell.
+   *  Anything that does not translate is dropped rather than guessed at. */
+  async function mountPackageSearch(rows) {
+    if (typeof PackageSearch === 'undefined') return;
 
-    panel.innerHTML = `
-      <div class="tx-trip">
-        <label class="tx-radio"><input type="radio" name="txTrip" value="oneway" checked> <span>One way</span></label>
-        <label class="tx-radio"><input type="radio" name="txTrip" value="round"> <span>Round trip</span></label>
-      </div>
-      <div class="tx-searchgrid">
-        <div class="tx-sf"><label for="txFrom">From</label>
-          <select id="txFrom">${codes.map(c => opt(c, 'HYD')).join('')}</select></div>
-        <div class="tx-sf"><label for="txTo">To</label>
-          <select id="txTo"><option value="">Anywhere</option>${codes.filter(c => c !== 'HYD').map(c => opt(c)).join('')}</select></div>
-        <div class="tx-sf"><label for="txDepart">Departure</label>
-          <input id="txDepart" type="date" value="${esc(today)}" min="${esc(today)}"></div>
-        <div class="tx-sf" id="txReturnWrap" hidden><label for="txReturn">Return</label>
-          <input id="txReturn" type="date" min="${esc(today)}"></div>
-        <div class="tx-sf"><label for="txAdults">Adults</label>
-          <select id="txAdults">${[1,2,3,4,5,6].map(n => `<option${n === 1 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
-        <div class="tx-sf"><label for="txChildren">Children</label>
-          <select id="txChildren">${[0,1,2,3,4].map(n => `<option${n === 0 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
-        <div class="tx-sf"><label for="txInfants">Infants</label>
-          <select id="txInfants">${[0,1,2].map(n => `<option${n === 0 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
-        <div class="tx-sf"><label for="txCabin">Cabin</label>
-          <select id="txCabin">${BookingData.CABIN_CLASSES.map(c =>
-            `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join('')}</select></div>
-        <button type="button" class="tx-btn tx-btn-primary tx-searchgo" id="txSearchGo">Search flights</button>
-      </div>`;
+    if (state.pkgType && !state.pkgDest) {
+      const hit = rows.find(p => p.name.toLowerCase() === String(state.pkgType).toLowerCase());
+      if (hit) state.pkgDest = hit.name;
+    }
 
-    panel.querySelectorAll('input[name="txTrip"]').forEach(r => r.addEventListener('change', () => {
-      state.trip = r.value;
-      /* The return field is hidden rather than disabled so a one-way search
-         cannot silently carry a stale return date into the booking. */
-      $('txReturnWrap').hidden = r.value !== 'round';
-      if (r.value !== 'round') $('txReturn').value = '';
-    }));
+    await PackageSearch.init(state, rows, req => {
+      state.pkgDest = req.destination || '';
+      state.pkgMonth = req.departureMonth || 'any';
+      state.pkgBudget = req.budget;
+      state.pkgDuration = req.duration;
+      state.pkgTravellers = req.travellers;
+      renderPackages(allPackages.length ? allPackages : rows);
+      $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
-    $('txSearchGo').addEventListener('click', () => {
-      state.from = $('txFrom').value;
-      state.to = $('txTo').value;
-      state.depart = $('txDepart').value;
-      state.ret = $('txReturn').value;
-      state.cabin = $('txCabin').value;
-      state.pax = {
-        adults: Number($('txAdults').value) || 1,
-        children: Number($('txChildren').value) || 0,
-        infants: Number($('txInfants').value) || 0,
-      };
-      if (state.pax.infants > state.pax.adults) {
-        showToast('Each infant must travel with an adult.', true);
-        return;
-      }
-      /* Destination narrows the facet set, which is what "search" means
-         against a client-side result list. */
-      state.dests = state.to ? new Set([state.to]) : new Set();
-      state.shown = PAGE_SIZE;
-      renderFilters();
-      renderFlights();
+    /* A month NAME from the hero becomes the first real departure month that
+       matches it; if nothing departs then, the filter is left off rather than
+       silently emptying the page. */
+    if (state.pkgMonth && !/^\d{4}-\d{2}$/.test(state.pkgMonth) && state.pkgMonth !== 'any') {
+      const wanted = String(state.pkgMonth).toLowerCase();
+      const match = PackageSearch.availableMonths()
+        .find(k => PackageSearch.monthLabel(k).toLowerCase().startsWith(wanted));
+      state.pkgMonth = match || 'any';
+      PackageSearch.mount();
+    }
+  }
+
+  /** The Hotels panel, same arrangement as Flights: it owns the criteria and
+   *  hands back a request; this file re-filters and re-renders. Absent module
+   *  means no panel and the plain list, rather than a broken page. */
+  function mountHotelSearch(rows) {
+    if (typeof HotelSearch === 'undefined') return;
+    HotelSearch.init(state, rows, req => {
+      state.dest = req.destination;
+      state.checkIn = req.checkIn;
+      state.checkOut = req.checkOut;
+      state.rooms = req.rooms;
+      state.guests = req.adults + req.children;
+      state.priceRange = req.priceRange;
+      renderHotels(allHotels.length ? allHotels : rows);
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
+
+  function mountSearch() {
+    if (typeof FlightSearch === 'undefined') return;
+    FlightSearch.init(state, req => {
+      /* The request names cabin as cabinClass and the party as separate
+         counts; `state` is already written by the panel, so this only has to
+         mirror the couple of fields the renderers read under other names. */
+      state.cabin = req.cabinClass;
+      state.pax = { adults: req.adults, children: req.children, infants: req.infants };
+      applySearch();
+      $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
 
   function bind() {
     const search = $('txSearch');
@@ -586,11 +713,99 @@ const TravelExplore = (function () {
      <body data-sp-service="flights">, and only that source is fetched — a
      hotels page must not call the flight API, and once each service has its own
      backend that would be three pointless round-trips per visit. */
+  /* ---------------------------------------------------------------------
+     Criteria arriving from the landing page.
+
+     The hero search cannot answer a query itself, so it collects the criteria
+     and sends them here in the URL. Seeding `state` before the panel mounts is
+     what makes the results page open ALREADY showing what was asked for —
+     nobody types their route twice.
+
+     Unknown or malformed values are ignored rather than trusted: this is a URL
+     anyone can edit, and `state` drives what gets booked.
+     --------------------------------------------------------------------- */
+  function seedFromUrl() {
+    const q = new URLSearchParams(location.search);
+    if (![...q.keys()].length) return false;
+
+    const str = (key, max) => {
+      const v = (q.get(key) || '').trim();
+      return v && v.length <= (max || 60) ? v : '';
+    };
+    const int = (key, lo, hi, dflt) => {
+      const n = parseInt(q.get(key), 10);
+      return Number.isFinite(n) && n >= lo && n <= hi ? n : dflt;
+    };
+    /* Dates are compared as strings elsewhere, so anything that is not a plain
+       ISO day is dropped rather than half-parsed. */
+    const day = key => (/^\d{4}-\d{2}-\d{2}$/.test(q.get(key) || '') ? q.get(key) : '');
+
+    let seeded = false;
+    const mark = () => { seeded = true; };
+
+    const trip = str('trip');
+    if (trip === 'oneway' || trip === 'round' || trip === 'multi') { state.trip = trip; mark(); }
+    const from = str('from', 40); if (from) { state.from = from.toUpperCase(); mark(); }
+    const to = str('to', 40);     if (to)   { state.to = to.toUpperCase(); mark(); }
+    const dep = day('depart');    if (dep)  { state.depart = dep; mark(); }
+    const ret = day('ret');       if (ret)  { state.ret = ret; state.trip = 'round'; mark(); }
+
+    if (q.has('adults') || q.has('children') || q.has('infants')) {
+      state.pax = {
+        adults: int('adults', 1, 9, state.pax.adults),
+        children: int('children', 0, 8, state.pax.children),
+        infants: int('infants', 0, 8, state.pax.infants),
+      };
+      mark();
+    }
+    const cabin = str('cabin', 20);
+    if (['economy', 'premium-economy', 'premium', 'business', 'first'].includes(cabin)) {
+      /* The hero labels it "Premium Economy"; the booking data calls it
+         'premium'. Normalise here rather than teaching both sides both names. */
+      state.cabin = cabin === 'premium-economy' ? 'premium' : cabin;
+      mark();
+    }
+
+    const dest = str('dest', 80);   if (dest) { state.dest = dest; mark(); }
+    const ci = day('checkIn');      if (ci)   { state.checkIn = ci; mark(); }
+    const co = day('checkOut');     if (co)   { state.checkOut = co; mark(); }
+    if (q.has('guests')) { state.guests = int('guests', 1, 32, state.guests); mark(); }
+    if (q.has('rooms'))  { state.rooms = int('rooms', 1, 4, state.rooms); mark(); }
+
+    const type = str('type', 60);   if (type)  { state.pkgType = type; mark(); }
+    const month = str('month', 20); if (month) { state.pkgMonth = month; mark(); }
+
+    return seeded;
+  }
+
+  /** Placeholder cards in whichever grid this page has. */
+  function showSkeleton(rows) {
+    const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
+    if (!host) return;
+    host.innerHTML = `<div class="tx-skeleton">${
+      Array.from({ length: rows || 4 }, () => `
+        <div class="tx-sk-card">
+          <div class="tx-sk-line w40"></div>
+          <div class="tx-sk-line w70"></div>
+          <div class="tx-sk-line w55"></div>
+        </div>`).join('')
+    }</div>`;
+  }
+
   async function init() {
     const service = document.body.dataset.spService;
     if (ready || !service) return;
     ready = true;
+    /* Before bind() and before the panel mounts, so the controls render
+       already holding the criteria rather than being corrected afterwards. */
+    const seeded = seedFromUrl();
+    state.seededFromUrl = seeded;
     bind();
+    /* Card-shaped placeholders while the catalogue loads. The sample data is
+       instant, so this is usually a single frame — but it is the same await a
+       real endpoint will sit behind, and an empty grid reads as "nothing
+       here" rather than "not yet". */
+    showSkeleton();
     try {
       if (service === 'flights') {
         mountSearch();
@@ -602,14 +817,24 @@ const TravelExplore = (function () {
           sub.textContent = `Schedule for ${fmtDate(flights[0].date)} — non-stop services `
             + 'across India, the Gulf and South-East Asia.';
         }
-        renderFilters();
-        renderFlights();
+        if (state.seededFromUrl) {
+          /* Criteria came from the landing page — show their results, not the
+             whole schedule the traveller did not ask for. */
+          applySearch();
+        } else {
+          renderFilters();
+          renderFlights();
+        }
       } else if (service === 'hotels') {
-        renderHotels(await TravelData.hotels());
+        const rows = await TravelData.hotels();
+        mountHotelSearch(rows);
+        renderHotels(rows);
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
       } else if (service === 'packages') {
-        renderPackages(await TravelData.packages());
+        const rows = await TravelData.packages();
+        await mountPackageSearch(rows);
+        renderPackages(rows);
       }
     } catch (err) {
       const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');

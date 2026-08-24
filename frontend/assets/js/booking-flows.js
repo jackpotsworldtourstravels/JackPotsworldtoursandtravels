@@ -105,7 +105,8 @@ const BookingFlows = (function () {
             return `${i === 3 ? '<span class="bk-aisle"></span>' : ''}
             <button type="button" class="${cls}" data-seat="${esc(s.id)}"
               ${s.occupied ? 'disabled' : ''} aria-label="${esc(label)}">
-              ${esc(s.letter)}</button>`;
+              <span class="bk-seat-letter">${esc(s.letter)}</span>${s.price > 0 && !s.occupied
+                ? `<span class="bk-seat-price">${esc(money(s.price))}</span>` : ''}</button>`;
           }).join('')}
           ${r.exit ? '<span class="bk-exit-tag">Exit</span>' : ''}
         </div>`).join('');
@@ -210,6 +211,7 @@ const BookingFlows = (function () {
       supportsCoupons: true,
       kicker: `${item.origin.code} → ${item.destination.code}`,
       title: `${item.airline} ${item.flightNumber}`,
+      backLabel: 'flight results',
       /* Kept as the offline fallback and the first paint. The server's answer
          below replaces it, and the two agree — customer_pricing_service.py is
          a port of P.flightPrice, verified against it. */
@@ -358,6 +360,7 @@ const BookingFlows = (function () {
       kind: 'hotel',
       kicker: esc(item.location),
       title: item.name,
+      backLabel: 'hotel results',
       price: P.hotelPrice,
       steps: [
         roomStep,
@@ -435,6 +438,7 @@ const BookingFlows = (function () {
       kind: 'cruise',
       kicker: esc(item.route),
       title: item.name,
+      backLabel: 'cruise results',
       price: P.cruisePrice,
       steps: [
         cabinStep,
@@ -507,6 +511,7 @@ const BookingFlows = (function () {
       kind: 'package',
       kicker: `${item.days} days`,
       title: item.name,
+      backLabel: 'tour packages',
       price: P.packagePrice,
       steps: [
         departureStep,
@@ -616,6 +621,7 @@ const BookingFlows = (function () {
       kind: 'visa',
       kicker: 'Visa services',
       title: 'Apply for a visa',
+      backLabel: 'visa services',
       price: P.visaPrice,
       steps: [
         visaTypeStep,
