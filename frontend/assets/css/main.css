@@ -859,3 +859,12 @@ button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offse
   .modal-remember{ gap:8px; }
   .field-locked input{ padding-right:76px !important; }
 }
+
+/* ==========================================================================
+   Password strength readout (signup step of the auth modal)
+   ========================================================================== */
+.pw-strength { margin: 6px 0 0; font-size: 12px; font-weight: 700; }
+.pw-strength:empty { display: none; }
+.pw-strength.is-s0, .pw-strength.is-s1 { color: var(--coral-dark, #C0392B); }
+.pw-strength.is-s2 { color: var(--gold, #E9A23B); }
+.pw-strength.is-s3, .pw-strength.is-s4 { color: var(--emerald, #12B76A); }
