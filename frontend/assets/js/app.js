@@ -584,172 +584,18 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    redesign — tour_packages no longer exists — so that call only ever 404'd and fell
    through to the hardcoded cards. Removed rather than left firing on every load. */
 
-/* ===========================================================================
-   Hero search — collect, gate, hand over.
-   ===========================================================================
-   The button used to say "Live search isn't available", which was true when
-   the catalog endpoints were removed. It is not true any more: the travel
-   pages search TravelData and render results, so the hero's job is to carry
-   what the traveller typed to the page that can answer it.
-
-   AUTH IS THE GATE, NOT A SUGGESTION. A signed-out click opens the auth modal
-   and DOES NOT search. The criteria are parked first, so signing in resumes
-   the search the traveller asked for rather than dropping them on the landing
-   page to type it again.
-
-   Cruises are deliberately still on the old toast — the cruise page has no
-   search panel to hand criteria to, and a redirect that ignored them would be
-   worse than saying so.
-   =========================================================================== */
-
-/** Where each panel's criteria go, and how to read them. */
-const HERO_SEARCH = {
-  flights: {
-    page: 'flights.html',
-    read() {
-      const dep = nativeDate('fDep');
-      const ret = nativeDate('fRet');
-      /* "1 Passenger" / "5+ Passengers" -> a number. The hero only offers a
-         single count; the results page splits it into adults/children/infants,
-         so everyone here is an adult until told otherwise. */
-      const pax = parseInt((val('fPax') || '1').replace(/\D+/g, ''), 10) || 1;
-      return {
-        trip: ret ? 'round' : 'oneway',
-        from: airportCode('fFrom'),
-        to: airportCode('fTo'),
-        depart: dep,
-        ret: ret,
-        adults: pax,
-        children: 0,
-        infants: 0,
-        cabin: (val('fCabin') || 'Economy').toLowerCase().replace(/\s+/g, '-'),
-      };
-    },
-    validate(p) {
-      if (!p.from) return ['Choose where you are flying from.', 'fFrom'];
-      if (!p.to) return ['Choose where you are flying to.', 'fTo'];
-      if (p.from === p.to) return ['Origin and destination cannot be the same.', 'fTo'];
-      if (!p.depart) return ['Choose a departure date.', 'fDep'];
-      if (p.ret && p.ret < p.depart) return ['The return date cannot be before departure.', 'fRet'];
-      return null;
-    },
-  },
-  hotels: {
-    page: 'hotels.html',
-    read() {
-      return {
-        dest: val('hDest'),
-        checkIn: nativeDate('hIn'),
-        checkOut: nativeDate('hOut'),
-        guests: parseInt((val('hGuests') || '2').replace(/\D+/g, ''), 10) || 2,
-        rooms: parseInt((val('hRooms') || '1').replace(/\D+/g, ''), 10) || 1,
-      };
-    },
-    validate(p) {
-      if (!p.dest) return ['Tell us where you are going.', 'hDest'];
-      if (!p.checkIn) return ['Choose a check-in date.', 'hIn'];
-      if (!p.checkOut) return ['Choose a check-out date.', 'hOut'];
-      if (p.checkOut <= p.checkIn) return ['Check-out must be after check-in.', 'hOut'];
-      return null;
-    },
-  },
-  packages: {
-    page: 'packages.html',
-    read() {
-      return { type: val('pType'), month: val('pMonth') };
-    },
-    validate() { return null; },   // both fields are dropdowns with a default
-  },
-};
-
-const val = id => (document.getElementById(id) || {}).value?.trim() || '';
-
-/** The ISO value behind a formatted date field.
- *  The visible input is a readonly display; the real value lives on the
- *  type="date" sibling, which is what the results page needs. */
-function nativeDate(displayId) {
-  const field = document.getElementById(displayId)?.closest('.field-date');
-  return field?.querySelector('.date-native')?.value || '';
-}
-
-/** "Hyderabad (HYD)" -> "HYD". Falls back to the whole string so a hand-typed
- *  city is still carried rather than silently dropped. */
-function airportCode(id) {
-  const v = val(id);
-  const m = /\(([A-Z]{3})\)/.exec(v);
-  return m ? m[1] : v;
-}
-
-/** Park a search so signing in can resume it. sessionStorage, not local: a
- *  search is about this visit, and finding yesterday's criteria reapplied on
- *  a new tab would be surprising. */
-const PENDING_SEARCH_KEY = 'jpc_pending_search';
-
-function storePendingSearch(kind, params) {
-  try { sessionStorage.setItem(PENDING_SEARCH_KEY, JSON.stringify({ kind, params })); }
-  catch { /* private mode — the traveller just re-runs the search */ }
-}
-
-function takePendingSearch() {
-  try {
-    const raw = sessionStorage.getItem(PENDING_SEARCH_KEY);
-    sessionStorage.removeItem(PENDING_SEARCH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-/** Send the traveller to the page that can answer, criteria in the URL. */
-function goToSearch(kind, params) {
-  const spec = HERO_SEARCH[kind];
-  if (!spec) return;
-  const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-  );
-  window.location.href = `${spec.page}?${qs.toString()}`;
-}
-
+/* The hero Search button has no API left to call. GET /api/flights|hotels|cruises|packages
+   went with the rest of the B2C surface in the V2 nine-table redesign, so every search
+   404'd and surfaced as "Search failed — please try again." — inviting a retry that could
+   never succeed. The request, the result-card renderer and the two form-reading helpers
+   only it used are gone; the button now says what is true. Restore from git history if
+   the catalog ever returns. */
 document.querySelectorAll('.search-go').forEach(btn => {
   btn.addEventListener('click', e => {
     e.preventDefault();
-    const panel = btn.closest('.search-panel');
-    const kind = panel?.dataset.panel;
-    const spec = HERO_SEARCH[kind];
-
-    /* Cruises: no search page to hand criteria to yet. */
-    if (!spec) {
-      showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
-      return;
-    }
-
-    const params = spec.read();
-    const bad = spec.validate(params);
-    if (bad) {
-      const [message, focusId] = bad;
-      showToast(message, true);
-      document.getElementById(focusId)?.focus();
-      return;
-    }
-
-    /* THE GATE. Signed out: park the criteria, open the modal, search nothing.
-       The modal's success path picks the search back up. */
-    const { access } = getStoredAuth();
-    if (!access) {
-      storePendingSearch(kind, params);
-      openAuth();
-      return;
-    }
-
-    goToSearch(kind, params);
+    showToast("Live search isn't available — browse our featured packages below.", true);
   });
 });
-
-/** Called once a session exists. Returns true if it navigated. */
-function resumePendingSearch() {
-  const pending = takePendingSearch();
-  if (!pending || !HERO_SEARCH[pending.kind]) return false;
-  goToSearch(pending.kind, pending.params);
-  return true;
-}
 
 /* AI chatbot */
 const chatPanel = document.getElementById('chatPanel');
@@ -1338,11 +1184,6 @@ function completeCustomerSignIn(data) {
   /* Reset to the first step for next time, AFTER closing — doing it before
      would flash the email form as the modal fades out. */
   showStep('email');
-
-  /* If the traveller was stopped mid-search, resume it. The greeting is
-     skipped in that case: they are already navigating away, and a toast that
-     outlives its page is just a flicker. */
-  if (typeof resumePendingSearch === 'function' && resumePendingSearch()) return;
   showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
 }
 

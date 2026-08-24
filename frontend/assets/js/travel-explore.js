@@ -356,54 +356,9 @@ const TravelExplore = (function () {
   /* ---------------------------------------------------------------------
      Hotels / cruises / packages
      --------------------------------------------------------------------- */
-  /** Hotels matching the destination the traveller searched for.
-   *
-   *  Matched against `location` ("Banjara Hills, Hyderabad") as a substring,
-   *  which is as much as the sample data supports — there is no city field to
-   *  match exactly and inventing one here would be guessing. Phase 4's
-   *  destination search is where this becomes a real lookup over cities,
-   *  areas and landmarks.
-   *
-   *  An unmatched destination returns nothing rather than everything: showing
-   *  Hyderabad hotels to somebody who asked for Goa is worse than saying we
-   *  have none, because they would have to notice for themselves. */
-  function hotelsMatching(rows, dest) {
-    if (!dest) return rows;
-    const needle = dest.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter(h => String(h.location || '').toLowerCase().includes(needle)
-                         || String(h.name || '').toLowerCase().includes(needle));
-  }
-
-  function renderHotels(all) {
+  function renderHotels(rows) {
     const el = $('txHotelGrid');
     if (!el) return;
-    const dest = state.seededFromUrl ? state.dest : '';
-    const rows = hotelsMatching(all, dest);
-
-    if (dest && !rows.length) {
-      catalogue.hotel = [];
-      el.innerHTML = `<div class="tx-empty">
-        <b>No stays in ${esc(dest)} yet</b>
-        We do not have hotels in that destination at the moment. Try another
-        city, or browse everything we do have.
-        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllHotels">Show all hotels</button>
-      </div>`;
-      const btn = $('txShowAllHotels');
-      if (btn) btn.addEventListener('click', () => {
-        state.dest = '';
-        state.seededFromUrl = false;
-        renderHotels(all);
-      });
-      const head = $('txHotelsHead');
-      if (head) head.textContent = `Stays in ${dest}`;
-      return;
-    }
-
-    if (dest) {
-      const head = $('txHotelsHead');
-      if (head) head.textContent = `Stays in ${dest}`;
-    }
     catalogue.hotel = rows;
     el.innerHTML = rows.map(h => `<article class="tx-card">
       <div class="tx-media">${hotelImage(h)}
@@ -475,20 +430,6 @@ const TravelExplore = (function () {
      It filters the SAME client-side result set the facets do. When the live
      endpoint lands, `submit` becomes a call with these values instead — the
      rendering below it does not change either way. */
-  /** Turn the current `state` into rendered results.
-   *
-   *  Shared by the Search button and by a search arriving in the URL, so the
-   *  two cannot drift — landing-page criteria produce exactly the result set
-   *  the button would have produced from the same values. */
-  function applySearch() {
-    /* Destination narrows the facet set, which is what "search" means
-       against a client-side result list. */
-    state.dests = state.to ? new Set([state.to]) : new Set();
-    state.shown = PAGE_SIZE;
-    renderFilters();
-    renderFlights();
-  }
-
   function mountSearch() {
     const panel = $('txSearchPanel');
     if (!panel) return;
@@ -498,40 +439,29 @@ const TravelExplore = (function () {
       esc(TravelData.airports[c].city)} (${esc(c)})</option>`;
     const today = new Date().toISOString().slice(0, 10);
 
-    /* EVERY CONTROL BELOW RENDERS FROM `state`, not from a literal. That is
-       what lets a search arriving from the landing page open this page already
-       showing what was asked for — seedFromUrl() has run by now, so the panel
-       and the results agree from the first paint. With no URL criteria `state`
-       still holds the same defaults these literals used to hardcode. */
-    const sel = { from: state.from || 'HYD', to: state.to || '' };
-    const depart = state.depart || today;
-    const isRound = state.trip === 'round';
-    const num = (n, cur) => `<option${n === cur ? ' selected' : ''}>${n}</option>`;
-
     panel.innerHTML = `
       <div class="tx-trip">
-        <label class="tx-radio"><input type="radio" name="txTrip" value="oneway"${isRound ? '' : ' checked'}> <span>One way</span></label>
-        <label class="tx-radio"><input type="radio" name="txTrip" value="round"${isRound ? ' checked' : ''}> <span>Round trip</span></label>
+        <label class="tx-radio"><input type="radio" name="txTrip" value="oneway" checked> <span>One way</span></label>
+        <label class="tx-radio"><input type="radio" name="txTrip" value="round"> <span>Round trip</span></label>
       </div>
       <div class="tx-searchgrid">
         <div class="tx-sf"><label for="txFrom">From</label>
-          <select id="txFrom">${codes.map(c => opt(c, sel.from)).join('')}</select></div>
+          <select id="txFrom">${codes.map(c => opt(c, 'HYD')).join('')}</select></div>
         <div class="tx-sf"><label for="txTo">To</label>
-          <select id="txTo"><option value=""${sel.to ? '' : ' selected'}>Anywhere</option>${
-            codes.filter(c => c !== sel.from).map(c => opt(c, sel.to)).join('')}</select></div>
+          <select id="txTo"><option value="">Anywhere</option>${codes.filter(c => c !== 'HYD').map(c => opt(c)).join('')}</select></div>
         <div class="tx-sf"><label for="txDepart">Departure</label>
-          <input id="txDepart" type="date" value="${esc(depart)}" min="${esc(today)}"></div>
-        <div class="tx-sf" id="txReturnWrap"${isRound ? '' : ' hidden'}><label for="txReturn">Return</label>
-          <input id="txReturn" type="date" value="${esc(state.ret || '')}" min="${esc(depart)}"></div>
+          <input id="txDepart" type="date" value="${esc(today)}" min="${esc(today)}"></div>
+        <div class="tx-sf" id="txReturnWrap" hidden><label for="txReturn">Return</label>
+          <input id="txReturn" type="date" min="${esc(today)}"></div>
         <div class="tx-sf"><label for="txAdults">Adults</label>
-          <select id="txAdults">${[1,2,3,4,5,6].map(n => num(n, state.pax.adults)).join('')}</select></div>
+          <select id="txAdults">${[1,2,3,4,5,6].map(n => `<option${n === 1 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="tx-sf"><label for="txChildren">Children</label>
-          <select id="txChildren">${[0,1,2,3,4].map(n => num(n, state.pax.children)).join('')}</select></div>
+          <select id="txChildren">${[0,1,2,3,4].map(n => `<option${n === 0 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="tx-sf"><label for="txInfants">Infants</label>
-          <select id="txInfants">${[0,1,2].map(n => num(n, state.pax.infants)).join('')}</select></div>
+          <select id="txInfants">${[0,1,2].map(n => `<option${n === 0 ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="tx-sf"><label for="txCabin">Cabin</label>
           <select id="txCabin">${BookingData.CABIN_CLASSES.map(c =>
-            `<option value="${esc(c.id)}"${c.id === state.cabin ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
+            `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join('')}</select></div>
         <button type="button" class="tx-btn tx-btn-primary tx-searchgo" id="txSearchGo">Search flights</button>
       </div>`;
 
@@ -558,7 +488,12 @@ const TravelExplore = (function () {
         showToast('Each infant must travel with an adult.', true);
         return;
       }
-      applySearch();
+      /* Destination narrows the facet set, which is what "search" means
+         against a client-side result list. */
+      state.dests = state.to ? new Set([state.to]) : new Set();
+      state.shown = PAGE_SIZE;
+      renderFilters();
+      renderFlights();
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
@@ -651,79 +586,10 @@ const TravelExplore = (function () {
      <body data-sp-service="flights">, and only that source is fetched — a
      hotels page must not call the flight API, and once each service has its own
      backend that would be three pointless round-trips per visit. */
-  /* ---------------------------------------------------------------------
-     Criteria arriving from the landing page.
-
-     The hero search cannot answer a query itself, so it collects the criteria
-     and sends them here in the URL. Seeding `state` before the panel mounts is
-     what makes the results page open ALREADY showing what was asked for —
-     nobody types their route twice.
-
-     Unknown or malformed values are ignored rather than trusted: this is a URL
-     anyone can edit, and `state` drives what gets booked.
-     --------------------------------------------------------------------- */
-  function seedFromUrl() {
-    const q = new URLSearchParams(location.search);
-    if (![...q.keys()].length) return false;
-
-    const str = (key, max) => {
-      const v = (q.get(key) || '').trim();
-      return v && v.length <= (max || 60) ? v : '';
-    };
-    const int = (key, lo, hi, dflt) => {
-      const n = parseInt(q.get(key), 10);
-      return Number.isFinite(n) && n >= lo && n <= hi ? n : dflt;
-    };
-    /* Dates are compared as strings elsewhere, so anything that is not a plain
-       ISO day is dropped rather than half-parsed. */
-    const day = key => (/^\d{4}-\d{2}-\d{2}$/.test(q.get(key) || '') ? q.get(key) : '');
-
-    let seeded = false;
-    const mark = () => { seeded = true; };
-
-    const trip = str('trip');
-    if (trip === 'oneway' || trip === 'round' || trip === 'multi') { state.trip = trip; mark(); }
-    const from = str('from', 40); if (from) { state.from = from.toUpperCase(); mark(); }
-    const to = str('to', 40);     if (to)   { state.to = to.toUpperCase(); mark(); }
-    const dep = day('depart');    if (dep)  { state.depart = dep; mark(); }
-    const ret = day('ret');       if (ret)  { state.ret = ret; state.trip = 'round'; mark(); }
-
-    if (q.has('adults') || q.has('children') || q.has('infants')) {
-      state.pax = {
-        adults: int('adults', 1, 9, state.pax.adults),
-        children: int('children', 0, 8, state.pax.children),
-        infants: int('infants', 0, 8, state.pax.infants),
-      };
-      mark();
-    }
-    const cabin = str('cabin', 20);
-    if (['economy', 'premium-economy', 'premium', 'business', 'first'].includes(cabin)) {
-      /* The hero labels it "Premium Economy"; the booking data calls it
-         'premium'. Normalise here rather than teaching both sides both names. */
-      state.cabin = cabin === 'premium-economy' ? 'premium' : cabin;
-      mark();
-    }
-
-    const dest = str('dest', 80);   if (dest) { state.dest = dest; mark(); }
-    const ci = day('checkIn');      if (ci)   { state.checkIn = ci; mark(); }
-    const co = day('checkOut');     if (co)   { state.checkOut = co; mark(); }
-    if (q.has('guests')) { state.guests = int('guests', 1, 32, state.guests); mark(); }
-    if (q.has('rooms'))  { state.rooms = int('rooms', 1, 4, state.rooms); mark(); }
-
-    const type = str('type', 60);   if (type)  { state.pkgType = type; mark(); }
-    const month = str('month', 20); if (month) { state.pkgMonth = month; mark(); }
-
-    return seeded;
-  }
-
   async function init() {
     const service = document.body.dataset.spService;
     if (ready || !service) return;
     ready = true;
-    /* Before bind() and before the panel mounts, so the controls render
-       already holding the criteria rather than being corrected afterwards. */
-    const seeded = seedFromUrl();
-    state.seededFromUrl = seeded;
     bind();
     try {
       if (service === 'flights') {
@@ -736,14 +602,8 @@ const TravelExplore = (function () {
           sub.textContent = `Schedule for ${fmtDate(flights[0].date)} — non-stop services `
             + 'across India, the Gulf and South-East Asia.';
         }
-        if (state.seededFromUrl) {
-          /* Criteria came from the landing page — show their results, not the
-             whole schedule the traveller did not ask for. */
-          applySearch();
-        } else {
-          renderFilters();
-          renderFlights();
-        }
+        renderFilters();
+        renderFlights();
       } else if (service === 'hotels') {
         renderHotels(await TravelData.hotels());
       } else if (service === 'cruises') {
