@@ -778,20 +778,6 @@ const TravelExplore = (function () {
     return seeded;
   }
 
-  /** Placeholder cards in whichever grid this page has. */
-  function showSkeleton(rows) {
-    const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
-    if (!host) return;
-    host.innerHTML = `<div class="tx-skeleton">${
-      Array.from({ length: rows || 4 }, () => `
-        <div class="tx-sk-card">
-          <div class="tx-sk-line w40"></div>
-          <div class="tx-sk-line w70"></div>
-          <div class="tx-sk-line w55"></div>
-        </div>`).join('')
-    }</div>`;
-  }
-
   async function init() {
     const service = document.body.dataset.spService;
     if (ready || !service) return;
@@ -801,11 +787,6 @@ const TravelExplore = (function () {
     const seeded = seedFromUrl();
     state.seededFromUrl = seeded;
     bind();
-    /* Card-shaped placeholders while the catalogue loads. The sample data is
-       instant, so this is usually a single frame — but it is the same await a
-       real endpoint will sit behind, and an empty grid reads as "nothing
-       here" rather than "not yet". */
-    showSkeleton();
     try {
       if (service === 'flights') {
         mountSearch();

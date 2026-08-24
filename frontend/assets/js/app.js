@@ -1077,41 +1077,6 @@ function clearFieldErrors() {
 }
 
 const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-
-/* --- password strength ---------------------------------------------------
-   The server's rule is length only (8..72, bcrypt's truncation point). This
-   adds a CLIENT-SIDE floor on top: eight characters drawn from at least two
-   of lowercase / uppercase / digit / symbol, so "password" and "12345678"
-   are refused at the form rather than accepted and regretted.
-
-   Deliberately not stricter than that. A rule the server does not share can
-   only ever be advisory — anyone posting straight to /signup bypasses it —
-   so it is set where it stops the genuinely weak without turning a booking
-   into a password-policy argument. */
-const PW_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
-
-function passwordScore(pw) {
-  if (!pw) return 0;
-  const classes = PW_CLASSES.filter(re => re.test(pw)).length;
-  if (pw.length < 8) return 0;
-  if (classes <= 1) return 1;                     // weak: one class only
-  if (classes === 2) return pw.length >= 12 ? 3 : 2;
-  return pw.length >= 12 ? 4 : 3;
-}
-
-const PW_LABELS = ['Too short', 'Too simple', 'Fair', 'Good', 'Strong'];
-
-/** Live strength readout under the signup password field. */
-function renderPasswordStrength() {
-  const input = document.getElementById('suPass');
-  const box = document.getElementById('suPassStrength');
-  if (!input || !box) return;
-  const pw = input.value;
-  if (!pw) { box.textContent = ''; box.className = 'pw-strength'; return; }
-  const score = passwordScore(pw);
-  box.textContent = PW_LABELS[score];
-  box.className = `pw-strength is-s${score}`;
-}
 const isMobile = v => /^\d{10,15}$/.test(String(v).replace(/[\s-]/g, ''));
 
 /* Clear a field's error the moment the traveller starts fixing it — leaving
@@ -1120,7 +1085,6 @@ authOverlay.addEventListener('input', e => {
   if (e.target.matches('input') && e.target.classList.contains('is-invalid')) {
     setFieldError(e.target.id, '');
   }
-  if (e.target.id === 'suPass') renderPasswordStrength();
 });
 
 /* --- open / close --------------------------------------------------------- */
@@ -1400,10 +1364,6 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   if (!isEmail(email)) return setFieldError('suEmail', 'That does not look like an email address.');
   if (!isMobile(mobile)) return setFieldError('suMobile', 'Enter a valid mobile number, 10 to 15 digits.');
   if (pass.length < 8) return setFieldError('suPass', 'Use at least 8 characters.');
-  if (passwordScore(pass) < 2) {
-    return setFieldError('suPass',
-      'Mix in a capital, a number or a symbol — this one is too easy to guess.');
-  }
   if (pass !== pass2) return setFieldError('suPass2', 'Both passwords must match.');
 
   setModalMsg(msg, 'Creating your account…', 'muted');

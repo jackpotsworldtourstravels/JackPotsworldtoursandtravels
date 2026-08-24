@@ -599,32 +599,3 @@
 @media (max-width: 560px) {
   .tx-pkggrid .tx-ap { min-width: 0; }
 }
-
-/* ==========================================================================
-   Loading skeletons
-   ==========================================================================
-   Card-shaped, because what is coming is a list of cards. A spinner would
-   say "wait"; this says "a list is arriving", and stops the layout jumping
-   when it does.
-   ========================================================================== */
-.tx-skeleton { display: grid; gap: 14px; }
-.tx-sk-card {
-  padding: 18px; border-radius: 16px;
-  background: var(--sp-surface, #fff);
-  border: 1px solid var(--sp-line, rgba(10, 37, 64, .1));
-}
-.tx-sk-line {
-  height: 12px; margin-bottom: 10px; border-radius: 6px;
-  background: linear-gradient(90deg,
-    var(--sp-surface-2, #F1F5F9) 25%,
-    rgba(10, 37, 64, .07) 37%,
-    var(--sp-surface-2, #F1F5F9) 63%);
-  background-size: 400% 100%;
-  animation: txShimmer 1.4s ease-in-out infinite;
-}
-.tx-sk-line:last-child { margin-bottom: 0; }
-.tx-sk-line.w40 { width: 40%; }
-.tx-sk-line.w55 { width: 55%; }
-.tx-sk-line.w70 { width: 70%; }
-@keyframes txShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .tx-sk-line { animation: none; } }
