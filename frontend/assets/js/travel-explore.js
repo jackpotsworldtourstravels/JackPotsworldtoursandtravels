@@ -489,31 +489,79 @@ const TravelExplore = (function () {
     renderFlights();
   }
 
-  /** The search panel lives in flight-search.js.
-   *
-   *  Criteria and results were one 60-line function that rendered eight
-   *  controls and read them back; they are two files now. This one owns
-   *  RESULTS and hands the panel a callback — the panel validates, writes the
-   *  shared `state`, and says "go". Neither has to know how the other works,
-   *  which is what let the panel grow an airport picker, a calendar and a
-   *  traveller popup without this file changing shape.
-   *
-   *  Falls back to nothing if the module is absent rather than throwing: the
-   *  results list below still renders, which is more useful than a blank page.
-   */
   function mountSearch() {
-    if (typeof FlightSearch === 'undefined') return;
-    FlightSearch.init(state, req => {
-      /* The request names cabin as cabinClass and the party as separate
-         counts; `state` is already written by the panel, so this only has to
-         mirror the couple of fields the renderers read under other names. */
-      state.cabin = req.cabinClass;
-      state.pax = { adults: req.adults, children: req.children, infants: req.infants };
+    const panel = $('txSearchPanel');
+    if (!panel) return;
+
+    const codes = Object.keys(TravelData.airports);
+    const opt = (c, sel) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${
+      esc(TravelData.airports[c].city)} (${esc(c)})</option>`;
+    const today = new Date().toISOString().slice(0, 10);
+
+    /* EVERY CONTROL BELOW RENDERS FROM `state`, not from a literal. That is
+       what lets a search arriving from the landing page open this page already
+       showing what was asked for — seedFromUrl() has run by now, so the panel
+       and the results agree from the first paint. With no URL criteria `state`
+       still holds the same defaults these literals used to hardcode. */
+    const sel = { from: state.from || 'HYD', to: state.to || '' };
+    const depart = state.depart || today;
+    const isRound = state.trip === 'round';
+    const num = (n, cur) => `<option${n === cur ? ' selected' : ''}>${n}</option>`;
+
+    panel.innerHTML = `
+      <div class="tx-trip">
+        <label class="tx-radio"><input type="radio" name="txTrip" value="oneway"${isRound ? '' : ' checked'}> <span>One way</span></label>
+        <label class="tx-radio"><input type="radio" name="txTrip" value="round"${isRound ? ' checked' : ''}> <span>Round trip</span></label>
+      </div>
+      <div class="tx-searchgrid">
+        <div class="tx-sf"><label for="txFrom">From</label>
+          <select id="txFrom">${codes.map(c => opt(c, sel.from)).join('')}</select></div>
+        <div class="tx-sf"><label for="txTo">To</label>
+          <select id="txTo"><option value=""${sel.to ? '' : ' selected'}>Anywhere</option>${
+            codes.filter(c => c !== sel.from).map(c => opt(c, sel.to)).join('')}</select></div>
+        <div class="tx-sf"><label for="txDepart">Departure</label>
+          <input id="txDepart" type="date" value="${esc(depart)}" min="${esc(today)}"></div>
+        <div class="tx-sf" id="txReturnWrap"${isRound ? '' : ' hidden'}><label for="txReturn">Return</label>
+          <input id="txReturn" type="date" value="${esc(state.ret || '')}" min="${esc(depart)}"></div>
+        <div class="tx-sf"><label for="txAdults">Adults</label>
+          <select id="txAdults">${[1,2,3,4,5,6].map(n => num(n, state.pax.adults)).join('')}</select></div>
+        <div class="tx-sf"><label for="txChildren">Children</label>
+          <select id="txChildren">${[0,1,2,3,4].map(n => num(n, state.pax.children)).join('')}</select></div>
+        <div class="tx-sf"><label for="txInfants">Infants</label>
+          <select id="txInfants">${[0,1,2].map(n => num(n, state.pax.infants)).join('')}</select></div>
+        <div class="tx-sf"><label for="txCabin">Cabin</label>
+          <select id="txCabin">${BookingData.CABIN_CLASSES.map(c =>
+            `<option value="${esc(c.id)}"${c.id === state.cabin ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select></div>
+        <button type="button" class="tx-btn tx-btn-primary tx-searchgo" id="txSearchGo">Search flights</button>
+      </div>`;
+
+    panel.querySelectorAll('input[name="txTrip"]').forEach(r => r.addEventListener('change', () => {
+      state.trip = r.value;
+      /* The return field is hidden rather than disabled so a one-way search
+         cannot silently carry a stale return date into the booking. */
+      $('txReturnWrap').hidden = r.value !== 'round';
+      if (r.value !== 'round') $('txReturn').value = '';
+    }));
+
+    $('txSearchGo').addEventListener('click', () => {
+      state.from = $('txFrom').value;
+      state.to = $('txTo').value;
+      state.depart = $('txDepart').value;
+      state.ret = $('txReturn').value;
+      state.cabin = $('txCabin').value;
+      state.pax = {
+        adults: Number($('txAdults').value) || 1,
+        children: Number($('txChildren').value) || 0,
+        infants: Number($('txInfants').value) || 0,
+      };
+      if (state.pax.infants > state.pax.adults) {
+        showToast('Each infant must travel with an adult.', true);
+        return;
+      }
       applySearch();
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
-
 
   function bind() {
     const search = $('txSearch');
