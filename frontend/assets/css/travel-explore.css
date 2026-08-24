@@ -586,16 +586,3 @@
   .tx-nights { max-width: none; }
   .tx-nights-out { text-align: left; }
 }
-
-/* ==========================================================================
-   Packages search panel
-   ==========================================================================
-   Nothing new beyond a grid: the destination picker and the traveller popup
-   are the shared widgets, and the three bands are plain selects already
-   styled by .tx-sf.
-   ========================================================================== */
-.tx-pkggrid { align-items: end; }
-.tx-pkggrid .tx-ap { min-width: 200px; }
-@media (max-width: 560px) {
-  .tx-pkggrid .tx-ap { min-width: 0; }
-}
