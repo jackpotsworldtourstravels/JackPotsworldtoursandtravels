@@ -700,6 +700,14 @@ h1,h2,h3,h4{letter-spacing:-.015em;}
   border:1px solid var(--jp-border);
   overflow:auto;
   background:var(--jp-surface);
+  /* Bounded so a long table scrolls internally with its header pinned
+     (the `table th{position:sticky}` rule below was inert without this —
+     nothing constrained the wrapper's height for it to stick inside of).
+     Generous enough that a short table's natural height never reaches it,
+     so nothing changes for the common case; only a genuinely long one
+     (Active Users, Booking History, Merchant List, Previously Raised
+     Requests, ...) starts scrolling instead of pushing the whole page down. */
+  max-height:min(70vh, 640px);
 }
 
 table th{
@@ -1193,7 +1201,7 @@ table th{ height:42px; }
 
 /* Money and counts read right-aligned, and tabular figures stop digits
    shifting column to column as values change. Opt-in for the same reason. */
-.jp-num{ text-align:right; font-variant-numeric:tabular-nums; }
+.jp-num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 
 /* ACTIONS SIT IN THE SAME PLACE IN EVERY TABLE.
    `:has()` finds the cell that actually holds the controls instead of assuming
@@ -1205,6 +1213,14 @@ table td:has(> .btn, > .cl-btn, > button){
 }
 table td:has(> .btn + .btn, > .cl-btn + .cl-btn, > button + button){
   display:flex; align-items:center; gap:8px; justify-content:flex-end;
+  /* `display:flex` opts this cell out of the table row-height consensus
+     that keeps every `<td>` in a row the same height — without this, a
+     multi-button actions cell in a row taller than the `52px` baseline
+     above (e.g. a row whose other columns stack two lines) rendered at
+     just that baseline, so the buttons sat pinned to the top of the row
+     instead of centered in it. `height:100%` resolves against the row's
+     actual (consensus) height, which flex alone had opted out of. */
+  height:auto;
 }
 
 /* A table narrower than its panel leaves a strip of dead surface down one

@@ -417,7 +417,7 @@ tbody tr:hover{background:var(--hover-bg);}
 
    `tabular-nums` is the other half of the job: with proportional figures a 1 is
    narrower than an 8, so right-aligned columns still look ragged. */
-th.num, td.num{text-align:right; font-variant-numeric:tabular-nums;}
+th.num, td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
 
 /* A STATUS PILL IS ONE LINE. `.badge` is `inline-block` with no `white-space`,
    so in a narrow column a two-word status broke across two lines INSIDE the
@@ -1435,7 +1435,7 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 .aa-mini td{padding:8px 9px; border-bottom:1px solid var(--border-color);
             color:var(--text-primary);}
 .aa-mini tr:last-child td{border-bottom:none;}
-.aa-mini .aa-num, .aa-mini th.aa-num{text-align:right; font-variant-numeric:tabular-nums;}
+.aa-mini .aa-num, .aa-mini th.aa-num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
 
 .aa-note{margin:12px 0 0; font-size:12px; line-height:1.6; color:var(--text-muted);}
 .aa-note b{color:var(--text-primary);}

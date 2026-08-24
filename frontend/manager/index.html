@@ -11,7 +11,9 @@
 <!-- The Admin Portal's stylesheet, unchanged. This portal is one screen and a
      modal; giving it its own design system would be two sets of table styles to
      keep in step for no visible gain. -->
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260815svc1">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260820ui1">
+<!-- Shared design system — must stay last, see admin/index.html for why. -->
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260819ui3">
 <style>
   /* The handful of rules this portal needs that admin.css has no reason to
      carry. Namespaced `mg-` so nothing here can reach the Admin screens. */
@@ -28,7 +30,6 @@
   .mg-tab-count{background:rgba(10,37,64,0.08); color:var(--text-primary); border-radius:100px;
                 padding:1px 8px; font-size:11px; font-weight:800;}
   .mg-tab.active .mg-tab-count{background:rgba(255,255,255,0.22); color:#fff;}
-  .mg-empty{padding:34px 18px; text-align:center; color:var(--text-muted); font-size:13px;}
   /* .modal-card.modal-lg sets padding:0 so a sticky header can sit flush; this
      modal has one, so it supplies its own padding below it. */
   #mgrReviewBody{padding:0 30px 30px;}
@@ -79,7 +80,11 @@
   @media (max-width:600px){ .mg-dl{grid-template-columns:1fr;} }
 </style>
 </head>
-<body>
+<!-- `jp-admin` opts this portal into jp-ds.css's §15 dialog & form standard —
+     see admin/index.html's comment on the same hook. This portal loads
+     admin.css directly, so its .modal-card / .modal-actions / .btn-* markup
+     already matches. -->
+<body class="jp-admin">
 <div class="mobile-topbar">
   <div class="brand"><img src="../assets/images/favicon-180.png" alt="JackPots World Tours &amp; Travels" style="height:28px;width:28px;border-radius:7px;object-fit:contain;"> JackPots Manager</div>
   <button type="button" class="hamburger-btn" id="mobileMenuBtn" aria-label="Open menu">
@@ -204,7 +209,7 @@
 
         <div class="table-wrap"><table id="mgrTable"><thead><tr>
           <th>Request</th><th>Merchant</th><th>Journey</th><th>Travel date</th>
-          <th>Pax</th><th>Status</th><th>Actions</th>
+          <th class="jp-num">Pax</th><th>Status</th><th>Actions</th>
         </tr></thead><tbody></tbody></table></div>
         <div class="pagination" id="mgrPagination"></div>
       </div>
@@ -274,6 +279,6 @@
 <script src="../components/toast.js?v=20260815svc1"></script>
 <script src="../components/focus-trap.js?v=20260815svc1"></script>
 <script src="../assets/js/auth.js?v=20260815svc1"></script>
-<script src="../assets/js/manager-portal.js?v=20260815svc1"></script>
+<script src="../assets/js/manager-portal.js?v=20260820ui1"></script>
 </body>
 </html>

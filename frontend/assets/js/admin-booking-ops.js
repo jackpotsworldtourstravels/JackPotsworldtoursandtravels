@@ -225,8 +225,8 @@ async function loadBookingOps() {
           ${r.workflow === 'classic_tours'
             ? '<span class="badge read" style="margin-top:4px;">Classic Tours · no payment</span>' : ''}
         </td>
-        <td>${escapeHtml(r.merchant_name || '—')}</td>
-        <td>${r.passengers}${r.lead_passenger ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.lead_passenger)}</div>` : ''}</td>
+        <td class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</td>
+        <td class="num">${r.passengers}${r.lead_passenger ? `<div style="font-size:11.5px;color:var(--text-muted);">${escapeHtml(r.lead_passenger)}</div>` : ''}</td>
         <td>${escapeHtml(fmtDate(r.travel_date))}</td>
         <td><span class="badge ${OPS_BADGE[r.status] || ''}">${escapeHtml(r.status_label)}</span>
           ${r.has_ticket_documents ? '<div style="font-size:11.5px;color:var(--text-muted);">tickets attached</div>' : ''}</td>
@@ -568,11 +568,20 @@ function opsRenderWork() {
           ${/* The desk is about to spend the platform's money against this
                 figure, so it belongs on the screen where that happens. It was
                 absent entirely: the only money this modal ever showed was the
-                fare input, which a quoted booking no longer renders. */''}
-          ${cell('Booking amount', moneyIsPositive(r.total_amount)
+                fare input, which a quoted booking no longer renders.
+                Named "Ticket amount", not "Booking amount" — that label now
+                belongs to Client Fare below, a different number (what the
+                merchant charges its own customer, not what it owes us). */''}
+          ${cell('Ticket amount', moneyIsPositive(r.total_amount)
             ? `<strong>${escapeHtml(moneyStr(r.total_amount))}</strong>${
                 classic ? ' <span class="ops-sub">settled from the wallet at ticketing</span>' : ''}`
             : '<span class="ops-sub">Not priced yet</span>')}
+          ${/* Read-only: this is what the merchant told its customer it would
+                cost, entered on their side (Enquiry/Booking Request form) —
+                nothing here writes it back. Not every booking has one. */''}
+          ${cell('Booking Amount', moneyIsPositive(r.client_fare)
+            ? `<strong>${escapeHtml(moneyStr(r.client_fare))}</strong>`
+            : '<span class="ops-sub">Not recorded</span>')}
           ${/* PNR, ticket number and airline reference are NOT repeated here.
                 They are editable in Airline references below, and a value shown
                 twice in one dialog is a value someone will eventually edit in

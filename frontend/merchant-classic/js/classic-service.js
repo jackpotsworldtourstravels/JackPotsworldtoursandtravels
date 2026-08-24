@@ -296,7 +296,7 @@ function clRenderServiceRequests() {
         <td class="cl-num">${clSrAmount(r)}</td>
         <td class="cl-nowrap">${escapeHtml(fmtDate(r.created_at))}</td>
         <td class="cl-actions">${clSrRowActions(r)}</td>
-      </tr>${clSrDetailRow(r)}`).join('')
+      </tr>`).join('')
     /* "None of this type" and "none at all" are different answers, and the
        second one is wrong when a filter is on. */
     : clEmptyRow(7, type
@@ -339,10 +339,6 @@ function clRenderServiceRequests() {
 
   body.querySelectorAll('[data-cl-sr-open]').forEach(b =>
     b.addEventListener('click', () => clOpenRequestDetail(b.dataset.clSrOpen)));
-  body.querySelectorAll('[data-cl-sr-approve]').forEach(b =>
-    b.addEventListener('click', () => clManagerDecide(b.dataset.clSrApprove, true)));
-  body.querySelectorAll('[data-cl-sr-reject]').forEach(b =>
-    b.addEventListener('click', () => clManagerDecide(b.dataset.clSrReject, false)));
 }
 
 /* The manager stage is not a status — it is a fact about a request that is
@@ -387,46 +383,13 @@ function clSrAmount(r) {
   return money(r.total_amount);
 }
 
-/* A second row carrying what does not fit the columns: what was asked for, and
-   what was decided. */
-function clSrDetailRow(r) {
-  const p = r.pricing || {};
-  const d = r.details || {};
-  const m = r.manager_approval || {};
-  const bits = [];
-
-  if (r.request_type === 'date_change' && d.new_travel_date) {
-    bits.push(`${escapeHtml(fmtDate(d.current_travel_date))} → <b>${escapeHtml(fmtDate(d.new_travel_date))}</b>`);
-  }
-  if (p.kind === 'cancellation') {
-    bits.push(`Cancellation charge ${money(p.cancellation_charge)}`);
-    bits.push(`Refund due <b>${money(p.refund_amount)}</b>`);
-  } else if (p.kind === 'reschedule') {
-    bits.push(`Fare difference ${money(p.fare_difference)}`);
-    bits.push(`Change fee ${money(p.change_fee)}`);
-    bits.push(`Payable <b>${money(p.total_payable)}</b>`);
-  }
-  if (m.requested_by_name && m.state === 'pending') {
-    bits.push(`Raised by ${escapeHtml(m.requested_by_name)}`);
-  }
-  if (m.state === 'approved' && m.by_name && !m.self_raised) {
-    bits.push(`Approved by ${escapeHtml(m.by_name)}`);
-  }
-  if (m.state === 'rejected') {
-    bits.push(`${escapeHtml(m.by_name || 'Your manager')} rejected this: ${escapeHtml(m.reason || 'no reason given')}`);
-  } else if (r.status === 'rejected' && r.rejection_reason) {
-    bits.push(`Not approved: ${escapeHtml(r.rejection_reason)}`);
-  } else if (d.reason) {
-    bits.push(`Reason: ${escapeHtml(d.reason)}`);
-  }
-
-  if (!bits.length) return '';
-  return `<tr class="cl-subrow"><td colspan="7" class="cl-kpi-sub">${bits.join(' &nbsp;·&nbsp; ')}</td></tr>`;
-}
-
-/* View is always offered. Approve and Reject only to a manager, and only on a
-   request that is actually waiting for one — the server refuses anything else,
-   so offering it would be offering a 403.
+/* View is the only row action now. Approve and Reject moved into its footer
+   (clOpenRequestDetail() in classic-requests.js) — same reasoning as the
+   DISCUSS move below: two ways to reach the same request (a row full of
+   buttons, and the detail dialog) when one, opened via View, is the natural
+   home for all of it. clManagerDecide() still refuses a decision the server
+   would refuse (wrong manager_state), so the footer buttons only render for
+   a request actually waiting on this account.
 
    DISCUSS IS GONE, AND ITS JOB MOVED INTO VIEW.
    It used to sit here as a third button that navigated to the Support Center
@@ -442,12 +405,7 @@ function clSrDetailRow(r) {
    and the ids this handler wrote into, so every click had been throwing a
    ReferenceError and landing the merchant on an empty Support Center. */
 function clSrRowActions(r) {
-  const out = [`<button type="button" class="cl-btn cl-btn-sm" data-cl-sr-open="${r.id}">View</button>`];
-  if (clIsManager() && r.manager_state === 'pending') {
-    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-primary" data-cl-sr-approve="${r.id}">Approve</button>`);
-    out.push(`<button type="button" class="cl-btn cl-btn-sm cl-btn-danger" data-cl-sr-reject="${r.id}">Reject</button>`);
-  }
-  return out.join('');
+  return `<button type="button" class="cl-btn cl-btn-sm" data-cl-sr-open="${r.id}">View</button>`;
 }
 
 async function clManagerDecide(id, approve) {
@@ -460,6 +418,7 @@ async function clManagerDecide(id, approve) {
       'Approve request')) return;
     try {
       await MerchantApi.managerApprove(id);
+      clCloseModal();
       await clLoadServiceRequests();
       clInvalidate('dashboard', 'requests');
       clLoadUnreadCount();

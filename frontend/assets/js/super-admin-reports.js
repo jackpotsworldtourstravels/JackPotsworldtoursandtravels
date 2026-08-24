@@ -18,13 +18,13 @@ const SA_REPORT_ICONS = {
 function saReportRow(m) {
   return `
     <tr>
-      <td><strong>${saEscapeHtml(m.company_name)}</strong></td>
+      <td class="jp-truncate" title="${saEscapeHtml(m.company_name)}"><strong>${saEscapeHtml(m.company_name)}</strong></td>
       <td>${saEscapeHtml(m.merchant_code)}</td>
       <td>${saStatusBadge(m.status)}</td>
-      <td>${m.total_requests}</td>
-      <td>${m.completed_requests}</td>
-      <td>${moneyStr(m.total_revenue)}</td>
-      <td>${m.user_count}</td>
+      <td class="jp-num">${m.total_requests}</td>
+      <td class="jp-num">${m.completed_requests}</td>
+      <td class="jp-num">${moneyStr(m.total_revenue)}</td>
+      <td class="jp-num">${m.user_count}</td>
     </tr>`;
 }
 

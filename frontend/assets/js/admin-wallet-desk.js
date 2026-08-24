@@ -129,7 +129,7 @@ async function wdLoadCounts() {
 
 async function wdLoadQueue() {
   const tbody = document.querySelector('#wdTable tbody');
-  tbody.innerHTML = '<tr><td colspan="8">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Loading…</td></tr>';
   try {
     const params = new URLSearchParams({ bucket: wdBucket, page: wdPage, page_size: 20 });
     if (wdSearch) params.set('search', wdSearch);
@@ -138,7 +138,7 @@ async function wdLoadQueue() {
       `${API_BASE}/api/admin/wallet/topups?${params}`, { headers: authHeaders() });
 
     if (!data.items.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="ops-sub">Nothing here.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Nothing here.</td></tr>`;
       document.getElementById('wdPagination').innerHTML = '';
       return;
     }
@@ -146,15 +146,15 @@ async function wdLoadQueue() {
     tbody.innerHTML = data.items.map(t => `
       <tr>
         <td><strong>${wdEsc(t.topup_number)}</strong></td>
-        <td>${wdEsc(t.merchant_name || '—')}</td>
-        <td>${wdMoney(t.amount)}</td>
+        <td class="jp-truncate" title="${wdEsc(t.merchant_name || '—')}">${wdEsc(t.merchant_name || '—')}</td>
+        <td class="num">${wdMoney(t.amount)}</td>
         <td>${wdEsc(WD_METHOD_LABELS[t.method] || t.method)}</td>
         <td>${wdEsc(t.utr || '—')}</td>
         <td>${wdEsc(wdDateTime(t.submitted_at))}</td>
         <td>${wdStatusChip(t.status)}${
           t.wallet_txn_number ? `<br><span class="ops-sub">${wdEsc(t.wallet_txn_number)}</span>` : ''
         }</td>
-        <td><button type="button" class="btn btn-sm" data-wd-review="${t.topup_id}">
+        <td><button type="button" class="btn btn-ghost btn-sm" data-wd-review="${t.topup_id}">
           ${t.status === 'submitted' ? 'Review' : 'View'}
         </button></td>
       </tr>`).join('');
@@ -172,7 +172,7 @@ async function wdLoadQueue() {
     document.getElementById('wdPrev')?.addEventListener('click', () => { wdPage--; wdLoadQueue(); });
     document.getElementById('wdNext')?.addEventListener('click', () => { wdPage++; wdLoadQueue(); });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="msg error">${wdEsc(wdErr(err, 'Could not load the queue.'))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${wdEsc(wdErr(err, 'Could not load the queue.'))}</td></tr>`;
   }
 }
 
@@ -330,7 +330,7 @@ async function wdDecide(topupId, action) {
 /* ------------------------------------------------------- reconciliation --- */
 async function wdLoadReconciliation() {
   const tbody = document.querySelector('#wdReconTable tbody');
-  tbody.innerHTML = '<tr><td colspan="8">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Loading…</td></tr>';
   try {
     const { data } = await axios.get(
       `${API_BASE}/api/admin/wallet/reconciliation`, { headers: authHeaders() });
@@ -343,22 +343,22 @@ async function wdLoadReconciliation() {
       : `${data.drifted_merchant_count} of ${data.merchant_count} merchants DO NOT reconcile.`;
     status.className = data.reconciled ? 'ops-sub' : 'msg error';
 
-    tbody.innerHTML = data.merchants.map(m => `
+    tbody.innerHTML = data.merchants.length ? data.merchants.map(m => `
       <tr>
-        <td><strong>${wdEsc(m.merchant_name)}</strong></td>
-        <td class="${moneyIsPositive(m.wallet_balance) ? '' : 'wd-neg'}">${wdMoney(m.wallet_balance)}</td>
-        <td>${wdMoney(m.ledger_balance)}</td>
-        <td>${m.reconciled
+        <td class="jp-truncate" title="${wdEsc(m.merchant_name)}"><strong>${wdEsc(m.merchant_name)}</strong></td>
+        <td class="num ${moneyIsPositive(m.wallet_balance) ? '' : 'wd-neg'}">${wdMoney(m.wallet_balance)}</td>
+        <td class="num">${wdMoney(m.ledger_balance)}</td>
+        <td class="num">${m.reconciled
               ? '<span class="badge ok">0.00</span>'
               : `<span class="badge danger">${wdMoney(m.drift)}</span>`}</td>
-        <td>${wdMoney(m.outstanding)}</td>
-        <td>${Number(m.credit_limit) > 0 ? wdMoney(m.credit_limit) : '<span class="ops-sub">No limit</span>'}</td>
-        <td>${m.pending_topup_count
+        <td class="num">${wdMoney(m.outstanding)}</td>
+        <td class="num">${Number(m.credit_limit) > 0 ? wdMoney(m.credit_limit) : '<span class="ops-sub">No limit</span>'}</td>
+        <td class="num">${m.pending_topup_count
               ? `${wdMoney(m.pending_topup_amount)} <span class="ops-sub">(${m.pending_topup_count})</span>`
               : '—'}</td>
-        <td><button type="button" class="btn btn-sm" data-wd-ledger="${m.merchant_id}"
+        <td><button type="button" class="btn btn-ghost btn-sm" data-wd-ledger="${m.merchant_id}"
                     data-wd-name="${wdEsc(m.merchant_name)}">Ledger</button></td>
-      </tr>`).join('');
+      </tr>`).join('') : '<tr><td colspan="8" class="empty-state">No merchants to reconcile.</td></tr>';
 
     document.querySelectorAll('[data-wd-ledger]').forEach(b => {
       b.addEventListener('click', () => wdOpenLedger(Number(b.dataset.wdLedger), b.dataset.wdName));
@@ -370,7 +370,7 @@ async function wdLoadReconciliation() {
         `<option value="${m.merchant_id}">${wdEsc(m.merchant_name)}</option>`).join(''));
     }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" class="msg error">${wdEsc(wdErr(err, 'Could not reconcile.'))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${wdEsc(wdErr(err, 'Could not reconcile.'))}</td></tr>`;
   }
 }
 
@@ -394,19 +394,19 @@ async function wdOpenLedger(merchantId, name) {
         <p class="ops-sub">Balance <strong class="${moneyIsPositive(data.wallet_balance) ? '' : 'wd-neg'}">${wdMoney(data.wallet_balance)}</strong>
            · ${data.total} transactions. These are the same rows the merchant sees.</p>
         <div class="table-wrap"><table><thead><tr>
-          <th>Reference</th><th>Type</th><th>Debit</th><th>Credit</th><th>Balance</th><th>When</th><th>Reason</th>
+          <th>Reference</th><th>Type</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th><th>When</th><th>Reason</th>
         </tr></thead><tbody>
           ${data.items.length ? data.items.map(x => `
             <tr>
               <td>${wdEsc(x.txn_number)}</td>
               <td>${wdEsc(WD_TXN_LABELS[x.txn_type] || x.txn_type)}</td>
-              <td>${Number(x.debit) > 0 ? wdMoney(x.debit) : '—'}</td>
-              <td>${Number(x.credit) > 0 ? wdMoney(x.credit) : '—'}</td>
-              <td class="${moneyIsPositive(x.balance_after) ? '' : 'wd-neg'}">${wdMoney(x.balance_after)}</td>
+              <td class="num">${Number(x.debit) > 0 ? wdMoney(x.debit) : '—'}</td>
+              <td class="num">${Number(x.credit) > 0 ? wdMoney(x.credit) : '—'}</td>
+              <td class="num ${moneyIsPositive(x.balance_after) ? '' : 'wd-neg'}">${wdMoney(x.balance_after)}</td>
               <td>${wdEsc(wdDateTime(x.created_at))}</td>
-              <td class="ops-sub">${wdEsc(x.reason || '—')}</td>
+              <td class="ops-sub jp-truncate" title="${wdEsc(x.reason || '—')}">${wdEsc(x.reason || '—')}</td>
             </tr>`).join('')
-            : '<tr><td colspan="7" class="ops-sub">No transactions yet.</td></tr>'}
+            : '<tr><td colspan="7" class="empty-state">No transactions yet.</td></tr>'}
         </tbody></table></div>
       </div>`;
     document.getElementById('wdLedgerClose').addEventListener('click', () => {

@@ -198,7 +198,7 @@ function adminSysLogRow(l) {
         ? `<br><small style="color:var(--text-muted);">${escapeHtml(l.user_email)}</small>` : ''}</td>
       <td>${escapeHtml(l.module || '—')}</td>
       <td>${escapeHtml(l.action || '—')}</td>
-      <td>${escapeHtml(l.description || '—')}</td>
+      <td class="jp-truncate" title="${escapeHtml(l.description || '—')}">${escapeHtml(l.description || '—')}</td>
       <td>${adminSysLogConnection(l)}</td>
       <td>${l.status ? `<span class="badge ${badge}">${escapeHtml(statusLabel(l.status))}</span>` : '—'}</td>
     </tr>`;

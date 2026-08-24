@@ -76,7 +76,6 @@
 .sa-perm-code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--text-primary);}
 .sa-tick{color:var(--emerald); font-weight:800;}
 .sa-cross{color:var(--border-color);}
-.sa-matrix-group td{background:var(--hover-bg); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);}
 
 /* ---------- Per-admin extra grants ---------- */
 .sa-perm-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px 16px; margin-bottom:18px;}

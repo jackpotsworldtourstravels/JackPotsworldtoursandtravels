@@ -248,7 +248,7 @@ async function openProvider(id) {
         ${data.users.length ? data.users.map(u => `
           <tr>
             <td>${escapeHtml(u.user_name)}</td>
-            <td>${escapeHtml(u.email)}</td>
+            <td class="jp-truncate" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}</td>
             <td>${escapeHtml(u.phone_number || '—')}</td>
             <td class="num">${u.tickets_booked}</td>
             <td class="num">${escapeHtml(moneyStr(u.total_amount))}</td>

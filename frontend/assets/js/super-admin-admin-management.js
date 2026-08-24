@@ -43,14 +43,13 @@ function saAdminRow(a) {
   const isActive = a.status === 'active';
   return `
     <tr>
-      <td><strong>${saEscapeHtml(a.full_name)}</strong></td>
-      <td>${saEscapeHtml(a.email)}</td>
+      <td class="jp-truncate" title="${saEscapeHtml(a.full_name)}"><strong>${saEscapeHtml(a.full_name)}</strong></td>
+      <td class="jp-truncate" title="${saEscapeHtml(a.email)}">${saEscapeHtml(a.email)}</td>
       <td>${saRoleBadge(a.role)}</td>
       <td>${saStatusBadge(a.status)}</td>
       <td>${a.last_login ? fmtDateTime(a.last_login) : 'Never'}</td>
       <td>${saFmtDate(a.created_at)}</td>
       <td>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn btn-ghost btn-sm" data-sa-edit="${a.id}">Edit</button>
           <button class="btn ${isActive ? 'btn-danger' : 'btn-navy'} btn-sm"
                   data-sa-status="${a.id}" data-next="${isActive ? 'suspended' : 'active'}">
@@ -58,7 +57,6 @@ function saAdminRow(a) {
           </button>
           <button class="btn btn-ghost btn-sm" data-sa-reset="${a.id}">Reset Password</button>
           <button class="btn btn-danger btn-sm" data-sa-delete="${a.id}">Delete</button>
-        </div>
       </td>
     </tr>`;
 }

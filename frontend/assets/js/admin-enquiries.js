@@ -215,11 +215,11 @@ async function loadTicketEnquiries(page = enqPage) {
       return `
       <tr>
         <td><span class="mono">${escapeHtml(r.reference_number)}</span></td>
-        <td>${escapeHtml(r.merchant_name || '—')}<div class="cell-sub">${escapeHtml(r.raised_by || '')}</div></td>
+        <td><div class="jp-truncate" title="${escapeHtml(r.merchant_name || '—')}">${escapeHtml(r.merchant_name || '—')}</div><div class="cell-sub">${escapeHtml(r.raised_by || '')}</div></td>
         <td>${enqRoute(r)}</td>
         <td>${r.travel_date ? fmtDate(r.travel_date) : '—'}<div class="cell-sub">${
           r.travel_type === 'hotel' ? '' : enqTime(r.preferred_time)}</div></td>
-        <td>${r.travel_type === 'hotel' ? escapeHtml(enqPaxSummary(r)) : r.passenger_count}</td>
+        <td class="num">${r.travel_type === 'hotel' ? escapeHtml(enqPaxSummary(r)) : r.passenger_count}</td>
         <td>
           <span class="badge ${ENQ_BADGE[r.status] || 'pending'}">${escapeHtml(enqLabel(r.status))}</span>
           ${heldByOther ? `<div class="cell-sub">with ${escapeHtml(holder)}</div>` : ''}

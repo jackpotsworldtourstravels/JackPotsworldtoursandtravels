@@ -929,7 +929,7 @@ async function clRenderImportedPassengers(list, e) {
           Download the uploaded file
         </button>
       </div>
-      <div class="cl-gb-viewwrap">
+      <div class="cl-table-wrap">
         <table class="cl-table cl-gb-view">
           <thead><tr>
             <th>#</th><th>Name</th><th>Type</th><th>Gender</th>
