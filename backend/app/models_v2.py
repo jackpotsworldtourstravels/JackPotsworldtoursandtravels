@@ -360,6 +360,22 @@ class DocumentVerification(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class OcrStatus(str, enum.Enum):
+    """Lifecycle of one passport scan (migration 0042).
+
+    The request returns as soon as the row exists, so the form always has an id
+    to poll; ``queued`` and ``processing`` are the states it polls through.
+    ``failed`` is a NORMAL outcome, not an exception - a passport the provider
+    could not read leaves error_code/error_detail set and the merchant types the
+    fields by hand, which is why nothing downstream treats it as an error.
+    """
+
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 def _pg_enum(python_enum: type[enum.Enum], name: str) -> SAEnum:
     """Bind to an existing PostgreSQL ENUM by value, without re-creating it."""
     return SAEnum(
@@ -1023,6 +1039,15 @@ class PassengerData(Base):
     passport_issue_date: Mapped[Optional[dt.date]] = mapped_column(Date)
     passport_expiry: Mapped[Optional[dt.date]] = mapped_column(Date)
     nationality: Mapped[Optional[str]] = mapped_column(String(100))
+    #: Migration 0043. Both are read off a scanned passport and have no
+    #: other source - nothing in the booking forms asks for either.
+    #: ICAO 9303 type code, "P" for an ordinary passport; two characters
+    #: because the standard allows a subtype ("PD", "PS").
+    passport_type: Mapped[Optional[str]] = mapped_column(String(2))
+    #: Printed on the page but NOT in the machine-readable zone, so it
+    #: arrives at lower confidence than the MRZ fields and is always worth
+    #: a glance before it is saved.
+    place_of_birth: Mapped[Optional[str]] = mapped_column(String(120))
 
     seat_preference: Mapped[Optional[SeatPreference]] = mapped_column(
         _pg_enum(SeatPreference, "seat_preference_enum")
@@ -2124,6 +2149,126 @@ class HotelBookingGuest(Base):
         return f"<HotelBookingGuest {self.first_name} {self.last_name} room={self.room_number}>"
 
 
+class PassportOcrExtraction(Base):
+    """One upload, one read attempt, one row (migration 0042).
+
+    THE ROW OUTLIVES THE IMAGE. ``stored_path`` points at the scan for as long
+    as retention allows and may be gone afterwards; everything the platform
+    needs to explain a passenger's details later - which provider read it, at
+    what confidence, what it returned - is on the row itself.
+
+    ``normalized`` is the application's own shape, not the vendor's.
+    ``raw_response`` keeps the vendor's, and is never returned to a browser.
+    """
+
+    __tablename__ = "passport_ocr_extractions"
+
+    extraction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: CASCADE: a deleted merchant takes its scans with it.
+    merchant_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("merchants.merchant_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: RESTRICT, unlike most user FKs here. Who read a passport is an audit
+    #: fact, so the user cannot be deleted out from under it.
+    created_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Both nullable and both SET NULL: a scan can be taken on a booking form
+    #: before the request or the passenger row exists, and must survive either
+    #: being removed.
+    request_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("service_requests.request_id", ondelete="SET NULL")
+    )
+    passenger_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("passenger_data.passenger_id", ondelete="SET NULL")
+    )
+
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    #: SHA-256 of the uploaded bytes. Identifies a re-upload of the same file.
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    status: Mapped[OcrStatus] = mapped_column(
+        _pg_enum(OcrStatus, "ocr_status_enum"),
+        nullable=False,
+        server_default=text("'queued'"),
+    )
+    #: Which adapter produced this, recorded per-row rather than read from
+    #: configuration: a deployment can change provider, and an old extraction
+    #: must still say truthfully what read it.
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    provider_model: Mapped[Optional[str]] = mapped_column(String(100))
+    provider_api_version: Mapped[Optional[str]] = mapped_column(String(40))
+
+    #: The vendor's own payload. BACKEND-ONLY - never serialised to a browser.
+    raw_response: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    #: The application's stable shape, ``{field: {value, confidence, source}}``.
+    normalized: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    overall_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4))
+    processing_ms: Mapped[Optional[int]] = mapped_column(Integer)
+
+    #: Set together on a failed read, and both safe to show: the code drives
+    #: the retry copy, the detail is already operator-worded.
+    error_code: Mapped[Optional[str]] = mapped_column(String(60))
+    error_detail: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    completed_at: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
+
+    #: ORDERED ON PURPOSE. These reach the client through FieldEditOut, and an
+    #: unordered relationship returns whatever the join happened to produce -
+    #: the same trap the passengers relationship hit. edit_id is insertion order.
+    edits: Mapped[list["PassportOcrFieldEdit"]] = relationship(
+        "PassportOcrFieldEdit",
+        back_populates="extraction",
+        cascade="all, delete-orphan",
+        order_by="PassportOcrFieldEdit.edit_id",
+    )
+
+
+class PassportOcrFieldEdit(Base):
+    """A field the OCR proposed and a human then changed (migration 0042).
+
+    This is the accuracy record. Because ``ocr_value`` is kept beside
+    ``edited_value``, "how often is the scan wrong, and on which field" is a
+    query rather than a guess - and it is the evidence that would have exposed
+    the fabricating provider immediately.
+    """
+
+    __tablename__ = "passport_ocr_field_edits"
+
+    edit_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    extraction_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("passport_ocr_extractions.extraction_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    field_name: Mapped[str] = mapped_column(String(60), nullable=False)
+    #: What the provider read. NULL means it read nothing and the human filled
+    #: an empty box - a different failure from misreading one.
+    ocr_value: Mapped[Optional[str]] = mapped_column(Text)
+    edited_value: Mapped[Optional[str]] = mapped_column(Text)
+    ocr_confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 4))
+    edited_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="RESTRICT"), nullable=False
+    )
+    edited_at: Mapped[dt.datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+    extraction: Mapped["PassportOcrExtraction"] = relationship(
+        "PassportOcrExtraction", back_populates="edits"
+    )
+
+
 __all__ = [
     "Base",
     "User",
@@ -2171,4 +2316,7 @@ __all__ = [
     "HotelEnquiryRoom",
     "HotelRoomChild",
     "HotelBookingGuest",
+    "OcrStatus",
+    "PassportOcrExtraction",
+    "PassportOcrFieldEdit",
 ]
