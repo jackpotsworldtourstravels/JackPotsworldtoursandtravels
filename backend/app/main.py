@@ -38,6 +38,7 @@ from app.routers import (
     merchant_team,
     merchants,
     notifications_v2,
+    passport_ocr,
     profile,
     providers,
     reports,
@@ -231,6 +232,13 @@ app.include_router(assistant.router)
 # and there must not be: booking documents are passport and visa scans, served
 # only through documents.py's authenticated, merchant-scoped download route.
 app.include_router(documents.router)
+# Passport scanning (CR-8). Mounted here because it is the same class of
+# data as documents.py above -- identity scans -- and carries the same rule:
+# the image is reachable only through an authenticated, scope-checked route,
+# never a static mount. The router answers "unavailable" of its own accord
+# when no provider is configured, so mounting it is safe on a deployment
+# that has not enabled OCR.
+app.include_router(passport_ocr.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
 # The merchant's manager signing off the service requests its own staff raised,

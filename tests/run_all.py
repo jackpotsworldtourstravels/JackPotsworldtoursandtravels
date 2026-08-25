@@ -107,6 +107,14 @@ SUITE = [
     # other way round.
     ("verify_providers.py",
      "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
+    # Passport OCR (CR-8). After the booking scripts because it attaches scans
+    # to real bookings, and before the rate-limit-heavy pair below. It needs no
+    # provider to be useful: with OCR_PROVIDER=none it asserts the unavailable
+    # contract -- availability says so, the endpoint answers 503, and a booking
+    # still submits -- rather than skipping. Set OCR_PROVIDER on the server
+    # under test to exercise real extraction.
+    ("verify_passport_ocr.py",
+     "Passport OCR: availability, scope, 503 contract, private scan proxy, edit audit"),
     # Customer Portal V1 (0044). Late, because its central assertion is that a
     # merchant/admin/manager/super-admin token and their credentials are ALL
     # refused by the customer API — so it signs each of them in, and a failure
