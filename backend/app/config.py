@@ -56,6 +56,64 @@ class Settings(BaseSettings):
     s3_sse: str = "AES256"
 
     # -----------------------------------------------------------------------
+    # Passport scanning (CR-8).
+    # -----------------------------------------------------------------------
+    # OFF by default, and "off" is a real answer rather than a fault: a
+    # deployment that has never configured OCR renders no Scan button at all,
+    # exactly as it does for SMTP. These settings went missing from this file
+    # while the CR-8 branch sat untracked, which left get_provider() reading
+    # attributes that did not exist -- an AttributeError on import rather than
+    # the orderly "unavailable" the factory was written to give.
+    #
+    # WHICH PROVIDER READS THE DOCUMENT:
+    #   "none"       -- no scanning offered (default)
+    #   "local"      -- read on this server, no vendor, no credentials
+    #   "azure"      -- Azure Document Intelligence
+    #   "miniailive" -- MiniAiLive ID Document Recognition server
+    # "simulated" is refused by name in the factory: it fabricated a passenger
+    # from the checksum of the upload and never opened the image.
+    ocr_provider: str = "none"
+    #: How long any provider gets before the scan is abandoned as a timeout.
+    ocr_timeout_seconds: float = 30.0
+    #: How long the HTTP request itself waits for a result before handing back
+    #: a job id for the form to poll. Keeps a slow read off the request thread
+    #: without making the merchant wait on a spinner that may not resolve.
+    ocr_inline_wait_seconds: float = 8.0
+
+    #: Azure Document Intelligence. Both must be set for OCR_PROVIDER=azure;
+    #: the provider refuses at construction rather than on the first scan.
+    ocr_azure_endpoint: str | None = None
+    ocr_azure_key: str | None = None
+    ocr_azure_model: str = "prebuilt-idDocument"
+    ocr_azure_api_version: str = "2024-11-30"
+
+    #: Local extraction. dpi is the render resolution for PDF input; raising it
+    #: costs time and helps only if the source is genuinely higher-resolution.
+    ocr_local_dpi: int = 300
+    ocr_local_max_pages: int = 2
+
+    #: MiniAiLive ID Document Recognition. The BACKEND is the only component
+    #: that may talk to it -- never the browser -- so none of this is ever
+    #: serialised into a page or an API response.
+    #:
+    #: NOTE ON THE TIMEOUT NAME: the integration brief specifies
+    #: MINIAILIVE_TIMEOUT=30000, i.e. milliseconds. Every other timeout in this
+    #: codebase is seconds, and a 30000 dropped into a seconds field is an
+    #: eight-hour hang rather than a visible misconfiguration, so the unit is
+    #: in the name here and the value is seconds.
+    miniailive_base_url: str = "http://127.0.0.1:8082"
+    miniailive_id_endpoint: str = "/api/check_id"
+    miniailive_timeout_seconds: float = 30.0
+    #: Sent as the licence/API credential if the installed server requires one.
+    miniailive_api_key: str | None = None
+
+    #: The six-month rule. A passport must remain valid for this many months
+    #: BEYOND the travel date or the passenger cannot be submitted. Applies to
+    #: a scanned expiry exactly as it does to a typed one.
+    passport_validity_months: int = 6
+
+
+    # -----------------------------------------------------------------------
     # Which emails actually leave the building.
     # -----------------------------------------------------------------------
     # OFF, and that is the intended production posture. The platform notifies
