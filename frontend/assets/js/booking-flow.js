@@ -297,15 +297,34 @@ const BookingFlow = (function () {
       if (!code) { say('Enter a coupon code.', false); return; }
       say('Checking…', true);
       try {
-        /* Checked before it is applied, so an unusable code never sits on the
-           draft quietly failing on every later re-price. */
-        const res = await BookingApi.validateCoupon(
-          code, BookingApi.flightPayload(ctx), BookingApi.passengerTypes(ctx)
-        );
-        if (!res.applies) { say(res.message || 'That coupon cannot be used here.', false); return; }
-        ctx.couponCode = res.code;
-        ctx.couponTitle = res.title;
-        await refreshPrice();          // re-prices on the server and repaints
+        if (ctx.kind === 'flight') {
+          /* Checked before it is applied, so an unusable code never sits on
+             the draft quietly failing on every later re-price. */
+          const res = await BookingApi.validateCoupon(
+            code, BookingApi.flightPayload(ctx), BookingApi.passengerTypes(ctx)
+          );
+          if (!res.applies) { say(res.message || 'That coupon cannot be used here.', false); return; }
+          ctx.couponCode = res.code;
+          ctx.couponTitle = res.title;
+          await refreshPrice();        // re-prices on the server and repaints
+          return;
+        }
+        /* Other live products (hotels) have no separate validate endpoint —
+           the quote itself already checks the coupon as part of pricing, so
+           apply it optimistically and let the quote's own answer say whether
+           it actually applied. */
+        ctx.couponCode = code;
+        ctx.couponTitle = null;
+        await refreshPrice();
+        if (ctx.couponError) {
+          say(ctx.couponError, false);
+          ctx.couponCode = null;
+          ctx.couponTitle = null;
+          await refreshPrice();
+          return;
+        }
+        ctx.couponTitle = (ctx.quote && ctx.quote.coupon_title) || null;
+        say(`${code} applied.`, true);
       } catch (err) {
         say(BookingApi.errorText(err, 'Could not check that coupon.'), false);
       }
@@ -326,7 +345,7 @@ const BookingFlow = (function () {
         view.setAttribute('aria-expanded', 'true');
         list.innerHTML = '<p class="bk-coupon-note">Loading…</p>';
         try {
-          const offers = await BookingApi.coupons('flight');
+          const offers = await BookingApi.coupons(ctx.kind);
           list.innerHTML = offers.length ? offers.map(c => `
             <button type="button" class="bk-coupon-offer" data-code="${esc(c.code)}">
               <b>${esc(c.code)}</b>
@@ -536,6 +555,20 @@ const BookingFlow = (function () {
     document.querySelectorAll('[data-bk-total]').forEach(el => {
       el.textContent = money(ctx.pricing.total);
     });
+    /* The Review step embeds its own copy of the fare summary (so the page
+       reads standalone). Re-render just that step's body — using the
+       ctx.pricing already refreshed above, not a second recalc — or applying
+       a coupon there leaves it showing the pre-coupon total until the
+       traveller leaves and comes back. */
+    const step = flow.steps[index];
+    if (step && step.id === 'summary') {
+      const main = document.getElementById('bkMain');
+      if (main) {
+        main.innerHTML = step.render(ctx);
+        if (step.mount) step.mount(main, ctx);
+        if (typeof JPIcon !== 'undefined') JPIcon.mount(main);
+      }
+    }
   }
 
   /** Re-render the current step in place. The traveller step calls this when

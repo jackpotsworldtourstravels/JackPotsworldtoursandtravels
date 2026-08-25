@@ -31,6 +31,7 @@ from app.schemas.customer_booking import (
     QuoteResponse,
 )
 from app.services import activity_service, customer_audit_service
+from app.services import customer_account_service as acct
 from app.services import customer_booking_service as bookings
 from app.services import customer_catalog_service as catalog
 from app.services import customer_pricing_service as pricing
@@ -217,6 +218,13 @@ def create_booking(
         description=f"{booking.booking_ref} — {booking.airline} {booking.flight_number}",
         meta=activity_service.request_context(request),
     )
+    acct.notify(
+        db, customer.customer_id, "booking_created",
+        title="Booking confirmed",
+        message=f"Your {booking.airline} {booking.flight_number} booking "
+                f"({booking.booking_ref}) has been recorded.",
+        related_ref=booking.booking_ref,
+    )
     db.commit()
     db.refresh(booking)
     return booking
@@ -296,6 +304,12 @@ def pay_booking(
         description=f"{booking.booking_ref} via {payload.method}",
         meta=activity_service.request_context(request),
     )
+    acct.notify(
+        db, customer.customer_id, "booking_payment",
+        title="Payment recorded",
+        message=f"A payment attempt via {payload.method} was recorded on {booking.booking_ref}.",
+        related_ref=booking.booking_ref,
+    )
     db.commit()
     db.refresh(booking)
     return booking
@@ -329,6 +343,12 @@ def cancel_booking(
         db, customer, "Booking cancelled", module="Bookings",
         description=booking.booking_ref,
         meta=activity_service.request_context(request),
+    )
+    acct.notify(
+        db, customer.customer_id, "booking_cancelled",
+        title="Booking cancelled",
+        message=f"{booking.booking_ref} has been cancelled.",
+        related_ref=booking.booking_ref,
     )
     db.commit()
     db.refresh(booking)

@@ -187,6 +187,109 @@ const BookingStore = (function () {
     };
   }
 
+  /** A server hotel booking, in the shape My Bookings already renders — the
+   *  same translation `fromApi` does for a flight, over
+   *  ``HotelBookingResponse`` instead of ``BookingResponse``. */
+  function fromHotelApi(b) {
+    return {
+      id: b.booking_ref,
+      ref: b.booking_ref,
+      kind: 'hotel',
+      kindLabel: 'Hotel',
+      icon: 'hotels',
+      title: b.hotel_name,
+      subtitle: b.hotel_location || '',
+      travelDate: b.check_in_date,
+      checkIn: b.check_in_date,
+      checkOut: b.check_out_date,
+      nights: b.nights,
+      roomName: b.room_name,
+      mealPlan: b.meal_plan,
+      status: b.status ? b.status.charAt(0).toUpperCase() + b.status.slice(1) : 'Pending',
+      pnr: null,
+      ticketNumber: null,
+      bookedAt: b.created_at,
+      cancelledAt: b.cancelled_at,
+      total: Number(b.total_amount),
+      currency: b.currency || 'INR',
+      passengers: (b.guests || []).map(g => ({
+        title: g.title, first: g.first_name, last: g.last_name,
+        gender: g.gender, dob: g.date_of_birth, kind: g.guest_type,
+        nationality: g.nationality, mobile: g.mobile, email: g.email,
+        isContact: g.is_contact,
+      })),
+      seats: [],
+      addons: (b.addons || []).map(a => ({
+        id: a.code, code: a.code, name: a.name, type: a.addon_type,
+        description: a.description, price: Number(a.unit_price), quantity: a.quantity,
+      })),
+      payments: (b.payments || []).map(p => ({
+        method: p.method, status: p.status, amount: Number(p.amount), at: p.created_at,
+      })),
+      pricing: {
+        lines: [
+          { label: `${b.room_name} × ${b.nights} night${b.nights === 1 ? '' : 's'}`, amount: Number(b.room_subtotal) },
+          { label: 'Taxes & service', amount: Number(b.taxes) },
+          ...(Number(b.addon_total) ? [{ label: 'Add-ons', amount: Number(b.addon_total) }] : []),
+          ...(Number(b.discount) ? [{ label: `Discount${b.coupon_code ? ' (' + b.coupon_code + ')' : ''}`, amount: -Number(b.discount) }] : []),
+        ],
+        total: Number(b.total_amount),
+      },
+      couponCode: b.coupon_code,
+      demo: false,
+    };
+  }
+
+  /** A server package booking, in the shape My Bookings already renders —
+   *  same translation as `fromApi`/`fromHotelApi`, over
+   *  ``PackageBookingResponse``. */
+  function fromPackageApi(b) {
+    return {
+      id: b.booking_ref,
+      ref: b.booking_ref,
+      kind: 'package',
+      kindLabel: 'Tour Package',
+      icon: 'packages',
+      title: b.package_name,
+      subtitle: `${b.package_days} day${b.package_days === 1 ? '' : 's'}`,
+      days: b.package_days,
+      travelDate: b.departure_date,
+      status: b.status ? b.status.charAt(0).toUpperCase() + b.status.slice(1) : 'Pending',
+      pnr: null,
+      ticketNumber: null,
+      bookedAt: b.created_at,
+      cancelledAt: b.cancelled_at,
+      total: Number(b.total_amount),
+      currency: b.currency || 'INR',
+      passengers: (b.travellers || []).map(t => ({
+        title: t.title, first: t.first_name, last: t.last_name,
+        gender: t.gender, dob: t.date_of_birth, kind: t.traveller_type,
+        passportNumber: t.passport_number, passportExpiry: t.passport_expiry,
+        nationality: t.nationality, issuingCountry: t.issuing_country,
+        mobile: t.mobile, email: t.email, isContact: t.is_contact,
+      })),
+      seats: [],
+      addons: (b.addons || []).map(a => ({
+        id: a.code, code: a.code, name: a.name, type: a.addon_type,
+        description: a.description, price: Number(a.unit_price), quantity: a.quantity,
+      })),
+      payments: (b.payments || []).map(p => ({
+        method: p.method, status: p.status, amount: Number(p.amount), at: p.created_at,
+      })),
+      pricing: {
+        lines: [
+          { label: `Package × ${b.pax_count}`, amount: Number(b.base_total) },
+          { label: 'GST', amount: Number(b.taxes) },
+          ...(Number(b.addon_total) ? [{ label: 'Add-ons', amount: Number(b.addon_total) }] : []),
+          ...(Number(b.discount) ? [{ label: `Discount${b.coupon_code ? ' (' + b.coupon_code + ')' : ''}`, amount: -Number(b.discount) }] : []),
+        ],
+        total: Number(b.total_amount),
+      },
+      couponCode: b.coupon_code,
+      demo: false,
+    };
+  }
+
   /** True when this draft is one the server can take. */
   function goesToServer(draft) {
     return !!(draft && draft.apiPayload && typeof BookingApi !== 'undefined'
@@ -195,17 +298,27 @@ const BookingStore = (function () {
 
   async function create(draft) {
     if (goesToServer(draft)) {
-      const created = await BookingApi.createBooking(draft.apiPayload);
+      const isHotel = draft.kind === 'hotel';
+      const isPackage = draft.kind === 'package';
+      const created = isHotel
+        ? await BookingApi.createHotelBooking(draft.apiPayload)
+        : isPackage
+        ? await BookingApi.createPackageBooking(draft.apiPayload)
+        : await BookingApi.createBooking(draft.apiPayload);
       /* Record the payment attempt against the booking just made. It is
          recorded as pending and nothing is charged — see
-         customer_booking_service.record_payment. */
+         customer_booking_service.record_payment (and its hotel/package mirrors). */
       let latest = created;
       if (draft.payment && draft.payment.method) {
         try {
-          latest = await BookingApi.payBooking(created.booking_ref, draft.payment.method);
+          latest = isHotel
+            ? await BookingApi.payHotelBooking(created.booking_ref, draft.payment.method)
+            : isPackage
+            ? await BookingApi.payPackageBooking(created.booking_ref, draft.payment.method)
+            : await BookingApi.payBooking(created.booking_ref, draft.payment.method);
         } catch { /* the booking exists; a failed attempt log must not lose it */ }
       }
-      return fromApi(latest);
+      return isHotel ? fromHotelApi(latest) : isPackage ? fromPackageApi(latest) : fromApi(latest);
     }
 
     const now = new Date();
@@ -234,15 +347,24 @@ const BookingStore = (function () {
 
   /** Every booking for the signed-in customer, newest first. */
   async function list() {
-    /* Flights live on the server; hotels, cruises, packages and visa are still
-       local demo bookings. Both are shown, newest first, so a customer sees one
-       list rather than being asked to care where a row is stored. */
+    /* Flights, hotels and packages live on the server; cruises and visa are
+       still local demo bookings. All are shown together, newest first, so a
+       customer sees one list — My Trips — rather than being asked to care
+       where a row is stored. */
     let server = [];
     if (typeof BookingApi !== 'undefined' && BookingApi.isSignedIn()) {
       try {
         const body = await BookingApi.listBookings();
         server = (Array.isArray(body) ? body : []).map(fromApi);
       } catch { /* signed out mid-session, or offline: show what is local */ }
+      try {
+        const hotelBody = await BookingApi.listHotelBookings();
+        server = server.concat((Array.isArray(hotelBody) ? hotelBody : []).map(fromHotelApi));
+      } catch { /* same — a hotel-booking failure must not blank the flights */ }
+      try {
+        const pkgBody = await BookingApi.listPackageBookings();
+        server = server.concat((Array.isArray(pkgBody) ? pkgBody : []).map(fromPackageApi));
+      } catch { /* same — a package-booking failure must not blank the rest */ }
     }
     const me = currentCustomerId();
     /* A guest's demo bookings stay visible once they sign in — otherwise the
@@ -260,9 +382,16 @@ const BookingStore = (function () {
 
   /** Demo cancellation: status only, and the row stays in the list. */
   async function cancel(id) {
-    /* Server references are JPB######; anything else is a local demo row. */
+    /* Server references are JPB###### (flight), JPH###### (hotel) or
+       JPP###### (package); anything else is a local demo row. */
     if (/^JPB\d+$/.test(String(id)) && typeof BookingApi !== 'undefined') {
       return fromApi(await BookingApi.cancelBooking(id));
+    }
+    if (/^JPH\d+$/.test(String(id)) && typeof BookingApi !== 'undefined') {
+      return fromHotelApi(await BookingApi.cancelHotelBooking(id));
+    }
+    if (/^JPP\d+$/.test(String(id)) && typeof BookingApi !== 'undefined') {
+      return fromPackageApi(await BookingApi.cancelPackageBooking(id));
     }
     const all = readAll();
     const b = all.find(x => x.id === id);
@@ -277,5 +406,5 @@ const BookingStore = (function () {
   async function clearAll() { writeAll([]); }
 
   return { config: CONFIG, KINDS, create, list, get, cancel, clearAll,
-           fromApi, makePnr, makeReference };
+           fromApi, fromHotelApi, fromPackageApi, makePnr, makeReference };
 })();

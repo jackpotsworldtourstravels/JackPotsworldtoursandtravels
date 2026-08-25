@@ -358,10 +358,32 @@ const BookingFlows = (function () {
     const guests = (search && search.guests) || 2;
     return {
       kind: 'hotel',
+      /* Hotels have a real coupon backend now too (STAYMORE, seeded in 0053
+         and already returned by /coupons?product_type=hotel) — same reason
+         flights show this and nothing else used to. */
+      supportsCoupons: true,
       kicker: esc(item.location),
       title: item.name,
       backLabel: 'hotel results',
+      /* Kept as the offline fallback and the first paint, same relationship
+         as flights: customer_hotel_pricing_service.py is a verified port of
+         P.hotelPrice, and the server's answer below replaces it. */
       price: P.hotelPrice,
+      async priceAsync(ctx) {
+        if (typeof BookingApi === 'undefined' || !BookingApi.isLive('hotel') || !ctx.room) return null;
+        const q = await BookingApi.quoteHotel(
+          BookingApi.hotelPayload(ctx),
+          BookingApi.hotelAddonPayload(ctx),
+          ctx.couponCode || null,
+        );
+        ctx.quote = q;
+        ctx.couponError = q.coupon_error || null;
+        return {
+          lines: (q.lines || []).map(l => ({ label: l.label, amount: Number(l.amount) })),
+          total: Number(q.total_amount),
+          note: q.coupon_error || null,
+        };
+      },
       steps: [
         roomStep,
         P.travellersStep({ passport: false, frequentFlyer: false, noun: 'Guest' }),
@@ -509,10 +531,31 @@ const BookingFlows = (function () {
   function pkg(item) {
     return {
       kind: 'package',
+      /* Packages have a real coupon backend now too (FAMILYFUN/TOGETHER25,
+         seeded in 0053 and already returned by /coupons?product_type=package). */
+      supportsCoupons: true,
       kicker: `${item.days} days`,
       title: item.name,
       backLabel: 'tour packages',
+      /* Kept as the offline fallback and the first paint, same relationship
+         as flights and hotels: customer_package_pricing_service.py is a
+         verified port of P.packagePrice. */
       price: P.packagePrice,
+      async priceAsync(ctx) {
+        if (typeof BookingApi === 'undefined' || !BookingApi.isLive('package') || !ctx.departure) return null;
+        const q = await BookingApi.quotePackage(
+          BookingApi.packagePayload(ctx),
+          BookingApi.packageAddonPayload(ctx),
+          ctx.couponCode || null,
+        );
+        ctx.quote = q;
+        ctx.couponError = q.coupon_error || null;
+        return {
+          lines: (q.lines || []).map(l => ({ label: l.label, amount: Number(l.amount) })),
+          total: Number(q.total_amount),
+          note: q.coupon_error || null,
+        };
+      },
       steps: [
         departureStep,
         P.travellersStep({ passport: true, frequentFlyer: false, noun: 'Traveller' }),

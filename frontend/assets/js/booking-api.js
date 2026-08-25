@@ -34,9 +34,10 @@ const BookingApi = (function () {
      redefined, so there is one answer to "where is the API". */
   const base = () => (typeof API_BASE === 'string' ? API_BASE : '');
 
-  /** Only flights have a booking backend. Everything else stays local. */
+  /** Flights, hotels and packages have a booking backend. Cruises and visa
+   *  stay local for now. */
   function isLive(productKind) {
-    return productKind === 'flight';
+    return productKind === 'flight' || productKind === 'hotel' || productKind === 'package';
   }
 
   function authHeaders() {
@@ -187,6 +188,102 @@ const BookingApi = (function () {
     post(`/api/customer/bookings/${encodeURIComponent(ref)}/cancel`, {});
 
   /* ---------------------------------------------------------------------
+     Hotels — its own path, its own table, its own reference series (JPH######).
+     Mirrors the flight functions above one-for-one; kept separate rather than
+     branching every flight function on kind, so neither reads like the other
+     product's code.
+     --------------------------------------------------------------------- */
+  const searchHotels = () => get('/api/customer/hotels');
+
+  const getHotelDetail = (hotelId) => get(`/api/customer/hotels/${encodeURIComponent(hotelId)}`);
+
+  const hotelAddons = () => get('/api/customer/hotels/addons');
+
+  const quoteHotel = (stay, addonCodes, couponCode) =>
+    post('/api/customer/hotel-bookings/quote', {
+      stay, addons: addonCodes || [], coupon_code: couponCode || null,
+    });
+
+  const createHotelBooking = (payload) => post('/api/customer/hotel-bookings', payload);
+
+  const listHotelBookings = () => get('/api/customer/hotel-bookings');
+
+  const getHotelBooking = (ref) => get(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}`);
+
+  const payHotelBooking = (ref, method) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/pay`, { method });
+
+  const cancelHotelBooking = (ref) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/cancel`, {});
+
+  /** The stay, in the shape StayInput wants. ``ctx.room.id`` is the string
+   *  form of the real room id (see getHotelDetail/hotelRoomsPayload) — Number()
+   *  here is the one place it becomes the integer the schema requires. */
+  function hotelPayload(ctx) {
+    return {
+      hotel_id: Number(ctx.item && ctx.item.id),
+      room_id: Number(ctx.room && ctx.room.id),
+      check_in: ctx.checkIn,
+      check_out: ctx.checkOut,
+      rooms_count: ctx.roomCount || 1,
+      adults: (ctx.paxKinds || []).filter(k => String(k).toLowerCase() !== 'child').length || 1,
+      children: (ctx.paxKinds || []).filter(k => String(k).toLowerCase() === 'child').length,
+      child_ages: [],
+    };
+  }
+
+  /** Add-ons, as codes — every hotel extra is billed once per booking, so
+   *  there is no passenger_index to carry. */
+  function hotelAddonPayload(ctx) {
+    return (ctx.addons || [])
+      .map(a => (a && (a.code || a.id) ? { code: a.code || a.id } : null))
+      .filter(Boolean);
+  }
+
+  /* ---------------------------------------------------------------------
+     Packages — its own path, its own table, its own reference series
+     (JPP######). Mirrors the hotel functions above one-for-one.
+     --------------------------------------------------------------------- */
+  const packageAddons = () => get('/api/customer/packages/addons');
+
+  const quotePackage = (trip, addonCodes, couponCode) =>
+    post('/api/customer/package-bookings/quote', {
+      trip, addons: addonCodes || [], coupon_code: couponCode || null,
+    });
+
+  const createPackageBooking = (payload) => post('/api/customer/package-bookings', payload);
+
+  const listPackageBookings = () => get('/api/customer/package-bookings');
+
+  const getPackageBooking = (ref) => get(`/api/customer/package-bookings/${encodeURIComponent(ref)}`);
+
+  const payPackageBooking = (ref, method) =>
+    post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/pay`, { method });
+
+  const cancelPackageBooking = (ref) =>
+    post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/cancel`, {});
+
+  /** The trip, in the shape TripInput wants. ``ctx.departure.id`` and
+   *  ``ctx.item.id`` are the string forms of the real ids returned by the
+   *  departures/packages endpoints — Number() here is the one place either
+   *  becomes the integer the schema requires. */
+  function packagePayload(ctx) {
+    return {
+      package_id: Number(ctx.item && ctx.item.id),
+      departure_id: Number(ctx.departure && ctx.departure.id),
+      pax_count: ctx.paxCount || 1,
+    };
+  }
+
+  /** Add-ons, as codes. Travel insurance is priced per traveller server-side
+   *  when no traveller_index is given, same as a flight per-passenger add-on. */
+  function packageAddonPayload(ctx) {
+    return (ctx.addons || [])
+      .map(a => (a && (a.code || a.id) ? { code: a.code || a.id, traveller_index: null } : null))
+      .filter(Boolean);
+  }
+
+  /* ---------------------------------------------------------------------
      Shaping the draft into what the API expects
      --------------------------------------------------------------------- */
   /** Minutes from a "2h 25m" style label, so the server can re-derive the
@@ -270,5 +367,11 @@ const BookingApi = (function () {
     createBooking, listBookings, getBooking, payBooking, cancelBooking,
     flightPayload, seatPayload, addonPayload, passengerTypes,
     isInternational, durationMinutes,
+    searchHotels, getHotelDetail, hotelAddons, quoteHotel,
+    createHotelBooking, listHotelBookings, getHotelBooking,
+    payHotelBooking, cancelHotelBooking, hotelPayload, hotelAddonPayload,
+    packageAddons, quotePackage, createPackageBooking, listPackageBookings,
+    getPackageBooking, payPackageBooking, cancelPackageBooking,
+    packagePayload, packageAddonPayload,
   };
 })();

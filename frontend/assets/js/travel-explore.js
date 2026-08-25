@@ -423,22 +423,70 @@ const TravelExplore = (function () {
     }
 
     catalogue.hotel = rows;
-    el.innerHTML = rows.map(h => `<article class="tx-card">
+    el.innerHTML = rows.map(h => `<article class="tx-card" data-hotel-card="${esc(h.id)}">
       <div class="tx-media">${hotelImage(h)}
         <span class="tx-badge">${esc(h.distanceKm)} km from airport</span>
       </div>
       <div class="tx-body">
         <h3 class="tx-title">${esc(h.name)}</h3>
-        <div class="tx-stars">${starRow(h.stars)}</div>
+        <div class="tx-stars">${starRow(h.stars)}
+          ${h.guestRating != null ? `<span class="tx-guest-rating">${esc(h.guestRating.toFixed(1))} Guest rating</span>` : ''}
+        </div>
         <p class="tx-sub">${esc(h.location)}</p>
         <div class="tx-chips">${h.amenities.map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}</div>
+        ${h.cancellationPolicy ? `<p class="tx-cancel-note">${esc(h.cancellationPolicy)}</p>` : ''}
         <div class="tx-foot">
-          <div class="tx-price"><span>per night</span><b>${esc(money(h.pricePerNight))}</b></div>
-          <button type="button" class="tx-btn tx-btn-primary" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Book Now</button>
+          <div class="tx-price"><span>per night</span><b>${esc(money(h.pricePerNight))}</b><i>+ taxes &amp; fees</i></div>
+          <div class="tx-card-actions">
+            <button type="button" class="tx-btn tx-btn-ghost" data-tx-hotel-details="${esc(h.id)}">View Details</button>
+            <button type="button" class="tx-btn tx-btn-primary" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Select Room</button>
+          </div>
         </div>
       </div>
     </article>`).join('');
     armIcons(el);
+  }
+
+  /* ---------------------------------------------------------------------
+     Hotel Details — an inline expansion, the same pattern flightCard's
+     "View Details" already uses (detailsHtml/data-tx-details), rather than a
+     second page: images, description, amenities, policies and every room
+     option (price, meal plan, cancellation policy) with its own Select Room.
+     --------------------------------------------------------------------- */
+  const hotelDetailCache = new Map();
+
+  async function hotelDetail(id) {
+    if (hotelDetailCache.has(id)) return hotelDetailCache.get(id);
+    const p = (typeof BookingApi !== 'undefined')
+      ? BookingApi.getHotelDetail(id)
+      : Promise.reject(new Error('offline'));
+    hotelDetailCache.set(id, p);
+    try { return await p; } catch (err) { hotelDetailCache.delete(id); throw err; }
+  }
+
+  function hotelDetailsHtml(h, detail) {
+    const rooms = (detail && detail.rooms) || [];
+    const roomRows = rooms.map(r => `
+      <article class="tx-room-opt">
+        <div class="tx-room-opt-body">
+          <b>${esc(r.name)}</b>
+          <span class="tx-room-opt-meta">${esc(r.bed_type || '')}${r.size_label ? ' · ' + esc(r.size_label) : ''} · up to ${esc(r.max_guests)} guests</span>
+          <span class="tx-chip">${esc(r.meal_plan)}</span>
+          ${r.cancellation_policy ? `<p class="tx-cancel-note">${esc(r.cancellation_policy)}</p>` : ''}
+        </div>
+        <div class="tx-room-opt-price">
+          <span>per night</span><b>${esc(money(r.price))}</b>
+          <button type="button" class="tx-btn tx-btn-primary tx-btn-sm" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Select Room</button>
+        </div>
+      </article>`).join('');
+
+    return `<div class="tx-hotel-details">
+      <p>${esc((detail && detail.description) || '')}</p>
+      <div class="tx-chips">${(h.amenities || []).map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}</div>
+      ${h.cancellationPolicy ? `<p class="tx-cancel-note"><b>Cancellation policy:</b> ${esc(h.cancellationPolicy)}</p>` : ''}
+      <h4 class="tx-room-opt-head">Room options</h4>
+      <div class="tx-room-opts">${roomRows || '<p class="is-muted">No rooms available right now.</p>'}</div>
+    </div>`;
   }
 
   function renderCruises(rows) {
@@ -677,6 +725,22 @@ const TravelExplore = (function () {
         if (open) { open.remove(); det.textContent = 'View Details'; return; }
         const f = flights.find(x => x.id === det.dataset.txDetails);
         if (f) { card.insertAdjacentHTML('beforeend', detailsHtml(f)); det.textContent = 'Hide Details'; }
+        return;
+      }
+
+      const hdet = e.target.closest('[data-tx-hotel-details]');
+      if (hdet) {
+        const card = hdet.closest('.tx-card');
+        const open = card.querySelector('.tx-hotel-details');
+        if (open) { open.remove(); hdet.textContent = 'View Details'; return; }
+        const h = (catalogue.hotel || []).find(x => x.id === hdet.dataset.txHotelDetails);
+        if (!h) return;
+        hdet.textContent = 'Loading…';
+        hotelDetail(h.id).then(detail => {
+          hdet.textContent = 'Hide Details';
+          card.querySelector('.tx-body').insertAdjacentHTML('beforeend', hotelDetailsHtml(h, detail));
+          armIcons(card);
+        }).catch(() => { hdet.textContent = 'View Details'; });
         return;
       }
       /* --- Book Now: hand the chosen item to the booking engine ------------

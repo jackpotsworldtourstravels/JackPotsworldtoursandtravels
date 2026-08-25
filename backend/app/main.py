@@ -21,8 +21,11 @@ from app.routers import (
     auth,
     booking_ops,
     change_requests,
+    customer_account,
     customer_auth,
     customer_bookings,
+    customer_hotel_bookings,
+    customer_package_bookings,
     customer_profile,
     customer_travellers,
     dashboard,
@@ -288,6 +291,20 @@ app.include_router(customer_profile.router)
 # because a seat map is not private and is browsed before signing in.
 app.include_router(customer_travellers.router)
 app.include_router(customer_bookings.router)
+# Account Center: payment history, wishlist, notifications, reviews, support
+# tickets. Same customer scope; `GET /reviews` (by item) is the one public
+# route in it, for the same reason the catalogue above is public.
+app.include_router(customer_account.router)
+# The real B2C hotel system (Phase 2): its own tables, its own booking
+# reference series (JPH######) — see migration 0055. Same customer scope as
+# the flight booking flow; the catalogue routes (`/hotels`, `/hotels/{id}`,
+# `/hotels/addons`) are public for the same reason a flight's seat map is.
+app.include_router(customer_hotel_bookings.router)
+# The real B2C tour-package system (Phase 5): its own tables, its own booking
+# reference series (JPP######) — see migration 0056. Same customer scope;
+# the catalogue routes (`/packages`, `/packages/{id}`, `/packages/departures`,
+# `/packages/addons`) are public for the same reason the hotel ones are.
+app.include_router(customer_package_bookings.router)
 
 
 @app.on_event("startup")

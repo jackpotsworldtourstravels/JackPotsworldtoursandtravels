@@ -837,10 +837,10 @@ const BookingProducts = (function () {
       payment: ctx.payment,
       pricing: ctx.pricing,
       item: ctx.item ? { id: ctx.item.id, name: ctx.summaryTitle } : null,
-      /* For flights, what the server is actually asked to book. Note it names
-         choices only — no prices — so the total is the server's arithmetic and
-         not something this page could dictate. Absent for the other products,
-         which BookingStore then keeps local. */
+      /* For flights and hotels, what the server is actually asked to book.
+         Note it names choices only — no prices — so the total is the
+         server's arithmetic and not something this page could dictate.
+         Absent for cruises/packages/visa, which BookingStore keeps local. */
       apiPayload: (ctx.kind === 'flight' && typeof BookingApi !== 'undefined')
         ? {
             flight: BookingApi.flightPayload(ctx),
@@ -869,6 +869,49 @@ const BookingProducts = (function () {
             coupon_code: ctx.couponCode || null,
             save_travellers: !!ctx.saveTravellers,
           }
+        : (ctx.kind === 'hotel' && typeof BookingApi !== 'undefined' && ctx.room)
+        ? {
+            stay: BookingApi.hotelPayload(ctx),
+            guests: (ctx.passengers || []).map((p, i) => ({
+              guest_type: String(p.kind || 'Adult').toLowerCase() === 'child' ? 'child' : 'adult',
+              title: p.title || null,
+              first_name: p.first,
+              last_name: p.last,
+              gender: p.gender || null,
+              date_of_birth: p.dob || null,
+              nationality: p.nationality || null,
+              is_contact: i === 0,
+              mobile: i === 0 && p.mobile
+                ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
+              email: i === 0 ? (p.email || null) : null,
+            })),
+            addons: BookingApi.hotelAddonPayload(ctx),
+            special_requests: ctx.requests || [],
+            notes: ctx.notes || null,
+            coupon_code: ctx.couponCode || null,
+          }
+        : (ctx.kind === 'package' && typeof BookingApi !== 'undefined' && ctx.departure)
+        ? {
+            trip: BookingApi.packagePayload(ctx),
+            travellers: (ctx.passengers || []).map((p, i) => ({
+              traveller_type: String(p.kind || 'Adult').toLowerCase(),
+              title: p.title || null,
+              first_name: p.first,
+              last_name: p.last,
+              gender: p.gender || null,
+              date_of_birth: p.dob || null,
+              nationality: p.nationality || null,
+              passport_number: p.passportNumber || null,
+              passport_expiry: p.passportExpiry || null,
+              issuing_country: p.issuingCountry || null,
+              is_contact: i === 0,
+              mobile: i === 0 && p.mobile
+                ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
+              email: i === 0 ? (p.email || null) : null,
+            })),
+            addons: BookingApi.packageAddonPayload(ctx),
+            coupon_code: ctx.couponCode || null,
+          }
         : null,
     };
   }
@@ -889,21 +932,32 @@ const BookingProducts = (function () {
            booking (the four products with no backend) still carries the ones
            booking-store.js stamps. */
         const live = b.demo === false;
+        const isHotel = ctx.kind === 'hotel';
+        const isPackage = ctx.kind === 'package';
+        const isFlight = ctx.kind === 'flight';
         const refs = [
           ['Booking ID', b.id],
           /* PNR IS SHOWN AS PENDING, NOT AS A NUMBER WE MADE UP. An airline
              issues it through a GDS and none is integrated, so a string
-             invented here would be quoted at a check-in desk and rejected. */
-          live
+             invented here would be quoted at a check-in desk and rejected.
+             There is no such concept for a hotel stay or a tour package, so
+             it is skipped entirely rather than shown as "Pending" for
+             something that will never exist. */
+          (live && isFlight)
             ? ['PNR', b.pnr || 'Pending — issued by the airline on ticketing']
             : (b.pnr ? ['PNR', b.pnr] : null),
           b.ticketNumber ? ['Ticket number', b.ticketNumber] : null,
-          ['Airline', b.title],
-          ['Route', b.subtitle],
-          b.travelDate ? ['Travel date', fmtDate(b.travelDate)] : null,
-          (b.departure || b.arrival) ? ['Departure / arrival',
+          [isHotel ? 'Hotel' : isPackage ? 'Package' : 'Airline', b.title],
+          !isPackage ? [isHotel ? 'Location' : 'Route', b.subtitle] : null,
+          isPackage && b.days ? ['Duration', `${b.days} day${b.days === 1 ? '' : 's'}`] : null,
+          isHotel && b.checkIn ? ['Check-in', fmtDate(b.checkIn)] : null,
+          isHotel && b.checkOut ? ['Check-out', fmtDate(b.checkOut)] : null,
+          isHotel && b.nights ? ['Nights', b.nights] : null,
+          isHotel && b.roomName ? ['Room', b.roomName] : null,
+          !isHotel && b.travelDate ? [isPackage ? 'Departure date' : 'Travel date', fmtDate(b.travelDate)] : null,
+          (isFlight && (b.departure || b.arrival)) ? ['Departure / arrival',
             `${b.departure || '—'} → ${b.arrival || '—'}`] : null,
-          (b.seats && b.seats.length) ? ['Seat' + (b.seats.length > 1 ? 's' : ''),
+          (isFlight && b.seats && b.seats.length) ? ['Seat' + (b.seats.length > 1 ? 's' : ''),
             b.seats.join(', ')] : null,
           ['Booked on', fmtDate(b.bookedAt)],
           ['Payment method', (b.payment || {}).methodLabel || (b.payments && b.payments[0] && b.payments[0].method) || '—'],
@@ -919,13 +973,13 @@ const BookingProducts = (function () {
         return `<div class="bk-step bk-done">
             <div class="bk-done-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('insurance', { size: 'xl' }) : ''}</div>
             <h2>Booking confirmed</h2>
-            <p class="bk-step-sub">Your flight booking has been successfully confirmed.
+            <p class="bk-step-sub">Your booking has been successfully confirmed.
               ${esc(ctx.summaryTitle || '')} — recorded against your account.</p>
 
             <div class="bk-refs">${refs}</div>
 
             <section class="bk-panel">
-              <h3>Travellers</h3>
+              <h3>${isHotel ? 'Guests' : 'Travellers'}</h3>
               <ul class="bk-list">${pax || '<li class="is-muted">—</li>'}</ul>
             </section>
 
@@ -936,7 +990,9 @@ const BookingProducts = (function () {
               <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>
             </div>
             <p class="bk-demo-foot">${b.demo === false
-              ? 'No payment gateway is connected, so nothing has been charged and no ticket has been issued by an airline yet. Your booking reference above is real and can be quoted to support.'
+              ? (isFlight
+                  ? 'No payment gateway is connected, so nothing has been charged and no ticket has been issued by an airline yet. Your booking reference above is real and can be quoted to support.'
+                  : 'No payment gateway is connected, so nothing has been charged yet. Your booking reference above is real and can be quoted to support.')
               : 'Demo booking — no payment was taken and no ticket has been issued by an airline.'}</p>
           </div>`;
       },

@@ -23,9 +23,9 @@
 const TravelData = (function () {
 
   const CONFIG = {
-    /* Flip per source as each real endpoint lands — they will not all arrive
-       together, and flights is the one that is coming first. */
-    useLiveApi: { flights: false, hotels: false, cruises: false, packages: false },
+    /* Flip per source as each real endpoint lands — flights, then hotels,
+       then packages. Cruises and visa stay demo for now. */
+    useLiveApi: { flights: false, hotels: true, cruises: false, packages: true },
     endpoints: {
       flights: '/api/customer/flights/search',
       hotels: '/api/customer/hotels',
@@ -307,13 +307,23 @@ const TravelData = (function () {
       id: h.id, name: h.name, imageKey: h.image, stars: h.stars,
       location: h.location, distanceKm: h.distanceKm,
       pricePerNight: h.pricePerNight, amenities: h.amenities.slice(),
+      /* Only the real endpoint sends these — undefined on the sample rows,
+         which the card/details renderers already treat as "not shown". */
+      guestRating: h.guest_rating != null ? Number(h.guest_rating) : undefined,
+      cancellationPolicy: h.cancellation_policy,
     };
   }
   function normaliseCruise(c) {
     return { id: c.id, name: c.name, route: c.route, nights: c.nights, priceFrom: c.priceFrom };
   }
   function normalisePackage(p) {
-    return { id: p.id, name: p.name, days: p.days, priceFrom: p.priceFrom, blurb: p.blurb };
+    return {
+      id: p.id, name: p.name, days: p.days, priceFrom: p.priceFrom, blurb: p.blurb,
+      /* Only the real endpoint sends this — undefined on the sample rows,
+         which isInternational() already treats as "unknown, assume domestic"
+         the same way a flight with no origin/destination country does. */
+      isInternational: p.is_international,
+    };
   }
 
   /* -------------------------------------------------------------------------
