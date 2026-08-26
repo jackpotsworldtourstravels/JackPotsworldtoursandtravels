@@ -44,6 +44,7 @@ from app.routers import (
     passport_ocr,
     profile,
     providers,
+    public,
     reports,
     super_admin,
     support_tickets,
@@ -202,6 +203,10 @@ PORTED_MODULES = [
     # a live module, but it is not part of the v2 B2B port: it has its own seven
     # tables, its own models Base, and shares no row with anything above.
     "customer_portal",
+    # The landing page's own contact form — public, no session, relays
+    # straight to the business inbox by email. No migration: nothing is
+    # persisted, there is no table to add.
+    "public_contact",
 ]
 PENDING_MODULES = [
     "catalog_management",  # deliberately deferred — see docs/SCHEMA_V2.md; not in the approved spec
@@ -313,6 +318,9 @@ app.include_router(customer_hotel_bookings.router)
 # the catalogue routes (`/packages`, `/packages/{id}`, `/packages/departures`,
 # `/packages/addons`) are public for the same reason the hotel ones are.
 app.include_router(customer_package_bookings.router)
+# The landing page's contact form. Deliberately last and unauthenticated —
+# see routers/public.py.
+app.include_router(public.router)
 
 
 @app.on_event("startup")
