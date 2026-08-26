@@ -23,13 +23,14 @@
 const BookingData = (function () {
 
   const CONFIG = {
-    useLiveApi: { seatMap: false, addons: false, rooms: false, cabins: false, visa: false },
+    useLiveApi: { seatMap: false, addons: false, rooms: true, cabins: false, visa: false, departures: true },
     endpoints: {
       seatMap: '/api/customer/flights/seatmap',
       addons:  '/api/customer/addons',
       rooms:   '/api/customer/hotels/rooms',
       cabins:  '/api/customer/cruises/cabins',
       visa:    '/api/customer/visa/requirements',
+      departures: '/api/customer/packages/departures',
     },
   };
 
@@ -284,6 +285,38 @@ const BookingData = (function () {
           return flat;
         } catch { /* fall through to the local catalogue */ }
       }
+      /* Hotels have their own real catalogue now (breakfast, transfers, late
+         checkout, insurance) — same flattening as flights, kept in its own
+         branch so cruises and packages are untouched by this. */
+      if (productType === 'hotel' && typeof BookingApi !== 'undefined'
+          && BookingApi.isLive('hotel')) {
+        try {
+          const c = await BookingApi.hotelAddons();
+          const flat = [];
+          ['meal', 'service'].forEach(group => {
+            (c[group] || []).forEach(a => flat.push({
+              id: a.code, code: a.code, name: a.name, price: a.price,
+              note: a.description, group, per: a.per,
+              icon: group === 'meal' ? 'activities' : 'insurance',
+            }));
+          });
+          return flat;
+        } catch { /* fall through to the local catalogue */ }
+      }
+      /* Packages: hotel upgrade, private guide, airport transfer, travel
+         insurance — same idea, own branch so cruises stay untouched. */
+      if (productType === 'package' && typeof BookingApi !== 'undefined'
+          && BookingApi.isLive('package')) {
+        try {
+          const c = await BookingApi.packageAddons();
+          const flat = [];
+          (c.service || []).forEach(a => flat.push({
+            id: a.code, code: a.code, name: a.name, price: a.price,
+            note: a.description, group: 'service', per: a.per, icon: 'insurance',
+          }));
+          return flat;
+        } catch { /* fall through to the local catalogue */ }
+      }
       return load('addons', () => (ADDONS[productType] || []).slice(), { type: productType });
     },
     async rooms(hotel) {
@@ -293,7 +326,7 @@ const BookingData = (function () {
       return load('cabins', () => buildCabins(cruise), { cruise: cruise.id });
     },
     async departures(pkg) {
-      return buildDepartures(pkg);
+      return load('departures', () => buildDepartures(pkg), { package: pkg.id });
     },
     async visaCountries() {
       return load('visa', () => Object.keys(VISA).sort());

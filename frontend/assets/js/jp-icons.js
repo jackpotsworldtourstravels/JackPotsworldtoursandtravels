@@ -138,6 +138,13 @@ const JPIcon = (function () {
     bell: `
       <path data-jpi="rock" d="M18 8.4a6 6 0 1 0-12 0c0 6.9-2.9 8.8-2.9 8.8h17.8S18 15.3 18 8.4" style="transform-origin:12px 6px"/>
       <path d="M13.7 20.9a2 2 0 0 1-3.4 0"/>`,
+
+    /* Upload a document into a tray. Used by the passport-scan control on the
+       traveller step — an arrow lifting into the tray it just left. */
+    upload: `
+      <path d="M4.4 15.6v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>
+      <path data-jpi="lift" d="M12 14.6V3.4"/>
+      <path data-jpi="lift" d="M7.8 7.4 12 3.2l4.2 4.2"/>`,
   };
 
   /** Human labels, used for the title/aria when an icon is asked to stand alone. */

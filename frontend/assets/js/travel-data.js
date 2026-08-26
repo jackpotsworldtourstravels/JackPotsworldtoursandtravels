@@ -23,9 +23,9 @@
 const TravelData = (function () {
 
   const CONFIG = {
-    /* Flip per source as each real endpoint lands — they will not all arrive
-       together, and flights is the one that is coming first. */
-    useLiveApi: { flights: false, hotels: false, cruises: false, packages: false },
+    /* Flip per source as each real endpoint lands — flights, then hotels,
+       then packages. Cruises and visa stay demo for now. */
+    useLiveApi: { flights: false, hotels: true, cruises: false, packages: true },
     endpoints: {
       flights: '/api/customer/flights/search',
       hotels: '/api/customer/hotels',
@@ -38,37 +38,23 @@ const TravelData = (function () {
   };
 
   /* -------------------------------------------------------------------------
-     Airport reference — code, city, and UTC offset in minutes.
+     Airport reference — moved to airports.js.
 
-     THE OFFSET IS NOT DECORATION. Departure and arrival are both LOCAL times,
-     so `arrival - departure` is only the real duration when both ends share a
-     timezone. Hyderabad -> Jeddah 05:05 -> 08:50 subtracts to 3h45m; the flight
-     actually takes 6h15m. Every international row in the sample data would have
-     been wrong. durationMinutes() converts both ends to UTC first.
+     It left this file so the landing page could have an airport picker without
+     also loading a flight schedule and a hotel image map for the sake of 17
+     city names. See that file's header for the table and for why the UTC offset
+     matters to durationMinutes() below.
 
-     travel-locations.js has the city and airport names but carries no offsets,
-     so they live here.
+     LOAD ORDER IS A REAL DEPENDENCY: airports.js must come before this script
+     on every page that loads it, or every flight here loses its origin and
+     destination cities. The fallback keeps that failure loud in the console
+     rather than silently rendering blank routes.
      ---------------------------------------------------------------------- */
-  const IST = 330;               // +05:30
-  const AIRPORTS = {
-    HYD: { city: 'Hyderabad',          country: 'India',        utc: IST },
-    DEL: { city: 'Delhi',              country: 'India',        utc: IST },
-    JAI: { city: 'Jaipur',             country: 'India',        utc: IST },
-    CJB: { city: 'Coimbatore',         country: 'India',        utc: IST },
-    AYJ: { city: 'Ayodhya',            country: 'India',        utc: IST },
-    CCU: { city: 'Kolkata',            country: 'India',        utc: IST },
-    NAG: { city: 'Nagpur',             country: 'India',        utc: IST },
-    TIR: { city: 'Tirupati',           country: 'India',        utc: IST },
-    TRV: { city: 'Thiruvananthapuram', country: 'India',        utc: IST },
-    IXU: { city: 'Aurangabad',         country: 'India',        utc: IST },
-    VGA: { city: 'Vijayawada',         country: 'India',        utc: IST },
-    STV: { city: 'Surat',              country: 'India',        utc: IST },
-    BLR: { city: 'Bengaluru',          country: 'India',        utc: IST },
-    JED: { city: 'Jeddah',             country: 'Saudi Arabia', utc: 180 },
-    MED: { city: 'Madinah',            country: 'Saudi Arabia', utc: 180 },
-    BAH: { city: 'Bahrain',            country: 'Bahrain',      utc: 180 },
-    BKK: { city: 'Bangkok',            country: 'Thailand',     utc: 420 },
-  };
+  if (typeof JPAirports === 'undefined') {
+    console.error('[travel-data] airports.js must load before travel-data.js');
+  }
+  const IST = (typeof JPAirports !== 'undefined') ? JPAirports.IST : 330;
+  const AIRPORTS = (typeof JPAirports !== 'undefined') ? JPAirports.TABLE : {};
 
   /* Carrier -> IATA, so airline-logos.js can resolve a vendored logo file.
      Keyed by name because the sample data names the airline; the flight number
@@ -307,13 +293,23 @@ const TravelData = (function () {
       id: h.id, name: h.name, imageKey: h.image, stars: h.stars,
       location: h.location, distanceKm: h.distanceKm,
       pricePerNight: h.pricePerNight, amenities: h.amenities.slice(),
+      /* Only the real endpoint sends these — undefined on the sample rows,
+         which the card/details renderers already treat as "not shown". */
+      guestRating: h.guest_rating != null ? Number(h.guest_rating) : undefined,
+      cancellationPolicy: h.cancellation_policy,
     };
   }
   function normaliseCruise(c) {
     return { id: c.id, name: c.name, route: c.route, nights: c.nights, priceFrom: c.priceFrom };
   }
   function normalisePackage(p) {
-    return { id: p.id, name: p.name, days: p.days, priceFrom: p.priceFrom, blurb: p.blurb };
+    return {
+      id: p.id, name: p.name, days: p.days, priceFrom: p.priceFrom, blurb: p.blurb,
+      /* Only the real endpoint sends this — undefined on the sample rows,
+         which isInternational() already treats as "unknown, assume domestic"
+         the same way a flight with no origin/destination country does. */
+      isInternational: p.is_international,
+    };
   }
 
   /* -------------------------------------------------------------------------

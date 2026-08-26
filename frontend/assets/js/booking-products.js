@@ -24,6 +24,23 @@ const BookingProducts = (function () {
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   const icon = n => (typeof JPIcon !== 'undefined' ? JPIcon.html(n, { size: 'sm' }) : '');
 
+  /** Whether the traveller step may offer "Upload Passport" at all.
+   *  `undefined` = not asked yet, `false`/`true` once the server has answered.
+   *  Asked once per page load and cached module-wide — this is a deployment
+   *  fact, not something that varies per traveller or repaint — and a
+   *  deployment with no provider configured must render no control at all,
+   *  never one that fails when pressed. */
+  let _ocrAvailable;
+
+  function checkOcrAvailability() {
+    if (_ocrAvailable !== undefined) return;
+    if (typeof BookingApi === 'undefined') { _ocrAvailable = false; return; }
+    _ocrAvailable = false; // hidden until proven otherwise
+    BookingApi.ocrAvailability().then(v => {
+      if (v) { _ocrAvailable = true; BookingFlow.repaint(); }
+    });
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso.length > 10 ? iso : iso + 'T00:00:00');
@@ -186,38 +203,92 @@ const BookingProducts = (function () {
     const needsPassport = ctx =>
       o.passport && !!(typeof BookingApi !== 'undefined' && BookingApi.isInternational(ctx.item));
 
+    /** A traveller counts as complete once the fields the airline actually
+     *  needs are on the draft — the same set validate() enforces, checked
+     *  here only to decide what the status pill says. */
+    function paxComplete(ctx, i, intl) {
+      const p = (ctx.passengers && ctx.passengers[i]) || {};
+      if (!p.first || !p.last || !p.gender) return false;
+      if (intl && (!p.passportNumber || !p.passportExpiry)) return false;
+      return true;
+    }
+
+    /** The "Upload Passport" control shown above the passport fields — absent
+     *  entirely on a deployment with no OCR provider configured (see
+     *  `checkOcrAvailability`), so there is never a button that fails when
+     *  pressed. States: idle, busy (reading), done (fields filled — the
+     *  traveller still reviews and edits them below, this only reports what
+     *  happened), error (a message the form can show without blocking manual
+     *  entry). No provider name ever appears here. */
+    function scanControlHtml(i, ctx) {
+      if (!_ocrAvailable) return '';
+      const scan = (ctx.paxScan && ctx.paxScan[i]) || { status: 'idle' };
+      const busy = scan.status === 'busy';
+      const done = scan.status === 'done';
+      const failed = scan.status === 'error';
+
+      if (done) {
+        return `<div class="bk-scan is-done">
+          <p class="bk-scan-msg is-ok">&#10003; Passport details detected</p>
+          <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" data-scan-edit="${i}">Edit Details</button>
+        </div>`;
+      }
+
+      return `<div class="bk-scan ${failed ? 'is-error' : ''}">
+        <input type="file" id="${scanId(i)}" class="bk-scan-input" data-scan-input="${i}"
+               accept="image/jpeg,image/png,image/webp,application/pdf" ${busy ? 'disabled' : ''}>
+        <label class="bk-scan-btn ${busy ? 'is-busy' : ''}" for="${scanId(i)}">
+          ${icon('upload')}<span>${busy ? 'Reading your passport…' : 'Upload Passport'}</span>
+        </label>
+        <p class="bk-scan-hint">Upload a clear passport image to automatically fill your details.</p>
+        ${failed ? `<p class="bk-scan-msg is-bad" role="alert">${esc(scan.message)}</p>` : ''}
+      </div>`;
+    }
+
+    const scanId = i => `p${i}_ppscan`;
+
     function cardHtml(i, ctx) {
       const kind = (ctx.paxKinds && ctx.paxKinds[i]) || 'Adult';
       const intl = needsPassport(ctx);
       const p = `p${i}_`;
+      const open = !!(ctx.paxOpen && ctx.paxOpen[i]);
+      const complete = paxComplete(ctx, i, intl);
 
       const passportBody = `
+        ${scanControlHtml(i, ctx)}
         <p class="bk-disclose-note" id="${p}ppnote" role="status" aria-live="polite"></p>
         <div class="bk-grid">${passportSpecs(i).map(field).join('')}</div>`;
 
       const ffBody = `<div class="bk-grid">${frequentFlyerSpecs(i).map(field).join('')}</div>`;
 
-      return `<section class="bk-pax" data-pax="${i}">
+      return `<section class="bk-pax ${open ? 'is-open' : ''}" data-pax="${i}">
         <header class="bk-pax-head">
-          <h3>${esc(o.noun)} ${i + 1} <span class="bk-tag">${esc(kind)}</span></h3>
-          ${i === 0 ? '<span class="bk-pax-note">Contact details for the whole booking</span>' : ''}
+          <button type="button" class="bk-pax-toggle" data-pax-toggle="${i}"
+                  aria-expanded="${open}" aria-controls="pax${i}-body">
+            <span class="bk-pax-chev" aria-hidden="true">${icon('arrowUp')}</span>
+            <h3>${esc(o.noun)} ${i + 1} <span class="bk-tag">${esc(kind)}</span></h3>
+          </button>
+          <span class="bk-pax-status ${complete ? 'is-done' : ''}">${complete ? '&#10003; Details completed' : 'Details required'}</span>
           ${i > 0 ? `<button type="button" class="bk-pax-remove" data-remove="${i}"
                        aria-label="Remove ${esc(o.noun)} ${i + 1}">Remove</button>` : ''}
         </header>
 
-        <div class="bk-grid">${primarySpecs(i, o).map(field).join('')}</div>
+        <div class="bk-pax-body" id="pax${i}-body" ${open ? '' : 'hidden'}>
+          ${i === 0 ? '<p class="bk-pax-note">Contact details for the whole booking</p>' : ''}
+          <div class="bk-grid">${primarySpecs(i, o).map(field).join('')}</div>
 
-        ${o.frequentFlyer ? disclosure(
-          `${p}ff`, 'Frequent flyer number', 'Avail extra benefits & earn points', ffBody
-        ) : ''}
+          ${o.frequentFlyer ? disclosure(
+            `${p}ff`, 'Frequent flyer number', 'Avail extra benefits & earn points', ffBody
+          ) : ''}
 
-        ${o.passport ? `
-          <div class="bk-subcard">
-            <h4 class="bk-subcard-title">OTHER DETAILS</h4>
-            ${disclosure(`${p}pp`, 'Passport details',
-              intl ? 'Required for international travel' : 'Optional for domestic travel',
-              passportBody, { open: intl })}
-          </div>` : ''}
+          ${o.passport ? `
+            <div class="bk-subcard">
+              <h4 class="bk-subcard-title">OTHER DETAILS</h4>
+              ${disclosure(`${p}pp`, 'Passport details',
+                intl ? 'Required for international travel' : 'Optional for domestic travel',
+                passportBody, { open: intl })}
+            </div>` : ''}
+        </div>
       </section>`;
     }
 
@@ -226,12 +297,20 @@ const BookingProducts = (function () {
       label: o.noun + 's',
 
       render(ctx) {
+        if (o.passport) checkOcrAvailability();
+
         /* The party size is the traveller's to change from here on, so it is
            held on the draft rather than recomputed from the search each time. */
         if (!Array.isArray(ctx.paxKinds) || !ctx.paxKinds.length) {
           ctx.paxKinds = Array.from({ length: Math.max(1, ctx.paxCount || 1) }, () => 'Adult');
         }
         ctx.paxCount = ctx.paxKinds.length;
+        /* Traveller 1 opens by default — there is always something to fill in.
+           Anyone already in the party beyond that starts collapsed, per the
+           reference; a traveller added just now via "+ Add" opens instead
+           (that push happens in mount(), not here). */
+        if (!Array.isArray(ctx.paxOpen)) ctx.paxOpen = [];
+        ctx.paxKinds.forEach((_, i) => { if (ctx.paxOpen[i] === undefined) ctx.paxOpen[i] = i === 0; });
 
         const cards = ctx.paxKinds.map((_, i) => cardHtml(i, ctx)).join('');
         const intl = needsPassport(ctx);
@@ -246,9 +325,9 @@ const BookingProducts = (function () {
             travel date.</p>` : ''}
           <div id="bkPaxList">${cards}</div>
           ${canAdd ? `<div class="bk-addpax">
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddAdult">+ ADD NEW ADULT</button>
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddChild">+ Add child</button>
-            <button type="button" class="bk-btn bk-btn-ghost" id="bkAddInfant">+ Add infant</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddAdult">+ Add Adult</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddChild">+ Add Child</button>
+            <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" id="bkAddInfant">+ Add Infant</button>
           </div>` : ''}
           <label class="bk-check bk-savelist">
             <input type="checkbox" id="bkSaveTravellers" ${ctx.saveTravellers ? 'checked' : ''}>
@@ -270,6 +349,16 @@ const BookingProducts = (function () {
             panel.hidden = !open;
             btn.setAttribute('aria-expanded', String(open));
             wrap.querySelector('.bk-disclose-sign').innerHTML = open ? '&minus;' : '+';
+          });
+        });
+
+        /* --- collapse/expand a whole traveller card --- */
+        root.querySelectorAll('[data-pax-toggle]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.paxToggle);
+            readInto(ctx, root);                 // keep what is on screen in every card
+            ctx.paxOpen[i] = !ctx.paxOpen[i];
+            BookingFlow.repaint();
           });
         });
 
@@ -324,10 +413,60 @@ const BookingProducts = (function () {
           });
         });
 
+        /* --- passport scan: upload a photo, fill blanks from what it read --
+           Same "only fill blanks" rule as the lookup above, and the same
+           tolerance for failure: a bad scan reports itself and leaves the
+           form exactly as usable as it was before the upload. */
+        root.querySelectorAll('[data-scan-input]').forEach(input => {
+          const i = Number(input.dataset.scanInput);
+
+          input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            readInto(ctx, root);
+            if (!Array.isArray(ctx.paxScan)) ctx.paxScan = [];
+            ctx.paxScan[i] = { status: 'busy' };
+            BookingFlow.repaint();
+
+            try {
+              const result = await BookingApi.extractPassport(file);
+              const fields = (result && result.fields) || {};
+              const fill = (suffix, key) => {
+                const el = root.querySelector(`#p${i}_${suffix}`);
+                const value = fields[key] && fields[key].value;
+                if (el && value && !el.value) el.value = value;
+              };
+              fill('first', 'first_name'); fill('last', 'last_name');
+              fill('gender', 'gender'); fill('title', 'title');
+              fill('dob', 'date_of_birth'); fill('nat', 'nationality');
+              fill('ppno', 'passport_number'); fill('ppexp', 'passport_expiry');
+              fill('ppiss', 'issuing_country');
+              readInto(ctx, root);
+              ctx.paxScan[i] = { status: 'done' };
+            } catch (err) {
+              const message = (typeof BookingApi.errorText === 'function')
+                ? BookingApi.errorText(err, 'We could not read that passport. Please enter the details by hand.')
+                : 'We could not read that passport. Please enter the details by hand.';
+              ctx.paxScan[i] = { status: 'error', message };
+            }
+            BookingFlow.repaint();
+          });
+        });
+
+        root.querySelectorAll('[data-scan-edit]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.scanEdit);
+            readInto(ctx, root);
+            if (Array.isArray(ctx.paxScan)) ctx.paxScan[i] = { status: 'idle' };
+            BookingFlow.repaint();
+          });
+        });
+
         /* --- add / remove travellers --- */
         const add = kind => {
           readInto(ctx, root);                 // keep what is on screen
           ctx.paxKinds.push(kind);
+          ctx.paxOpen.push(true);              // open the one just added — it's empty
           ctx.paxCount = ctx.paxKinds.length;
           BookingFlow.repaint();
         };
@@ -344,6 +483,8 @@ const BookingProducts = (function () {
             const i = Number(btn.dataset.remove);
             ctx.paxKinds.splice(i, 1);
             (ctx.passengers || []).splice(i, 1);
+            if (Array.isArray(ctx.paxOpen)) ctx.paxOpen.splice(i, 1);
+            if (Array.isArray(ctx.paxScan)) ctx.paxScan.splice(i, 1);
             /* A seat belonged to the traveller who just left, not to the
                position, so drop it rather than shifting it onto someone else. */
             if (Array.isArray(ctx.seats)) ctx.seats.splice(i, 1);
@@ -367,8 +508,20 @@ const BookingProducts = (function () {
           const el = root.querySelector('#' + id);
           if (el) {
             el.classList.add('is-invalid');
-            /* Open the panel the bad field is in, or the traveller is told to
-               fix something they cannot see. */
+            /* Open the traveller card itself first — a field inside a
+               collapsed card cannot be focused at all — then the disclosure
+               panel inside it, or the traveller is told to fix something
+               they cannot see. */
+            const card = el.closest('.bk-pax');
+            const body = card && card.querySelector('.bk-pax-body');
+            if (body && body.hidden) {
+              body.hidden = false;
+              card.classList.add('is-open');
+              const toggle = card.querySelector('.bk-pax-toggle');
+              if (toggle) toggle.setAttribute('aria-expanded', 'true');
+              const i = card.dataset.pax;
+              if (i != null && ctx.paxOpen) ctx.paxOpen[i] = true;
+            }
             const panel = el.closest('.bk-disclose-panel');
             if (panel && panel.hidden) {
               const wrap = panel.closest('.bk-disclose');
@@ -586,11 +739,10 @@ const BookingProducts = (function () {
           a => a.passengerIndex == null && a.per !== 'passenger');
 
         const travellers = (ctx.passengers || []).map((p, i) => {
-          const seat = ctx.seats && ctx.seats[i];
           const mine = addonsFor(i);
+          /* Seats get their own dedicated panel below (flights only), so this
+             card stays about who the traveller is, not where they sit. */
           const rows = [
-            ['Seat', seat ? `${esc(seat.id)} — ${seat.price ? esc(money(seat.price)) : 'No extra charge'}`
-                          : 'Assigned at check-in'],
             ...mine.map(a => [a.group === 'meal' ? 'Meal' : a.group === 'baggage' ? 'Baggage' : 'Service',
                               `${esc(a.name)} — ${a.price ? esc(money(a.price)) : 'Free'}`]),
           ];
@@ -630,17 +782,33 @@ const BookingProducts = (function () {
             <p class="bk-step-sub">Nothing is charged until you confirm on the next step.</p>
 
             <section class="bk-panel">
-              <div class="bk-panel-head"><h3>Journey details</h3></div>
+              <div class="bk-panel-head"><h3>${ctx.kind === 'flight' ? 'Flight' : 'Journey details'}</h3></div>
               ${describe(ctx)}
             </section>
 
             <section class="bk-panel">
               <div class="bk-panel-head">
                 <h3>${esc(ctx.passengers.length)} ${ctx.passengers.length === 1 ? 'traveller' : 'travellers'}</h3>
-                ${edit('travellers', 'travellers')}${edit('seats', 'seats')}
+                ${edit('travellers', 'travellers')}
               </div>
               <div class="bk-review-paxlist">${travellers}</div>
             </section>
+
+            ${ctx.kind === 'flight' ? `
+            <section class="bk-panel">
+              <div class="bk-panel-head"><h3>Seats</h3>${edit('seats', 'seats')}</div>
+              <div class="bk-review-seats">
+                ${(ctx.passengers || []).map((p, i) => {
+                  const seat = ctx.seats && ctx.seats[i];
+                  return `<div class="bk-review-seat">
+                      <span>Traveller ${i + 1}</span>
+                      ${seat
+                        ? `<b>${esc(seat.id)}</b><span>${seat.price ? esc(money(seat.price)) : 'No extra charge'}</span>`
+                        : '<span class="is-muted">Assigned at check-in</span>'}
+                    </div>`;
+                }).join('')}
+              </div>
+            </section>` : ''}
 
             <section class="bk-panel">
               <div class="bk-panel-head"><h3>Add-ons</h3>${edit('addons', 'add-ons')}</div>
@@ -773,10 +941,10 @@ const BookingProducts = (function () {
       payment: ctx.payment,
       pricing: ctx.pricing,
       item: ctx.item ? { id: ctx.item.id, name: ctx.summaryTitle } : null,
-      /* For flights, what the server is actually asked to book. Note it names
-         choices only — no prices — so the total is the server's arithmetic and
-         not something this page could dictate. Absent for the other products,
-         which BookingStore then keeps local. */
+      /* For flights and hotels, what the server is actually asked to book.
+         Note it names choices only — no prices — so the total is the
+         server's arithmetic and not something this page could dictate.
+         Absent for cruises/packages/visa, which BookingStore keeps local. */
       apiPayload: (ctx.kind === 'flight' && typeof BookingApi !== 'undefined')
         ? {
             flight: BookingApi.flightPayload(ctx),
@@ -805,6 +973,49 @@ const BookingProducts = (function () {
             coupon_code: ctx.couponCode || null,
             save_travellers: !!ctx.saveTravellers,
           }
+        : (ctx.kind === 'hotel' && typeof BookingApi !== 'undefined' && ctx.room)
+        ? {
+            stay: BookingApi.hotelPayload(ctx),
+            guests: (ctx.passengers || []).map((p, i) => ({
+              guest_type: String(p.kind || 'Adult').toLowerCase() === 'child' ? 'child' : 'adult',
+              title: p.title || null,
+              first_name: p.first,
+              last_name: p.last,
+              gender: p.gender || null,
+              date_of_birth: p.dob || null,
+              nationality: p.nationality || null,
+              is_contact: i === 0,
+              mobile: i === 0 && p.mobile
+                ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
+              email: i === 0 ? (p.email || null) : null,
+            })),
+            addons: BookingApi.hotelAddonPayload(ctx),
+            special_requests: ctx.requests || [],
+            notes: ctx.notes || null,
+            coupon_code: ctx.couponCode || null,
+          }
+        : (ctx.kind === 'package' && typeof BookingApi !== 'undefined' && ctx.departure)
+        ? {
+            trip: BookingApi.packagePayload(ctx),
+            travellers: (ctx.passengers || []).map((p, i) => ({
+              traveller_type: String(p.kind || 'Adult').toLowerCase(),
+              title: p.title || null,
+              first_name: p.first,
+              last_name: p.last,
+              gender: p.gender || null,
+              date_of_birth: p.dob || null,
+              nationality: p.nationality || null,
+              passport_number: p.passportNumber || null,
+              passport_expiry: p.passportExpiry || null,
+              issuing_country: p.issuingCountry || null,
+              is_contact: i === 0,
+              mobile: i === 0 && p.mobile
+                ? `${(p.countryCode || '+91 India').split(' ')[0]}${p.mobile}` : null,
+              email: i === 0 ? (p.email || null) : null,
+            })),
+            addons: BookingApi.packageAddonPayload(ctx),
+            coupon_code: ctx.couponCode || null,
+          }
         : null,
     };
   }
@@ -825,21 +1036,32 @@ const BookingProducts = (function () {
            booking (the four products with no backend) still carries the ones
            booking-store.js stamps. */
         const live = b.demo === false;
+        const isHotel = ctx.kind === 'hotel';
+        const isPackage = ctx.kind === 'package';
+        const isFlight = ctx.kind === 'flight';
         const refs = [
           ['Booking ID', b.id],
           /* PNR IS SHOWN AS PENDING, NOT AS A NUMBER WE MADE UP. An airline
              issues it through a GDS and none is integrated, so a string
-             invented here would be quoted at a check-in desk and rejected. */
-          live
+             invented here would be quoted at a check-in desk and rejected.
+             There is no such concept for a hotel stay or a tour package, so
+             it is skipped entirely rather than shown as "Pending" for
+             something that will never exist. */
+          (live && isFlight)
             ? ['PNR', b.pnr || 'Pending — issued by the airline on ticketing']
             : (b.pnr ? ['PNR', b.pnr] : null),
           b.ticketNumber ? ['Ticket number', b.ticketNumber] : null,
-          ['Airline', b.title],
-          ['Route', b.subtitle],
-          b.travelDate ? ['Travel date', fmtDate(b.travelDate)] : null,
-          (b.departure || b.arrival) ? ['Departure / arrival',
+          [isHotel ? 'Hotel' : isPackage ? 'Package' : 'Airline', b.title],
+          !isPackage ? [isHotel ? 'Location' : 'Route', b.subtitle] : null,
+          isPackage && b.days ? ['Duration', `${b.days} day${b.days === 1 ? '' : 's'}`] : null,
+          isHotel && b.checkIn ? ['Check-in', fmtDate(b.checkIn)] : null,
+          isHotel && b.checkOut ? ['Check-out', fmtDate(b.checkOut)] : null,
+          isHotel && b.nights ? ['Nights', b.nights] : null,
+          isHotel && b.roomName ? ['Room', b.roomName] : null,
+          !isHotel && b.travelDate ? [isPackage ? 'Departure date' : 'Travel date', fmtDate(b.travelDate)] : null,
+          (isFlight && (b.departure || b.arrival)) ? ['Departure / arrival',
             `${b.departure || '—'} → ${b.arrival || '—'}`] : null,
-          (b.seats && b.seats.length) ? ['Seat' + (b.seats.length > 1 ? 's' : ''),
+          (isFlight && b.seats && b.seats.length) ? ['Seat' + (b.seats.length > 1 ? 's' : ''),
             b.seats.join(', ')] : null,
           ['Booked on', fmtDate(b.bookedAt)],
           ['Payment method', (b.payment || {}).methodLabel || (b.payments && b.payments[0] && b.payments[0].method) || '—'],
@@ -855,24 +1077,26 @@ const BookingProducts = (function () {
         return `<div class="bk-step bk-done">
             <div class="bk-done-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('insurance', { size: 'xl' }) : ''}</div>
             <h2>Booking confirmed</h2>
-            <p class="bk-step-sub">Your flight booking has been successfully confirmed.
+            <p class="bk-step-sub">Your booking has been successfully confirmed.
               ${esc(ctx.summaryTitle || '')} — recorded against your account.</p>
 
             <div class="bk-refs">${refs}</div>
 
             <section class="bk-panel">
-              <h3>Travellers</h3>
+              <h3>${isHotel ? 'Guests' : 'Travellers'}</h3>
               <ul class="bk-list">${pax || '<li class="is-muted">—</li>'}</ul>
             </section>
 
             <div class="bk-done-actions">
-              <button type="button" class="bk-btn bk-btn-primary" data-act="download">Download ticket</button>
-              <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>
+              <a class="bk-btn bk-btn-primary" href="my-bookings.html">View booking</a>
+              <button type="button" class="bk-btn bk-btn-ghost" data-act="download">Download ticket</button>
               <button type="button" class="bk-btn bk-btn-ghost" data-act="email">Email ticket</button>
-              <a class="bk-btn bk-btn-ghost" href="my-bookings.html">View my bookings</a>
+              <button type="button" class="bk-btn bk-btn-ghost" data-act="print">Print</button>
             </div>
             <p class="bk-demo-foot">${b.demo === false
-              ? 'No payment gateway is connected, so nothing has been charged and no ticket has been issued by an airline yet. Your booking reference above is real and can be quoted to support.'
+              ? (isFlight
+                  ? 'No payment gateway is connected, so nothing has been charged and no ticket has been issued by an airline yet. Your booking reference above is real and can be quoted to support.'
+                  : 'No payment gateway is connected, so nothing has been charged yet. Your booking reference above is real and can be quoted to support.')
               : 'Demo booking — no payment was taken and no ticket has been issued by an airline.'}</p>
           </div>`;
       },

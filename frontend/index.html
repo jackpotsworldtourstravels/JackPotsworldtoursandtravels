@@ -13,12 +13,44 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
 <link rel="stylesheet" href="assets/css/main.css?v=20260824ic9">
+<!-- The hero card's own controls: trip type, the passenger popover and the
+     round-trip return row. Loaded AFTER main.css, which still owns .search-card
+     and .field — this file only adds. -->
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260825h1">
+<!-- All of these are needed BEFORE the inline BookingCard.render() call in the
+     hero, so they are in <head> rather than at the foot with the rest.
+
+     airports.js and search-widgets.js are the airport picker: the ~2KB table
+     and the shared listbox. NOT travel-data.js — the note at the foot of this
+     page about the explore assets still stands, and the table was moved out of
+     it precisely so the landing page could have a picker without a flight
+     schedule and a hotel image map coming along for the ride. -->
+<script src="assets/js/airports.js?v=20260825t3"></script>
+<script src="assets/js/search-widgets.js?v=20260825t3"></script>
+<script src="assets/js/destinations.js?v=20260825h1"></script>
+<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
+<script src="assets/js/pax-selector.js?v=20260825t2"></script>
+<script src="assets/js/booking-card.js?v=20260825h1"></script>
+<!-- The header's scroll fade, hamburger and hero parallax. Shared with the
+     Flights page, which mounts its whole nav from this file — see its header
+     comment. This page keeps its static markup and only borrows the behaviour. -->
+<script src="assets/js/hero-shell.js?v=20260825t2"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
 <body>
 <a href="#main" class="skip-link">Skip to content</a>
 
+<!-- THIS NAV BAR EXISTS TWICE, AND THE OTHER COPY IS hero-shell.js.
+
+     The Flights page is this page continued rather than a separate layout, so
+     it wears exactly this header — but it builds it in JS, while this one stays
+     static HTML on purpose: this is the marketing front door, and its nav links
+     and hero heading should be in the document a crawler is served rather than
+     assembled afterwards.
+
+     CHANGE ONE, CHANGE THE OTHER. Styling is main.css's and is shared, so only
+     the link list, the logo and the account controls live in both places. -->
 <header id="siteHeader">
   <nav class="wrap">
     <a href="#home" class="logo">
@@ -118,158 +150,14 @@
     <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
   </div>
 
-  <div class="wrap search-dock">
-    <div class="search-card" role="region" aria-label="Booking search">
-      <div class="tabs" role="tablist" aria-label="Booking type">
-        <button class="tab active" role="tab" aria-selected="true" data-tab="flights" data-jpi-hover><span data-jp-icon="flights" data-jp-size="sm"></span> Flights</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="hotels" data-jpi-hover><span data-jp-icon="hotels" data-jp-size="sm"></span> Hotels</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="cruises" data-jpi-hover><span data-jp-icon="cruises" data-jp-size="sm"></span> Cruises</button>
-        <button class="tab" role="tab" aria-selected="false" data-tab="packages" data-jpi-hover><span data-jp-icon="packages" data-jp-size="sm"></span> Tour Packages</button>
-      </div>
-
-      <div class="search-body">
-      <div class="search-panel active" data-panel="flights">
-        <div class="search-fields">
-          <div class="field"><label for="fFrom">From Airport</label><input id="fFrom" value="Hyderabad (HYD)"></div>
-          <button class="swap-btn" type="button" aria-label="Swap origin and destination"><span data-jp-icon="swap" data-jp-size="sm"></span></button>
-          <div class="field"><label for="fTo">To Airport</label><input id="fTo" value="Delhi (DEL)"></div>
-          <div class="field field-date">
-            <label for="fDep">Departure</label>
-            <input id="fDep" class="date-display" value="Sat, 4 Jul" readonly>
-            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
-            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div class="field field-date">
-            <label for="fRet">Return</label>
-            <input id="fRet" class="date-display" value="Add date" readonly>
-            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
-            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div class="field">
-            <label for="fPax">Passengers</label>
-            <select id="fPax">
-              <option>1 Passenger</option>
-              <option>2 Passengers</option>
-              <option>3 Passengers</option>
-              <option>4 Passengers</option>
-              <option>5+ Passengers</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="fCabin">Cabin</label>
-            <select id="fCabin">
-              <option>Economy</option>
-              <option>Premium Economy</option>
-              <option>Business</option>
-              <option>First</option>
-            </select>
-          </div>
-          <button class="btn btn-coral search-go">Search</button>
-        </div>
-      </div>
-
-      <div class="search-panel" data-panel="hotels">
-        <div class="search-fields cols-6">
-          <div class="field"><label for="hDest">Destination</label><input id="hDest" value="Goa, India"></div>
-          <div class="field field-date">
-            <label for="hIn">Check-in</label>
-            <input id="hIn" class="date-display" value="Fri, 10 Jul" readonly>
-            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
-            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div class="field field-date">
-            <label for="hOut">Check-out</label>
-            <input id="hOut" class="date-display" value="Sun, 12 Jul" readonly>
-            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
-            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div class="field">
-            <label for="hGuests">Guests</label>
-            <select id="hGuests">
-              <option>1 Guest</option>
-              <option>2 Guests</option>
-              <option>3 Guests</option>
-              <option>4 Guests</option>
-              <option>5+ Guests</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="hRooms">Rooms</label>
-            <select id="hRooms">
-              <option>1 Room</option>
-              <option>2 Rooms</option>
-              <option>3 Rooms</option>
-              <option>4 Rooms</option>
-            </select>
-          </div>
-          <button class="btn btn-coral search-go">Search</button>
-        </div>
-      </div>
-
-      <div class="search-panel" data-panel="cruises">
-        <div class="search-fields cols-5">
-          <div class="field">
-            <label for="crType">Cruise Type</label>
-            <select id="crType">
-              <option>Goa Cruise</option>
-              <option>Kerala Backwater Cruise</option>
-              <option>Singapore Cruise</option>
-              <option>Dubai Cruise</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="crMonth">Month</label>
-            <select id="crMonth">
-              <option>January</option><option>February</option><option>March</option><option>April</option>
-              <option>May</option><option>June</option><option selected>July</option><option>August</option>
-              <option>September</option><option>October</option><option>November</option><option>December</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="crDur">Duration</label>
-            <select id="crDur">
-              <option>2 Days</option>
-              <option>3 Days</option>
-              <option>5 Days</option>
-              <option>7 Days</option>
-            </select>
-          </div>
-          <div class="field"><label for="crTrav">Travellers</label><input id="crTrav" value="2 Adults"></div>
-          <button class="btn btn-coral search-go">Search</button>
-        </div>
-      </div>
-
-      <div class="search-panel" data-panel="packages">
-        <div class="search-fields cols-3">
-          <div class="field">
-            <label for="pType">Tour Package Type</label>
-            <select id="pType">
-              <option>Casino Tour Package</option>
-              <option>Domestic Tour Package</option>
-              <option>Pilgrimage Tour Package</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="pMonth">Month</label>
-            <select id="pMonth">
-              <option>January</option><option>February</option><option>March</option><option>April</option>
-              <option>May</option><option>June</option><option selected>July</option><option>August</option>
-              <option>September</option><option>October</option><option>November</option><option>December</option>
-            </select>
-          </div>
-          <button class="btn btn-coral search-go">Search</button>
-        </div>
-      </div>
-      </div>
-
-      <div class="trust-row">
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Trusted by 2 Million+ Travellers</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>24/7 Support</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Secure Payments</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Instant Confirmation</span>
-      </div>
-    </div>
-  </div>
+  <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
+       Flights page mounts the same module — the two pages share one control
+       instead of two copies of a form that would have drifted apart.
+       Rendered inline and synchronously, so this DOM exists before app.js runs
+       at the bottom of the page and its handlers still find .search-panel,
+       .search-go and the field ids exactly where they were. -->
+  <div class="wrap search-dock" id="heroSearchDock"></div>
+  <script>BookingCard.render('heroSearchDock');</script>
 
   <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
 </section>
@@ -949,7 +837,7 @@
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
 <script src="assets/js/jp-icons.js?v=20260824bk9"></script>
-<script src="assets/js/app.js?v=20260824ic9"></script>
+<script src="assets/js/app.js?v=20260825t2"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

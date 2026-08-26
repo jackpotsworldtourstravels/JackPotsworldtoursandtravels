@@ -105,7 +105,8 @@ const BookingFlows = (function () {
             return `${i === 3 ? '<span class="bk-aisle"></span>' : ''}
             <button type="button" class="${cls}" data-seat="${esc(s.id)}"
               ${s.occupied ? 'disabled' : ''} aria-label="${esc(label)}">
-              ${esc(s.letter)}</button>`;
+              <span class="bk-seat-letter">${esc(s.letter)}</span>${s.price > 0 && !s.occupied
+                ? `<span class="bk-seat-price">${esc(money(s.price))}</span>` : ''}</button>`;
           }).join('')}
           ${r.exit ? '<span class="bk-exit-tag">Exit</span>' : ''}
         </div>`).join('');
@@ -210,6 +211,7 @@ const BookingFlows = (function () {
       supportsCoupons: true,
       kicker: `${item.origin.code} → ${item.destination.code}`,
       title: `${item.airline} ${item.flightNumber}`,
+      backLabel: 'flight results',
       /* Kept as the offline fallback and the first paint. The server's answer
          below replaces it, and the two agree — customer_pricing_service.py is
          a port of P.flightPrice, verified against it. */
@@ -356,9 +358,32 @@ const BookingFlows = (function () {
     const guests = (search && search.guests) || 2;
     return {
       kind: 'hotel',
+      /* Hotels have a real coupon backend now too (STAYMORE, seeded in 0053
+         and already returned by /coupons?product_type=hotel) — same reason
+         flights show this and nothing else used to. */
+      supportsCoupons: true,
       kicker: esc(item.location),
       title: item.name,
+      backLabel: 'hotel results',
+      /* Kept as the offline fallback and the first paint, same relationship
+         as flights: customer_hotel_pricing_service.py is a verified port of
+         P.hotelPrice, and the server's answer below replaces it. */
       price: P.hotelPrice,
+      async priceAsync(ctx) {
+        if (typeof BookingApi === 'undefined' || !BookingApi.isLive('hotel') || !ctx.room) return null;
+        const q = await BookingApi.quoteHotel(
+          BookingApi.hotelPayload(ctx),
+          BookingApi.hotelAddonPayload(ctx),
+          ctx.couponCode || null,
+        );
+        ctx.quote = q;
+        ctx.couponError = q.coupon_error || null;
+        return {
+          lines: (q.lines || []).map(l => ({ label: l.label, amount: Number(l.amount) })),
+          total: Number(q.total_amount),
+          note: q.coupon_error || null,
+        };
+      },
       steps: [
         roomStep,
         P.travellersStep({ passport: false, frequentFlyer: false, noun: 'Guest' }),
@@ -435,6 +460,7 @@ const BookingFlows = (function () {
       kind: 'cruise',
       kicker: esc(item.route),
       title: item.name,
+      backLabel: 'cruise results',
       price: P.cruisePrice,
       steps: [
         cabinStep,
@@ -505,9 +531,31 @@ const BookingFlows = (function () {
   function pkg(item) {
     return {
       kind: 'package',
+      /* Packages have a real coupon backend now too (FAMILYFUN/TOGETHER25,
+         seeded in 0053 and already returned by /coupons?product_type=package). */
+      supportsCoupons: true,
       kicker: `${item.days} days`,
       title: item.name,
+      backLabel: 'tour packages',
+      /* Kept as the offline fallback and the first paint, same relationship
+         as flights and hotels: customer_package_pricing_service.py is a
+         verified port of P.packagePrice. */
       price: P.packagePrice,
+      async priceAsync(ctx) {
+        if (typeof BookingApi === 'undefined' || !BookingApi.isLive('package') || !ctx.departure) return null;
+        const q = await BookingApi.quotePackage(
+          BookingApi.packagePayload(ctx),
+          BookingApi.packageAddonPayload(ctx),
+          ctx.couponCode || null,
+        );
+        ctx.quote = q;
+        ctx.couponError = q.coupon_error || null;
+        return {
+          lines: (q.lines || []).map(l => ({ label: l.label, amount: Number(l.amount) })),
+          total: Number(q.total_amount),
+          note: q.coupon_error || null,
+        };
+      },
       steps: [
         departureStep,
         P.travellersStep({ passport: true, frequentFlyer: false, noun: 'Traveller' }),
@@ -616,6 +664,7 @@ const BookingFlows = (function () {
       kind: 'visa',
       kicker: 'Visa services',
       title: 'Apply for a visa',
+      backLabel: 'visa services',
       price: P.visaPrice,
       steps: [
         visaTypeStep,

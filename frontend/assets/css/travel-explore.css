@@ -240,6 +240,11 @@
 .tx-details { grid-column: 1 / -1; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--tx-line); display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; }
 .tx-detail span { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--tx-muted); margin-bottom: 3px; }
 .tx-detail b { font-size: 14px; color: var(--tx-ink); font-weight: 700; }
+/* Fare rules reads as a sentence, not a fact — give it the whole row instead
+   of a 140px column, and let it wrap normally rather than fighting <b>'s
+   usual single-line labels. */
+.tx-detail-wide { grid-column: 1 / -1; }
+.tx-detail-wide b { font-weight: 600; line-height: 1.5; }
 
 /* --------------------------------------------------------------------------
    Empty state + pagination
@@ -278,6 +283,30 @@
    under the price rather than squeezing it out on a narrow card. */
 .tx-card-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .tx-card-actions .tx-btn { padding: 9px 13px; font-size: 12.5px; }
+
+/* Hotel results: guest rating next to the star row, and the cancellation-
+   policy line every card and every room option in Hotel Details shows. */
+.tx-guest-rating { margin-left: 8px; font-size: 12px; font-weight: 700; color: var(--tx-ink); letter-spacing: 0; }
+.tx-cancel-note { font-size: 12px; color: var(--tx-muted); line-height: 1.5; margin: 2px 0 0; }
+.tx-btn-sm { padding: 7px 11px; font-size: 12px; }
+
+/* Hotel Details — an inline expansion under the card, same idea as
+   .tx-details for a flight but block-flowing prose/chips/room cards rather
+   than a flat key-value grid. */
+.tx-hotel-details { grid-column: 1 / -1; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--tx-line); display: flex; flex-direction: column; gap: 10px; }
+.tx-room-opt-head { font-size: 13px; font-weight: 800; color: var(--tx-ink); margin: 4px 0 0; }
+.tx-room-opts { display: flex; flex-direction: column; gap: 10px; }
+.tx-room-opt { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-surface-2); }
+.tx-room-opt-body { display: flex; flex-direction: column; gap: 4px; }
+.tx-room-opt-body b { font-size: 14px; color: var(--tx-ink); }
+.tx-room-opt-meta { font-size: 12px; color: var(--tx-muted); }
+.tx-room-opt-price { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; white-space: nowrap; }
+.tx-room-opt-price span { font-size: 11px; color: var(--tx-muted); font-weight: 700; }
+.tx-room-opt-price b { font-size: 16px; color: var(--tx-ink); }
+@media (max-width: 560px) {
+  .tx-room-opt { flex-direction: column; }
+  .tx-room-opt-price { align-items: flex-start; text-align: left; width: 100%; }
+}
 
 /* --------------------------------------------------------------------------
    Responsive
@@ -428,7 +457,9 @@
   background: var(--sp-accent, #FF4D4D) !important; color: #fff; font-weight: 800;
 }
 .tx-cal-cell:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: -2px; }
-/* Reserved for real fares — see fareFor() in flight-search.js. */
+/* Reserved for real fares. search-widgets.js's calendar draws this whenever a
+   panel passes a `noteFor(iso)`; nothing does yet, because there is no
+   fare-by-date source to answer it. */
 .tx-cal-fare { font-size: 9.5px; line-height: 1; color: var(--sp-emerald, #12B76A); }
 .tx-cal-cell.is-selected .tx-cal-fare { color: #fff; }
 
@@ -627,4 +658,53 @@
 .tx-sk-line.w55 { width: 55%; }
 .tx-sk-line.w70 { width: 70%; }
 @keyframes txShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
-@media (prefers-reduced-motion: reduce) { .tx-sk-line { animation: none; } }
+
+/* --------------------------------------------------------------------------
+   Flight skeleton
+
+   Built on .tx-flight itself, so the placeholder inherits the real card's
+   grid, padding, border and radius and the list does not resize when the two
+   are swapped. Only the CONTENTS are grey bars; the box is the box.
+   -------------------------------------------------------------------------- */
+.tx-sk-list { display: block; }
+.tx-sk-flight { pointer-events: none; }
+/* The real card lifts on hover. A placeholder that did the same would invite a
+   click on nothing. */
+.tx-sk-flight:hover { transform: none; box-shadow: var(--tx-shadow); border-color: var(--tx-line); }
+.tx-sk-col { display: flex; flex-direction: column; gap: 8px; }
+.tx-sk-col .tx-sk-line { margin-bottom: 0; }
+
+.tx-sk-logo {
+  width: 46px; height: 46px; flex: none; border-radius: 12px;
+  background: var(--tx-surface-2); border: 1px solid var(--tx-line);
+}
+/* Sized to the type it stands in for: 21px/800 times, a 19px fare. A bar that
+   is not the height of its text is what makes the swap visible. */
+.tx-sk-time  { height: 21px; width: 74px; border-radius: 7px; }
+.tx-sk-dur   { height: 12px; width: 62px; }
+.tx-sk-stops { height: 11px; width: 54px; }
+.tx-sk-fare  { height: 19px; width: 88px; margin-left: auto; border-radius: 7px; }
+.tx-sk-btn {
+  height: 40px; border-radius: 11px;
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, rgba(10, 37, 64, .07) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: txShimmer 1.4s ease-in-out infinite;
+}
+.tx-sk-rule { width: 100%; height: 2px; border-radius: 2px; background: var(--tx-line); }
+.tx-sk-line.w45 { width: 45%; }
+.tx-sk-line.w50 { width: 50%; }
+.tx-sk-line.w60 { width: 60%; }
+.tx-sk-line.w80 { width: 80%; }
+/* The skeleton borrows the page palette rather than the hard-coded light one
+   the generic cards above use, so it is right in either theme. */
+.tx-scope .tx-sk-card { background: var(--tx-surface); border-color: var(--tx-line); }
+.tx-scope .tx-sk-line {
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, rgba(10, 37, 64, .07) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-sk-line, .tx-sk-btn { animation: none; }
+}

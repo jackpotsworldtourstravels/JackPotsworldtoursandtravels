@@ -2,7 +2,7 @@
 /* ===========================================================================
    hotel-search.js — the Hotels search panel.
    ===========================================================================
-   Same shape as flight-search.js and built from the same SearchWidgets: a
+   Built from SearchWidgets, like every other search panel in the product: a
    destination autocomplete, two calendars and a stepper popup. Nothing here
    re-implements a listbox or a month grid.
 

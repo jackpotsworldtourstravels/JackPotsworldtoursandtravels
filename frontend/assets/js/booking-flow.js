@@ -35,24 +35,101 @@ const BookingFlow = (function () {
   let ctx = null;       // the draft being built
   let index = 0;
   let busy = false;
+  let headerObserver = null;   // watches #spHeader so --bk-header-h tracks its real height
 
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const backArrow = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /* ---------------------------------------------------------------------
      Shell
      --------------------------------------------------------------------- */
+  /* Mounted as a normal block right after the site's own sticky header,
+     rather than as a fixed-position overlay — the reference layout keeps the
+     header visible and the flow reads as the page, not a dialog on top of
+     it. Every service page (flights/hotels/cruises/packages/visa/activities)
+     shares the same `#spHeader` id, so this needs no per-page wiring. */
   function ensureRoot() {
     let el = document.getElementById('bkRoot');
     if (el) return el;
     el = document.createElement('div');
     el.id = 'bkRoot';
     el.className = 'bk-root';
-    el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('role', 'region');
     el.setAttribute('aria-label', 'Booking');
-    document.body.appendChild(el);
+    const header = document.getElementById('spHeader');
+    if (header && header.parentNode) header.insertAdjacentElement('afterend', el);
+    else document.body.appendChild(el);
     return el;
+  }
+
+  /* The header is sticky but not a fixed height (its nav wraps on narrow
+     widths), so the fare rail's sticky offset and the scroll-into-view math
+     in paint() read it live off a CSS variable rather than a guessed pixel
+     value. */
+  function setHeaderHeightVar() {
+    const header = document.getElementById('spHeader');
+    document.documentElement.style.setProperty('--bk-header-h', (header ? header.offsetHeight : 0) + 'px');
+  }
+
+  /* For flights only — a compact, persistent itinerary card shown above the
+     stepper on every step, per the reference. Built entirely from fields
+     already on ctx.item (see travel-data.js's normaliseFlight): no aircraft
+     type is invented because the data model does not carry one. */
+  function flightSummaryHtml(c) {
+    if (!c || c.kind !== 'flight' || !c.item) return '';
+    const item = c.item;
+    const cabin = (typeof BookingData !== 'undefined' && BookingData.CABIN_CLASSES.find(x => x.id === c.cabin)) || {};
+    const stops = item.stops ? `${item.stops} stop${item.stops > 1 ? 's' : ''}` : 'Non-stop';
+    return `
+      <div class="bk-flightsum">
+        <div class="bk-flightsum-airline">
+          ${flightLogoHtml(item)}
+          <div>
+            <b>${esc(item.airline)} ${esc(item.flightNumber)}</b>
+            <span>${esc(cabin.label || 'Economy')}${item.fareType ? ` · ${esc(item.fareType)}` : ''}</span>
+          </div>
+        </div>
+        <div class="bk-flightsum-leg">
+          <div>
+            <b>${esc(item.departure || 'TBA')}</b>
+            <span>${esc(item.origin.city)} (${esc(item.origin.code)})</span>
+            <span>${esc(fmtDateShort(item.date))}</span>
+          </div>
+          <div class="bk-flightsum-mid">
+            <span>${esc(item.durationLabel || '—')}</span>
+            <i></i>
+            <span>${esc(stops)}</span>
+          </div>
+          <div class="is-end">
+            <b>${esc(item.arrival || 'TBA')}</b>
+            <span>${esc(item.destination.city)} (${esc(item.destination.code)})</span>
+            <span>${esc(fmtDateShort(item.date))}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function fmtDateShort(iso) {
+    if (typeof fmtDate === 'function') return fmtDate(iso);
+    return iso || '';
+  }
+
+  /* Same vendored-logo-or-code-tile pattern travel-explore.js uses on the
+     results cards (airline-logos.js), so the summary card reads as the same
+     component rather than a second implementation of it. */
+  function flightLogoHtml(item) {
+    const code = item.airlineCode;
+    const have = typeof AIRLINE_LOGO_FILES !== 'undefined' && code && AIRLINE_LOGO_FILES[code];
+    if (have) {
+      const dir = (typeof AIRLINE_LOGO_DIR === 'string') ? AIRLINE_LOGO_DIR : 'assets/images/airlines/';
+      return `<span class="tx-logo"><img src="${esc(dir + AIRLINE_LOGO_FILES[code])}"
+        alt="${esc(item.airline)} logo" width="28" height="28" decoding="async"
+        onerror="this.parentNode.innerHTML='<span class=&quot;tx-logo-fb&quot;>${esc(code)}</span>'"></span>`;
+    }
+    const fallback = code ? `<span class="tx-logo-fb">${esc(code)}</span>`
+      : (typeof JPIcon !== 'undefined' ? JPIcon.html('flights') : '<span class="tx-logo-fb">--</span>');
+    return `<span class="tx-logo">${fallback}</span>`;
   }
 
   function shellHtml() {
@@ -64,13 +141,13 @@ const BookingFlow = (function () {
 
     return `
       <div class="bk-sheet">
-        <header class="bk-head">
-          <div>
-            <div class="bk-kicker">${esc(flow.kicker || 'Booking')}</div>
-            <h2 class="bk-title">${esc(flow.title)}</h2>
-          </div>
-          <button type="button" class="bk-close" id="bkClose" aria-label="Close booking">&times;</button>
-        </header>
+        <div class="bk-pagehead">
+          <button type="button" class="bk-back" id="bkExit">${backArrow} Back to ${esc(flow.backLabel || 'results')}</button>
+          <div class="bk-kicker">${esc(flow.kicker || 'Booking')}</div>
+          <h1 class="bk-title">${esc(flow.title)}</h1>
+        </div>
+
+        ${flightSummaryHtml(ctx)}
 
         <ol class="bk-rail" aria-label="Booking steps">${steps}</ol>
 
@@ -81,6 +158,7 @@ const BookingFlow = (function () {
 
         <footer class="bk-foot">
           <button type="button" class="bk-btn bk-btn-ghost" id="bkBack">Back</button>
+          <div class="bk-foot-total" id="bkFootTotal" aria-hidden="true"></div>
           <div class="bk-foot-msg" id="bkMsg" role="alert"></div>
           <button type="button" class="bk-btn bk-btn-primary" id="bkNext">Continue</button>
         </footer>
@@ -220,15 +298,34 @@ const BookingFlow = (function () {
       if (!code) { say('Enter a coupon code.', false); return; }
       say('Checking…', true);
       try {
-        /* Checked before it is applied, so an unusable code never sits on the
-           draft quietly failing on every later re-price. */
-        const res = await BookingApi.validateCoupon(
-          code, BookingApi.flightPayload(ctx), BookingApi.passengerTypes(ctx)
-        );
-        if (!res.applies) { say(res.message || 'That coupon cannot be used here.', false); return; }
-        ctx.couponCode = res.code;
-        ctx.couponTitle = res.title;
-        await refreshPrice();          // re-prices on the server and repaints
+        if (ctx.kind === 'flight') {
+          /* Checked before it is applied, so an unusable code never sits on
+             the draft quietly failing on every later re-price. */
+          const res = await BookingApi.validateCoupon(
+            code, BookingApi.flightPayload(ctx), BookingApi.passengerTypes(ctx)
+          );
+          if (!res.applies) { say(res.message || 'That coupon cannot be used here.', false); return; }
+          ctx.couponCode = res.code;
+          ctx.couponTitle = res.title;
+          await refreshPrice();        // re-prices on the server and repaints
+          return;
+        }
+        /* Other live products (hotels) have no separate validate endpoint —
+           the quote itself already checks the coupon as part of pricing, so
+           apply it optimistically and let the quote's own answer say whether
+           it actually applied. */
+        ctx.couponCode = code;
+        ctx.couponTitle = null;
+        await refreshPrice();
+        if (ctx.couponError) {
+          say(ctx.couponError, false);
+          ctx.couponCode = null;
+          ctx.couponTitle = null;
+          await refreshPrice();
+          return;
+        }
+        ctx.couponTitle = (ctx.quote && ctx.quote.coupon_title) || null;
+        say(`${code} applied.`, true);
       } catch (err) {
         say(BookingApi.errorText(err, 'Could not check that coupon.'), false);
       }
@@ -249,7 +346,7 @@ const BookingFlow = (function () {
         view.setAttribute('aria-expanded', 'true');
         list.innerHTML = '<p class="bk-coupon-note">Loading…</p>';
         try {
-          const offers = await BookingApi.coupons('flight');
+          const offers = await BookingApi.coupons(ctx.kind);
           list.innerHTML = offers.length ? offers.map(c => `
             <button type="button" class="bk-coupon-offer" data-code="${esc(c.code)}">
               <b>${esc(c.code)}</b>
@@ -278,11 +375,19 @@ const BookingFlow = (function () {
     const root = document.getElementById('bkRoot');
 
     /* Re-render the rail so the tick marks and the "now" highlight move. */
-    root.querySelector('.bk-rail').innerHTML = flow.steps.map((s, i) => `
+    const rail = root.querySelector('.bk-rail');
+    rail.innerHTML = flow.steps.map((s, i) => `
       <li class="bk-rail-step ${i < index ? 'is-done' : ''} ${i === index ? 'is-now' : ''}">
         <span class="bk-rail-dot">${i < index ? '&#10003;' : i + 1}</span>
         <span class="bk-rail-label">${esc(s.label)}</span>
       </li>`).join('');
+    /* The rail scrolls horizontally once it is wider than the screen (see
+       booking.css) — without this, the step somebody is actually on can
+       land off the edge of that scroll area, on a phone, with nothing on
+       screen saying so. */
+    rail.querySelector('.bk-rail-step.is-now')?.scrollIntoView({
+      block: 'nearest', inline: 'center', behavior: 'smooth',
+    });
 
     main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
     if (step.load) main.innerHTML = skeleton(3);
@@ -300,10 +405,22 @@ const BookingFlow = (function () {
       return;
     }
 
-    await recalcAsync();
+    const p = await recalcAsync();
     main.innerHTML = step.render(ctx);
     document.getElementById('bkSide').innerHTML = sideHtml();
     mountSide();
+
+    /* The mobile-only echo of the fare total in the sticky footer (see
+       booking.css) — the full breakdown above stops being sticky once the
+       layout drops to one column, so this is what keeps the running total in
+       view next to Continue without it. Empty wherever the side panel itself
+       is hidden (step.hideSummary), for the same reason it is hidden there. */
+    const footTotal = document.getElementById('bkFootTotal');
+    if (footTotal) {
+      footTotal.innerHTML = (step.hideSummary || !p) ? '' : `
+        <span class="bk-foot-total-label">Total</span>
+        <span class="bk-foot-total-amt">${esc(money(p.total))}</span>`;
+    }
     if (step.mount) step.mount(main, ctx);
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
@@ -316,8 +433,16 @@ const BookingFlow = (function () {
     next.className = 'bk-btn ' + (step.primaryDanger ? 'bk-btn-danger' : 'bk-btn-primary');
     setMsg('');
 
-    main.scrollTop = 0;
-    root.querySelector('.bk-sheet').scrollTop = 0;
+    /* The flow is real page content now, not a modal with its own scroll
+       box — so a step change scrolls the page itself back to the top of the
+       sheet (just clear of the sticky header) rather than resetting an
+       internal scrollTop that no longer does anything. */
+    const sheet = root.querySelector('.bk-sheet');
+    if (sheet) {
+      const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bk-header-h')) || 0;
+      const top = sheet.getBoundingClientRect().top + window.scrollY - headerH - 12;
+      window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
+    }
   }
 
   function setMsg(text, tone) {
@@ -392,9 +517,18 @@ const BookingFlow = (function () {
     const root = ensureRoot();
     root.innerHTML = shellHtml();
     root.classList.add('is-open');
-    document.body.classList.add('bk-locked');
+    document.body.classList.add('bk-inpage');
 
-    root.querySelector('#bkClose').addEventListener('click', confirmClose);
+    setHeaderHeightVar();
+    const header = document.getElementById('spHeader');
+    if (header && 'ResizeObserver' in window) {
+      headerObserver = new ResizeObserver(setHeaderHeightVar);
+      headerObserver.observe(header);
+    } else {
+      window.addEventListener('resize', setHeaderHeightVar);
+    }
+
+    root.querySelector('#bkExit').addEventListener('click', confirmClose);
     root.querySelector('#bkBack').addEventListener('click', back);
     root.querySelector('#bkNext').addEventListener('click', next);
     document.addEventListener('keydown', onKey);
@@ -419,7 +553,10 @@ const BookingFlow = (function () {
   function close() {
     const root = document.getElementById('bkRoot');
     if (root) { root.classList.remove('is-open'); root.innerHTML = ''; }
-    document.body.classList.remove('bk-locked');
+    document.body.classList.remove('bk-inpage');
+    if (headerObserver) { headerObserver.disconnect(); headerObserver = null; }
+    window.removeEventListener('resize', setHeaderHeightVar);
+    document.documentElement.style.removeProperty('--bk-header-h');
     document.removeEventListener('keydown', onKey);
     const after = flow && flow.onClose;
     const finished = ctx && ctx.booking;
@@ -439,6 +576,20 @@ const BookingFlow = (function () {
     document.querySelectorAll('[data-bk-total]').forEach(el => {
       el.textContent = money(ctx.pricing.total);
     });
+    /* The Review step embeds its own copy of the fare summary (so the page
+       reads standalone). Re-render just that step's body — using the
+       ctx.pricing already refreshed above, not a second recalc — or applying
+       a coupon there leaves it showing the pre-coupon total until the
+       traveller leaves and comes back. */
+    const step = flow.steps[index];
+    if (step && step.id === 'summary') {
+      const main = document.getElementById('bkMain');
+      if (main) {
+        main.innerHTML = step.render(ctx);
+        if (step.mount) step.mount(main, ctx);
+        if (typeof JPIcon !== 'undefined') JPIcon.mount(main);
+      }
+    }
   }
 
   /** Re-render the current step in place. The traveller step calls this when

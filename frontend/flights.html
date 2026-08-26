@@ -1,61 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- data-theme="light" is deliberate, not a leftover.
+
+     This page wears the LANDING PAGE's shell now — main.css, whose palette is
+     light by construction and which contains no prefers-color-scheme block at
+     all. travel-explore.css's dark palette is keyed to `:not([data-theme=
+     "light"])` precisely so a page like this can opt out: without it a visitor
+     on a dark OS got a light header, a light hero, one dark results band and a
+     light footer, which is worse than no dark mode. -->
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flights — JackPots World Tours &amp; Travels</title>
 <meta name="description" content="Search and compare flight departures with JackPots World Tours &amp; Travels.">
-<link rel="icon" href="assets/images/favicon.ico">
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="icon" href="assets/images/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- THE SAME STYLESHEETS THE LANDING PAGE LOADS, in the same order, because
+     this is that page continued rather than a service page that resembles it.
+     service-page.css is deliberately absent: it exists to give the standalone
+     hotels/cruises/packages pages their own navy shell, and loading it here
+     would put a second header design and a second palette on the page. The
+     handful of --sp-* tokens booking.css still asks for are bridged onto
+     main.css's palette in booking-card.css. -->
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/service-page.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260824bk9">
-<!-- Applied BEFORE first paint. Without this a stored dark choice arrives only
-     after service-shell.js runs and the page flashes light on the way. -->
-<script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<link rel="stylesheet" href="assets/css/main.css?v=20260824ic9">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260825h1">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260825a">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
+
+<!-- Loaded in <head> because the header and the card are mounted inline,
+     during parse — the same trick index.html uses, so nothing on this page
+     renders a frame later than it does over there. -->
+<script src="shared/formatters.js"></script>
+<script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/jp-icons.js?v=20260825t1"></script>
+<!-- The airport picker: the table and the shared listbox. airports.js also has
+     to precede travel-data.js further down, which reads the same table. -->
+<script src="assets/js/airports.js?v=20260825t3"></script>
+<script src="assets/js/search-widgets.js?v=20260825t3"></script>
+<script src="assets/js/destinations.js?v=20260825h1"></script>
+<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
+<script src="assets/js/pax-selector.js?v=20260825t2"></script>
+<script src="assets/js/booking-card.js?v=20260825h1"></script>
+<script src="assets/js/hero-shell.js?v=20260825t2"></script>
 </head>
-<body data-sp-service="flights">
-<a href="#spMain" class="skip-link">Skip to content</a>
+<body class="sp-continuation" data-sp-service="flights">
+<a href="#txResults" class="skip-link">Skip to results</a>
 
-<header class="sp-header" id="spHeader"></header>
+<!-- The landing page's navigation bar, from hero-shell.js. See that file's
+     header for why the markup lives there and index.html keeps its own copy. -->
+<header id="siteHeader"></header>
+<script>HeroShell.mountHeader('flights.html');</script>
 
-<div class="sp-hero">
-  <div class="sp-wrap">
-    <div class="sp-crumb"><a href="index.html">Home</a> &nbsp;›&nbsp; Flights</div>
-    <div class="sp-hero-row">
-      <div>
-        <h1>Flights</h1>
-        <p>Compare departures by airline, time and destination, then book in a couple of taps.</p>
-      </div>
-    </div>
-    <nav class="sp-switch" aria-label="Other services">
-      <a href="flights.html" aria-current="page" data-jpi-hover><span data-jp-icon="flights"></span> Flights</a>
-      <a href="hotels.html" data-jpi-hover><span data-jp-icon="hotels"></span> Hotels</a>
-      <a href="cruises.html" data-jpi-hover><span data-jp-icon="cruises"></span> Cruises</a>
-      <a href="packages.html" data-jpi-hover><span data-jp-icon="packages"></span> Tour Packages</a>
-      <a href="visa.html" data-jpi-hover><span data-jp-icon="visa"></span> Visa</a>
-      <a href="activities.html" data-jpi-hover><span data-jp-icon="activities"></span> Activities</a>
-    </nav>
+<main id="main">
+<section class="hero" id="home">
+  <div class="hero-bg" id="heroBg"></div>
+  <!-- The same four clips, in the same order, with flights already active: a
+       traveller arriving from a Search click must not see the video restart,
+       swap or fade. -->
+  <div class="hero-video-layer" id="heroVideoLayer">
+    <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
+    <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video data-video="cruises" data-src="assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
   </div>
-</div>
+  <div class="hero-overlay"></div>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search</div>
+    <h1>Your next adventure<span class="accent"> starts here.</span></h1>
+    <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
+  </div>
 
-<main id="spMain" class="tx-scope">
+  <!-- The SAME card as the landing page, holding the criteria that produced the
+       list below. Seeding happens in travel-explore.js once it has read the
+       URL, so the card and the results cannot show different searches. -->
+  <div class="wrap search-dock" id="heroSearchDock"></div>
+  <script>BookingCard.render('heroSearchDock', { tab: 'flights' });</script>
+</section>
+
+<div class="tx-scope">
   <section class="tx-section" aria-labelledby="txFlightsHead">
     <div class="tx-head">
       <div>
-        <h2 id="txFlightsHead">Today's departures from Hyderabad</h2>
-        <!-- Written by the renderer from the data's own date; typing it here
-             produced "Fri, 08 Aug" against cards that said Sat. -->
+        <h2 id="txFlightsHead">Departures</h2>
+        <!-- Written by the renderer from the criteria and the data's own date;
+             typing it here produced "Fri, 08 Aug" against cards that said Sat. -->
         <p id="txFlightsSub">Non-stop services across India, the Gulf and South-East Asia.</p>
       </div>
       <span class="tx-sample" title="Replaced automatically when the Flight API is connected">Sample schedule</span>
     </div>
-
-    <!-- Step 1 of the booking journey. Rendered by travel-explore.js from
-         TravelData.airports so the airport list cannot drift from the data. -->
-    <div class="tx-search-panel" id="txSearchPanel"></div>
 
     <div class="tx-toolbar" id="txResults">
       <div class="tx-search">
@@ -88,29 +125,33 @@
       </div>
     </div>
   </section>
+</div>
 </main>
 
-<footer class="sp-footer" id="spFooter"></footer>
+<footer id="siteFooter"></footer>
 
-<script src="shared/formatters.js"></script>
+<script>
+  /* Rendered after the results markup so nothing above it waits on a footer. */
+  HeroShell.mountFooter();
+</script>
+
 <script src="components/toast.js"></script>
-<script src="assets/js/auth.js?v=20260824ic9"></script>
 <script src="assets/js/airline-logos.js?v=20260824ic9"></script>
-<script src="assets/js/travel-data.js?v=20260824bk9"></script>
+<script src="assets/js/travel-data.js?v=20260825t3"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=20260824bk9"></script>
-<script src="assets/js/booking-data.js?v=20260824bk9"></script>
-<script src="assets/js/booking-store.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flow.js?v=20260824bk9"></script>
-<script src="assets/js/booking-products.js?v=20260824bk9"></script>
+<script src="assets/js/booking-api.js?v=20260825a"></script>
+<script src="assets/js/booking-data.js?v=20260824ph5a"></script>
+<script src="assets/js/booking-store.js?v=20260824ph5a"></script>
+<script src="assets/js/booking-flow.js?v=20260825b"></script>
+<script src="assets/js/booking-products.js?v=20260825a"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flows.js?v=20260824bk9"></script>
-<script src="assets/js/search-widgets.js?v=20260824bk9"></script>
-<script src="assets/js/flight-search.js?v=20260824bk9"></script>
-<script src="assets/js/travel-explore.js?v=20260824bk9"></script>
-<script src="assets/js/jp-icons.js?v=20260824bk9"></script>
-<script src="assets/js/service-shell.js?v=20260824bk9"></script>
+<script src="assets/js/booking-flows.js?v=20260824ph5a"></script>
+<!-- No search panel is loaded down here: the hero card IS this page's search
+     panel, so a second set of criteria controls below the fold would be two
+     places to type the same trip into. search-widgets.js is loaded in <head>,
+     above, because the card's airport picker is built from it. -->
+<script src="assets/js/travel-explore.js?v=20260825t2"></script>
 </body>
 </html>

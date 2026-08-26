@@ -25,6 +25,14 @@
   --sp-header-ink:#FFFFFF;
   --sp-gold:      #FFB020;
   --sp-emerald:   #12B76A;
+  /* Both already lived as undeclared `var(x, fallback)` defaults throughout
+     booking.css/travel-explore.css — every usage resolved to exactly these
+     two values already. Declared here so they are real tokens rather than
+     fallbacks nobody could see, and so dark mode can give the error shade
+     the contrast it needs (see below) instead of silently inheriting a
+     light-mode value that was never checked against a dark surface. */
+  --sp-coral-dark:  #C0392B;
+  --sp-accent-soft: rgba(255,77,77,.12);
   --sp-radius:    16px;
   --ff-body: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -44,6 +52,11 @@
     --sp-muted:     #93A3BA;
     --sp-line:      rgba(232,238,247,.14);
     --sp-header:    #070C16;
+    /* #C0392B (the light-mode shade) reads as ~2.8:1 against these dark
+       surfaces — under WCAG AA's 4.5:1 for text. The CTA red already clears
+       it here (~5.2:1), so error/danger text borrows that instead of a third
+       hand-picked shade. */
+    --sp-coral-dark: var(--sp-accent, #FF4D4D);
   }
 }
 /* An explicit choice beats the system, both ways. */
@@ -55,6 +68,7 @@
   --sp-muted:     #93A3BA;
   --sp-line:      rgba(232,238,247,.14);
   --sp-header:    #070C16;
+  --sp-coral-dark: var(--sp-accent, #FF4D4D);
 }
 
 * { box-sizing: border-box; }

@@ -21,7 +21,15 @@ const SearchWidgets = (function () {
 
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
   const $ = id => document.getElementById(id);
-  const iso = d => d.toISOString().slice(0, 10);
+  /* NOT d.toISOString().slice(0,10) — that converts to UTC first, and every
+     calendar day here is built as LOCAL midnight (`new Date(year, month, d)`).
+     In any timezone ahead of UTC (IST included, the timezone this whole site
+     is built for) local midnight is still the previous day in UTC, so the
+     14th's cell was carrying data-date="...-13" while its label and
+     aria-label both said "14" — every date picked landed one day earlier
+     than what was clicked. Reading the local components directly has no UTC
+     conversion to drift across. */
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = () => iso(new Date());
 
   /** Whole nights between two ISO days. */

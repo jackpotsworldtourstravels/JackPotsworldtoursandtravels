@@ -4,58 +4,111 @@
    Inherits the --sp-* tokens from service-page.css, so light and dark come
    free and the booking sheet always matches the page it opened over.
 
-   Everything is namespaced `bk-`. The sheet is a fixed overlay rather than a
-   route, which is why body gets `bk-locked` while it is open.
+   Everything is namespaced `bk-`. The sheet mounts as in-page content right
+   below the site's own sticky header (see ensureRoot() in booking-flow.js)
+   rather than as a modal overlay — the reference layout keeps the header
+   visible, so `body.bk-inpage` hides the rest of the page instead of the
+   flow sitting on top of it.
+
+   `.bk-close` and `@keyframes bkRise` are declared further down, in the My
+   Bookings section — that screen's detail view is a genuine modal overlay
+   (`.mb-overlay`) and still uses both; nothing in the booking flow itself
+   references them any more.
    =========================================================================== */
 
+/* Still used by my-bookings.js for its own `.mb-overlay` detail modal (a
+   genuine overlay, unlike the booking flow below). */
 .bk-locked { overflow: hidden; }
 
-.bk-root {
-  position: fixed; inset: 0; z-index: 300;
-  display: none; padding: 24px;
-  background: rgba(6, 12, 24, .55);
-  /* Blur reads as depth and separates the sheet from a busy results page. */
-  backdrop-filter: blur(3px);
-  overflow: auto;
-}
+/* Everything else on the page hides while the flow is open — the header
+   (and skip-link) stay, `#bkRoot` mounts right after the header (see
+   ensureRoot() in booking-flow.js), and the flow itself becomes the page.
+   Scoped to direct children of body so it needs no per-page selector: every
+   service page's hero/results/footer sit there regardless of page. */
+body.bk-inpage > *:not(#spHeader):not(.skip-link):not(#bkRoot) { display: none; }
+
+.bk-root { display: none; }
 .bk-root.is-open { display: block; }
 
 .bk-sheet {
-  max-width: 1080px; margin: 0 auto; background: var(--sp-bg, #F8FAFC);
-  color: var(--sp-ink, #0A2540); border-radius: 18px; overflow: hidden;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .38);
-  display: flex; flex-direction: column; min-height: min(92vh, 900px);
-  animation: bkRise .3s cubic-bezier(.22, 1, .36, 1);
+  max-width: 1200px; margin: 0 auto; padding: 24px clamp(16px, 3vw, 32px) 0;
+  color: var(--sp-ink, #0A2540);
+  display: flex; flex-direction: column;
 }
-@keyframes bkRise { from { opacity: 0; transform: translateY(14px) scale(.99); } }
 
 /* --------------------------------------------------------------------------
-   Header + progress rail
+   Page head — a back link plus the booking's own title, in place of the
+   old dark modal bar. The site's header above this is untouched.
    -------------------------------------------------------------------------- */
-.bk-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  padding: 20px 24px 16px; background: var(--sp-header, #0A2540); color: #fff;
+.bk-pagehead { margin-bottom: 18px; }
+.bk-back {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px;
+  padding: 0; background: none; border: none; cursor: pointer; font: inherit;
+  font-size: 13.5px; font-weight: 700; color: var(--sp-muted, #5B6B82);
+  transition: color .18s ease;
 }
-.bk-kicker { font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; opacity: .7; }
-.bk-title { margin: 4px 0 0; font-size: 20px; line-height: 1.2; }
-.bk-close {
-  width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,.24);
-  background: transparent; color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
-  flex: none; transition: background .18s ease;
-}
-.bk-close:hover { background: rgba(255,255,255,.14); }
+.bk-back:hover { color: var(--sp-accent, #FF4D4D); }
+.bk-back:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 3px; border-radius: 6px; }
+.bk-back svg { flex: none; }
+.bk-kicker { font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--sp-accent, #FF4D4D); }
+.bk-title { margin: 4px 0 0; font-size: 24px; line-height: 1.2; color: var(--sp-ink, #0A2540); }
 
+/* --------------------------------------------------------------------------
+   Flight summary — flights only, persistent above the stepper on every step
+   -------------------------------------------------------------------------- */
+.bk-flightsum {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px;
+  margin-bottom: 18px; padding: 16px 20px;
+  background: var(--sp-surface, #fff); border: 1px solid var(--sp-line, rgba(10,37,64,.1));
+  border-radius: var(--sp-radius, 16px);
+}
+.bk-flightsum-airline { display: flex; align-items: center; gap: 12px; flex: none; }
+.bk-flightsum-airline b { display: block; font-size: 14px; }
+.bk-flightsum-airline span { display: block; font-size: 12px; color: var(--sp-muted, #5B6B82); margin-top: 2px; }
+.bk-flightsum-leg {
+  display: flex; align-items: center; gap: 18px; flex: 1; min-width: 260px;
+  padding-left: 18px; border-left: 1px solid var(--sp-line, rgba(10,37,64,.1));
+}
+.bk-flightsum-leg > div { display: flex; flex-direction: column; gap: 1px; }
+.bk-flightsum-leg b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.bk-flightsum-leg span { font-size: 12px; color: var(--sp-muted, #5B6B82); }
+.bk-flightsum-leg .is-end { text-align: right; align-items: flex-end; }
+.bk-flightsum-mid {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none;
+  font-size: 11.5px; color: var(--sp-muted, #5B6B82); min-width: 90px;
+}
+.bk-flightsum-mid i {
+  display: block; width: 100%; height: 1px; background: var(--sp-line, rgba(10,37,64,.16));
+  position: relative;
+}
+.bk-flightsum-mid i::after {
+  content: ''; position: absolute; right: -1px; top: 50%; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--sp-accent, #FF4D4D); transform: translateY(-50%);
+}
+
+/* --------------------------------------------------------------------------
+   Stepper
+   -------------------------------------------------------------------------- */
 .bk-rail {
-  display: flex; gap: 4px; margin: 0; padding: 14px 24px; list-style: none;
-  background: var(--sp-surface, #fff); border-bottom: 1px solid var(--sp-line, rgba(10,37,64,.1));
+  display: flex; gap: 0; margin: 0 0 20px; padding: 0; list-style: none;
   overflow-x: auto; scrollbar-width: none;
 }
 .bk-rail::-webkit-scrollbar { display: none; }
-.bk-rail-step { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; white-space: nowrap; }
+.bk-rail-step {
+  display: flex; align-items: center; gap: 8px; padding: 0 14px 0 0; white-space: nowrap;
+  position: relative;
+}
+/* Connecting line between dots — sits behind them, filled up to the current
+   step so progress reads at a glance. */
+.bk-rail-step:not(:last-child)::after {
+  content: ''; flex: 1 0 24px; height: 2px; margin: 0 8px;
+  background: var(--sp-line, rgba(10,37,64,.14));
+}
+.bk-rail-step.is-done:not(:last-child)::after { background: var(--sp-emerald, #12B76A); }
 .bk-rail-dot {
-  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
   font-size: 12px; font-weight: 800; flex: none;
-  background: var(--sp-surface-2, #F1F5F9); color: var(--sp-muted, #5B6B82);
+  background: var(--sp-surface, #fff); color: var(--sp-muted, #5B6B82);
   border: 1.5px solid var(--sp-line, rgba(10,37,64,.1)); transition: all .25s ease;
 }
 .bk-rail-label { font-size: 13px; font-weight: 700; color: var(--sp-muted, #5B6B82); }
@@ -66,9 +119,9 @@
 /* --------------------------------------------------------------------------
    Body
    -------------------------------------------------------------------------- */
-.bk-body { display: grid; grid-template-columns: 1fr 300px; gap: 0; flex: 1; align-items: start; }
-.bk-main { padding: 24px; min-width: 0; }
-.bk-side { padding: 24px 24px 24px 0; position: sticky; top: 24px; }
+.bk-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 32%); gap: 28px; flex: 1; align-items: start; }
+.bk-main { padding: 0 0 32px; min-width: 0; }
+.bk-side { padding: 0 0 32px; position: sticky; top: calc(var(--bk-header-h, 0px) + 16px); }
 
 /* Direction-aware entrance, so Back feels like going back. */
 .bk-in      { animation: bkNext .28s cubic-bezier(.22,1,.36,1); }
@@ -83,11 +136,31 @@
 /* --------------------------------------------------------------------------
    Forms
    -------------------------------------------------------------------------- */
-.bk-pax { margin-bottom: 22px; padding: 18px; background: var(--sp-surface, #fff);
-  border: 1px solid var(--sp-line, rgba(10,37,64,.1)); border-radius: 14px; }
-.bk-pax-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.bk-pax-head h3 { margin: 0; font-size: 15px; }
-.bk-pax-note { font-size: 12px; color: var(--sp-muted); }
+.bk-pax { margin-bottom: 14px; padding: 16px 18px; background: var(--sp-surface, #fff);
+  border: 1px solid var(--sp-line, rgba(10,37,64,.1)); border-radius: var(--sp-radius, 16px);
+  transition: border-color .18s ease; }
+.bk-pax.is-open { border-color: var(--sp-line-strong, rgba(10,37,64,.18)); }
+.bk-pax-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bk-pax.is-open .bk-pax-head { margin-bottom: 14px; }
+.bk-pax-toggle {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer; font: inherit; color: inherit;
+}
+.bk-pax-toggle h3 { margin: 0; font-size: 15px; }
+/* The icon itself (arrowUp) points up, so the resting/closed state — "click
+   to open" — is the one that needs the 180deg flip to read as a down chevron;
+   open removes it, so the arrow points up ("click to collapse") once expanded. */
+.bk-pax-chev { display: inline-flex; color: var(--sp-muted); transition: transform .2s ease; flex: none; transform: rotate(180deg); }
+.bk-pax-chev .jpi { display: block; }
+.bk-pax.is-open .bk-pax-chev { transform: rotate(0deg); }
+.bk-pax-status {
+  font-size: 11.5px; font-weight: 800; letter-spacing: .02em; color: var(--sp-muted);
+  padding: 3px 10px; border-radius: 999px; background: var(--sp-surface-2, #F1F5F9);
+}
+.bk-pax-status.is-done { color: var(--sp-emerald, #12B76A);
+  background: color-mix(in srgb, var(--sp-emerald, #12B76A) 14%, transparent); }
+.bk-pax-note { margin: 0 0 12px; font-size: 12px; color: var(--sp-muted); }
+.bk-pax-body { padding-top: 4px; }
 .bk-tag { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
   background: var(--sp-surface-2, #F1F5F9); color: var(--sp-muted); font-size: 11px; font-weight: 700; }
 
@@ -122,6 +195,7 @@
 .bk-choice:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(10,37,64,.08); }
 .bk-choice.is-on { border-color: var(--sp-accent, #FF4D4D);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 14%, transparent); }
+.bk-choice:has(:focus-visible) { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 2px; }
 .bk-choice input { width: 18px; height: 18px; accent-color: var(--sp-accent); flex: none; }
 .bk-choice-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .bk-choice-body b { font-size: 15px; }
@@ -141,47 +215,79 @@
 .bk-seat-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .bk-seat-legend i { width: 18px; height: 18px; display: inline-block; }
 
+/* Sized to use the space the two-column layout actually gives it — the old
+   420px cap left the aircraft floating in a sea of blank card on any screen
+   wider than a phone. It now fills the main column up to a sensible ceiling
+   for seat-button legibility, and only scrolls internally past a generous
+   height instead of being squeezed into a fixed small box. */
 .bk-cabin {
-  max-width: 420px; margin: 0 auto; padding: 18px 14px 22px;
-  background: var(--sp-surface, #fff); border: 1px solid var(--sp-line); border-radius: 26px 26px 14px 14px;
-  max-height: 46vh; overflow: auto;
+  max-width: 640px; margin: 0 auto; padding: 22px 20px 26px;
+  background: var(--sp-surface, #fff); border: 1px solid var(--sp-line); border-radius: 28px 28px 16px 16px;
+  max-height: 72vh; overflow: auto;
 }
-.bk-nose { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--sp-muted); padding-bottom: 14px; }
-.bk-seatrow { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
-.bk-seatrow.is-exit { border-top: 1px dashed color-mix(in srgb, var(--sp-emerald) 55%, transparent); padding-top: 6px; }
-.bk-seatno { width: 20px; font-size: 10.5px; color: var(--sp-muted); text-align: right; flex: none; }
-.bk-aisle { width: 16px; flex: none; }
-.bk-exit-tag { font-size: 9.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+.bk-nose { text-align: center; font-size: 11.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--sp-muted); padding-bottom: 18px; }
+.bk-seatrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bk-seatrow.is-exit { border-top: 1px dashed color-mix(in srgb, var(--sp-emerald) 55%, transparent); padding-top: 8px; }
+.bk-seatno { width: 24px; font-size: 12px; font-weight: 700; color: var(--sp-muted); text-align: right; flex: none; }
+.bk-aisle { width: 24px; flex: none; }
+.bk-exit-tag { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
   color: var(--sp-emerald); margin-left: 4px; }
 
 .bk-seat {
-  width: 30px; height: 30px; flex: none; border-radius: 7px; cursor: pointer;
-  font-size: 11px; font-weight: 700; font-family: inherit;
+  width: 44px; height: 44px; flex: none; border-radius: 10px; cursor: pointer;
+  font-size: 13px; font-weight: 700; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   border: 1.5px solid var(--sp-line); background: var(--sp-surface-2, #F1F5F9);
-  color: var(--sp-muted); transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  color: var(--sp-ink); transition: transform .12s ease, background .18s ease, border-color .18s ease;
 }
-.bk-seat:hover:not(:disabled) { transform: scale(1.1); border-color: var(--sp-accent); }
+.bk-seat-letter { line-height: 1; }
+.bk-seat-price { font-size: 8.5px; font-weight: 700; line-height: 1; opacity: .75; font-variant-numeric: tabular-nums; }
+.bk-seat:hover:not(:disabled) { transform: scale(1.08); border-color: var(--sp-accent); z-index: 1; }
+.bk-seat:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 2px; z-index: 1; }
 .bk-seat.is-window { background: color-mix(in srgb, var(--sp-sky, #2F80ED) 14%, transparent); }
 .bk-seat.is-aisle  { background: color-mix(in srgb, var(--sp-emerald, #12B76A) 13%, transparent); }
 .bk-seat.is-taken  { background: var(--sp-line); color: transparent; cursor: not-allowed; border-style: dashed; }
 .bk-seat.is-mine   { background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent); color: #fff; }
-.bk-seat-count { text-align: center; margin: 14px 0 0; font-size: 13px; font-weight: 700; color: var(--sp-muted); }
+.bk-seat-count { text-align: center; margin: 16px 0 0; font-size: 13.5px; font-weight: 700; color: var(--sp-muted); }
+
+@media (max-width: 560px) {
+  .bk-cabin { padding: 16px 10px 20px; }
+  .bk-seat { width: 36px; height: 36px; border-radius: 9px; }
+  .bk-seat-letter { font-size: 12px; }
+  .bk-seat-price { font-size: 7.5px; }
+  .bk-seatno { width: 18px; font-size: 10.5px; }
+  .bk-aisle { width: 14px; }
+}
 
 /* --------------------------------------------------------------------------
    Add-ons + tick grids
    -------------------------------------------------------------------------- */
-.bk-addons { display: grid; gap: 10px; }
-.bk-addon { display: flex; align-items: center; gap: 13px; padding: 14px 16px; cursor: pointer;
-  background: var(--sp-surface, #fff); border: 1.5px solid var(--sp-line); border-radius: 13px;
-  transition: border-color .18s ease; }
-.bk-addon.is-on { border-color: var(--sp-accent); }
-.bk-addon input { width: 18px; height: 18px; accent-color: var(--sp-accent); flex: none; }
-.bk-addon-icon { color: var(--sp-accent); display: grid; place-items: center; }
-.bk-addon-body { flex: 1; min-width: 0; }
-.bk-addon-body b { display: block; font-size: 14.5px; }
-.bk-addon-body span { font-size: 12px; color: var(--sp-muted); }
-.bk-addon-price { font-weight: 800; font-size: 14.5px; white-space: nowrap; }
+/* Selectable tiles in a responsive grid rather than stacked full-width rows —
+   same markup, same checkbox semantics (booking-products.js is unchanged),
+   just laid out as cards. The checkbox stays visible (top-right, small) so
+   focus/keyboard behaviour is untouched; a "Selected" pill next to the price
+   is the reference's visual confirmation. */
+.bk-addons { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.bk-addon { display: flex; flex-direction: column; gap: 10px; padding: 16px; cursor: pointer;
+  background: var(--sp-surface, #fff); border: 1.5px solid var(--sp-line); border-radius: 14px;
+  position: relative; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.bk-addon:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(10,37,64,.08); }
+.bk-addon.is-on { border-color: var(--sp-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 14%, transparent); }
+.bk-addon input { position: absolute; top: 14px; right: 14px; width: 18px; height: 18px;
+  accent-color: var(--sp-accent); margin: 0; }
+.bk-addon-icon { width: 36px; height: 36px; border-radius: 10px; flex: none;
+  background: var(--sp-surface-2, #F1F5F9); color: var(--sp-accent); display: grid; place-items: center; }
+.bk-addon-body { flex: 1; min-width: 0; padding-right: 26px; }
+.bk-addon-body b { display: block; font-size: 14px; margin-bottom: 2px; }
+.bk-addon-body span { display: block; font-size: 11.5px; color: var(--sp-muted); }
+.bk-addon-price { font-weight: 800; font-size: 15px; }
+.bk-addon.is-on .bk-addon-price::after {
+  content: '✓ Added'; display: inline-block; margin-left: 8px; padding: 2px 8px;
+  border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .02em; vertical-align: middle;
+  background: color-mix(in srgb, var(--sp-accent) 14%, transparent); color: var(--sp-accent);
+}
 
 .bk-tickgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .bk-tickgrid.is-stack { grid-template-columns: 1fr; }
@@ -220,13 +326,13 @@
 /* --------------------------------------------------------------------------
    Price rail
    -------------------------------------------------------------------------- */
-.bk-price { padding: 18px; background: var(--sp-surface, #fff); border: 1px solid var(--sp-line); border-radius: 14px; }
-.bk-price h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--sp-muted); }
-.bk-price-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 13.5px; }
+.bk-price { padding: 20px; background: var(--sp-surface, #fff); border: 1px solid var(--sp-line); border-radius: var(--sp-radius, 16px); }
+.bk-price h3 { margin: 0 0 14px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--sp-muted); }
+.bk-price-line { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 13.5px; }
 .bk-price-line.is-muted { color: var(--sp-muted); }
 .bk-price-empty { font-size: 13px; color: var(--sp-muted); margin: 0; }
-.bk-price-total { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px;
-  border-top: 2px solid var(--sp-line); font-size: 17px; font-weight: 800; }
+.bk-price-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 12px; padding-top: 14px;
+  border-top: 1.5px dashed var(--sp-line); font-size: 20px; font-weight: 800; color: var(--sp-ink); }
 .bk-price-note { margin: 12px 0 0; font-size: 11.5px; color: var(--sp-muted); line-height: 1.5; }
 
 /* --------------------------------------------------------------------------
@@ -243,7 +349,8 @@
 .bk-pay { display: flex; align-items: center; gap: 13px; padding: 14px 16px; cursor: pointer;
   background: var(--sp-surface, #fff); border: 1.5px solid var(--sp-line); border-radius: 13px;
   transition: border-color .18s ease; }
-.bk-pay.is-on { border-color: var(--sp-accent); }
+.bk-pay.is-on { border-color: var(--sp-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 14%, transparent); }
 .bk-pay input { width: 18px; height: 18px; accent-color: var(--sp-accent); flex: none; }
 .bk-pay-body b { display: block; font-size: 14.5px; }
 .bk-pay-body span { font-size: 12px; color: var(--sp-muted); }
@@ -255,8 +362,12 @@
    Confirmation
    -------------------------------------------------------------------------- */
 .bk-done { text-align: center; max-width: 640px; margin: 0 auto; }
-.bk-done-mark { color: var(--sp-emerald, #12B76A); font-size: 26px; margin-bottom: 10px; }
-.bk-done h2 { margin: 0 0 6px; font-size: 24px; }
+.bk-done-mark {
+  width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--sp-emerald, #12B76A);
+  background: color-mix(in srgb, var(--sp-emerald, #12B76A) 14%, transparent);
+}
+.bk-done h2 { margin: 0 0 6px; font-size: 26px; }
 .bk-refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;
   margin: 20px 0; padding: 18px; background: var(--sp-surface, #fff);
   border: 1px solid var(--sp-line); border-radius: 14px; text-align: left; }
@@ -269,17 +380,33 @@
 /* --------------------------------------------------------------------------
    Footer, buttons, states
    -------------------------------------------------------------------------- */
-.bk-foot { display: flex; align-items: center; gap: 14px; padding: 16px 24px;
+.bk-foot { display: flex; align-items: center; gap: 14px;
+  margin: 0 calc(-1 * clamp(16px, 3vw, 32px)) 0; padding: 16px clamp(16px, 3vw, 32px);
   background: var(--sp-surface, #fff); border-top: 1px solid var(--sp-line); position: sticky; bottom: 0; }
 .bk-foot-msg { flex: 1; font-size: 13px; font-weight: 700; text-align: center; }
 .bk-foot-msg.is-error { color: var(--sp-accent, #FF4D4D); }
 .bk-foot-msg.is-ok { color: var(--sp-emerald, #12B76A); }
+
+/* The mobile-only echo of the fare total (see paint() in booking-flow.js).
+   Hidden on desktop, where the full breakdown sits in the always-sticky
+   .bk-side panel instead — this exists only for the width where that panel
+   stops being sticky (below) and could otherwise scroll out of view while
+   Continue stays pinned. */
+.bk-foot-total { display: none; }
 
 .bk-btn { padding: 12px 22px; border-radius: 11px; border: 1.5px solid transparent; cursor: pointer;
   font-family: inherit; font-size: 14px; font-weight: 800; text-align: center;
   transition: background .18s ease, border-color .18s ease, color .18s ease, transform .12s ease; }
 .bk-btn:active { transform: translateY(1px); }
 .bk-btn:disabled { opacity: .6; cursor: default; }
+/* Every other interactive class in this file gets its own focus-visible ring
+   (see .bk-back, .bk-disclose-btn, .bk-pax-remove, .bk-coupon-*…) — .bk-btn
+   had been relying on the browser default, despite covering Continue, Back
+   and Pay, the three highest-stakes controls in the whole flow. Same ring,
+   same offset, so keyboard focus reads as one system rather than switching
+   styles between a step's own controls and its Continue button. */
+.bk-btn:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 2px; }
+.bk-btn-sm { padding: 8px 15px; font-size: 12.5px; border-radius: 999px; }
 .bk-btn-primary { background: var(--sp-accent, #FF4D4D); color: #fff; }
 .bk-btn-primary:hover:not(:disabled) { background: var(--sp-accent-dk, #E63946); }
 .bk-btn-ghost { background: transparent; color: var(--sp-ink); border-color: var(--sp-line); }
@@ -299,6 +426,16 @@
 .bk-sk-line:last-child { margin-bottom: 0; }
 .bk-sk-line.w40 { width: 40%; } .bk-sk-line.w55 { width: 55%; } .bk-sk-line.w70 { width: 70%; }
 @keyframes bkShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+/* Used only by the My Bookings detail overlay below (`.mb-detail .bk-close`,
+   my-bookings.js) — the booking flow's own exit is the `.bk-back` link now. */
+.bk-close {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,.24);
+  background: transparent; color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+  flex: none; transition: background .18s ease;
+}
+.bk-close:hover { background: rgba(255,255,255,.14); }
+@keyframes bkRise { from { opacity: 0; transform: translateY(14px) scale(.99); } }
 
 /* ===========================================================================
    My Bookings
@@ -373,22 +510,31 @@
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 900px) {
-  .bk-root { padding: 0; }
-  .bk-sheet { border-radius: 0; min-height: 100vh; }
-  /* The fare rail moves under the step instead of being squeezed to a sliver. */
+  /* The fare rail moves under the step instead of being squeezed to a sliver.
+     Horizontal spacing already comes from .bk-sheet's own clamp() padding at
+     every width, so nothing here needs to re-add it. */
   .bk-body { grid-template-columns: 1fr; }
-  .bk-side { position: static; padding: 0 18px 18px; }
-  .bk-main { padding: 18px; }
-  .bk-head, .bk-rail, .bk-foot { padding-left: 18px; padding-right: 18px; }
+  .bk-side { position: static; padding: 0; }
   .bk-rail-label { display: none; }          /* dots alone once space is tight */
   .bk-rail-step.is-now .bk-rail-label { display: inline; }
+  .bk-flightsum-leg { padding-left: 0; border-left: none; }
+
+  .bk-foot-total {
+    display: flex; flex-direction: column; gap: 1px; line-height: 1.15;
+    margin-right: auto; white-space: nowrap;
+  }
+  .bk-foot-total:empty { display: none; }
+  .bk-foot-total-label { font-size: 11px; font-weight: 700; color: var(--sp-muted, #5B6B82); }
+  .bk-foot-total-amt { font-size: 17px; font-weight: 800; color: var(--sp-ink, #0A2540); }
 }
 @media (max-width: 560px) {
   .bk-grid, .bk-inline, .bk-tickgrid { grid-template-columns: 1fr; }
   .bk-choice { flex-wrap: wrap; }
   .bk-choice-price { text-align: left; }
   .bk-done-actions .bk-btn { flex: 1 1 46%; }
-  .bk-seat { width: 27px; height: 27px; }
+  /* Seat sizing at this width is set once, above, alongside the rest of the
+     cabin's mobile treatment (padding, label/price font sizes) — not repeated
+     here, which is what silently overrode it back down to 27px before. */
   .bk-foot { flex-wrap: wrap; }
   .bk-foot-msg { order: -1; flex-basis: 100%; text-align: left; }
 }
@@ -473,6 +619,43 @@
 .bk-disclose-note { margin: 0 0 10px; font-size: 13px; color: var(--sp-muted, #5B6B82); }
 .bk-disclose-note:empty { display: none; }
 .bk-disclose-note.is-ok { color: var(--sp-emerald, #12B76A); font-weight: 700; }
+
+/* Passport scan — "Upload Passport" above the manual fields. The file input
+   is visually hidden, not `hidden`, so it stays in the tab order: a keyboard
+   user tabs to it and opens the file picker with Space/Enter exactly as a
+   sighted mouse user clicks the label, and :focus-visible on the label
+   (via the input->label sibling order in the markup) shows where they are. */
+.bk-scan {
+  margin: 0 0 16px; padding: 14px 16px; border-radius: 12px;
+  background: var(--sp-surface-2, #F1F5F9);
+  border: 1px solid var(--sp-line, rgba(10, 37, 64, .1));
+}
+.bk-scan-input {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.bk-scan-btn {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  color: var(--sp-header, #0A2540);
+  background: var(--sp-surface, #FFFFFF);
+  border: 1px solid var(--sp-line, rgba(10, 37, 64, .1));
+  transition: border-color .15s ease, color .15s ease;
+}
+.bk-scan-btn:hover { border-color: var(--sp-accent, #FF4D4D); color: var(--sp-accent, #FF4D4D); }
+.bk-scan-input:focus-visible + .bk-scan-btn {
+  outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 2px;
+}
+.bk-scan-btn.is-busy { cursor: progress; opacity: .75; }
+.bk-scan-hint {
+  margin: 8px 0 0; font-size: 12px; line-height: 1.5;
+  color: var(--sp-muted, #5B6B82);
+}
+.bk-scan-msg { margin: 0; font-size: 13px; font-weight: 700; }
+.bk-scan-msg.is-ok { color: var(--sp-emerald, #12B76A); }
+.bk-scan-msg.is-bad { margin-top: 8px; color: var(--sp-coral-dark, #C0392B); font-weight: 600; }
+.bk-scan.is-done { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bk-scan.is-error { border-color: var(--sp-coral-dark, #C0392B); }
 
 /* Notice above the traveller list, e.g. the international passport rule. */
 .bk-note {
@@ -648,6 +831,16 @@
 .bk-review-dl dd { margin: 2px 0 0; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
 .bk-journey { margin-top: 14px; }
 
+.bk-review-seats { display: grid; gap: 8px; }
+.bk-review-seat {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: var(--sp-surface-2, #F1F5F9); border: 1px solid var(--sp-line, rgba(10,37,64,.1));
+  border-radius: 12px; font-size: 13.5px;
+}
+.bk-review-seat > span:first-child { flex: 1; color: var(--sp-muted); }
+.bk-review-seat b { font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.bk-review-seat > span:last-child:not(:first-child) { color: var(--sp-muted); font-size: 12px; }
+
 /* --------------------------------------------------------------------------
    Coupon, inside the Fare Summary card
    -------------------------------------------------------------------------- */
@@ -712,11 +905,10 @@
    Mobile — the flow at 375px. Single column, nothing off the side.
    -------------------------------------------------------------------------- */
 @media (max-width: 640px) {
-  /* The Fare Summary drops below the step instead of sitting beside it. */
+  /* The Fare Summary drops below the step instead of sitting beside it.
+     Horizontal spacing comes from .bk-sheet's own clamp() padding. */
   .bk-body { grid-template-columns: 1fr; }
-  .bk-side { position: static; padding: 0 16px 20px; }
-  .bk-main { padding: 16px; }
-  .bk-rail { padding: 12px 16px; }
+  .bk-side { position: static; padding: 0; }
 }
 
 @media (max-width: 560px) {

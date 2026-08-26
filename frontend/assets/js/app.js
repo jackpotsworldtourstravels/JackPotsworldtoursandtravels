@@ -33,126 +33,33 @@ function apiErrorText(err, fallback) {
   return fallback;
 }
 
-/* Nav: header fades from transparent to solid black gradually over a long scroll range */
-const header = document.getElementById('siteHeader');
-const HEADER_FADE_RANGE = 600;
-const updateHeader = () => {
-  const progress = Math.min(1, Math.max(0, window.scrollY / HEADER_FADE_RANGE));
-  header.style.backgroundColor = `rgba(0,0,0,${progress.toFixed(3)})`;
-  header.style.backdropFilter = `blur(${(progress * 16).toFixed(1)}px)`;
-  header.style.boxShadow = progress > 0.05 ? `0 1px 0 rgba(255,255,255,${(progress * 0.08).toFixed(3)})` : 'none';
-};
-window.addEventListener('scroll', updateHeader, { passive: true });
-updateHeader();
+/* THE HEADER'S BEHAVIOUR MOVED OUT OF THIS FILE.
 
-const hamburgerBtn = document.getElementById('hamburgerBtn');
+   The transparent-to-black scroll fade, the hamburger and the hero parallax all
+   used to be written here, against markup in index.html. They are hero-shell.js's
+   now, because the Flights page wears the same header and does NOT load this
+   file — so its navbar simply never faded, which is the kind of drift a second
+   copy guarantees. One call, and both pages behave identically. */
 const mobileNav = document.getElementById('mobileNav');
-hamburgerBtn.addEventListener('click', () => {
-  const open = mobileNav.classList.toggle('open');
-  hamburgerBtn.setAttribute('aria-expanded', open);
-});
-mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-  mobileNav.classList.remove('open');
-  hamburgerBtn.setAttribute('aria-expanded', 'false');
-}));
+if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
 
-/* Hero parallax (subtle, disabled for reduced motion) */
-const heroBg = document.getElementById('heroBg');
-const heroVideoLayer = document.getElementById('heroVideoLayer');
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (heroBg && !reduceMotion) {
-  window.addEventListener('scroll', () => {
-    const y = Math.min(window.scrollY, 800);
-    const t = `translateY(${y * 0.25}px) scale(${1 + y * 0.0002})`;
-    heroBg.style.transform = t;
-    if (heroVideoLayer) heroVideoLayer.style.transform = t;
-  }, { passive: true });
-}
+/* THE HERO CARD MOVED OUT OF THIS FILE.
 
-/* Hero background videos: one per booking tab, lazy-loaded on first use */
-const heroVideos = document.querySelectorAll('.hero-video-layer video');
-const HERO_VIDEO_SPEED = 1.35; // slightly faster than real-time, still smooth/natural
-heroVideos.forEach(v => {
-  v.playbackRate = HERO_VIDEO_SPEED;
-  v.addEventListener('loadedmetadata', () => { v.playbackRate = HERO_VIDEO_SPEED; });
-});
-function switchHeroVideo(name) {
-  heroVideos.forEach(v => {
-    if (v.dataset.video === name) {
-      v.classList.add('active');
-      if (!v.getAttribute('src') && v.dataset.src) {
-        v.setAttribute('src', v.dataset.src);
-      }
-      v.playbackRate = HERO_VIDEO_SPEED;
-      const playPromise = v.play();
-      if (playPromise && playPromise.catch) playPromise.catch(() => {});
-    } else {
-      v.classList.remove('active');
-      v.pause();
-    }
-  });
-}
+   The booking tabs, their hero videos, the swap button, the date fields and the
+   Search button all used to be wired here, against markup that lived in
+   index.html. Both are booking-card.js's now, because the Flights page renders
+   the SAME card and does not load this file — a second copy of these handlers
+   over there is exactly the drift the module exists to prevent.
 
-/* Booking tabs */
-const tabs = document.querySelectorAll('.tab');
-const panels = document.querySelectorAll('.search-panel');
+   What is still this file's: WHERE a search goes and WHETHER it is allowed to
+   run. See the hero search section further down, which hands the card a
+   handler. */
+
+/** Switch the hero's product tab. Kept as a free function because the voice
+ *  search and the deep-link handlers below have always called it by this name. */
 function activateTab(name) {
-  tabs.forEach(t => {
-    const active = t.dataset.tab === name;
-    t.classList.toggle('active', active);
-    t.setAttribute('aria-selected', active);
-  });
-  panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
-  switchHeroVideo(name);
+  if (typeof BookingCard !== 'undefined') BookingCard.activateTab(name);
 }
-tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
-/* THE data-tab-link HANDLER IS GONE, AND SO ARE THE ATTRIBUTES.
-
-   Those nav words used to be href="#" plus a script that switched the hero tab
-   and scrolled back to the hero — which only ever changed which search form was
-   on screen. Each service has its own page now (flights.html, hotels.html,
-   cruises.html, packages.html, visa.html, activities.html), so they are plain
-   links. A real href also means middle-click, "open in new tab" and a visible
-   status-bar target, none of which an href="#" gave.
-
-   The hero's tab BUTTONS still use data-tab and activateTab() above; they
-   switch the search panel in place and are unrelated to these. */
-
-/* Swap From/To fields */
-document.querySelectorAll('.swap-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const fields = btn.parentElement.querySelectorAll('.field input');
-    if (fields.length >= 2) {
-      const tmp = fields[0].value;
-      fields[0].value = fields[1].value;
-      fields[1].value = tmp;
-    }
-  });
-});
-
-/* Date fields: open native picker on click, format the chosen date into the display input */
-document.querySelectorAll('.field-date').forEach(field => {
-  const display = field.querySelector('.date-display');
-  const native = field.querySelector('.date-native');
-  const openPicker = () => {
-    if (native.showPicker) {
-      try { native.showPicker(); } catch (e) { native.focus(); }
-    } else {
-      native.focus();
-      native.click();
-    }
-  };
-  display.addEventListener('click', openPicker);
-  field.querySelector('.cal-icon').addEventListener('click', openPicker);
-  native.addEventListener('change', () => {
-    if (native.value) {
-      const d = new Date(native.value + 'T00:00:00');
-      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const month = d.toLocaleDateString('en-US', { month: 'short' });
-      display.value = `${weekday}, ${d.getDate()} ${month}`;
-    }
-  });
-});
 
 /* Button ripple effect — shared by .btn and the floating action menu */
 function createRipple(e, el) {
@@ -301,7 +208,7 @@ async function refreshWishlistState() {
   const { access } = getStoredAuth();
   if (!access) return;
   try {
-    const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
+    const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
     data.forEach(w => wishlistMap.set(`${w.item_type}:${w.item_id}`, w.id));
   } catch (err) { /* ignore — hearts stay unfilled */ }
 }
@@ -329,12 +236,12 @@ document.addEventListener('click', async e => {
   const key = `${type}:${id}`;
   try {
     if (wishlistMap.has(key)) {
-      await axios.delete(`${API_BASE}/api/wishlist/${wishlistMap.get(key)}`, { headers: { Authorization: `Bearer ${access}` } });
+      await axios.delete(`${API_BASE}/api/customer/wishlist/${wishlistMap.get(key)}`, { headers: { Authorization: `Bearer ${access}` } });
       wishlistMap.delete(key);
       showToast('Removed from wishlist.');
     } else {
       const { data } = await axios.post(
-        `${API_BASE}/api/wishlist`, { item_type: type, item_id: id }, { headers: { Authorization: `Bearer ${access}` } }
+        `${API_BASE}/api/customer/wishlist`, { item_type: type, item_id: id }, { headers: { Authorization: `Bearer ${access}` } }
       );
       wishlistMap.set(key, data.id);
       showToast('Saved to wishlist!');
@@ -379,7 +286,7 @@ async function openReviewsModal(type, id, label) {
   const { access, userId } = getStoredAuth();
   document.getElementById('reviewFormWrap').style.display = access ? 'block' : 'none';
   try {
-    const { data } = await axios.get(`${API_BASE}/api/reviews`, { params: { item_type: type, item_id: id } });
+    const { data } = await axios.get(`${API_BASE}/api/customer/reviews`, { params: { item_type: type, item_id: id } });
     if (access && userId) {
       const mine = data.find(r => String(r.user_id) === String(userId));
       if (mine) {
@@ -404,7 +311,7 @@ async function openReviewsModal(type, id, label) {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete your review?')) return;
         try {
-          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: { Authorization: `Bearer ${access}` } });
+          await axios.delete(`${API_BASE}/api/customer/reviews/${btn.dataset.deleteReview}`, { headers: { Authorization: `Bearer ${access}` } });
           openReviewsModal(type, id, label);
         } catch (err) { showToast('Failed to delete review.', true); }
       });
@@ -435,10 +342,10 @@ reviewForm.addEventListener('submit', async e => {
   const comment = document.getElementById('reviewComment').value;
   try {
     if (myReviewId) {
-      await axios.put(`${API_BASE}/api/reviews/${myReviewId}`, { rating: currentReviewRating, comment }, { headers: { Authorization: `Bearer ${access}` } });
+      await axios.put(`${API_BASE}/api/customer/reviews/${myReviewId}`, { rating: currentReviewRating, comment }, { headers: { Authorization: `Bearer ${access}` } });
     } else {
       await axios.post(
-        `${API_BASE}/api/reviews`,
+        `${API_BASE}/api/customer/reviews`,
         { item_type: currentReviewItem.type, item_id: currentReviewItem.id, rating: currentReviewRating, comment },
         { headers: { Authorization: `Bearer ${access}` } }
       );
@@ -602,83 +509,15 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    worse than saying so.
    =========================================================================== */
 
-/** Where each panel's criteria go, and how to read them. */
+/** Where each panel's criteria go. READING them is booking-card.js's job — it
+ *  owns the controls, so it is the only thing that can know whether a return
+ *  date belongs to this search or is left over from a round trip the traveller
+ *  switched away from. This map is only the destination. */
 const HERO_SEARCH = {
-  flights: {
-    page: 'flights.html',
-    read() {
-      const dep = nativeDate('fDep');
-      const ret = nativeDate('fRet');
-      /* "1 Passenger" / "5+ Passengers" -> a number. The hero only offers a
-         single count; the results page splits it into adults/children/infants,
-         so everyone here is an adult until told otherwise. */
-      const pax = parseInt((val('fPax') || '1').replace(/\D+/g, ''), 10) || 1;
-      return {
-        trip: ret ? 'round' : 'oneway',
-        from: airportCode('fFrom'),
-        to: airportCode('fTo'),
-        depart: dep,
-        ret: ret,
-        adults: pax,
-        children: 0,
-        infants: 0,
-        cabin: (val('fCabin') || 'Economy').toLowerCase().replace(/\s+/g, '-'),
-      };
-    },
-    validate(p) {
-      if (!p.from) return ['Choose where you are flying from.', 'fFrom'];
-      if (!p.to) return ['Choose where you are flying to.', 'fTo'];
-      if (p.from === p.to) return ['Origin and destination cannot be the same.', 'fTo'];
-      if (!p.depart) return ['Choose a departure date.', 'fDep'];
-      if (p.ret && p.ret < p.depart) return ['The return date cannot be before departure.', 'fRet'];
-      return null;
-    },
-  },
-  hotels: {
-    page: 'hotels.html',
-    read() {
-      return {
-        dest: val('hDest'),
-        checkIn: nativeDate('hIn'),
-        checkOut: nativeDate('hOut'),
-        guests: parseInt((val('hGuests') || '2').replace(/\D+/g, ''), 10) || 2,
-        rooms: parseInt((val('hRooms') || '1').replace(/\D+/g, ''), 10) || 1,
-      };
-    },
-    validate(p) {
-      if (!p.dest) return ['Tell us where you are going.', 'hDest'];
-      if (!p.checkIn) return ['Choose a check-in date.', 'hIn'];
-      if (!p.checkOut) return ['Choose a check-out date.', 'hOut'];
-      if (p.checkOut <= p.checkIn) return ['Check-out must be after check-in.', 'hOut'];
-      return null;
-    },
-  },
-  packages: {
-    page: 'packages.html',
-    read() {
-      return { type: val('pType'), month: val('pMonth') };
-    },
-    validate() { return null; },   // both fields are dropdowns with a default
-  },
+  flights:  { page: 'flights.html' },
+  hotels:   { page: 'hotels.html' },
+  packages: { page: 'packages.html' },
 };
-
-const val = id => (document.getElementById(id) || {}).value?.trim() || '';
-
-/** The ISO value behind a formatted date field.
- *  The visible input is a readonly display; the real value lives on the
- *  type="date" sibling, which is what the results page needs. */
-function nativeDate(displayId) {
-  const field = document.getElementById(displayId)?.closest('.field-date');
-  return field?.querySelector('.date-native')?.value || '';
-}
-
-/** "Hyderabad (HYD)" -> "HYD". Falls back to the whole string so a hand-typed
- *  city is still carried rather than silently dropped. */
-function airportCode(id) {
-  const v = val(id);
-  const m = /\(([A-Z]{3})\)/.exec(v);
-  return m ? m[1] : v;
-}
 
 /** Park a search so signing in can resume it. sessionStorage, not local: a
  *  search is about this visit, and finding yesterday's criteria reapplied on
@@ -708,40 +547,28 @@ function goToSearch(kind, params) {
   window.location.href = `${spec.page}?${qs.toString()}`;
 }
 
-document.querySelectorAll('.search-go').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.preventDefault();
-    const panel = btn.closest('.search-panel');
-    const kind = panel?.dataset.panel;
-    const spec = HERO_SEARCH[kind];
+/* THE GATE. The card has already validated by the time this runs; what is left
+   is whether this traveller may search at all. Signed out: park the criteria,
+   open the modal, search nothing — the modal's success path picks it back up.
 
-    /* Cruises: no search page to hand criteria to yet. */
-    if (!spec) {
+   Cruises never reach here: the card has no cruises handler to call because the
+   cruise page has no search panel to hand criteria to, and a redirect that
+   ignored them would be worse than saying so. */
+if (typeof BookingCard !== 'undefined') {
+  BookingCard.setSearchHandler((kind, params) => {
+    if (!HERO_SEARCH[kind]) {
       showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
       return;
     }
-
-    const params = spec.read();
-    const bad = spec.validate(params);
-    if (bad) {
-      const [message, focusId] = bad;
-      showToast(message, true);
-      document.getElementById(focusId)?.focus();
-      return;
-    }
-
-    /* THE GATE. Signed out: park the criteria, open the modal, search nothing.
-       The modal's success path picks the search back up. */
     const { access } = getStoredAuth();
     if (!access) {
       storePendingSearch(kind, params);
       openAuth();
       return;
     }
-
     goToSearch(kind, params);
   });
-});
+}
 
 /** Called once a session exists. Returns true if it navigated. */
 function resumePendingSearch() {
@@ -892,7 +719,9 @@ function applyVoiceQuery(transcript) {
 
   showToast(`Heard: "${text}"`);
   if (confidentMatch) {
-    document.querySelector('.search-panel.active .search-go')?.click();
+    /* One Search button for the whole card now, in its footer — it is no
+       longer inside the active panel. */
+    document.querySelector('.search-card .search-go')?.click();
   }
 }
 fabVoiceBtn.addEventListener('click', () => {
@@ -1713,7 +1542,14 @@ document.getElementById('acctPasswordForm').addEventListener('submit', async e =
   }
 });
 
-/* ---------- Bookings (list, cancel, confirmation/timeline) ---------- */
+/* ---------- Bookings (list, cancel, confirmation/timeline) ----------
+   Reads the real `GET /api/customer/bookings` (migration 0053) — every field
+   below (booking_ref, product_type, airline, origin_city, total_amount,
+   passengers[], payments[]) is what that response actually carries. Only
+   flight bookings exist server-side today (hotels/cruises/packages are still
+   the client-side demo in booking-store.js — see BookingApi.isLive); this
+   renders whatever `product_type`s the endpoint returns, so it needs no
+   further change once the others are real too. */
 const TYPE_ICONS = {
   flight: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/>',
   hotel: '<path d="M3 21V7a2 2 0 0 1 2-2h6v16"/><path d="M11 9h8a2 2 0 0 1 2 2v10"/><path d="M3 21h18"/>',
@@ -1721,12 +1557,45 @@ const TYPE_ICONS = {
   package: '<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
 };
 let allBookingsCache = [];
-let paymentsByBooking = new Map();
-async function loadPaymentsMap() {
-  try {
-    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
-    paymentsByBooking = new Map(data.map(p => [p.booking_id, p]));
-  } catch (err) { /* receipt just won't show payment rows */ }
+
+/* My Trips: everything the customer has booked, flight and hotel together.
+   Two tables, two endpoints (see migration 0055's isolation reasoning), one
+   list here — a hotel row is aliased onto the field names the flight-shaped
+   rendering below already reads (`travel_date`, `passengers`) so bookingTitle/
+   bookingRoute/showAcctConfirmation/the row and card renderers below need a
+   handful of `product_type === 'hotel'` branches, not a second copy of each. */
+async function fetchAllCustomerBookings() {
+  const [flightsRes, hotelsRes, packagesRes] = await Promise.allSettled([
+    axios.get(`${API_BASE}/api/customer/bookings`, { headers: authHeaders() }),
+    axios.get(`${API_BASE}/api/customer/hotel-bookings`, { headers: authHeaders() }),
+    axios.get(`${API_BASE}/api/customer/package-bookings`, { headers: authHeaders() }),
+  ]);
+  if (flightsRes.status === 'rejected' && hotelsRes.status === 'rejected' && packagesRes.status === 'rejected') {
+    throw flightsRes.reason;
+  }
+  const flights = flightsRes.status === 'fulfilled' ? flightsRes.value.data : [];
+  const hotels = hotelsRes.status === 'fulfilled' ? hotelsRes.value.data : [];
+  const packages = packagesRes.status === 'fulfilled' ? packagesRes.value.data : [];
+  const merged = [
+    ...flights,
+    ...hotels.map(h => ({ ...h, travel_date: h.check_in_date, passengers: h.guests || [] })),
+    ...packages.map(p => ({ ...p, travel_date: p.departure_date, passengers: p.travellers || [] })),
+  ];
+  merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return merged;
+}
+
+function bookingTitle(b) {
+  if (b.product_type === 'flight') return `${b.airline || 'Flight'} ${b.flight_number || ''}`.trim();
+  if (b.product_type === 'hotel') return b.hotel_name || `Hotel — ${b.booking_ref}`;
+  if (b.product_type === 'package') return b.package_name || `Package — ${b.booking_ref}`;
+  return `${b.product_type} — ${b.booking_ref}`;
+}
+function bookingRoute(b) {
+  if (b.product_type === 'hotel') return b.hotel_location || '';
+  if (b.product_type === 'package') return b.package_days ? `${b.package_days} day${b.package_days === 1 ? '' : 's'}` : '';
+  if (!b.origin_city && !b.destination_city) return '';
+  return `${b.origin_city || b.origin_code || ''} → ${b.destination_city || b.destination_code || ''}`;
 }
 function renderTimeline(booking) {
   if (booking.status === 'cancelled') {
@@ -1745,61 +1614,41 @@ function renderTimeline(booking) {
     <div class="tl-step ${s.done ? 'done' : ''}"><span class="tl-dot"></span><span class="tl-label">${s.label}</span></div>
   `).join('')}</div>`;
 }
-const CATALOG_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
-const catalogItemCache = new Map();
-async function fetchCatalogItem(type, id) {
-  const cacheKey = `${type}-${id}`;
-  if (catalogItemCache.has(cacheKey)) return catalogItemCache.get(cacheKey);
-  const endpoint = CATALOG_ENDPOINTS[type];
-  if (!endpoint) return null;
-  try {
-    const { data } = await axios.get(`${API_BASE}/api/${endpoint}/${id}`);
-    catalogItemCache.set(cacheKey, data);
-    return data;
-  } catch (err) {
-    return null;
-  }
-}
-function bookingReference(bookingId) { return 'JWT-' + String(bookingId).padStart(6, '0'); }
-
 function closeAcctTicket() { document.getElementById('acctConfirmOverlay').classList.remove('open'); }
 document.getElementById('acctConfirmCloseBtn').addEventListener('click', closeAcctTicket);
 
-async function showAcctConfirmation(bookingId) {
-  const booking = allBookingsCache.find(b => String(b.id) === String(bookingId));
+async function showAcctConfirmation(bookingRef) {
+  const booking = allBookingsCache.find(b => b.booking_ref === bookingRef);
   if (!booking) return;
-  const payment = paymentsByBooking.get(booking.id);
-  const item = await fetchCatalogItem(booking.booking_type, booking.item_id);
-  const reference = bookingReference(booking.id);
-  const isFlight = booking.booking_type === 'flight';
+  const payment = (booking.payments || [])[booking.payments.length - 1];
+  const reference = booking.booking_ref;
+  const isFlight = booking.product_type === 'flight';
+  const isHotel = booking.product_type === 'hotel';
+  const isPackage = booking.product_type === 'package';
+  const contact = (booking.passengers || []).find(p => p.is_contact) || (booking.passengers || [])[0];
 
-  let itemTitle = `${booking.booking_type} — #${booking.item_id}`;
-  let itemSub = '';
-  let dateValue = fmtDate(booking.travel_date);
-  let sourceDestRow = '';
-  let timeRow = '';
-  let seatRow = '';
-
-  if (item) {
-    if (isFlight) {
-      itemTitle = `${item.airline} · ${item.cabin_class}`;
-      dateValue = fmtDate(booking.travel_date || item.departure_time);
-      sourceDestRow = `
-        <div class="confirm-row"><span>From</span><span>${escapeHtml(item.from_airport)}</span></div>
-        <div class="confirm-row"><span>To</span><span>${escapeHtml(item.to_airport)}</span></div>`;
-      timeRow = `<div class="confirm-row"><span>Time</span><span>${fmtTime(item.departure_time)} – ${fmtTime(item.arrival_time)}</span></div>`;
-      seatRow = `<div class="confirm-row"><span>Seat Number</span><span>Assigned at check-in</span></div>`;
-    } else if (booking.booking_type === 'hotel') {
-      itemTitle = item.name;
-      itemSub = item.location;
-    } else if (booking.booking_type === 'cruise') {
-      itemTitle = item.name;
-      itemSub = `Departs ${item.departure_port}`;
-    } else if (booking.booking_type === 'package') {
-      itemTitle = item.title;
-      itemSub = item.package_type;
-    }
-  }
+  const itemTitle = isFlight
+    ? `${booking.airline || ''} · ${booking.cabin_class || ''}`
+    : bookingTitle(booking);
+  const sourceDestRow = isFlight ? `
+        <div class="confirm-row"><span>From</span><span>${escapeHtml(booking.origin_city || booking.origin_code || '—')}</span></div>
+        <div class="confirm-row"><span>To</span><span>${escapeHtml(booking.destination_city || booking.destination_code || '—')}</span></div>`
+    : isHotel ? `
+        <div class="confirm-row"><span>Property</span><span>${escapeHtml(booking.hotel_name || '—')}</span></div>
+        <div class="confirm-row"><span>Location</span><span>${escapeHtml(booking.hotel_location || '—')}</span></div>` : '';
+  const timeRow = isFlight
+    ? `<div class="confirm-row"><span>Time</span><span>${escapeHtml(booking.departure_time || '—')} – ${escapeHtml(booking.arrival_time || '—')}</span></div>` : '';
+  const seatRow = isFlight
+    ? `<div class="confirm-row"><span>Seat Number</span><span>Assigned at check-in</span></div>` : '';
+  const stayRow = isHotel ? `
+        <div class="confirm-row"><span>Room</span><span>${escapeHtml(booking.room_name || '—')}</span></div>
+        <div class="confirm-row"><span>Check-in</span><span>${fmtDate(booking.check_in_date)}</span></div>
+        <div class="confirm-row"><span>Check-out</span><span>${fmtDate(booking.check_out_date)}</span></div>
+        <div class="confirm-row"><span>Nights</span><span>${escapeHtml(booking.nights ?? '—')}</span></div>` : '';
+  const tripRow = isPackage ? `
+        <div class="confirm-row"><span>Destination</span><span>${escapeHtml(booking.package_name || '—')}</span></div>
+        <div class="confirm-row"><span>Duration</span><span>${escapeHtml(booking.package_days ? booking.package_days + ' days' : '—')}</span></div>
+        <div class="confirm-row"><span>Departure date</span><span>${fmtDate(booking.departure_date)}</span></div>` : '';
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(reference)}`;
 
@@ -1808,26 +1657,27 @@ async function showAcctConfirmation(bookingId) {
       <img src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours & Travels">
       <div>
         <div class="th-name">${escapeHtml(itemTitle)}</div>
-        ${itemSub ? `<div class="modal-sub" style="margin:2px 0 0;">${escapeHtml(itemSub)}</div>` : ''}
       </div>
     </div>
     ${renderTimeline(booking)}
-    <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
-    <div class="confirm-row"><span>PNR / Booking Reference</span><span>${reference}</span></div>
-    <div class="confirm-row"><span>Passenger Name</span><span>${escapeHtml(acctCurrentUser?.full_name || '—')}</span></div>
-    <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
+    <div class="confirm-row"><span>Booking Reference</span><span>${escapeHtml(reference)}</span></div>
+    ${booking.pnr ? `<div class="confirm-row"><span>PNR</span><span>${escapeHtml(booking.pnr)}</span></div>` : ''}
+    <div class="confirm-row"><span>${isHotel ? 'Guest Name' : isPackage ? 'Traveller Name' : 'Passenger Name'}</span><span>${escapeHtml(contact ? `${contact.first_name} ${contact.last_name}` : (acctCurrentUser?.full_name || '—'))}</span></div>
+    <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.product_type}</span></div>
     ${sourceDestRow}
-    <div class="confirm-row"><span>Date</span><span>${dateValue}</span></div>
+    ${!isHotel && !isPackage ? `<div class="confirm-row"><span>Date</span><span>${fmtDate(booking.travel_date)}</span></div>` : ''}
     ${timeRow}
     ${seatRow}
-    <div class="confirm-row"><span>Quantity</span><span>${booking.quantity}</span></div>
+    ${stayRow}
+    ${tripRow}
+    <div class="confirm-row"><span>${isHotel ? 'Guests' : isPackage ? 'Travellers' : 'Passengers'}</span><span>${(booking.passengers || []).length || 1}</span></div>
     <div class="confirm-row"><span>Booking Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
     ${payment ? `<div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>` : ''}
-    <div class="confirm-row"><span>Total Amount</span><span>${money(booking.total_price)}</span></div>
+    <div class="confirm-row"><span>Total Amount</span><span>${money(booking.total_amount)}</span></div>
     <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
     ${payment ? `
       <div class="confirm-row"><span>Payment Method</span><span style="text-transform:capitalize">${payment.method}</span></div>
-      <div class="confirm-row"><span>Transaction Ref</span><span>${payment.transaction_ref}</span></div>
+      ${payment.provider_reference ? `<div class="confirm-row"><span>Transaction Ref</span><span>${escapeHtml(payment.provider_reference)}</span></div>` : ''}
     ` : ''}
     <div class="ticket-qr">
       <img src="${qrUrl}" alt="Booking QR code" width="140" height="140">
@@ -1847,7 +1697,7 @@ async function showAcctConfirmation(bookingId) {
   document.getElementById('ticketPrintBtn').addEventListener('click', () => window.print());
   document.getElementById('ticketCloseBtn').addEventListener('click', closeAcctTicket);
   document.getElementById('ticketShareBtn').addEventListener('click', async () => {
-    const shareText = `My ${booking.booking_type} booking with JackPots World Tours & Travels — Ref ${reference}`;
+    const shareText = `My ${booking.product_type} booking with JackPots World Tours & Travels — Ref ${reference}`;
     if (navigator.share) {
       try { await navigator.share({ title: 'JackPots World Tours & Travels — Booking Ticket', text: shareText }); }
       catch (err) { /* user cancelled the native share sheet */ }
@@ -1866,24 +1716,28 @@ async function showAcctConfirmation(bookingId) {
 }
 
 function bookingRowHtml(b) {
+  const route = bookingRoute(b);
   return `
     <div class="acct-row">
-      <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[b.booking_type] || TYPE_ICONS.package}</svg></div>
+      <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[b.product_type] || TYPE_ICONS.package}</svg></div>
       <div class="ar-main">
-        <div class="ar-title">${escapeHtml(b.booking_type)} — #${b.item_id}</div>
-        <div class="ar-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel ' + fmtDate(b.travel_date) : ''} ${b.quantity > 1 ? '· Qty ' + b.quantity : ''}</div>
+        <div class="ar-title">${escapeHtml(bookingTitle(b))}</div>
+        <div class="ar-sub">${route ? escapeHtml(route) + ' · ' : ''}Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel ' + fmtDate(b.travel_date) : ''}</div>
       </div>
       <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
-      <div class="ar-amount">${money(b.total_price)}</div>
-      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.id}">View Ticket</button>
-      ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.id}">Cancel</button>` : ''}
+      <div class="ar-amount">${money(b.total_amount)}</div>
+      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
+      ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.booking_ref}">Cancel</button>` : ''}
     </div>`;
 }
-async function cancelBookingById(bookingId, onSuccess) {
+async function cancelBookingById(bookingRef, onSuccess) {
   if (!confirm('Cancel this booking?')) return;
+  /* JPH###### is a hotel booking, JPP###### a package booking (each its own
+     table/sequence — see migrations 0055/0056); everything else is flight. */
+  const path = /^JPH/.test(bookingRef) ? 'hotel-bookings'
+    : /^JPP/.test(bookingRef) ? 'package-bookings' : 'bookings';
   try {
-    await axios.delete(`${API_BASE}/api/bookings/${bookingId}`, { headers: authHeaders() });
-    await loadPaymentsMap();
+    await axios.post(`${API_BASE}/api/customer/${path}/${bookingRef}/cancel`, {}, { headers: authHeaders() });
     if (typeof onSuccess === 'function') await onSuccess();
   } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
@@ -1899,7 +1753,7 @@ function wireBookingRowActions(container) {
 async function loadAcctBookings() {
   const container = document.getElementById('acctBookingsList');
   try {
-    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    const data = await fetchAllCustomerBookings();
     allBookingsCache = data;
     if (!data.length) {
       container.innerHTML = '<div class="acct-empty">No bookings yet — go find your next trip!</div>';
@@ -1916,41 +1770,38 @@ async function loadAcctBookings() {
 let upcomingCountdownTimer = null;
 
 function upcomingCardHtml(entry) {
-  const { booking, item, when } = entry;
-  const ref = bookingReference(booking.id);
-  let title = `${booking.booking_type} — #${booking.item_id}`;
-  let fromTo = '';
-  let timeSpan = '';
-  let seatSpan = '';
-  if (item) {
-    if (booking.booking_type === 'flight') {
-      title = item.airline;
-      fromTo = `<span>${escapeHtml(item.from_airport)} &rarr; ${escapeHtml(item.to_airport)}</span>`;
-      timeSpan = `<span>Time: <b>${fmtTime(item.departure_time)}</b></span>`;
-      seatSpan = `<span>Seat: <b>Assigned at check-in</b></span>`;
-    } else if (booking.booking_type === 'hotel') title = item.name;
-    else if (booking.booking_type === 'cruise') title = item.name;
-    else if (booking.booking_type === 'package') title = item.title;
-  }
+  const { booking, when } = entry;
+  const isFlight = booking.product_type === 'flight';
+  const isHotel = booking.product_type === 'hotel';
+  const isPackage = booking.product_type === 'package';
+  const fromTo = isFlight
+    ? `<span>${escapeHtml(booking.origin_city || booking.origin_code || '')} &rarr; ${escapeHtml(booking.destination_city || booking.destination_code || '')}</span>`
+    : isHotel ? `<span>${escapeHtml(booking.hotel_location || '')}</span>`
+    : isPackage ? `<span>${escapeHtml(booking.package_days ? booking.package_days + ' days' : '')}</span>` : '';
+  const timeSpan = isFlight ? `<span>Time: <b>${escapeHtml(booking.departure_time || '—')}</b></span>` : '';
+  const seatSpan = isFlight ? `<span>Seat: <b>Assigned at check-in</b></span>` : '';
+  const dateLabel = isHotel ? 'Check-in' : isPackage ? 'Departure' : 'Date';
+  const stayMeta = isHotel ? `<span>Check-out: <b>${fmtDate(booking.check_out_date)}</b></span><span>Room: <b>${escapeHtml(booking.room_name || '—')}</b></span>` : '';
   return `
-    <div class="upcoming-card" data-upcoming-id="${booking.id}" data-upcoming-when="${when.toISOString()}">
+    <div class="upcoming-card" data-upcoming-id="${booking.booking_ref}" data-upcoming-when="${when.toISOString()}">
       <div class="upcoming-main">
-        <div class="upcoming-title">${escapeHtml(title)}</div>
-        <div class="upcoming-sub">Booking #${booking.id} · PNR ${ref} · <span class="badge ${booking.status}">${escapeHtml(booking.status)}</span></div>
+        <div class="upcoming-title">${escapeHtml(bookingTitle(booking))}</div>
+        <div class="upcoming-sub">${escapeHtml(booking.booking_ref)}${booking.pnr ? ' · PNR ' + escapeHtml(booking.pnr) : ''} · <span class="badge ${booking.status}">${escapeHtml(booking.status)}</span></div>
         <div class="upcoming-meta">
           ${fromTo}
-          <span>Date: <b>${fmtDate(booking.travel_date)}</b></span>
+          <span>${dateLabel}: <b>${fmtDate(booking.travel_date)}</b></span>
           ${timeSpan}
-          <span>Passengers: <b>${booking.quantity}</b></span>
+          ${stayMeta}
+          <span>${isHotel ? 'Guests' : isPackage ? 'Travellers' : 'Passengers'}: <b>${(booking.passengers || []).length || 1}</b></span>
           ${seatSpan}
         </div>
       </div>
       <div class="upcoming-countdown" data-countdown></div>
       <div class="upcoming-actions">
-        <button type="button" class="btn btn-coral btn-sm" data-upcoming-view="${booking.id}">View Ticket</button>
-        <button type="button" class="btn btn-navy btn-sm" data-upcoming-download="${booking.id}">Download Ticket</button>
+        <button type="button" class="btn btn-coral btn-sm" data-upcoming-view="${booking.booking_ref}">View Ticket</button>
+        <button type="button" class="btn btn-navy btn-sm" data-upcoming-download="${booking.booking_ref}">Download Ticket</button>
         <button type="button" class="btn btn-ghost btn-sm" data-upcoming-account>View Booking</button>
-        <button type="button" class="btn btn-danger btn-sm" data-upcoming-cancel="${booking.id}">Cancel Booking</button>
+        <button type="button" class="btn btn-danger btn-sm" data-upcoming-cancel="${booking.booking_ref}">Cancel Booking</button>
       </div>
     </div>`;
 }
@@ -2004,19 +1855,18 @@ async function loadUpcomingJourney() {
   const { access } = getStoredAuth();
   if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
   try {
-    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    const data = await fetchAllCustomerBookings();
     allBookingsCache = data;
     const now = new Date();
     const candidates = data.filter(b => b.status !== 'cancelled' && b.status !== 'completed' && b.travel_date);
-    const resolved = await Promise.all(candidates.map(async b => {
-      const item = await fetchCatalogItem(b.booking_type, b.item_id);
+    const resolved = candidates.map(b => {
       let when = new Date(`${b.travel_date}T00:00:00`);
-      if (b.booking_type === 'flight' && item?.departure_time) {
-        const clock = new Date(item.departure_time);
-        when.setHours(clock.getHours(), clock.getMinutes(), clock.getSeconds(), 0);
+      if (b.product_type === 'flight' && b.departure_time) {
+        const clock = new Date(b.departure_time);
+        if (!isNaN(clock)) when.setHours(clock.getHours(), clock.getMinutes(), clock.getSeconds(), 0);
       }
-      return { booking: b, item, when };
-    }));
+      return { booking: b, when };
+    });
     const upcoming = resolved.filter(r => r.when.getTime() > now.getTime()).sort((a, b) => a.when - b.when);
     clearInterval(upcomingCountdownTimer);
     if (!upcoming.length) {
@@ -2038,9 +1888,9 @@ async function loadUpcomingJourney() {
 async function loadAcctPayments() {
   const tbody = document.querySelector('#acctPaymentsTable tbody');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/payments/history`, { headers: authHeaders() });
     tbody.innerHTML = data.map(p => `
-      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref)}</td></tr>
+      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref || p.booking_ref)}</td></tr>
     `).join('') || `<tr><td colspan="5" class="acct-empty">No payments yet.</td></tr>`;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" class="acct-empty">Failed to load payment history.</td></tr>`;
@@ -2050,11 +1900,21 @@ async function loadAcctPayments() {
 /* ---------- Wishlist ---------- */
 const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
 async function fetchWishlistWithCatalog() {
-  const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: authHeaders() });
+  const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: authHeaders() });
   const catalogs = {};
+  /* No REST catalogue exists for these (they're still travel-data.js's static
+     sample arrays, browsed client-side, not served over HTTP) — so a saved
+     item can never be enriched with a name/price yet. Caught per type rather
+     than left to fail the outer Promise.all, so one 404 does not turn a
+     working wishlist into "Failed to load wishlist"; wishlistLabel() already
+     has a "no longer available" fallback for exactly this case. */
   await Promise.all([...new Set(data.map(w => w.item_type))].map(async t => {
-    const { data: items } = await axios.get(`${API_BASE}/api/${ACCT_WISHLIST_ENDPOINTS[t]}`);
-    catalogs[t] = new Map(items.map(i => [i.id, i]));
+    try {
+      const { data: items } = await axios.get(`${API_BASE}/api/${ACCT_WISHLIST_ENDPOINTS[t]}`);
+      catalogs[t] = new Map(items.map(i => [i.id, i]));
+    } catch (err) {
+      catalogs[t] = new Map();
+    }
   }));
   return { data, catalogs };
 }
@@ -2089,7 +1949,7 @@ async function loadAcctWishlist() {
     container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
-          await axios.delete(`${API_BASE}/api/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
+          await axios.delete(`${API_BASE}/api/customer/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
           loadAcctWishlist();
         } catch (err) { alert('Failed to remove item.'); }
       });
@@ -2104,7 +1964,7 @@ async function loadAcctNotifications() {
   const container = document.getElementById('acctNotificationsList');
   const clearBar = document.getElementById('acctNotifClearBar');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/notifications`, { headers: authHeaders() });
     if (!data.length) {
       container.innerHTML = `
         <div class="acct-empty acct-empty-notif">
@@ -2134,7 +1994,7 @@ async function loadAcctNotifications() {
     container.querySelectorAll('[data-mark-read]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
-          await axios.patch(`${API_BASE}/api/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
+          await axios.patch(`${API_BASE}/api/customer/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
           loadAcctNotifications();
         } catch (err) { alert('Failed to mark as read.'); }
       });
@@ -2147,7 +2007,7 @@ async function loadAcctNotifications() {
 
 document.getElementById('acctMarkAllReadBtn').addEventListener('click', async () => {
   try {
-    await axios.patch(`${API_BASE}/api/notifications/read-all`, {}, { headers: authHeaders() });
+    await axios.patch(`${API_BASE}/api/customer/notifications/read-all`, {}, { headers: authHeaders() });
     loadAcctNotifications();
   } catch (err) { alert('Failed to mark all as read.'); }
 });
@@ -2155,7 +2015,7 @@ document.getElementById('acctMarkAllReadBtn').addEventListener('click', async ()
 document.getElementById('acctClearAllBtn').addEventListener('click', async () => {
   if (!confirm('Are you sure you want to clear all notifications?')) return;
   try {
-    await axios.delete(`${API_BASE}/api/notifications/read`, { headers: authHeaders() });
+    await axios.delete(`${API_BASE}/api/customer/notifications/read`, { headers: authHeaders() });
     loadAcctNotifications();
   } catch (err) { alert('Failed to clear notifications.'); }
 });
@@ -2171,7 +2031,7 @@ function starString(rating) {
 async function loadAcctReviews() {
   const container = document.getElementById('acctReviewsList');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/reviews/mine`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/reviews/mine`, { headers: authHeaders() });
     if (!data.length) {
       container.innerHTML = "<div class=\"acct-empty\">You haven't written any reviews yet.</div>";
       return;
@@ -2195,7 +2055,7 @@ async function loadAcctReviews() {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete this review?')) return;
         try {
-          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
+          await axios.delete(`${API_BASE}/api/customer/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
           loadAcctReviews();
         } catch (err) { alert('Failed to delete review.'); }
       });
@@ -2230,7 +2090,7 @@ function openAcctReviewEdit(reviewId, rating, comment) {
   document.getElementById(`acctCancelReview-${reviewId}`).addEventListener('click', loadAcctReviews);
   document.getElementById(`acctSaveReview-${reviewId}`).addEventListener('click', async () => {
     try {
-      await axios.put(`${API_BASE}/api/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: authHeaders() });
+      await axios.put(`${API_BASE}/api/customer/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: authHeaders() });
       loadAcctReviews();
     } catch (err) { alert('Failed to update review.'); }
   });
@@ -2240,7 +2100,7 @@ function openAcctReviewEdit(reviewId, rating, comment) {
 async function loadAcctSupportTickets() {
   const container = document.getElementById('acctTicketsList');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/support-tickets`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/support-tickets`, { headers: authHeaders() });
     if (!data.length) {
       container.innerHTML = '<div class="acct-empty">No support tickets yet.</div>';
       return;
@@ -2263,7 +2123,7 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
   e.preventDefault();
   const msg = document.getElementById('acctTicketMsg');
   try {
-    await axios.post(`${API_BASE}/api/support-tickets`, {
+    await axios.post(`${API_BASE}/api/customer/support-tickets`, {
       subject: document.getElementById('acctTicketSubject').value,
       description: document.getElementById('acctTicketDescription').value,
       priority: document.getElementById('acctTicketPriority').value,
