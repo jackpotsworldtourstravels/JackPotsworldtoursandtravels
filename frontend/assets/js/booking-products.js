@@ -24,6 +24,23 @@ const BookingProducts = (function () {
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   const icon = n => (typeof JPIcon !== 'undefined' ? JPIcon.html(n, { size: 'sm' }) : '');
 
+  /** Whether the traveller step may offer "Upload Passport" at all.
+   *  `undefined` = not asked yet, `false`/`true` once the server has answered.
+   *  Asked once per page load and cached module-wide — this is a deployment
+   *  fact, not something that varies per traveller or repaint — and a
+   *  deployment with no provider configured must render no control at all,
+   *  never one that fails when pressed. */
+  let _ocrAvailable;
+
+  function checkOcrAvailability() {
+    if (_ocrAvailable !== undefined) return;
+    if (typeof BookingApi === 'undefined') { _ocrAvailable = false; return; }
+    _ocrAvailable = false; // hidden until proven otherwise
+    BookingApi.ocrAvailability().then(v => {
+      if (v) { _ocrAvailable = true; BookingFlow.repaint(); }
+    });
+  }
+
   function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso.length > 10 ? iso : iso + 'T00:00:00');
@@ -196,6 +213,40 @@ const BookingProducts = (function () {
       return true;
     }
 
+    /** The "Upload Passport" control shown above the passport fields — absent
+     *  entirely on a deployment with no OCR provider configured (see
+     *  `checkOcrAvailability`), so there is never a button that fails when
+     *  pressed. States: idle, busy (reading), done (fields filled — the
+     *  traveller still reviews and edits them below, this only reports what
+     *  happened), error (a message the form can show without blocking manual
+     *  entry). No provider name ever appears here. */
+    function scanControlHtml(i, ctx) {
+      if (!_ocrAvailable) return '';
+      const scan = (ctx.paxScan && ctx.paxScan[i]) || { status: 'idle' };
+      const busy = scan.status === 'busy';
+      const done = scan.status === 'done';
+      const failed = scan.status === 'error';
+
+      if (done) {
+        return `<div class="bk-scan is-done">
+          <p class="bk-scan-msg is-ok">&#10003; Passport details detected</p>
+          <button type="button" class="bk-btn bk-btn-ghost bk-btn-sm" data-scan-edit="${i}">Edit Details</button>
+        </div>`;
+      }
+
+      return `<div class="bk-scan ${failed ? 'is-error' : ''}">
+        <input type="file" id="${scanId(i)}" class="bk-scan-input" data-scan-input="${i}"
+               accept="image/jpeg,image/png,image/webp,application/pdf" ${busy ? 'disabled' : ''}>
+        <label class="bk-scan-btn ${busy ? 'is-busy' : ''}" for="${scanId(i)}">
+          ${icon('upload')}<span>${busy ? 'Reading your passport…' : 'Upload Passport'}</span>
+        </label>
+        <p class="bk-scan-hint">Upload a clear passport image to automatically fill your details.</p>
+        ${failed ? `<p class="bk-scan-msg is-bad" role="alert">${esc(scan.message)}</p>` : ''}
+      </div>`;
+    }
+
+    const scanId = i => `p${i}_ppscan`;
+
     function cardHtml(i, ctx) {
       const kind = (ctx.paxKinds && ctx.paxKinds[i]) || 'Adult';
       const intl = needsPassport(ctx);
@@ -204,6 +255,7 @@ const BookingProducts = (function () {
       const complete = paxComplete(ctx, i, intl);
 
       const passportBody = `
+        ${scanControlHtml(i, ctx)}
         <p class="bk-disclose-note" id="${p}ppnote" role="status" aria-live="polite"></p>
         <div class="bk-grid">${passportSpecs(i).map(field).join('')}</div>`;
 
@@ -245,6 +297,8 @@ const BookingProducts = (function () {
       label: o.noun + 's',
 
       render(ctx) {
+        if (o.passport) checkOcrAvailability();
+
         /* The party size is the traveller's to change from here on, so it is
            held on the draft rather than recomputed from the search each time. */
         if (!Array.isArray(ctx.paxKinds) || !ctx.paxKinds.length) {
@@ -359,6 +413,55 @@ const BookingProducts = (function () {
           });
         });
 
+        /* --- passport scan: upload a photo, fill blanks from what it read --
+           Same "only fill blanks" rule as the lookup above, and the same
+           tolerance for failure: a bad scan reports itself and leaves the
+           form exactly as usable as it was before the upload. */
+        root.querySelectorAll('[data-scan-input]').forEach(input => {
+          const i = Number(input.dataset.scanInput);
+
+          input.addEventListener('change', async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            readInto(ctx, root);
+            if (!Array.isArray(ctx.paxScan)) ctx.paxScan = [];
+            ctx.paxScan[i] = { status: 'busy' };
+            BookingFlow.repaint();
+
+            try {
+              const result = await BookingApi.extractPassport(file);
+              const fields = (result && result.fields) || {};
+              const fill = (suffix, key) => {
+                const el = root.querySelector(`#p${i}_${suffix}`);
+                const value = fields[key] && fields[key].value;
+                if (el && value && !el.value) el.value = value;
+              };
+              fill('first', 'first_name'); fill('last', 'last_name');
+              fill('gender', 'gender'); fill('title', 'title');
+              fill('dob', 'date_of_birth'); fill('nat', 'nationality');
+              fill('ppno', 'passport_number'); fill('ppexp', 'passport_expiry');
+              fill('ppiss', 'issuing_country');
+              readInto(ctx, root);
+              ctx.paxScan[i] = { status: 'done' };
+            } catch (err) {
+              const message = (typeof BookingApi.errorText === 'function')
+                ? BookingApi.errorText(err, 'We could not read that passport. Please enter the details by hand.')
+                : 'We could not read that passport. Please enter the details by hand.';
+              ctx.paxScan[i] = { status: 'error', message };
+            }
+            BookingFlow.repaint();
+          });
+        });
+
+        root.querySelectorAll('[data-scan-edit]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.scanEdit);
+            readInto(ctx, root);
+            if (Array.isArray(ctx.paxScan)) ctx.paxScan[i] = { status: 'idle' };
+            BookingFlow.repaint();
+          });
+        });
+
         /* --- add / remove travellers --- */
         const add = kind => {
           readInto(ctx, root);                 // keep what is on screen
@@ -381,6 +484,7 @@ const BookingProducts = (function () {
             ctx.paxKinds.splice(i, 1);
             (ctx.passengers || []).splice(i, 1);
             if (Array.isArray(ctx.paxOpen)) ctx.paxOpen.splice(i, 1);
+            if (Array.isArray(ctx.paxScan)) ctx.paxScan.splice(i, 1);
             /* A seat belonged to the traveller who just left, not to the
                position, so drop it rather than shifting it onto someone else. */
             if (Array.isArray(ctx.seats)) ctx.seats.splice(i, 1);

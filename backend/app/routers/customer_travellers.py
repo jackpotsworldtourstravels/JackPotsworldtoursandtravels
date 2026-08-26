@@ -5,14 +5,17 @@ carries no customer id, and the two routes that do take a traveller id resolve
 it through ``get_owned``, which filters on the session's own customer. A
 guessed id from another account resolves to 404, not to someone else's passport.
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import datetime as dt
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.customer_deps import get_current_customer
 from app.database.session import get_db
 from app.models_customer import Customer
 from app.schemas.customer_booking import TravellerCreate, TravellerResponse
-from app.services import activity_service, customer_audit_service
+from app.schemas.customer_passport_ocr import OcrAvailabilityOut, PassportExtractionOut
+from app.services import activity_service, customer_audit_service, customer_passport_ocr_service
 from app.services import customer_traveller_service as service
 
 router = APIRouter(prefix="/api/customer/travellers", tags=["customer-travellers"])
@@ -61,6 +64,48 @@ def lookup_by_passport(
             detail="No saved traveller with that passport number.",
         )
     return traveller
+
+
+@router.get(
+    "/passport/availability",
+    response_model=OcrAvailabilityOut,
+    summary="Should the traveller step offer a Scan control?",
+    description=(
+        "No session required — a guest fills in traveller details before signing in on some "
+        "flows, and the traveller step needs to know whether to render the Scan button before "
+        "that. Reads `false` on a deployment with no OCR provider configured, so the button "
+        "never appears rather than appearing and failing when pressed."
+    ),
+)
+def passport_ocr_availability():
+    return OcrAvailabilityOut(available=customer_passport_ocr_service.is_available())
+
+
+@router.post(
+    "/passport/extract",
+    response_model=PassportExtractionOut,
+    summary="Scan a passport to prefill the traveller form",
+    description=(
+        "Requires a customer session. Uploads a passport photo or PDF and reads back the "
+        "fields the traveller form can use — first/last name, gender, date of birth, "
+        "nationality, passport number, expiry and issuing country. Nothing is written to the "
+        "database and the image is not stored; the traveller's own review and Save is what "
+        "keeps anything. A failed or unclear scan returns an error the form can show without "
+        "blocking manual entry — scanning is a shortcut over a form that works without it."
+    ),
+    responses={
+        415: {"description": "Unsupported file type — PDF, JPEG, PNG or WebP only."},
+        422: {"description": "The passport could not be read clearly."},
+        503: {"description": "Passport scanning is not enabled on this deployment."},
+        504: {"description": "The scan took too long."},
+    },
+)
+def extract_passport(
+    file: UploadFile = File(...),
+    travel_date: dt.date | None = Form(default=None),
+    _: Customer = Depends(get_current_customer),
+):
+    return customer_passport_ocr_service.extract(file, travel_date)
 
 
 @router.post(

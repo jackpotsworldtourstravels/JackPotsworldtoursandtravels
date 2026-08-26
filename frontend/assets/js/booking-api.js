@@ -172,6 +172,35 @@ const BookingApi = (function () {
 
   const saveTraveller = (payload) => post('/api/customer/travellers', payload);
 
+  /** Whether the traveller step should offer a "Upload Passport" control at
+   *  all — a deployment with no OCR provider configured answers `false`, and
+   *  the form renders no control rather than one that fails when pressed.
+   *  Never throws: a check that itself failed should read the same as "no". */
+  async function ocrAvailability() {
+    try {
+      const res = await get('/api/customer/travellers/passport/availability');
+      return !!(res && res.available);
+    } catch { return false; }
+  }
+
+  /** Upload a passport photo/PDF and get back the fields it could read, each
+   *  with its own confidence. Multipart, so it bypasses `request()`'s JSON
+   *  body — the browser sets its own `Content-Type` boundary. */
+  async function extractPassport(file) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${base()}/api/customer/travellers/passport/extract`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form,
+    });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!res.ok) throw new ApiError(res.status, data);
+    return data;
+  }
+
   /* ---------------------------------------------------------------------
      Bookings
      --------------------------------------------------------------------- */
@@ -363,7 +392,7 @@ const BookingApi = (function () {
     isLive, isSignedIn, errorText,
     seatMap, addons, reference, paymentMethods,
     quote, validateCoupon, coupons,
-    travellers, lookupPassport, saveTraveller,
+    travellers, lookupPassport, saveTraveller, ocrAvailability, extractPassport,
     createBooking, listBookings, getBooking, payBooking, cancelBooking,
     flightPayload, seatPayload, addonPayload, passengerTypes,
     isInternational, durationMinutes,

@@ -33,126 +33,33 @@ function apiErrorText(err, fallback) {
   return fallback;
 }
 
-/* Nav: header fades from transparent to solid black gradually over a long scroll range */
-const header = document.getElementById('siteHeader');
-const HEADER_FADE_RANGE = 600;
-const updateHeader = () => {
-  const progress = Math.min(1, Math.max(0, window.scrollY / HEADER_FADE_RANGE));
-  header.style.backgroundColor = `rgba(0,0,0,${progress.toFixed(3)})`;
-  header.style.backdropFilter = `blur(${(progress * 16).toFixed(1)}px)`;
-  header.style.boxShadow = progress > 0.05 ? `0 1px 0 rgba(255,255,255,${(progress * 0.08).toFixed(3)})` : 'none';
-};
-window.addEventListener('scroll', updateHeader, { passive: true });
-updateHeader();
+/* THE HEADER'S BEHAVIOUR MOVED OUT OF THIS FILE.
 
-const hamburgerBtn = document.getElementById('hamburgerBtn');
+   The transparent-to-black scroll fade, the hamburger and the hero parallax all
+   used to be written here, against markup in index.html. They are hero-shell.js's
+   now, because the Flights page wears the same header and does NOT load this
+   file — so its navbar simply never faded, which is the kind of drift a second
+   copy guarantees. One call, and both pages behave identically. */
 const mobileNav = document.getElementById('mobileNav');
-hamburgerBtn.addEventListener('click', () => {
-  const open = mobileNav.classList.toggle('open');
-  hamburgerBtn.setAttribute('aria-expanded', open);
-});
-mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-  mobileNav.classList.remove('open');
-  hamburgerBtn.setAttribute('aria-expanded', 'false');
-}));
+if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
 
-/* Hero parallax (subtle, disabled for reduced motion) */
-const heroBg = document.getElementById('heroBg');
-const heroVideoLayer = document.getElementById('heroVideoLayer');
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (heroBg && !reduceMotion) {
-  window.addEventListener('scroll', () => {
-    const y = Math.min(window.scrollY, 800);
-    const t = `translateY(${y * 0.25}px) scale(${1 + y * 0.0002})`;
-    heroBg.style.transform = t;
-    if (heroVideoLayer) heroVideoLayer.style.transform = t;
-  }, { passive: true });
-}
+/* THE HERO CARD MOVED OUT OF THIS FILE.
 
-/* Hero background videos: one per booking tab, lazy-loaded on first use */
-const heroVideos = document.querySelectorAll('.hero-video-layer video');
-const HERO_VIDEO_SPEED = 1.35; // slightly faster than real-time, still smooth/natural
-heroVideos.forEach(v => {
-  v.playbackRate = HERO_VIDEO_SPEED;
-  v.addEventListener('loadedmetadata', () => { v.playbackRate = HERO_VIDEO_SPEED; });
-});
-function switchHeroVideo(name) {
-  heroVideos.forEach(v => {
-    if (v.dataset.video === name) {
-      v.classList.add('active');
-      if (!v.getAttribute('src') && v.dataset.src) {
-        v.setAttribute('src', v.dataset.src);
-      }
-      v.playbackRate = HERO_VIDEO_SPEED;
-      const playPromise = v.play();
-      if (playPromise && playPromise.catch) playPromise.catch(() => {});
-    } else {
-      v.classList.remove('active');
-      v.pause();
-    }
-  });
-}
+   The booking tabs, their hero videos, the swap button, the date fields and the
+   Search button all used to be wired here, against markup that lived in
+   index.html. Both are booking-card.js's now, because the Flights page renders
+   the SAME card and does not load this file — a second copy of these handlers
+   over there is exactly the drift the module exists to prevent.
 
-/* Booking tabs */
-const tabs = document.querySelectorAll('.tab');
-const panels = document.querySelectorAll('.search-panel');
+   What is still this file's: WHERE a search goes and WHETHER it is allowed to
+   run. See the hero search section further down, which hands the card a
+   handler. */
+
+/** Switch the hero's product tab. Kept as a free function because the voice
+ *  search and the deep-link handlers below have always called it by this name. */
 function activateTab(name) {
-  tabs.forEach(t => {
-    const active = t.dataset.tab === name;
-    t.classList.toggle('active', active);
-    t.setAttribute('aria-selected', active);
-  });
-  panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
-  switchHeroVideo(name);
+  if (typeof BookingCard !== 'undefined') BookingCard.activateTab(name);
 }
-tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
-/* THE data-tab-link HANDLER IS GONE, AND SO ARE THE ATTRIBUTES.
-
-   Those nav words used to be href="#" plus a script that switched the hero tab
-   and scrolled back to the hero — which only ever changed which search form was
-   on screen. Each service has its own page now (flights.html, hotels.html,
-   cruises.html, packages.html, visa.html, activities.html), so they are plain
-   links. A real href also means middle-click, "open in new tab" and a visible
-   status-bar target, none of which an href="#" gave.
-
-   The hero's tab BUTTONS still use data-tab and activateTab() above; they
-   switch the search panel in place and are unrelated to these. */
-
-/* Swap From/To fields */
-document.querySelectorAll('.swap-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const fields = btn.parentElement.querySelectorAll('.field input');
-    if (fields.length >= 2) {
-      const tmp = fields[0].value;
-      fields[0].value = fields[1].value;
-      fields[1].value = tmp;
-    }
-  });
-});
-
-/* Date fields: open native picker on click, format the chosen date into the display input */
-document.querySelectorAll('.field-date').forEach(field => {
-  const display = field.querySelector('.date-display');
-  const native = field.querySelector('.date-native');
-  const openPicker = () => {
-    if (native.showPicker) {
-      try { native.showPicker(); } catch (e) { native.focus(); }
-    } else {
-      native.focus();
-      native.click();
-    }
-  };
-  display.addEventListener('click', openPicker);
-  field.querySelector('.cal-icon').addEventListener('click', openPicker);
-  native.addEventListener('change', () => {
-    if (native.value) {
-      const d = new Date(native.value + 'T00:00:00');
-      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const month = d.toLocaleDateString('en-US', { month: 'short' });
-      display.value = `${weekday}, ${d.getDate()} ${month}`;
-    }
-  });
-});
 
 /* Button ripple effect — shared by .btn and the floating action menu */
 function createRipple(e, el) {
@@ -602,83 +509,15 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    worse than saying so.
    =========================================================================== */
 
-/** Where each panel's criteria go, and how to read them. */
+/** Where each panel's criteria go. READING them is booking-card.js's job — it
+ *  owns the controls, so it is the only thing that can know whether a return
+ *  date belongs to this search or is left over from a round trip the traveller
+ *  switched away from. This map is only the destination. */
 const HERO_SEARCH = {
-  flights: {
-    page: 'flights.html',
-    read() {
-      const dep = nativeDate('fDep');
-      const ret = nativeDate('fRet');
-      /* "1 Passenger" / "5+ Passengers" -> a number. The hero only offers a
-         single count; the results page splits it into adults/children/infants,
-         so everyone here is an adult until told otherwise. */
-      const pax = parseInt((val('fPax') || '1').replace(/\D+/g, ''), 10) || 1;
-      return {
-        trip: ret ? 'round' : 'oneway',
-        from: airportCode('fFrom'),
-        to: airportCode('fTo'),
-        depart: dep,
-        ret: ret,
-        adults: pax,
-        children: 0,
-        infants: 0,
-        cabin: (val('fCabin') || 'Economy').toLowerCase().replace(/\s+/g, '-'),
-      };
-    },
-    validate(p) {
-      if (!p.from) return ['Choose where you are flying from.', 'fFrom'];
-      if (!p.to) return ['Choose where you are flying to.', 'fTo'];
-      if (p.from === p.to) return ['Origin and destination cannot be the same.', 'fTo'];
-      if (!p.depart) return ['Choose a departure date.', 'fDep'];
-      if (p.ret && p.ret < p.depart) return ['The return date cannot be before departure.', 'fRet'];
-      return null;
-    },
-  },
-  hotels: {
-    page: 'hotels.html',
-    read() {
-      return {
-        dest: val('hDest'),
-        checkIn: nativeDate('hIn'),
-        checkOut: nativeDate('hOut'),
-        guests: parseInt((val('hGuests') || '2').replace(/\D+/g, ''), 10) || 2,
-        rooms: parseInt((val('hRooms') || '1').replace(/\D+/g, ''), 10) || 1,
-      };
-    },
-    validate(p) {
-      if (!p.dest) return ['Tell us where you are going.', 'hDest'];
-      if (!p.checkIn) return ['Choose a check-in date.', 'hIn'];
-      if (!p.checkOut) return ['Choose a check-out date.', 'hOut'];
-      if (p.checkOut <= p.checkIn) return ['Check-out must be after check-in.', 'hOut'];
-      return null;
-    },
-  },
-  packages: {
-    page: 'packages.html',
-    read() {
-      return { type: val('pType'), month: val('pMonth') };
-    },
-    validate() { return null; },   // both fields are dropdowns with a default
-  },
+  flights:  { page: 'flights.html' },
+  hotels:   { page: 'hotels.html' },
+  packages: { page: 'packages.html' },
 };
-
-const val = id => (document.getElementById(id) || {}).value?.trim() || '';
-
-/** The ISO value behind a formatted date field.
- *  The visible input is a readonly display; the real value lives on the
- *  type="date" sibling, which is what the results page needs. */
-function nativeDate(displayId) {
-  const field = document.getElementById(displayId)?.closest('.field-date');
-  return field?.querySelector('.date-native')?.value || '';
-}
-
-/** "Hyderabad (HYD)" -> "HYD". Falls back to the whole string so a hand-typed
- *  city is still carried rather than silently dropped. */
-function airportCode(id) {
-  const v = val(id);
-  const m = /\(([A-Z]{3})\)/.exec(v);
-  return m ? m[1] : v;
-}
 
 /** Park a search so signing in can resume it. sessionStorage, not local: a
  *  search is about this visit, and finding yesterday's criteria reapplied on
@@ -708,40 +547,28 @@ function goToSearch(kind, params) {
   window.location.href = `${spec.page}?${qs.toString()}`;
 }
 
-document.querySelectorAll('.search-go').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.preventDefault();
-    const panel = btn.closest('.search-panel');
-    const kind = panel?.dataset.panel;
-    const spec = HERO_SEARCH[kind];
+/* THE GATE. The card has already validated by the time this runs; what is left
+   is whether this traveller may search at all. Signed out: park the criteria,
+   open the modal, search nothing — the modal's success path picks it back up.
 
-    /* Cruises: no search page to hand criteria to yet. */
-    if (!spec) {
+   Cruises never reach here: the card has no cruises handler to call because the
+   cruise page has no search panel to hand criteria to, and a redirect that
+   ignored them would be worse than saying so. */
+if (typeof BookingCard !== 'undefined') {
+  BookingCard.setSearchHandler((kind, params) => {
+    if (!HERO_SEARCH[kind]) {
       showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
       return;
     }
-
-    const params = spec.read();
-    const bad = spec.validate(params);
-    if (bad) {
-      const [message, focusId] = bad;
-      showToast(message, true);
-      document.getElementById(focusId)?.focus();
-      return;
-    }
-
-    /* THE GATE. Signed out: park the criteria, open the modal, search nothing.
-       The modal's success path picks the search back up. */
     const { access } = getStoredAuth();
     if (!access) {
       storePendingSearch(kind, params);
       openAuth();
       return;
     }
-
     goToSearch(kind, params);
   });
-});
+}
 
 /** Called once a session exists. Returns true if it navigated. */
 function resumePendingSearch() {
@@ -892,7 +719,9 @@ function applyVoiceQuery(transcript) {
 
   showToast(`Heard: "${text}"`);
   if (confidentMatch) {
-    document.querySelector('.search-panel.active .search-go')?.click();
+    /* One Search button for the whole card now, in its footer — it is no
+       longer inside the active panel. */
+    document.querySelector('.search-card .search-go')?.click();
   }
 }
 fabVoiceBtn.addEventListener('click', () => {

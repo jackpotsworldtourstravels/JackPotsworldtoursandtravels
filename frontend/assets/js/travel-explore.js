@@ -32,6 +32,9 @@ const TravelExplore = (function () {
        traveller forms already know how many people to ask about — nobody
        should have to say "2 adults" twice. */
     trip: 'oneway', from: 'HYD', to: '', depart: '', ret: '',
+    /* A multi-city itinerary, [{from, to, date}, ...]. Empty for the other two
+       trip types, so nothing has to ask which one is in play before reading it. */
+    legs: [],
     pax: { adults: 1, children: 0, infants: 0 },
     cabin: 'economy',
     guests: 2, rooms: 1, checkIn: '', checkOut: '',
@@ -185,6 +188,10 @@ const TravelExplore = (function () {
   function matches(f) {
     if (state.nonStop && !f.nonStop) return false;
     if (state.airlines.size && !state.airlines.has(f.airline)) return false;
+    /* Origin, not just destination. The sample schedule is one base airport, so
+       this changes nothing today — but the criteria say HYD -> DEL and a list
+       that ignored the HYD would start lying the moment a second base lands. */
+    if (state.from && f.origin.code !== state.from) return false;
     if (state.dests.size && !state.dests.has(f.destination.code)) return false;
     if (state.windows.size && !state.windows.has(windowOf(minutesOf(f.departure)))) return false;
     if (state.q) {
@@ -203,6 +210,18 @@ const TravelExplore = (function () {
     if (state.sort === 'airline')  out.sort((a, b) => a.airline.localeCompare(b.airline)
                                               || minutesOf(a.departure) - minutesOf(b.departure));
     return out;
+  }
+
+  /** The day these results are FOR.
+   *
+   *  The sample set is one supplied day of departures (travel-data.js,
+   *  SAMPLE_DATE) and it is already in the past. Filtering it against a chosen
+   *  departure date would empty the page for every real search, so the searched
+   *  day is what the cards and the heading show instead — which is what a live
+   *  endpoint would return anyway, and the "Sample schedule" badge beside the
+   *  heading is what says the tariffs are not quotes. */
+  function shownDate(f) {
+    return state.depart || (f && f.date) || '';
   }
 
   function flightCard(f) {
@@ -235,7 +254,7 @@ const TravelExplore = (function () {
         ${airlineLogo(f)}
         <div>
           <div class="tx-carrier-name">${esc(f.airline)}</div>
-          <div class="tx-carrier-no">${esc(f.flightNumber)} · ${esc(fmtDate(f.date))}</div>
+          <div class="tx-carrier-no">${esc(f.flightNumber)} · ${esc(fmtDate(shownDate(f)))}</div>
         </div>
       </div>
 
@@ -266,17 +285,31 @@ const TravelExplore = (function () {
   }
 
   function detailsHtml(f) {
-    const cell = (label, value) => `<div class="tx-detail"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+    const cell = (label, value, wide) =>
+      `<div class="tx-detail${wide ? ' tx-detail-wide' : ''}"><span>${esc(label)}</span><b>${esc(value)}</b></div>`;
+    /* Same constant booking-data.js's seat map uses (see its own comment —
+       every aircraft in this sample dataset is one type), read here once
+       rather than left absent just because the seat map is a step away. */
+    const aircraft = 'Airbus A320neo';
+    const cabin = (typeof BookingData !== 'undefined'
+      && BookingData.CABIN_CLASSES.find(c => c.id === state.cabin)) || {};
+    const fareRule = f.refundable
+      ? 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.'
+      : 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
     return `<div class="tx-details">
       ${cell('Flight', f.flightNumber)}
       ${cell('Airline', f.airline)}
+      ${cell('Aircraft', aircraft)}
       ${cell('Route', `${f.origin.code} → ${f.destination.code}`)}
-      ${cell('Date', fmtDate(f.date))}
+      ${cell('Date', fmtDate(shownDate(f)))}
       ${cell('Departs', `${f.departure} · ${f.origin.city}`)}
       ${cell('Arrives', f.arrival ? `${f.arrival} · ${f.destination.city}` : 'To be announced')}
       ${cell('Duration', f.durationLabel || 'Not published')}
       ${cell('Stops', f.nonStop ? 'Non-stop' : String(f.stops))}
+      ${cell('Cabin', cabin.label || 'Economy')}
+      ${cell('Baggage', `Cabin ${f.baggage.cabin} · Check-in ${f.baggage.checkIn}`)}
       ${cell('Status', f.status)}
+      ${cell('Fare rules', `${f.fareType} — ${fareRule}`, true)}
     </div>`;
   }
 
@@ -571,14 +604,12 @@ const TravelExplore = (function () {
   }
 
   /* ---------------------------------------------------------------------
-     Events
-     --------------------------------------------------------------------- */
-  /* ---------------------------------------------------------------------
-     Step 1 — the search panel
+     Search
      ---------------------------------------------------------------------
-     It filters the SAME client-side result set the facets do. When the live
-     endpoint lands, `submit` becomes a call with these values instead — the
-     rendering below it does not change either way. */
+     The criteria filter the SAME client-side result set the facets do. When
+     the live endpoint lands, this becomes a call carrying these values — the
+     rendering below does not change either way. */
+
   /** Turn the current `state` into rendered results.
    *
    *  Shared by the Search button and by a search arriving in the URL, so the
@@ -593,18 +624,6 @@ const TravelExplore = (function () {
     renderFlights();
   }
 
-  /** The search panel lives in flight-search.js.
-   *
-   *  Criteria and results were one 60-line function that rendered eight
-   *  controls and read them back; they are two files now. This one owns
-   *  RESULTS and hands the panel a callback — the panel validates, writes the
-   *  shared `state`, and says "go". Neither has to know how the other works,
-   *  which is what let the panel grow an airport picker, a calendar and a
-   *  traveller popup without this file changing shape.
-   *
-   *  Falls back to nothing if the module is absent rather than throwing: the
-   *  results list below still renders, which is more useful than a blank page.
-   */
   /** The Packages panel.
    *
    *  The landing page speaks a different dialect: its Month is a bare name
@@ -659,16 +678,110 @@ const TravelExplore = (function () {
     });
   }
 
+  /* ---------------------------------------------------------------------
+     The search panel IS the hero card.
+
+     This page used to carry a second set of criteria controls below the fold,
+     in a module of their own. It does not any more: the card in the hero is the
+     landing page's card, mounted here with the criteria that produced the list
+     underneath it, so there is one place to type a trip and one place it can
+     be read back from.
+
+     A search here does NOT reload the page. The criteria are written into
+     `state`, the URL is rewritten so the result is linkable and survives a
+     refresh, and the list re-renders under a skeleton — which is what makes
+     Search on this page feel like a filter rather than a navigation.
+     --------------------------------------------------------------------- */
+
+  /** Hotels, cruises and packages still live on their own pages, so their tabs
+   *  navigate. Flights is handled in place. */
+  const OTHER_SERVICES = { hotels: 'hotels.html', packages: 'packages.html' };
+
+  function leaveFor(kind, params) {
+    const page = OTHER_SERVICES[kind];
+    if (!page) {
+      if (typeof showToast === 'function') {
+        showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
+      }
+      return;
+    }
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+    window.location.href = `${page}?${qs.toString()}`;
+  }
+
+  /** Push the criteria into the address bar without reloading, so a result set
+   *  can be shared, bookmarked and reached again with Back. */
+  function writeUrl() {
+    const multi = state.trip === 'multi' && state.legs.length >= 2;
+    const p = {
+      trip: state.trip, from: state.from, to: state.to,
+      depart: state.depart, ret: state.trip === 'round' ? state.ret : '',
+      legs: multi && typeof BookingCard !== 'undefined'
+        ? BookingCard.encodeLegs(state.legs) : '',
+      adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
+      cabin: state.cabin,
+    };
+    const qs = new URLSearchParams(
+      Object.entries(p).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== 0));
+    history.replaceState(null, '', `${location.pathname}?${qs.toString()}`);
+  }
+
+  /** Bring the results under the hero into view. Honours reduced motion, which
+   *  is the same condition the rest of the site stops animating under. */
+  function revealResults() {
+    const target = $('txResults');
+    if (!target) return;
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    /* Deferred a frame: called straight after render the list is still being
+       laid out and the scroll lands short of it. */
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    });
+  }
+
   function mountSearch() {
-    if (typeof FlightSearch === 'undefined') return;
-    FlightSearch.init(state, req => {
-      /* The request names cabin as cabinClass and the party as separate
-         counts; `state` is already written by the panel, so this only has to
-         mirror the couple of fields the renderers read under other names. */
-      state.cabin = req.cabinClass;
-      state.pax = { adults: req.adults, children: req.children, infants: req.infants };
-      applySearch();
-      $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (typeof BookingCard === 'undefined') return;
+
+    /* The card renders during parse with its own defaults; this is where the
+       criteria that produced the list below are written into it, so the two
+       cannot show different searches. */
+    BookingCard.seedFlights({
+      trip: state.trip, from: state.from, to: state.to,
+      depart: state.depart, ret: state.ret, cabin: state.cabin,
+      legs: state.legs.length ? state.legs : undefined,
+      adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
+    });
+
+    BookingCard.setSearchHandler((kind, params) => {
+      if (kind !== 'flights') { leaveFor(kind, params); return; }
+      state.trip = params.trip;
+      /* The card hands over the ENCODED itinerary, because that is what a URL
+         can carry; the array is this file's business. */
+      state.legs = params.legs && typeof BookingCard !== 'undefined'
+        ? BookingCard.decodeLegs(params.legs) : [];
+      /* from/to/depart are the FIRST leg for a multi-city search — the card
+         fills them in for exactly this reason, so the filters and the renderers
+         below need no idea that an itinerary is in play. */
+      state.from = params.from;
+      state.to = params.to;
+      state.depart = params.depart;
+      state.ret = params.ret || '';
+      state.cabin = params.cabin === 'premium-economy' ? 'premium' : params.cabin;
+      state.pax = {
+        adults: params.adults, children: params.children, infants: params.infants,
+      };
+      /* A new search is a new result set: the old airline and time-window
+         filters were chosen against a different route and would silently hide
+         most of what was just asked for. */
+      state.airlines = new Set();
+      state.windows = new Set();
+      state.nonStop = false;
+      state.q = '';
+      const box = $('txSearch');
+      if (box) box.value = '';
+      writeUrl();
+      runFlightSearch({ scroll: true });
     });
   }
 
@@ -750,7 +863,15 @@ const TravelExplore = (function () {
       const book = e.target.closest('[data-tx-book]');
       if (book) {
         const f = flights.find(x => x.id === book.dataset.txBook);
-        if (f) BookingFlows.open('flight', f, { pax: state.pax, cabin: state.cabin });
+        /* The row is handed on with the SEARCHED day, not the sample set's own.
+           The card beside this button says "Thu, 10 Sept" (see shownDate); a
+           booking sheet that then said "8 Aug 2026" is the same flight quoting
+           two different dates, and the traveller has no way to tell which one
+           they are buying. */
+        if (f) {
+          BookingFlows.open('flight', Object.assign({}, f, { date: shownDate(f) }),
+                            { pax: state.pax, cabin: state.cabin });
+        }
         return;
       }
       const buy = e.target.closest('[data-tx-buy]');
@@ -814,12 +935,36 @@ const TravelExplore = (function () {
     const dep = day('depart');    if (dep)  { state.depart = dep; mark(); }
     const ret = day('ret');       if (ret)  { state.ret = ret; state.trip = 'round'; mark(); }
 
+    /* The itinerary, decoded by the card that wrote it — one codec, not two
+       that have to agree about a separator. */
+    const rawLegs = q.get('legs');
+    if (rawLegs && typeof BookingCard !== 'undefined') {
+      const legs = BookingCard.decodeLegs(rawLegs).filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l.date));
+      if (legs.length >= 2) {
+        state.legs = legs;
+        state.trip = 'multi';
+        /* The first leg is what the results below can actually answer, so it
+           doubles as the plain from/to/depart the renderers already read. */
+        state.from = legs[0].from;
+        state.to = legs[0].to;
+        state.depart = legs[0].date;
+        mark();
+      }
+    }
+
     if (q.has('adults') || q.has('children') || q.has('infants')) {
-      state.pax = {
-        adults: int('adults', 1, 9, state.pax.adults),
-        children: int('children', 0, 8, state.pax.children),
-        infants: int('infants', 0, 8, state.pax.infants),
+      /* Clamped by the SAME rules the picker enforces, not by a second set of
+         bounds written here. A URL is editable by anyone and `state.pax` is
+         what gets booked, so "9 adults and 9 children" has to be reduced to a
+         party that can actually fly rather than trusted because it parsed. */
+      const wanted = {
+        adults: int('adults', 1, 99, state.pax.adults),
+        children: int('children', 0, 99, state.pax.children),
+        infants: int('infants', 0, 99, state.pax.infants),
       };
+      state.pax = (typeof PaxSelector !== 'undefined')
+        ? PaxSelector.clamp(wanted)
+        : wanted;
       mark();
     }
     const cabin = str('cabin', 20);
@@ -842,9 +987,77 @@ const TravelExplore = (function () {
     return seeded;
   }
 
-  /** Placeholder cards in whichever grid this page has. */
+  /* =====================================================================
+     Loading state
+     =====================================================================
+     A skeleton is a PROMISE ABOUT SHAPE. The flights one is built from the
+     real card's own classes — .tx-flight, .tx-carrier, .tx-leg, .tx-act — so
+     the placeholder occupies the same grid, the same three columns and very
+     nearly the same height as the card that replaces it. That is what stops
+     the list jumping when the data lands; a generic stack of grey bars looks
+     tidier in isolation and moves everything when it is swapped out.
+     ===================================================================== */
+
+  /** One placeholder flight: logo, airline, both times, duration, fare, button
+   *  — every element the real card carries, in its place. */
+  function flightSkeletonCard() {
+    return `<article class="tx-flight tx-sk-flight" aria-hidden="true">
+      <div class="tx-carrier">
+        <div class="tx-sk-logo"></div>
+        <div class="tx-sk-col">
+          <div class="tx-sk-line w80"></div>
+          <div class="tx-sk-line w50"></div>
+        </div>
+      </div>
+      <div class="tx-leg">
+        <div class="tx-sk-col">
+          <div class="tx-sk-line tx-sk-time"></div>
+          <div class="tx-sk-line w70"></div>
+        </div>
+        <div class="tx-path tx-sk-col">
+          <div class="tx-sk-line tx-sk-dur"></div>
+          <div class="tx-sk-rule"></div>
+          <div class="tx-sk-line tx-sk-stops"></div>
+        </div>
+        <div class="tx-leg-end tx-sk-col">
+          <div class="tx-sk-line tx-sk-time"></div>
+          <div class="tx-sk-line w70"></div>
+        </div>
+      </div>
+      <div class="tx-act tx-sk-col">
+        <div class="tx-sk-line tx-sk-fare"></div>
+        <div class="tx-sk-btn"></div>
+      </div>
+    </article>`;
+  }
+
+  /** Card-shaped placeholders in the flight list.
+   *
+   *  role="status" on the wrapper, not aria-hidden on it: a screen reader is
+   *  told a search is running, while the decorative bars inside it are not
+   *  announced one by one. */
+  function showFlightSkeleton(rows) {
+    const host = $('txFlightList');
+    if (!host) return;
+    const count = rows || 5;
+    host.innerHTML = `<div class="tx-sk-list" role="status" aria-live="polite">
+      <span class="sr-only">Searching for flights…</span>
+      ${Array.from({ length: count }, flightSkeletonCard).join('')}
+    </div>`;
+    /* The count line and the Show-more button belong to the previous result
+       set; leaving them up over a skeleton says the old numbers still hold. */
+    const line = $('txCount');
+    if (line) line.innerHTML = '';
+    const more = $('txMore');
+    if (more) more.style.display = 'none';
+  }
+
+  /** Placeholder cards in whichever grid this page has. Flights get the
+   *  card-shaped set above; the other three are still simple stacks, because
+   *  their cards are image tiles and a grey rectangle is already the shape. */
   function showSkeleton(rows) {
-    const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
+    if ($('txFlightList')) { showFlightSkeleton(rows); return; }
+    const host = $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
     if (!host) return;
     host.innerHTML = `<div class="tx-skeleton">${
       Array.from({ length: rows || 4 }, () => `
@@ -854,6 +1067,88 @@ const TravelExplore = (function () {
           <div class="tx-sk-line w55"></div>
         </div>`).join('')
     }</div>`;
+  }
+
+  /* The shortest time a skeleton stays up.
+     Not padding for its own sake: the sample set resolves in the same frame the
+     search starts, so without a floor the skeleton appears and vanishes inside
+     one repaint — which reads as a flicker in the list, not as loading. Once a
+     real endpoint is behind TravelData.flights() this stops mattering, because
+     the response will already take longer than this. */
+  const SKELETON_FLOOR_MS = 320;
+
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  /** Run the current `state` as a search: skeleton, fetch, render.
+   *
+   *  Every path that searches goes through here — the card's Search button and
+   *  criteria arriving in the URL — so the first paint and the tenth search
+   *  cannot produce different-looking results from the same values. */
+  async function runFlightSearch(opts) {
+    const started = Date.now();
+    showFlightSkeleton();
+    /* Scrolled to the SKELETON, not to the results: the placeholder is already
+       the right shape and height, so the page settles once instead of moving
+       again when the real cards land. */
+    if (opts && opts.scroll) revealResults();
+    try {
+      flights = await TravelData.flights();
+      const left = SKELETON_FLOOR_MS - (Date.now() - started);
+      if (left > 0) await wait(left);
+      writeFlightHeading();
+      applySearch();
+    } catch (err) {
+      const host = $('txFlightList');
+      if (host) {
+        host.innerHTML = `<div class="tx-empty"><b>We could not load these flights</b>
+          Check your connection and try the search again.</div>`;
+      }
+    }
+  }
+
+  /** The results heading, written from the criteria rather than typed into the
+   *  markup — the two disagreed the moment a city was hardcoded. */
+  function writeFlightHeading() {
+    const head = $('txFlightsHead');
+    const sub = $('txFlightsSub');
+    const city = code => {
+      const a = typeof TravelData !== 'undefined' && TravelData.airports[code];
+      return a ? a.city : code;
+    };
+    const multi = state.trip === 'multi' && state.legs.length >= 2;
+
+    if (head) {
+      if (multi) {
+        /* The whole itinerary, not just the leg being shown — the traveller
+           planned four cities and should see four cities named back. */
+        const stops = [city(state.legs[0].from)].concat(state.legs.map(l => city(l.to)));
+        head.textContent = stops.join(' → ');
+      } else {
+        head.textContent = state.to
+          ? `${city(state.from)} to ${city(state.to)}`
+          : `Departures from ${city(state.from)}`;
+      }
+    }
+
+    if (sub) {
+      const when = state.depart || (flights[0] && flights[0].date);
+      const party = typeof PaxSelector !== 'undefined'
+        ? PaxSelector.summary(state.pax) : '';
+      const bits = [];
+      if (multi) {
+        /* SAYS WHICH LEG THIS IS. The list below can only answer one leg at a
+           time, and a page headed with a four-city itinerary that silently
+           showed one hop would be reporting more than it found. */
+        bits.push(`Flight 1 of ${state.legs.length}: `
+          + `${city(state.legs[0].from)} to ${city(state.legs[0].to)}`);
+      }
+      if (when) bits.push(fmtDate(when));
+      if (state.trip === 'round' && state.ret) bits.push(`returning ${fmtDate(state.ret)}`);
+      if (party) bits.push(party);
+      sub.textContent = bits.length
+        ? bits.join(' · ')
+        : 'Non-stop services across India, the Gulf and South-East Asia.';
+    }
   }
 
   async function init() {
@@ -873,22 +1168,22 @@ const TravelExplore = (function () {
     try {
       if (service === 'flights') {
         mountSearch();
-        flights = await TravelData.flights();
-        /* Written from the data, never typed into the markup — the two
-           disagreed the moment a weekday was hardcoded. */
-        const sub = $('txFlightsSub');
-        if (sub && flights.length) {
-          sub.textContent = `Schedule for ${fmtDate(flights[0].date)} — non-stop services `
-            + 'across India, the Gulf and South-East Asia.';
-        }
-        if (state.seededFromUrl) {
-          /* Criteria came from the landing page — show their results, not the
-             whole schedule the traveller did not ask for. */
-          applySearch();
-        } else {
-          renderFilters();
-          renderFlights();
-        }
+        /* ONE path, whether the criteria arrived in the URL from the landing
+           page or are this page's own defaults: skeleton, fetch, render. A
+           second "just render the schedule" branch is how the first paint and
+           a later search ended up looking different. */
+        await runFlightSearch();
+        /* HOW THE SEAM IS HIDDEN.
+
+           The hero above is pixel-identical to the landing page's — same nav,
+           same video, same heading, same card in the same place — so arriving
+           here looks like nothing happened, and the results would be a screen
+           below the fold. Scrolling to them once they exist is what turns that
+           into "the content beneath the hero changed": the page the traveller
+           left is on screen for a moment, then moves up to reveal what they
+           asked for. Only when they actually searched — a bare visit to this
+           page should land on the hero like any other. */
+        if (state.seededFromUrl) revealResults();
       } else if (service === 'hotels') {
         const rows = await TravelData.hotels();
         mountHotelSearch(rows);

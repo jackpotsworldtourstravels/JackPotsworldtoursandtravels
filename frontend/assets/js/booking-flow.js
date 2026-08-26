@@ -158,6 +158,7 @@ const BookingFlow = (function () {
 
         <footer class="bk-foot">
           <button type="button" class="bk-btn bk-btn-ghost" id="bkBack">Back</button>
+          <div class="bk-foot-total" id="bkFootTotal" aria-hidden="true"></div>
           <div class="bk-foot-msg" id="bkMsg" role="alert"></div>
           <button type="button" class="bk-btn bk-btn-primary" id="bkNext">Continue</button>
         </footer>
@@ -374,11 +375,19 @@ const BookingFlow = (function () {
     const root = document.getElementById('bkRoot');
 
     /* Re-render the rail so the tick marks and the "now" highlight move. */
-    root.querySelector('.bk-rail').innerHTML = flow.steps.map((s, i) => `
+    const rail = root.querySelector('.bk-rail');
+    rail.innerHTML = flow.steps.map((s, i) => `
       <li class="bk-rail-step ${i < index ? 'is-done' : ''} ${i === index ? 'is-now' : ''}">
         <span class="bk-rail-dot">${i < index ? '&#10003;' : i + 1}</span>
         <span class="bk-rail-label">${esc(s.label)}</span>
       </li>`).join('');
+    /* The rail scrolls horizontally once it is wider than the screen (see
+       booking.css) — without this, the step somebody is actually on can
+       land off the edge of that scroll area, on a phone, with nothing on
+       screen saying so. */
+    rail.querySelector('.bk-rail-step.is-now')?.scrollIntoView({
+      block: 'nearest', inline: 'center', behavior: 'smooth',
+    });
 
     main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
     if (step.load) main.innerHTML = skeleton(3);
@@ -396,10 +405,22 @@ const BookingFlow = (function () {
       return;
     }
 
-    await recalcAsync();
+    const p = await recalcAsync();
     main.innerHTML = step.render(ctx);
     document.getElementById('bkSide').innerHTML = sideHtml();
     mountSide();
+
+    /* The mobile-only echo of the fare total in the sticky footer (see
+       booking.css) — the full breakdown above stops being sticky once the
+       layout drops to one column, so this is what keeps the running total in
+       view next to Continue without it. Empty wherever the side panel itself
+       is hidden (step.hideSummary), for the same reason it is hidden there. */
+    const footTotal = document.getElementById('bkFootTotal');
+    if (footTotal) {
+      footTotal.innerHTML = (step.hideSummary || !p) ? '' : `
+        <span class="bk-foot-total-label">Total</span>
+        <span class="bk-foot-total-amt">${esc(money(p.total))}</span>`;
+    }
     if (step.mount) step.mount(main, ctx);
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
