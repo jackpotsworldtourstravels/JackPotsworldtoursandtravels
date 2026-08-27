@@ -57,7 +57,7 @@ const BookingFlow = (function () {
     el.className = 'bk-root';
     el.setAttribute('role', 'region');
     el.setAttribute('aria-label', 'Booking');
-    const header = document.getElementById('spHeader');
+    const header = siteHeader();
     if (header && header.parentNode) header.insertAdjacentElement('afterend', el);
     else document.body.appendChild(el);
     return el;
@@ -67,100 +67,95 @@ const BookingFlow = (function () {
      widths), so the fare rail's sticky offset and the scroll-into-view math
      in paint() read it live off a CSS variable rather than a guessed pixel
      value. */
+  /* Two shells, two ids: the standalone service pages use #spHeader and the
+     landing-shell pages (index, flights) use #siteHeader. Everything that
+     measures or positions against "the site header" goes through here. */
+  function siteHeader() {
+    return document.getElementById('spHeader') || document.getElementById('siteHeader');
+  }
+
   function setHeaderHeightVar() {
-    const header = document.getElementById('spHeader');
+    const header = siteHeader();
     document.documentElement.style.setProperty('--bk-header-h', (header ? header.offsetHeight : 0) + 'px');
   }
 
-  /* For flights only — a compact, persistent itinerary card shown above the
-     stepper on every step, per the reference. Built entirely from fields
-     already on ctx.item (see travel-data.js's normaliseFlight): no aircraft
-     type is invented because the data model does not carry one. */
-  function flightSummaryHtml(c) {
-    if (!c || c.kind !== 'flight' || !c.item) return '';
-    const item = c.item;
-    const cabin = (typeof BookingData !== 'undefined' && BookingData.CABIN_CLASSES.find(x => x.id === c.cabin)) || {};
-    const stops = item.stops ? `${item.stops} stop${item.stops > 1 ? 's' : ''}` : 'Non-stop';
-    return `
-      <div class="bk-flightsum">
-        <div class="bk-flightsum-airline">
-          ${flightLogoHtml(item)}
-          <div>
-            <b>${esc(item.airline)} ${esc(item.flightNumber)}</b>
-            <span>${esc(cabin.label || 'Economy')}${item.fareType ? ` · ${esc(item.fareType)}` : ''}</span>
-          </div>
-        </div>
-        <div class="bk-flightsum-leg">
-          <div>
-            <b>${esc(item.departure || 'TBA')}</b>
-            <span>${esc(item.origin.city)} (${esc(item.origin.code)})</span>
-            <span>${esc(fmtDateShort(item.date))}</span>
-          </div>
-          <div class="bk-flightsum-mid">
-            <span>${esc(item.durationLabel || '—')}</span>
-            <i></i>
-            <span>${esc(stops)}</span>
-          </div>
-          <div class="is-end">
-            <b>${esc(item.arrival || 'TBA')}</b>
-            <span>${esc(item.destination.city)} (${esc(item.destination.code)})</span>
-            <span>${esc(fmtDateShort(item.date))}</span>
-          </div>
-        </div>
-      </div>`;
+  /* THE ITINERARY CARD, shown above the stepper on every flight step.
+
+     The markup lives in booking-products.js next to the Review screen that
+     shares its segment helpers (rvSegments/bkfLogo), so there is one
+     implementation of "what a leg looks like" rather than two that drift.
+     Non-flight products have no itinerary strip and get an empty string. */
+  function itineraryHtml(c, step) {
+    if (!c || c.kind !== 'flight') return '';
+    if (typeof BookingProducts === 'undefined' || !BookingProducts.itineraryHtml) return '';
+    return BookingProducts.itineraryHtml(c, step);
   }
 
-  function fmtDateShort(iso) {
-    if (typeof fmtDate === 'function') return fmtDate(iso);
-    return iso || '';
-  }
+  /* One implementation of the step rail, used by both the first render and
+     every repaint — they had drifted apart as two copies of the same markup.
 
-  /* Same vendored-logo-or-code-tile pattern travel-explore.js uses on the
-     results cards (airline-logos.js), so the summary card reads as the same
-     component rather than a second implementation of it. */
-  function flightLogoHtml(item) {
-    const code = item.airlineCode;
-    const have = typeof AIRLINE_LOGO_FILES !== 'undefined' && code && AIRLINE_LOGO_FILES[code];
-    if (have) {
-      const dir = (typeof AIRLINE_LOGO_DIR === 'string') ? AIRLINE_LOGO_DIR : 'assets/images/airlines/';
-      return `<span class="tx-logo"><img src="${esc(dir + AIRLINE_LOGO_FILES[code])}"
-        alt="${esc(item.airline)} logo" width="28" height="28" decoding="async"
-        onerror="this.parentNode.innerHTML='<span class=&quot;tx-logo-fb&quot;>${esc(code)}</span>'"></span>`;
-    }
-    const fallback = code ? `<span class="tx-logo-fb">${esc(code)}</span>`
-      : (typeof JPIcon !== 'undefined' ? JPIcon.html('flights') : '<span class="tx-logo-fb">--</span>');
-    return `<span class="tx-logo">${fallback}</span>`;
+     `flow.priorSteps` are stages the traveller has already cleared before the
+     flow opened (flights list "Search", which happens on the results page), so
+     they always render as done and are never navigable. They shift the
+     numbering of the real steps, which is why the offset is threaded through
+     rather than using the array index directly. */
+  function railItemsHtml() {
+    const prior = (flow.priorSteps || []).map(label => `
+      <li class="bk-rail-step is-done">
+        <span class="bk-rail-dot">&#10003;</span>
+        <span class="bk-rail-label">${esc(label)}</span>
+      </li>`).join('');
+    const offset = (flow.priorSteps || []).length;
+    const own = flow.steps.map((s, i) => {
+      const done = i < index;
+      const dot = `<span class="bk-rail-dot">${done ? '&#10003;' : i + 1 + offset}</span>`;
+      const lab = `<span class="bk-rail-label">${esc(s.label)}</span>`;
+      /* A cleared step is a way back. The reference's action bar carries no
+         Back control, so on flights this is what replaces it; it renders
+         identically either way — only the element type changes. */
+      const inner = done
+        ? `<button type="button" class="bk-rail-go" data-goto="${esc(s.id)}">${dot}${lab}</button>`
+        : dot + lab;
+      return `
+      <li class="bk-rail-step ${done ? 'is-done' : ''} ${i === index ? 'is-now' : ''}"
+          ${i === index ? 'aria-current="step"' : ''}>${inner}</li>`;
+    }).join('');
+    return prior + own;
   }
 
   function shellHtml() {
-    const steps = flow.steps.map((s, i) => `
-      <li class="bk-rail-step ${i < index ? 'is-done' : ''} ${i === index ? 'is-now' : ''}">
-        <span class="bk-rail-dot">${i < index ? '&#10003;' : i + 1}</span>
-        <span class="bk-rail-label">${esc(s.label)}</span>
-      </li>`).join('');
+    const steps = railItemsHtml();
 
     return `
-      <div class="bk-sheet">
+      <div class="bk-sheet ${flow.kind === 'flight' ? 'is-flight' : ''}">
         <div class="bk-pagehead">
           <button type="button" class="bk-back" id="bkExit">${backArrow} Back to ${esc(flow.backLabel || 'results')}</button>
           <div class="bk-kicker">${esc(flow.kicker || 'Booking')}</div>
           <h1 class="bk-title">${esc(flow.title)}</h1>
         </div>
 
-        ${flightSummaryHtml(ctx)}
-
         <ol class="bk-rail" aria-label="Booking steps">${steps}</ol>
+
+        <div id="bkItin"></div>
 
         <div class="bk-body">
           <section class="bk-main" id="bkMain" aria-live="polite"></section>
           <aside class="bk-side" id="bkSide"></aside>
         </div>
 
-        <footer class="bk-foot">
+        <footer class="bk-foot" id="bkFoot">
           <button type="button" class="bk-btn bk-btn-ghost" id="bkBack">Back</button>
+          <!-- Steps that want the reference's wide action bar (the Review step
+               does) fill this with their own trust mark + itinerary + total.
+               Empty everywhere else, which leaves the original three-part
+               footer exactly as it was. -->
+          <div class="bk-foot-rich" id="bkFootRich"></div>
           <div class="bk-foot-total" id="bkFootTotal" aria-hidden="true"></div>
           <div class="bk-foot-msg" id="bkMsg" role="alert"></div>
-          <button type="button" class="bk-btn bk-btn-primary" id="bkNext">Continue</button>
+          <div class="bk-foot-cta">
+            <button type="button" class="bk-btn bk-btn-primary" id="bkNext">Continue</button>
+            <span class="bk-foot-note" id="bkFootNote"></span>
+          </div>
         </footer>
       </div>`;
   }
@@ -196,6 +191,32 @@ const BookingFlow = (function () {
      two agree anyway — the server's arithmetic is a port of the local one.
      If the request fails the local total simply stands, so a dropped
      connection cannot leave somebody unable to see a price. */
+  /* What to SAY when the quote is refused, which is not the same as the fare
+     service being unreachable.
+
+     A 4xx means the server looked at the selection and rejected it — a seat
+     someone else took while this booking was being filled in, an add-on that
+     stopped being offered. That is actionable, and the traveller needs to know
+     which part to go back and change. A network failure or a 5xx is not
+     actionable, and the locally-computed estimate still stands.
+
+     The server's own sentence is never printed: it is written for an API
+     consumer ("Seat 11A is already taken."), and this is a booking screen. */
+  function quoteErrorNote(err) {
+    const status = err && (err.status || (err.response && err.response.status));
+    const detail = String((err && err.message) || '').toLowerCase();
+    if (status >= 400 && status < 500) {
+      if (detail.includes('seat')) return 'One of your selected seats is no longer available. Please choose another.';
+      if (detail.includes('add-on') || detail.includes('addon') || detail.includes('baggage') || detail.includes('meal')) {
+        return 'One of your selected add-ons is no longer available. Please review your add-ons.';
+      }
+      if (detail.includes('coupon')) return 'That coupon could not be applied. Please review the total.';
+      if (detail.includes('price') || detail.includes('fare')) return 'Your fare has changed. Please review the updated total.';
+      return 'Something in this booking is no longer available. Please review your selections.';
+    }
+    return 'Showing an estimate — could not reach the fare service.';
+  }
+
   async function recalcAsync() {
     recalc();
     if (!flow.priceAsync) return ctx.pricing;
@@ -203,7 +224,10 @@ const BookingFlow = (function () {
       const priced = await flow.priceAsync(ctx);
       if (priced) ctx.pricing = priced;
     } catch (err) {
-      ctx.pricing.note = 'Showing an estimate — could not reach the fare service.';
+      const status = err && (err.status || (err.response && err.response.status));
+      ctx.pricing.note = quoteErrorNote(err);
+      /* A refusal is a problem to act on; an unreachable service is not. */
+      ctx.pricing.noteIsError = status >= 400 && status < 500;
     }
     return ctx.pricing;
   }
@@ -211,6 +235,19 @@ const BookingFlow = (function () {
   function sideHtml() {
     const step = flow.steps[index];
     if (step.hideSummary) return '';
+    /* A step may render its own Fare Summary when the default breakdown is not
+       enough — the Review step groups the fare by journey leg and adds the
+       benefit cards. It still gets the coupon control from here, so there is
+       only ever one implementation of applying a code. */
+    const custom0 = step.sideHtml && step.sideHtml(ctx, { money, esc, couponHtml });
+    if (custom0 != null && custom0 !== false) return custom0;   // null = "fall through"
+    /* A product may also own the rail for ALL of its steps — flights do, so
+       the Fare Summary card is the same on Traveller Details, Seats, Add-ons
+       and Review rather than four near-copies. */
+    if (flow.sideHtml) {
+      const custom = flow.sideHtml(ctx, { money, esc, couponHtml }, step);
+      if (custom != null) return custom;
+    }
     const p = ctx.pricing || { lines: [], total: 0 };
     const lines = p.lines.map(l => `
       <div class="bk-price-line ${l.muted ? 'is-muted' : ''}">
@@ -270,6 +307,14 @@ const BookingFlow = (function () {
   /** Wire the coupon controls. Called after every side-panel render, because
    *  re-pricing replaces the panel's markup along with its listeners. */
   function mountSide() {
+    /* The Fare Summary's own collapse control lives in this panel, not in the
+       step's root — so the step's mount() never sees it. Wired here, on every
+       side render, because re-pricing replaces this markup and its listeners.
+       Must come BEFORE the coupon early-return below. */
+    const side = document.getElementById('bkSide');
+    if (side && typeof BookingProducts !== 'undefined' && BookingProducts.wireFolds) {
+      BookingProducts.wireFolds(side, ctx);
+    }
     if (!flow || !flow.supportsCoupons) return;
     const msg = document.getElementById('bkCouponMsg');
     const say = (text, ok) => {
@@ -376,17 +421,24 @@ const BookingFlow = (function () {
 
     /* Re-render the rail so the tick marks and the "now" highlight move. */
     const rail = root.querySelector('.bk-rail');
-    rail.innerHTML = flow.steps.map((s, i) => `
-      <li class="bk-rail-step ${i < index ? 'is-done' : ''} ${i === index ? 'is-now' : ''}">
-        <span class="bk-rail-dot">${i < index ? '&#10003;' : i + 1}</span>
-        <span class="bk-rail-label">${esc(s.label)}</span>
-      </li>`).join('');
+    rail.innerHTML = railItemsHtml();
+
+    /* The itinerary card, repainted per step: the Review step's version names
+       the party and cabin and offers "Edit Search", the others "Change
+       Flights", so it cannot be rendered once at start(). */
+    const itin = root.querySelector('#bkItin');
+    if (itin) itin.innerHTML = itineraryHtml(ctx, step);
     /* The rail scrolls horizontally once it is wider than the screen (see
        booking.css) — without this, the step somebody is actually on can
        land off the edge of that scroll area, on a phone, with nothing on
        screen saying so. */
     rail.querySelector('.bk-rail-step.is-now')?.scrollIntoView({
       block: 'nearest', inline: 'center', behavior: 'smooth',
+    });
+    /* Cleared steps walk back. Wired here because railItemsHtml() is re-run on
+       every paint, which throws the previous listeners away with the markup. */
+    rail.querySelectorAll('[data-goto]').forEach(b => {
+      b.addEventListener('click', () => goTo(b.dataset.goto));
     });
 
     main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
@@ -421,7 +473,27 @@ const BookingFlow = (function () {
         <span class="bk-foot-total-label">Total</span>
         <span class="bk-foot-total-amt">${esc(money(p.total))}</span>`;
     }
+
+    /* The wide action bar, for steps that ask for one. `is-rich` is what
+       switches .bk-foot from the three-part layout to the reference's
+       trust-mark / itinerary / total / CTA row, so a step that supplies
+       nothing here keeps the footer it always had. */
+    const footRich = document.getElementById('bkFootRich');
+    const foot = document.getElementById('bkFoot');
+    if (footRich) {
+      const owner = step.footHtml || flow.footHtml;
+      const rich = (!step.hideSummary && owner) ? owner(ctx, { money, esc }, step) : '';
+      footRich.innerHTML = rich;
+      if (foot) foot.classList.toggle('is-rich', !!rich);
+    }
+    const footNote = document.getElementById('bkFootNote');
+    if (footNote) footNote.textContent = step.ctaNote || '';
     if (step.mount) step.mount(main, ctx);
+    /* #bkItin sits outside the step's own root, so its Change Flights / Edit
+       Search button has to be wired from here. */
+    root.querySelectorAll('#bkItin [data-bk-exit]').forEach(b => {
+      b.addEventListener('click', confirmClose);
+    });
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
 
     /* Buttons reflect where we are: no Back on the first step, and the last
@@ -431,6 +503,13 @@ const BookingFlow = (function () {
     back.style.visibility = (index === 0 || step.hideBack) ? 'hidden' : 'visible';
     next.textContent = step.nextLabel || 'Continue';
     next.className = 'bk-btn ' + (step.primaryDanger ? 'bk-btn-danger' : 'bk-btn-primary');
+    /* The reference's CTA carries a trailing arrow. The label itself stays
+       whatever the step named, so no wording changes — this only appends the
+       glyph, and only on flights. */
+    if (flow.kind === 'flight' && !step.hideSummary
+        && typeof BookingProducts !== 'undefined' && BookingProducts.svg) {
+      next.innerHTML = esc(next.textContent) + BookingProducts.svg('arrowRight');
+    }
     setMsg('');
 
     /* The flow is real page content now, not a modal with its own scroll
@@ -520,7 +599,7 @@ const BookingFlow = (function () {
     document.body.classList.add('bk-inpage');
 
     setHeaderHeightVar();
-    const header = document.getElementById('spHeader');
+    const header = siteHeader();
     if (header && 'ResizeObserver' in window) {
       headerObserver = new ResizeObserver(setHeaderHeightVar);
       headerObserver.observe(header);

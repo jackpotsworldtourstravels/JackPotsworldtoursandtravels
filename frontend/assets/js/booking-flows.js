@@ -25,13 +25,44 @@ const BookingFlows = (function () {
       SEATS BELONG TO A TRAVELLER, NOT TO THE BOOKING. The step used to say
       "pick 2 seats" and collect them into a list, which meant the party knew
       it had 12A and 12B but not which of them was in which. The backend has
-      always taken {passenger_index, seat_number}, so this now assigns against
+      always taken {passenger_index, seat_number}, so this assigns against
       that shape directly rather than inventing a second model.
 
       An infant is not allocated a seat — they travel on an adult's lap — so
-      they are absent from the traveller strip rather than listed with nothing
+      they are absent from the traveller list rather than listed with nothing
       to choose.
+
+      THE MAP IS THE SERVER'S. Rows, letters, prices, which seats are taken and
+      which are exit rows all come from GET /flights/seatmap; the four bands
+      below (available / preferred / extra legroom / occupied) are read off
+      that response, not decided here.
    */
+  const SEAT_BANDS = [
+    { key: 'selected', label: 'Selected' },
+    { key: 'available', label: 'Available' },
+    { key: 'occupied', label: 'Occupied' },
+    { key: 'preferred', label: 'Preferred Seat' },
+    { key: 'legroom', label: 'Extra Legroom' },
+  ];
+
+  /** Which band a seat falls in.
+
+      BANDED BY POSITION, NOT BY "COSTS SOMETHING". The catalogue prices every
+      seat (middle 150, aisle 300, window 350, +450 in an exit row, +200 in the
+      first four rows — customer_catalog_service.seat_map), so a
+      `price > 0 ? preferred : available` test put the WHOLE cabin in one band
+      and the map came out a flat wash. The server's own `type` and `exit` are
+      what the three bands actually mean: an exit row is the legroom, a window
+      or an aisle is the preferred position, and a middle seat is a plain one.
+      The legend prints each band's real entry price beside it. */
+  function seatBand(s, selected) {
+    if (selected) return 'selected';
+    if (s.occupied) return 'occupied';
+    if (s.exit) return 'legroom';
+    if (s.type === 'window' || s.type === 'aisle') return 'preferred';
+    return 'available';
+  }
+
   const seatStep = {
     id: 'seats',
     label: 'Seats',
@@ -60,108 +91,153 @@ const BookingFlows = (function () {
         return n || `Traveller ${i + 1}`;
       };
 
-      const strip = people.map(({ p, i }) => {
+      const item = ctx.item || {};
+      const sub = [
+        item.origin && item.destination ? `${item.origin.code} → ${item.destination.code}` : '',
+        [item.airline, item.flightNumber].filter(Boolean).join(' '),
+        P.bkfDate ? P.bkfDate(ctx.travelDate || item.date) : '',
+      ].filter(Boolean).join(' · ');
+
+      const paxRows = people.map(({ p, i }) => {
         const seat = ctx.seats[i];
         const active = i === ctx.activeSeatPax;
         return `
-          <button type="button" class="bk-paxseat ${active ? 'is-active' : ''}"
+          <button type="button" class="bkf-seatpax ${active ? 'is-active' : ''}"
                   data-paxseat="${i}" aria-pressed="${active}">
-            <span class="bk-paxseat-who">
-              <b>Traveller ${i + 1}</b>
-              <span>${esc(nameOf(p, i))}${kinds[i] ? ' · ' + esc(kinds[i]) : ''}</span>
+            <i class="bkf-n">${i + 1}</i>
+            <span class="bkf-seatpax-body">
+              <b>${esc(nameOf(p, i))}</b>
+              <span>${esc(kinds[i] || 'Adult')}</span>
             </span>
-            <span class="bk-paxseat-seat">
-              ${seat
-                ? `<b>${esc(seat.id)}</b><span>${seat.price ? esc(money(seat.price)) : 'Free'}</span>`
-                : '<span class="is-muted">No seat selected</span>'}
-            </span>
+            <span class="bkf-seatpax-seat ${seat ? '' : 'is-empty'}">${
+              seat ? esc(seat.id) : 'Not selected'}</span>
           </button>`;
       }).join('');
 
-      const mine = new Map();
-      ctx.seats.forEach((s, i) => { if (s) mine.set(s.id, i); });
+      /* The legend names the bands this aircraft actually has, and prints the
+         real entry price of each — not a fixed list. */
+      const all = ctx.seatMap.rows.flatMap(r => r.seats);
+      const cheapest = key => {
+        const prices = all.filter(x => seatBand(x, false) === key && x.price > 0).map(x => x.price);
+        return prices.length ? Math.min(...prices) : 0;
+      };
+      const present = key => key === 'selected' || all.some(x => seatBand(x, false) === key);
+      const legend = SEAT_BANDS.filter(present2 => present(present2.key)).map(b => {
+        const from = b.key === 'selected' || b.key === 'occupied' ? 0 : cheapest(b.key);
+        return `<div><i class="bkf-sw-${b.key}"></i>${esc(b.label)}${
+          from ? `<b>${esc(money(from))}</b>` : ''}</div>`;
+      }).join('');
 
-      const rows = ctx.seatMap.rows.map(r => `
-        <div class="bk-seatrow ${r.exit ? 'is-exit' : ''}">
-          <span class="bk-seatno">${r.row}</span>
-          ${r.seats.map((s, i) => {
-            const owner = mine.get(s.id);
-            const selected = owner !== undefined;
-            /* "Paid" is a seat that costs extra and is still free to take.
-               Selected wins over paid, because what the traveller most needs
-               to see on their own seat is that it is theirs. */
-            const paid = !s.occupied && !selected && s.price > 0;
-            const cls = [
-              'bk-seat',
-              s.occupied ? 'is-occupied' : '',
-              selected ? 'is-selected' : '',
-              paid ? 'is-paid' : '',
-            ].filter(Boolean).join(' ');
-            const label = s.occupied
-              ? 'Occupied'
-              : selected
-                ? `Seat ${s.id}, selected for traveller ${owner + 1}`
-                : `Seat ${s.id}, ${s.type}, ${s.price ? money(s.price) : 'no extra charge'}`;
-            return `${i === 3 ? '<span class="bk-aisle"></span>' : ''}
-            <button type="button" class="${cls}" data-seat="${esc(s.id)}"
-              ${s.occupied ? 'disabled' : ''} aria-label="${esc(label)}">
-              <span class="bk-seat-letter">${esc(s.letter)}</span>${s.price > 0 && !s.occupied
-                ? `<span class="bk-seat-price">${esc(money(s.price))}</span>` : ''}</button>`;
-          }).join('')}
-          ${r.exit ? '<span class="bk-exit-tag">Exit</span>' : ''}
-        </div>`).join('');
+      const mineBySeat = new Map();
+      ctx.seats.forEach((s, i) => { if (s) mineBySeat.set(s.id, i); });
 
-      /* The server sends its own legend; these are the four states it names.
-         Rendered from the response where there is one so the words on screen
-         and the words in the API cannot drift apart. */
-      const legend = (ctx.seatMap.legend && ctx.seatMap.legend.length
-        ? ctx.seatMap.legend
-        : [
-            { state: 'available', label: 'Available' },
-            { state: 'selected', label: 'Selected' },
-            { state: 'occupied', label: 'Occupied' },
-            { state: 'paid', label: 'Paid' },
-          ]
-      ).map(l => `<span><i class="bk-seat is-${esc(l.state)}"></i> ${esc(l.label)}</span>`).join('');
+      const letters = (ctx.seatMap.rows[0] || { seats: [] }).seats.map(s => s.letter);
+      const half = Math.ceil(letters.length / 2);
+      const cols = `<span></span>${letters.slice(0, half).map(l => `<span>${esc(l)}</span>`).join('')}
+        <span></span>${letters.slice(half).map(l => `<span>${esc(l)}</span>`).join('')}<span></span>`;
 
-      return `<div class="bk-step">
-          <h2 class="bk-step-title">Choose your seats</h2>
-          <p class="bk-step-sub">${esc(ctx.seatMap.aircraft)} · ${esc(ctx.seatMap.layout)} ·
-             choose a traveller, then tap a seat. Skipping this assigns seats at check-in.</p>
+      const rows = ctx.seatMap.rows.map(r => {
+        const cells = r.seats.map((s, n) => {
+          const owner = mineBySeat.get(s.id);
+          const selected = owner !== undefined;
+          const band = seatBand(s, selected);
+          const label = s.occupied ? `Seat ${s.id}, occupied`
+            : selected ? `Seat ${s.id}, selected for traveller ${owner + 1}`
+            : `Seat ${s.id}, ${s.type}${s.exit ? ', extra legroom' : ''}, ${s.price ? money(s.price) : 'no extra charge'}`;
+          const gap = n === half ? `<span class="bkf-rowno">${r.row}</span>` : '';
+          return `${gap}<button type="button" class="bkf-seat is-${band} bkf-sw-${band}"
+              data-seat="${esc(s.id)}" ${s.occupied ? 'disabled' : ''}
+              title="${esc(label)}" aria-label="${esc(label)}">${selected ? owner + 1 : esc(s.letter)}</button>`;
+        }).join('');
+        return `<div class="bkf-seatrow2">
+            ${r.exit ? '<span class="bkf-exit">EXIT</span>' : '<span></span>'}
+            ${cells}
+            ${r.exit ? '<span class="bkf-exit">EXIT</span>' : '<span></span>'}
+          </div>`;
+      }).join('');
 
-          <h3 class="bk-seat-forwho">Select seat for:</h3>
-          <div class="bk-paxseats">${strip}</div>
+      /* The blue strip describes the seat that is actually selected. With none
+         chosen there is nothing true to say, so there is no strip. */
+      const chosen = ctx.seats[ctx.activeSeatPax];
+      const tip = (chosen && !ctx.seatTipClosed) ? `
+        <div class="bkf-strip is-info" id="bkfSeatTip">
+          ${P.svg('info')}
+          <span><b>${esc(P.seatTypeLabel(chosen))} seat${chosen.exit ? ' with extra legroom' : ''}</b>
+            ${chosen.exit ? 'Enjoy more comfort for your journey.'
+              : chosen.price ? 'A preferred position on this aircraft.'
+              : 'No extra charge for this seat.'}</span>
+          <button type="button" class="bkf-strip-x" id="bkfSeatTipX" aria-label="Dismiss">&times;</button>
+        </div>` : '';
 
-          <div class="bk-seat-legend">${legend}</div>
-
-          <div class="bk-cabin">
-            <div class="bk-nose">Front of aircraft</div>
-            ${rows}
+      return `<div class="bk-step bkf-step">
+        <section class="bkf-card">
+          <div class="bkf-card-head has-rule">
+            <div>
+              <h2 class="bkf-h2">Select Seats</h2>
+              <p class="bkf-sub">${esc(sub)}</p>
+            </div>
+            <div class="bkf-paxpick">
+              <span>Passenger</span>
+              <select id="bkfSeatPax" aria-label="Traveller to seat">
+                ${people.map(({ p, i }) => `<option value="${i}"${
+                  i === ctx.activeSeatPax ? ' selected' : ''}>${i + 1}. ${esc(nameOf(p, i))}</option>`).join('')}
+              </select>
+            </div>
           </div>
-          <p class="bk-seat-count" id="bkSeatCount"></p>
-        </div>`;
+          <div class="bkf-card-body">
+            <div class="bkf-seatwrap">
+              <div class="bkf-seatside">
+                <div class="bkf-box">
+                  <h4>Passenger</h4>
+                  ${paxRows}
+                  <button type="button" class="bkf-clear" id="bkfClearSeat">Clear Seat</button>
+                </div>
+                <div class="bkf-box">
+                  <h4>Seat Legend</h4>
+                  <div class="bkf-legend">${legend}</div>
+                </div>
+              </div>
+              <div>
+                ${tip}
+                <div class="bkf-cabin">
+                  <div class="bkf-plane">
+                    <div class="bkf-nose"><span></span></div>
+                    <div class="bkf-cols">${cols}</div>
+                    <div class="bkf-planerows">${rows}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="bkf-strip is-warn" style="margin-top:16px">
+              ${P.svg('warn')}
+              <span>Seats are held for this booking only and can be changed until check-in.</span>
+            </div>
+          </div>
+        </section>
+      </div>`;
     },
     mount(root, ctx) {
       const kinds = ctx.paxKinds || [];
-      const seatableCount = Math.max(1, (ctx.paxKinds || []).filter(
-        k => String(k || 'Adult').toLowerCase() !== 'infant').length || (ctx.paxCount || 1));
 
-      const count = root.querySelector('#bkSeatCount');
-      const paint = () => {
-        const n = ctx.seats.filter(Boolean).length;
-        count.textContent = n
-          ? `${n} of ${seatableCount} assigned — ` + ctx.seats
-              .map((s, i) => (s ? `Traveller ${i + 1}: ${s.id}` : null))
-              .filter(Boolean).join(', ')
-          : 'No seats selected yet.';
-      };
-      paint();
-
+      const pick = i => { ctx.activeSeatPax = Number(i); BookingFlow.repaint(); };
       root.querySelectorAll('[data-paxseat]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          ctx.activeSeatPax = Number(btn.dataset.paxseat);
-          BookingFlow.repaint();
-        });
+        btn.addEventListener('click', () => pick(btn.dataset.paxseat));
+      });
+      const sel = root.querySelector('#bkfSeatPax');
+      if (sel) sel.addEventListener('change', () => pick(sel.value));
+
+      const clear = root.querySelector('#bkfClearSeat');
+      if (clear) clear.addEventListener('click', () => {
+        ctx.seats[ctx.activeSeatPax] = null;
+        BookingFlow.repaint();
+        BookingFlow.refreshPrice();
+      });
+
+      const tipX = root.querySelector('#bkfSeatTipX');
+      if (tipX) tipX.addEventListener('click', () => {
+        ctx.seatTipClosed = true;
+        const tip = root.querySelector('#bkfSeatTip');
+        if (tip) tip.remove();
       });
 
       root.querySelectorAll('[data-seat]').forEach(btn => {
@@ -186,6 +262,7 @@ const BookingFlows = (function () {
               return;
             }
             ctx.seats[active] = seat;
+            ctx.seatTipClosed = false;            // a new seat has something new to say
           }
 
           BookingFlow.repaint();
@@ -206,6 +283,9 @@ const BookingFlows = (function () {
     ];
     return {
       kind: 'flight',
+      /* The traveller chose the flight on the results page, so the reference's
+         first step is behind them before this flow ever opens. */
+      priorSteps: ['Search'],
       /* Flights are the only product with a coupon backend, so the Fare
          Summary shows the coupon controls here and nowhere else. */
       supportsCoupons: true,
@@ -240,10 +320,21 @@ const BookingFlows = (function () {
           note: q.coupon_error || null,
         };
       },
+      /* THE SAME FARE SUMMARY AND THE SAME ACTION BAR ON EVERY STEP, which is
+         what the reference shows. Owned by the flow rather than repeated on
+         four steps; booking-flow.js falls through to these whenever the step
+         itself does not supply one. */
+      sideHtml: (ctx, h, step) => P.fareHtml(ctx, h, step),
+      footHtml: ctx => P.footHtml(ctx),
       steps: [
-        P.travellersStep({ passport: true, frequentFlyer: true, noun: 'Traveller' }),
-        seatStep,
-        P.addonsStep('flight'),
+        Object.assign(
+          P.travellersStep({ passport: true, frequentFlyer: true, noun: 'Traveller',
+                             stepLabel: 'Traveller Details', reference: true }),
+          { nextLabel: 'Continue to Seats', ctaNote: 'You can review your booking next' }),
+        Object.assign({}, seatStep,
+          { nextLabel: 'Continue to Add-ons', ctaNote: 'You can add baggage, meals & more' }),
+        Object.assign(P.addonsStep('flight'),
+          { nextLabel: 'Continue to Review', ctaNote: 'Review your booking details' }),
         /* The full journey, spelled out. The itinerary strip stays — it is the
            fastest way to read a flight — and every field the review needs is
            named beneath it rather than left to be inferred from it. */

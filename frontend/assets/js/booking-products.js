@@ -294,7 +294,7 @@ const BookingProducts = (function () {
 
     return {
       id: 'travellers',
-      label: o.noun + 's',
+      label: o.stepLabel || (o.noun + 's'),
 
       render(ctx) {
         if (o.passport) checkOcrAvailability();
@@ -311,6 +311,10 @@ const BookingProducts = (function () {
            (that push happens in mount(), not here). */
         if (!Array.isArray(ctx.paxOpen)) ctx.paxOpen = [];
         ctx.paxKinds.forEach((_, i) => { if (ctx.paxOpen[i] === undefined) ctx.paxOpen[i] = i === 0; });
+
+        /* Flights wear the supplied reference (booking-ref.css). The other
+           four products keep the split card this step has always had. */
+        if (o.reference) return bkfTravellersHtml(ctx, o);
 
         const cards = ctx.paxKinds.map((_, i) => cardHtml(i, ctx)).join('');
         const intl = needsPassport(ctx);
@@ -341,6 +345,7 @@ const BookingProducts = (function () {
 
       mount(root, ctx) {
         /* --- disclosure open/close, and the + / − it shows --- */
+        /* (absent on the reference layout, where nothing is collapsed) */
         root.querySelectorAll('.bk-disclose-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const wrap = btn.closest('.bk-disclose');
@@ -368,7 +373,8 @@ const BookingProducts = (function () {
             const el = root.querySelector(`#p${i}_${suffix}`);
             if (el && value != null && value !== '') el.value = value;
           };
-          set('first', pax.first); set('last', pax.last); set('gender', pax.gender);
+          set('first', pax.first); set('middle', pax.middle);
+          set('last', pax.last); set('gender', pax.gender);
           set('ccode', pax.countryCode); set('mobile', pax.mobile); set('email', pax.email);
           set('ppno', pax.passportNumber); set('ppexp', pax.passportExpiry);
           set('ppiss', pax.issuingCountry); set('nat', pax.nationality);
@@ -388,7 +394,7 @@ const BookingProducts = (function () {
 
           input.addEventListener('change', async () => {
             const number = input.value.trim();
-            if (note) { note.textContent = ''; note.className = 'bk-disclose-note'; }
+            if (note) { note.textContent = ''; note.className = o.reference ? 'bkf-note' : 'bk-disclose-note'; }
             if (!number || typeof BookingApi === 'undefined' || !BookingApi.isSignedIn()) return;
 
             try {
@@ -407,7 +413,7 @@ const BookingProducts = (function () {
               fill('ffair', found.frequent_flyer_airline); fill('ff', found.frequent_flyer_number);
               if (note) {
                 note.textContent = 'Passenger details found — check them and edit if anything has changed.';
-                note.className = 'bk-disclose-note is-ok';
+                note.className = (o.reference ? 'bkf-note' : 'bk-disclose-note') + ' is-ok';
               }
             } catch { /* a lookup failure must never block the booking */ }
           });
@@ -537,21 +543,33 @@ const BookingProducts = (function () {
 
         for (let i = 0; i < n; i++) {
           const p = `p${i}_`;
-          const who = `${o.noun} ${i + 1}`;
+          const who = o.reference
+            ? `${(ctx.paxKinds || [])[i] || 'Adult'} ${bkfKindNo(ctx, i)}`
+            : `${o.noun} ${i + 1}`;
 
           if (!val(root, p + 'first')) return flag(p + 'first', `${who}: first name is required.`);
           if (!val(root, p + 'last')) return flag(p + 'last', `${who}: last name is required.`);
           if (!val(root, p + 'gender')) return flag(p + 'gender', `${who}: gender is required.`);
 
-          /* Contact is optional per the form, but a value that IS given has to
-             be usable — a typo'd email is worse than a blank one, because the
-             ticket goes to it. */
+          /* The reference's form marks Date of Birth, Nationality, Email ID and
+             Mobile Number with an asterisk. A required marker that is not
+             enforced is a lie, so on that layout they are enforced; the other
+             four products keep the looser rule they had. */
+          if (o.reference) {
+            if (!val(root, p + 'dob')) return flag(p + 'dob', `${who}: date of birth is required.`);
+            if (!val(root, p + 'nat')) return flag(p + 'nat', `${who}: nationality is required.`);
+          }
+
+          /* A contact value that IS given has to be usable — a typo'd email is
+             worse than a blank one, because the ticket goes to it. */
           if (i === 0) {
             const email = val(root, p + 'email');
+            if (o.reference && !email) return flag(p + 'email', 'An email address is required — your ticket is sent to it.');
             if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
               return flag(p + 'email', 'Enter a valid email address, or leave it blank.');
             }
             const mob = val(root, p + 'mobile').replace(/[\s-]/g, '');
+            if (o.reference && !mob) return flag(p + 'mobile', 'A mobile number is required for booking updates.');
             if (mob && !/^\d{8,15}$/.test(mob)) {
               return flag(p + 'mobile', 'Enter a valid mobile number, or leave it blank.');
             }
@@ -603,6 +621,7 @@ const BookingProducts = (function () {
       return {
         title: pick('title', prev.title),
         first: pick('first', prev.first),
+        middle: pick('middle', prev.middle),
         last: pick('last', prev.last),
         gender: pick('gender', prev.gender),
         dob: pick('dob', prev.dob),
@@ -640,6 +659,9 @@ const BookingProducts = (function () {
       label: 'Add-ons',
       async load(ctx) { ctx.addonCatalogue = await BookingData.addons(productType); },
       render(ctx) {
+        /* Flights wear the supplied reference; the other four products keep
+           the tile grid this step has always had. */
+        if (productType === 'flight') return bkfAddonsHtml(ctx);
         const chosen = new Set(ctx.addons.map(a => a.id));
         const cat = ctx.addonCatalogue || [];
 
@@ -695,6 +717,7 @@ const BookingProducts = (function () {
           </div>`;
       },
       mount(root, ctx) {
+        if (productType === 'flight') return bkfMountAddons(root, ctx);
         root.querySelectorAll('[data-addon-cb]').forEach(cb => {
           cb.addEventListener('change', () => {
             const id = cb.dataset.addonCb;
@@ -713,6 +736,53 @@ const BookingProducts = (function () {
   }
 
   /* =====================================================================
+     REVIEW — the flight Review screen
+     ---------------------------------------------------------------------
+     Built to the supplied reference: itinerary strip, then one card per thing
+     the traveller can still change, a grouped Fare Summary in the sticky rail
+     and a wide action bar pinned to the bottom.
+
+     EVERY FIGURE COMES FROM ctx.pricing / ctx.quote — the server's answer.
+     Nothing on this screen adds anything up.
+
+     SEGMENTS. The screen renders a LIST of legs and is correct for any length,
+     but the booking flow carries exactly one flight (`ctx.item`), and
+     `customer_bookings` stores one flight per row — singular `flight_number`,
+     `origin_code`, `destination_code`, with no segments table. So a real
+     booking is one segment today. `ctx.segments` is read first, so the day the
+     flow carries several this screen renders them without further change.
+     ===================================================================== */
+
+  function rvSegments(ctx) {
+    if (Array.isArray(ctx.segments) && ctx.segments.length) return ctx.segments;
+    const it = ctx.item || {};
+    if (!it.origin) return [];
+    return [{
+      origin: it.origin, destination: it.destination,
+      date: ctx.travelDate || it.date, departure: it.departure, arrival: it.arrival,
+      airline: it.airline, airlineCode: it.airlineCode, flightNumber: it.flightNumber,
+      stops: it.stops, durationLabel: it.durationLabel, fare: it.price,
+    }];
+  }
+
+  const rvTripLabel = n => (n > 2 ? 'Multi City Trip' : n === 2 ? 'Round Trip' : 'One Way Trip');
+
+  const rvStops = s => (s ? `${s} stop${s > 1 ? 's' : ''}` : 'Non Stop');
+
+  /* Window / Aisle / Middle from the column letter, when the seat map did not
+     already say. A 3-3 cabin is the assumption the seat step also makes. */
+  function rvSeatType(seat) {
+    if (!seat) return '';
+    /* The seat map returns 'window' / 'aisle' / 'middle' in lower case. */
+    if (seat.type) return seat.type.charAt(0).toUpperCase() + seat.type.slice(1);
+    const col = String(seat.id || '').slice(-1).toUpperCase();
+    if ('AF'.includes(col)) return 'Window';
+    if ('CD'.includes(col)) return 'Aisle';
+    if ('BE'.includes(col)) return 'Middle';
+    return '';
+  }
+
+  /* =====================================================================
      SHARED STEP — summary
      ===================================================================== */
   function summaryStep(describe) {
@@ -721,13 +791,18 @@ const BookingProducts = (function () {
     return {
       id: 'summary',
       label: 'Review',
-      nextLabel: 'Continue to payment',
+      nextLabel: 'Continue to Payment',
       render(ctx) {
         const kinds = ctx.paxKinds || [];
         const editable = typeof BookingFlow !== 'undefined' && BookingFlow.goTo;
         const edit = (stepId, label) => editable
           ? `<button type="button" class="bk-edit" data-edit="${esc(stepId)}">Edit ${esc(label)}</button>`
           : '';
+
+        /* Flights get the reference Review screen. The other four products keep
+           the original panel layout below — none of them has segments, seats or
+           a per-leg fare, which is most of what the reference screen is for. */
+        if (ctx.kind === 'flight') return bkfReviewHtml(ctx);
 
         /* An add-on priced per traveller is bought for the whole party, so it
            is listed under each of them; one priced per booking is listed once,
@@ -822,13 +897,1003 @@ const BookingProducts = (function () {
             </section>
           </div>`;
       },
-      mount(root) {
+      /* The flight rail and action bar are the flow's now (booking-flows.js),
+         because the reference uses the same two on every step. Returning null
+         here lets every product fall through to whatever owns them. */
+      ctaNote: "You won't be charged yet",
+      mount(root, ctx) {
         root.querySelectorAll('[data-edit]').forEach(btn => {
           btn.addEventListener('click', () => BookingFlow.goTo(btn.dataset.edit));
         });
+        bkfWireFolds(root, ctx);
       },
     };
   }
+
+  /* =====================================================================
+     THE FLIGHT SCREENS, BUILT TO THE SUPPLIED REFERENCE
+     ---------------------------------------------------------------------
+     Traveller Details, Seats, Add-ons and Review share one shell: an
+     itinerary card under the stepper, one white card in the main column, the
+     same Fare Summary rail, and the same wide action bar. Only the card body
+     changes per step, which is why these helpers live together.
+
+     NOTHING HERE IS SPECIFIC TO THE SAMPLE DATA IN THE REFERENCE. Every
+     figure, name, airline, seat and price is read off ctx / the server's
+     quote; the reference supplies layout, not content.
+
+     ICONS. JPIcon's family is the six product marks plus a handful of UI
+     glyphs — it has no seat, suitcase, passport or headset — so the marks the
+     reference puts on these screens are drawn here as plain inline SVG. They
+     are decorative and inherit currentColor.
+     ===================================================================== */
+
+  const SVG_PATHS = {
+    edit: '<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M13.5 6.5l4 4"/>',
+    user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/>',
+    users: '<circle cx="9" cy="8" r="3.2"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.9"/><path d="M17.6 14.4a6.2 6.2 0 0 1 3.6 5.1"/>',
+    child: '<circle cx="12" cy="7" r="3"/><path d="M9 20v-4.5L7 13l1.6-2.6h6.8L17 13l-2 2.5V20"/>',
+    infant: '<circle cx="12" cy="7.5" r="3.2"/><path d="M8 20c0-3 1.8-5.2 4-5.2S16 17 16 20"/>',
+    seat: '<path d="M6.5 4h2.2a2 2 0 0 1 2 1.8l.7 6.2H8.4a2 2 0 0 1-2-1.8L6.5 4Z"/><path d="M11.4 12h4.4a2.4 2.4 0 0 1 0 4.8h-6a3 3 0 0 1-3-2.7"/><path d="M5 10v9"/>',
+    bag: '<rect x="3.5" y="7" width="17" height="13" rx="2.2"/><path d="M9 7V5.2A1.7 1.7 0 0 1 10.7 3.5h2.6A1.7 1.7 0 0 1 15 5.2V7"/><path d="M9 11v5M15 11v5"/>',
+    meal: '<path d="M6 3v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3"/><path d="M8 12v9"/><path d="M17.5 3c-1.4 1-2.2 2.6-2.2 4.6 0 1.6.7 2.7 2.2 3.1V21"/>',
+    shield: '<path d="M12 3l7.2 3v5.3c0 4.3-3 8-7.2 9.4-4.2-1.4-7.2-5.1-7.2-9.4V6L12 3Z"/>',
+    shieldCheck: '<path d="M12 3l7.2 3v5.3c0 4.3-3 8-7.2 9.4-4.2-1.4-7.2-5.1-7.2-9.4V6L12 3Z"/><path d="m9.2 11.8 2 2 3.6-3.8"/>',
+    phone: '<path d="M21 16.9v2.6a2 2 0 0 1-2.2 2 19.4 19.4 0 0 1-8.5-3A19.1 19.1 0 0 1 4.4 12 19.4 19.4 0 0 1 1.5 3.4 2 2 0 0 1 3.5 1.2h2.6a2 2 0 0 1 2 1.7c.12.8.34 1.6.66 2.3a2 2 0 0 1-.45 2.1L7.2 8.5a15.6 15.6 0 0 0 6 6l1.2-1.1a2 2 0 0 1 2.1-.45c.74.32 1.52.54 2.32.66a2 2 0 0 1 1.7 2Z"/>',
+    mail: '<rect x="2.8" y="5" width="18.4" height="14" rx="2.2"/><path d="m3.4 6.6 8.6 6 8.6-6"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.2"/><path d="M12 7.7h.01"/>',
+    warn: '<path d="M12 3.6 21 19.4H3L12 3.6Z"/><path d="M12 9.6v4.2"/><path d="M12 16.7h.01"/>',
+    chevDown: '<path d="m5 8.5 7 7 7-7"/>',
+    arrowRight: '<path d="M4.5 12h14.4"/><path d="m13 6 6 6-6 6"/>',
+    plane: '<path d="M12 2.4c.88 0 1.6 1.06 1.6 2.37v3.6l7.4 4.32v2.1l-7.4-2.2v3.94l2.4 1.78v1.6L12 18.9l-4 1.2v-1.6l2.4-1.78V12.8l-7.4 2.2v-2.1l7.4-4.32v-3.6C10.4 3.46 11.12 2.4 12 2.4Z"/>',
+    refresh: '<path d="M20.4 12a8.4 8.4 0 1 1-2.6-6.1"/><path d="M20.6 4v5h-5"/><path d="M9.4 13.2a3.6 3.6 0 0 0 5.2 0"/><path d="M9 10h.01M15 10h.01"/>',
+    support: '<path d="M4.4 15v-3a7.6 7.6 0 0 1 15.2 0v3"/><rect x="2.6" y="13.4" width="3.6" height="5.6" rx="1.6"/><rect x="17.8" y="13.4" width="3.6" height="5.6" rx="1.6"/><path d="M19.6 19a3.6 3.6 0 0 1-3.6 2.6h-1.8"/>',
+    tag: '<path d="M3.6 11.4V4.4a.8.8 0 0 1 .8-.8h7l9 9-7.8 7.8-9-9Z"/><circle cx="7.8" cy="7.8" r="1.3"/>',
+    upload: '<path d="M12 15.5V4"/><path d="m7.5 8.2 4.5-4.4 4.5 4.4"/><path d="M4.5 15.4v3.1a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3.1"/>',
+    check: '<path d="m5 12.6 4.6 4.6L19 7.6"/>',
+  };
+
+  /** One decorative inline glyph. Unknown names render nothing rather than a
+   *  broken box, matching JPIcon.html's contract. */
+  function svg(name, cls) {
+    const d = SVG_PATHS[name];
+    if (!d) return '';
+    return `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  }
+
+  /* The reference prints "04 Jul, 2026" — no weekday. fmtDate() above is the
+     flow's long form and is still what every other product uses. */
+  function bkfDate(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso).length > 10 ? iso : iso + 'T00:00:00');
+    if (isNaN(d)) return String(iso);
+    const m = d.toLocaleDateString('en-IN', { month: 'short' });
+    return `${String(d.getDate()).padStart(2, '0')} ${m}, ${d.getFullYear()}`;
+  }
+
+  const bkfInitials = p =>
+    [p && p.first, p && p.last].filter(Boolean).map(s => s[0]).join('').toUpperCase() || '—';
+
+  const bkfName = p => [p && p.title, p && p.first, p && p.middle, p && p.last]
+    .filter(Boolean).join(' ').trim();
+
+  /** How many travellers of each kind, and this one's number within its kind —
+   *  the reference labels cards "Adult 1", "Child 1", not "Traveller 3". */
+  function bkfKindNo(ctx, i) {
+    const kinds = ctx.paxKinds || [];
+    const mine = String(kinds[i] || 'Adult');
+    let n = 0;
+    for (let k = 0; k <= i; k++) if (String(kinds[k] || 'Adult') === mine) n++;
+    return n;
+  }
+
+  /* ---- the itinerary card, above every flight step -------------------- */
+  function itineraryHtml(ctx, step) {
+    const segs = rvSegments(ctx);
+    if (!segs.length) return '';
+    const review = !!(step && step.id === 'summary');
+    const n = segs.length;
+    const flights = `${n} ${n === 1 ? 'Flight' : 'Flights'}`;
+    const paxCount = Math.max(1, (ctx.paxKinds || []).length || ctx.paxCount || 1);
+    const cabin = (typeof BookingData !== 'undefined'
+      && (BookingData.CABIN_CLASSES.find(c => c.id === (ctx.cabin || 'economy')) || {}).label) || 'Economy';
+    const party = (ctx.paxKinds || []).length
+      ? ['Adult', 'Child', 'Infant']
+          .map(k => {
+            const c = ctx.paxKinds.filter(x => String(x || 'Adult') === k).length;
+            return c ? `${c} ${k}${c > 1 ? (k === 'Child' ? 'ren' : 's') : ''}` : '';
+          }).filter(Boolean).join(', ')
+      : `${paxCount} Adult${paxCount > 1 ? 's' : ''}`;
+
+    const cells = segs.map((s, i) => `
+      <div class="bkf-seg">
+        <div class="bkf-seg-top">
+          <i class="bkf-n">${i + 1}</i>
+          <span class="bkf-seg-route">${esc(s.origin.code)}
+            <span class="bkf-arrow" aria-hidden="true">&#8594;</span>
+            ${esc(s.destination.code)}</span>
+        </div>
+        <div class="bkf-seg-when">${esc(bkfDate(s.date))}${
+          s.departure ? ` &middot; ${esc(s.departure)}${s.arrival ? ` &ndash; ${esc(s.arrival)}` : ''}` : ''}</div>
+        <div class="bkf-seg-air">
+          ${bkfLogo(s)}
+          <span class="bkf-airline">${esc(s.airline || '')}</span>
+          <span>${esc(s.flightNumber || '')}</span>
+          <span class="bkf-dot" aria-hidden="true">&bull;</span>
+          <span>${esc(rvStops(s.stops))}</span>
+        </div>
+      </div>`).join('<div class="bkf-seg-link">' + svg('plane') + '</div>');
+
+    return `
+      <section class="bkf-itin ${review ? 'is-review' : ''}" aria-label="Your itinerary">
+        <div class="bkf-itin-head">
+          <div class="bkf-itin-titles">
+            <h2 class="bkf-itin-title">${esc(rvTripLabel(n))}</h2>
+            <span class="bkf-chip">${review ? `(${flights})` : flights}</span>
+            ${review ? `<span class="bkf-itin-meta">${esc(party)}<i>&middot;</i>${esc(cabin)}</span>` : ''}
+          </div>
+          <button type="button" class="bkf-obtn" data-bk-exit="1">
+            ${svg('edit')}<span>${review ? 'Edit Search' : 'Change Flights'}</span>
+          </button>
+        </div>
+        <div class="bkf-itin-segs">${cells}</div>
+      </section>`;
+  }
+
+  function bkfLogo(seg) {
+    const code = seg.airlineCode
+      || (typeof TravelData !== 'undefined' && TravelData.airlineCode ? TravelData.airlineCode(seg.flightNumber) : '');
+    const files = (typeof AIRLINE_LOGO_FILES !== 'undefined') ? AIRLINE_LOGO_FILES : null;
+    if (files && code && files[code]) {
+      const dir = (typeof AIRLINE_LOGO_DIR === 'string') ? AIRLINE_LOGO_DIR : 'assets/images/airlines/';
+      return `<span class="bkf-logo"><img src="${esc(dir + files[code])}" alt=""
+        width="26" height="26" decoding="async" loading="lazy"></span>`;
+    }
+    return `<span class="bkf-logo"><span class="bkf-logo-fb">${esc(code || '✈')}</span></span>`;
+  }
+
+  /* ---- the Fare Summary rail, identical on every flight step ---------- */
+  /* THE SERVER'S OWN BREAKDOWN, GROUPED. Nothing here adds anything up: the
+     lines, their labels and the total are whatever the last quote returned
+     (customer_pricing_service.py). The grouping is presentational. */
+  function bkfFareHtml(ctx, h, step) {
+    /* The reference draws no coupon entry box on Traveller Details, Seats or
+       Add-ons — only the applied state, on Review. So the control lives on
+       Review, and the three steps before it look exactly as supplied. */
+    const onReview = !!(step && step.id === 'summary');
+    const segs = rvSegments(ctx);
+    const p = ctx.pricing || { lines: [], total: 0 };
+    const lines = p.lines || [];
+
+    const isSeat = l => /seat/i.test(l.label || '');
+    const isDiscount = l => Number(l.amount) < 0 || /discount/i.test(l.label || '');
+    const isAddon = l => !isSeat(l) && !isDiscount(l)
+      && /baggage|meal|priorit|service|add-?on/i.test(l.label || '');
+
+    const seatLines = lines.filter(isSeat);
+    const discountLines = lines.filter(isDiscount);
+    const addonLines = lines.filter(isAddon);
+    const mainLines = lines.filter(l => !isSeat(l) && !isDiscount(l) && !isAddon(l));
+    const addonSum = addonLines.reduce((t, l) => t + Number(l.amount || 0), 0);
+
+    const money2 = n => money(Math.abs(Number(n || 0)));
+    const rule = '<div class="bkf-rule"></div>';
+
+    const segRows = segs.length > 1 ? segs.map((s, i) => `
+      <div class="bkf-fare-seg">
+        <span><i class="bkf-n">${i + 1}</i>${esc(s.origin.code)}
+          <span class="bkf-arrow" aria-hidden="true">&#8594;</span> ${esc(s.destination.code)}</span>
+        <span>${s.fare ? esc(money(s.fare)) : ''}${svg('chevDown')}</span>
+      </div>`).join('') : '';
+
+    const seatBlock = seatLines.length ? `
+      <div class="bkf-fare-trip">Seat(s)</div>
+      ${seatLines.map(l => `
+        <div class="bk-price-line"><span>${esc(bkfSeatScope(ctx))}</span>
+          <span>${esc(money(l.amount))}</span></div>`).join('')}
+      ${rule}` : '';
+
+    const addonBlock = addonLines.length ? `
+      ${rule}
+      <details class="bkf-fare-group" open>
+        <summary><span>Add-ons</span>
+          <span class="bkf-amt">${esc(money(addonSum))}${svg('chevDown')}</span></summary>
+        ${addonLines.map(l => `
+          <div class="bk-price-line is-sub"><span>${esc(l.label)}</span>
+            <span>${l.free ? 'Included' : esc(money(l.amount))}</span></div>`).join('')}
+      </details>` : '';
+
+    /* The applied coupon: its value is the server's Discount line, the pill
+       and Remove are the control. #bkCouponRemove is what mountSide() wires,
+       so applying and removing stay one implementation. */
+    const discountBlock = discountLines.length ? `
+      ${rule}
+      ${discountLines.map(l => `
+        <div class="bk-price-line is-discount"><span>Discount</span>
+          <span>&minus; ${esc(money2(l.amount))}</span></div>`).join('')}
+      ${ctx.couponCode ? `
+        <div class="bkf-coupon-row">
+          <span class="bkf-coupon-tag">${esc(ctx.couponCode)} Applied</span>
+          <button type="button" class="bkf-edit" id="bkCouponRemove">Remove</button>
+        </div>` : ''}` : '';
+
+    return `
+      <div class="bk-price bkf-fare">
+        <div class="bkf-fare-head">
+          <h3 class="bkf-fare-title">Fare Summary</h3>
+          <button type="button" class="bkf-chev" data-bkf-fold="fare"
+                  aria-label="Collapse fare summary">${svg('chevDown')}</button>
+        </div>
+        <div class="bkf-fare-body">
+          ${segs.length ? `<div class="bkf-fare-trip">${esc(rvTripLabel(segs.length))}
+            <span style="font-weight:500">(${segs.length} ${segs.length === 1 ? 'Flight' : 'Flights'})</span></div>` : ''}
+          ${segRows}
+          ${segRows ? rule : ''}
+          ${seatBlock}
+          ${mainLines.map(l => `
+            <div class="bk-price-line"><span>${esc(l.label)}</span>
+              <span>${l.free ? 'Included' : esc(money(l.amount))}</span></div>`).join('')
+            || '<p class="bk-price-empty">Choose an option to see the fare.</p>'}
+          ${addonBlock}
+          ${discountBlock}
+          <div class="bk-price-total"><span>Total Amount</span><span>${esc(money(p.total))}</span></div>
+          <p class="bkf-incl">Inclusive of all taxes</p>
+          ${(ctx.couponCode || !onReview) ? '' : h.couponHtml()}
+          ${p.note ? `<p class="bk-price-note ${p.noteIsError ? 'is-error' : ''}"
+              ${p.noteIsError ? 'role="alert"' : ''}>${esc(p.note)}</p>` : ''}
+        </div>
+      </div>
+      <div class="bkf-assure">
+        ${svg('refresh')}
+        <div><b>Free Cancellation</b><span>Cancel within 24 hours of booking</span></div>
+      </div>
+      <ul class="bkf-benefits">
+        <li>${svg('tag')}<div><b>Best Price Guarantee</b><span>We promise you the lowest price</span></div></li>
+        <li>${svg('shieldCheck')}<div><b>Secure Booking</b><span>Your data is 100% protected</span></div></li>
+        <li>${svg('support')}<div><b>24/7 Customer Support</b><span>We're here to help you anytime</span></div></li>
+      </ul>`;
+  }
+
+  function bkfSeatScope(ctx) {
+    const n = (ctx.seats || []).filter(Boolean).length || 1;
+    return `${n} Traveller${n > 1 ? 's' : ''}`;
+  }
+
+  /* ---- the wide action bar, identical on every flight step ------------ */
+  function bkfFootHtml(ctx) {
+    const segs = rvSegments(ctx);
+    const p = ctx.pricing || { total: 0 };
+    const legs = segs.map((s, i) => `
+      <div class="bkf-foot-leg">
+        <i class="bkf-n">${i + 1}</i>
+        <div><b>${esc(s.origin.code)} <span aria-hidden="true">&#8594;</span> ${esc(s.destination.code)}</b>
+          <span>${esc(bkfDate(s.date))}</span></div>
+      </div>`).join('');
+    return `
+      <div class="bkf-foot-trust">
+        ${svg('shieldCheck')}
+        <div><b>Secure Booking</b><span>Your data is 100% protected</span></div>
+      </div>
+      <div class="bkf-foot-legs">${legs}</div>
+      <div class="bkf-foot-total">
+        <span>Total Amount</span>
+        <b>${esc(money(p.total))}</b>
+        <span class="bkf-foot-incl">Inclusive of all taxes ${svg('info')}</span>
+      </div>`;
+  }
+
+  /* ---- fields, the reference's shape: label above a 42px control -------- */
+  function bkfField(o) {
+    const id = esc(o.id);
+    const req = o.required ? '<span class="req">*</span>' : '';
+    const opt = o.optional ? ' <span class="opt">(Optional)</span>' : '';
+    let control;
+    if (o.type === 'select') {
+      control = `<select id="${id}" name="${id}">
+          ${o.placeholder !== false ? `<option value="">${esc(o.placeholder || 'Select')}</option>` : ''}
+          ${(o.options || []).map(v => {
+            const value = typeof v === 'string' ? v : v.value;
+            const label = typeof v === 'string' ? v : v.label;
+            return `<option value="${esc(value)}"${o.value === value ? ' selected' : ''}>${esc(label)}</option>`;
+          }).join('')}
+        </select>`;
+    } else {
+      control = `<input id="${id}" name="${id}" type="${esc(o.type || 'text')}"
+        value="${esc(o.value || '')}" placeholder="${esc(o.placeholder || '')}"
+        ${o.max ? `max="${esc(o.max)}"` : ''} ${o.min ? `min="${esc(o.min)}"` : ''}
+        ${o.inputmode ? `inputmode="${esc(o.inputmode)}"` : ''}
+        ${o.autocomplete ? `autocomplete="${esc(o.autocomplete)}"` : ''}>`;
+    }
+    return `<div class="bkf-f ${o.span ? 'span' + o.span : ''}">
+        <label for="${id}">${esc(o.label)}${req}${opt}</label>${control}
+        ${o.note ? `<p class="bkf-note" id="${id}-note" role="status" aria-live="polite"></p>` : ''}
+      </div>`;
+  }
+
+  /** The mobile field: dial code + number in one grid slot, one label. */
+  function bkfTelField(i) {
+    const p = `p${i}_`;
+    return `<div class="bkf-f span2">
+        <label for="${p}mobile">Mobile Number<span class="req">*</span></label>
+        <div class="bkf-tel">
+          <select id="${p}ccode" name="${p}ccode" aria-label="Country dialling code">
+            ${COUNTRY_CODES.map(c => {
+              const dial = c.split(' ')[0];
+              return `<option value="${esc(c)}"${c === '+91 India' ? ' selected' : ''}>${esc(dial)}</option>`;
+            }).join('')}
+          </select>
+          <input id="${p}mobile" name="${p}mobile" type="tel" inputmode="numeric"
+                 autocomplete="tel" placeholder="Enter mobile number">
+        </div>
+      </div>`;
+  }
+
+  /* ---- one traveller card ---------------------------------------------- */
+  function bkfPaxCard(i, ctx, o) {
+    const p = `p${i}_`;
+    const kind = String((ctx.paxKinds || [])[i] || 'Adult');
+    const intl = !!(o.passport && typeof BookingApi !== 'undefined' && BookingApi.isInternational(ctx.item));
+    const lead = i === 0;
+    const icons = { Adult: 'user', Child: 'child', Infant: 'infant' };
+
+    const fields = [
+      bkfField({ id: p + 'title', label: 'Title', type: 'select',
+                 options: BookingData.TITLES, placeholder: 'Mr' }),
+      bkfField({ id: p + 'first', label: 'First Name', required: true, autocomplete: 'given-name',
+                 placeholder: 'Enter first name' }),
+      bkfField({ id: p + 'middle', label: 'Middle Name', optional: true,
+                 autocomplete: 'additional-name', placeholder: 'Enter middle name' }),
+      bkfField({ id: p + 'last', label: 'Last Name', required: true, autocomplete: 'family-name',
+                 placeholder: 'Enter last name' }),
+      bkfField({ id: p + 'dob', label: 'Date of Birth', required: true, type: 'date',
+                 max: new Date().toISOString().slice(0, 10) }),
+      bkfField({ id: p + 'gender', label: 'Gender', type: 'select', required: true,
+                 options: BookingData.GENDERS, placeholder: 'Select' }),
+      bkfField({ id: p + 'nat', label: 'Nationality', type: 'select', required: true,
+                 options: BookingData.NATIONALITIES, value: 'India' }),
+      o.frequentFlyer
+        ? bkfField({ id: p + 'ff', label: 'Frequent Flyer', optional: true,
+                     placeholder: 'Enter FF number' })
+        : '',
+      lead ? bkfField({ id: p + 'email', label: 'Email ID', required: true, type: 'email',
+                        autocomplete: 'email', placeholder: 'Enter email address', span: 2 }) : '',
+      lead ? bkfTelField(i) : '',
+    ].join('');
+
+    /* Passport is asked for where it is actually needed. The reference is a
+       domestic itinerary and shows no passport block; an international one
+       requires the details, and that is the case OCR exists for. */
+    const passport = intl ? `
+      <div class="bkf-passport">
+        <div class="bkf-group-head">${bkfIc('shield')}<h3>Passport Details</h3></div>
+        ${bkfScanHtml(i, ctx)}
+        <p class="bkf-note" id="${p}ppnote" role="status" aria-live="polite"></p>
+        <div class="bkf-grid">
+          ${bkfField({ id: p + 'ppno', label: 'Passport Number', required: true, placeholder: 'e.g. M1234567' })}
+          ${bkfField({ id: p + 'ppexp', label: 'Passport Expiry', required: true, type: 'date',
+                       min: new Date().toISOString().slice(0, 10) })}
+          ${bkfField({ id: p + 'ppiss', label: 'Issuing Country', type: 'select',
+                       options: BookingData.NATIONALITIES, value: 'India' })}
+        </div>
+      </div>` : '';
+
+    return `<div class="bkf-pax" data-pax="${i}">
+        <div class="bkf-pax-head">
+          <div class="bkf-pax-who">
+            ${bkfIc(icons[kind] || 'user')}
+            <h3>${esc(kind)} ${bkfKindNo(ctx, i)}</h3>
+            ${lead ? '<span class="bkf-pill">Lead Traveller</span>' : ''}
+          </div>
+          <div class="bkf-pax-right">
+            ${lead ? `<label class="bkf-switch">
+              <span>Save to my profile</span>
+              <input type="checkbox" id="bkSaveTravellers" ${ctx.saveTravellers ? 'checked' : ''}><i></i>
+            </label>` : `<button type="button" class="bkf-pax-remove" data-remove="${i}">Remove</button>`}
+          </div>
+        </div>
+        <div class="bkf-pax-body">
+          <div class="bkf-grid">${fields}</div>
+          ${passport}
+        </div>
+      </div>`;
+  }
+
+  const bkfIc = name => `<span class="bkf-ic">${svg(name)}</span>`;
+
+  /** "Upload Passport" — absent entirely where no OCR provider is configured,
+   *  so there is never a control that fails when pressed. Same states and the
+   *  same ids as before; only the styling is the reference's. */
+  function bkfScanHtml(i, ctx) {
+    if (!_ocrAvailable) return '';
+    const scan = (ctx.paxScan && ctx.paxScan[i]) || { status: 'idle' };
+    const busy = scan.status === 'busy';
+    if (scan.status === 'done') {
+      return `<div class="bkf-scan">
+        <p class="bkf-scan-msg is-ok">&#10003; Passport details detected</p>
+        <button type="button" class="bkf-obtn" data-scan-edit="${i}">Edit Details</button>
+      </div>`;
+    }
+    return `<div class="bkf-scan">
+      <input type="file" id="p${i}_ppscan" data-scan-input="${i}"
+             accept="image/jpeg,image/png,image/webp,application/pdf" ${busy ? 'disabled' : ''}>
+      <label class="bkf-scan-btn ${busy ? 'is-busy' : ''}" for="p${i}_ppscan">
+        ${svg('upload')}<span>${busy ? 'Reading your passport…' : 'Upload Passport'}</span>
+      </label>
+      <span class="bkf-scan-hint">Upload a clear passport image to fill these details automatically.</span>
+      ${scan.status === 'error' ? `<p class="bkf-scan-msg is-bad" role="alert">${esc(scan.message)}</p>` : ''}
+    </div>`;
+  }
+
+  /* ---- the whole Traveller Details step -------------------------------- */
+  function bkfTravellersHtml(ctx, o) {
+    const kinds = ctx.paxKinds || [];
+    const idx = kind => kinds.map((k, i) => [k, i])
+      .filter(([k]) => String(k || 'Adult') === kind).map(([, i]) => i);
+    const cards = list => list.map(i => bkfPaxCard(i, ctx, o)).join('');
+    const canAdd = kinds.length < 9;
+
+    const group = (kind, icon, heading, addId, addLabel) => `
+      <div class="bkf-group">
+        <div class="bkf-group-head">${bkfIc(icon)}<h3>${esc(heading)}</h3></div>
+        ${cards(idx(kind))}
+        ${canAdd ? `<div class="bkf-add"><button type="button" class="bkf-addbtn" id="${addId}">+ ${esc(addLabel)}</button></div>` : ''}
+      </div>`;
+
+    return `<div class="bk-step bkf-step">
+      <section class="bkf-card">
+        <div class="bkf-card-head has-rule">
+          <div>
+            <h2 class="bkf-h2">Traveller Details</h2>
+            <p class="bkf-sub">Enter details as per government ID proof</p>
+          </div>
+        </div>
+        <div class="bkf-card-body">
+          ${cards(idx('Adult'))}
+          ${canAdd ? `<div class="bkf-add"><button type="button" class="bkf-addbtn" id="bkAddAdult">+ Add Adult</button></div>` : ''}
+          ${group('Child', 'child', 'Children', 'bkAddChild', 'Add Child')}
+          ${group('Infant', 'infant', 'Infants', 'bkAddInfant', 'Add Infant')}
+          <div class="bkf-strip is-warn" style="margin-top:20px">
+            ${svg('info')}
+            <span>Names must match government-issued ID proof. Corrections are not allowed after booking.</span>
+          </div>
+        </div>
+      </section>
+    </div>`;
+  }
+
+  /* =====================================================================
+     ADD-ONS, the reference's "Customize your journey"
+     ---------------------------------------------------------------------
+     The catalogue is the server's (GET /api/customer/addons): baggage, meal
+     and service rows with their own codes and prices. Baggage and meals are
+     one-of within their group, as the reference's radio cards are; the other
+     services are independent, which is why they keep tick boxes.
+
+     PER PASSENGER IS REAL. The quote endpoint already takes
+     {code, passenger_index} and charges qty 1 when an index is named
+     (customer_pricing_service.price_addons), so the Passenger selector picks
+     who an extra is bought for rather than decorating the screen.
+     ===================================================================== */
+  const BKF_ADDON_TABS = [
+    { key: 'baggage', label: 'Baggage', title: 'Baggage', icon: 'bag' },
+    { key: 'meal', label: 'Meals', title: 'Meals', icon: 'meal' },
+    { key: 'service', label: 'Other Add-ons', title: 'Other Add-ons', icon: 'shield' },
+  ];
+
+  const bkfAddonKey = (a, i) => `${a.id}#${i == null ? '' : i}`;
+
+  /** Illustration for an option card. No photography exists in this project,
+   *  so these are drawn — a case whose size tracks the allowance, a tray for
+   *  a meal, a mark for everything else. */
+  function bkfArt(group, n, tone) {
+    const fills = ['#C9CFD8', '#8FB6E8', '#6E9BE0', '#A98BD8', '#E8A05C'];
+    const c = fills[Math.min(n, fills.length - 1)];
+    if (group === 'baggage') {
+      const h = 26 + Math.min(n, 4) * 4;
+      return `<svg width="46" height="52" viewBox="0 0 46 52" fill="none" aria-hidden="true">
+        <rect x="17" y="${44 - h - 8}" width="12" height="8" rx="3" stroke="#98A2B3" stroke-width="2"/>
+        <rect x="8" y="${44 - h}" width="30" height="${h}" rx="4" fill="${c}"/>
+        <rect x="14" y="${44 - h}" width="3" height="${h}" fill="rgba(255,255,255,.5)"/>
+        <rect x="29" y="${44 - h}" width="3" height="${h}" fill="rgba(255,255,255,.5)"/>
+        <rect x="11" y="44" width="4" height="4" rx="1.4" fill="#98A2B3"/>
+        <rect x="31" y="44" width="4" height="4" rx="1.4" fill="#98A2B3"/>
+      </svg>`;
+    }
+    if (group === 'meal') {
+      const food = tone || '#E8A05C';
+      return `<svg width="52" height="44" viewBox="0 0 52 44" fill="none" aria-hidden="true">
+        <rect x="4" y="10" width="44" height="26" rx="4" fill="#EEF1F5"/>
+        <rect x="8" y="14" width="20" height="18" rx="3" fill="${food}"/>
+        <circle cx="38" cy="20" r="5" fill="#9CC98A"/>
+        <rect x="32" y="27" width="12" height="5" rx="2.5" fill="#D8DEE7"/>
+      </svg>`;
+    }
+    return `<svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+      <circle cx="22" cy="22" r="16" fill="#EEF1F5"/>
+      <g transform="translate(11,11)" stroke="#7E8CA0" stroke-width="1.7"
+         stroke-linecap="round" stroke-linejoin="round" fill="none">${SVG_PATHS.shieldCheck}</g>
+    </svg>`;
+  }
+
+  function bkfAddonsHtml(ctx) {
+    const cat = ctx.addonCatalogue || [];
+    const segs = rvSegments(ctx);
+    const chosen = new Map((ctx.addons || []).map(a => [bkfAddonKey(a, a.passengerIndex), a]));
+    /* MUST default the same way bkfMountAddons does (0, not null): the mount
+       stores `passengerIndex: 0` on the chosen add-on, so a render that looked
+       for `passengerIndex: null` matched nothing and every group kept showing
+       its "none" card as selected. */
+    const who = ctx.addonPax == null ? 0 : Number(ctx.addonPax);
+    const people = (ctx.paxKinds || ['Adult']).map((k, i) => {
+      const p = (ctx.passengers || [])[i] || {};
+      const name = [p.first, p.last].filter(Boolean).join(' ').trim();
+      return { i, label: `${i + 1}. ${name || `${k} ${bkfKindNo(ctx, i)}`}` };
+    });
+    const active = ctx.addonSector == null ? 0 : Number(ctx.addonSector);
+
+    const sectorRow = segs.length ? `
+      <div class="bkf-sectors" role="tablist" aria-label="Flight">
+        ${segs.map((s, i) => `
+          <button type="button" class="bkf-sector ${i === active ? 'is-on' : ''}"
+                  data-sector="${i}" role="tab" aria-selected="${i === active}">
+            <b>${esc(s.origin.code)} <span aria-hidden="true">&#8594;</span> ${esc(s.destination.code)}</b>
+            <span>${esc([s.airline, s.flightNumber].filter(Boolean).join(' '))}</span>
+          </button>`).join('')}
+      </div>` : '';
+
+    /* "Best Value" goes to the cheapest rupee per kilo the catalogue offers —
+       derived, not decided here. */
+    const kg = a => { const m = /(\d+)\s*kg/i.exec(a.name || ''); return m ? Number(m[1]) : 0; };
+    const bagRows = cat.filter(a => a.group === 'baggage');
+    let bestId = null;
+    bagRows.forEach(a => {
+      if (!kg(a) || !a.price) return;
+      const rate = a.price / kg(a);
+      if (bestId === null || rate < bestId.rate) bestId = { id: a.id, rate };
+    });
+
+    const noneCard = (group, title, note) => `
+      <label class="bkf-opt ${!bkfGroupPick(ctx, group, who) ? 'is-on' : ''}" data-none="${group}">
+        <input type="radio" name="bkf-${group}" ${!bkfGroupPick(ctx, group, who) ? 'checked' : ''}>
+        <span class="bkf-opt-top"><span class="bkf-radio"></span>
+          <span class="bkf-opt-txt"><b>${esc(title)}</b><span>${esc(note)}</span></span></span>
+        <span class="bkf-opt-art">${bkfArt(group, 0)}</span>
+        <span class="bkf-opt-foot"><span class="bkf-opt-price is-free">Included</span></span>
+      </label>`;
+
+    const optCard = (a, n, single) => {
+      const on = chosen.has(bkfAddonKey(a, who));
+      return `
+      <label class="bkf-opt ${on ? 'is-on' : ''}" data-addon="${esc(a.id)}" data-group="${esc(a.group)}">
+        <input type="${single ? 'radio' : 'checkbox'}" ${single ? `name="bkf-${esc(a.group)}"` : ''} ${on ? 'checked' : ''}>
+        <span class="bkf-opt-top">
+          <span class="bkf-radio ${single ? '' : 'is-box'}"></span>
+          <span class="bkf-opt-txt"><b>${esc(bkfShortName(a))}</b><span>${esc(a.note || '')}</span></span>
+        </span>
+        <span class="bkf-opt-art">${bkfArt(a.group, n + 1, bkfMealTone(a))}</span>
+        <span class="bkf-opt-foot">
+          <span class="bkf-opt-price ${a.price ? '' : 'is-free'}">${a.price ? esc(money(a.price)) : 'Free'}</span>
+          ${bestId && bestId.id === a.id ? '<span class="bkf-best">Best Value</span>' : ''}
+        </span>
+      </label>`;
+    };
+
+    const section = tab => {
+      const rows = cat.filter(a => a.group === tab.key);
+      if (!rows.length) return '';
+      const single = tab.key !== 'service';
+      const none = tab.key === 'baggage'
+        ? noneCard('baggage', 'No Extra Baggage', bkfIncludedNote(cat, 'baggage'))
+        : tab.key === 'meal' ? noneCard('meal', 'No Meal', 'Complimentary') : '';
+      return `
+        <section class="bkf-sect" data-sect="${esc(tab.key)}">
+          <div class="bkf-sect-head">
+            ${bkfIc(tab.icon)}<h3>${esc(tab.title)}</h3>
+            <span class="bkf-hint">Prices are per passenger per sector</span>
+          </div>
+          ${sectorRow}
+          <div class="bkf-opts">${none}${rows.map((a, n) => optCard(a, n, single)).join('')}</div>
+          ${bkfApplyAllHtml(segs, tab)}
+        </section>`;
+    };
+
+    return `<div class="bk-step bkf-step">
+      <section class="bkf-card">
+        <div class="bkf-card-head">
+          <div>
+            <h2 class="bkf-h2">Customize your journey</h2>
+            <p class="bkf-sub">Add baggage, meals and other services for a more comfortable trip.</p>
+          </div>
+          <div class="bkf-paxpick">
+            <span>Passenger</span>
+            <select id="bkfAddonPax" aria-label="Passenger these add-ons are for">
+              ${people.map(x => `<option value="${x.i}"${x.i === who ? ' selected' : ''}>${esc(x.label)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="bkf-tabs" role="tablist" aria-label="Add-on type">
+          ${BKF_ADDON_TABS.filter(t => cat.some(a => a.group === t.key)).map((t, i) => `
+            <button type="button" class="bkf-tab ${i === 0 ? 'is-on' : ''}" data-tab="${esc(t.key)}"
+                    role="tab" aria-selected="${i === 0}">${esc(t.label)}</button>`).join('')}
+        </div>
+        ${BKF_ADDON_TABS.map(section).join('')}
+      </section>
+    </div>`;
+  }
+
+
+  /* "Apply to all flights" is in the reference, and it cannot be honest here:
+     an add-on in this backend carries a code and (optionally) a passenger, and
+     no segment at all — customer_pricing_service.price_addons has no per-leg
+     dimension to apply anything TO. So it is rendered only once a booking
+     genuinely carries more than one leg, and until then there is no switch
+     that silently does nothing. See docs/ for the multi-city note. */
+  function bkfApplyAllHtml(segs, tab) {
+    if (segs.length < 2) return '';
+    return `
+      <div class="bkf-applyall">
+        <span class="bkf-bullet" aria-hidden="true"></span>
+        <p>Add ${esc(tab.title.toLowerCase())} for all remaining flights in this trip.</p>
+        <label class="bkf-switch"><span>Apply to all flights</span>
+          <input type="checkbox" data-applyall="${esc(tab.key)}"><i></i></label>
+      </div>`;
+  }
+
+  /** What is already in the fare, in the reference's short form. */
+  function bkfIncludedNote(cat, group) {
+    const inc = (cat.included || []).map(b => b.allowance).filter(Boolean);
+    return inc.length ? `${inc.join(' + ')} included` : 'Included in your fare';
+  }
+
+  /** The catalogue names things for an API ("Extra baggage 10 kg"); the
+   *  reference's card leads with the number. Nothing is invented — this only
+   *  moves the allowance to the front of the name the server gave. */
+  function bkfShortName(a) {
+    const m = /(\d+\s*kg)/i.exec(a.name || '');
+    if (a.group === 'baggage' && m) return `+${m[1].replace(/\s+/g, ' ')}`;
+    return a.name || '';
+  }
+
+  function bkfMealTone(a) {
+    const n = (a.name || '').toLowerCase();
+    if (n.includes('non-veg') || n.includes('non veg')) return '#C4603F';
+    if (n.includes('special')) return '#D7B45A';
+    return '#7FA96A';
+  }
+
+  /** The add-on currently chosen in a one-of group, for this passenger. */
+  function bkfGroupPick(ctx, group, who) {
+    return (ctx.addons || []).find(a => a.group === group
+      && Number(a.passengerIndex == null ? 0 : a.passengerIndex) === Number(who == null ? 0 : who));
+  }
+
+  /* ---- Add-ons: wiring ------------------------------------------------
+     Every change writes to ctx.addons and asks the flow to re-price, so the
+     rail moves as boxes are ticked. `passengerIndex` is what the quote
+     endpoint already understands, so who an extra is for survives all the way
+     to the booking. */
+  function bkfMountAddons(root, ctx) {
+    const cat = ctx.addonCatalogue || [];
+    const who = () => (ctx.addonPax == null ? 0 : Number(ctx.addonPax));
+    const mine = a => Number(a.passengerIndex == null ? 0 : a.passengerIndex) === who();
+
+    const pax = root.querySelector('#bkfAddonPax');
+    if (pax) pax.addEventListener('change', () => {
+      ctx.addonPax = Number(pax.value);
+      BookingFlow.repaint();
+    });
+
+    /* The tabs are jump links, not filters: the reference shows every section
+       on the page with the tab marking where you are. */
+    root.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        root.querySelectorAll('[data-tab]').forEach(b => {
+          const on = b === btn;
+          b.classList.toggle('is-on', on);
+          b.setAttribute('aria-selected', String(on));
+        });
+        const sect = root.querySelector(`[data-sect="${btn.dataset.tab}"]`);
+        if (sect) sect.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    });
+
+    root.querySelectorAll('[data-sector]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ctx.addonSector = Number(btn.dataset.sector);
+        BookingFlow.repaint();
+      });
+    });
+
+    const drop = group => {
+      ctx.addons = (ctx.addons || []).filter(a => !(a.group === group && mine(a)));
+    };
+
+    root.querySelectorAll('[data-none]').forEach(label => {
+      const input = label.querySelector('input');
+      if (!input) return;
+      input.addEventListener('change', () => {
+        drop(label.dataset.none);
+        BookingFlow.repaint();
+        BookingFlow.refreshPrice();
+      });
+    });
+
+    root.querySelectorAll('[data-addon]').forEach(label => {
+      const input = label.querySelector('input');
+      if (!input) return;
+      input.addEventListener('change', () => {
+        const item = cat.find(a => a.id === label.dataset.addon);
+        if (!item) return;
+        const picked = Object.assign({}, item, { passengerIndex: who() });
+        if (input.type === 'radio') {
+          drop(item.group);                       // one baggage, one meal
+          ctx.addons.push(picked);
+        } else if (input.checked) {
+          ctx.addons.push(picked);
+        } else {
+          ctx.addons = ctx.addons.filter(a => !(a.id === item.id && mine(a)));
+        }
+        BookingFlow.repaint();
+        BookingFlow.refreshPrice();
+      });
+    });
+  }
+
+  /* =====================================================================
+     REVIEW, the reference's "Review your booking"
+     ---------------------------------------------------------------------
+     One card per thing that can still be changed, each with an Edit that
+     jumps back to the step that owns it. The itinerary card above it is the
+     shell's (see itineraryHtml) — the Review variant, which is the one that
+     names the party and the cabin and offers "Edit Search".
+     ===================================================================== */
+  function bkfReviewHtml(ctx) {
+    const editable = typeof BookingFlow !== 'undefined' && BookingFlow.goTo;
+    const segs = rvSegments(ctx);
+    const edit = (stepId, what) => editable
+      ? `<button type="button" class="bkf-edit" data-edit="${esc(stepId)}"
+           aria-label="Edit ${esc(what)}">Edit</button>` : '';
+    const fold = key => `<button type="button" class="bkf-chev" data-bkf-fold="${esc(key)}"
+        aria-label="Collapse section">${svg('chevDown')}</button>`;
+
+    return `<div class="bk-step bkf-step bk-rv">
+      <div class="bkf-rv-head">
+        <div>
+          <h2 class="bkf-h2">Review your booking</h2>
+          <p class="bkf-sub">Please review your details before proceeding to payment.</p>
+        </div>
+        ${editable ? `<button type="button" class="bkf-obtn" data-edit="travellers"
+            aria-label="Edit all booking details">${svg('edit')}<span>Edit All</span></button>` : ''}
+      </div>
+      ${bkfRvTravellerHtml(ctx, edit)}
+      ${bkfRvSeatsHtml(ctx, segs, edit, fold)}
+      ${bkfRvAddonsHtml(ctx, segs, edit, fold)}
+      ${bkfRvContactHtml(ctx, edit)}
+      ${bkfRvInfoHtml(ctx)}
+    </div>`;
+  }
+
+  function bkfRvTravellerHtml(ctx, edit) {
+    const p = (ctx.passengers || [])[0] || {};
+    const kinds = ctx.paxKinds || [];
+    /* "Verified" has to mean verified: this reports whether the fields the
+       traveller step requires are actually on the draft, rather than assuming
+       that reaching Review implies they are. */
+    const intl = ctx.item && typeof BookingApi !== 'undefined' && BookingApi.isInternational
+      ? BookingApi.isInternational(ctx.item) : false;
+    const missing = [];
+    if (!p.first || !p.last) missing.push('name');
+    if (!p.dob) missing.push('date of birth');
+    if (!p.nationality) missing.push('nationality');
+    if (intl && !p.passportNumber) missing.push('passport');
+    const ok = missing.length === 0;
+
+    const meta = [kinds[0] || p.kind || 'Adult', p.gender, p.dob ? bkfDate(p.dob) : '',
+                  p.nationality ? bkfNationalityAdj(p.nationality) : ''].filter(Boolean);
+    const email = (ctx.contact && ctx.contact.email) || p.email || '';
+    const phone = bkfPhone(p, ctx);
+
+    const others = (ctx.passengers || []).slice(1).map((q, i) => `
+      <div class="bkf-rvpax-more">
+        <span class="bkf-avatar is-sm">${esc(bkfInitials(q))}</span>
+        <div><b>${esc(bkfName(q))}</b>
+          <span>${esc([kinds[i + 1] || q.kind || 'Adult', q.gender,
+                       q.dob ? bkfDate(q.dob) : ''].filter(Boolean).join(' · '))}</span></div>
+      </div>`).join('');
+
+    return `
+      <section class="bkf-card bkf-rvcard">
+        <div class="bkf-card-head">
+          <h3 class="bkf-rvtitle">${bkfIc('users')}<span>Traveller Details</span></h3>
+          <div class="bkf-rvright">
+            <span class="bkf-verified ${ok ? '' : 'is-warn'}">${ok ? '&#10003; Details Verified' : 'Needs attention'}</span>
+            ${edit('travellers', 'traveller details')}
+          </div>
+        </div>
+        <div class="bkf-card-body">
+          <div class="bkf-rvpax">
+            <span class="bkf-avatar">${esc(bkfInitials(p))}</span>
+            <div class="bkf-rvpax-main">
+              <div class="bkf-rvpax-name"><b>${esc(bkfName(p) || 'Traveller 1')}</b>
+                <span class="bkf-pill">Lead Traveller</span></div>
+              <div class="bkf-rvpax-meta">${meta.map(esc).join('<i aria-hidden="true">·</i>')}</div>
+              ${!ok ? `<p class="bkf-warn">Missing: ${esc(missing.join(', '))}</p>` : ''}
+              ${(email || phone) ? `<div class="bkf-rvpax-contact">
+                ${email ? `<span>${svg('mail')}${esc(email)}</span>` : ''}
+                ${phone ? `<span>${svg('phone')}${esc(phone)}</span>` : ''}
+              </div>` : ''}
+            </div>
+          </div>
+          ${others}
+        </div>
+      </section>`;
+  }
+
+  /** "Indian" reads better than "India" on a traveller line, which is what the
+   *  reference prints. Only the handful the portal actually sells to. */
+  function bkfNationalityAdj(n) {
+    const map = {
+      'India': 'Indian', 'United Arab Emirates': 'Emirati', 'Saudi Arabia': 'Saudi',
+      'Singapore': 'Singaporean', 'Thailand': 'Thai', 'United Kingdom': 'British',
+      'United States': 'American', 'Australia': 'Australian', 'Canada': 'Canadian',
+      'Germany': 'German', 'France': 'French', 'Malaysia': 'Malaysian',
+      'Sri Lanka': 'Sri Lankan', 'Nepal': 'Nepali', 'Qatar': 'Qatari', 'Oman': 'Omani',
+      'Bahrain': 'Bahraini', 'Kuwait': 'Kuwaiti', 'Maldives': 'Maldivian',
+      'Indonesia': 'Indonesian',
+    };
+    return map[n] || n;
+  }
+
+  function bkfPhone(p, ctx) {
+    const c = (ctx.contact && ctx.contact.phone) || '';
+    if (c) return c;
+    if (!p.mobile) return '';
+    const dial = String(p.countryCode || '+91 India').split(' ')[0];
+    return `${dial} ${p.mobile}`;
+  }
+
+  function bkfRvSeatsHtml(ctx, segs, edit, fold) {
+    const rows = (ctx.passengers || []).map((p, i) => {
+      const seat = (ctx.seats || [])[i];
+      const seg = segs[Math.min(i, segs.length - 1)] || segs[0];
+      if (!seat || !seg) return '';
+      return `
+        <div class="bkf-row">
+          <div class="bkf-row-lead">${bkfLogo(seg)}
+            <div><b>${esc(seg.origin.code)} <span aria-hidden="true">&#8594;</span> ${esc(seg.destination.code)}</b>
+              <span>${esc(bkfDate(seg.date))} &middot; ${esc([seg.airline, seg.flightNumber].filter(Boolean).join(' '))}</span></div>
+          </div>
+          <div class="bkf-row-facts">
+            <div><span>Seat</span><b class="is-seat">${esc(seat.id)}</b></div>
+            <div><span>Type</span><b>${esc(rvSeatType(seat) || '—')}</b></div>
+          </div>
+          ${edit('seats', 'seats')}
+        </div>`;
+    }).filter(Boolean).join('');
+    if (!rows) return '';
+    return `
+      <section class="bkf-card bkf-rvcard" data-fold="seats">
+        <div class="bkf-card-head">
+          <h3 class="bkf-rvtitle">${bkfIc('seat')}<span>Seats</span></h3>
+          <div class="bkf-rvright">${fold('seats')}</div>
+        </div>
+        <div class="bkf-card-body bkf-rows">${rows}</div>
+      </section>`;
+  }
+
+  function bkfRvAddonsHtml(ctx, segs, edit, fold) {
+    const all = ctx.addons || [];
+    if (!all.length) return '';
+    const scope = i => {
+      const who = i == null ? null : Number(i);
+      if (who == null) return segs.length === 1 && segs[0]
+        ? `${segs[0].origin.code} → ${segs[0].destination.code}` : 'All Flights';
+      const p = (ctx.passengers || [])[who] || {};
+      return [p.first, p.last].filter(Boolean).join(' ') || `Traveller ${who + 1}`;
+    };
+    const groups = [
+      ['baggage', 'Baggage', 'bag'],
+      ['meal', 'Meals', 'meal'],
+      ['other', 'Other Add-ons', 'shield'],
+    ];
+    const rows = groups.map(([key, label, ic]) => {
+      const mine = all.filter(a => (key === 'other')
+        ? (a.group !== 'baggage' && a.group !== 'meal')
+        : a.group === key);
+      if (!mine.length) return '';
+      const sum = mine.reduce((t, a) => t + Number(a.price || 0), 0);
+      return `
+        <div class="bkf-row">
+          <div class="bkf-row-lead">${bkfIc(ic)}
+            <div><b>${esc(label)}</b>
+              <span>${mine.map(a => `${esc(a.name)} (${esc(scope(a.passengerIndex))})`).join(', ')}</span></div>
+          </div>
+          <div class="bkf-row-amt">${sum ? esc(money(sum)) : 'Included'}</div>
+          ${edit('addons', 'add-ons')}
+        </div>`;
+    }).filter(Boolean).join('');
+    if (!rows) return '';
+    return `
+      <section class="bkf-card bkf-rvcard" data-fold="addons">
+        <div class="bkf-card-head">
+          <h3 class="bkf-rvtitle">${bkfIc('bag')}<span>Add-ons</span></h3>
+          <div class="bkf-rvright">${fold('addons')}</div>
+        </div>
+        <div class="bkf-card-body bkf-rows">${rows}</div>
+      </section>`;
+  }
+
+  function bkfRvContactHtml(ctx, edit) {
+    const p = (ctx.passengers || [])[0] || {};
+    const c = ctx.contact || {};
+    const email = c.email || p.email || '';
+    const phone = bkfPhone(p, ctx);
+    if (!email && !phone) return '';
+    return `
+      <section class="bkf-card bkf-rvcard">
+        <div class="bkf-card-head">
+          <h3 class="bkf-rvtitle">${bkfIc('phone')}<span>Contact Details</span></h3>
+          <div class="bkf-rvright">${edit('travellers', 'contact details')}</div>
+        </div>
+        <div class="bkf-card-body">
+          <div class="bkf-contact">
+            ${email ? `<div><span>Email</span><b>${esc(email)}</b></div>` : ''}
+            ${phone ? `<div><span>Mobile</span><b>${esc(phone)}</b></div>` : ''}
+          </div>
+          <p class="bkf-okline">&#10003; We will send booking updates on this contact</p>
+        </div>
+      </section>`;
+  }
+
+  /* The app's own rules, not invented ones: the six-month passport rule and
+     the 24-hour cancellation window are both enforced elsewhere in this
+     codebase, and the fare-rules line restates what the add-ons step says. */
+  function bkfRvInfoHtml(ctx) {
+    const intl = ctx.item && typeof BookingApi !== 'undefined' && BookingApi.isInternational
+      ? BookingApi.isInternational(ctx.item) : false;
+    const items = [
+      'Names must match government-issued ID proof.',
+      'Check-in baggage allowance and fare rules vary by airline.',
+    ];
+    if (intl) items.push('Passports must be valid for at least six months from the date of travel.');
+    items.push('You can cancel within 24 hours of booking for eligible fares.');
+    items.push('By continuing, you agree to our <a href="#" data-bkf-terms="terms">Terms &amp; Conditions</a> and <a href="#" data-bkf-terms="privacy">Privacy Policy</a>.');
+    return `
+      <section class="bkf-card bkf-rvcard">
+        <div class="bkf-card-head">
+          <h3 class="bkf-rvtitle">${bkfIc('info')}<span>Important Information</span></h3>
+        </div>
+        <div class="bkf-card-body">
+          <ul class="bkf-info-list">${items.map((t, i) =>
+            `<li>${i === items.length - 1 ? t : esc(t)}</li>`).join('')}</ul>
+        </div>
+      </section>`;
+  }
+
+  /* ---- shared mount: collapsible cards, on Review and on the fare rail --- */
+  function bkfWireFolds(scope, ctx) {
+    if (!scope) return;
+    if (!ctx.bkfShut) ctx.bkfShut = {};
+    scope.querySelectorAll('[data-bkf-fold]').forEach(btn => {
+      const key = btn.dataset.bkfFold;
+      const card = btn.closest('.bkf-rvcard') || btn.closest('.bk-price');
+      if (!card) return;
+      const body = card.querySelector('.bkf-card-body, .bkf-fare-body');
+      if (ctx.bkfShut[key]) {
+        card.classList.add('is-shut');
+        if (body && card.classList.contains('bk-price')) body.style.display = 'none';
+      }
+      btn.addEventListener('click', () => {
+        const shut = !ctx.bkfShut[key];
+        ctx.bkfShut[key] = shut;
+        card.classList.toggle('is-shut', shut);
+        if (body && card.classList.contains('bk-price')) body.style.display = shut ? 'none' : '';
+        btn.setAttribute('aria-label', shut ? 'Expand section' : 'Collapse section');
+      });
+    });
+  }
+
 
   /* =====================================================================
      SHARED STEP — payment (simulated)
@@ -951,7 +2016,11 @@ const BookingProducts = (function () {
             passengers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
               title: p.title || null,
-              first_name: p.first,
+              /* The API carries no middle name (customer_booking.py has
+                 first_name/last_name only), and an airline's given-name field
+                 is where a middle name goes on a ticket. With none typed this
+                 is byte-identical to what it always sent. */
+              first_name: [p.first, p.middle].filter(Boolean).join(' '),
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,
@@ -979,7 +2048,11 @@ const BookingProducts = (function () {
             guests: (ctx.passengers || []).map((p, i) => ({
               guest_type: String(p.kind || 'Adult').toLowerCase() === 'child' ? 'child' : 'adult',
               title: p.title || null,
-              first_name: p.first,
+              /* The API carries no middle name (customer_booking.py has
+                 first_name/last_name only), and an airline's given-name field
+                 is where a middle name goes on a ticket. With none typed this
+                 is byte-identical to what it always sent. */
+              first_name: [p.first, p.middle].filter(Boolean).join(' '),
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,
@@ -1000,7 +2073,11 @@ const BookingProducts = (function () {
             travellers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
               title: p.title || null,
-              first_name: p.first,
+              /* The API carries no middle name (customer_booking.py has
+                 first_name/last_name only), and an airline's given-name field
+                 is where a middle name goes on a ticket. With none typed this
+                 is byte-identical to what it always sent. */
+              first_name: [p.first, p.middle].filter(Boolean).join(' '),
               last_name: p.last,
               gender: p.gender || null,
               date_of_birth: p.dob || null,
@@ -1026,7 +2103,7 @@ const BookingProducts = (function () {
   function confirmationStep() {
     return {
       id: 'done',
-      label: 'Confirmed',
+      label: 'Confirmation',
       hideSummary: true,
       hideBack: true,
       nextLabel: 'Done',
@@ -1113,7 +2190,13 @@ const BookingProducts = (function () {
      ===================================================================== */
   function addonTotal(ctx) {
     const pax = Math.max(1, ctx.paxCount || 1);
-    return ctx.addons.reduce((sum, a) => sum + (a.price || 0) * (a.per === 'passenger' ? pax : 1), 0);
+    /* An extra bought for ONE named traveller is charged once — the same rule
+       customer_pricing_service.price_addons applies, so the local estimate and
+       the server's quote cannot disagree about it. */
+    return ctx.addons.reduce((sum, a) => {
+      const qty = (a.per === 'passenger' && a.passengerIndex == null) ? pax : 1;
+      return sum + (a.price || 0) * qty;
+    }, 0);
   }
 
   function flightPrice(ctx) {
@@ -1206,6 +2289,10 @@ const BookingProducts = (function () {
     travellersStep, addonsStep, summaryStep, paymentStep, confirmationStep,
     readTravellersInto: readInto,
     addonTotal, nightsBetween,
+    /* The flight reference screens, used by booking-flow.js (the itinerary
+       card and the CTA arrow) and booking-flows.js (the rail and action bar). */
+    svg, itineraryHtml, fareHtml: bkfFareHtml, footHtml: bkfFootHtml, bkfDate,
+    seatTypeLabel: rvSeatType, wireFolds: bkfWireFolds,
     flightPrice, hotelPrice, cruisePrice, packagePrice, visaPrice,
     PAY_METHODS,
   };

@@ -29,7 +29,11 @@
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
 <link rel="stylesheet" href="assets/css/main.css?v=20260824ic9">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260825h1">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260825a">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
+<!-- The flight booking screens, built to the supplied reference. Every rule
+     inside is scoped to .bk-sheet.is-flight, so the other four products keep
+     booking.css exactly as it is. -->
+<link rel="stylesheet" href="assets/css/booking-ref.css?v=20260826rf7">
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
 
 <!-- Loaded in <head> because the header and the card are mounted inline,
@@ -46,10 +50,17 @@
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
 <script src="assets/js/booking-card.js?v=20260825h1"></script>
-<script src="assets/js/hero-shell.js?v=20260825t2"></script>
+<script src="assets/js/hero-shell.js?v=20260826ac1"></script>
 </head>
 <body class="sp-continuation" data-sp-service="flights">
 <a href="#txResults" class="skip-link">Skip to results</a>
+
+<!-- The Account Center, so the profile chip opens it HERE instead of navigating
+     to index.html and throwing away a half-filled booking. Must load from inside
+     <body> (it injects its own markup) and BEFORE mountHeader below, which asks
+     whether AccountCenter exists to decide if the chip is a button or a link. -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/account-center.js?v=20260826ac1"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -144,10 +155,10 @@
 <script src="assets/js/booking-api.js?v=20260825a"></script>
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260824ph5a"></script>
-<script src="assets/js/booking-flow.js?v=20260825b"></script>
-<script src="assets/js/booking-products.js?v=20260825a"></script>
+<script src="assets/js/booking-flow.js?v=20260826rf8"></script>
+<script src="assets/js/booking-products.js?v=20260826rf8"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flows.js?v=20260824ph5a"></script>
+<script src="assets/js/booking-flows.js?v=20260826rf8"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search
      panel, so a second set of criteria controls below the fold would be two
      places to type the same trip into. search-widgets.js is loaded in <head>,
