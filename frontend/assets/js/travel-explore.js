@@ -25,6 +25,9 @@ const TravelExplore = (function () {
        lives in flight-filters.js instead — one place that owns what a filter is,
        rather than a named Set here per filter that ever gets added. */
     q: '', sort: 'best', shown: PAGE_SIZE,
+    /* Hotels page out of the flights page's way: two results grids on two
+       pages, each with its own sort and its own paging cursor. */
+    hotelSort: 'recommended', hotelShown: PAGE_SIZE,
     /* Step 1 of the booking journey. These are carried into the flow so the
        traveller forms already know how many people to ask about — nobody
        should have to say "2 adults" twice. */
@@ -415,63 +418,155 @@ const TravelExplore = (function () {
     return out;
   }
 
-  function renderHotels(all) {
-    const el = $('txHotelGrid');
-    if (!el) return;
-    allHotels = all;
-    const dest = state.dest || '';
-    const priced = state.priceRange && state.priceRange !== 'any';
-    const rows = hotelsFiltered(all);
+  /** Feed the panel the searchable set and repaint the sort menu. Both come
+   *  from the SAME rows, so a sort whose field nothing carries is never
+   *  offered — the same arrangement the flights page uses. */
+  function renderHotelFilters() {
+    if (typeof HotelFilters === 'undefined') return;
+    HotelFilters.setRows(hotelsFiltered(allHotels));
+    renderHotelSortOptions();
+  }
 
-    const head = $('txHotelsHead');
-    if (head) head.textContent = dest ? `Stays in ${dest}` : 'Hotels near the airport';
+  function renderHotelSortOptions() {
+    const sel = $('txSort');
+    if (!sel || typeof HotelFilters === 'undefined') return;
+    const opts = HotelFilters.availableSorts();
+    if (!opts.some(o => o.id === state.hotelSort)) state.hotelSort = HotelFilters.DEFAULT_SORT;
+    sel.innerHTML = opts.map(o =>
+      `<option value="${esc(o.id)}"${o.id === state.hotelSort ? ' selected' : ''}>${esc(o.label)}</option>`
+    ).join('');
+  }
 
-    if (!rows.length) {
-      catalogue.hotel = [];
-      /* Say which filter emptied the list. "No results" leaves the traveller
-         guessing whether it was the city or the price band. */
-      const because = dest && priced ? `in ${esc(dest)} in that price range`
-                    : dest ? `in ${esc(dest)}`
-                    : 'in that price range';
-      el.innerHTML = `<div class="tx-empty">
-        <b>No stays ${because}</b>
-        Try another destination or a wider price range, or browse everything we do have.
-        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllHotels">Show all hotels</button>
-      </div>`;
-      const btn = $('txShowAllHotels');
-      if (btn) btn.addEventListener('click', () => {
-        state.dest = '';
-        state.priceRange = 'any';
-        state.seededFromUrl = false;
-        if (typeof HotelSearch !== 'undefined') HotelSearch.mount();
-        renderHotels(all);
-      });
-      return;
-    }
+  function hotelCard(h) {
+    /* Distance is optional on the API row, so the badge is too — an empty
+       "km from airport" is worse than no badge. */
+    const badge = h.distanceKm != null
+      ? `<span class="tx-badge">${esc(h.distanceKm)} km from airport</span>` : '';
+    const rating = h.guestRating != null
+      ? `<span class="tx-guest-rating">${esc(h.guestRating.toFixed(1))} Guest rating</span>` : '';
+    const price = h.pricePerNight != null
+      ? `<div class="tx-price"><span>per night</span><b>${esc(money(h.pricePerNight))}</b><i>+ taxes &amp; fees</i></div>`
+      : `<div class="tx-price"><span>per night</span><b>Rate on request</b></div>`;
+    /* The free-cancellation badge is shown only when the policy text actually
+       says so — classified by the same reader the filter uses, so the badge and
+       the filter can never disagree. */
+    const cancelKey = typeof HotelFilters !== 'undefined' ? HotelFilters.cancellationOf(h) : null;
+    const cancelBadge = cancelKey && cancelKey !== 'non-refundable'
+      ? `<span class="tx-chip is-good">${esc(HotelFilters.cancellationLabel(cancelKey))}</span>` : '';
 
-    catalogue.hotel = rows;
-    el.innerHTML = rows.map(h => `<article class="tx-card" data-hotel-card="${esc(h.id)}">
-      <div class="tx-media">${hotelImage(h)}
-        <span class="tx-badge">${esc(h.distanceKm)} km from airport</span>
-      </div>
+    return `<article class="tx-card" data-hotel-card="${esc(h.id)}">
+      <div class="tx-media">${hotelImage(h)}${badge}</div>
       <div class="tx-body">
         <h3 class="tx-title">${esc(h.name)}</h3>
-        <div class="tx-stars">${starRow(h.stars)}
-          ${h.guestRating != null ? `<span class="tx-guest-rating">${esc(h.guestRating.toFixed(1))} Guest rating</span>` : ''}
-        </div>
+        <div class="tx-stars">${starRow(h.stars)}${rating}</div>
         <p class="tx-sub">${esc(h.location)}</p>
-        <div class="tx-chips">${h.amenities.map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}</div>
+        <div class="tx-chips">
+          ${cancelBadge}
+          ${(h.amenities || []).map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}
+        </div>
         ${h.cancellationPolicy ? `<p class="tx-cancel-note">${esc(h.cancellationPolicy)}</p>` : ''}
         <div class="tx-foot">
-          <div class="tx-price"><span>per night</span><b>${esc(money(h.pricePerNight))}</b><i>+ taxes &amp; fees</i></div>
+          ${price}
           <div class="tx-card-actions">
             <button type="button" class="tx-btn tx-btn-ghost" data-tx-hotel-details="${esc(h.id)}">View Details</button>
             <button type="button" class="tx-btn tx-btn-primary" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Select Room</button>
           </div>
         </div>
       </div>
-    </article>`).join('');
+    </article>`;
+  }
+
+  function renderHotels(all) {
+    const el = $('txHotelGrid');
+    if (!el) return;
+    allHotels = all;
+    const dest = state.dest || '';
+
+    const head = $('txHotelsHead');
+    if (head) head.textContent = dest ? `Stays in ${dest}` : 'Hotels near the airport';
+
+    /* Two stages, and the difference matters for the copy below. `searched` is
+       what the destination and price band left; `found` is what the sidebar
+       then allowed. An empty `searched` means the search found nothing; an
+       empty `found` means the filters did, and those need different buttons. */
+    const searched = hotelsFiltered(all);
+    const found = (typeof HotelFilters !== 'undefined')
+      ? HotelFilters.apply(searched)
+      : searched;
+    const page = found.slice(0, state.hotelShown);
+
+    const line = $('txCount');
+    if (line) {
+      line.innerHTML = found.length
+        ? `Showing <b>${page.length}</b> of <b>${found.length}</b> ${found.length === 1 ? 'stay' : 'stays'}`
+        : '';
+    }
+
+    /* Only the rendered page is handed to the booking layer, matching what a
+       Select Room click can actually reach. */
+    catalogue.hotel = page;
+
+    if (!page.length) {
+      el.innerHTML = searched.length ? emptyByFilters() : emptyBySearch(dest);
+      wireHotelEmptyState(all);
+      return;
+    }
+
+    el.innerHTML = page.map(hotelCard).join('');
     armIcons(el);
+
+    const more = $('txHotelMore');
+    if (more) {
+      const rest = found.length - page.length;
+      more.style.display = rest > 0 ? '' : 'none';
+      more.textContent = rest > 0 ? `Show ${Math.min(rest, PAGE_SIZE)} more` : '';
+    }
+    writeUrl();
+  }
+
+  /** The filters emptied it — the search itself found properties. */
+  function emptyByFilters() {
+    return `<div class="tx-empty">
+      <b>No stays match those filters</b>
+      Every property the search found was ruled out by the filters currently on.
+      Clear them to see the full list again.
+      <div class="tx-empty-acts">
+        <button type="button" class="tx-btn tx-btn-primary" data-tx-hotel-clear>Clear filters</button>
+      </div>
+    </div>`;
+  }
+
+  /** The search itself found nothing, so clearing filters would not help. */
+  function emptyBySearch(dest) {
+    const because = dest ? `in ${esc(dest)}` : 'in that price range';
+    return `<div class="tx-empty">
+      <b>No stays ${because}</b>
+      Try another destination or a wider price range, or browse everything we do have.
+      <div class="tx-empty-acts">
+        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllHotels">Show all hotels</button>
+      </div>
+    </div>`;
+  }
+
+  function wireHotelEmptyState(all) {
+    const clear = $('txHotelGrid').querySelector('[data-tx-hotel-clear]');
+    if (clear) clear.addEventListener('click', () => {
+      if (typeof HotelFilters !== 'undefined') HotelFilters.clear();
+      state.hotelShown = PAGE_SIZE;
+      renderHotelFilters();
+      renderHotels(all);
+    });
+    const showAll = $('txShowAllHotels');
+    if (showAll) showAll.addEventListener('click', () => {
+      state.dest = '';
+      state.priceRange = 'any';
+      state.seededFromUrl = false;
+      if (typeof HotelFilters !== 'undefined') HotelFilters.clear();
+      state.hotelShown = PAGE_SIZE;
+      if (typeof HotelSearch !== 'undefined') HotelSearch.mount();
+      renderHotelFilters();
+      renderHotels(all);
+    });
   }
 
   /* ---------------------------------------------------------------------
@@ -664,7 +759,15 @@ const TravelExplore = (function () {
       state.rooms = req.rooms;
       state.guests = req.adults + req.children;
       state.priceRange = req.priceRange;
-      renderHotels(allHotels.length ? allHotels : rows);
+      /* A NEW SEARCH CLEARS THE FILTERS. They were chosen against a different
+         destination — a neighbourhood in Hyderabad means nothing in Goa, and a
+         price band from one city would hide every result in another. This is
+         the one case that resets them; sorting and paging leave them alone. */
+      if (typeof HotelFilters !== 'undefined') HotelFilters.clear();
+      state.hotelShown = PAGE_SIZE;
+      const rowsNow = allHotels.length ? allHotels : rows;
+      renderHotelFilters();
+      renderHotels(rowsNow);
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
@@ -736,6 +839,20 @@ const TravelExplore = (function () {
        f_* by the module, so nothing here has to know what they are or how many
        there now are — that is the point of asking it rather than listing them. */
     if (typeof FlightFilters !== 'undefined') FlightFilters.writeParams(p);
+
+    /* The hotels page carries its own criteria and its own h_* filters. Both
+       pages call one writeUrl so "what is in the address bar" is one answer. */
+    if (document.body.dataset.spService === 'hotels') {
+      Object.assign(p, {
+        trip: undefined, from: undefined, to: undefined, ret: undefined,
+        legs: undefined, cabin: undefined,
+        dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
+        rooms: state.rooms, guests: state.guests,
+        price: state.priceRange && state.priceRange !== 'any' ? state.priceRange : undefined,
+      });
+      if (typeof HotelFilters !== 'undefined') HotelFilters.writeParams(p);
+    }
+
     const qs = new URLSearchParams(
       Object.entries(p).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== 0));
     history.replaceState(null, '', `${location.pathname}?${qs.toString()}`);
@@ -828,12 +945,36 @@ const TravelExplore = (function () {
       });
     }
 
+    /* The hotels sidebar. Same engine, its own definitions and its own h_*
+       parameters, so the two pages cannot read each other's URL state. */
+    const hotelsPage = document.body.dataset.spService === 'hotels';
+    if (hotelsPage && typeof HotelFilters !== 'undefined') {
+      HotelFilters.mount($('txFilters'), () => {
+        state.hotelShown = PAGE_SIZE;
+        renderHotelFilters();
+        renderHotels(allHotels);
+      });
+    }
+
     const sort = $('txSort');
     if (sort) sort.addEventListener('change', () => {
+      /* Sorting NEVER resets the filters — separate state, and the spec is
+         explicit about it on both pages. */
+      if (hotelsPage) {
+        state.hotelSort = sort.value;
+        if (typeof HotelFilters !== 'undefined') HotelFilters.sort = sort.value;
+        renderHotels(allHotels);
+        return;
+      }
       state.sort = sort.value;
       if (typeof FlightFilters !== 'undefined') FlightFilters.sort = sort.value;
-      /* Filters are untouched: only the order changes. */
       renderFlights();
+    });
+
+    const hotelMore = $('txHotelMore');
+    if (hotelMore) hotelMore.addEventListener('click', () => {
+      state.hotelShown += PAGE_SIZE;
+      renderHotels(allHotels);
     });
 
     const more = $('txMore');
@@ -1017,6 +1158,10 @@ const TravelExplore = (function () {
     if (typeof FlightFilters !== 'undefined') {
       FlightFilters.readParams(name => q.get(name));
       state.sort = FlightFilters.sort;
+    }
+    if (typeof HotelFilters !== 'undefined') {
+      HotelFilters.readParams(name => q.get(name));
+      state.hotelSort = HotelFilters.sort;
     }
     const freeText = str('q', 80);
     if (freeText) {
@@ -1296,8 +1441,14 @@ const TravelExplore = (function () {
         if (state.seededFromUrl) revealResults();
       } else if (service === 'hotels') {
         const rows = await TravelData.hotels();
+        allHotels = rows;
         mountHotelSearch(rows);
+        /* Panel before grid: it derives the options and reconciles anything the
+           URL asked for against what actually came back, so the first paint of
+           the list is already the filtered one. */
+        renderHotelFilters();
         renderHotels(rows);
+        if (state.seededFromUrl) revealResults();
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
       } else if (service === 'packages') {

@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260825a">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827ff1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827fe1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="hotels">
@@ -53,9 +53,32 @@
          destination list cannot drift from what is bookable. -->
     <div class="tx-search-panel" id="txSearchPanel"></div>
 
-    <div class="tx-toolbar" id="txResults"></div>
+    <!-- Sort and the mobile filter button. The count line sits under it, the
+         same arrangement flights.html uses, so the two results pages are one
+         layout rather than two that resemble each other. -->
+    <div class="tx-toolbar" id="txResults">
+      <button type="button" class="tx-filter-toggle" id="txFilterToggle" aria-controls="txFilters">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+        Filters
+      </button>
+      <div class="tx-sort">
+        <label for="txSort">Sort by</label>
+        <!-- Options are written by the renderer from the data, so a sort whose
+             field no property carries is never offered. -->
+        <select id="txSort"></select>
+      </div>
+    </div>
 
-    <div class="tx-grid" id="txHotelGrid"></div>
+    <div class="tx-layout">
+      <!-- Filters and their counts are derived from the rows, so a new amenity
+           in the API needs no markup here. -->
+      <aside class="tx-filters" id="txFilters" aria-label="Filter hotels"></aside>
+      <div>
+        <p class="tx-count-line" id="txCount"></p>
+        <div class="tx-grid" id="txHotelGrid"></div>
+        <button type="button" class="tx-more" id="txHotelMore" style="display:none"></button>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -73,7 +96,7 @@
 <script src="assets/js/hotel-images.js?v=20260824ic9"></script>
 <!-- The airport table travel-data.js reads. Must precede it. -->
 <script src="assets/js/airports.js?v=20260825t3"></script>
-<script src="assets/js/travel-data.js?v=20260825t3"></script>
+<script src="assets/js/travel-data.js?v=20260827fe1"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
@@ -86,7 +109,11 @@
 <script src="assets/js/booking-flows.js?v=20260826rf8"></script>
 <script src="assets/js/search-widgets.js?v=20260824sw2"></script>
 <script src="assets/js/hotel-search.js?v=20260824bk9"></script>
-<script src="assets/js/travel-explore.js?v=20260827g2"></script>
+<!-- The generic filter panel, then the hotel definitions that drive it. Same
+     engine flights.html loads; only the definition list differs. -->
+<script src="assets/js/filter-engine.js?v=20260827fe1"></script>
+<script src="assets/js/hotel-filters.js?v=20260827fe1"></script>
+<script src="assets/js/travel-explore.js?v=20260827fe1"></script>
 <script src="assets/js/jp-icons.js?v=20260825a"></script>
 <script src="assets/js/service-shell.js?v=20260826ac1"></script>
 </body>

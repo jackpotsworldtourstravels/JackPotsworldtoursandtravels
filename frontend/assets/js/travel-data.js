@@ -288,14 +288,24 @@ const TravelData = (function () {
     { id: 'p7', name: 'Goa',       days: 4, priceFrom: 21900, blurb: 'North and South Goa beaches, Old Goa churches, a river cruise.' },
   ];
 
+  /** NUMBERS ARRIVE AS STRINGS. FastAPI serialises a SQL ``Numeric`` to JSON as
+   *  a quoted decimal — "12500.00", "24.0" — so every numeric field is coerced
+   *  here, at the API boundary, and nowhere else. The card's money() already
+   *  called Number() and got away with it; a range filter comparing "9600.00"
+   *  against a slider does not, and Math.min over quoted decimals is a bug
+   *  waiting for the first four-digit tariff. */
+  const dec = v => (v == null || v === '' ? undefined : Number(v));
+
   function normaliseHotel(h) {
     return {
       id: h.id, name: h.name, imageKey: h.image, stars: h.stars,
-      location: h.location, distanceKm: h.distanceKm,
-      pricePerNight: h.pricePerNight, amenities: h.amenities.slice(),
+      location: h.location,
+      distanceKm: dec(h.distanceKm),
+      pricePerNight: dec(h.pricePerNight),
+      amenities: (h.amenities || []).slice(),
       /* Only the real endpoint sends these — undefined on the sample rows,
          which the card/details renderers already treat as "not shown". */
-      guestRating: h.guest_rating != null ? Number(h.guest_rating) : undefined,
+      guestRating: dec(h.guest_rating),
       cancellationPolicy: h.cancellation_policy,
     };
   }
