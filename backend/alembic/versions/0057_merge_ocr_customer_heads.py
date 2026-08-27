@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0057_merge_ocr_and_customer_heads'
+revision: str = '0057_merge_ocr_customer_heads'
 down_revision: Union[str, None] = ('0043_passport_details', '0056_customer_package_system')
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
