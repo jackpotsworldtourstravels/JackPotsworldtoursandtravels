@@ -698,6 +698,20 @@ const TravelExplore = (function () {
   const OTHER_SERVICES = { hotels: 'hotels.html', packages: 'packages.html' };
 
   function leaveFor(kind, params) {
+    /* A GROUP DEALS ENQUIRY IS NOT A NAVIGATION, and this is the choke point
+       every non-flights submission passes through.
+
+       BookingCard holds ONE search handler and the last page to mount wins it.
+       On index.html that is app.js, which makes this same check; this page
+       registers its own, so without the check here the Hotels panel's Group
+       Deals form — which this page renders in full — would fall through to the
+       URLSearchParams below and put the enquirer's name, email and phone in a
+       query string. Two handlers, one rule, and GroupEnquiry owns both halves
+       of it so they cannot drift. */
+    if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+      GroupEnquiry.handle(params);
+      return;
+    }
     const page = OTHER_SERVICES[kind];
     if (!page) {
       if (typeof showToast === 'function') {
@@ -705,8 +719,11 @@ const TravelExplore = (function () {
       }
       return;
     }
+    /* Nested values are skipped rather than stringified — see the same filter
+       in app.js's goToSearch. An array here becomes "[object Object]". */
     const qs = new URLSearchParams(
-      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined));
+      Object.entries(params).filter(([, v]) =>
+        v !== '' && v !== null && v !== undefined && typeof v !== 'object'));
     window.location.href = `${page}?${qs.toString()}`;
   }
 

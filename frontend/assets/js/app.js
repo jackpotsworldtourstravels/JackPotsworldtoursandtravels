@@ -541,8 +541,13 @@ function takePendingSearch() {
 function goToSearch(kind, params) {
   const spec = HERO_SEARCH[kind];
   if (!spec) return;
+  /* Objects and arrays are skipped, not stringified: URLSearchParams turns one
+     into the literal text "[object Object]". Anything nested that a results
+     page genuinely needs travels as an encoded scalar beside it — `legs` for an
+     itinerary, `pax` for the per-room party. */
   const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    Object.entries(params).filter(([, v]) =>
+      v !== '' && v !== null && v !== undefined && typeof v !== 'object')
   );
   window.location.href = `${spec.page}?${qs.toString()}`;
 }

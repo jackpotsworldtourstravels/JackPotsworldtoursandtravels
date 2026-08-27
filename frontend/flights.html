@@ -28,7 +28,7 @@
      main.css's palette in booking-card.css. -->
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
 <link rel="stylesheet" href="assets/css/main.css?v=20260824ic9">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260825h1">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260827g2">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
@@ -49,7 +49,7 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260825h1"></script>
+<script src="assets/js/booking-card.js?v=20260827g2"></script>
 <script src="assets/js/hero-shell.js?v=20260826ac1"></script>
 </head>
 <body class="sp-continuation" data-sp-service="flights">
@@ -163,6 +163,10 @@
      panel, so a second set of criteria controls below the fold would be two
      places to type the same trip into. search-widgets.js is loaded in <head>,
      above, because the card's airport picker is built from it. -->
-<script src="assets/js/travel-explore.js?v=20260825t2"></script>
+<!-- This page renders the Hotels panel too, Group Deals included, so it needs
+     the enquiry seam its search handler defers to. Before travel-explore.js,
+     which is what calls it. -->
+<script src="assets/js/group-enquiry.js?v=20260827g2"></script>
+<script src="assets/js/travel-explore.js?v=20260827g2"></script>
 </body>
 </html>

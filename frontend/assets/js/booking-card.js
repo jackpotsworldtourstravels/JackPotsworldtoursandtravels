@@ -890,6 +890,29 @@ const BookingCard = (function () {
     }).filter(l => l.from && l.to);
   }
 
+  /** "2:7,2" — one room per comma, adults first then each child's age.
+   *
+   *  Same shape and the same reasoning as encodeLegs above: the rooms array is
+   *  the only nested value a hotel search carries, and URLSearchParams turns a
+   *  nested value into the string "[object Object]". That is what this used to
+   *  put in the address bar, which quietly threw away the child ages the search
+   *  will not run without — a gate that costs the traveller a decision and then
+   *  discards the answer. */
+  const encodeRooms = list =>
+    (list || []).map(r => [r.adults].concat(r.childAges || []).join(':')).join(',');
+
+  function decodeRooms(raw) {
+    return String(raw || '').split(',').filter(Boolean).map(part => {
+      const bits = part.split(':').map(n => parseInt(n, 10));
+      const ages = bits.slice(1).filter(Number.isFinite);
+      return {
+        adults: Number.isFinite(bits[0]) ? bits[0] : 2,
+        children: ages.length,
+        childAges: ages,
+      };
+    }).filter(r => r.adults > 0);
+  }
+
   /** Everything the Flights page needs to reproduce this search.
    *
    *  The party and the cabin are read the same way for all three trip types,
@@ -986,8 +1009,15 @@ const BookingCard = (function () {
       adults: t.adults,
       children: t.children,
       /* The per-room breakdown is what a hotel actually prices; the flat
-         adults/children totals above are for the results filter and the URL. */
+         adults/children totals above are for the results filter.
+
+         TWO REPRESENTATIONS, DELIBERATELY. `roomsDetail` is the array, for a
+         caller in this tab that wants the structure (the validator reads it to
+         find a missing age). `pax` is the same thing flattened, because that is
+         what a URL can carry — whoever needs the array back calls decodeRooms,
+         exactly as the Flights page does with decodeLegs. */
       roomsDetail: list,
+      pax: encodeRooms(list),
       guests: t.adults + t.children,
     });
   }
@@ -1141,6 +1171,12 @@ const BookingCard = (function () {
     const panel = root && root.querySelector('.search-panel.active');
     const kind = panel && panel.dataset.panel;
     if (!kind) return;
+
+    /* Clear FIRST, so a message from the previous attempt cannot outlive the
+       thing it was about. Switching tab or mode does not clear it, so without
+       this a Group Deals complaint stays on screen through a switch to the
+       standard flow and a search that then succeeds. */
+    clearError();
 
     const params = criteria(kind);
     const check = VALIDATORS[kind];
@@ -1665,6 +1701,10 @@ const BookingCard = (function () {
        same `legs=` parameter this card writes. One encoder, one decoder. */
     encodeLegs,
     decodeLegs,
+    /* Same pair for the hotel party, so a results page can get the per-room
+       breakdown (and the child ages) back out of the URL. */
+    encodeRooms,
+    decodeRooms,
     activateTab,
     criteria,
     flightCriteria,
