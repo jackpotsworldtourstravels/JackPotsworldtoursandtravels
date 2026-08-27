@@ -151,9 +151,14 @@ const ServiceShell = (function () {
   }
 
   function onChip() {
-    /* No dropdown component on these pages, and building one would be a fifth
-       copy of something index.html already has. The Account Center IS on the
-       landing page, so the chip goes there. */
+    /* This used to be `window.location.href = 'index.html?account=profile'`,
+       on the reasoning that building a menu here would be a fifth copy of one
+       index.html already had. True — but the fix for that is one copy every
+       page can load, not a redirect: leaving the page threw away whatever the
+       traveller had already filled in.
+
+       account-center.js is that copy. Navigate only if it is not present. */
+    if (typeof AccountCenter !== 'undefined') { AccountCenter.open('profile'); return; }
     window.location.href = 'index.html?account=profile';
   }
 

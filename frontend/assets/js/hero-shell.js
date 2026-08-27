@@ -147,15 +147,34 @@ const HeroShell = (function () {
 
     const name = session.name || 'Traveller';
     const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-    /* One chip, no dropdown: the Account Center lives on the landing page and
-       rebuilding its menu on every service page is four more copies of it. */
-    slot.innerHTML = '<a class="profile-chip" href="index.html?account=profile">'
-      + '<span class="profile-chip-avatar">' + esc(initials) + '</span>'
-      + '<span class="profile-chip-name">' + esc(name) + '</span></a>';
+    /* One chip, no dropdown. It used to be a LINK to index.html?account=profile,
+       because the Account Center only existed on the landing page — which meant
+       checking your profile mid-booking threw the booking away. It is now
+       account-center.js, loadable anywhere, so the chip opens it in place and
+       the page (and any half-filled booking on it) stays exactly as it was.
+
+       Still a link when that module is absent, so a page that has not adopted it
+       keeps the old behaviour rather than a chip that does nothing. */
+    const inPlace = typeof AccountCenter !== 'undefined';
+    const chipInner = '<span class="profile-chip-avatar">' + esc(initials) + '</span>'
+      + '<span class="profile-chip-name">' + esc(name) + '</span>';
+    slot.innerHTML = inPlace
+      ? '<button type="button" class="profile-chip" id="heroProfileChip">' + chipInner + '</button>'
+      : '<a class="profile-chip" href="index.html?account=profile">' + chipInner + '</a>';
     if (mobile) {
-      mobile.innerHTML = '<a href="index.html?account=profile">My Account</a>'
+      mobile.innerHTML = (inPlace
+          ? '<a href="#" data-acct-open="profile">My Account</a>'
+          : '<a href="index.html?account=profile">My Account</a>')
         + '<a href="my-bookings.html">My Bookings</a>';
     }
+    if (inPlace) wireAccountOpeners(slot, mobile);
+  }
+
+  /* Both openers land on the same call; nothing here navigates. */
+  function wireAccountOpeners(slot, mobile) {
+    const open = e => { e.preventDefault(); AccountCenter.open('profile'); };
+    slot.querySelector('#heroProfileChip')?.addEventListener('click', open);
+    mobile?.querySelectorAll('[data-acct-open]').forEach(a => a.addEventListener('click', open));
   }
 
   /* ---------------------------------------------------------------------

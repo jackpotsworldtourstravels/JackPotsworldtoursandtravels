@@ -34,7 +34,7 @@
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260825t2"></script>
+<script src="assets/js/hero-shell.js?v=20260826ac1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -837,7 +837,11 @@
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
 <script src="assets/js/jp-icons.js?v=20260824bk9"></script>
-<script src="assets/js/app.js?v=20260825t2"></script>
+<!-- The Account Center. Before app.js, which calls AccountCenter.configure()
+     at the end of its own load. This page keeps its static modal markup above,
+     so the module skips injecting a second copy. -->
+<script src="assets/js/account-center.js?v=20260826ac1"></script>
+<script src="assets/js/app.js?v=20260826ac1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

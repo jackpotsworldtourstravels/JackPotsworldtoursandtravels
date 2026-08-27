@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260808bk1">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260808bk1">
+<link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="activities">
@@ -55,8 +56,13 @@
 <footer class="sp-footer" id="spFooter"></footer>
 
 <script src="shared/formatters.js"></script>
+<!-- The Account Center, so the profile chip opens it HERE rather than
+     navigating to index.html and discarding whatever is in progress.
+     Loads from inside <body>: it injects its own modal markup. -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/account-center.js?v=20260826ac1"></script>
 <script src="assets/js/auth.js?v=20260808ic2"></script>
 <script src="assets/js/jp-icons.js?v=20260808bk1"></script>
-<script src="assets/js/service-shell.js?v=20260808bk1"></script>
+<script src="assets/js/service-shell.js?v=20260826ac1"></script>
 </body>
 </html>
