@@ -325,13 +325,52 @@ const TravelData = (function () {
   /* -------------------------------------------------------------------------
      Fetch — used only once a source is switched to live.
      ---------------------------------------------------------------------- */
+  /** How long a catalogue request gets before it is abandoned. A results page
+   *  that spins forever is indistinguishable from one that is broken, and the
+   *  traveller cannot tell which without being told. */
+  const REQUEST_TIMEOUT_MS = 12000;
+
+  /** Errors carry a `kind` so the page can say WHICH thing went wrong —
+   *  "no connection" and "the server refused" need different words and
+   *  different advice, and a single "something went wrong" gives neither. */
+  function dataError(kind, message, status) {
+    const err = new Error(message);
+    err.kind = kind;              // 'timeout' | 'network' | 'http'
+    if (status != null) err.status = status;
+    return err;
+  }
+
   async function getJson(url, params) {
     const qs = params && Object.keys(params).length
       ? '?' + new URLSearchParams(params).toString() : '';
     const base = (typeof API_BASE === 'string') ? API_BASE : '';
-    const res = await fetch(`${base}${url}${qs}`, { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`${url} responded ${res.status}`);
-    return res.json();
+
+    /* AbortController rather than a Promise.race: race leaves the request
+       running and its response still lands, which on a slow connection means a
+       "timed out" page quietly repopulating half a minute later. */
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), REQUEST_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(`${base}${url}${qs}`, {
+        headers: { Accept: 'application/json' }, signal: ctl.signal,
+      });
+    } catch (err) {
+      /* An abort we caused is a timeout; anything else thrown by fetch is the
+         connection itself — DNS, offline, CORS, a refused socket. */
+      throw ctl.signal.aborted
+        ? dataError('timeout', `${url} did not answer within ${REQUEST_TIMEOUT_MS / 1000}s`)
+        : dataError('network', `${url} could not be reached`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!res.ok) throw dataError('http', `${url} responded ${res.status}`, res.status);
+    try {
+      return await res.json();
+    } catch {
+      throw dataError('http', `${url} did not return JSON`, res.status);
+    }
   }
 
   /** Resolve a source: live when switched on, otherwise the sample rows.

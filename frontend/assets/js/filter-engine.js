@@ -497,8 +497,30 @@ const FilterEngine = (function () {
       document.addEventListener('pointercancel', stopDrag);
     }
 
+    /** Placeholder groups while the catalogue is still in flight.
+     *
+     *  The sidebar is as tall as the results and arrives at the same moment, so
+     *  a blank one beside a grid of card skeletons is the half of the page that
+     *  still jumps. Widths vary per row because a column of identical stubs is
+     *  the one thing a real filter list never looks like. */
+    function showSkeleton(groups) {
+      if (!host) return;
+      const widths = [78, 62, 88, 54, 70];
+      const group = (i) => `<div class="ff-sk-group">
+        <div class="ff-sk-head tx-sk-line"></div>
+        ${Array.from({ length: 3 }, (_, j) => `<div class="ff-sk-row">
+          <span class="ff-sk-box"></span>
+          <span class="ff-sk-txt" style="max-width:${widths[(i * 3 + j) % widths.length]}%"></span>
+        </div>`).join('')}
+      </div>`;
+      host.classList.add('ff-scope');
+      host.innerHTML = `<span class="sr-only" role="status">Loading filters…</span>`
+        + Array.from({ length: groups || 4 }, (_, i) => group(i)).join('');
+    }
+
     /* ------------------------------------------------------------------ api */
     return {
+      showSkeleton,
       mount(el, cb) {
         host = typeof el === 'string' ? document.getElementById(el) : el;
         onChange = cb;

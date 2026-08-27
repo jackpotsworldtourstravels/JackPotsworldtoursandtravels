@@ -418,6 +418,61 @@ const TravelExplore = (function () {
     return out;
   }
 
+  /* ---------------------------------------------------------------------
+     The sticky search summary
+
+     WHY A SEPARATE BAR AND NOT THE PANEL PINNED. The search panel is a full
+     form — destination, two calendars, a rooms-and-guests popover, a submit —
+     and pinning it would hold about 180px of the viewport open on every scroll,
+     on the page whose whole job is a long list. So the panel stays where it is
+     and this appears once it has scrolled away: the criteria as one line, plus
+     the way back to the form that owns them. Edit scrolls to the panel rather
+     than duplicating its controls, which is what stops there being two places
+     to type a destination and two answers to what was searched.
+     --------------------------------------------------------------------- */
+  function hotelSummaryBits() {
+    const nights = (typeof SearchWidgets !== 'undefined')
+      ? SearchWidgets.nightsBetween(state.checkIn, state.checkOut) : 0;
+    const bits = [];
+    if (state.dest) bits.push(state.dest);
+    if (state.checkIn && state.checkOut) {
+      bits.push(`${fmtDate(state.checkIn)} – ${fmtDate(state.checkOut)}`);
+      if (nights) bits.push(`${nights} ${nights === 1 ? 'night' : 'nights'}`);
+    }
+    const rooms = Number(state.rooms) || 1;
+    const guests = Number(state.guests) || 1;
+    bits.push(`${rooms} ${rooms === 1 ? 'room' : 'rooms'}`);
+    bits.push(`${guests} ${guests === 1 ? 'guest' : 'guests'}`);
+    return bits;
+  }
+
+  function renderHotelSummary() {
+    const bar = $('txSummaryBar');
+    if (!bar) return;
+    bar.innerHTML = `
+      <div class="tx-summary-in">
+        <p class="tx-summary-text">${hotelSummaryBits().map(b => `<span>${esc(b)}</span>`).join('')}</p>
+        <button type="button" class="tx-btn tx-btn-primary tx-summary-edit" data-tx-edit-search>
+          Edit search
+        </button>
+      </div>`;
+  }
+
+  /** Show the bar only once the panel it summarises is off screen. An
+   *  IntersectionObserver rather than a scroll handler: no work per frame, and
+   *  it is correct on a page whose height changes as filters run. */
+  function watchHotelSummary() {
+    const panel = $('txSearchPanel');
+    const bar = $('txSummaryBar');
+    if (!panel || !bar || typeof IntersectionObserver === 'undefined') return;
+    new IntersectionObserver(([entry]) => {
+      bar.classList.toggle('is-shown', !entry.isIntersecting);
+      /* Hidden from assistive tech as well as from view — a duplicate summary
+         in the tab order is noise while the real form is still on screen. */
+      bar.setAttribute('aria-hidden', String(entry.isIntersecting));
+    }, { rootMargin: '-80px 0px 0px 0px', threshold: 0 }).observe(panel);
+  }
+
   /** Feed the panel the searchable set and repaint the sort menu. Both come
    *  from the SAME rows, so a sort whose field nothing carries is never
    *  offered — the same arrangement the flights page uses. */
@@ -768,6 +823,7 @@ const TravelExplore = (function () {
       const rowsNow = allHotels.length ? allHotels : rows;
       renderHotelFilters();
       renderHotels(rowsNow);
+      renderHotelSummary();
       $('txResults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
@@ -996,10 +1052,12 @@ const TravelExplore = (function () {
         renderFilters(); renderFlights();
         return;
       }
-      /* "Modify search" on the empty state: the card at the top of the page IS
-         the search form, so this puts them back in it rather than navigating. */
-      if (e.target.closest('[data-tx-modify]')) {
-        const dock = $('heroSearchDock');
+      /* "Edit search" on the sticky bar and "Modify search" on the empty and
+         error states are one action: return to the form that owns the criteria.
+         The hotels page keeps its form in #txSearchPanel, the flights page in
+         the hero card. */
+      if (e.target.closest('[data-tx-modify], [data-tx-edit-search]')) {
+        const dock = $('txSearchPanel') || $('heroSearchDock');
         if (dock) {
           const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
           dock.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
@@ -1300,6 +1358,12 @@ const TravelExplore = (function () {
    *  Cruises and packages are still simple stacks: their cards are image tiles
    *  with a caption, so a grey rectangle is already very nearly the shape. */
   function showSkeleton(rows) {
+    /* The sidebar too, not just the list — see FilterEngine.showSkeleton. */
+    const panel = (document.body.dataset.spService === 'hotels')
+      ? (typeof HotelFilters !== 'undefined' ? HotelFilters : null)
+      : (typeof FlightFilters !== 'undefined' ? FlightFilters : null);
+    if (panel && $('txFilters')) panel.showSkeleton();
+
     if ($('txFlightList')) { showFlightSkeleton(rows); return; }
 
     const hotelGrid = $('txHotelGrid');
@@ -1420,6 +1484,13 @@ const TravelExplore = (function () {
        real endpoint will sit behind, and an empty grid reads as "nothing
        here" rather than "not yet". */
     showSkeleton();
+    await loadCatalogue(service);
+  }
+
+  /** Fetch and render one product's catalogue. Separate from init() so the
+   *  error state's "Try again" can run it again without re-seeding the URL or
+   *  binding a second set of listeners to every control on the page. */
+  async function loadCatalogue(service) {
     try {
       if (service === 'flights') {
         mountSearch();
@@ -1448,6 +1519,8 @@ const TravelExplore = (function () {
            the list is already the filtered one. */
         renderHotelFilters();
         renderHotels(rows);
+        renderHotelSummary();
+        watchHotelSummary();
         if (state.seededFromUrl) revealResults();
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
@@ -1457,13 +1530,73 @@ const TravelExplore = (function () {
         renderPackages(rows);
       }
     } catch (err) {
-      const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
-      if (host) {
-        host.innerHTML = `<div class="tx-empty"><b>We could not load this just now</b>
-          Please refresh the page, or try again in a moment.</div>`;
-      }
-      console.error('[explore] load failed', service, err);
+      showLoadError(err, service);
     }
+  }
+
+  /* ---------------------------------------------------------------------
+     When the catalogue does not arrive
+
+     WHY THIS IS FOUR MESSAGES AND NOT ONE. "Something went wrong" tells the
+     traveller nothing they can act on. Whether the connection dropped, the
+     request took too long, or the server answered with an error decides
+     whether retrying is worth their time — and only the first is something
+     they can fix themselves. TravelData tags the error with `kind`; this
+     turns each into words plus the one or two buttons that actually help.
+     --------------------------------------------------------------------- */
+  const LOAD_ERRORS = {
+    network: {
+      icon: 'M1 1l22 22M16.7 16.7A10.9 10.9 0 0 0 12 20M5 12.5a10.9 10.9 0 0 1 4-2.4M2 8.8a16 16 0 0 1 5-3.3M20 5.5a16 16 0 0 1 2 3.3',
+      title: 'No connection',
+      body: 'Your device appears to be offline, so we could not reach our servers. Check the connection and try again.',
+    },
+    timeout: {
+      icon: 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
+      title: 'This is taking longer than it should',
+      body: 'The request timed out before anything came back. It is usually a passing thing — trying again often works.',
+    },
+    http: {
+      icon: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+      title: 'We could not load these results',
+      body: 'Our servers answered with an error. Nothing is wrong with your search — please try again in a moment.',
+    },
+  };
+
+  function errorStateHtml(kind, opts) {
+    const e = LOAD_ERRORS[kind] || LOAD_ERRORS.http;
+    const modify = (opts && opts.modify) ? `
+      <button type="button" class="tx-btn tx-btn-ghost" data-tx-modify>Modify search</button>` : '';
+    return `<div class="tx-state" role="alert">
+      <svg class="tx-state-art" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="${e.icon}"/>
+      </svg>
+      <b>${esc(e.title)}</b>
+      <p>${esc(e.body)}</p>
+      <div class="tx-empty-acts">
+        <button type="button" class="tx-btn tx-btn-primary" data-tx-retry>Try again</button>
+        ${modify}
+      </div>
+    </div>`;
+  }
+
+  function showLoadError(err, service) {
+    const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
+    /* Offline is worth trusting over the thrown kind: a browser that knows it
+       has no network says so more reliably than a failed fetch can. */
+    const kind = (navigator.onLine === false) ? 'network' : ((err && err.kind) || 'http');
+    if (host) {
+      host.innerHTML = errorStateHtml(kind, { modify: service === 'flights' || service === 'hotels' });
+      const retry = host.querySelector('[data-tx-retry]');
+      if (retry) retry.addEventListener('click', () => {
+        /* `ready` is what stops init() running twice; reload the catalogue
+           directly instead, so a retry does not re-bind every listener. */
+        showSkeleton();
+        loadCatalogue(service);
+      });
+    }
+    /* Still logged: a 500 is our problem to find, whatever the page says. */
+    console.error('[explore] load failed', service, err);
   }
 
   return { init, state };

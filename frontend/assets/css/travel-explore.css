@@ -178,13 +178,54 @@
 .tx-filters::-webkit-scrollbar { width: 8px; }
 .tx-filters::-webkit-scrollbar-thumb { background: var(--tx-line); border-radius: 99px; }
 .tx-filters::-webkit-scrollbar-track { background: transparent; }
-.tx-fgroup + .tx-fgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--tx-line); }
-.tx-fgroup h4 { margin: 0 0 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--tx-muted); }
-.tx-check { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; color: var(--tx-ink); cursor: pointer; }
-.tx-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--tx-accent); cursor: pointer; flex: none; }
-.tx-check .tx-count { margin-left: auto; font-size: 12px; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
-.tx-clear { margin-top: 16px; width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--tx-line); background: transparent; color: var(--tx-ink); font-weight: 700; font-size: 13.5px; font-family: inherit; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
-.tx-clear:hover { border-color: var(--tx-accent); color: var(--tx-accent); }
+/* .tx-fgroup, .tx-check and .tx-clear were the hand-written filter markup that
+   filter-engine.js replaced. Nothing renders those class names any more, so
+   the rules are gone with them rather than left to be inherited by accident. */
+
+/* --------------------------------------------------------------------------
+   Sticky search summary (hotels)
+
+   Sits under .sp-header, which is itself sticky at top:0 and 72px tall, and
+   below it in the stack so a scrolled page never shows the two overlapping.
+   Collapsed to zero height until shown, so it takes no space and cannot be
+   tabbed into while the real form is still on screen.
+   -------------------------------------------------------------------------- */
+.tx-summary-bar {
+  position: sticky; top: 72px; z-index: 40;
+  margin: 0 0 18px;
+  max-height: 0; overflow: hidden; opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height .24s ease, opacity .2s ease, transform .24s ease;
+  pointer-events: none;
+}
+.tx-summary-bar.is-shown {
+  max-height: 90px; opacity: 1; transform: none; pointer-events: auto;
+}
+.tx-summary-in {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--tx-surface); border: 1px solid var(--tx-line);
+  box-shadow: var(--tx-shadow-lg);
+}
+.tx-summary-text {
+  margin: 0; flex: 1; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0;
+  font-size: 13.5px; font-weight: 700; color: var(--tx-ink);
+}
+/* Middot separators drawn in CSS, so the text itself stays a plain list of
+   values that a screen reader reads without punctuation between every word. */
+.tx-summary-text span + span::before {
+  content: '·'; margin: 0 9px; color: var(--tx-muted); font-weight: 400;
+}
+.tx-summary-edit { flex: none; padding: 9px 16px; font-size: 13px; }
+@media (max-width: 560px) {
+  .tx-summary-bar.is-shown { max-height: 140px; }
+  .tx-summary-text { font-size: 12.5px; }
+  .tx-summary-edit { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-summary-bar { transition: none; }
+}
 
 .tx-filter-toggle { display: none; }
 
@@ -402,6 +443,54 @@
 .tx-empty { text-align: center; padding: 46px 20px; background: var(--tx-surface); border: 1px dashed var(--tx-line); border-radius: var(--tx-radius); color: var(--tx-muted); }
 .tx-empty b { display: block; color: var(--tx-ink); font-size: 16px; margin-bottom: 6px; }
 .tx-empty-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+
+/* --------------------------------------------------------------------------
+   Load-failure states
+
+   Shares .tx-empty's box but carries an illustration and its own copy. The
+   mark is a line drawing rather than a picture: it has to read at 56px in
+   both themes, and it inherits currentColor so it cannot be the one element
+   that stays light on a dark page.
+   -------------------------------------------------------------------------- */
+.tx-state {
+  grid-column: 1 / -1;
+  text-align: center; padding: 46px 20px;
+  background: var(--tx-surface); border: 1px dashed var(--tx-line);
+  border-radius: var(--tx-radius); color: var(--tx-muted);
+}
+.tx-state-art {
+  width: 56px; height: 56px; margin: 0 auto 14px; display: block;
+  color: var(--tx-accent); opacity: .85;
+}
+.tx-state b { display: block; color: var(--tx-ink); font-size: 17px; margin-bottom: 6px; }
+.tx-state p { margin: 0 auto; max-width: 46ch; font-size: 14px; line-height: 1.55; }
+/* The empty state sits in a grid that may be several columns wide. */
+.tx-empty { grid-column: 1 / -1; }
+
+/* --------------------------------------------------------------------------
+   Filter-panel skeleton
+
+   The sidebar is as tall as the results and arrives at the same time, so
+   leaving it blank while the grid shows card placeholders is the one half of
+   the page that still jumps. Four groups of three, which is the shape of the
+   panel that replaces it.
+   -------------------------------------------------------------------------- */
+.ff-sk-group { border-top: 1px solid var(--tx-line); padding: 14px 0; }
+.ff-sk-group:first-child { border-top: none; }
+.ff-sk-head { height: 11px; width: 44%; margin-bottom: 14px; }
+.ff-sk-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; }
+.ff-sk-box { width: 16px; height: 16px; border-radius: 4px; flex: none; }
+.ff-sk-txt { height: 12px; border-radius: 6px; flex: 1; }
+.ff-sk-group .tx-sk-line,
+.ff-sk-box, .ff-sk-txt {
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: txShimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-sk-box, .ff-sk-txt { animation: none; }
+}
 
 .tx-more { display: block; margin: 18px auto 0; padding: 12px 26px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
 .tx-more:hover { border-color: var(--tx-accent); color: var(--tx-accent); }
