@@ -1069,12 +1069,72 @@ const TravelExplore = (function () {
     if (more) more.style.display = 'none';
   }
 
-  /** Placeholder cards in whichever grid this page has. Flights get the
-   *  card-shaped set above; the other three are still simple stacks, because
-   *  their cards are image tiles and a grey rectangle is already the shape. */
+  /** One placeholder hotel: image, name, rating, location, amenities, price and
+   *  both buttons — every element renderHotels puts on the real card, in its
+   *  place.
+   *
+   *  Built on .tx-card/.tx-media/.tx-body themselves, exactly as the flight one
+   *  is built on .tx-flight, so the placeholder inherits the real card's grid
+   *  cell, aspect-ratio, padding, border and radius. Only the CONTENTS are grey
+   *  bars; the box is the box. The previous three-line stack was a third of the
+   *  height of what replaced it, so a full grid of them collapsed upward the
+   *  moment the data landed. */
+  function hotelSkeletonCard() {
+    return `<article class="tx-card tx-sk-hotel" aria-hidden="true">
+      <div class="tx-media tx-sk-media"></div>
+      <div class="tx-body">
+        <div class="tx-sk-line tx-sk-h-title"></div>
+        <div class="tx-sk-line tx-sk-h-stars"></div>
+        <div class="tx-sk-line tx-sk-h-sub"></div>
+        <!-- FOUR chips, not three: the real cards carry four amenities, which
+             wrap to two rows at this column width. Three sat on one row and
+             made the placeholder a row shorter than the card. -->
+        <div class="tx-chips">
+          <span class="tx-sk-chip"></span>
+          <span class="tx-sk-chip w-sm"></span>
+          <span class="tx-sk-chip w-lg"></span>
+          <span class="tx-sk-chip"></span>
+        </div>
+        <!-- The cancellation note. Two lines, because that is what "Free
+             cancellation up to 48 hours before check-in" wraps to here. -->
+        <div class="tx-sk-h-cancel">
+          <div class="tx-sk-line tx-sk-h-note"></div>
+          <div class="tx-sk-line tx-sk-h-note w60"></div>
+        </div>
+        <div class="tx-foot">
+          <div class="tx-sk-col">
+            <div class="tx-sk-line tx-sk-h-cap"></div>
+            <div class="tx-sk-line tx-sk-h-price"></div>
+            <div class="tx-sk-line tx-sk-h-tax"></div>
+          </div>
+          <div class="tx-sk-h-actions">
+            <div class="tx-sk-btn tx-sk-h-btn"></div>
+            <div class="tx-sk-btn tx-sk-h-btn"></div>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  /** Placeholder cards in whichever grid this page has.
+   *
+   *  Flights and hotels get card-shaped sets built from their own markup.
+   *  Cruises and packages are still simple stacks: their cards are image tiles
+   *  with a caption, so a grey rectangle is already very nearly the shape. */
   function showSkeleton(rows) {
     if ($('txFlightList')) { showFlightSkeleton(rows); return; }
-    const host = $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
+
+    const hotelGrid = $('txHotelGrid');
+    if (hotelGrid) {
+      /* Into the grid itself, not a wrapper: .tx-grid is what lays the cards
+         out in columns, and a <div> in between would put every placeholder in
+         one column and then reflow the lot when the real cards replace them. */
+      hotelGrid.innerHTML = `<span class="sr-only" role="status">Searching for hotels…</span>`
+        + Array.from({ length: rows || 6 }, hotelSkeletonCard).join('');
+      return;
+    }
+
+    const host = $('txCruiseGrid') || $('txPackageGrid');
     if (!host) return;
     host.innerHTML = `<div class="tx-skeleton">${
       Array.from({ length: rows || 4 }, () => `
