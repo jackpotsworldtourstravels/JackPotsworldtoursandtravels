@@ -741,6 +741,7 @@ const TravelExplore = (function () {
        arrived after the first render. */
     if (typeof Wishlist !== 'undefined') Wishlist.refresh();
     restoreOpenHotel();
+    paintSheetDone();
 
     const more = $('txHotelMore');
     if (more) {
@@ -845,7 +846,7 @@ const TravelExplore = (function () {
       if (typeof HotelDetails !== 'undefined') HotelDetails.mount(card);
       armIcons(card);
       state.openHotel = h.id;
-      writeUrl();
+      writeUrl(true);
     }).catch(err => {
       btn.removeAttribute('aria-busy');
       btn.textContent = 'View Details';
@@ -1081,7 +1082,15 @@ const TravelExplore = (function () {
 
   /** Push the criteria into the address bar without reloading, so a result set
    *  can be shared, bookmarked and reached again with Back. */
-  function writeUrl() {
+  /* Set by the handlers for deliberate acts — ticking a filter, changing the
+     sort, paging, opening a card — and consumed by the next writeUrl(). A flag
+     rather than an argument because writeUrl is called from inside the render
+     functions, several layers below the click that caused it. */
+  let pendingPush = false;
+  const pushNext = () => { pendingPush = true; };
+
+  function writeUrl(push) {
+    if (pendingPush) { push = true; pendingPush = false; }
     const multi = state.trip === 'multi' && state.legs.length >= 2;
     const p = {
       trip: state.trip, from: state.from, to: state.to,
@@ -1108,13 +1117,26 @@ const TravelExplore = (function () {
         rooms: state.rooms, guests: state.guests,
         price: state.priceRange && state.priceRange !== 'any' ? state.priceRange : undefined,
         open: state.openHotel || undefined,
+        /* How far down the list they had read. Only once they have paged at
+           least once — the first page is the default and does not need saying. */
+        shown: state.hotelShown > PAGE_SIZE ? state.hotelShown : undefined,
       });
       if (typeof HotelFilters !== 'undefined') HotelFilters.writeParams(p);
     }
 
     const qs = new URLSearchParams(
       Object.entries(p).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== 0));
-    history.replaceState(null, '', `${location.pathname}?${qs.toString()}`);
+    const url = `${location.pathname}?${qs.toString()}`;
+    if (url === location.pathname + location.search) return;   // nothing changed
+
+    /* REPLACE BY DEFAULT, PUSH ON A DELIBERATE CHANGE.
+       A slider dragged across its range fires many commits; pushing each would
+       bury the previous page under thirty history entries, and Back would walk
+       the drag frame by frame. Ticking a filter, changing the sort, paging or
+       opening a card are single deliberate acts, and Back should undo exactly
+       one of them — so those push and everything else replaces. */
+    if (push) history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
   }
 
   /** Bring the results under the hero into view. Honours reduced motion, which
@@ -1221,9 +1243,19 @@ const TravelExplore = (function () {
 
   function paintSheetDone() {
     const done = $('txSheetDone');
-    if (!done) return;
-    const btn = done.querySelector('[data-tx-sheet-done]');
-    if (btn) btn.textContent = sheetCount();
+    if (done) {
+      const btn = done.querySelector('[data-tx-sheet-done]');
+      if (btn) btn.textContent = sheetCount();
+    }
+    /* The floating button carries how many filters are on. While scrolled deep
+       into the list it is the only thing on screen that could say so. */
+    const t = $('txFilterToggle');
+    if (!t) return;
+    const panel = (document.body.dataset.spService === 'hotels')
+      ? (typeof HotelFilters !== 'undefined' ? HotelFilters : null)
+      : (typeof FlightFilters !== 'undefined' ? FlightFilters : null);
+    const n = panel ? panel.activeCount() : 0;
+    if (n) t.setAttribute('data-count', String(n)); else t.removeAttribute('data-count');
   }
 
   function openFilterSheet(open) {
@@ -1292,8 +1324,62 @@ const TravelExplore = (function () {
     });
   }
 
+  /* ---------------------------------------------------------------------
+     Back and Forward
+
+     Every filter, sort and page writes a URL, so the browser's own buttons
+     ought to walk them — and without this they did not: the state lived in
+     `state` and in the filter panel, and only the address bar moved. This
+     re-reads the URL that Back landed on and rebuilds from it, which is the
+     same path a cold load takes, so a restored view and a shared link cannot
+     end up different.
+     --------------------------------------------------------------------- */
+  function bindHistory() {
+    window.addEventListener('popstate', () => {
+      const service = document.body.dataset.spService;
+      /* Filters hold their own values; clear before re-reading or a facet that
+         is absent from the new URL would survive from the old one. */
+      /* Sort as well as the facets. clear() resets the ticked boxes but not the
+         order, and readParams only ASSIGNS a sort when the URL names one — so
+         without this an entry with no h_sort inherited the previous entry's,
+         and the replaceState at the end of the render wrote it back into the
+         history entry we had just landed on. */
+      if (typeof HotelFilters !== 'undefined') {
+        HotelFilters.clear();
+        HotelFilters.sort = HotelFilters.DEFAULT_SORT;
+        state.hotelSort = HotelFilters.DEFAULT_SORT;
+      }
+      if (typeof FlightFilters !== 'undefined') {
+        FlightFilters.clear();
+        FlightFilters.sort = FlightFilters.DEFAULT_SORT;
+        state.sort = FlightFilters.DEFAULT_SORT;
+      }
+      state.openHotel = null;
+      state.hotelShown = PAGE_SIZE;
+      state.shown = PAGE_SIZE;
+      seedFromUrl();
+
+      if (service === 'hotels') {
+        /* Any open panel belongs to the entry we just left. */
+        document.querySelectorAll('.tx-hotel-details').forEach(p => p.remove());
+        document.querySelectorAll('[data-tx-hotel-details]').forEach(b => {
+          b.textContent = 'View Details';
+          b.setAttribute('aria-expanded', 'false');
+        });
+        if (typeof HotelSearch !== 'undefined' && HotelSearch.mount) HotelSearch.mount();
+        renderHotelFilters();
+        renderHotels(allHotels);
+        renderHotelSummary(false);
+      } else if (service === 'flights') {
+        renderFilters();
+        renderFlights();
+      }
+    });
+  }
+
   function bind() {
     bindFilterSheet();
+    bindHistory();
     const search = $('txSearch');
     if (search) {
       let t = null;
@@ -1315,9 +1401,13 @@ const TravelExplore = (function () {
        changing one must not clear the other, and they are separate state. */
     if (typeof FlightFilters !== 'undefined') {
       FlightFilters.mount($('txFilters'), () => {
+        /* Same as the hotels panel: ticking a filter is a deliberate act and
+           Back should undo exactly one of them. */
+        pushNext();
         state.shown = PAGE_SIZE;
         renderFilters();
         renderFlights();
+        paintSheetDone();
       });
     }
 
@@ -1326,6 +1416,7 @@ const TravelExplore = (function () {
     const hotelsPage = document.body.dataset.spService === 'hotels';
     if (hotelsPage && typeof HotelFilters !== 'undefined') {
       HotelFilters.mount($('txFilters'), () => {
+        pushNext();
         state.hotelShown = PAGE_SIZE;
         renderHotelFilters();
         renderHotels(allHotels);
@@ -1340,11 +1431,13 @@ const TravelExplore = (function () {
       /* Sorting NEVER resets the filters — separate state, and the spec is
          explicit about it on both pages. */
       if (hotelsPage) {
+        pushNext();
         state.hotelSort = sort.value;
         if (typeof HotelFilters !== 'undefined') HotelFilters.sort = sort.value;
         renderHotels(allHotels);
         return;
       }
+      pushNext();
       state.sort = sort.value;
       if (typeof FlightFilters !== 'undefined') FlightFilters.sort = sort.value;
       renderFlights();
@@ -1369,12 +1462,17 @@ const TravelExplore = (function () {
 
     const hotelMore = $('txHotelMore');
     if (hotelMore) hotelMore.addEventListener('click', () => {
+      pushNext();
       state.hotelShown += PAGE_SIZE;
       renderHotels(allHotels);
     });
 
     const more = $('txMore');
-    if (more) more.addEventListener('click', () => { state.shown += PAGE_SIZE; renderFlights(); });
+    if (more) more.addEventListener('click', () => {
+      pushNext();
+      state.shown += PAGE_SIZE;
+      renderFlights();
+    });
 
     const toggle = $('txFilterToggle');
     if (toggle) toggle.addEventListener('click', () => openFilterSheet(true));
@@ -1438,7 +1536,7 @@ const TravelExplore = (function () {
           hdet.textContent = 'View Details';
           hdet.setAttribute('aria-expanded', 'false');
           state.openHotel = null;
-          writeUrl();
+          writeUrl(true);
           return;
         }
         const h = (catalogue.hotel || []).find(x => x.id === hdet.dataset.txHotelDetails);
@@ -1586,6 +1684,10 @@ const TravelExplore = (function () {
     /* Which card was expanded. Not "seeded": reopening a panel is not a
        search, and marking it would scroll a visitor past the hero. */
     const open = str('open', 40);   if (open) state.openHotel = open;
+    /* Clamped: `shown` comes from an editable URL, and an enormous one would
+       render the whole catalogue in a single frame. */
+    const shown = int('shown', PAGE_SIZE, 500, PAGE_SIZE);
+    state.hotelShown = Math.max(PAGE_SIZE, shown);
 
     const dest = str('dest', 80);   if (dest) { state.dest = dest; mark(); }
     const ci = day('checkIn');      if (ci)   { state.checkIn = ci; mark(); }

@@ -567,7 +567,6 @@
 .tx-card-actions .tx-btn { padding: 9px 13px; font-size: 12.5px; }
 
 .tx-cancel-note { font-size: 12px; color: var(--tx-muted); line-height: 1.5; margin: 2px 0 0; }
-.tx-btn-sm { padding: 7px 11px; font-size: 12px; }
 
 /* --------------------------------------------------------------------------
    Hotel card
@@ -677,18 +676,43 @@
   .hd-room-buy { align-items: flex-start; text-align: left; }
   .hd-policies > div { grid-template-columns: 1fr; gap: 2px; }
 }
-@media (max-width: 560px) {
-  .tx-room-opt { flex-direction: column; }
-  .tx-room-opt-price { align-items: flex-start; text-align: left; width: 100%; }
-}
+/* The .tx-room-opt* rules that were here belonged to the fixed four-section
+   details panel hotel-details.js replaced; .hd-room above is its successor and
+   already carries its own narrow-screen stacking. */
 
 /* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 1000px) {
   .tx-layout { grid-template-columns: 1fr; }
-  .tx-filter-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 12px 16px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; }
-  .tx-filter-toggle:hover { border-color: var(--tx-accent); }
+  /* FLOATING, not a button in the toolbar. The toolbar scrolls away with the
+     top of the page, and the filters are wanted most while deep in the list —
+     which is exactly where a toolbar button cannot be reached. Centred at the
+     bottom, where a thumb already is. */
+  .tx-filter-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    position: fixed; z-index: 88;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    padding: 13px 22px; border-radius: 999px;
+    border: none; background: var(--tx-ink); color: var(--tx-surface);
+    font-weight: 800; font-size: 14.5px; font-family: inherit; cursor: pointer;
+    box-shadow: 0 6px 22px rgba(10, 37, 64, .34);
+  }
+  .tx-filter-toggle:hover { background: var(--tx-accent); color: var(--tx-accent-ink); }
+  .tx-filter-toggle:focus-visible { outline: 2px solid var(--tx-accent); outline-offset: 3px; }
+  /* The sheet has its own way out; two competing buttons at the bottom is one
+     too many. */
+  body.tx-sheet-open .tx-filter-toggle { display: none; }
+  /* How many filters are on, so the button says something while it is the only
+     thing on screen that could. */
+  .tx-filter-toggle[data-count]::after {
+    content: attr(data-count);
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: 99px;
+    background: var(--tx-accent); color: var(--tx-accent-ink);
+    font-size: 11.5px; font-weight: 800;
+  }
 
   /* ------------------------------------------------------------------------
      The filter panel becomes a BOTTOM SHEET.
