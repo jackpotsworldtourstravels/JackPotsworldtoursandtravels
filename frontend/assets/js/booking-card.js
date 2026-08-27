@@ -556,13 +556,71 @@ const BookingCard = (function () {
     });
   }
 
+  /* A group enquiry is the one submission that goes over the network from this
+     card — everything else navigates, and a page that is leaving needs no
+     pending state. So the button has to say it is working, and must not be
+     pressable twice while it is. */
+  let busy = false;
+
   /** The one Search button, labelled for whatever is being submitted. */
   function paintSearchButton() {
     const go = root && root.querySelector('.search-go');
-    if (!go) return;
+    if (!go || busy) return;   // a repaint mid-send must not undo setBusy's label
     const group = state.tab === 'hotels' && state.hotelMode === 'group';
     go.textContent = group ? 'Request Group Quote' : 'Search';
     go.classList.toggle('is-wide', group);
+  }
+
+  function setBusy(on, label) {
+    busy = !!on;
+    const go = root && root.querySelector('.search-go');
+    if (!go) return;
+    go.disabled = busy;
+    go.classList.toggle('is-busy', busy);
+    go.setAttribute('aria-busy', String(busy));
+    if (busy) go.textContent = label || 'Sending…';
+    else paintSearchButton();
+  }
+
+  /** The enquiry landed. Replace the form with an acknowledgement rather than
+   *  leaving the fields sitting there — a form that still looks submittable
+   *  after a successful submit is an invitation to send it twice. */
+  function showGroupSuccess(info) {
+    const panel = root && root.querySelector('[data-panel="hotels"]');
+    if (!panel) return;
+    const who = (info && info.name) ? String(info.name).split(/\s+/)[0] : '';
+    const where = (info && info.dest) ? info.dest : 'your group';
+
+    const done = document.createElement('div');
+    done.className = 'hotel-sent';
+    done.setAttribute('role', 'status');
+    done.innerHTML =
+      '<svg class="hotel-sent-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'
+      + '<h3>' + (who ? 'Thanks, ' + esc(who) + '.' : 'Thanks — that\'s with us.') + '</h3>'
+      + '<p>Your enquiry for ' + esc(where) + ' has reached the group desk. '
+      + 'We reply to group enquiries within one working day.</p>'
+      + '<button type="button" class="btn btn-ghost hotel-sent-again" data-group-again>'
+      + 'Make another enquiry</button>';
+
+    panel.classList.add('is-sent');
+    panel.appendChild(done);
+    /* The footer belongs to the form that is no longer there. */
+    const foot = root.querySelector('.search-foot');
+    if (foot) foot.hidden = true;
+    const again = done.querySelector('[data-group-again]');
+    if (again) {
+      again.addEventListener('click', () => {
+        done.remove();
+        panel.classList.remove('is-sent');
+        if (foot) foot.hidden = false;
+        clearError();
+        setBusy(false);
+        const dest = $('hDest');
+        if (dest) dest.focus();
+      });
+      again.focus();
+    }
   }
 
   function activateTab(name) {
@@ -1618,6 +1676,13 @@ const BookingCard = (function () {
     hotelCriteria,
     roomsValue: () => (rooms ? rooms.value() : []),
     setSearchHandler(fn) { searchHandler = fn; },
+    /* The group-enquiry submission is the search handler's job, not the card's
+       — the card does not know where an enquiry goes any more than it knows
+       which page a search lands on. These are how it reports back. */
+    setBusy,
+    showGroupSuccess,
+    complain,
+    clearError,
     get trip() { return state.trip; },
     get tab() { return state.tab; },
     passengers: () => (pax ? pax.value() : { adults: 1, children: 0, infants: 0 }),

@@ -556,6 +556,16 @@ function goToSearch(kind, params) {
    ignored them would be worse than saying so. */
 if (typeof BookingCard !== 'undefined') {
   BookingCard.setSearchHandler((kind, params) => {
+    /* GROUP DEALS IS NOT A SEARCH, and is checked before everything below.
+       It does not navigate, so it needs no results page; it is quoted by a
+       person, so it does not wait on a sign-in either — turning "tell us about
+       your group" into "make an account first" loses the enquiry. And its
+       criteria carry a name, an email and a phone number, which must never
+       reach goToSearch(): that puts them in a query string. */
+    if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+      GroupEnquiry.handle(params);
+      return;
+    }
     if (!HERO_SEARCH[kind]) {
       showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
       return;
