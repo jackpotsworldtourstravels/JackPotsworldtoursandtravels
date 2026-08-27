@@ -448,16 +448,118 @@ const TravelExplore = (function () {
     return bits;
   }
 
-  function renderHotelSummary() {
+  /* The bar has two faces: the criteria as a line, and the same criteria as a
+     small form. Editing happens HERE rather than by sending the traveller back
+     up the page, because the results are what they are looking at and a search
+     that scrolls them away from it to change one date is a search that loses
+     their place. The full panel above stays the canonical form; this writes
+     into the same `state` and re-runs the same render, so the two can never
+     disagree about what was searched. */
+  const todayIso = () => new Date().toISOString().slice(0, 10);
+
+  function renderHotelSummary(editing) {
     const bar = $('txSummaryBar');
     if (!bar) return;
-    bar.innerHTML = `
+    bar.innerHTML = editing ? summaryFormHtml() : `
       <div class="tx-summary-in">
         <p class="tx-summary-text">${hotelSummaryBits().map(b => `<span>${esc(b)}</span>`).join('')}</p>
         <button type="button" class="tx-btn tx-btn-primary tx-summary-edit" data-tx-edit-search>
           Edit search
         </button>
       </div>`;
+    if (editing) {
+      const first = bar.querySelector('#txSumDest');
+      if (first) { first.focus(); first.select(); }
+    }
+  }
+
+  function summaryFormHtml() {
+    const rooms = Number(state.rooms) || 1;
+    const guests = Number(state.guests) || 2;
+    /* The destinations the catalogue actually has, so the list cannot offer a
+       city with nothing in it. */
+    const places = [...new Set((allHotels || []).map(h => {
+      const p = String(h.location || '').split(',').map(s => s.trim()).filter(Boolean);
+      return p[p.length - 1];
+    }).filter(Boolean))];
+
+    return `<form class="tx-summary-in is-editing" id="txSummaryForm">
+      <div class="tx-sum-field">
+        <label for="txSumDest">Destination</label>
+        <input id="txSumDest" name="dest" type="text" list="txSumPlaces" autocomplete="off"
+               placeholder="City, area or hotel" value="${esc(state.dest || '')}">
+        <datalist id="txSumPlaces">${places.map(p => `<option value="${esc(p)}"></option>`).join('')}</datalist>
+      </div>
+      <div class="tx-sum-field">
+        <label for="txSumIn">Check-in</label>
+        <input id="txSumIn" name="checkIn" type="date" min="${esc(todayIso())}"
+               value="${esc(state.checkIn || '')}">
+      </div>
+      <div class="tx-sum-field">
+        <label for="txSumOut">Check-out</label>
+        <input id="txSumOut" name="checkOut" type="date" min="${esc(state.checkIn || todayIso())}"
+               value="${esc(state.checkOut || '')}">
+      </div>
+      <div class="tx-sum-field is-narrow">
+        <label for="txSumRooms">Rooms</label>
+        <input id="txSumRooms" name="rooms" type="number" min="1" max="8" value="${rooms}">
+      </div>
+      <div class="tx-sum-field is-narrow">
+        <label for="txSumGuests">Guests</label>
+        <input id="txSumGuests" name="guests" type="number" min="1" max="32" value="${guests}">
+      </div>
+      <div class="tx-sum-actions">
+        <button type="submit" class="tx-btn tx-btn-primary">Search</button>
+        <button type="button" class="tx-btn tx-btn-ghost" data-tx-cancel-edit>Cancel</button>
+      </div>
+      <p class="tx-sum-error" id="txSumError" role="alert" hidden></p>
+    </form>`;
+  }
+
+  /** Apply the inline form. Returns false (and says why) rather than running a
+   *  search that cannot mean anything. */
+  function applySummaryEdit(form) {
+    const err = $('txSumError');
+    const say = msg => {
+      if (!err) return false;
+      err.textContent = msg; err.hidden = false;
+      return false;
+    };
+    if (err) err.hidden = true;
+
+    const dest = form.dest.value.trim();
+    const ci = form.checkIn.value;
+    const co = form.checkOut.value;
+    if (ci && co && co <= ci) return say('Check-out must be after check-in.');
+    if (ci && ci < todayIso()) return say('Check-in cannot be in the past.');
+
+    const rooms = Math.max(1, Math.min(8, Number(form.rooms.value) || 1));
+    const guests = Math.max(1, Math.min(32, Number(form.guests.value) || 1));
+    if (guests < rooms) return say('There must be at least one guest per room.');
+
+    state.dest = dest;
+    state.checkIn = ci;
+    state.checkOut = co;
+    state.rooms = rooms;
+    state.guests = guests;
+    /* A new search is a new result set — the same rule the panel above
+       follows, for the same reason. */
+    if (typeof HotelFilters !== 'undefined') HotelFilters.clear();
+    state.hotelShown = PAGE_SIZE;
+    state.openHotel = null;
+
+    /* Keep the canonical panel in step, so opening it shows what was just
+       searched rather than the values from before the edit. */
+    if (typeof HotelSearch !== 'undefined' && HotelSearch.mount) HotelSearch.mount();
+
+    renderHotelFilters();
+    renderHotels(allHotels);
+    renderHotelSummary(false);
+    const head = $('txHotelsHead');
+    if (head && typeof showToast === 'function') {
+      showToast(state.dest ? `Showing stays in ${state.dest}` : 'Showing all stays', 'success');
+    }
+    return true;
   }
 
   /** Show the bar only once the panel it summarises is off screen. An
@@ -1074,7 +1176,124 @@ const TravelExplore = (function () {
   }
 
 
+  /* ---------------------------------------------------------------------
+     The mobile filter sheet
+
+     On a narrow screen the panel is a bottom sheet rather than a block in the
+     flow. That is a modal, so it owes the same things any modal does: a scrim
+     that closes it, Escape, a locked page behind it, focus kept inside, and
+     focus returned to the button that opened it. The "Show N stays" footer is
+     the way out, and its number is the live result count — the answer to the
+     question the traveller is actually asking while they tick boxes.
+     --------------------------------------------------------------------- */
+  let sheetOpener = null;
+
+  function sheetParts() {
+    const panel = $('txFilters');
+    if (!panel) return null;
+    let scrim = $('txSheetScrim');
+    let done = $('txSheetDone');
+    if (!scrim) {
+      scrim = document.createElement('div');
+      scrim.id = 'txSheetScrim';
+      scrim.className = 'tx-sheet-scrim';
+      scrim.hidden = false;
+      panel.parentNode.insertBefore(scrim, panel);
+    }
+    if (!done) {
+      done = document.createElement('div');
+      done.id = 'txSheetDone';
+      done.className = 'tx-sheet-done';
+      done.innerHTML = '<button type="button" class="tx-btn tx-btn-primary" data-tx-sheet-done></button>';
+      panel.parentNode.insertBefore(done, panel.nextSibling);
+    }
+    return { panel, scrim, done };
+  }
+
+  /** How many results the current selection yields — the number on the footer
+   *  button, recomputed whenever the panel changes. */
+  function sheetCount() {
+    if (document.body.dataset.spService !== 'hotels') return '';
+    const found = (typeof HotelFilters !== 'undefined')
+      ? HotelFilters.apply(hotelsFiltered(allHotels)) : (allHotels || []);
+    return found.length === 1 ? 'Show 1 stay' : `Show ${found.length} stays`;
+  }
+
+  function paintSheetDone() {
+    const done = $('txSheetDone');
+    if (!done) return;
+    const btn = done.querySelector('[data-tx-sheet-done]');
+    if (btn) btn.textContent = sheetCount();
+  }
+
+  function openFilterSheet(open) {
+    const parts = sheetParts();
+    if (!parts) return;
+    const { panel, scrim, done } = parts;
+    panel.classList.toggle('tx-open', open);
+    scrim.classList.toggle('is-shown', open);
+    done.classList.toggle('is-shown', open);
+    document.body.classList.toggle('tx-sheet-open', open);
+    const t = $('txFilterToggle');
+    if (t) t.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+      /* The toggle is the fallback rather than whatever happened to be focused:
+         a mouse click does not always leave focus on the button it activated,
+         and closing to <body> means tabbing back through the whole page. */
+      const active = document.activeElement;
+      sheetOpener = (active && active !== document.body) ? active : t;
+      paintSheetDone();
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      /* First control inside, so a keyboard lands in the sheet rather than
+         behind it. */
+      const first = panel.querySelector('button, input');
+      if (first) first.focus();
+    } else {
+      panel.removeAttribute('role');
+      panel.removeAttribute('aria-modal');
+      if (sheetOpener && sheetOpener.focus) sheetOpener.focus();
+      sheetOpener = null;
+    }
+  }
+
+  const sheetIsOpen = () => {
+    const p = $('txFilters');
+    return !!p && p.classList.contains('tx-open');
+  };
+
+  function bindFilterSheet() {
+    document.addEventListener('click', e => {
+      if (e.target.closest('[data-tx-sheet-done]') || e.target.id === 'txSheetScrim') {
+        openFilterSheet(false);
+      }
+    });
+    document.addEventListener('keydown', e => {
+      if (!sheetIsOpen()) return;
+      if (e.key === 'Escape') { e.preventDefault(); openFilterSheet(false); return; }
+      if (e.key !== 'Tab') return;
+      /* Trap: the sheet and its footer button are the whole ring. */
+      const panel = $('txFilters');
+      const done = $('txSheetDone');
+      const focusables = [
+        ...panel.querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])'),
+        ...(done ? done.querySelectorAll('button') : []),
+      ].filter(el => el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    /* Widening past the breakpoint must not leave a locked page behind an
+       invisible sheet. */
+    matchMedia('(max-width: 1000px)').addEventListener('change', ev => {
+      if (!ev.matches && sheetIsOpen()) openFilterSheet(false);
+    });
+  }
+
   function bind() {
+    bindFilterSheet();
     const search = $('txSearch');
     if (search) {
       let t = null;
@@ -1110,6 +1329,9 @@ const TravelExplore = (function () {
         state.hotelShown = PAGE_SIZE;
         renderHotelFilters();
         renderHotels(allHotels);
+        /* The sheet's footer answers "how many will I get" — so it has to move
+           with every tick, not only when the sheet is opened. */
+        paintSheetDone();
       });
     }
 
@@ -1128,6 +1350,23 @@ const TravelExplore = (function () {
       renderFlights();
     });
 
+    /* The inline summary form. Delegated on document because the bar is
+       re-rendered every time it flips between its two faces. */
+    document.addEventListener('submit', e => {
+      const form = e.target.closest('#txSummaryForm');
+      if (!form) return;
+      e.preventDefault();
+      applySummaryEdit(form);
+    });
+    /* Escape leaves the inline editor without applying it. */
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (!e.target.closest || !e.target.closest('#txSummaryForm')) return;
+      renderHotelSummary(false);
+      const again = $('txSummaryBar').querySelector('[data-tx-edit-search]');
+      if (again) again.focus();
+    });
+
     const hotelMore = $('txHotelMore');
     if (hotelMore) hotelMore.addEventListener('click', () => {
       state.hotelShown += PAGE_SIZE;
@@ -1138,7 +1377,7 @@ const TravelExplore = (function () {
     if (more) more.addEventListener('click', () => { state.shown += PAGE_SIZE; renderFlights(); });
 
     const toggle = $('txFilterToggle');
-    if (toggle) toggle.addEventListener('click', () => $('txFilters').classList.toggle('tx-open'));
+    if (toggle) toggle.addEventListener('click', () => openFilterSheet(true));
 
     /* Delegated: the filter panel and the result list are both re-rendered, so
        per-element listeners would be lost on every repaint. */
@@ -1153,11 +1392,24 @@ const TravelExplore = (function () {
         renderFilters(); renderFlights();
         return;
       }
-      /* "Edit search" on the sticky bar and "Modify search" on the empty and
-         error states are one action: return to the form that owns the criteria.
-         The hotels page keeps its form in #txSearchPanel, the flights page in
-         the hero card. */
-      if (e.target.closest('[data-tx-modify], [data-tx-edit-search]')) {
+      /* Edit in place on the hotels page: the results are what they came for,
+         and scrolling them back up to change one date loses their place. */
+      if (e.target.closest('[data-tx-edit-search]')) {
+        renderHotelSummary(true);
+        return;
+      }
+      if (e.target.closest('[data-tx-cancel-edit]')) {
+        renderHotelSummary(false);
+        const again = $('txSummaryBar').querySelector('[data-tx-edit-search]');
+        if (again) again.focus();
+        return;
+      }
+
+      /* "Modify search" on the empty and error states still returns to the
+         full form, which is where a search that found nothing is best rebuilt.
+         The hotels page keeps that form in #txSearchPanel, flights in the hero
+         card. */
+      if (e.target.closest('[data-tx-modify]')) {
         const dock = $('txSearchPanel') || $('heroSearchDock');
         if (dock) {
           const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;

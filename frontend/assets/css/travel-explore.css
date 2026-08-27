@@ -218,6 +218,40 @@
   content: '·'; margin: 0 9px; color: var(--tx-muted); font-weight: 400;
 }
 .tx-summary-edit { flex: none; padding: 9px 16px; font-size: 13px; }
+
+/* The bar's other face: the same criteria as a small form. Taller than the
+   read-only line, so the shown height allows for it. */
+.tx-summary-bar.is-shown { max-height: 260px; }
+.tx-summary-in.is-editing {
+  display: grid; align-items: end;
+  grid-template-columns: minmax(160px, 1.6fr) repeat(2, minmax(130px, 1fr)) repeat(2, 84px) auto;
+  gap: 10px;
+}
+.tx-sum-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tx-sum-field label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--tx-muted);
+}
+.tx-sum-field input {
+  width: 100%; padding: 9px 10px; border-radius: 9px;
+  border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink);
+  /* 16px so iOS does not zoom the page when one is focused. */
+  font-size: 16px; font-family: inherit; outline: none;
+}
+.tx-sum-field input:focus { border-color: var(--tx-accent); }
+.tx-sum-actions { display: flex; gap: 8px; }
+.tx-sum-actions .tx-btn { padding: 10px 15px; font-size: 13px; }
+.tx-sum-error {
+  grid-column: 1 / -1; margin: 2px 0 0;
+  font-size: 12.5px; font-weight: 700; color: var(--tx-accent);
+}
+@media (max-width: 860px) {
+  .tx-summary-in.is-editing { grid-template-columns: 1fr 1fr; }
+  .tx-sum-field:first-child { grid-column: 1 / -1; }
+  .tx-sum-actions { grid-column: 1 / -1; }
+  .tx-sum-actions .tx-btn { flex: 1; }
+  .tx-summary-bar.is-shown { max-height: 420px; }
+}
 @media (max-width: 560px) {
   .tx-summary-bar.is-shown { max-height: 140px; }
   .tx-summary-text { font-size: 12.5px; }
@@ -653,10 +687,82 @@
    -------------------------------------------------------------------------- */
 @media (max-width: 1000px) {
   .tx-layout { grid-template-columns: 1fr; }
-  .tx-filters { position: static; display: none; }
-  .tx-filters.tx-open { display: block; }
   .tx-filter-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 12px 16px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; }
   .tx-filter-toggle:hover { border-color: var(--tx-accent); }
+
+  /* ------------------------------------------------------------------------
+     The filter panel becomes a BOTTOM SHEET.
+
+     Not merely `display:block` in the flow, which is what it used to do: that
+     pushed the results down the page, so opening the filters scrolled the
+     thing being filtered out of sight, and closing them left the traveller
+     somewhere they had not chosen to be. A sheet leaves the list exactly where
+     it was underneath.
+
+     It slides from the bottom because that is where a thumb is. The header and
+     the "show results" footer stay put while the middle scrolls, so the way
+     out is always reachable without scrolling back up through every group.
+     ------------------------------------------------------------------------ */
+  .tx-filters {
+    position: fixed; z-index: 90;
+    left: 0; right: 0; bottom: 0; top: auto;
+    max-height: 86vh; margin: 0;
+    border-radius: 18px 18px 0 0;
+    border: 1px solid var(--tx-line); border-bottom: none;
+    box-shadow: 0 -8px 40px rgba(10, 37, 64, .28);
+    padding: 0 18px calc(76px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(101%);
+    transition: transform .28s cubic-bezier(.22, .8, .3, 1);
+    /* Not display:none — a hidden-by-transform sheet keeps its scroll position
+       and can animate. visibility keeps it out of the tab order while closed. */
+    visibility: hidden;
+    overscroll-behavior: contain;
+  }
+  .tx-filters.tx-open { transform: none; visibility: visible; }
+
+  /* The grab handle and title, pinned while the groups scroll under them. */
+  .tx-filters::before {
+    content: ''; display: block; width: 40px; height: 4px; border-radius: 99px;
+    background: var(--tx-line); margin: 10px auto 4px;
+    position: sticky; top: 0;
+  }
+  .ff-scope .ff-top {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--tx-surface); padding: 8px 0 10px;
+    border-bottom: 1px solid var(--tx-line); margin-bottom: 0;
+  }
+
+  /* Bigger targets: this is being used with a thumb. */
+  .ff-opt { padding: 10px 0; }
+  .ff-opt input { width: 20px; height: 20px; }
+  .ff-toggle { padding: 16px 0 14px; }
+  .ff-range-track { height: 34px; }
+  .ff-range-track input[type="range"] { height: 34px; }
+  .ff-range-track::before, .ff-range-fill { top: 15px; }
+  .ff-range-track input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+  .ff-range-track input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+
+  /* The way out, always on screen. Its label is written by the page, so it
+     says how many results the current selection actually yields. */
+  .tx-sheet-done {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 91;
+    display: none; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--tx-surface); border-top: 1px solid var(--tx-line);
+  }
+  .tx-filters.tx-open ~ .tx-sheet-done,
+  .tx-sheet-done.is-shown { display: block; }
+  .tx-sheet-done .tx-btn { width: 100%; padding: 14px; font-size: 15px; }
+
+  .tx-sheet-scrim {
+    position: fixed; inset: 0; z-index: 89;
+    background: rgba(6, 12, 24, .45);
+    opacity: 0; pointer-events: none; transition: opacity .24s ease;
+  }
+  .tx-sheet-scrim.is-shown { opacity: 1; pointer-events: auto; }
+  body.tx-sheet-open { overflow: hidden; }
+}
+@media (max-width: 1000px) and (prefers-reduced-motion: reduce) {
+  .tx-filters, .tx-sheet-scrim { transition: none; }
 }
 @media (max-width: 760px) {
   /* The header is shorter here, so the desktop 148px would leave a big gap. */
