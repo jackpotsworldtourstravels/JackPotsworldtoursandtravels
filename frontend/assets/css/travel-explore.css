@@ -166,7 +166,18 @@
   border-radius: var(--tx-radius); padding: 18px; box-shadow: var(--tx-shadow);
   /* Clears the fixed header, same reason as .tx-section's scroll-margin-top. */
   position: sticky; top: 148px;
+  /* The panel scrolls INSIDE itself once it is taller than what is left of the
+     viewport under the header. Without this a long filter list simply runs off
+     the bottom of a sticky box and its last group cannot be reached at all. */
+  max-height: calc(100vh - 168px);
+  overflow-y: auto; overscroll-behavior: contain;
 }
+/* A slim scrollbar, so the panel does not gain a chunky OS gutter that eats
+   into the option labels. */
+.tx-filters { scrollbar-width: thin; scrollbar-color: var(--tx-line) transparent; }
+.tx-filters::-webkit-scrollbar { width: 8px; }
+.tx-filters::-webkit-scrollbar-thumb { background: var(--tx-line); border-radius: 99px; }
+.tx-filters::-webkit-scrollbar-track { background: transparent; }
 .tx-fgroup + .tx-fgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--tx-line); }
 .tx-fgroup h4 { margin: 0 0 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--tx-muted); }
 .tx-check { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; color: var(--tx-ink); cursor: pointer; }
@@ -176,6 +187,137 @@
 .tx-clear:hover { border-color: var(--tx-accent); color: var(--tx-accent); }
 
 .tx-filter-toggle { display: none; }
+
+/* --------------------------------------------------------------------------
+   Filter panel (flight-filters.js)
+
+   Its own `ff-` namespace rather than more `tx-fgroup` rules: the panel is
+   rendered entirely by a module that knows nothing about this page, and the
+   prefix is what keeps that boundary visible in the stylesheet too.
+   -------------------------------------------------------------------------- */
+.ff-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.ff-heading {
+  margin: 0; font-size: 14px; font-weight: 800; color: var(--tx-ink);
+  display: flex; align-items: center; gap: 8px;
+}
+.ff-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px;
+  background: var(--tx-accent); color: var(--tx-accent-ink);
+  font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.ff-clear-all {
+  margin-left: auto; background: none; border: none; padding: 4px 2px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--tx-accent); text-decoration: underline; text-underline-offset: 3px;
+}
+
+.ff-group { border-top: 1px solid var(--tx-line); }
+.ff-head { margin: 0; }
+.ff-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 14px 0 12px; background: none; border: none; cursor: pointer;
+  font-family: inherit; text-align: left; color: var(--tx-muted);
+  font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+}
+.ff-toggle:hover { color: var(--tx-ink); }
+.ff-title { flex: 1; min-width: 0; }
+.ff-caret { width: 16px; height: 16px; flex: none; transition: transform .2s ease; }
+.ff-toggle[aria-expanded="false"] .ff-caret { transform: rotate(-90deg); }
+.ff-body { padding-bottom: 14px; }
+
+.ff-opts { display: flex; flex-direction: column; }
+.ff-opt {
+  display: flex; align-items: center; gap: 9px; padding: 6px 0;
+  font-size: 14px; color: var(--tx-ink); cursor: pointer;
+}
+.ff-opt input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--tx-accent); cursor: pointer; }
+.ff-opt-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ff-opt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-opt-note { font-size: 11px; color: var(--tx-muted); font-weight: 600; }
+.ff-count { margin-left: auto; font-size: 12px; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
+/* Still selectable — it is how you get back to a wider result set — but shown
+   as leading nowhere on its own. */
+.ff-opt.is-empty { opacity: .45; }
+
+.ff-logo {
+  width: 20px; height: 20px; flex: none; border-radius: 5px; object-fit: contain;
+  background: var(--tx-surface-2);
+}
+.ff-logo-code {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 8.5px; font-weight: 800; color: var(--tx-muted);
+  border: 1px solid var(--tx-line);
+}
+
+.ff-search { margin-bottom: 8px; }
+.ff-search input {
+  width: 100%; padding: 8px 10px; border-radius: 9px;
+  border: 1.5px solid var(--tx-line); background: var(--tx-surface);
+  color: var(--tx-ink); font-family: inherit; font-size: 13.5px; outline: none;
+}
+.ff-search input:focus { border-color: var(--tx-accent); }
+.ff-none { margin: 6px 0; font-size: 13px; color: var(--tx-muted); }
+.ff-clear-one {
+  margin-top: 8px; background: none; border: none; padding: 2px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--tx-accent); text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Dual-range slider
+
+   Two overlaid <input type=range>. Each keeps its own thumb, so both are
+   focusable and arrow-key operable — which a single custom-drawn track with
+   div thumbs would have to reimplement badly. The inputs themselves are
+   transparent; the visible track and fill are the div underneath.
+   -------------------------------------------------------------------------- */
+.ff-range-out {
+  display: block; font-size: 13.5px; font-weight: 800; color: var(--tx-ink);
+  font-variant-numeric: tabular-nums; margin-bottom: 10px;
+}
+.ff-range-track { position: relative; height: 22px; }
+.ff-range-track::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 9px; height: 4px;
+  border-radius: 99px; background: var(--tx-line);
+}
+.ff-range-fill {
+  position: absolute; top: 9px; height: 4px; border-radius: 99px;
+  background: var(--tx-accent);
+}
+.ff-range-track input[type="range"] {
+  position: absolute; left: 0; top: 0; width: 100%; height: 22px; margin: 0;
+  background: none; appearance: none; -webkit-appearance: none;
+  /* The track must not swallow the other thumb's pointer events; only the
+     thumbs themselves are interactive. */
+  pointer-events: none;
+}
+.ff-range-track input[type="range"]:focus { outline: none; }
+.ff-range-track input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; pointer-events: auto;
+  width: 18px; height: 18px; border-radius: 50%; cursor: grab;
+  background: var(--tx-surface); border: 2.5px solid var(--tx-accent);
+  box-shadow: 0 1px 4px rgba(10, 37, 64, .25);
+}
+.ff-range-track input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px; height: 18px; border-radius: 50%; cursor: grab; border: 2.5px solid var(--tx-accent);
+  background: var(--tx-surface); box-shadow: 0 1px 4px rgba(10, 37, 64, .25);
+}
+.ff-range-track input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--tx-accent); outline-offset: 2px;
+}
+.ff-range-track input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--tx-accent); outline-offset: 2px;
+}
+.ff-range-ends {
+  display: flex; justify-content: space-between; margin-top: 6px;
+  font-size: 11.5px; color: var(--tx-muted); font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-caret { transition: none; }
+}
 
 /* --------------------------------------------------------------------------
    Flight card
@@ -259,6 +401,7 @@
    -------------------------------------------------------------------------- */
 .tx-empty { text-align: center; padding: 46px 20px; background: var(--tx-surface); border: 1px dashed var(--tx-line); border-radius: var(--tx-radius); color: var(--tx-muted); }
 .tx-empty b { display: block; color: var(--tx-ink); font-size: 16px; margin-bottom: 6px; }
+.tx-empty-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
 
 .tx-more { display: block; margin: 18px auto 0; padding: 12px 26px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
 .tx-more:hover { border-color: var(--tx-accent); color: var(--tx-accent); }

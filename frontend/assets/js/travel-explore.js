@@ -16,18 +16,15 @@ const TravelExplore = (function () {
 
   const PAGE_SIZE = 8;
 
-  /* Buckets for the "Departure Time" filter. Ordered, because the sidebar and
-     the matcher both iterate this one list — two hand-kept copies would drift. */
-  const TIME_WINDOWS = [
-    { id: 'early',     label: 'Before 6 AM',   from: 0,    to: 359  },
-    { id: 'morning',   label: '6 AM – 12 PM',  from: 360,  to: 719  },
-    { id: 'afternoon', label: '12 PM – 6 PM',  from: 720,  to: 1079 },
-    { id: 'evening',   label: 'After 6 PM',    from: 1080, to: 1439 },
-  ];
+  /* The departure-time buckets moved to flight-filters.js, which now owns five
+     of them (the "night" the four here had no room for) and uses the same list
+     for arrival. windowOf() went with them. */
 
   const state = {
-    q: '', airlines: new Set(), windows: new Set(), dests: new Set(),
-    nonStop: false, sort: 'dep-asc', shown: PAGE_SIZE,
+    /* The free-text box and the paging cursor. Every FACET the sidebar offers
+       lives in flight-filters.js instead — one place that owns what a filter is,
+       rather than a named Set here per filter that ever gets added. */
+    q: '', sort: 'best', shown: PAGE_SIZE,
     /* Step 1 of the booking journey. These are carried into the flow so the
        traveller forms already know how many people to ask about — nobody
        should have to say "2 adults" twice. */
@@ -88,11 +85,6 @@ const TravelExplore = (function () {
    *  change, every "show more" — brings in icons it has never seen. */
   function armIcons(scope) {
     if (typeof JPIcon !== 'undefined') JPIcon.mount(scope || document);
-  }
-
-  function windowOf(mins) {
-    const w = TIME_WINDOWS.find(x => mins >= x.from && mins <= x.to);
-    return w ? w.id : 'evening';
   }
 
   function fmtDate(iso) {
@@ -185,31 +177,43 @@ const TravelExplore = (function () {
   /* ---------------------------------------------------------------------
      Flights — filter, sort, render
      --------------------------------------------------------------------- */
-  function matches(f) {
-    if (state.nonStop && !f.nonStop) return false;
-    if (state.airlines.size && !state.airlines.has(f.airline)) return false;
-    /* Origin, not just destination. The sample schedule is one base airport, so
-       this changes nothing today — but the criteria say HYD -> DEL and a list
-       that ignored the HYD would start lying the moment a second base lands. */
+  /** The free-text box in the toolbar, which is NOT one of the sidebar filters:
+   *  it searches across every field at once rather than narrowing one facet, so
+   *  it stays here and the panel stays generic. Everything else the sidebar
+   *  decides — see flight-filters.js. */
+  function matchesQuery(f) {
+    /* THE SEARCHED ROUTE, both ends. Origin matters as much as destination: the
+       sample schedule is one base airport so it changes nothing today, but the
+       criteria say HYD -> DEL and a list that ignored the HYD would start lying
+       the moment a second base lands.
+
+       This is the SEARCH's destination, which is not the sidebar's "Arrival
+       airport" filter — that one narrows within these results and is the
+       traveller's, this one is the query. */
     if (state.from && f.origin.code !== state.from) return false;
-    if (state.dests.size && !state.dests.has(f.destination.code)) return false;
-    if (state.windows.size && !state.windows.has(windowOf(minutesOf(f.departure)))) return false;
-    if (state.q) {
-      const hay = [f.flightNumber, f.flightNumberRaw, f.airline,
-                   f.destination.city, f.destination.code,
-                   f.origin.city, f.origin.code].join(' ').toLowerCase();
-      if (!hay.includes(state.q.toLowerCase())) return false;
-    }
-    return true;
+    if (state.to && f.destination.code !== state.to) return false;
+    if (!state.q) return true;
+    const hay = [f.flightNumber, f.flightNumberRaw, f.airline,
+                 f.destination.city, f.destination.code,
+                 f.origin.city, f.origin.code].join(' ').toLowerCase();
+    return hay.includes(state.q.toLowerCase());
+  }
+
+  /** Everything the query allows, before the sidebar has its say. This is the
+   *  set the filter panel derives its options and counts from — deriving them
+   *  from the whole schedule would offer airlines that the searched route does
+   *  not fly. */
+  const searchable = () => flights.filter(matchesQuery);
+
+  function matches(f) {
+    return matchesQuery(f)
+      && (typeof FlightFilters === 'undefined' || FlightFilters.test(f));
   }
 
   function sorted(list) {
-    const out = list.slice();
-    if (state.sort === 'dep-asc')  out.sort((a, b) => minutesOf(a.departure) - minutesOf(b.departure));
-    if (state.sort === 'dep-desc') out.sort((a, b) => minutesOf(b.departure) - minutesOf(a.departure));
-    if (state.sort === 'airline')  out.sort((a, b) => a.airline.localeCompare(b.airline)
-                                              || minutesOf(a.departure) - minutesOf(b.departure));
-    return out;
+    return (typeof FlightFilters !== 'undefined')
+      ? FlightFilters.sortRows(list, state.sort)
+      : list.slice();
   }
 
   /** The day these results are FOR.
@@ -313,51 +317,30 @@ const TravelExplore = (function () {
     </div>`;
   }
 
-  function facet(list, keyFn, labelFn) {
-    const counts = new Map();
-    list.forEach(f => {
-      const k = keyFn(f);
-      counts.set(k, (counts.get(k) || 0) + 1);
-    });
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
-      .map(([k, n]) => ({ key: k, label: labelFn(k), count: n }));
+  /* facet() lived here and counted one field into {key,label,count} rows. The
+     filter panel needs its counts computed against the OTHER active filters
+     rather than the whole set, so that job moved into flight-filters.js with
+     the definitions it belongs to. */
+
+  /** Hand the panel the current searchable set and repaint the sort menu.
+   *
+   *  Both are derived from the SAME rows, which is what keeps a sort mode from
+   *  being offered for data the filters have already decided does not exist —
+   *  "Lowest layover" over a list of non-stops, for instance. */
+  function renderFilters() {
+    if (typeof FlightFilters === 'undefined') return;
+    FlightFilters.setRows(searchable());
+    renderSortOptions();
   }
 
-  function renderFilters() {
-    const box = $('txFilters');
-    if (!box) return;
-    const airlines = facet(flights, f => f.airline, k => k);
-    const dests = facet(flights, f => f.destination.code,
-                        k => `${(TravelData.airports[k] || {}).city || k} (${k})`);
-    const wins = TIME_WINDOWS.map(w => ({
-      key: w.id, label: w.label,
-      count: flights.filter(f => windowOf(minutesOf(f.departure)) === w.id).length,
-    })).filter(w => w.count);
-
-    const group = (title, name, items, checkedSet) => `
-      <div class="tx-fgroup">
-        <h4>${esc(title)}</h4>
-        ${items.map(i => `<label class="tx-check">
-          <input type="checkbox" data-tx-facet="${esc(name)}" value="${esc(i.key)}"
-                 ${checkedSet.has(i.key) ? 'checked' : ''}>
-          <span>${esc(i.label)}</span><span class="tx-count">${i.count}</span>
-        </label>`).join('')}
-      </div>`;
-
-    box.innerHTML =
-      group('Airline', 'airlines', airlines, state.airlines) +
-      group('Departure time', 'windows', wins, state.windows) +
-      group('Destination', 'dests', dests, state.dests) +
-      `<div class="tx-fgroup">
-         <h4>Stops</h4>
-         <label class="tx-check">
-           <input type="checkbox" data-tx-nonstop ${state.nonStop ? 'checked' : ''}>
-           <span>Non-stop only</span>
-           <span class="tx-count">${flights.filter(f => f.nonStop).length}</span>
-         </label>
-       </div>
-       <button type="button" class="tx-clear" data-tx-clear>Clear all filters</button>`;
+  function renderSortOptions() {
+    const sel = $('txSort');
+    if (!sel || typeof FlightFilters === 'undefined') return;
+    const opts = FlightFilters.availableSorts();
+    if (!opts.some(o => o.id === state.sort)) state.sort = FlightFilters.DEFAULT_SORT;
+    sel.innerHTML = opts.map(o =>
+      `<option value="${esc(o.id)}"${o.id === state.sort ? ' selected' : ''}>${esc(o.label)}</option>`
+    ).join('');
   }
 
   function renderFlights() {
@@ -375,8 +358,19 @@ const TravelExplore = (function () {
 
     list.innerHTML = page.length
       ? page.map(flightCard).join('')
-      : `<div class="tx-empty"><b>No flights match those filters</b>
-           Try clearing a filter or searching for a different city.</div>`;
+      : `<div class="tx-empty">
+           <b>No flights match those filters</b>
+           Every result was ruled out by the filters currently on. Clear them to
+           see the full list again, or change the route and dates above.
+           <div class="tx-empty-acts">
+             <button type="button" class="tx-btn tx-btn-primary" data-tx-clear>Clear filters</button>
+             <button type="button" class="tx-btn tx-btn-ghost" data-tx-modify>Modify search</button>
+           </div>
+         </div>`;
+
+    /* Written on every render, so a filter, a sort and a "show more" all leave
+       a URL that reproduces exactly what is on screen. */
+    writeUrl();
 
     armIcons(list);
 
@@ -616,9 +610,6 @@ const TravelExplore = (function () {
    *  two cannot drift — landing-page criteria produce exactly the result set
    *  the button would have produced from the same values. */
   function applySearch() {
-    /* Destination narrows the facet set, which is what "search" means
-       against a client-side result list. */
-    state.dests = state.to ? new Set([state.to]) : new Set();
     state.shown = PAGE_SIZE;
     renderFilters();
     renderFlights();
@@ -738,7 +729,13 @@ const TravelExplore = (function () {
         ? BookingCard.encodeLegs(state.legs) : '',
       adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
       cabin: state.cabin,
+      q: state.q,
     };
+    /* THE FILTERS GO IN THE URL TOO, which is the whole of "persist across a
+       refresh, a sort change, opening a flight, and Back". They are namespaced
+       f_* by the module, so nothing here has to know what they are or how many
+       there now are — that is the point of asking it rather than listing them. */
+    if (typeof FlightFilters !== 'undefined') FlightFilters.writeParams(p);
     const qs = new URLSearchParams(
       Object.entries(p).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== 0));
     history.replaceState(null, '', `${location.pathname}?${qs.toString()}`);
@@ -788,12 +785,12 @@ const TravelExplore = (function () {
       state.pax = {
         adults: params.adults, children: params.children, infants: params.infants,
       };
-      /* A new search is a new result set: the old airline and time-window
-         filters were chosen against a different route and would silently hide
-         most of what was just asked for. */
-      state.airlines = new Set();
-      state.windows = new Set();
-      state.nonStop = false;
+      /* A NEW SEARCH CLEARS THE FILTERS. They were chosen against a different
+         route — an airline that flies HYD→DEL may not fly the next pair at all,
+         and a price band from a short hop would hide every result on a long
+         one. This is the one case that resets them; sorting, paging and opening
+         a flight all deliberately leave them alone. */
+      if (typeof FlightFilters !== 'undefined') FlightFilters.clear();
       state.q = '';
       const box = $('txSearch');
       if (box) box.value = '';
@@ -809,12 +806,35 @@ const TravelExplore = (function () {
       let t = null;
       search.addEventListener('input', () => {
         clearTimeout(t);
-        t = setTimeout(() => { state.q = search.value.trim(); state.shown = PAGE_SIZE; renderFlights(); }, 160);
+        t = setTimeout(() => {
+          state.q = search.value.trim();
+          state.shown = PAGE_SIZE;
+          /* The query changes which rows the panel is describing, so its
+             options and counts have to be re-derived, not just the list. */
+          renderFilters();
+          renderFlights();
+        }, 160);
+      });
+    }
+
+    /* The sidebar. Mounted once; setRows() feeds it and this fires on every
+       change it makes. Sorting is NOT reset here — the spec is explicit that
+       changing one must not clear the other, and they are separate state. */
+    if (typeof FlightFilters !== 'undefined') {
+      FlightFilters.mount($('txFilters'), () => {
+        state.shown = PAGE_SIZE;
+        renderFilters();
+        renderFlights();
       });
     }
 
     const sort = $('txSort');
-    if (sort) sort.addEventListener('change', () => { state.sort = sort.value; renderFlights(); });
+    if (sort) sort.addEventListener('change', () => {
+      state.sort = sort.value;
+      if (typeof FlightFilters !== 'undefined') FlightFilters.sort = sort.value;
+      /* Filters are untouched: only the order changes. */
+      renderFlights();
+    });
 
     const more = $('txMore');
     if (more) more.addEventListener('click', () => { state.shown += PAGE_SIZE; renderFlights(); });
@@ -824,28 +844,27 @@ const TravelExplore = (function () {
 
     /* Delegated: the filter panel and the result list are both re-rendered, so
        per-element listeners would be lost on every repaint. */
-    document.addEventListener('change', e => {
-      const cb = e.target.closest('[data-tx-facet]');
-      if (cb) {
-        const set = state[cb.dataset.txFacet];
-        cb.checked ? set.add(cb.value) : set.delete(cb.value);
+    document.addEventListener('click', e => {
+      /* Both buttons on the empty state, and the sidebar's own "clear all"
+         routes here too — one way to reset, wherever it is asked for. */
+      if (e.target.closest('[data-tx-clear]')) {
+        state.q = '';
         state.shown = PAGE_SIZE;
-        renderFlights();
+        if (search) search.value = '';
+        if (typeof FlightFilters !== 'undefined') FlightFilters.clear();
+        renderFilters(); renderFlights();
         return;
       }
-      if (e.target.closest('[data-tx-nonstop]')) {
-        state.nonStop = e.target.checked;
-        state.shown = PAGE_SIZE;
-        renderFlights();
-      }
-    });
-
-    document.addEventListener('click', e => {
-      if (e.target.closest('[data-tx-clear]')) {
-        state.q = ''; state.airlines.clear(); state.windows.clear(); state.dests.clear();
-        state.nonStop = false; state.shown = PAGE_SIZE;
-        if (search) search.value = '';
-        renderFilters(); renderFlights();
+      /* "Modify search" on the empty state: the card at the top of the page IS
+         the search form, so this puts them back in it rather than navigating. */
+      if (e.target.closest('[data-tx-modify]')) {
+        const dock = $('heroSearchDock');
+        if (dock) {
+          const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+          dock.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+          const first = dock.querySelector('input, button');
+          if (first) setTimeout(() => first.focus(), smooth ? 420 : 0);
+        }
         return;
       }
       const det = e.target.closest('[data-tx-details]');
@@ -990,6 +1009,20 @@ const TravelExplore = (function () {
          'premium'. Normalise here rather than teaching both sides both names. */
       state.cabin = cabin === 'premium-economy' ? 'premium' : cabin;
       mark();
+    }
+
+    /* The sidebar reads its own f_* parameters. Not marked as "seeded": a URL
+       carrying only filters is not a search, and marking it would scroll a
+       first-time visitor past the hero to a list they did not ask for. */
+    if (typeof FlightFilters !== 'undefined') {
+      FlightFilters.readParams(name => q.get(name));
+      state.sort = FlightFilters.sort;
+    }
+    const freeText = str('q', 80);
+    if (freeText) {
+      state.q = freeText;
+      const box = $('txSearch');
+      if (box) box.value = freeText;
     }
 
     const dest = str('dest', 80);   if (dest) { state.dest = dest; mark(); }
