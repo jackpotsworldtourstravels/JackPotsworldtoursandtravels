@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260825a">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827fe3">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827hd1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="hotels">
@@ -94,9 +94,11 @@
      navigating to index.html and discarding whatever is in progress.
      Loads from inside <body>: it injects its own modal markup. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/account-center.js?v=20260826ac1"></script>
-<script src="components/toast.js"></script>
+<!-- auth.js FIRST: account-center.js calls getStoredAuth() at module scope, so
+     parsing it before this file left the function undefined on first load. -->
 <script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/account-center.js?v=20260827fe4"></script>
+<script src="components/toast.js"></script>
 <!-- The vendored hotel photography map. No airline logos on this page. -->
 <script src="assets/js/hotel-images.js?v=20260824ic9"></script>
 <!-- The airport table travel-data.js reads. Must precede it. -->
@@ -118,7 +120,12 @@
      engine flights.html loads; only the definition list differs. -->
 <script src="assets/js/filter-engine.js?v=20260827fe3"></script>
 <script src="assets/js/hotel-filters.js?v=20260827fe3"></script>
-<script src="assets/js/travel-explore.js?v=20260827fe3"></script>
+<!-- The expanded panel and its parts. hotel-gallery.js first: hotel-details.js
+     asks it whether there are photographs before rendering that section. -->
+<script src="assets/js/wishlist.js?v=20260827hd1"></script>
+<script src="assets/js/hotel-gallery.js?v=20260827hd1"></script>
+<script src="assets/js/hotel-details.js?v=20260827hd1"></script>
+<script src="assets/js/travel-explore.js?v=20260827hd1"></script>
 <script src="assets/js/jp-icons.js?v=20260825a"></script>
 <script src="assets/js/service-shell.js?v=20260826ac1"></script>
 </body>

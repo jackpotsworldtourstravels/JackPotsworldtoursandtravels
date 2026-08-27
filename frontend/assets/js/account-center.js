@@ -696,7 +696,17 @@ function wireUpcomingJourneyActions() {
 async function loadUpcomingJourney() {
   const section = document.getElementById('upcomingJourneySection');
   const list = document.getElementById('upcomingJourneyList');
-  const { access } = getStoredAuth();
+  /* THE STRIP IS index.html's, and this file is loaded by every service page
+     too. Without this guard the call at module scope below threw on all of
+     them — `section` is null there — which is where the "Cannot read
+     properties of null (reading 'classList')" on hotels, flights, cruises and
+     packages came from. Nothing to render is not an error; it is this page
+     simply not having the strip. */
+  if (!section || !list) return;
+  /* Called at module scope, and on some pages this file is parsed before
+     auth.js — so the function it needs may genuinely not exist yet. Treated as
+     "not signed in", which is what an unreadable session means anyway. */
+  const { access } = (typeof getStoredAuth === 'function') ? getStoredAuth() : {};
   if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
   try {
     const data = await fetchAllCustomerBookings();

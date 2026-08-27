@@ -28,6 +28,8 @@ const TravelExplore = (function () {
     /* Hotels page out of the flights page's way: two results grids on two
        pages, each with its own sort and its own paging cursor. */
     hotelSort: 'recommended', hotelShown: PAGE_SIZE,
+    /* Which card is expanded, so a shared link reopens the same one. */
+    openHotel: null,
     /* Step 1 of the booking journey. These are carried into the flow so the
        traveller forms already know how many people to ask about — nobody
        should have to say "2 adults" twice. */
@@ -492,43 +494,106 @@ const TravelExplore = (function () {
     ).join('');
   }
 
+  /** The heart on a card. Rendered only where the module is loaded, so a page
+   *  that does not carry wishlist.js simply has no button rather than a
+   *  broken one. */
+  function wishlistButton(h) {
+    return (typeof Wishlist !== 'undefined') ? Wishlist.button('hotel', h.id, h.name) : '';
+  }
+
+  /** A discount, only if the API sends something to discount FROM. No field
+   *  does today, so the badge never renders — and will, unchanged, the moment
+   *  an original price appears on the row. */
+  function hotelDiscount(h) {
+    const was = Number(h.originalPrice != null ? h.originalPrice : h.strikePrice);
+    const now = Number(h.pricePerNight);
+    if (!Number.isFinite(was) || !Number.isFinite(now) || was <= now) return null;
+    return { pct: Math.round((was - now) / was * 100), was };
+  }
+
+  /* THE CARD'S HIERARCHY, in the order the eye should take it: the
+     photograph, then the name, then how good it is (stars + score), then where
+     it is, then what it costs. Amenities are capped at four because a card is
+     a summary — the rest are one click away in the expanded panel, and a chip
+     list that wraps to four rows buries the price under it. */
+  const CARD_AMENITIES = 4;
+
   function hotelCard(h) {
     /* Distance is optional on the API row, so the badge is too — an empty
        "km from airport" is worse than no badge. */
     const badge = h.distanceKm != null
       ? `<span class="tx-badge">${esc(h.distanceKm)} km from airport</span>` : '';
-    const rating = h.guestRating != null
-      ? `<span class="tx-guest-rating">${esc(h.guestRating.toFixed(1))} Guest rating</span>` : '';
-    const price = h.pricePerNight != null
-      ? `<div class="tx-price"><span>per night</span><b>${esc(money(h.pricePerNight))}</b><i>+ taxes &amp; fees</i></div>`
-      : `<div class="tx-price"><span>per night</span><b>Rate on request</b></div>`;
-    /* The free-cancellation badge is shown only when the policy text actually
-       says so — classified by the same reader the filter uses, so the badge and
-       the filter can never disagree. */
+
+    /* Guest rating as a scored block rather than a sentence: it is the number
+       people compare properties on, so it gets its own weight. The review
+       COUNT beside it is what makes a score trustworthy, so it renders the
+       moment the API sends one — and stays absent until then, because "4.6"
+       from three guests and from three thousand are not the same claim. */
+    const rating = h.guestRating != null ? `
+      <span class="tx-score" title="Guest rating">
+        <b>${esc(h.guestRating.toFixed(1))}</b>
+        <span>${esc(scoreWord(h.guestRating))}${h.reviewCount != null
+          ? ` · ${esc(Number(h.reviewCount).toLocaleString('en-IN'))} reviews` : ''}</span>
+      </span>` : '';
+
+    const disc = hotelDiscount(h);
+    const price = h.pricePerNight != null ? `
+      <div class="tx-price">
+        ${disc ? `<s class="tx-was">${esc(money(disc.was))}</s>` : ''}
+        <b>${esc(money(h.pricePerNight))}</b>
+        <span>per night</span>
+        <i>+ taxes &amp; fees</i>
+      </div>`
+      : `<div class="tx-price"><b>Rate on request</b></div>`;
+
+    /* Classified by the same reader the filter uses, so the badge and the
+       filter can never disagree about what the policy says. */
     const cancelKey = typeof HotelFilters !== 'undefined' ? HotelFilters.cancellationOf(h) : null;
     const cancelBadge = cancelKey && cancelKey !== 'non-refundable'
       ? `<span class="tx-chip is-good">${esc(HotelFilters.cancellationLabel(cancelKey))}</span>` : '';
+    /* Breakfast is the one amenity people filter a whole search on, so it gets
+       a badge of its own rather than sitting anonymously in the chip list. */
+    const meals = (h.amenities || []).find(a => /breakfast/i.test(a));
+    const mealBadge = meals ? `<span class="tx-chip is-good">${esc(meals)}</span>` : '';
+
+    const shown = (h.amenities || []).filter(a => a !== meals).slice(0, CARD_AMENITIES);
+    const restCount = Math.max(0, (h.amenities || []).length - shown.length - (meals ? 1 : 0));
 
     return `<article class="tx-card" data-hotel-card="${esc(h.id)}">
-      <div class="tx-media">${hotelImage(h)}${badge}</div>
+      <div class="tx-media">
+        ${hotelImage(h)}
+        ${badge}
+        ${disc ? `<span class="tx-deal">${disc.pct}% off</span>` : ''}
+        ${wishlistButton(h)}
+      </div>
       <div class="tx-body">
         <h3 class="tx-title">${esc(h.name)}</h3>
-        <div class="tx-stars">${starRow(h.stars)}${rating}</div>
+        <div class="tx-rate-row">${starRow(h.stars)}${rating}</div>
         <p class="tx-sub">${esc(h.location)}</p>
         <div class="tx-chips">
-          ${cancelBadge}
-          ${(h.amenities || []).map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}
+          ${cancelBadge}${mealBadge}
+          ${shown.map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}
+          ${restCount ? `<span class="tx-chip is-more">+${restCount} more</span>` : ''}
         </div>
-        ${h.cancellationPolicy ? `<p class="tx-cancel-note">${esc(h.cancellationPolicy)}</p>` : ''}
         <div class="tx-foot">
           ${price}
           <div class="tx-card-actions">
-            <button type="button" class="tx-btn tx-btn-ghost" data-tx-hotel-details="${esc(h.id)}">View Details</button>
-            <button type="button" class="tx-btn tx-btn-primary" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Select Room</button>
+            <button type="button" class="tx-btn tx-btn-ghost"
+                    data-tx-hotel-details="${esc(h.id)}" aria-expanded="false">View Details</button>
+            <button type="button" class="tx-btn tx-btn-primary"
+                    data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Book Now</button>
           </div>
         </div>
       </div>
     </article>`;
+  }
+
+  /** The word next to the score. Same thresholds the Guest rating filter bands
+   *  use, read from that one list so the card and the filter cannot disagree. */
+  function scoreWord(r) {
+    if (typeof HotelFilters === 'undefined' || !HotelFilters.RATING_BANDS) return '';
+    const band = HotelFilters.RATING_BANDS.find(b => r >= b.min);
+    return band ? band.label : '';
   }
 
   function renderHotels(all) {
@@ -569,6 +634,11 @@ const TravelExplore = (function () {
 
     el.innerHTML = page.map(hotelCard).join('');
     armIcons(el);
+    /* The cards were just replaced, so the hearts are freshly rendered from
+       whatever Wishlist knew at build time; repaint in case the saved set
+       arrived after the first render. */
+    if (typeof Wishlist !== 'undefined') Wishlist.refresh();
+    restoreOpenHotel();
 
     const more = $('txHotelMore');
     if (more) {
@@ -641,29 +711,59 @@ const TravelExplore = (function () {
     try { return await p; } catch (err) { hotelDetailCache.delete(id); throw err; }
   }
 
+  /* The panel's markup moved to hotel-details.js, which renders each section
+     only when the payload can fill it — gallery, rooms, about, amenities,
+     policies, charges, nearby and map — rather than the fixed four this used
+     to print whether or not there was anything in them. */
   function hotelDetailsHtml(h, detail) {
-    const rooms = (detail && detail.rooms) || [];
-    const roomRows = rooms.map(r => `
-      <article class="tx-room-opt">
-        <div class="tx-room-opt-body">
-          <b>${esc(r.name)}</b>
-          <span class="tx-room-opt-meta">${esc(r.bed_type || '')}${r.size_label ? ' · ' + esc(r.size_label) : ''} · up to ${esc(r.max_guests)} guests</span>
-          <span class="tx-chip">${esc(r.meal_plan)}</span>
-          ${r.cancellation_policy ? `<p class="tx-cancel-note">${esc(r.cancellation_policy)}</p>` : ''}
-        </div>
-        <div class="tx-room-opt-price">
-          <span>per night</span><b>${esc(money(r.price))}</b>
-          <button type="button" class="tx-btn tx-btn-primary tx-btn-sm" data-tx-buy="hotel" data-tx-id="${esc(h.id)}">Select Room</button>
-        </div>
-      </article>`).join('');
+    if (typeof HotelDetails === 'undefined') return '';
+    const body = HotelDetails.html(h, detail);
+    return body ? `<div class="tx-hotel-details">${body}</div>` : '';
+  }
 
-    return `<div class="tx-hotel-details">
-      <p>${esc((detail && detail.description) || '')}</p>
-      <div class="tx-chips">${(h.amenities || []).map(a => `<span class="tx-chip">${esc(a)}</span>`).join('')}</div>
-      ${h.cancellationPolicy ? `<p class="tx-cancel-note"><b>Cancellation policy:</b> ${esc(h.cancellationPolicy)}</p>` : ''}
-      <h4 class="tx-room-opt-head">Room options</h4>
-      <div class="tx-room-opts">${roomRows || '<p class="is-muted">No rooms available right now.</p>'}</div>
-    </div>`;
+  /** Expand one card. Its own function because the click handler and the
+   *  restore-from-URL path both need it, and because a details fetch can fail
+   *  on its own — separately from the catalogue that is already on screen. */
+  function openHotelDetails(card, btn, h) {
+    btn.textContent = 'Loading…';
+    btn.setAttribute('aria-busy', 'true');
+    hotelDetail(h.id).then(detail => {
+      const html = hotelDetailsHtml(h, detail);
+      btn.removeAttribute('aria-busy');
+      if (!html) {
+        /* Nothing the payload could fill. Saying so beats opening an empty
+           drawer and leaving the traveller to wonder what they missed. */
+        btn.textContent = 'No further details';
+        btn.disabled = true;
+        return;
+      }
+      btn.textContent = 'Hide Details';
+      btn.setAttribute('aria-expanded', 'true');
+      card.querySelector('.tx-body').insertAdjacentHTML('beforeend', html);
+      if (typeof HotelDetails !== 'undefined') HotelDetails.mount(card);
+      armIcons(card);
+      state.openHotel = h.id;
+      writeUrl();
+    }).catch(err => {
+      btn.removeAttribute('aria-busy');
+      btn.textContent = 'View Details';
+      /* The list is fine; only this panel failed. A toast says so without
+         replacing results the traveller can still use. */
+      if (typeof showToast === 'function') {
+        showToast('We could not load those details just now. Please try again.', 'error');
+      }
+      console.error('[explore] hotel details failed', h.id, err);
+    });
+  }
+
+  /** Re-open whatever the URL says was open, once the grid exists. */
+  function restoreOpenHotel() {
+    if (!state.openHotel) return;
+    const card = document.querySelector(`[data-hotel-card="${CSS.escape(state.openHotel)}"]`);
+    if (!card) return;
+    const btn = card.querySelector('[data-tx-hotel-details]');
+    const h = (catalogue.hotel || []).find(x => x.id === state.openHotel);
+    if (btn && h && !card.querySelector('.tx-hotel-details')) openHotelDetails(card, btn, h);
   }
 
   function renderCruises(rows) {
@@ -905,6 +1005,7 @@ const TravelExplore = (function () {
         dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
         rooms: state.rooms, guests: state.guests,
         price: state.priceRange && state.priceRange !== 'any' ? state.priceRange : undefined,
+        open: state.openHotel || undefined,
       });
       if (typeof HotelFilters !== 'undefined') HotelFilters.writeParams(p);
     }
@@ -1080,15 +1181,17 @@ const TravelExplore = (function () {
       if (hdet) {
         const card = hdet.closest('.tx-card');
         const open = card.querySelector('.tx-hotel-details');
-        if (open) { open.remove(); hdet.textContent = 'View Details'; return; }
+        if (open) {
+          open.remove();
+          hdet.textContent = 'View Details';
+          hdet.setAttribute('aria-expanded', 'false');
+          state.openHotel = null;
+          writeUrl();
+          return;
+        }
         const h = (catalogue.hotel || []).find(x => x.id === hdet.dataset.txHotelDetails);
         if (!h) return;
-        hdet.textContent = 'Loading…';
-        hotelDetail(h.id).then(detail => {
-          hdet.textContent = 'Hide Details';
-          card.querySelector('.tx-body').insertAdjacentHTML('beforeend', hotelDetailsHtml(h, detail));
-          armIcons(card);
-        }).catch(() => { hdet.textContent = 'View Details'; });
+        openHotelDetails(card, hdet, h);
         return;
       }
       /* --- Book Now: hand the chosen item to the booking engine ------------
@@ -1227,6 +1330,10 @@ const TravelExplore = (function () {
       const box = $('txSearch');
       if (box) box.value = freeText;
     }
+
+    /* Which card was expanded. Not "seeded": reopening a panel is not a
+       search, and marking it would scroll a visitor past the hero. */
+    const open = str('open', 40);   if (open) state.openHotel = open;
 
     const dest = str('dest', 80);   if (dest) { state.dest = dest; mark(); }
     const ci = day('checkIn');      if (ci)   { state.checkIn = ci; mark(); }
@@ -1513,6 +1620,11 @@ const TravelExplore = (function () {
       } else if (service === 'hotels') {
         const rows = await TravelData.hotels();
         allHotels = rows;
+        /* Started, not awaited: the saved set is a decoration on cards that
+           should render at once, and a slow wishlist must not hold the grid. */
+        if (typeof Wishlist !== 'undefined') {
+          Wishlist.init().then(() => Wishlist.refresh());
+        }
         mountHotelSearch(rows);
         /* Panel before grid: it derives the options and reconciles anything the
            URL asked for against what actually came back, so the first paint of
