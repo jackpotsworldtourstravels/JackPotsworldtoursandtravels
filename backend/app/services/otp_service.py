@@ -20,8 +20,14 @@ offline. Instead:
   the response under ``dev_otp``, so local development and demos work.
 
 :func:`delivery_mode` reports which is active, and the login response says
-so explicitly. There is no configuration flag to get this wrong: it follows
-``SMTP_HOST``/``SMTP_FROM_EMAIL`` directly.
+so explicitly.
+
+There is ONE override, added when SMTP was switched on for the website's
+contact form and local logins started waiting on Gmail: ``OTP_DEV_MODE=true``
+forces the dev path while leaving every other email sending. It is ANDed with
+``DEBUG`` (see ``Settings.otp_dev_mode_active``), because returning a login
+code in an API response is an authentication bypass and one stray environment
+variable should not be enough to cause it.
 """
 import datetime
 import hashlib
@@ -65,7 +71,15 @@ def _hash(code: str) -> str:
 
 
 def delivery_mode() -> str:
-    """``"email"`` when SMTP is configured, otherwise ``"dev"``."""
+    """``"email"`` when SMTP is configured, otherwise ``"dev"``.
+
+    ``OTP_DEV_MODE`` overrides that, but only with ``DEBUG`` also on — see
+    ``Settings.otp_dev_mode_active``. It exists because SMTP is now configured
+    for the website's contact form, and without it the only way back to codes
+    on screen was to turn that mail off too.
+    """
+    if settings.otp_dev_mode_active:
+        return DEV_MODE
     return EMAIL_MODE if (settings.smtp_host and settings.smtp_from_email) else DEV_MODE
 
 

@@ -30,6 +30,36 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_from_name: str = "JackPots World Tours & Travels"
 
+    # -----------------------------------------------------------------------
+    # Login codes on screen instead of in an inbox (development only).
+    # -----------------------------------------------------------------------
+    # OTP delivery normally follows SMTP: configured means the code is emailed
+    # and never leaves the server, unconfigured means it is logged and returned
+    # in `dev_otp` so an offline machine can still sign in.
+    #
+    # That coupling is a problem once SMTP is switched on for something ELSE —
+    # the contact form, say. Turning SMTP off to get the code back on screen
+    # takes the website's enquiry mail down with it; leaving it on means
+    # waiting on Gmail for every local login.
+    #
+    # This decouples the two. Set OTP_DEV_MODE=true and codes are shown in the
+    # response again while every other email keeps sending.
+    #
+    # IT CANNOT DO ANYTHING IN PRODUCTION, and that is the point. Returning a
+    # login code in an API response is a complete authentication bypass for
+    # anyone who can call the endpoint, so this is ANDed with `debug` — which
+    # production sets to false — rather than trusted on its own. Two switches
+    # have to be wrong at once, and the one that matters is already the one
+    # deployments are careful about.
+    otp_dev_mode: bool = False
+
+    @property
+    def otp_dev_mode_active(self) -> bool:
+        """True only when BOTH switches say so. The single place that answers
+        "are we handing login codes back to the caller?" — both OTP services
+        read this rather than reimplementing the AND."""
+        return bool(self.debug and self.otp_dev_mode)
+
     # Where booking-request documents (passports, visas, IDs) are written.
     # Deliberately OUTSIDE any served directory and never mounted with
     # StaticFiles — these files are returned only through an authenticated
