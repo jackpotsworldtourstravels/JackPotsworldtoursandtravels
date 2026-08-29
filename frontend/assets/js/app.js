@@ -1186,14 +1186,22 @@ function showOtpStep(challenge, message, origin) {
   box.focus();
 }
 
-/** Show the code when there is no mail server to send it to.
- *  The API only returns `dev_otp` in DEV_MODE, so on a mail-configured server
- *  this is always a no-op. Text content, never innerHTML — the value is echoed
- *  from a response and has no business being parsed as markup. */
+/** Show the code instead of emailing it.
+ *
+ *  The API returns `dev_otp` only in DEV_MODE — either because no mail server
+ *  is configured, or because OTP_DEV_MODE is on for local work while SMTP
+ *  keeps sending everything else. It is never present on a deployed server, so
+ *  this is a no-op there and the code arrives by email as normal.
+ *
+ *  It no longer says "email is not configured": that stopped being the only
+ *  reason the moment the contact form needed SMTP switched on.
+ *
+ *  Text content, never innerHTML — the value is echoed from a response and has
+ *  no business being parsed as markup. */
 function showDevOtp(code) {
   const el = document.getElementById('liDevOtp');
   if (!el) return;
-  el.textContent = code ? `Email is not configured on this server — your code is ${code}` : '';
+  el.textContent = code ? `Development mode — your code is ${code}` : '';
   el.className = code ? 'modal-devbox' : '';
 }
 
