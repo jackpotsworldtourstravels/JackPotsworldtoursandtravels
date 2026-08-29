@@ -9,7 +9,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 GUEST_TYPES = ("adult", "child")
 
@@ -48,6 +48,13 @@ class HotelSearchResult(BaseModel):
     pricePerNight: Decimal = Field(validation_alias="price_per_night")
     amenities: list[str]
     cancellation_policy: str | None
+    #: Derived from the property's rooms and its policy text — see the
+    #: properties of the same names on ``CustomerHotel``. Sent so the results
+    #: card can show a meal plan and a free-cancellation badge, and so the
+    #: filter rail can offer those facets, without the browser having to fetch
+    #: every property's rooms to find out.
+    meal_plans: list[str] = []
+    free_cancellation: bool = False
 
     @field_validator("id", mode="before")
     @classmethod
@@ -101,6 +108,10 @@ class GuestInput(BaseModel):
     ID at the desk, not a document this portal collects."""
 
     guest_type: str = "adult"
+    #: Which room this guest is staying in, 0-based, matching the order of
+    #: ``StayInput.room_ids``. Optional: a single-room booking has only one
+    #: answer, and callers that predate multi-room do not send it.
+    room_index: int | None = Field(default=None, ge=0, le=3)
     title: str | None = Field(default=None, max_length=10)
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -136,6 +147,32 @@ class StayInput(BaseModel):
     adults: int = Field(default=1, ge=1, le=32)
     children: int = Field(default=0, ge=0, le=16)
     child_ages: list[int] = Field(default_factory=list)
+    #: One room id per room booked, in the order the traveller configured them
+    #: — this is what lets a stay mix room types (see migration 0058). Optional
+    #: and empty by default, so every caller that predates it keeps describing
+    #: "``rooms_count`` of ``room_id``" and behaves exactly as before.
+    room_ids: list[int] = Field(default_factory=list, max_length=4)
+
+    @field_validator("room_ids")
+    @classmethod
+    def _positive(cls, v: list[int]) -> list[int]:
+        if any(r <= 0 for r in v):
+            raise ValueError("Every room id must be a positive number.")
+        return v
+
+    @model_validator(mode="after")
+    def _rooms_agree(self) -> "StayInput":
+        """``room_ids`` and ``rooms_count`` must describe the same stay.
+
+        Rather than let one silently win, a mismatch is refused: booking three
+        rooms while naming two of them is a client bug, and quietly picking
+        either interpretation would charge for a stay nobody asked for.
+        """
+        if self.room_ids and len(self.room_ids) != self.rooms_count:
+            raise ValueError(
+                f"{len(self.room_ids)} rooms were chosen but {self.rooms_count} were asked for."
+            )
+        return self
 
     @field_validator("check_out")
     @classmethod
@@ -172,6 +209,10 @@ class HotelQuoteResponse(BaseModel):
 
 
 class HotelBookingCreate(BaseModel):
+    #: Identifies ONE submission. Send the same key when retrying and the
+    #: server returns the booking it already made rather than making another
+    #: (migration 0060). Optional, so existing callers are unaffected.
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
     stay: StayInput
     guests: list[GuestInput] = Field(min_length=1, max_length=32)
     addons: list[HotelAddonSelection] = Field(default_factory=list)
@@ -180,10 +221,25 @@ class HotelBookingCreate(BaseModel):
     coupon_code: str | None = Field(default=None, max_length=40)
 
 
+class HotelBookingRoomResponse(BaseModel):
+    """One room on the stay. Present for every booking made after migration
+    0058; older bookings have none and are still fully described by the
+    parent's own ``room_name``/``rooms_count``."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    room_index: int
+    room_id: int
+    room_name: str
+    meal_plan: str | None
+    price_per_night: Decimal
+
+
 class HotelBookingGuestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     guest_index: int
+    room_index: int | None
     guest_type: str
     title: str | None
     first_name: str
@@ -253,6 +309,7 @@ class HotelBookingResponse(BaseModel):
     cancelled_at: dt.datetime | None
     created_at: dt.datetime
 
+    rooms: list[HotelBookingRoomResponse] = []
     guests: list[HotelBookingGuestResponse] = []
     addons: list[HotelBookingAddonResponse] = []
     payments: list[HotelBookingPaymentResponse] = []

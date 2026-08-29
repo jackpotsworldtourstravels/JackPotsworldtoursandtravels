@@ -2047,6 +2047,12 @@ const BookingProducts = (function () {
             stay: BookingApi.hotelPayload(ctx),
             guests: (ctx.passengers || []).map((p, i) => ({
               guest_type: String(p.kind || 'Adult').toLowerCase() === 'child' ? 'child' : 'adult',
+              /* Which room this guest is staying in. The Guest Details screen
+                 groups the party by room and that grouping has to survive the
+                 write, or the property receives names and rooms with nothing
+                 tying the two together (migration 0059). Null when the guest
+                 came from a flow that never asked. */
+              room_index: (p.roomIndex === undefined || p.roomIndex === null) ? null : p.roomIndex,
               title: p.title || null,
               /* The API carries no middle name (customer_booking.py has
                  first_name/last_name only), and an airline's given-name field
@@ -2151,11 +2157,28 @@ const BookingProducts = (function () {
           `<li>${esc(p.title)} ${esc(p.first)} ${esc(p.last)}
              <span>${esc(p.kind || 'Adult')}${b.seats && b.seats[i] ? ' · Seat ' + esc(b.seats[i]) : ''}</span></li>`).join('');
 
+        /* THE HEADLINE MUST MATCH THE STATUS.
+           No payment gateway is integrated, so a server booking is created
+           `pending` and stays there — nothing has been paid and no property
+           has confirmed anything. Saying "Booking confirmed" over a pending
+           booking is the one claim this screen must never make.
+
+           Scoped to hotels deliberately. Flight bookings are created `pending`
+           for exactly the same reason and carry exactly the same wrong
+           headline, but the Flights journey is signed off and is not being
+           changed here — see the Phase 6 report. */
+        const confirmed = /confirm|complete|paid/i.test(String(b.status || ''));
+        const heading = (isHotel && !confirmed) ? 'Booking received' : 'Booking confirmed';
+        const subline = (isHotel && !confirmed)
+          ? `${esc(ctx.summaryTitle || '')} — held against your account. Your booking
+             is <b>pending</b> until payment is arranged; nothing has been charged.`
+          : `Your booking has been successfully confirmed.
+             ${esc(ctx.summaryTitle || '')} — recorded against your account.`;
+
         return `<div class="bk-step bk-done">
             <div class="bk-done-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('insurance', { size: 'xl' }) : ''}</div>
-            <h2>Booking confirmed</h2>
-            <p class="bk-step-sub">Your booking has been successfully confirmed.
-              ${esc(ctx.summaryTitle || '')} — recorded against your account.</p>
+            <h2>${heading}</h2>
+            <p class="bk-step-sub">${subline}</p>
 
             <div class="bk-refs">${refs}</div>
 

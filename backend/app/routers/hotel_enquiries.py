@@ -63,8 +63,11 @@ def create_hotel_enquiry(
     tags=["merchant · hotel enquiry"],
     summary="Hotel Enquiry listing",
     description=(
-        "Requires `ticket.view`. A merchant sees only its own hotel enquiries; platform staff "
-        "see every merchant's. Search matches the reference, destination and hotel name."
+        "Requires `ticket.view`, and the merchant's company must have Hotels service access "
+        "enabled — reading hotel data is using Hotels, so a company whose entitlement is off "
+        "gets 403 here too, not just on create. Platform staff are exempt and see every "
+        "merchant's, entitled or not. A merchant sees only its own. Search matches the "
+        "reference, destination and hotel name."
     ),
 )
 def list_hotel_enquiries(
@@ -89,7 +92,12 @@ def list_hotel_enquiries(
     response_model=HotelEnquiryResponse,
     tags=["merchant · hotel enquiry"],
     summary="Hotel enquiry detail",
-    description="Requires `ticket.view`. Everything the View Details card shows.",
+    description=(
+        "Requires `ticket.view`, and the merchant's company must have Hotels service access "
+        "enabled (same rule as the listing — checked before the row is looked up, so an "
+        "unentitled merchant gets the same 403 for every id rather than a 403/404 split that "
+        "would say which ids exist). Everything the View Details card shows."
+    ),
 )
 def get_hotel_enquiry(
     enquiry_id: int,

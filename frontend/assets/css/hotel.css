@@ -1,0 +1,1560 @@
+/* ===========================================================================
+   hotel.css — the B2C Hotel booking screens.
+   ===========================================================================
+   Phase 1 covers Hotel Results: the three-column layout (filters / results /
+   booking summary), the search summary bar, the horizontal stepper and the
+   sticky action bar.
+
+   NAMESPACE. Everything here is prefixed `hr-` and nothing outside this file
+   uses that prefix, so these rules cannot reach the Flights screens, the
+   Explore band (`tx-`), the shared booking engine (`bk-`) or the merchant
+   portals. That is deliberate: flights are complete and must stay untouched.
+
+   TOKENS. Every colour is an alias over the product's own `--sp-*` tokens —
+   see the block below for why that also means this file carries no dark-mode
+   rules of its own.
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Tokens.
+
+   THERE IS NO DARK BLOCK IN THIS FILE, ON PURPOSE. Every value below is an
+   alias over the site's own `--sp-*` tokens, and service-page.css already
+   redefines those for all three theme states (explicit light, explicit dark,
+   and the un-stamped "system" default). Re-declaring a hotel-specific dark
+   palette here would be a second set of colours to keep in sync, and the two
+   would drift the first time either changed. Aliasing means this screen
+   follows the product's theme by construction.
+
+   The tiers the design system does not have — a third text weight, a softer
+   rule, tinted callout grounds — are mixed FROM those tokens rather than
+   hardcoded, so they flip with the theme too.
+   --------------------------------------------------------------------------- */
+.hr-scope {
+  --hr-ink:        var(--sp-ink, #0A2540);
+  /* Three text tiers, all of which must clear 4.5:1 on a card in BOTH themes.
+     Mixing the quiet tier toward the page GROUND (the obvious way to get a
+     lighter grey) took it to 3.35:1 on white and failed AA, so the hierarchy
+     is built the other way: the middle tier is pulled toward the ink and the
+     quiet tier is the design system's muted value untouched. Mixing toward
+     `--sp-ink` adapts in both directions on its own, because that token is
+     dark in light mode and near-white in dark mode. */
+  --hr-ink-2:      color-mix(in srgb, var(--sp-muted, #5B6B82) 68%, var(--sp-ink, #0A2540));
+  --hr-ink-3:      var(--sp-muted, #5B6B82);
+  --hr-line:       var(--sp-line, rgba(10, 37, 64, .10));
+  --hr-line-soft:  color-mix(in srgb, var(--sp-line, rgba(10, 37, 64, .10)) 55%, transparent);
+  --hr-surface:    var(--sp-surface, #FFFFFF);
+  --hr-surface-2:  var(--sp-surface-2, #F1F5F9);
+  --hr-ground:     var(--sp-bg, #F8FAFC);
+
+  /* The same two-weight accent the rest of the product uses: `--sp-accent`
+     fills a primary button (matching .bk-btn-primary on the Flights screens),
+     `--sp-accent-dk` is the darker weight for accent TEXT, which needs more
+     contrast against a light surface than the bright coral gives it. */
+  --hr-accent:     var(--sp-accent, #FF4D4D);
+  --hr-accent-dk:  var(--sp-accent-dk, #E63946);
+  --hr-accent-ink: #ffffff;
+  --hr-accent-soft:var(--sp-accent-soft, rgba(255, 77, 77, .12));
+
+  /* The design system's emerald is a FILL colour: as text on white it is only
+     2.6:1, and white text on it fails just as badly. So it is split in two.
+     `--hr-ok` is pulled toward the ink for use as TEXT, which darkens it in
+     light mode and lightens it in dark mode; `--hr-ok-fill` stays dark in
+     both themes because it always carries white text on it. */
+  --hr-ok:         color-mix(in srgb, var(--sp-emerald, #12B76A) 62%, var(--sp-ink, #0A2540));
+  /* 60% measured at 4.9:1 against white. The badge and the completed step dot
+     both set 11.5–12.5px bold white on this, which is NOT "large text" under
+     WCAG, so it needs the full 4.5:1 — the design system's emerald straight
+     managed only 2.6:1 and the first darkening pass only 3.9:1. */
+  --hr-ok-fill:    color-mix(in srgb, var(--sp-emerald, #12B76A) 60%, #06301B);
+  --hr-ok-soft:    color-mix(in srgb, var(--sp-emerald, #12B76A) 14%, transparent);
+  --hr-star:       var(--sp-gold, #FFB020);
+
+  --hr-radius:     12px;
+  --hr-radius-sm:  8px;
+  /* Built on the ink token, so the shadow deepens with the dark ground
+     instead of staying a light-mode navy nobody can see. */
+  --hr-shadow:     0 1px 2px color-mix(in srgb, var(--sp-ink, #0A2540) 6%, transparent),
+                   0 6px 20px -10px color-mix(in srgb, var(--sp-ink, #0A2540) 18%, transparent);
+  --hr-shadow-lg:  0 2px 6px color-mix(in srgb, var(--sp-ink, #0A2540) 9%, transparent),
+                   0 18px 40px -20px color-mix(in srgb, var(--sp-ink, #0A2540) 30%, transparent);
+}
+
+.hr-scope {
+  background: var(--hr-ground);
+  color: var(--hr-ink);
+  /* Room for the sticky action bar so the last card is never trapped under it. */
+  padding-bottom: 104px;
+}
+.hr-scope *,
+.hr-scope *::before,
+.hr-scope *::after { box-sizing: border-box; }
+
+.hr-wrap {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ---------------------------------------------------------------------------
+   Suppressing the Explore band while a hotel screen owns the page.
+
+   `hidden` is not sufficient on these elements: `.tx-head` sets
+   `display: flex`, which ties on specificity with the user agent's
+   `[hidden] { display: none }` and wins on source order, so the "hidden"
+   heading still occupied 60px. These two classes are the reliable form.
+   Scoped by element, never by a bare `[hidden]` override, so nothing else on
+   the page changes behaviour.
+   --------------------------------------------------------------------------- */
+.tx-section.hr-collapsed { display: none; }
+.tx-scope .hr-hidden { display: none; }
+
+/* The service-page banner is 256px of breadcrumb, a second "Hotels" title and
+   a duplicate of the service switcher that already sits in the site header.
+   The approved booking screens go straight from header to criteria bar, and
+   with the banner in place the first real content sat 531px down. Suppressed
+   only while a hotel booking screen is on — `hr-booking` is set by
+   hotel-results.js on this page alone, so no other service page is affected
+   and the Flights UI is untouched. */
+body.hr-booking .sp-hero { display: none; }
+
+/* ===========================================================================
+   Search summary bar — the criteria, always visible, with Modify Search.
+   =========================================================================== */
+.hr-searchbar {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 20px 0 0;
+  overflow: hidden;
+}
+.hr-sb-field {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 14px 20px;
+  border-right: 1px solid var(--hr-line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+}
+.hr-sb-field:last-of-type { border-right: 0; }
+.hr-sb-label {
+  font-size: 11.5px;
+  color: var(--hr-ink-3);
+  letter-spacing: .02em;
+}
+.hr-sb-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hr-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hr-sb-sub { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-sb-action { display: flex; align-items: center; padding: 12px 16px; flex: none; }
+
+/* ===========================================================================
+   Stepper — horizontal only. No vertical timeline anywhere in this flow.
+   =========================================================================== */
+.hr-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 18px 0 22px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.hr-stepper::-webkit-scrollbar { display: none; }
+.hr-step { display: flex; align-items: center; gap: 9px; flex: none; }
+.hr-step-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--hr-surface);
+  color: var(--hr-ink-3);
+  border: 1.5px solid var(--hr-line);
+  flex: none;
+}
+.hr-step-label {
+  font-size: 13px;
+  color: var(--hr-ink-3);
+  white-space: nowrap;
+}
+.hr-step-line {
+  width: 46px;
+  height: 1.5px;
+  background: var(--hr-line);
+  margin: 0 12px;
+  flex: none;
+}
+.hr-step.is-done .hr-step-dot {
+  background: var(--hr-ok-fill);
+  border-color: var(--hr-ok-fill);
+  color: #fff;
+}
+.hr-step.is-done .hr-step-label { color: var(--hr-ink-2); }
+.hr-step.is-done + .hr-step-line { background: var(--hr-ok-fill); }
+.hr-step.is-current .hr-step-dot {
+  background: var(--hr-accent);
+  border-color: var(--hr-accent);
+  color: var(--hr-accent-ink);
+}
+.hr-step.is-current .hr-step-label {
+  color: var(--hr-accent-dk);
+  font-weight: 600;
+}
+
+/* ===========================================================================
+   The three-column grid.
+   Widths follow the reference: a narrow filter rail, the results taking the
+   remaining space, and a summary rail wide enough for a price breakdown.
+   =========================================================================== */
+.hr-layout {
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr) 316px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Both rails stick; the results column scrolls past them. */
+.hr-rail {
+  position: sticky;
+  top: 16px;
+  /* Never taller than the viewport, or the bottom of a long filter list
+     becomes unreachable. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* ===========================================================================
+   Filters
+   =========================================================================== */
+.hr-filters {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  overflow: hidden;
+}
+.hr-filters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hr-line-soft);
+}
+.hr-filters-head h2 { font-size: 15.5px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-group { padding: 14px 16px; border-bottom: 1px solid var(--hr-line-soft); }
+.hr-group:last-child { border-bottom: 0; }
+.hr-group h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--hr-ink);
+  letter-spacing: .01em;
+}
+.hr-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--hr-ink-2);
+}
+.hr-opt input { flex: none; width: 15px; height: 15px; accent-color: var(--hr-accent); cursor: pointer; margin: 0; }
+.hr-opt-label { flex: 1; min-width: 0; }
+.hr-opt-count { color: var(--hr-ink-3); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.hr-opt input:disabled { cursor: not-allowed; }
+.hr-opt:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+.hr-opt:hover:not(:has(input:disabled)) .hr-opt-label { color: var(--hr-ink); }
+
+.hr-price-read {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--hr-ink-2);
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.hr-range { width: 100%; accent-color: var(--hr-accent); margin: 2px 0 0; cursor: pointer; }
+
+.hr-linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--hr-accent-dk);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+.hr-linkbtn:hover { text-decoration: underline; }
+
+/* ===========================================================================
+   Results column
+   =========================================================================== */
+.hr-results-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.hr-results-title { font-size: 21px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-results-sub { font-size: 13px; color: var(--hr-ink-3); }
+.hr-results-count { margin-left: auto; font-size: 13.5px; color: var(--hr-ink-2); font-variant-numeric: tabular-nums; }
+
+.hr-sortbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  padding: 9px 14px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: var(--hr-ink-2);
+}
+.hr-sortbar select {
+  font: inherit;
+  font-weight: 600;
+  color: var(--hr-ink);
+  /* No `background` shorthand here: on a bare <select> it tiles the native
+     caret across the control in dark mode. Set the colour only. */
+  background-color: transparent;
+  border: 1px solid var(--hr-line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+/* ---- Hotel card ---------------------------------------------------------- */
+.hr-cards { display: flex; flex-direction: column; gap: 14px; }
+
+.hr-card {
+  display: grid;
+  grid-template-columns: 214px minmax(0, 1fr);
+  gap: 0;
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  overflow: hidden;
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.hr-card:hover { box-shadow: var(--hr-shadow-lg); border-color: var(--hr-ink-3); }
+.hr-card.is-selected {
+  border-color: var(--hr-accent);
+  box-shadow: 0 0 0 1px var(--hr-accent), var(--hr-shadow-lg);
+}
+
+.hr-card-media { position: relative; background: var(--hr-surface-2); min-height: 188px; }
+.hr-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+.hr-card-badge {
+  position: absolute;
+  top: 10px; left: 10px;
+  background: rgba(16, 35, 63, .82);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 5px;
+  z-index: 1;
+}
+
+.hr-card-body { padding: 15px 18px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.hr-card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; }
+.hr-card-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.hr-name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hr-name { font-size: 17px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-stars { display: inline-flex; gap: 1px; color: var(--hr-star); font-size: 13px; line-height: 1; }
+
+.hr-loc { font-size: 13px; color: var(--hr-ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hr-loc .hr-dot { color: var(--hr-ink-3); }
+
+.hr-rating-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.hr-rating {
+  background: var(--hr-ok-fill);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.hr-rating-word { font-size: 13px; font-weight: 600; color: var(--hr-ink); }
+
+.hr-amenities { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 1px; }
+.hr-amenity { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--hr-ink-2); }
+
+.hr-notes { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
+.hr-note-ok { font-size: 12.5px; color: var(--hr-ok); font-weight: 600; }
+.hr-note-plain { font-size: 12.5px; color: var(--hr-ink-3); }
+
+/* Price block — the loudest thing on the card, per the reference. */
+.hr-card-price { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.hr-price-main {
+  font-size: 23px;
+  font-weight: 800;
+  color: var(--hr-ink);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hr-price-tax { font-size: 12px; color: var(--hr-ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hr-price-for { font-size: 12px; color: var(--hr-ink-3); white-space: nowrap; }
+.hr-card-cta { margin-top: 8px; }
+
+/* ---- states -------------------------------------------------------------- */
+.hr-skeleton {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  height: 190px;
+  overflow: hidden;
+  position: relative;
+}
+.hr-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--hr-surface-2), transparent);
+  transform: translateX(-100%);
+  animation: hr-shimmer 1.3s infinite;
+}
+@keyframes hr-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .hr-skeleton::after { animation: none; }
+}
+
+.hr-empty, .hr-error {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  padding: 40px 28px;
+  text-align: center;
+  box-shadow: var(--hr-shadow);
+}
+.hr-empty b, .hr-error b { display: block; font-size: 16.5px; margin-bottom: 6px; color: var(--hr-ink); }
+.hr-empty p, .hr-error p { margin: 0 0 16px; color: var(--hr-ink-2); font-size: 14px; }
+
+/* ===========================================================================
+   Booking Summary rail
+   =========================================================================== */
+.hr-summary {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  overflow: hidden;
+}
+.hr-sum-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hr-line-soft);
+}
+.hr-sum-head h2 { font-size: 15.5px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-sum-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+.hr-sum-hotel { display: flex; gap: 11px; align-items: flex-start; }
+.hr-sum-thumb {
+  width: 54px; height: 54px;
+  border-radius: var(--hr-radius-sm);
+  object-fit: cover;
+  flex: none;
+  background: var(--hr-surface-2);
+}
+.hr-sum-hotel-name { font-size: 14px; font-weight: 700; color: var(--hr-ink); margin: 0 0 2px; }
+.hr-sum-hotel-loc { font-size: 12.5px; color: var(--hr-ink-3); }
+
+.hr-sum-dest { font-size: 15.5px; font-weight: 700; color: var(--hr-ink); }
+.hr-sum-dates { font-size: 13px; color: var(--hr-ink-2); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.hr-sum-meta { font-size: 13px; color: var(--hr-ink-2); }
+
+.hr-sum-rule { height: 1px; background: var(--hr-line-soft); margin: 2px 0; }
+.hr-sum-sec-title { font-size: 13.5px; font-weight: 700; color: var(--hr-ink); }
+
+.hr-sum-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--hr-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.hr-sum-line b { font-weight: 600; color: var(--hr-ink); }
+
+.hr-sum-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hr-line-soft);
+}
+.hr-sum-total-label { font-size: 15px; font-weight: 700; color: var(--hr-ink); }
+.hr-sum-total-value {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--hr-accent-dk);
+  font-variant-numeric: tabular-nums;
+}
+.hr-sum-note { font-size: 11.5px; color: var(--hr-ink-3); }
+
+.hr-sum-callout {
+  background: var(--hr-ok-soft);
+  border: 1px solid color-mix(in srgb, var(--hr-ok) 30%, transparent);
+  border-radius: var(--hr-radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.hr-sum-callout b { display: block; font-size: 12.5px; color: var(--hr-ok); font-weight: 700; }
+.hr-sum-callout span { font-size: 12px; color: var(--hr-ink-2); }
+
+.hr-trust { display: flex; flex-direction: column; gap: 11px; padding: 0 16px 16px; }
+.hr-trust-row { display: flex; gap: 10px; align-items: flex-start; }
+.hr-trust-row b { display: block; font-size: 12.5px; color: var(--hr-ink); font-weight: 600; }
+.hr-trust-row span { font-size: 11.5px; color: var(--hr-ink-3); }
+
+.hr-sum-placeholder {
+  padding: 18px 16px 22px;
+  text-align: center;
+  color: var(--hr-ink-3);
+  font-size: 13px;
+}
+
+/* ===========================================================================
+   Sticky action bar
+   =========================================================================== */
+.hr-actionbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--hr-surface);
+  border-top: 1px solid var(--hr-line);
+  box-shadow: 0 -4px 20px -8px color-mix(in srgb, var(--sp-ink, #0A2540) 24%, transparent);
+  z-index: 40;
+  /* No backdrop-filter: it creates a containing block that breaks the
+     position:fixed of anything rendered inside. */
+}
+.hr-actionbar-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.hr-ab-item { display: flex; align-items: center; gap: 10px; flex: none; }
+.hr-ab-item b { display: block; font-size: 13.5px; font-weight: 600; color: var(--hr-ink); }
+.hr-ab-item span { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-ab-sep { width: 1px; align-self: stretch; background: var(--hr-line-soft); flex: none; }
+.hr-ab-total { margin-left: auto; text-align: right; flex: none; }
+.hr-ab-total b {
+  display: block;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--hr-ink);
+  font-variant-numeric: tabular-nums;
+}
+.hr-ab-total span { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-ab-cta { flex: none; text-align: center; }
+.hr-ab-cta span { display: block; font-size: 11.5px; color: var(--hr-ink-3); margin-top: 4px; }
+
+/* ===========================================================================
+   Buttons — hotel-scoped so they cannot restyle any other screen.
+   Equal-specificity source-order losses are why every state is written here
+   rather than inherited from a global .btn.
+   =========================================================================== */
+.hr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 10px 18px;
+  border-radius: var(--hr-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.hr-btn-primary { background-color: var(--hr-accent); color: var(--hr-accent-ink); border-color: var(--hr-accent); }
+.hr-btn-primary:hover { background-color: var(--hr-accent-dk); border-color: var(--hr-accent-dk); }
+.hr-btn-ghost { background-color: var(--hr-surface); color: var(--hr-ink); border-color: var(--hr-line); }
+.hr-btn-ghost:hover { border-color: var(--hr-ink-3); background-color: var(--hr-ground); }
+.hr-btn-lg { font-size: 15px; padding: 12px 26px; }
+.hr-btn:disabled,
+.hr-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.hr-btn:disabled:hover,
+.hr-btn[aria-disabled="true"]:hover { background-color: var(--hr-accent); border-color: var(--hr-accent); }
+
+/* One visible focus treatment for every interactive thing on the page. */
+.hr-scope :is(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--hr-accent-dk);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.hr-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===========================================================================
+   Responsive
+   ===========================================================================
+   1440 / 1366 / 1280 keep all three columns; the rails narrow first. Below
+   1120 the summary drops under the results (it is restated in the sticky bar,
+   so nothing is lost). Below 900 the filter rail collapses into a disclosure.
+   =========================================================================== */
+@media (max-width: 1439px) {
+  .hr-layout { grid-template-columns: 236px minmax(0, 1fr) 300px; gap: 16px; }
+  .hr-wrap { padding: 0 20px; }
+  .hr-actionbar-inner { padding: 12px 20px; }
+}
+@media (max-width: 1320px) {
+  .hr-layout { grid-template-columns: 220px minmax(0, 1fr) 284px; }
+  .hr-card { grid-template-columns: 190px minmax(0, 1fr); }
+  .hr-ab-item.hr-ab-hide-sm { display: none; }
+}
+@media (max-width: 1120px) {
+  .hr-layout { grid-template-columns: 216px minmax(0, 1fr); }
+  .hr-rail-summary { grid-column: 1 / -1; position: static; max-height: none; }
+}
+@media (max-width: 900px) {
+  .hr-layout { grid-template-columns: minmax(0, 1fr); }
+  .hr-rail-filters { position: static; max-height: none; }
+  .hr-searchbar { flex-wrap: wrap; }
+  .hr-sb-field { flex-basis: 50%; border-right: 0; border-bottom: 1px solid var(--hr-line-soft); }
+  .hr-sb-action { flex-basis: 100%; }
+  .hr-sb-action .hr-btn { width: 100%; }
+}
+@media (max-width: 720px) {
+  .hr-wrap { padding: 0 14px; }
+  .hr-card { grid-template-columns: minmax(0, 1fr); }
+  .hr-card-media { min-height: 172px; }
+  .hr-card-top { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .hr-card-price { text-align: left; align-items: flex-start; }
+  .hr-card-cta .hr-btn { width: 100%; }
+  .hr-sb-field { flex-basis: 100%; }
+
+  /* The action bar keeps only the total and the CTA on a phone. */
+  .hr-actionbar-inner { padding: 10px 14px; gap: 12px; }
+  .hr-ab-item, .hr-ab-sep { display: none; }
+  .hr-ab-total { margin-left: 0; }
+  .hr-ab-cta { flex: 1; }
+  .hr-ab-cta .hr-btn { width: 100%; }
+  .hr-ab-cta span { display: none; }
+  .hr-scope { padding-bottom: 86px; }
+
+  .hr-results-title { font-size: 19px; }
+  .hr-price-main { font-size: 21px; }
+}
+
+/* iOS zooms any input whose text is under 16px when it receives focus. */
+@media (max-width: 720px) {
+  .hr-scope :is(input, select, textarea) { font-size: 16px; }
+}
+
+/* ===========================================================================
+   HOTEL DETAILS (Phase 2)
+   ===========================================================================
+   Two columns rather than the Results screen's three: the gallery and the
+   content need the width, and there is no filter rail to keep. The summary
+   rail keeps exactly the proportions and styling it has on Results, so the
+   two screens read as one product.
+   =========================================================================== */
+.hr-hd-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 22px;
+  align-items: start;
+}
+
+.hr-backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  margin-bottom: 12px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--hr-accent-dk);
+  cursor: pointer;
+}
+.hr-backlink:hover { text-decoration: underline; }
+.hr-back-ico { transform: rotate(90deg); }
+
+/* ---- Hero: gallery beside the property's identity ------------------------ */
+.hr-hd-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 470px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* ---- Gallery ------------------------------------------------------------- */
+.hr-gallery { margin: 0; position: relative; min-width: 0; }
+.hr-gal-frame {
+  position: relative;
+  width: 100%;
+  /* A fixed ratio rather than a fixed height, so the frame is the same shape
+     at every width and the image never letterboxes. */
+  aspect-ratio: 16 / 9;
+  background: var(--hr-surface-2);
+  border-radius: var(--hr-radius);
+  overflow: hidden;
+  border: 1px solid var(--hr-line);
+}
+.hr-gal-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Shown only when the img failed and removed itself. */
+.hr-gal-broken {
+  display: none;
+  position: absolute;
+  inset: 0;
+  place-items: center;
+  color: var(--hr-ink-3);
+  font-size: 14px;
+}
+.hr-gal-frame.is-broken .hr-gal-broken { display: grid; }
+
+.hr-gal-thumbs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.hr-gal-thumb {
+  flex: none;
+  width: 104px;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border-radius: var(--hr-radius-sm);
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--hr-surface-2);
+  cursor: pointer;
+}
+.hr-gal-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hr-gal-thumb.is-on { border-color: var(--hr-accent); }
+
+.hr-gal-count {
+  position: absolute;
+  right: 10px;
+  /* Sits on the image, clear of the thumbnail strip below it. */
+  top: calc(56.25% - 34px);
+  background: color-mix(in srgb, #05101f 78%, transparent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hr-gal-cap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+}
+.hr-gal-credit { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-gal-credit a { color: inherit; }
+/* An honest caption, not a disclaimer to hide: the photograph is of the chain,
+   so it is labelled as such rather than passed off as this building. */
+.hr-gal-standin {
+  font-size: 12px;
+  color: var(--hr-ink-2);
+  font-style: italic;
+}
+
+.hr-card-credit {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 3px 8px;
+  background: color-mix(in srgb, #05101f 66%, transparent);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.35;
+  z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Header -------------------------------------------------------------- */
+.hr-hd-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.hr-hd-name { font-size: 26px; font-weight: 800; margin: 0; color: var(--hr-ink); letter-spacing: -.015em; }
+
+/* ---- Tabs ---------------------------------------------------------------- */
+.hr-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 0;
+  border-bottom: 1px solid var(--hr-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hr-tabs::-webkit-scrollbar { display: none; }
+.hr-tab {
+  flex: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hr-ink-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hr-tab:hover { color: var(--hr-ink); }
+.hr-tab.is-on { color: var(--hr-accent-dk); border-bottom-color: var(--hr-accent); }
+
+.hr-panel {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-top: 0;
+  border-radius: 0 0 var(--hr-radius) var(--hr-radius);
+  padding: 20px 22px;
+  box-shadow: var(--hr-shadow);
+}
+.hr-panel:focus-visible { outline: 2px solid var(--hr-accent-dk); outline-offset: -2px; }
+.hr-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--hr-ink);
+}
+.hr-prose { margin: 0; color: var(--hr-ink-2); font-size: 14.5px; line-height: 1.65; max-width: 68ch; }
+.hr-prose + .hr-panel-title { margin-top: 22px; }
+.hr-amenity-grid + .hr-panel-title { margin-top: 22px; }
+.hr-panel-note { margin: 14px 0 0; font-size: 12.5px; color: var(--hr-ink-3); }
+
+.hr-amenity-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 9px 18px;
+}
+.hr-amenity-grid li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  color: var(--hr-ink-2);
+}
+.hr-amenity-grid li svg { color: var(--hr-ok); flex: none; }
+
+.hr-policy-list { margin: 0; padding-left: 18px; color: var(--hr-ink-2); font-size: 14px; }
+.hr-policy-list li { margin-bottom: 6px; }
+
+/* The map drops in here when coordinates exist; the slot is sized so adding
+   one does not shift anything below it. */
+.hr-mapslot {
+  margin-top: 14px;
+  min-height: 220px;
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-surface-2);
+  border: 1px solid var(--hr-line);
+}
+
+/* ---- Room list on the details page --------------------------------------- */
+.hr-roomlist { display: flex; flex-direction: column; gap: 10px; }
+.hr-roomrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-surface);
+}
+.hr-roomrow-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hr-roomrow-main > b { font-size: 15px; font-weight: 700; color: var(--hr-ink); }
+.hr-roomrow-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--hr-ink-2); }
+.hr-roomrow-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.hr-roomrow-perks { display: flex; gap: 6px; flex-wrap: wrap; }
+.hr-roomrow-perks i {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--hr-ink-2);
+  background: var(--hr-surface-2);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+.hr-roomrow-price { text-align: right; display: flex; flex-direction: column; gap: 1px; flex: none; }
+.hr-roomrow-price b {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--hr-ink);
+  font-variant-numeric: tabular-nums;
+}
+.hr-roomrow-price span { font-size: 11.5px; color: var(--hr-ink-3); white-space: nowrap; }
+.hr-panel-cta { margin-top: 16px; }
+
+/* ===========================================================================
+   ROOM SELECTION (Phase 3)
+   =========================================================================== */
+
+/* ---- Which room is being configured -------------------------------------- */
+.hr-roomtabs {
+  display: flex;
+  gap: 10px;
+  margin: 18px 0 14px;
+  flex-wrap: wrap;
+}
+.hr-roomtab {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-surface);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.hr-roomtab:hover { border-color: var(--hr-ink-3); }
+.hr-roomtab.is-on {
+  border-color: var(--hr-accent);
+  box-shadow: 0 0 0 1px var(--hr-accent);
+}
+.hr-roomtab-title { font-size: 14px; font-weight: 700; color: var(--hr-ink); }
+.hr-roomtab-party { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-roomtab-state {
+  font-size: 12px;
+  color: var(--hr-ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hr-roomtab-state.is-set { color: var(--hr-ok); font-weight: 600; }
+
+/* ---- Room cards ---------------------------------------------------------- */
+.hr-roomcards { display: flex; flex-direction: column; gap: 14px; }
+
+/* No image column: `customer_hotel_rooms` has no room photograph, and the
+   property's exterior is not a picture of the room. The card is text-forward
+   rather than carrying a misleading one. */
+.hr-roomcard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+  gap: 20px;
+  padding: 18px 20px;
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.hr-roomcard:hover:not(.is-unavailable) { box-shadow: var(--hr-shadow-lg); border-color: var(--hr-ink-3); }
+.hr-roomcard.is-selected {
+  border-color: var(--hr-accent);
+  box-shadow: 0 0 0 1px var(--hr-accent), var(--hr-shadow-lg);
+}
+.hr-roomcard.is-unavailable { opacity: .58; }
+.hr-roomcard:focus-within { border-color: var(--hr-accent); }
+
+.hr-roomcard-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hr-roomcard-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hr-roomcard-name { font-size: 17px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-chip-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--hr-ok);
+  background: var(--hr-ok-soft);
+  border: 1px solid color-mix(in srgb, var(--hr-ok) 30%, transparent);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+.hr-roomcard-desc { margin: 0; font-size: 13.5px; color: var(--hr-ink-2); line-height: 1.6; max-width: 62ch; }
+.hr-roomcard-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--hr-ink-2); }
+.hr-roomcard-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.hr-roomcard-perks { display: flex; gap: 6px; flex-wrap: wrap; }
+.hr-roomcard-perks i {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--hr-ink-2);
+  background: var(--hr-surface-2);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.hr-roomcard-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 2px;
+  border-left: 1px solid var(--hr-line-soft);
+  padding-left: 20px;
+}
+.hr-roomcard-rate {
+  font-size: 23px;
+  font-weight: 800;
+  color: var(--hr-ink);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.hr-roomcard-per { font-size: 12px; color: var(--hr-ink-3); }
+.hr-roomcard-stay { font-size: 12.5px; color: var(--hr-ink-2); font-variant-numeric: tabular-nums; }
+.hr-roomcard-tax { font-size: 11.5px; color: var(--hr-ink-3); margin-bottom: 10px; }
+.hr-roomcard-side .hr-btn { width: 100%; justify-content: center; }
+.hr-roomcard-why { font-size: 11px; color: var(--hr-ink-3); margin-top: 6px; line-height: 1.4; }
+
+/* ---- Summary additions --------------------------------------------------- */
+.hr-sum-pending { font-style: normal; font-weight: 500; color: var(--hr-ink-3); }
+.hr-sum-error { margin: 0; font-size: 12.5px; color: var(--hr-accent-dk); }
+
+.hr-skeleton-room { height: 168px; margin-bottom: 12px; }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 1320px) {
+  .hr-roomcard { grid-template-columns: minmax(0, 1fr) 208px; }
+}
+@media (max-width: 720px) {
+  .hr-roomcard { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .hr-roomcard-side {
+    align-items: stretch;
+    text-align: left;
+    border-left: 0;
+    border-top: 1px solid var(--hr-line-soft);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+  .hr-roomtab { flex-basis: 100%; }
+}
+
+/* ===========================================================================
+   GUEST DETAILS (Phase 4)
+   =========================================================================== */
+
+/* One card per ROOM, with that room's guests inside it — the grouping is the
+   structure, not a heading floating above a flat list. */
+.hr-roomgroup {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.hr-roomgroup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--hr-line-soft);
+}
+.hr-roomgroup-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-roomgroup-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; font-size: 12.5px; color: var(--hr-ink-3); }
+.hr-roomgroup-meta b { color: var(--hr-ink-2); font-weight: 600; }
+.hr-optional { font-weight: 500; font-size: 13px; color: var(--hr-ink-3); }
+
+.hr-guest { padding: 14px 0; border-bottom: 1px dashed var(--hr-line-soft); }
+.hr-guest:last-child { border-bottom: 0; padding-bottom: 0; }
+.hr-guest-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 10px; }
+.hr-guest-head b { font-size: 13.5px; font-weight: 700; color: var(--hr-ink); }
+.hr-chip-lead, .hr-chip-age {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 8px;
+  border: 1px solid;
+}
+.hr-chip-lead { color: var(--hr-accent-dk); background: var(--hr-accent-soft); border-color: var(--hr-accent-line, color-mix(in srgb, var(--hr-accent-dk) 30%, transparent)); }
+.hr-chip-age { color: var(--hr-ink-2); background: var(--hr-surface-2); border-color: var(--hr-line); }
+
+/* ---- Fields -------------------------------------------------------------- */
+.hr-fieldgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 16px;
+}
+.hr-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hr-field.is-wide { grid-column: 1 / -1; }
+.hr-label { font-size: 12.5px; font-weight: 600; color: var(--hr-ink-2); }
+.hr-label i { color: var(--hr-accent-dk); font-style: normal; margin-left: 2px; }
+
+.hr-input {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  color: var(--hr-ink);
+  /* background-COLOR only. A `background` shorthand on a rule that reaches a
+     bare <select> tiles the native caret across the control in dark mode. */
+  background-color: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  padding: 9px 11px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.hr-input:hover { border-color: var(--hr-ink-3); }
+.hr-input:focus { outline: none; border-color: var(--hr-accent); box-shadow: 0 0 0 3px var(--hr-accent-soft); }
+.hr-input::placeholder { color: var(--hr-ink-3); }
+.hr-textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
+
+.hr-field.has-error .hr-input { border-color: var(--hr-accent-dk); }
+.hr-err { font-size: 12px; color: var(--hr-accent-dk); }
+.hr-hint { font-size: 11.5px; color: var(--hr-ink-3); }
+
+/* Dial code sits beside the number and never shrinks the number away. */
+.hr-field-phone { display: flex; flex-direction: column; gap: 5px; }
+.hr-phone { display: flex; gap: 8px; }
+.hr-dial { flex: 0 0 92px; width: 92px; }
+.hr-phone .hr-input:last-child { flex: 1 1 auto; min-width: 0; }
+
+.hr-sum-sub { font-size: 11.5px; color: var(--hr-ink-3); margin: -4px 0 4px; }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 720px) {
+  .hr-roomgroup { padding: 14px; }
+  .hr-fieldgrid { grid-template-columns: minmax(0, 1fr); }
+  .hr-roomgroup-head { gap: 6px; }
+}
+
+/* ===========================================================================
+   REVIEW (Phase 5)
+   ===========================================================================
+   Summary, not form: sections are cards of facts with an Edit that returns to
+   the step that owns them. Only Extras and the coupon are interactive.
+   =========================================================================== */
+.hr-rvsec {
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius);
+  box-shadow: var(--hr-shadow);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.hr-rvsec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--hr-line-soft);
+  background: var(--hr-surface-2);
+}
+.hr-rvsec-head h2 { font-size: 15px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+.hr-rvsec-body { padding: 16px 18px; }
+
+.hr-editbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--hr-accent-dk);
+  background: var(--hr-surface);
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  padding: 5px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hr-editbtn:hover { border-color: var(--hr-accent); }
+
+/* ---- Hotel block --------------------------------------------------------- */
+.hr-rv-hotel { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; }
+.hr-rv-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-surface-2);
+}
+.hr-rv-hotel-body { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.hr-rv-name { font-size: 18px; font-weight: 700; margin: 0; color: var(--hr-ink); }
+
+/* Fact pairs, so labels and values line up down the card. */
+.hr-rv-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 18px;
+  margin: 6px 0 0;
+}
+.hr-rv-facts div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hr-rv-facts dt { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-rv-facts dd { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--hr-ink); }
+
+/* ---- Room + guest blocks ------------------------------------------------- */
+.hr-rv-room, .hr-rv-guestroom {
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--hr-line-soft);
+}
+.hr-rv-room:first-child, .hr-rv-guestroom:first-child { padding-top: 0; }
+.hr-rv-room:last-child, .hr-rv-guestroom:last-child { border-bottom: 0; padding-bottom: 0; }
+.hr-rv-room-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.hr-rv-room-head b { font-size: 14px; color: var(--hr-ink); }
+.hr-rv-room-type { font-size: 13.5px; font-weight: 600; color: var(--hr-accent-dk); }
+.hr-rv-room-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hr-line-soft);
+  font-size: 13px;
+  color: var(--hr-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.hr-rv-room-price b { font-size: 15px; color: var(--hr-ink); }
+
+.hr-rv-guestlist { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.hr-rv-guestlist li { display: flex; flex-direction: column; gap: 1px; }
+.hr-rv-guestname { font-size: 14px; font-weight: 600; color: var(--hr-ink); }
+.hr-rv-guestmeta { font-size: 12px; color: var(--hr-ink-3); }
+.hr-rv-guestcontact { font-size: 12px; color: var(--hr-ink-2); }
+
+/* ---- Extras -------------------------------------------------------------- */
+.hr-extras { display: flex; flex-direction: column; gap: 9px; }
+.hr-extra {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  cursor: pointer;
+  transition: border-color .15s ease;
+}
+.hr-extra:hover { border-color: var(--hr-ink-3); }
+.hr-extra.is-on { border-color: var(--hr-accent); background: var(--hr-accent-soft); }
+.hr-extra.is-busy { opacity: .6; cursor: progress; }
+.hr-extra input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--hr-accent); flex: none; }
+.hr-extra-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hr-extra-body b { font-size: 13.5px; font-weight: 600; color: var(--hr-ink); }
+.hr-extra-body span { font-size: 12px; color: var(--hr-ink-3); }
+.hr-extra-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--hr-ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Coupon -------------------------------------------------------------- */
+.hr-coupon { display: flex; gap: 10px; }
+.hr-coupon .hr-input { flex: 1 1 auto; min-width: 0; }
+.hr-coupon .hr-btn { flex: none; }
+.hr-coupon-on {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-ok-soft);
+  border: 1px solid color-mix(in srgb, var(--hr-ok) 30%, transparent);
+}
+.hr-coupon-on > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.hr-coupon-on b { font-size: 13.5px; color: var(--hr-ok); }
+.hr-coupon-on span { font-size: 12px; color: var(--hr-ink-2); }
+.hr-coupon-on svg { color: var(--hr-ok); flex: none; }
+
+/* ---- Price change -------------------------------------------------------- */
+.hr-pricechange {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: var(--hr-radius);
+  background: var(--hr-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--hr-accent-dk) 34%, transparent);
+}
+.hr-pricechange > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hr-pricechange b { font-size: 14px; color: var(--hr-accent-dk); }
+.hr-pricechange span { font-size: 13px; color: var(--hr-ink-2); line-height: 1.55; }
+.hr-pricechange svg { color: var(--hr-accent-dk); flex: none; margin-top: 2px; }
+.hr-pricechange .hr-btn { flex: none; }
+
+.hr-sum-line.is-discount b { color: var(--hr-ok); }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 720px) {
+  .hr-rv-hotel { grid-template-columns: minmax(0, 1fr); }
+  .hr-rv-thumb { aspect-ratio: 16 / 9; }
+  .hr-rvsec-head { flex-wrap: wrap; }
+  .hr-coupon { flex-direction: column; }
+  .hr-coupon .hr-btn { width: 100%; }
+  .hr-pricechange { flex-direction: column; }
+  .hr-pricechange .hr-btn { width: 100%; }
+}
+
+/* ===========================================================================
+   PAYMENT (Phase 6)
+   ===========================================================================
+   No gateway is connected, so there is no QR, no card field and no UPI field
+   to style here. What the screen has is a method choice and a notice, and the
+   notice is given real weight rather than being a footnote.
+   =========================================================================== */
+.hr-paylist { display: flex; flex-direction: column; gap: 10px; }
+.hr-pay {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--hr-line);
+  border-radius: var(--hr-radius-sm);
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.hr-pay:hover { border-color: var(--hr-ink-3); }
+.hr-pay.is-on { border-color: var(--hr-accent); background-color: var(--hr-accent-soft); }
+.hr-pay input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--hr-accent); flex: none; }
+.hr-pay-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hr-pay-body b { font-size: 14px; font-weight: 600; color: var(--hr-ink); }
+.hr-pay-body span { font-size: 12px; color: var(--hr-ink-3); }
+
+.hr-paynotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 17px;
+  margin-bottom: 14px;
+  border-radius: var(--hr-radius);
+  background: var(--hr-surface-2);
+  border: 1px solid var(--hr-line);
+}
+.hr-paynotice > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hr-paynotice b { font-size: 14px; color: var(--hr-ink); }
+.hr-paynotice span { font-size: 13px; color: var(--hr-ink-2); line-height: 1.6; }
+.hr-paynotice em { font-style: normal; font-weight: 600; color: var(--hr-ink); }
+.hr-paynotice svg { color: var(--hr-ink-2); flex: none; margin-top: 2px; }
+.hr-paynotice .hr-btn { flex: none; }
+/* The signed-out prompt is the one thing blocking progress, so it is louder. */
+.hr-paynotice.is-warn {
+  background: var(--hr-accent-soft);
+  border-color: color-mix(in srgb, var(--hr-accent-dk) 34%, transparent);
+}
+.hr-paynotice.is-warn b { color: var(--hr-accent-dk); }
+.hr-paynotice.is-warn svg { color: var(--hr-accent-dk); }
+
+@media (max-width: 720px) {
+  .hr-paynotice { flex-direction: column; }
+  .hr-paynotice .hr-btn { width: 100%; }
+}
+
+/* ===========================================================================
+   CONFIRMATION (Phase 7)
+   ===========================================================================
+   The banner carries the state, so it is styled by state rather than always
+   celebrating: `is-wait` for a booking that is received but not confirmed,
+   `is-ok` for one the server actually confirms. Nothing here is green until
+   the status earns it.
+   =========================================================================== */
+.hr-cf-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 22px 24px;
+  border-radius: var(--hr-radius);
+  border: 1px solid var(--hr-line);
+  background: var(--hr-surface);
+  box-shadow: var(--hr-shadow);
+  margin-bottom: 14px;
+}
+.hr-cf-banner.is-wait { border-color: color-mix(in srgb, var(--hr-star) 45%, transparent); }
+.hr-cf-banner.is-ok { border-color: color-mix(in srgb, var(--hr-ok) 40%, transparent); }
+.hr-cf-mark {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.hr-cf-banner.is-wait .hr-cf-mark { background: color-mix(in srgb, var(--hr-star) 18%, transparent); color: var(--hr-ink); }
+.hr-cf-banner.is-ok .hr-cf-mark { background: var(--hr-ok-fill); color: #fff; }
+.hr-cf-mark svg { width: 20px; height: 20px; }
+.hr-cf-title { font-size: 22px; font-weight: 800; margin: 0 0 3px; color: var(--hr-ink); letter-spacing: -.01em; }
+.hr-cf-banner p { margin: 0; font-size: 13.5px; color: var(--hr-ink-2); line-height: 1.55; }
+.hr-cf-ref {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  padding-left: 18px;
+  border-left: 1px solid var(--hr-line-soft);
+}
+.hr-cf-ref span { font-size: 11px; color: var(--hr-ink-3); letter-spacing: .04em; text-transform: uppercase; }
+.hr-cf-ref b { font-size: 19px; font-weight: 800; color: var(--hr-ink); font-variant-numeric: tabular-nums; }
+
+/* ---- Status strip -------------------------------------------------------- */
+.hr-cf-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 20px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  border-radius: var(--hr-radius);
+  border: 1px solid var(--hr-line);
+  background: var(--hr-surface);
+  box-shadow: var(--hr-shadow);
+}
+.hr-cf-stat { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hr-cf-stat > span { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-cf-stat > b { font-size: 14px; font-weight: 600; color: var(--hr-ink); }
+
+.hr-pill {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  width: fit-content;
+  text-transform: capitalize;
+}
+.hr-pill.is-wait {
+  color: var(--hr-ink);
+  background: color-mix(in srgb, var(--hr-star) 16%, transparent);
+  border-color: color-mix(in srgb, var(--hr-star) 45%, transparent);
+  text-transform: none;
+}
+.hr-pill.is-ok {
+  color: var(--hr-ok);
+  background: var(--hr-ok-soft);
+  border-color: color-mix(in srgb, var(--hr-ok) 30%, transparent);
+}
+
+/* ---- What happens next --------------------------------------------------- */
+.hr-cf-steps { margin: 0; padding-left: 20px; color: var(--hr-ink-2); font-size: 14px; line-height: 1.6; }
+.hr-cf-steps li { margin-bottom: 9px; }
+.hr-cf-steps li:last-child { margin-bottom: 0; }
+.hr-cf-steps b { color: var(--hr-ink); font-weight: 600; }
+.hr-cf-steps em { font-style: normal; font-weight: 600; color: var(--hr-ink); }
+
+/* ---- Actions ------------------------------------------------------------- */
+.hr-cf-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; margin-top: 4px; }
+.hr-cf-voucher { display: flex; flex-direction: column; gap: 5px; max-width: 320px; }
+/* The reason lives beside the disabled control, not in a tooltip nobody
+   opens — a control that cannot be pressed has to say why. */
+.hr-cf-why { font-size: 11.5px; color: var(--hr-ink-3); line-height: 1.45; }
+
+@media (max-width: 720px) {
+  .hr-cf-banner { grid-template-columns: auto minmax(0, 1fr); gap: 14px; }
+  .hr-cf-ref { grid-column: 1 / -1; text-align: left; padding-left: 0; border-left: 0;
+               padding-top: 12px; border-top: 1px solid var(--hr-line-soft); }
+  .hr-cf-title { font-size: 19px; }
+  .hr-cf-actions .hr-btn { width: 100%; }
+  .hr-cf-voucher { max-width: none; width: 100%; }
+}
+
+.hr-cf-cancel {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--hr-radius-sm);
+  background: var(--hr-surface-2);
+  border: 1px solid var(--hr-line);
+}
+.hr-cf-cancel > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.hr-cf-cancel b { font-size: 12.5px; color: var(--hr-ink); }
+.hr-cf-cancel > div > span { font-size: 12.5px; color: var(--hr-ink-2); line-height: 1.55; }
+.hr-cf-cancel svg { color: var(--hr-ink-2); flex: none; margin-top: 2px; }
+
+/* The already-submitted notice. Green, because this is a good outcome — the
+   booking exists — not a warning. */
+.hr-paynotice.is-done {
+  background: var(--hr-ok-soft);
+  border-color: color-mix(in srgb, var(--hr-ok) 32%, transparent);
+}
+.hr-paynotice.is-done b { color: var(--hr-ok); }
+.hr-paynotice.is-done svg { color: var(--hr-ok); }
+.hr-paynotice strong { font-weight: 700; color: var(--hr-ink); font-variant-numeric: tabular-nums; }
+
+/* ---- Skeletons ----------------------------------------------------------- */
+.hr-skeleton-gal { aspect-ratio: 16 / 9; height: auto; margin-bottom: 14px; }
+.hr-skeleton-line { height: 74px; margin-bottom: 10px; }
+.hr-skeleton-sum { height: 420px; }
+
+/* ---- Responsive ---------------------------------------------------------- */
+@media (max-width: 1439px) { .hr-hd-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; } }
+@media (max-width: 1320px) { .hr-hd-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
+@media (max-width: 1024px) {
+  .hr-hd-layout { grid-template-columns: minmax(0, 1fr); }
+  .hr-hd-layout .hr-rail-summary { position: static; max-height: none; }
+}
+/* The hero stacks before the page does, so the photograph keeps a usable
+   width instead of shrinking to a thumbnail beside the text. */
+@media (max-width: 900px) {
+  .hr-hd-hero { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 720px) {
+  .hr-hd-name { font-size: 21px; }
+  .hr-panel { padding: 16px 14px; }
+  .hr-roomrow { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .hr-roomrow-price { text-align: left; align-items: flex-start; }
+  .hr-gal-count { top: calc(56.25% - 30px); }
+  .hr-panel-cta .hr-btn { width: 100%; }
+}

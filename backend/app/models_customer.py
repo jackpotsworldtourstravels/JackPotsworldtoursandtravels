@@ -731,6 +731,41 @@ class CustomerHotel(Base):
         back_populates="hotel", order_by="CustomerHotelRoom.base_price_per_night",
     )
 
+    # -- Derived, not stored -------------------------------------------------
+    # The Hotel Results card shows "Breakfast included" and offers a meal-plan
+    # filter. Neither is a property-level fact in this schema: the meal plan
+    # belongs to the ROOM, and a property sells several. Rather than add a
+    # column that would duplicate (and could contradict) the room rows, both
+    # read the rooms. Callers that touch these in a loop must eager-load
+    # ``rooms`` — ``customer_hotel_catalog_service.list_hotels`` does.
+
+    @property
+    def meal_plans(self) -> list[str]:
+        """Every distinct meal plan sold here, cheapest room first.
+
+        Order follows the ``rooms`` relationship, which is already sorted by
+        price, so "Breakfast included" appearing first means the cheapest room
+        includes breakfast — not that it merely exists somewhere in the list.
+        """
+        seen: list[str] = []
+        for room in self.rooms:
+            if room.is_active and room.meal_plan and room.meal_plan not in seen:
+                seen.append(room.meal_plan)
+        return seen
+
+    @property
+    def free_cancellation(self) -> bool:
+        """Whether this property's policy is a free-cancellation one.
+
+        Read off the policy TEXT, because that text is the only cancellation
+        fact the schema holds — there is no boolean to consult. The seeded
+        policies all open with "Free cancellation up to N hours before
+        check-in", so the prefix is the rule. Deliberately conservative: a
+        policy this cannot parse reports False and the badge is simply not
+        shown, rather than claiming a refund right the text may not grant.
+        """
+        return str(self.cancellation_policy or "").strip().lower().startswith("free cancellation")
+
 
 class CustomerHotelRoom(Base):
     """One sellable room type at a property."""
@@ -799,6 +834,9 @@ class CustomerHotelBooking(Base):
     total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     coupon_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: Deduplicates a resubmission of the SAME booking — see migration 0060.
+    #: Unique per customer; NULL for bookings made before it existed.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
@@ -822,6 +860,15 @@ class CustomerHotelBooking(Base):
         back_populates="booking", cascade="all, delete-orphan",
         order_by="CustomerHotelBookingGuest.guest_index",
     )
+    #: One row per room actually booked, in the order the traveller configured
+    #: them — see migration 0058. ``room_id``/``room_name`` above stay the
+    #: FIRST room and the summary; these rows are the authority when a booking
+    #: mixes room types. Ordered explicitly: "Room 2" must be the room chosen
+    #: second, not whichever row came back first.
+    rooms: Mapped[list["CustomerHotelBookingRoom"]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan",
+        order_by="CustomerHotelBookingRoom.room_index",
+    )
     addons: Mapped[list["CustomerHotelBookingAddon"]] = relationship(
         back_populates="booking", cascade="all, delete-orphan",
     )
@@ -829,6 +876,38 @@ class CustomerHotelBooking(Base):
         back_populates="booking", cascade="all, delete-orphan",
         order_by="CustomerHotelBookingPayment.customer_hotel_booking_payment_id",
     )
+
+
+class CustomerHotelBookingRoom(Base):
+    """One room on a stay, so a booking can mix room types.
+
+    The parent booking's ``room_id``/``rooms_count`` describe "N of one type",
+    which cannot express a Deluxe plus a Premium. These rows can. Prices are
+    snapshotted at booking time for the same reason the parent snapshots
+    ``room_name``: a later re-pricing must not rewrite a booked stay.
+    """
+
+    __tablename__ = "customer_hotel_booking_rooms"
+
+    customer_hotel_booking_room_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    hotel_booking_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_hotel_bookings.customer_hotel_booking_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    room_index: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    room_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_hotel_rooms.customer_hotel_room_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    room_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    meal_plan: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    price_per_night: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    booking: Mapped["CustomerHotelBooking"] = relationship(back_populates="rooms")
 
 
 class CustomerHotelBookingGuest(Base):
@@ -843,6 +922,10 @@ class CustomerHotelBookingGuest(Base):
         nullable=False,
     )
     guest_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Which room on this booking the guest occupies, matching
+    #: ``CustomerHotelBookingRoom.room_index`` — see migration 0059. NULL on
+    #: bookings made before that migration, which genuinely never recorded it.
+    room_index: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     guest_type: Mapped[str] = mapped_column(
         _TRAVELLER_TYPE, nullable=False, default=CustomerTravellerType.ADULT.value,
     )

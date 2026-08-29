@@ -307,6 +307,11 @@ const TravelData = (function () {
          which the card/details renderers already treat as "not shown". */
       guestRating: dec(h.guest_rating),
       cancellationPolicy: h.cancellation_policy,
+      /* Derived server-side from the property's rooms and its policy text.
+         Undefined on the sample rows, which the results renderer treats as
+         "not known" and omits — it never guesses a meal plan. */
+      mealPlans: Array.isArray(h.meal_plans) ? h.meal_plans.slice() : undefined,
+      freeCancellation: typeof h.free_cancellation === 'boolean' ? h.free_cancellation : undefined,
     };
   }
   function normaliseCruise(c) {

@@ -126,24 +126,19 @@ def get_hotel(hotel_id: int, db: Session = Depends(get_db)):
     ),
 )
 def quote_hotel_booking(payload: HotelQuoteRequest, db: Session = Depends(get_db)):
-    room = catalog.get_room(db, payload.stay.hotel_id, payload.stay.room_id)
-    if room is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                             detail="That room is not available at this property.")
-    if payload.stay.check_out <= payload.stay.check_in:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                             detail="Check-out must be at least one night after check-in.")
+    # Priced through the booking service, NOT by resolving a room here: this
+    # route used to do its own lookup and its own checks, which is how it came
+    # to ignore `room_ids` and quote two of the first room for a stay that
+    # mixes types. One function now answers both the quote and the booking.
     try:
-        result = pricing.quote(
-            db, room=room,
-            nights=pricing.nights_between(payload.stay.check_in, payload.stay.check_out),
-            rooms_count=payload.stay.rooms_count,
-            addon_selections=[a.model_dump() for a in payload.addons],
-            coupon_code=payload.coupon_code,
+        return bookings.quote_stay(
+            db,
+            payload.stay.model_dump(),
+            [a.model_dump() for a in payload.addons],
+            payload.coupon_code,
         )
-    except pricing.HotelPricingError as exc:
+    except bookings.HotelBookingError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return result
 
 
 # ---------------------------------------------------------------------------

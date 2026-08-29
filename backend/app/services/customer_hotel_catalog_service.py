@@ -49,10 +49,16 @@ def list_hotels(db: Session) -> list[CustomerHotel]:
     Filtering by destination/price band stays client-side, matching how
     flights work: the sample-sized catalogue is fetched once and narrowed in
     the browser, which is also why there is no ``destination`` parameter here.
+
+    Rooms are eager-loaded because ``HotelSearchResult`` carries two fields
+    derived from them (``meal_plans``, and the room set behind the results
+    card's meal badge). Serialising N properties would otherwise issue N extra
+    queries — the classic N+1 — for data every row needs.
     """
     return list(
         db.execute(
             select(CustomerHotel)
+            .options(selectinload(CustomerHotel.rooms))
             .where(CustomerHotel.is_active.is_(True))
             .order_by(CustomerHotel.customer_hotel_id)
         ).scalars()

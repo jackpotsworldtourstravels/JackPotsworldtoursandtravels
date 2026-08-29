@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models_customer import (
@@ -26,6 +27,7 @@ from app.models_customer import (
     CustomerHotelBookingAddon,
     CustomerHotelBookingGuest,
     CustomerHotelBookingPayment,
+    CustomerHotelBookingRoom,
     CustomerPaymentStatus,
 )
 from app.services import customer_hotel_catalog_service as catalog
@@ -64,33 +66,112 @@ def _validate_guests(guests: list[dict]) -> None:
             raise HotelBookingError(f"Guest {i}: last name is required.")
 
 
+def _resolve_rooms(db: Session, stay: dict) -> list:
+    """The rooms being booked, in order.
+
+    ``room_ids`` names one room per room booked and may mix types; without it
+    the stay is ``rooms_count`` of the single ``room_id``, which is how every
+    caller before migration 0058 describes itself. Each id is resolved through
+    ``catalog.get_room``, which scopes it to the property — a room id from a
+    different hotel must not become bookable here just because it is an
+    integer somebody could type.
+    """
+    hotel_id = stay["hotel_id"]
+    room_ids = list(stay.get("room_ids") or [])
+    rooms_count = stay.get("rooms_count") or 1
+
+    if not room_ids:
+        room_ids = [stay["room_id"]] * rooms_count
+    elif len(room_ids) != rooms_count:
+        raise HotelBookingError(
+            f"{len(room_ids)} rooms were chosen but {rooms_count} were asked for."
+        )
+
+    rooms = []
+    for rid in room_ids:
+        room = catalog.get_room(db, hotel_id, rid)
+        if room is None:
+            raise HotelBookingError("That room is not available at this property.")
+        rooms.append(room)
+    return rooms
+
+
 def _price_stay(db: Session, stay: dict, addons: list[dict], coupon_code: str | None) -> dict:
-    room = catalog.get_room(db, stay["hotel_id"], stay["room_id"])
-    if room is None:
-        raise HotelBookingError("That room is not available at this property.")
+    rooms = _resolve_rooms(db, stay)
+    room = rooms[0]
 
     check_in, check_out = stay["check_in"], stay["check_out"]
     if check_out <= check_in:
         raise HotelBookingError("Check-out must be at least one night after check-in.")
     nights = pricing.nights_between(check_in, check_out)
-    rooms_count = stay.get("rooms_count") or 1
-    if rooms_count > room.total_inventory:
-        raise HotelBookingError(
-            f"Only {room.total_inventory} of this room type can be booked at once."
-        )
+    rooms_count = len(rooms)
+
+    # Inventory is per room TYPE, so the check counts how many of each type
+    # this stay asks for rather than comparing the whole party to one room's
+    # stock — two Deluxe plus one Premium must not fail because three exceeds
+    # the Premium's inventory of two.
+    wanted: dict[int, int] = {}
+    for r in rooms:
+        wanted[r.customer_hotel_room_id] = wanted.get(r.customer_hotel_room_id, 0) + 1
+    for r in rooms:
+        n = wanted[r.customer_hotel_room_id]
+        if n > r.total_inventory:
+            raise HotelBookingError(
+                f"Only {r.total_inventory} {r.name} can be booked at once."
+            )
 
     try:
         priced = pricing.quote(
-            db, room=room, nights=nights, rooms_count=rooms_count,
+            db, room=room, nights=nights, rooms_count=rooms_count, rooms=rooms,
             addon_selections=addons, coupon_code=coupon_code,
         )
     except pricing.HotelPricingError as exc:
         raise HotelBookingError(str(exc)) from exc
 
     priced["room"] = room
+    priced["rooms"] = rooms
     priced["nights"] = nights
     priced["rooms_count"] = rooms_count
     return priced
+
+
+def quote_stay(db: Session, stay: dict, addons: list[dict], coupon_code: str | None) -> dict:
+    """Price a stay without booking it — what ``POST /hotel-bookings/quote``
+    answers.
+
+    Deliberately the SAME function the real booking prices through. The quote
+    route used to resolve the room and re-implement the checks itself, and the
+    two drifted the moment per-room selections arrived: the booking honoured
+    ``room_ids`` while the quote silently priced ``rooms_count`` of the first
+    room, so a Superior-plus-Deluxe stay was quoted as two Superiors. Sharing
+    one function is what makes the endpoint's own promise — "the same code
+    path prices the real booking" — actually true.
+    """
+    return _price_stay(db, stay, addons, coupon_code)
+
+
+def find_by_idempotency_key(
+    db: Session, customer: Customer, key: str
+) -> CustomerHotelBooking | None:
+    """The booking this customer already made under this key, if any.
+
+    Scoped to the customer as well as the key: the unique index is on the pair,
+    and looking up by key alone would let one account's key surface another
+    account's booking.
+    """
+    return db.execute(
+        select(CustomerHotelBooking)
+        .options(
+            selectinload(CustomerHotelBooking.rooms),
+            selectinload(CustomerHotelBooking.guests),
+            selectinload(CustomerHotelBooking.addons),
+            selectinload(CustomerHotelBooking.payments),
+        )
+        .where(
+            CustomerHotelBooking.customer_id == customer.customer_id,
+            CustomerHotelBooking.idempotency_key == key,
+        )
+    ).scalar_one_or_none()
 
 
 def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerHotelBooking:
@@ -98,9 +179,22 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerHo
 
     Nothing the client sends about money is read — the room, the dates, the
     party and the add-ons are inputs; every rupee is recomputed here.
+
+    SUBMITTING TWICE MAKES ONE BOOKING. When the payload carries an
+    ``idempotency_key`` the booking already made under it is returned as-is.
+    The lookup is a fast path, not the guarantee — two simultaneous requests
+    can both find nothing — so the unique index from migration 0060 is what
+    actually decides, and the loser of that race re-reads the winner's row.
     """
     stay = payload["stay"]
     guests = payload.get("guests") or []
+    key = (payload.get("idempotency_key") or "").strip() or None
+
+    if key:
+        existing = find_by_idempotency_key(db, customer, key)
+        if existing is not None:
+            return existing
+
     _validate_guests(guests)
 
     priced = _price_stay(db, stay, payload.get("addons") or [], payload.get("coupon_code"))
@@ -135,14 +229,40 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerHo
         total_amount=priced["total_amount"],
         currency=priced["currency"],
         coupon_code=priced["coupon_code"],
+        idempotency_key=key,
     )
     db.add(booking)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Lost the race: another request carrying this same key inserted first.
+        # Roll this attempt back and hand back the booking that won, so both
+        # callers see one booking rather than one of them seeing an error.
+        db.rollback()
+        if key:
+            existing = find_by_idempotency_key(db, customer, key)
+            if existing is not None:
+                return existing
+        raise
+
+    # One row per room booked, in the order they were configured, with the
+    # rate snapshotted — see migration 0058. The parent's own room_id/
+    # room_name above stay the first room and the summary.
+    for i, r in enumerate(priced["rooms"]):
+        db.add(CustomerHotelBookingRoom(
+            hotel_booking_id=booking.customer_hotel_booking_id,
+            room_index=i,
+            room_id=r.customer_hotel_room_id,
+            room_name=r.name,
+            meal_plan=r.meal_plan,
+            price_per_night=r.base_price_per_night,
+        ))
 
     for i, g in enumerate(guests):
         db.add(CustomerHotelBookingGuest(
             hotel_booking_id=booking.customer_hotel_booking_id,
             guest_index=i,
+            room_index=g.get("room_index"),
             guest_type=g.get("guest_type", "adult"),
             title=g.get("title"),
             first_name=(g.get("first_name") or "").strip(),
@@ -172,6 +292,7 @@ def list_for_customer(db: Session, customer: Customer) -> list[CustomerHotelBook
         db.execute(
             select(CustomerHotelBooking)
             .options(
+                selectinload(CustomerHotelBooking.rooms),
                 selectinload(CustomerHotelBooking.guests),
                 selectinload(CustomerHotelBooking.addons),
                 selectinload(CustomerHotelBooking.payments),
@@ -189,7 +310,8 @@ def get_owned(db: Session, customer: Customer, booking_ref: str) -> CustomerHote
     return db.execute(
         select(CustomerHotelBooking)
         .options(
-            selectinload(CustomerHotelBooking.guests),
+            selectinload(CustomerHotelBooking.rooms),
+                selectinload(CustomerHotelBooking.guests),
             selectinload(CustomerHotelBooking.addons),
             selectinload(CustomerHotelBooking.payments),
         )

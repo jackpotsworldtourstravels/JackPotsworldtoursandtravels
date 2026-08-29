@@ -40,6 +40,8 @@ HERE = Path(__file__).resolve().parent
 BACKEND = HERE.parent / "backend"
 sys.path.insert(0, str(BACKEND))
 
+from alembic.config import Config as AlembicConfig  # noqa: E402
+from alembic.script import ScriptDirectory  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.database.session import SessionLocal  # noqa: E402
@@ -78,36 +80,43 @@ check("verify_m8.py runs last — it burns the auth rate-limit budget on purpose
 # ===========================================================================
 print("\n== the migration set ==")
 # ===========================================================================
-revisions: dict[str, str | None] = {}
-for path in VERSIONS.glob("*.py"):
-    source = path.read_text(encoding="utf-8")
-    rev = re.search(r'^revision:\s*str\s*=\s*["\']([^"\']+)', source, re.M)
-    down = re.search(r'^down_revision:\s*(?:Union\[str, None\]|str \| None)\s*=\s*(?:["\']([^"\']+)["\']|None)',
-                     source, re.M)
-    if rev:
-        revisions[rev.group(1)] = down.group(1) if down and down.group(1) else None
+# ASKED OF ALEMBIC, NOT OF A REGEX. This block used to pull `down_revision`
+# out of every file with one pattern that matched a quoted id or None and
+# nothing else — so a MERGE migration, whose down_revision is a *tuple* of the
+# two revisions it rejoins, parsed as having no parent at all. 0057 then
+# counted as a second base, the two revisions it merges counted as heads
+# because nothing claimed them, and the linear walk stopped dead at the first
+# legitimate branchpoint. Three heads and two bases, reported against a chain
+# `alembic heads` calls single-headed. A merge point is this project’s
+# convention for rejoining a fork, so the parser has to understand one — and
+# the safest parser is the one that runs `alembic upgrade head` on deploy.
+_cfg = AlembicConfig()
+_cfg.set_main_option("script_location", str(VERSIONS.parent))
+script = ScriptDirectory.from_config(_cfg)
 
-check(f"every migration declares a revision id ({len(revisions)} found)", len(revisions) >= 37,
-      str(len(revisions)))
-
-heads = set(revisions) - {d for d in revisions.values() if d}
+heads = set(script.get_heads())
 check("there is exactly one head — no accidental branch", len(heads) == 1, str(sorted(heads)))
 
-bases = [r for r, d in revisions.items() if d is None]
+bases = list(script.get_bases())
 check("there is exactly one base", len(bases) == 1, str(bases))
 
-# Walk the chain from base to head; a break here is a migration nobody can apply.
-chain, seen, cursor = [], set(), bases[0] if bases else None
-children = {}
-for rev, down in revisions.items():
-    children.setdefault(down, []).append(rev)
-while cursor and cursor not in seen:
-    seen.add(cursor)
-    chain.append(cursor)
-    nxt = children.get(cursor, [])
-    cursor = nxt[0] if len(nxt) == 1 else None
-check("the revision chain is unbroken from base to head",
-      len(chain) == len(revisions), f"walked {len(chain)} of {len(revisions)}")
+# Everything alembic can actually reach walking base -> head. A migration on
+# disk that is missing from this set is one nobody can apply: an orphan, or a
+# down_revision naming an id that does not exist. Stronger than the old
+# single-successor walk, which could not cross a branchpoint at all, and it
+# resolves the ids instead of trusting how they are spelled.
+reachable = {r.revision for r in script.walk_revisions("base", "heads")}
+on_disk_revs = set()
+for path in VERSIONS.glob("*.py"):
+    rev = re.search(r'^revision:\s*str\s*=\s*["\']([^"\']+)', path.read_text(encoding="utf-8"), re.M)
+    if rev:
+        on_disk_revs.add(rev.group(1))
+
+check(f"every migration declares a revision id ({len(on_disk_revs)} found)",
+      len(on_disk_revs) >= 37, str(len(on_disk_revs)))
+check("the revision graph reaches every migration on disk",
+      reachable == on_disk_revs,
+      f"unreachable: {sorted(on_disk_revs - reachable)} / not on disk: {sorted(reachable - on_disk_revs)}")
 
 undocumented = []
 for path in VERSIONS.glob("*.py"):
