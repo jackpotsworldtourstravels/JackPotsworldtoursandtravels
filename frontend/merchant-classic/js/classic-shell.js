@@ -719,6 +719,13 @@ async function clShowApp() {
   if (target === 'visa' && !svc.visa) target = 'dashboard';
   if (target === 'holidays' && !svc.holidays) target = 'dashboard';
   if ((target === 'enquiry' || target === 'booking-request') && !hasBookingProduct) target = 'dashboard';
+  /* Hotel Booking Request has no rail entry — it is reached from Raise Booking
+     on a hotel enquiry row — so it was never in this list, and #hotel-booking-
+     request rendered the whole screen for a company without the Hotels
+     entitlement. The endpoints behind it already answer 403, so nothing could
+     be submitted; this stops the screen being drawn at all, which is what the
+     other product-gated hashes above already do. */
+  if (target === 'hotel-booking-request' && !svc.hotels) target = 'dashboard';
   clGo(target);
   clLoadUnreadCount();
   clLoadSupportBadge();
