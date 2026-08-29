@@ -249,15 +249,33 @@ const BookingApi = (function () {
    *  form of the real room id (see getHotelDetail/hotelRoomsPayload) — Number()
    *  here is the one place it becomes the integer the schema requires. */
   function hotelPayload(ctx) {
+    /* Room Selection produces one room per room booked, which is what lets a
+       stay mix room types (StayInput.room_ids, migration 0058). Absent — any
+       flow that has not been through that screen — the stay is still
+       `rooms_count` of the single `room_id`, exactly as before. */
+    const picks = Array.isArray(ctx.roomPicks) ? ctx.roomPicks.filter(Boolean) : [];
+    const roomsCount = ctx.roomCount || 1;
+
+    /* The ages the search panel collected. `StayInput` has always accepted
+       child_ages and `customer_hotel_bookings` has always had a column for
+       them; this used to send a hard-coded empty list, so no age ever reached
+       either. `ctx.roomsList` is where the search panel keeps them. */
+    const list = Array.isArray(ctx.roomsList) ? ctx.roomsList : null;
+    const ages = list
+      ? list.flatMap(r => Array.from({ length: Number(r.children) || 0 },
+          (_, i) => Number((r.childAges || [])[i] ?? 8)))
+      : [];
+
     return {
       hotel_id: Number(ctx.item && ctx.item.id),
-      room_id: Number(ctx.room && ctx.room.id),
+      room_id: Number(picks.length ? picks[0].id : (ctx.room && ctx.room.id)),
+      ...(picks.length === roomsCount ? { room_ids: picks.map(p => Number(p.id)) } : {}),
       check_in: ctx.checkIn,
       check_out: ctx.checkOut,
-      rooms_count: ctx.roomCount || 1,
+      rooms_count: roomsCount,
       adults: (ctx.paxKinds || []).filter(k => String(k).toLowerCase() !== 'child').length || 1,
       children: (ctx.paxKinds || []).filter(k => String(k).toLowerCase() === 'child').length,
-      child_ages: [],
+      child_ages: ages,
     };
   }
 

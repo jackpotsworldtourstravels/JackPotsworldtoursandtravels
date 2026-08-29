@@ -129,6 +129,15 @@ def list_enquiries(
     request_status: S | None = None, merchant_id: int | None = None,
     search: str | None = None,
 ) -> tuple[list[HotelEnquiry], int]:
+    # READING HOTEL DATA IS ALSO USING HOTELS.
+    # This used to be gated by `ticket.view` alone, which asks whether the USER
+    # may see enquiries — never whether their COMPANY has the product. A
+    # merchant whose Hotels entitlement was switched off kept full API access
+    # to every hotel enquiry they had already raised: the module vanished from
+    # the portal while the data stayed readable. Same helper the create path
+    # uses, so there is one rule and it bypasses for platform staff.
+    service_access_service.assert_enabled(db, actor, ServiceCode.HOTELS)
+
     conditions = [_base_filter(actor)]
     if request_status is not None:
         conditions.append(HotelEnquiry.status == request_status)
@@ -162,6 +171,12 @@ def _get_full(db: Session, enquiry_id: int) -> HotelEnquiry | None:
 
 
 def get(db: Session, actor: User, enquiry_id: int) -> HotelEnquiry:
+    # Entitlement first, ownership second — see list_enquiries. Checked before
+    # the row is looked up so a merchant without the product gets the same
+    # answer for every id, rather than a 403 for their own enquiries and a 404
+    # for everyone else's, which would say which ids exist.
+    service_access_service.assert_enabled(db, actor, ServiceCode.HOTELS)
+
     enquiry = db.scalars(
         select(HotelEnquiry)
         .where(and_(HotelEnquiry.id == enquiry_id, _base_filter(actor)))

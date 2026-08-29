@@ -244,12 +244,21 @@ let clEnquiryTotal = 0;
    filter allows (both, when it's "All") and merges the results, so the rest
    of this screen can keep treating clEnquiryRows as one list. */
 async function clFetchEnquiryStatus(status, travelType) {
+  /* ENTITLEMENT DECIDES WHICH ENDPOINTS ARE CALLED AT ALL.
+     "All" (no travelType) used to mean "call both", regardless of what the
+     company actually has. That was merely wasteful while the hotel listing
+     answered 200 to anyone; now that reading hotel data requires the Hotels
+     entitlement, the same unconditional call makes a Flights-only merchant's
+     enquiry screen fail with "Failed to load enquiries" — an error for a
+     product they were never entitled to and never asked for. Same source of
+     truth the navigation and the enquiry-type toggle already read. */
+  const svc = clEnquiryAccess();
   const calls = [];
-  if (!travelType || travelType === 'flight') {
+  if (svc.flights && (!travelType || travelType === 'flight')) {
     calls.push(MerchantApi.listEnquiries({ page_size: 100, ...(status ? { status } : {}) })
       .then(d => ({ items: d.items || [], total: d.total ?? 0 })));
   }
-  if (!travelType || travelType === 'hotel') {
+  if (svc.hotels && (!travelType || travelType === 'hotel')) {
     calls.push(MerchantApi.listHotelEnquiries({ page_size: 100, ...(status ? { status } : {}) })
       .then(d => ({ items: d.items || [], total: d.total ?? 0 })));
   }

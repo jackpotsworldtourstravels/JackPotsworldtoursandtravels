@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Account — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260807">
+<link rel="stylesheet" href="css/customer.css?v=20260807">
+<style>
+  /* The page renders empty until the session check resolves. Without this the
+     header flashes "Good evening, undefined" and an empty form for one frame
+     before the profile arrives. */
+  body.cx:not(.is-ready) .cx-main{visibility:hidden;}
+</style>
+</head>
+<body class="cx">
+
+<header class="cx-top">
+  <img src="../assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
+  <span class="cx-top-spacer"></span>
+  <span class="cx-chip" id="cxdTopChip"></span>
+  <button type="button" class="cx-signout" id="cxdSignOut">Sign Out</button>
+</header>
+
+<main class="cx-main">
+  <h1 class="cx-hello" id="cxdHello">&nbsp;</h1>
+  <p class="cx-hello-sub">Manage your personal details and account security.</p>
+
+  <div class="cx-idcard" id="cxdIdCard"></div>
+
+  <!-- ------------------------------------------------------------ profile -->
+  <section class="cx-panel">
+    <div class="cx-panel-head">
+      <div>
+        <h2>Personal Information</h2>
+        <p>These details are used on your bookings and tickets.</p>
+      </div>
+    </div>
+
+    <form id="cxdProfileForm" novalidate>
+      <div class="cx-form-grid">
+        <div class="cx-field" data-field="cxdName">
+          <label for="cxdName">Full Name</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5v-.8a7.2 7.2 0 0 1 14.4 0v.8"/></svg>
+            <input id="cxdName" type="text" autocomplete="name" placeholder="Your full name">
+          </div>
+          <p class="cx-err" data-err="cxdName"></p>
+        </div>
+
+        <div class="cx-field">
+          <label for="cxdEmailShown">Email Address</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
+            <!-- Read-only, and the API has no route that would change it: the
+                 email is the login identifier, so changing it is account
+                 recovery rather than a profile edit. -->
+            <input id="cxdEmailShown" type="email" disabled>
+          </div>
+          <p class="cx-hint">Your sign-in address. Contact support to change it.</p>
+        </div>
+
+        <div class="cx-field" data-field="cxdMobile">
+          <label for="cxdMobile">Mobile Number</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2.5h10a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 20V4A1.5 1.5 0 0 1 7 2.5Z"/><path d="M10.5 18.5h3"/></svg>
+            <input id="cxdMobile" type="tel" autocomplete="tel" placeholder="+91 98765 43210">
+          </div>
+          <p class="cx-err" data-err="cxdMobile"></p>
+        </div>
+
+        <div class="cx-field" data-field="cxdDob">
+          <label for="cxdDob">Date of Birth</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20.5h16v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2Z"/><path d="M12 12.5V9"/><path d="M12 6.5V5"/></svg>
+            <input id="cxdDob" type="date" autocomplete="bday">
+          </div>
+          <p class="cx-err" data-err="cxdDob"></p>
+        </div>
+
+        <div class="cx-field" data-field="cxdGender">
+          <label for="cxdGender">Gender</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5v-.8a7.2 7.2 0 0 1 14.4 0v.8"/></svg>
+            <select id="cxdGender">
+              <option value="">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="cx-field" data-field="cxdPostal">
+          <label for="cxdPostal">Postal Code</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            <input id="cxdPostal" type="text" autocomplete="postal-code" placeholder="560001">
+          </div>
+        </div>
+
+        <div class="cx-field cx-span-2" data-field="cxdAddr1">
+          <label for="cxdAddr1">Address Line 1</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            <input id="cxdAddr1" type="text" autocomplete="address-line1" placeholder="Flat, building, street">
+          </div>
+        </div>
+
+        <div class="cx-field cx-span-2" data-field="cxdAddr2">
+          <label for="cxdAddr2">Address Line 2</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            <input id="cxdAddr2" type="text" autocomplete="address-line2" placeholder="Area, landmark">
+          </div>
+        </div>
+
+        <div class="cx-field" data-field="cxdCity">
+          <label for="cxdCity">City</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16"/><path d="M2 21h20"/></svg>
+            <input id="cxdCity" type="text" autocomplete="address-level2" placeholder="Bengaluru">
+          </div>
+        </div>
+
+        <div class="cx-field" data-field="cxdState">
+          <label for="cxdState">State</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16"/><path d="M2 21h20"/></svg>
+            <input id="cxdState" type="text" autocomplete="address-level1" placeholder="Karnataka">
+          </div>
+        </div>
+
+        <div class="cx-field cx-span-2" data-field="cxdCountry">
+          <label for="cxdCountry">Country</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18Z"/></svg>
+            <input id="cxdCountry" type="text" autocomplete="country-name" placeholder="India">
+          </div>
+        </div>
+      </div>
+
+      <div class="cx-actions">
+        <button type="submit" class="cx-btn cx-btn-inline">Save Changes</button>
+      </div>
+      <div class="cx-msg" id="cxdProfileMsg"></div>
+    </form>
+  </section>
+
+  <!-- ----------------------------------------------------------- password -->
+  <section class="cx-panel">
+    <div class="cx-panel-head">
+      <div>
+        <h2>Change Password</h2>
+        <p>Choose something you do not use anywhere else.</p>
+      </div>
+    </div>
+
+    <form id="cxdPwForm" novalidate>
+      <div class="cx-form-grid">
+        <div class="cx-field cx-span-2 cx-has-eye" data-field="cxdCurrent">
+          <label for="cxdCurrent">Current Password</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+            <input id="cxdCurrent" type="password" autocomplete="current-password" placeholder="Enter your current password">
+            <button type="button" class="cx-eye" data-cx-eye="cxdCurrent" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="cx-err" data-err="cxdCurrent"></p>
+        </div>
+
+        <div class="cx-field cx-has-eye" data-field="cxdNewPw">
+          <label for="cxdNewPw">New Password</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+            <input id="cxdNewPw" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+            <button type="button" class="cx-eye" data-cx-eye="cxdNewPw" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="cx-err" data-err="cxdNewPw"></p>
+        </div>
+
+        <div class="cx-field cx-has-eye" data-field="cxdConfirmPw">
+          <label for="cxdConfirmPw">Confirm New Password</label>
+          <div class="cx-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+            <input id="cxdConfirmPw" type="password" autocomplete="new-password" placeholder="Re-enter the new password">
+            <button type="button" class="cx-eye" data-cx-eye="cxdConfirmPw" aria-label="Show password">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="cx-err" data-err="cxdConfirmPw"></p>
+        </div>
+      </div>
+
+      <div class="cx-actions">
+        <button type="submit" class="cx-btn cx-btn-inline">Update Password</button>
+      </div>
+      <div class="cx-msg" id="cxdPwMsg"></div>
+    </form>
+  </section>
+
+  <!-- ----------------------------------------------------------- sessions -->
+  <section class="cx-panel">
+    <div class="cx-panel-head">
+      <div>
+        <h2>Active Sessions</h2>
+        <p>Where your account is currently signed in.</p>
+      </div>
+    </div>
+    <div id="cxdSessions"><p class="cx-empty">Loading…</p></div>
+  </section>
+</main>
+
+<script src="js/customer-core.js?v=20260807"></script>
+<script src="js/customer-dashboard.js?v=20260807"></script>
+<script>
+  // The dashboard's password fields are in the page, not built by cxField, so
+  // the eye toggles are bound after the markup exists rather than by the
+  // builder.
+  cxBindEyes();
+  cxBindClearOnInput();
+</script>
+</body>
+</html>

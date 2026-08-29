@@ -136,7 +136,27 @@ tables = [r[0] for r in db.execute(text(
     "select tablename from pg_tables where schemaname='public' "
     "and tablename like 'customer%' order by 1"
 ))]
-check("all seven customer tables exist", len(tables) == 7, tables)
+# THE SCHEMA THE CODE DECLARES, NOT A COUNT FROM THE DAY THIS WAS WRITTEN.
+# This asserted `len(tables) == 7` — true when the B2C side was only an
+# identity, and false from the moment bookings, hotels and packages landed
+# (31 tables today). A count is not the property worth protecting; matching
+# the model layer is, in both directions: a table the models declare and the
+# database lacks is a migration that never ran, and a `customer%` table the
+# models do not declare is one a migration left behind. Both are real
+# failures, and neither is detectable by counting.
+import app.models_customer as _mc  # noqa: E402
+
+all_tables = {r[0] for r in db.execute(text(
+    "select tablename from pg_tables where schemaname='public'"
+))}
+declared = {t.name for t in _mc.Base.metadata.tables.values()}
+check(f"every table the B2C model layer declares exists ({len(declared)} of them)",
+      not (declared - all_tables), f"missing: {sorted(declared - all_tables)}")
+check("no orphan customer table the model layer does not declare",
+      not (set(tables) - declared), f"orphans: {sorted(set(tables) - declared)}")
+
+# The identity core, named explicitly: these seven are what every other
+# customer table hangs off, so they are worth failing on by name.
 for t in ("customers", "customer_auth", "customer_profiles", "customer_sessions",
           "customer_otps", "customer_password_resets", "customer_audit_logs"):
     check(f"  {t}", t in tables)

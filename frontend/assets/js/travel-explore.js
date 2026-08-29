@@ -422,6 +422,26 @@ const TravelExplore = (function () {
   }
 
   function renderHotels(all) {
+    /* The Hotels page carries the three-column Results screen, which
+       hotel-results.js owns end to end — filters, cards, summary and the
+       sticky bar. When that shell is on the page this file renders nothing
+       for hotels and simply hands over the rows and the shared criteria.
+
+       Guarded on the module AND the shell so every other page that shows a
+       hotel grid — and cruises and packages, which share this renderer — is
+       completely unaffected. */
+    if (typeof HotelResults !== 'undefined' && HotelResults.owns()) {
+      allHotels = all;
+      catalogue.hotel = all;
+      /* This file paints a skeleton into the grid before the fetch resolves.
+         Handing over without clearing it leaves that skeleton stranded above
+         the real results forever. */
+      const grid = $('txHotelGrid');
+      if (grid) grid.innerHTML = '';
+      HotelResults.render(all, state);
+      return;
+    }
+
     const el = $('txHotelGrid');
     if (!el) return;
     allHotels = all;

@@ -447,6 +447,34 @@ const BookingFlows = (function () {
 
   function hotel(item, search) {
     const guests = (search && search.guests) || 2;
+    /* Rooms chosen on the Room Selection screen, one per room booked. Their
+       presence is what tells this builder the room question is already
+       answered. */
+    const picks = (search && Array.isArray(search.roomPicks))
+      ? search.roomPicks.filter(Boolean) : [];
+    const hasPickedRooms = picks.length > 0;
+
+    /* The party collected on the Guest Details screen, already grouped by
+       room. Its presence means the guest and special-request questions have
+       been answered, so those steps are dropped too and the flow opens on
+       Review — which is where "Continue to Review" says it goes.
+
+       Add-ons are dropped with them: the approved hotel journey is
+       Search → Results → Details → Rooms → Guests → Review → Payment →
+       Confirmation, with no add-ons step, and landing on one would contradict
+       both the stepper and the button. The add-on catalogue is still live and
+       still priced by the server; it simply has nowhere to be chosen in this
+       journey yet. */
+    const guestForms = (search && Array.isArray(search.guestForms))
+      ? search.guestForms.filter(Boolean) : [];
+    const hasGuests = guestForms.length > 0;
+    /* Set once the Review screen has been through and the traveller has
+       accepted the server's total, so the flow opens on Payment. */
+    const reviewed = !!(search && search.reviewed);
+    /* A booking that already EXISTS. The Payment screen created it and logged
+       the attempt, so nothing is left to collect or submit — the flow opens
+       straight on Confirmation and simply shows what the server returned. */
+    const done = !!(search && search.booking);
     return {
       kind: 'hotel',
       /* Hotels have a real coupon backend now too (STAYMORE, seeded in 0053
@@ -475,12 +503,27 @@ const BookingFlows = (function () {
           note: q.coupon_error || null,
         };
       },
-      steps: [
-        roomStep,
-        P.travellersStep({ passport: false, frequentFlyer: false, noun: 'Guest' }),
-        requestsStep,
-        P.addonsStep('hotel'),
-        P.summaryStep(ctx => `
+      /* The room step is dropped when the rooms have ALREADY been chosen on
+         the Room Selection screen (hotel-rooms.js), which is where a hotel
+         booking now starts. Leaving it in made "Continue to Guest Details"
+         land on "Choose a room" and ask again for a choice just made.
+
+         Scoped to this builder on purpose: flights, cruises, packages and
+         visa assemble their own step lists a few lines away and none of them
+         is touched by this. */
+      /* A booking that already exists needs no steps but the last one. */
+      steps: done ? [P.confirmationStep()] : [
+        ...(hasPickedRooms ? [] : [roomStep]),
+        ...(hasGuests ? [] : [
+          P.travellersStep({ passport: false, frequentFlyer: false, noun: 'Guest' }),
+          requestsStep,
+          P.addonsStep('hotel'),
+        ]),
+        /* Review lives on its own screen now (hotel-review.js). When the
+           traveller has been through it and accepted the total, this step is
+           dropped so the flow opens on Payment instead of asking them to
+           review the same booking twice. */
+        ...(reviewed ? [] : [P.summaryStep(ctx => `
           <h3>Stay</h3>
           <div class="bk-meta">
             <span><b>${esc(ctx.item.name)}</b></span>
@@ -489,7 +532,7 @@ const BookingFlows = (function () {
             <span>${esc(ctx.room ? ctx.room.name : '')}</span>
             <span>${esc(ctx.roomCount || 1)} room(s) · ${esc(ctx.paxCount)} guest(s)</span>
           </div>
-          ${(ctx.requests || []).length ? `<p class="bk-req">Requests: ${esc(ctx.requests.join(', '))}</p>` : ''}`),
+          ${(ctx.requests || []).length ? `<p class="bk-req">Requests: ${esc(ctx.requests.join(', '))}</p>` : ''}`)]),
         P.paymentStep(),
         P.confirmationStep(),
       ],
@@ -500,6 +543,31 @@ const BookingFlows = (function () {
         return {
           item,
           paxCount: guests,
+          /* The chosen rooms, seeded so the summary, the pricing call and the
+             payload all have them without a room step having run. `room` stays
+             the first one because everything downstream that predates
+             multi-room reads that single field. */
+          ...(hasPickedRooms ? { room: picks[0], roomPicks: picks } : {}),
+          /* The party, in the shape the shared steps and the create payload
+             already read (`passengers` / `paxKinds`), so nothing downstream
+             needs to know a separate screen collected it. */
+          ...(done ? { booking: search.booking, paymentMeta: search.paymentMeta || null } : {}),
+          ...(hasGuests ? {
+            passengers: guestForms,
+            paxKinds: guestForms.map(g => (g.kind === 'child' ? 'Child' : 'Adult')),
+            paxCount: guestForms.length,
+            requests: (search && search.requests) || [],
+            notes: (search && search.notes) || null,
+            /* Extras and the coupon are chosen on the Review screen; both are
+               carried so the fare the flow re-quotes matches what was accepted
+               there. Shaped as {code} objects, which is what
+               `hotelAddonPayload` reads — seeding bare code strings left the
+               list looking empty and quietly dropped the extras from the
+               price between Review and Payment. */
+            addons: ((search && search.addonCodes) || []).map(code => ({ code })),
+            couponCode: (search && search.couponCode) || null,
+          } : {}),
+          roomsList: (search && search.roomsList) || null,
           roomCount: (search && search.rooms) || 1,
           checkIn: (search && search.checkIn) || inD.toISOString().slice(0, 10),
           checkOut: (search && search.checkOut) || outD.toISOString().slice(0, 10),

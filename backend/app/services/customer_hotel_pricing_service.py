@@ -68,12 +68,26 @@ def quote(
     room: CustomerHotelRoom,
     nights: int,
     rooms_count: int,
+    rooms: list[CustomerHotelRoom] | None = None,
     addon_selections: list[dict] | None = None,
     coupon_code: str | None = None,
 ) -> dict:
     """The whole stay, priced from choices alone — used by both
-    ``POST /hotel-bookings/quote`` and ``POST /hotel-bookings``."""
-    room_subtotal = _money(Decimal(str(room.base_price_per_night)) * nights * rooms_count)
+    ``POST /hotel-bookings/quote`` and ``POST /hotel-bookings``.
+
+    ``rooms`` is the per-room form: one entry per room booked, which may be
+    different room types. When it is given it is authoritative and each room
+    is priced at its own nightly rate. ``room``/``rooms_count`` remain the
+    single-type form and are what every existing caller passes, so nothing
+    that predates migration 0058 changes behaviour.
+    """
+    selected = list(rooms) if rooms else [room] * rooms_count
+    if not selected:
+        raise HotelPricingError("A stay needs at least one room.")
+
+    room_subtotal = _money(
+        sum(Decimal(str(r.base_price_per_night)) for r in selected) * nights
+    )
     taxes = _money(room_subtotal * Decimal("0.12"))
     addon_total, addon_rows = price_addons(addon_selections or [])
 
@@ -91,12 +105,27 @@ def quote(
 
     total = _money(room_subtotal + taxes + addon_total - discount)
 
+    # One line per DISTINCT room type, so a mixed booking reads
+    # "Deluxe Room × 4 nights" / "Premium Room × 4 nights" rather than
+    # collapsing two different rooms into one meaningless total.
+    nightword = "night" if nights == 1 else "nights"
+    grouped: list[tuple[CustomerHotelRoom, int]] = []
+    for r in selected:
+        if grouped and grouped[-1][0].customer_hotel_room_id == r.customer_hotel_room_id:
+            grouped[-1] = (grouped[-1][0], grouped[-1][1] + 1)
+        else:
+            found = next((g for g in grouped if g[0].customer_hotel_room_id == r.customer_hotel_room_id), None)
+            if found:
+                grouped[grouped.index(found)] = (found[0], found[1] + 1)
+            else:
+                grouped.append((r, 1))
+
     lines = [
-        {"label": f"{room.name} × {nights} {'night' if nights == 1 else 'nights'}"
-                  + (f" × {rooms_count} rooms" if rooms_count > 1 else ""),
-         "amount": room_subtotal},
-        {"label": "Taxes & service", "amount": taxes},
+        {"label": f"{r.name} × {nights} {nightword}" + (f" × {count} rooms" if count > 1 else ""),
+         "amount": _money(Decimal(str(r.base_price_per_night)) * nights * count)}
+        for r, count in grouped
     ]
+    lines.append({"label": "Taxes & service", "amount": taxes})
     if addon_total:
         lines.append({"label": "Add-ons", "amount": addon_total})
     if discount:

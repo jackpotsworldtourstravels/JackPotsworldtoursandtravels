@@ -660,10 +660,12 @@ function clPaintIdentity() {
    decision below this line — the Approvals rail item, and then every button the
    first screen renders — reads the session snapshot synchronously. Firing the
    repair off and routing anyway would paint the whole portal from the snapshot
-   this function was called to fix. For a healthy session clRefreshRole returns
-   on its first line and this costs a microtask; only a snapshot that is
-   actually missing something waits for the network, which is the one case where
-   waiting is right. */
+   this function was called to fix. clRefreshRole no longer short-circuits
+   on a healthy-looking snapshot (see its own comment), so this waits for
+   /api/profile on every load — deliberately: service_access is the one
+   field Admin can change while the merchant is already signed in, and a
+   stale copy of it never looks broken enough for a conditional repair to
+   fire. Hotels being switched off is exactly that case. */
 async function clShowApp() {
   $('clAuth').style.display = 'none';
   $('clApp').classList.add('active');
