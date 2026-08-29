@@ -77,11 +77,22 @@ const HotelFilters = (function () {
      two real rows. Text that says neither is left unclassified rather than
      guessed at: an unreadable policy must not become a reassuring badge. */
   const cancellationOf = h => {
+    /* THE BOOLEAN FIRST. The API now derives `free_cancellation` server-side
+       from the property's rooms and its policy text, which is a better answer
+       than this file re-deriving it from one sentence — the server can see the
+       rooms, and a policy worded a way the regex below does not expect would
+       otherwise be silently unclassified. The text is still read for the
+       WINDOW, because "free up to 48 hours" and "free up to 24 hours" are a
+       real choice between two real rows and the boolean cannot express it. */
     const t = String((h && h.cancellationPolicy) || '').toLowerCase();
-    if (!t) return null;
+    const known = h && typeof h.freeCancellation === 'boolean';
+
+    if (known && !h.freeCancellation) return 'non-refundable';
     if (/non[- ]?refundable/.test(t)) return 'non-refundable';
+
     const m = /free cancellation up to (\d+)\s*hour/.exec(t);
     if (m) return `free-${m[1]}`;
+    if (known && h.freeCancellation) return 'free';
     if (/free cancellation/.test(t)) return 'free';
     return null;
   };
