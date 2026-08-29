@@ -9,6 +9,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260808bk1">
+<!-- main.css supplies the landing page's navigation bar, which this page now
+     wears too (hero-shell.js). Loaded FIRST so service-page.css still wins on
+     anything the two both define. -->
+<link rel="stylesheet" href="assets/css/main.css?v=20260829h2">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260808bk1">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
@@ -16,7 +20,9 @@
 <body data-sp-service="activities">
 <a href="#spMain" class="skip-link">Skip to content</a>
 
-<header class="sp-header" id="spHeader"></header>
+<!-- The landing page's navigation bar, same as index.html and flights.html.
+     Built by hero-shell.js; see that file for why the markup lives there. -->
+<header id="siteHeader"></header>
 
 <div class="sp-hero">
   <div class="sp-wrap">
@@ -63,6 +69,8 @@
 <script src="assets/js/account-center.js?v=20260826ac1"></script>
 <script src="assets/js/auth.js?v=20260808ic2"></script>
 <script src="assets/js/jp-icons.js?v=20260808bk1"></script>
+<script src="assets/js/hero-shell.js?v=20260829h1"></script>
 <script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<script>HeroShell.mountHeader('activities.html');</script>
 </body>
 </html>

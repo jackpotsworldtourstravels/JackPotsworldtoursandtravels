@@ -198,6 +198,19 @@ const HeroShell = (function () {
   function bindScrollFade() {
     const header = document.getElementById('siteHeader');
     if (!header) return;
+
+    /* THE FADE ONLY MAKES SENSE OVER THE VIDEO HERO.
+       It starts the bar fully transparent so the film shows through, which is
+       right on index.html and flights.html and wrong everywhere else: a
+       service page has a light background, so a transparent bar with the
+       hero's white lettering is white-on-white. Those pages get the solid bar
+       instead — the same nav, painted, which is what the header looks like on
+       the landing page once you have scrolled past the film anyway. */
+    if (!document.getElementById('heroBg')) {
+      header.classList.add('is-solid');
+      return;
+    }
+
     const paint = () => {
       const progress = Math.min(1, Math.max(0, window.scrollY / HEADER_FADE_RANGE));
       header.style.backgroundColor = 'rgba(0,0,0,' + progress.toFixed(3) + ')';
