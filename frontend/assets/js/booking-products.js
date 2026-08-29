@@ -2167,13 +2167,26 @@ const BookingProducts = (function () {
            for exactly the same reason and carry exactly the same wrong
            headline, but the Flights journey is signed off and is not being
            changed here — see the Phase 6 report. */
+        /* THE HEADLINE FOLLOWS THE STATUS, FOR EVERY PRODUCT.
+           No payment gateway is integrated, so a server booking — flight,
+           hotel or package alike — is created `pending` and stays there:
+           nothing has been paid and no supplier has confirmed anything.
+           "Booking confirmed" over that is the one claim this screen must
+           never make. It was scoped to hotels when the hotel journey was
+           built; flights and packages carried the same wrong headline for the
+           same reason, and now they do not.
+
+           Cruise and visa have no backend at all: booking-store stamps those
+           local rows `Confirmed` itself, and they are labelled "Demo booking"
+           in the footer below, so reading their own status leaves them
+           exactly as they were. */
         const confirmed = /confirm|complete|paid/i.test(String(b.status || ''));
-        const heading = (isHotel && !confirmed) ? 'Booking received' : 'Booking confirmed';
-        const subline = (isHotel && !confirmed)
-          ? `${esc(ctx.summaryTitle || '')} — held against your account. Your booking
-             is <b>pending</b> until payment is arranged; nothing has been charged.`
-          : `Your booking has been successfully confirmed.
-             ${esc(ctx.summaryTitle || '')} — recorded against your account.`;
+        const heading = confirmed ? 'Booking confirmed' : 'Booking received';
+        const subline = confirmed
+          ? `Your booking has been successfully confirmed.
+             ${esc(ctx.summaryTitle || '')} — recorded against your account.`
+          : `${esc(ctx.summaryTitle || '')} — held against your account. Your booking
+             is <b>pending</b> until payment is arranged; nothing has been charged.`;
 
         return `<div class="bk-step bk-done">
             <div class="bk-done-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('insurance', { size: 'xl' }) : ''}</div>
