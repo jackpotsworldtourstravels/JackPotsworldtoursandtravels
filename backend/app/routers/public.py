@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from app.auth.rate_limit import limiter
 from app.schemas.public import ContactFormRequest, NewsletterSubscribeRequest
 from app.services import email_service
+from app.services.email_service import CONTACT_FORM_RECIPIENT
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -28,9 +29,15 @@ def submit_contact_form(request: Request, payload: ContactFormRequest):
         message=payload.message,
     )
     if not sent:
+        # NAME THE ADDRESS. "Email us directly" without saying where leaves the
+        # visitor with a dead end and a message they have already typed. The
+        # recipient is a constant, so the fallback can simply quote it.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="We couldn't send your message right now — please email us directly instead.",
+            detail=(
+                "We couldn't send your message right now — please email us directly "
+                f"at {CONTACT_FORM_RECIPIENT} instead."
+            ),
         )
 
 
@@ -46,5 +53,8 @@ def submit_newsletter_signup(request: Request, payload: NewsletterSubscribeReque
     if not sent:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="We couldn't subscribe you right now — please try again shortly.",
+            detail=(
+                "We couldn't subscribe you right now — please try again shortly, or "
+                f"email {CONTACT_FORM_RECIPIENT}."
+            ),
         )
