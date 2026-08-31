@@ -71,11 +71,14 @@ const HeroShell = (function () {
       + '<button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false">'
       + '<span></span><span></span><span></span></button>'
       + '</div></nav>'
+      /* NO AUTH CONTROLS IN THE DRAWER. It used to carry its own Login/Sign Up
+         and, signed in, its own account list — a second set of the controls
+         .nav-actions already shows at every width, kept in step by hand. The
+         header's chip is avatar-only under 560px and reachable on a phone, so
+         the drawer is the page LINKS and the account is the header. */
       + '<div class="mobile-nav" id="mobileNav">' + navLinks(active)
-      + '<div class="mobile-auth-links">'
       + '<a href="partner-login.html" class="mobile-partner-mark">' + PARTNER_MARK + 'My Partner</a>'
-      + '<span id="shellAuthMobile"></span>'
-      + '</div></div>';
+      + '</div>';
   }
 
   /* ---------------------------------------------------------------------
@@ -130,7 +133,6 @@ const HeroShell = (function () {
      --------------------------------------------------------------------- */
   function paintAuth() {
     const slot = document.getElementById('shellAuth');
-    const mobile = document.getElementById('shellAuthMobile');
     if (!slot) return;
 
     /* THE CHIP AND ITS MENU ARE profile-menu.js's.
@@ -147,16 +149,6 @@ const HeroShell = (function () {
         + '<a href="index.html?signin=1" class="btn btn-coral nav-signup">Sign Up</a>';
     }
 
-    /* The mobile drawer is this shell's own list, not a dropdown, so it stays
-       here — but it is filled from the SAME item list, so the two cannot offer
-       different destinations. */
-    if (mobile) {
-      const session = (typeof ProfileMenu !== 'undefined') ? ProfileMenu.session() : null;
-      mobile.innerHTML = session && typeof ProfileMenu !== 'undefined'
-        ? ProfileMenu.ITEMS.map(i =>
-            `<a href="#" data-pm-tab="${esc(i.tab)}">${esc(i.label)}</a>`).join('')
-        : '<a href="index.html?signin=1">Login</a><a href="index.html?signin=1">Sign Up</a>';
-    }
   }
 
   /* wireAccountOpeners() bound the old chip and the old mobile links. Both

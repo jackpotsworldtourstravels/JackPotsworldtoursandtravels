@@ -80,11 +80,32 @@ const ProfileMenu = (function () {
 
   /** The whole component, signed in or out. A page drops this in a slot and is
    *  finished; it never decides what the menu contains. */
+  /** An ADMIN signed in on the shared `jwt_*` session. Not a customer — this
+   *  menu is the B2C Account Center — but they should not be shown a Login
+   *  button either. index.html used to relabel its static links to
+   *  "Dashboard"/"Logout" for exactly this case; that markup is gone, so the
+   *  one link that was actually useful is rendered here instead. */
+  function adminSession() {
+    const s = (typeof getStoredAuth === 'function') ? getStoredAuth() : null;
+    return (s && s.access && s.role === 'admin') ? s : null;
+  }
+
   function html() {
     const s = session();
     if (!s) {
-      return `<a class="pm-login" href="index.html?signin=1">Login</a>
-        <a class="pm-signup" href="index.html?signin=1">Sign Up</a>`;
+      if (adminSession()) {
+        return `<a class="pm-signup" href="admin/index.html">Dashboard</a>`;
+      }
+      /* IN PLACE WHERE THE MODAL EXISTS. The landing page carries the sign-in
+         dialog, and its static Login/Sign Up links used to open it directly —
+         `data-auth` in app.js. Those links are gone (they were the duplicate),
+         so the behaviour moves here rather than being lost: on a page with the
+         modal these open it, and only a page without one navigates. */
+      const inPlace = typeof openAuth === 'function';
+      const href = inPlace ? '#' : 'index.html?signin=1';
+      const attr = inPlace ? ' data-pm-auth' : '';
+      return `<a class="pm-login" href="${href}"${attr}>Login</a>
+        <a class="pm-signup" href="${href}"${attr}>Sign Up</a>`;
     }
     const name = s.name || 'Traveller';
     return `<div class="pm-wrap" data-pm>
@@ -181,6 +202,12 @@ const ProfileMenu = (function () {
         e.stopPropagation();
         const wrap = toggle.closest('[data-pm]');
         wrap.classList.contains('is-open') ? close(wrap) : open(wrap);
+        return;
+      }
+      /* Login / Sign Up on a page that has the modal. */
+      if (e.target.closest('[data-pm-auth]')) {
+        e.preventDefault();
+        if (typeof openAuth === 'function') openAuth();
         return;
       }
       const tab = e.target.closest('[data-pm-tab]');

@@ -612,9 +612,10 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .profile-dropdown hr{border:none; border-top:1px solid var(--line); margin:6px 4px;}
 .profile-dropdown .logout-item{color:var(--coral-dark);}
 .profile-dropdown .logout-item .dd-icon{color:var(--coral-dark);}
-.mobile-account-links{display:none;}
-.mobile-nav.show-account .mobile-account-links{display:block;}
-.mobile-nav.show-account .mobile-auth-links{display:none;}
+/* .mobile-account-links / .show-account / .mobile-auth-links were the drawer's
+   duplicate account controls, swapped in and out by a class. The drawer no
+   longer carries any — profile-menu.js in the header is the one set, at every
+   width — so the markup and these rules are gone together. */
 
 /* ---------- ACCOUNT CENTER MODAL ---------- */
 #accountModalOverlay .modal-card{max-width:960px; padding:0; max-height:88vh; display:flex; flex-direction:column;}

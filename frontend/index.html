@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260824ic9">
+<link rel="stylesheet" href="assets/css/main.css?v=20260827dup1">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
@@ -36,7 +36,7 @@
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260827pm1"></script>
+<script src="assets/js/hero-shell.js?v=20260827dup1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -81,12 +81,17 @@
         <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
         <span>My Partner</span>
       </a>
-      <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
-      <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
-      <!-- The profile chip and its dropdown, from profile-menu.js. Markup used
-           to be inline here and existed on no other page, which is why the
-           menu vanished after a search. One component now; the slot is all a
-           page declares. -->
+      <!-- THE ONLY AUTHENTICATION CONTROLS ON THIS PAGE.
+           profile-menu.js renders Login + Sign Up when signed out and the chip
+           + dropdown when signed in, so exactly one set exists at a time and
+           the same component serves every other page.
+
+           A static `navLoginLink`/`navSignupLink` pair used to sit here as
+           well. Once the component started rendering its own, the header
+           carried BOTH — the duplicate Login/Sign Up. Removed rather than
+           hidden: two implementations IS the bug, and a `display:none` would
+           have left the second pair in the DOM, in the tab order, and still
+           wired to app.js's click handler. -->
       <div class="pm-slot" data-profile-menu></div>
       <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
@@ -100,25 +105,16 @@
     <a href="visa.html">Visa</a>
     <a href="activities.html">Activities</a>
     <a href="#contact">Contact</a>
-    <div class="mobile-auth-links">
-      <a href="partner-login.html" class="mobile-partner-mark">
-        <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
-        My Partner
-      </a>
-      <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
-      <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
-    </div>
-    <div class="mobile-account-links">
-      <a href="#" data-acct-tab="profile">My Profile</a>
-      <a href="#" data-acct-tab="bookings">My Bookings</a>
-      <a href="#" data-acct-tab="wishlist">Wishlist</a>
-      <a href="#" data-acct-tab="payments">Payment History</a>
-      <a href="#" data-acct-tab="notifications">Notifications</a>
-      <a href="#" data-acct-tab="support">Support Tickets</a>
-      <a href="#" data-acct-tab="reviews">Reviews</a>
-      <a href="#" data-acct-tab="settings">Settings</a>
-      <a href="#" id="mobileLogoutLink">Logout</a>
-    </div>
+    <!-- The drawer's own Login/Sign Up pair and its nine account links are
+         gone. They were a THIRD and FOURTH copy of the same controls, kept in
+         step by hand in renderAuthNav(), and they are not needed: .nav-actions
+         stays visible at every width, so the chip (avatar-only under 560px)
+         and the signed-out buttons are already reachable in the header on a
+         phone. The drawer is the page LINKS; the account is the header. -->
+    <a href="partner-login.html" class="mobile-partner-mark">
+      <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+      My Partner
+    </a>
   </div>
 </header>
 
@@ -830,12 +826,12 @@
      so the module skips injecting a second copy. -->
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout it
      calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
-<script src="assets/js/profile-menu.js?v=20260827pm2"></script>
-<script src="assets/js/account-center.js?v=20260827pm3"></script>
+<script src="assets/js/profile-menu.js?v=20260827dup1"></script>
+<script src="assets/js/account-center.js?v=20260827dup1"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260827pm1"></script>
+<script src="assets/js/app.js?v=20260827dup1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

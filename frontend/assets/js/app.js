@@ -789,36 +789,18 @@ authHeaders = customerAuthHeaders;
    this was a 401 every 30 seconds, silenced by its own .catch(). If customer
    presence is ever wanted, it needs an endpoint on the customer side. */
 
-const authNavPairs = [
-  [document.getElementById('navLoginLink'), document.getElementById('navSignupLink')],
-];
-
+/** Tell the header the session changed.
+ *
+ *  This used to relabel and show/hide FOUR hand-maintained controls: a static
+ *  Login and Sign Up in the header, and another pair in the mobile drawer,
+ *  plus a nine-link account list toggled by a `show-account` class. All of it
+ *  is deleted — profile-menu.js renders the authentication controls, and it
+ *  reads the session itself, so the only thing left to say is "look again".
+ *
+ *  The duplicate Login/Sign Up came from exactly that overlap: the static pair
+ *  never went away when the component started rendering its own. */
 function renderAuthNav() {
-  const { access, name, role } = getStoredAuth();
-  const loggedIn = Boolean(access) && role !== 'admin';
-  const isAdmin = Boolean(access) && role === 'admin';
-
-  // Admins keep the old simple treatment (link straight to admin.html) — the
-  // Account Center below is a customer-only experience.
-  authNavPairs.forEach(([loginEl, signupEl]) => {
-    if (loginEl) loginEl.textContent = isAdmin ? 'Dashboard' : 'Login';
-    if (signupEl) signupEl.textContent = isAdmin ? 'Logout' : 'Sign Up';
-    if (loginEl) loginEl.style.display = loggedIn ? 'none' : '';
-    if (signupEl) signupEl.style.display = loggedIn ? 'none' : '';
-  });
-
-  document.getElementById('mobileNav').classList.toggle('show-account', loggedIn);
-
-  /* The chip, the initials and the whole dropdown are profile-menu.js's — the
-     same component the results pages render — so this page no longer builds
-     its own and the two cannot drift. It reads the session itself; all that is
-     needed here is to tell it the session changed. */
   if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
-
-  const mobileLoginLink = document.getElementById('mobileNavLoginLink');
-  const mobileSignupLink = document.getElementById('mobileNavSignupLink');
-  if (isAdmin) { mobileLoginLink.textContent = 'Dashboard'; mobileSignupLink.textContent = 'Logout'; }
-  else { mobileLoginLink.textContent = 'Login'; mobileSignupLink.textContent = 'Sign Up'; }
 }
 renderAuthNav();
 

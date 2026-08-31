@@ -311,7 +311,9 @@ function doAccountLogout() {
   renderAuthNav();
 }
 document.getElementById('profileLogoutBtn')?.addEventListener('click', doAccountLogout);
-document.getElementById('mobileLogoutLink')?.addEventListener('click', e => { e.preventDefault(); doAccountLogout(); });
+/* #mobileLogoutLink was the drawer's own Logout. The drawer no longer carries
+   account controls — profile-menu.js's dropdown is the one place to sign out,
+   at every width — so there is nothing left to bind. */
 
 /* ---------- Profile (header + editable form) ---------- */
 /* The customer record names two of these differently from the old platform
