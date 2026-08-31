@@ -1009,27 +1009,49 @@ loadUpcomingJourney();
    forwards it to partner-login.html, so a traveller sent there would land on
    the MERCHANT sign-in.
 
-   Runs last so every function and const it touches is already initialised, and
-   the parameter is stripped afterwards — a bookmarked or refreshed URL should
+   DEFERRED TO DOMContentLoaded, and that is load-bearing. This used to run at
+   parse time on the strength of "runs last, so everything it touches is
+   initialised" — true of this file, and NOT true of `openAuth`, which is
+   declared in app.js and loads AFTER this script on index.html. So the one
+   branch that matters, ?signin=1 while signed out, called a function that did
+   not exist yet: the intent was consumed, the parameter was stripped, and no
+   dialog ever opened. A traveller sent here by the wishlist's sign-in handoff
+   landed on the home page with nothing to show for the trip.
+
+   The parameter is stripped afterwards — a bookmarked or refreshed URL should
    not keep reopening a dialog the visitor has closed.
    --------------------------------------------------------------------------- */
-(function handleServicePageIntent() {
+function handleServicePageIntent() {
   const params = new URLSearchParams(location.search);
   const signin = params.get('signin');
   const account = params.get('account');
   if (!signin && !account) return;
 
-  const { access } = getStoredAuth();
+  const { access } = (typeof getStoredAuth === 'function') ? getStoredAuth() : {};
   /* ?account= while signed out is still a request to reach the account, so it
      opens the door rather than doing nothing. */
-  if (account && access) openAccountCenter(account);
-  else openAuth('login');
+  if (account && access) {
+    openAccountCenter(account);
+  } else if (typeof openAuth === 'function') {
+    openAuth('login');
+  } else {
+    /* A page that carries this file but not the sign-in modal. Better to leave
+       the intent in the URL than to strip it and silently do nothing. */
+    console.warn('[account-center] ?signin= on a page with no sign-in modal.');
+    return;
+  }
 
   params.delete('signin');
   params.delete('account');
   const qs = params.toString();
   history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
-})();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', handleServicePageIntent);
+} else {
+  handleServicePageIntent();
+}
 
 
   return {

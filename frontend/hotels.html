@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827hd5">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260827pt1">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260827pt4">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="hotels">
@@ -210,7 +210,7 @@
      (Both branches found this independently; account-center.js also carries a
      guard now, so the strip it renders no longer throws on a page without it.) -->
 <script src="assets/js/auth.js?v=20260824ic9"></script>
-<script src="assets/js/account-center.js?v=20260827fe4"></script>
+<script src="assets/js/account-center.js?v=20260827pt4"></script>
 <!-- The vendored hotel photography map. No airline logos on this page.
      hotel-image-map.js reports whether a photo is of THIS property or is a
      stand-in for the chain, which the Details gallery caption depends on. -->
@@ -234,6 +234,9 @@
 <!-- The filter rail: the generic engine, then the hotel definitions that drive
      it. The same pair flights.html loads — only the definition list differs.
      Must precede hotel-results.js, which mounts the panel into #hrFilters. -->
+<!-- Save for later. Generic over item_type because the endpoint is, so the
+     same module serves any product that grows a heart. -->
+<script src="assets/js/wishlist.js?v=20260827pt4"></script>
 <script src="assets/js/filter-engine.js?v=20260827fe3"></script>
 <script src="assets/js/hotel-filters.js?v=20260827pt1"></script>
 <!-- Must precede travel-explore.js: that file checks for this module and
@@ -245,7 +248,7 @@
 <script src="assets/js/hotel-review.js?v=20260827p1"></script>
 <script src="assets/js/hotel-payment.js?v=20260827d1"></script>
 <script src="assets/js/hotel-confirm.js?v=20260827c2"></script>
-<script src="assets/js/hotel-results.js?v=20260827pt3"></script>
+<script src="assets/js/hotel-results.js?v=20260827pt4"></script>
 <script src="assets/js/travel-explore.js?v=20260827m1"></script>
 <script src="assets/js/jp-icons.js?v=20260825a"></script>
 <script src="assets/js/service-shell.js?v=20260826ac1"></script>

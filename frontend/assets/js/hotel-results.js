@@ -257,6 +257,18 @@ const HotelResults = (function () {
   /* ---------------------------------------------------------------------
      Render — one hotel card
      --------------------------------------------------------------------- */
+  /** The save-for-later heart, from wishlist.js.
+   *
+   *  Rendered only where that module is loaded, so a page without it gets no
+   *  button rather than a broken one. The module owns the whole interaction —
+   *  the API call, the optimistic fill, putting it back when the server
+   *  disagrees, and sending a signed-out visitor to sign in — and it is
+   *  generic over item_type because the endpoint is, so this is one call
+   *  rather than a wishlist implementation living in a results screen. */
+  function saveButton(h) {
+    return (typeof Wishlist !== 'undefined') ? Wishlist.button('hotel', h.id, h.name) : '';
+  }
+
   function cardHtml(h) {
     const cost = stayCost(h);
     const meal = headlineMeal(h);
@@ -272,6 +284,7 @@ const HotelResults = (function () {
           ${img}
           ${h.distanceKm != null
             ? `<span class="hr-card-badge">${esc(h.distanceKm)} km from airport</span>` : ''}
+          ${saveButton(h)}
           ${photoCredit(h)}
         </div>
         <div class="hr-card-body">
@@ -503,6 +516,10 @@ const HotelResults = (function () {
       return;
     }
     el.innerHTML = list.map(cardHtml).join('');
+    /* The cards were just replaced, so their hearts are freshly built from
+       whatever Wishlist knew at the time. Repaint in case the saved set landed
+       after this render — it is fetched in parallel, not awaited. */
+    if (typeof Wishlist !== 'undefined') Wishlist.refresh();
   }
 
   /** Hand the panel the current rows. It re-derives which facets the data can
@@ -692,6 +709,13 @@ const HotelResults = (function () {
     const heading = $('hrHeading');
     if (heading) heading.textContent = shell.dest ? `Hotels in ${shell.dest}` : 'Hotels';
 
+
+    /* Started, not awaited: the saved set is a decoration on cards that should
+       render at once, and a slow wishlist must not hold the results back.
+       Signed out it is a no-op rather than a 401 on every load. */
+    if (typeof Wishlist !== 'undefined') {
+      Wishlist.init().then(() => Wishlist.refresh());
+    }
 
     /* Before the first paint, so the rail renders already holding whatever the
        URL asked for rather than being corrected a frame later. */

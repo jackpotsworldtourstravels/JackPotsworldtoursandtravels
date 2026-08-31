@@ -1231,7 +1231,35 @@ function completeCustomerSignIn(data) {
      skipped in that case: they are already navigating away, and a toast that
      outlives its page is just a flicker. */
   if (typeof resumePendingSearch === 'function' && resumePendingSearch()) return;
+  /* Or sent here from another page to sign in — go back to it. Same reason the
+     greeting is skipped: they are leaving. */
+  if (returnToNext()) return;
   showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
+}
+
+/** Honour `?next=` after signing in.
+ *
+ *  A service page that has no sign-in modal of its own sends the traveller here
+ *  with `next` set to where they were — the wishlist heart on the Hotels
+ *  results does exactly that, and carries the filters with it — so signing in
+ *  returns them to the list they were reading rather than stranding them on the
+ *  home page.
+ *
+ *  SAME-ORIGIN PATHS ONLY. `next` comes from a URL anyone can write, and a
+ *  redirect that accepts whatever it is handed is an open redirect: a link that
+ *  looks like this site and lands on someone else's login form. It must start
+ *  with a single "/" — which rejects "//evil.test" (protocol-relative) and
+ *  "https://evil.test" alike — and is resolved against this origin so the
+ *  browser cannot be talked into leaving it.
+ *
+ *  @returns {boolean} whether a navigation was started. */
+function returnToNext() {
+  const raw = new URLSearchParams(location.search).get('next');
+  if (!raw || raw[0] !== '/' || raw[1] === '/' || raw.includes('\\')) return false;
+  const url = new URL(raw, location.origin);
+  if (url.origin !== location.origin) return false;
+  location.href = url.pathname + url.search + url.hash;
+  return true;
 }
 
 /* --- Registration ------------------------------------------------------- */
