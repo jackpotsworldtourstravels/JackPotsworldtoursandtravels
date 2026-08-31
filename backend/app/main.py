@@ -388,6 +388,24 @@ def _run_completion_sweep() -> None:
 
 
 @app.on_event("startup")
+async def warn_if_otp_echo_is_on() -> None:
+    """Say it loudly, every boot, if login codes are not being emailed.
+
+    OTP_DEV_ECHO is meant for a laptop or CI, where the fixtures' addresses are
+    fake and tests/ reads the code out of the login response. On a real host it
+    means anyone who learns a password is handed the second factor with it, and
+    nothing else about the running server would reveal that — so the only
+    defence against it being set by accident is that it announces itself.
+    """
+    if settings.otp_dev_echo:
+        logger.warning(
+            "OTP_DEV_ECHO is ON: login codes are NOT emailed — they are logged "
+            "and returned in the API response. This is for local and CI hosts "
+            "only. If this is a deployed server, unset it now."
+        )
+
+
+@app.on_event("startup")
 async def start_booking_completion() -> None:
     global _completion_task
     if not settings.booking_completion_enabled:

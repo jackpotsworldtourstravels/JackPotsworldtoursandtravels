@@ -61,6 +61,17 @@ def _hash(code: str) -> str:
 
 
 def delivery_mode() -> str:
+    """``"email"`` when SMTP is configured and this is not a dev host.
+
+    ``"dev"`` means the code is logged and returned to the caller instead of
+    being mailed.
+    """
+    # A dev/test host says so explicitly, and then OTPs are never mailed even
+    # though SMTP is configured for everything else. Without this the two were
+    # one decision: configuring SMTP so the contact form could send mail also
+    # switched login codes to email, which stopped tests/ signing in at all.
+    if settings.otp_dev_echo:
+        return DEV_MODE
     return EMAIL_MODE if (settings.smtp_host and settings.smtp_from_email) else DEV_MODE
 
 

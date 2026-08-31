@@ -30,6 +30,29 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None
     smtp_from_name: str = "JackPots World Tours & Travels"
 
+    # THIS IS A DEV/TEST HOST: never email login OTPs, return them in the API
+    # response instead. Local and CI only.
+    #
+    # Whether SMTP exists and whether OTPs are emailed used to be the same
+    # question: no SMTP meant dev delivery meant the code came back in
+    # `dev_otp`. Configuring SMTP so the CONTACT FORM could send mail therefore
+    # silently switched every login to email delivery as well, and the test
+    # suite — which reads `dev_otp` from the login response — could no longer
+    # sign in at all. Each failed attempt still spent one of the five OTP
+    # requests an account gets per hour, so the suite locked itself out within
+    # a single run.
+    #
+    # This flag separates the two. SMTP still carries the contact form, the
+    # password-reset link and everything else; OTP delivery is forced to dev
+    # mode here, so codes are logged and returned rather than mailed to the
+    # fake addresses the fixtures use — which also keeps a suite run from
+    # spending dozens of sends against the real mailbox's daily quota.
+    #
+    # It defaults to False, so a host that sets nothing behaves exactly as it
+    # always did. NEVER set it on a deployed host: it hands anyone who knows a
+    # password the second factor as well.
+    otp_dev_echo: bool = False
+
     # Where booking-request documents (passports, visas, IDs) are written.
     # Deliberately OUTSIDE any served directory and never mounted with
     # StaticFiles — these files are returned only through an authenticated
