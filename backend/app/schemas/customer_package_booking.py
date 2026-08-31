@@ -145,6 +145,10 @@ class PackageBookingCreate(BaseModel):
     travellers: list[TravellerInput] = Field(min_length=1, max_length=12)
     addons: list[PackageAddonSelection] = Field(default_factory=list)
     coupon_code: str | None = Field(default=None, max_length=40)
+    #: Identifies ONE submission. Send the same key when retrying and the
+    #: server returns the booking it already made rather than making another
+    #: (migration 0061). Optional, so existing callers are unaffected.
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
 
 
 class PackageBookingTravellerResponse(BaseModel):

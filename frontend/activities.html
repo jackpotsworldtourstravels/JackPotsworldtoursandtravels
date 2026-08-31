@@ -9,30 +9,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260808bk1">
-<link rel="stylesheet" href="assets/css/service-page.css?v=20260808bk1">
+<!-- main.css supplies the landing page's navigation bar, which this page now
+     wears too (hero-shell.js). Loaded FIRST so service-page.css still wins on
+     anything the two both define. -->
+<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
+<link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
-<!-- The profile chip + dropdown, shared by every page that shows a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
+<!-- The profile chip + dropdown, shared by every page with a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="activities">
 <a href="#spMain" class="skip-link">Skip to content</a>
 
-<header class="sp-header" id="spHeader"></header>
+<!-- The landing page's navigation bar, same as index.html and flights.html.
+     Built by hero-shell.js; see that file for why the markup lives there. -->
+<header id="siteHeader"></header>
 
 <div class="sp-hero">
   <div class="sp-wrap">
     <div class="sp-crumb"><a href="index.html">Home</a> &nbsp;›&nbsp; Activities</div>
     <h1>Activities</h1>
     <p>Day tours, attractions and experiences to add to any trip.</p>
-    <nav class="sp-switch" aria-label="Other services">
-      <a href="flights.html" data-jpi-hover><span data-jp-icon="flights"></span> Flights</a>
-      <a href="hotels.html" data-jpi-hover><span data-jp-icon="hotels"></span> Hotels</a>
-      <a href="cruises.html" data-jpi-hover><span data-jp-icon="cruises"></span> Cruises</a>
-      <a href="packages.html" data-jpi-hover><span data-jp-icon="packages"></span> Tour Packages</a>
-      <a href="visa.html" data-jpi-hover><span data-jp-icon="visa"></span> Visa</a>
-      <a href="activities.html" aria-current="page" data-jpi-hover><span data-jp-icon="activities"></span> Activities</a>
-    </nav>
   </div>
 </div>
 
@@ -62,10 +60,18 @@
      navigating to index.html and discarding whatever is in progress.
      Loads from inside <body>: it injects its own modal markup. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/profile-menu.js?v=20260827dup1"></script>
-<script src="assets/js/account-center.js?v=20260827dup1"></script>
-<script src="assets/js/auth.js?v=20260827pm2"></script>
+<!-- auth.js MUST precede account-center.js. The Account Center calls
+     getStoredAuth() during its own start-up and that function is declared in
+     auth.js; with auth.js second every one of those calls threw
+     "getStoredAuth is not defined" and the profile panel never initialised. -->
+<script src="assets/js/auth.js?v=20260808ic2"></script>
+<!-- The profile chip + dropdown. Before account-center.js, whose Logout
+     it calls, and after auth.js, whose session it reads. -->
+<script src="assets/js/profile-menu.js?v=20260829pm5"></script>
+<script src="assets/js/account-center.js?v=20260829pm6"></script>
 <script src="assets/js/jp-icons.js?v=20260808bk1"></script>
-<script src="assets/js/service-shell.js?v=20260827pm1"></script>
+<script src="assets/js/hero-shell.js?v=20260829h1"></script>
+<script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<script>HeroShell.mountHeader('activities.html');</script>
 </body>
 </html>

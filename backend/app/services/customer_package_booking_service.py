@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models_customer import (
@@ -117,10 +118,46 @@ def _price_trip(db: Session, trip: dict, addons: list[dict], coupon_code: str | 
     return priced
 
 
+def find_by_idempotency_key(
+    db: Session, customer: Customer, key: str
+) -> CustomerPackageBooking | None:
+    """The booking this customer already made under this key, if any.
+
+    Scoped to the customer as well as the key: the unique index is on the pair,
+    and looking up by key alone would let one account's key surface another
+    account's booking.
+    """
+    return db.execute(
+        select(CustomerPackageBooking)
+        .options(
+            selectinload(CustomerPackageBooking.travellers),
+            selectinload(CustomerPackageBooking.addons),
+            selectinload(CustomerPackageBooking.payments),
+        )
+        .where(
+            CustomerPackageBooking.customer_id == customer.customer_id,
+            CustomerPackageBooking.idempotency_key == key,
+        )
+    ).scalar_one_or_none()
+
+
 def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerPackageBooking:
-    """Price the request from scratch, then write it down."""
+    """Price the request from scratch, then write it down.
+
+    SUBMITTING TWICE MAKES ONE BOOKING. When the payload carries an
+    ``idempotency_key`` the booking already made under it is returned as-is.
+    The lookup is a fast path, not the guarantee — two simultaneous requests
+    can both find nothing — so the unique index from migration 0061 is what
+    actually decides, and the loser of that race re-reads the winner's row.
+    """
     trip = payload["trip"]
     travellers_in = payload.get("travellers") or []
+    key = (payload.get("idempotency_key") or "").strip() or None
+
+    if key:
+        existing = find_by_idempotency_key(db, customer, key)
+        if existing is not None:
+            return existing
 
     priced = _price_trip(db, trip, payload.get("addons") or [], payload.get("coupon_code"))
     if priced["coupon_error"]:
@@ -151,9 +188,21 @@ def create_booking(db: Session, customer: Customer, payload: dict) -> CustomerPa
         total_amount=priced["total_amount"],
         currency=priced["currency"],
         coupon_code=priced["coupon_code"],
+        idempotency_key=key,
     )
     db.add(booking)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # Lost the race: another request carrying this same key inserted first.
+        # Roll this attempt back and hand back the booking that won, so both
+        # callers see one booking rather than one of them seeing an error.
+        db.rollback()
+        if key:
+            existing = find_by_idempotency_key(db, customer, key)
+            if existing is not None:
+                return existing
+        raise
 
     for i, t in enumerate(travellers_in):
         db.add(CustomerPackageBookingTraveller(

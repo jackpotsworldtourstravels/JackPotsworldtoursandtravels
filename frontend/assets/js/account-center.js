@@ -34,22 +34,18 @@
    =========================================================================== */
 const AccountCenter = (function () {
 
-  /** Who is signed in. auth.js's getCustomerSession() asks BOTH namespaces —
-   *  this module used to ask getStoredAuth() alone, which only means the
-   *  customer on pages that load app.js. On every other page it read an empty
-   *  `jwt_*` and concluded nobody was signed in, so opening the Account Center
-   *  from a results page silently offered a login instead. */
+  /** Who is signed in. auth.js's getCustomerSession() asks BOTH namespaces.
+   *  Asking getStoredAuth() alone only means the customer on pages that load
+   *  app.js — which rebinds it — so on every other page this module read an
+   *  empty `jwt_*` and concluded nobody was signed in. */
   const customerSession = () => (typeof getCustomerSession === 'function')
     ? getCustomerSession()
     : ((typeof getStoredAuth === 'function') ? getStoredAuth() : {});
 
-  /** Bearer header for this module's ~10 requests.
-   *
-   *  NOT the global authHeaders(): that reads `jwt_access` directly, and
-   *  app.js rebinds it to the customer namespace — on index.html only, as its
-   *  own comment says. Every request from here on any other page therefore
-   *  went out with an empty token and came back 401. Derived from
-   *  customerSession() so it is right wherever this file is loaded. */
+  /** Bearer header for this module's ~20 requests. NOT the global
+   *  authHeaders(): that reads `jwt_access` directly and is rebound to the
+   *  customer namespace by app.js on index.html only, so every request from
+   *  here on any other page went out with an empty token and came back 401. */
   const customerHeaders = () => ({ Authorization: `Bearer ${customerSession().access}` });
 
   /* ---- host-supplied dependencies ------------------------------------- */
@@ -289,21 +285,29 @@ document.querySelectorAll('[data-acct-tab]').forEach(link => {
     openAccountCenter(link.dataset.acctTab);
   });
 });
-/* The chip and its dropdown were wired here, against elements looked up at
-   PARSE time. On every page whose header is injected by a shell those lookups
-   found null and the menu silently did nothing — which is why the profile had
-   no dropdown anywhere except the landing page. profile-menu.js owns the
-   component now and binds by delegation, so when the markup arrives no longer
-   matters. */
+const profileChipBtn = document.getElementById('profileChipBtn');
+const profileDropdown = document.getElementById('profileDropdown');
+/* Absent on the booking pages, which carry their own header. */
+if (profileChipBtn && profileDropdown) {
+  profileChipBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = profileDropdown.classList.toggle('open');
+    profileChipBtn.classList.toggle('open', open);
+  });
+  document.addEventListener('click', () => {
+    profileDropdown.classList.remove('open');
+    profileChipBtn.classList.remove('open');
+  });
+}
 
 function doAccountLogout() {
   const { access } = customerSession();
   axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
-  /* BOTH namespaces. clearStoredAuth is rebound to the customer one by app.js,
-     but only on index.html — everywhere else it cleared an empty `jwt_*` and
-     left the real session in place, so Logout appeared to do nothing. */
+  /* BOTH namespaces: clearStoredAuth is rebound to the customer one by app.js,
+     but only on index.html — elsewhere it cleared an empty `jwt_*` and left the
+     real session in place, so Logout appeared to do nothing. */
   if (typeof clearCustomerAuth === 'function') clearCustomerAuth();
-  if (typeof clearStoredAuth === 'function') clearStoredAuth();
+  clearStoredAuth();
   acctCurrentUser = null;
   acctLoadedTabs.clear();
   resetWishlist();
@@ -366,8 +370,7 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
       city: document.getElementById('acctProfileCity').value || null,
       address_line1: document.getElementById('acctProfileAddress').value || null,
     }, { headers: customerHeaders() });
-    const cur = customerSession();
-    setStoredAuth(cur.access, cur.refresh, data.full_name, 'customer', data.id);
+    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'customer', data.id);
     renderAuthNav();
     loadAcctHeaderProfile();
     msg.textContent = 'Profile updated.';
@@ -713,16 +716,13 @@ function wireUpcomingJourneyActions() {
 async function loadUpcomingJourney() {
   const section = document.getElementById('upcomingJourneySection');
   const list = document.getElementById('upcomingJourneyList');
-  /* THE STRIP IS index.html's, and this file is loaded by every service page
-     too. Without this guard the call at module scope below threw on all of
-     them — `section` is null there — which is where the "Cannot read
-     properties of null (reading 'classList')" on hotels, flights, cruises and
-     packages came from. Nothing to render is not an error; it is this page
-     simply not having the strip. */
+  /* Only the landing page carries the Upcoming Journey strip. The other seven
+     pages load this file for the header and the Account Center, so the markup
+     it renders into simply is not there — that is expected, not a failure, and
+     it must leave without touching a null. Before this guard every service
+     page threw an uncaught TypeError on load, which stopped the rest of this
+     module's start-up from running. */
   if (!section || !list) return;
-  /* Called at module scope, and on some pages this file is parsed before
-     auth.js — so the function it needs may genuinely not exist yet. Treated as
-     "not signed in", which is what an unreadable session means anyway. */
   const { access } = customerSession();
   if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
   try {
@@ -1026,19 +1026,11 @@ loadUpcomingJourney();
    forwards it to partner-login.html, so a traveller sent there would land on
    the MERCHANT sign-in.
 
-   DEFERRED TO DOMContentLoaded, and that is load-bearing. This used to run at
-   parse time on the strength of "runs last, so everything it touches is
-   initialised" — true of this file, and NOT true of `openAuth`, which is
-   declared in app.js and loads AFTER this script on index.html. So the one
-   branch that matters, ?signin=1 while signed out, called a function that did
-   not exist yet: the intent was consumed, the parameter was stripped, and no
-   dialog ever opened. A traveller sent here by the wishlist's sign-in handoff
-   landed on the home page with nothing to show for the trip.
-
-   The parameter is stripped afterwards — a bookmarked or refreshed URL should
+   Runs last so every function and const it touches is already initialised, and
+   the parameter is stripped afterwards — a bookmarked or refreshed URL should
    not keep reopening a dialog the visitor has closed.
    --------------------------------------------------------------------------- */
-function handleServicePageIntent() {
+(function handleServicePageIntent() {
   const params = new URLSearchParams(location.search);
   const signin = params.get('signin');
   const account = params.get('account');
@@ -1047,38 +1039,20 @@ function handleServicePageIntent() {
   const { access } = customerSession();
   /* ?account= while signed out is still a request to reach the account, so it
      opens the door rather than doing nothing. */
-  if (account && access) {
-    openAccountCenter(account);
-  } else if (typeof openAuth === 'function') {
-    openAuth('login');
-  } else {
-    /* A page that carries this file but not the sign-in modal. Better to leave
-       the intent in the URL than to strip it and silently do nothing. */
-    console.warn('[account-center] ?signin= on a page with no sign-in modal.');
-    return;
-  }
+  if (account && access) openAccountCenter(account);
+  else openAuth('login');
 
   params.delete('signin');
   params.delete('account');
   const qs = params.toString();
   history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', handleServicePageIntent);
-} else {
-  handleServicePageIntent();
-}
+})();
 
 
   return {
     configure,
     open: openAccountCenter,
     close: closeAccountCenter,
-    /* Exposed for profile-menu.js's Logout item. What signing out MEANS — the
-       API call, clearing the session, resetting the wishlist and this module's
-       own state — stays here; a second copy in the menu would drift. */
-    logout: doAccountLogout,
     loadUpcomingJourney,
     starString,
   };

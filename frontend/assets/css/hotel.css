@@ -86,6 +86,11 @@
   /* Room for the sticky action bar so the last card is never trapped under it. */
   padding-bottom: 104px;
 }
+/* …but the action bar itself carries `hr-scope` (it needs the tokens) and was
+   therefore inheriting that clearance as its OWN bottom padding: 86px of
+   content sitting in a 191px bar, a fifth of the viewport spent on nothing.
+   It clears nothing and sits at the bottom of the screen, so it takes none. */
+.hr-actionbar.hr-scope { padding-bottom: 0; background: var(--hr-surface); }
 .hr-scope *,
 .hr-scope *::before,
 .hr-scope *::after { box-sizing: border-box; }
@@ -129,13 +134,13 @@ body.hr-booking .sp-hero { display: none; }
   display: flex;
   align-items: stretch;
   gap: 0;
-  margin: 20px 0 0;
+  margin: 14px 0 0;
   overflow: hidden;
 }
 .hr-sb-field {
   flex: 1 1 0;
   min-width: 0;
-  padding: 14px 20px;
+  padding: 9px 18px;
   border-right: 1px solid var(--hr-line-soft);
   display: flex;
   flex-direction: column;
@@ -157,7 +162,7 @@ body.hr-booking .sp-hero { display: none; }
   text-overflow: ellipsis;
 }
 .hr-sb-sub { font-size: 11.5px; color: var(--hr-ink-3); }
-.hr-sb-action { display: flex; align-items: center; padding: 12px 16px; flex: none; }
+.hr-sb-action { display: flex; align-items: center; padding: 8px 14px; flex: none; }
 
 /* ===========================================================================
    Stepper — horizontal only. No vertical timeline anywhere in this flow.
@@ -166,7 +171,7 @@ body.hr-booking .sp-hero { display: none; }
   display: flex;
   align-items: center;
   gap: 0;
-  margin: 18px 0 22px;
+  margin: 12px 0 14px;
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 2px;
@@ -191,10 +196,10 @@ body.hr-booking .sp-hero { display: none; }
   white-space: nowrap;
 }
 .hr-step-line {
-  width: 46px;
+  width: 26px;
   height: 1.5px;
   background: var(--hr-line);
-  margin: 0 12px;
+  margin: 0 8px;
   flex: none;
 }
 .hr-step.is-done .hr-step-dot {
@@ -226,12 +231,15 @@ body.hr-booking .sp-hero { display: none; }
   align-items: start;
 }
 
-/* Both rails stick; the results column scrolls past them. */
-.hr-rail {
-  position: sticky;
-  top: 16px;
-  /* Never taller than the viewport, or the bottom of a long filter list
-     becomes unreachable. */
+/* Both rails stick; the content column scrolls past them. */
+.hr-rail { position: sticky; top: 16px; }
+
+/* ONLY THE FILTER RAIL GETS ITS OWN SCROLLBAR, and only because a long facet
+   list would otherwise have an unreachable bottom. The Booking Summary must
+   not: giving it `overflow-y: auto` put a nested scrollbar inside the page on
+   shorter viewports — two things to scroll in order to read one column. The
+   page scrolls; the summary rides along. */
+.hr-rail-filters {
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   scrollbar-width: thin;
@@ -566,10 +574,10 @@ body.hr-booking .sp-hero { display: none; }
 .hr-actionbar-inner {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 12px 24px;
+  padding: 9px 24px;
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 20px;
 }
 .hr-ab-item { display: flex; align-items: center; gap: 10px; flex: none; }
 .hr-ab-item b { display: block; font-size: 13.5px; font-weight: 600; color: var(--hr-ink); }
@@ -613,7 +621,7 @@ body.hr-booking .sp-hero { display: none; }
 .hr-btn-primary:hover { background-color: var(--hr-accent-dk); border-color: var(--hr-accent-dk); }
 .hr-btn-ghost { background-color: var(--hr-surface); color: var(--hr-ink); border-color: var(--hr-line); }
 .hr-btn-ghost:hover { border-color: var(--hr-ink-3); background-color: var(--hr-ground); }
-.hr-btn-lg { font-size: 15px; padding: 12px 26px; }
+.hr-btn-lg { font-size: 14.5px; padding: 10px 22px; }
 .hr-btn:disabled,
 .hr-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 .hr-btn:disabled:hover,
@@ -702,7 +710,9 @@ body.hr-booking .sp-hero { display: none; }
    =========================================================================== */
 .hr-hd-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  /* ~70/30. A fixed 340px rail read as 75/25 on a 1440 desktop and left the
+     summary cramped beside a very wide form. */
+  grid-template-columns: minmax(0, 7fr) minmax(322px, 3fr);
   gap: 22px;
   align-items: start;
 }
@@ -713,8 +723,8 @@ body.hr-booking .sp-hero { display: none; }
   gap: 6px;
   background: none;
   border: 0;
-  padding: 4px 0;
-  margin-bottom: 12px;
+  padding: 2px 0;
+  margin-bottom: 8px;
   font: inherit;
   font-size: 13.5px;
   font-weight: 600;
@@ -830,7 +840,7 @@ body.hr-booking .sp-hero { display: none; }
   gap: 8px;
   min-width: 0;
 }
-.hr-hd-name { font-size: 26px; font-weight: 800; margin: 0; color: var(--hr-ink); letter-spacing: -.015em; }
+.hr-hd-name { font-size: 22px; font-weight: 800; margin: 0; color: var(--hr-ink); letter-spacing: -.015em; }
 
 /* ---- Tabs ---------------------------------------------------------------- */
 .hr-tabs {
@@ -1097,16 +1107,16 @@ body.hr-booking .sp-hero { display: none; }
   border: 1px solid var(--hr-line);
   border-radius: var(--hr-radius);
   box-shadow: var(--hr-shadow);
-  padding: 18px 20px;
-  margin-bottom: 16px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
 }
 .hr-roomgroup-head {
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
-  padding-bottom: 12px;
-  margin-bottom: 4px;
+  padding-bottom: 9px;
+  margin-bottom: 2px;
   border-bottom: 1px solid var(--hr-line-soft);
 }
 .hr-roomgroup-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: var(--hr-ink); }
@@ -1114,9 +1124,9 @@ body.hr-booking .sp-hero { display: none; }
 .hr-roomgroup-meta b { color: var(--hr-ink-2); font-weight: 600; }
 .hr-optional { font-weight: 500; font-size: 13px; color: var(--hr-ink-3); }
 
-.hr-guest { padding: 14px 0; border-bottom: 1px dashed var(--hr-line-soft); }
+.hr-guest { padding: 11px 0; border-bottom: 1px dashed var(--hr-line-soft); }
 .hr-guest:last-child { border-bottom: 0; padding-bottom: 0; }
-.hr-guest-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 10px; }
+.hr-guest-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
 .hr-guest-head b { font-size: 13.5px; font-weight: 700; color: var(--hr-ink); }
 .hr-chip-lead, .hr-chip-age {
   font-size: 11px;
@@ -1131,12 +1141,14 @@ body.hr-booking .sp-hero { display: none; }
 /* ---- Fields -------------------------------------------------------------- */
 .hr-fieldgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px 16px;
+  /* 190px lets four fields sit on one row of the 70% column instead of three,
+     which is what the reference does — the same guest in fewer rows. */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px 14px;
 }
-.hr-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hr-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .hr-field.is-wide { grid-column: 1 / -1; }
-.hr-label { font-size: 12.5px; font-weight: 600; color: var(--hr-ink-2); }
+.hr-label { font-size: 11.5px; font-weight: 600; color: var(--hr-ink-2); line-height: 1.35; }
 .hr-label i { color: var(--hr-accent-dk); font-style: normal; margin-left: 2px; }
 
 .hr-input {
@@ -1149,17 +1161,17 @@ body.hr-booking .sp-hero { display: none; }
   background-color: var(--hr-surface);
   border: 1px solid var(--hr-line);
   border-radius: var(--hr-radius-sm);
-  padding: 9px 11px;
+  padding: 7px 10px;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 .hr-input:hover { border-color: var(--hr-ink-3); }
 .hr-input:focus { outline: none; border-color: var(--hr-accent); box-shadow: 0 0 0 3px var(--hr-accent-soft); }
 .hr-input::placeholder { color: var(--hr-ink-3); }
-.hr-textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
+.hr-textarea { resize: vertical; min-height: 62px; line-height: 1.5; }
 
 .hr-field.has-error .hr-input { border-color: var(--hr-accent-dk); }
-.hr-err { font-size: 12px; color: var(--hr-accent-dk); }
-.hr-hint { font-size: 11.5px; color: var(--hr-ink-3); }
+.hr-err { font-size: 11.5px; color: var(--hr-accent-dk); line-height: 1.35; }
+.hr-hint { font-size: 11px; color: var(--hr-ink-3); line-height: 1.35; }
 
 /* Dial code sits beside the number and never shrinks the number away. */
 .hr-field-phone { display: flex; flex-direction: column; gap: 5px; }
@@ -1539,8 +1551,11 @@ body.hr-booking .sp-hero { display: none; }
 .hr-skeleton-sum { height: 420px; }
 
 /* ---- Responsive ---------------------------------------------------------- */
-@media (max-width: 1439px) { .hr-hd-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; } }
-@media (max-width: 1320px) { .hr-hd-layout { grid-template-columns: minmax(0, 1fr) 300px; } }
+/* The 70/30 ratio holds all the way down to the stacking breakpoint. These
+   used to pin the rail to a fixed 320px/300px, which quietly turned the split
+   back into 75/25 on a 1366 laptop — the exact screen most people book on. */
+@media (max-width: 1439px) { .hr-hd-layout { gap: 18px; } }
+@media (max-width: 1320px) { .hr-hd-layout { grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr); } }
 @media (max-width: 1024px) {
   .hr-hd-layout { grid-template-columns: minmax(0, 1fr); }
   .hr-hd-layout .hr-rail-summary { position: static; max-height: none; }

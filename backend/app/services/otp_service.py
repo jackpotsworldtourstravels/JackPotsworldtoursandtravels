@@ -20,14 +20,8 @@ offline. Instead:
   the response under ``dev_otp``, so local development and demos work.
 
 :func:`delivery_mode` reports which is active, and the login response says
-so explicitly.
-
-There is ONE override, added when SMTP was switched on for the website's
-contact form and local logins started waiting on Gmail: ``OTP_DEV_MODE=true``
-forces the dev path while leaving every other email sending. It is ANDed with
-``DEBUG`` (see ``Settings.otp_dev_mode_active``), because returning a login
-code in an API response is an authentication bypass and one stray environment
-variable should not be enough to cause it.
+so explicitly. There is no configuration flag to get this wrong: it follows
+``SMTP_HOST``/``SMTP_FROM_EMAIL`` directly.
 """
 import datetime
 import hashlib
@@ -71,14 +65,16 @@ def _hash(code: str) -> str:
 
 
 def delivery_mode() -> str:
-    """``"email"`` when SMTP is configured, otherwise ``"dev"``.
+    """``"email"`` when SMTP is configured and this is not a dev host.
 
-    ``OTP_DEV_MODE`` overrides that, but only with ``DEBUG`` also on — see
-    ``Settings.otp_dev_mode_active``. It exists because SMTP is now configured
-    for the website's contact form, and without it the only way back to codes
-    on screen was to turn that mail off too.
+    ``"dev"`` means the code is logged and returned to the caller instead of
+    being mailed.
     """
-    if settings.otp_dev_mode_active:
+    # A dev/test host says so explicitly, and then OTPs are never mailed even
+    # though SMTP is configured for everything else. Without this the two were
+    # one decision: configuring SMTP so the contact form could send mail also
+    # switched login codes to email, which stopped tests/ signing in at all.
+    if settings.otp_dev_echo:
         return DEV_MODE
     return EMAIL_MODE if (settings.smtp_host and settings.smtp_from_email) else DEV_MODE
 
@@ -126,8 +122,9 @@ def issue(db: Session, user: User, purpose: OtpPurpose = OtpPurpose.LOGIN) -> st
         msg_status = MessageStatus.SENT if sent else MessageStatus.FAILED
     else:
         logger.warning(
-            "OTP for %s is %s (SMTP not configured — dev delivery mode). "
-            "Set SMTP_HOST and SMTP_FROM_EMAIL in backend/.env to email codes instead.",
+            "OTP for %s is %s (dev delivery mode — the code was not emailed). "
+            "Set SMTP_HOST and SMTP_FROM_EMAIL, and leave OTP_DEV_ECHO off, to "
+            "email codes instead.",
             user.email,
             code,
         )

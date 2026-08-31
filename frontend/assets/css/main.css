@@ -183,15 +183,15 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   background:rgba(255,255,255,0.82); backdrop-filter:blur(20px) saturate(160%);
   border:1px solid rgba(255,255,255,0.6); border-radius:24px; box-shadow:var(--shadow-lg); padding:14px;
 }
-.tabs{display:flex; gap:6px; padding:6px 6px 16px; flex-wrap:wrap;}
-.tab{
-  padding:11px 20px; border-radius:100px; font-size:14px; font-weight:700; color:var(--navy); opacity:.55;
-  display:flex; align-items:center; gap:8px; transition:all .25s ease;
-}
-.tab.active{background:var(--navy); color:#fff; opacity:1; box-shadow:var(--shadow-sm);}
-.tab:hover:not(.active){opacity:.9; background:rgba(10,37,64,0.06);}
-/* Panels are stacked via CSS grid (grid-area:1/1) so the tallest panel sets the
-   container height once — switching tabs never resizes or animates the card. */
+/* THE PRODUCT TAB STRIP IS GONE. .tabs / .tab styled a Flights / Hotels /
+   Cruises / Tour Packages row inside the card — the site header's product
+   navigation, repeated one screen below it. The card carries one product now
+   (booking-card.js: PANELS) and the header is the only product navigation, so
+   these rules had nothing left to style and were removed rather than left as
+   dead selectors for the next person to wonder about. */
+/* One panel is built per card, so the stack below never has more than one
+   member; grid-area:1/1 is kept because booking-card.css layers the active
+   panel's own display rules on top of it. */
 .search-body{display:grid;}
 .search-panel{grid-area:1/1; visibility:hidden;}
 .search-panel.active{visibility:visible;}
@@ -869,3 +869,66 @@ button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offse
 .pw-strength.is-s0, .pw-strength.is-s1 { color: var(--coral-dark, #C0392B); }
 .pw-strength.is-s2 { color: var(--gold, #E9A23B); }
 .pw-strength.is-s3, .pw-strength.is-s4 { color: var(--emerald, #12B76A); }
+
+/* ===========================================================================
+   header.is-solid — the same navigation bar on a page with no video behind it
+   ===========================================================================
+   hero-shell.js adds this class when the page has no `#heroBg`, i.e. every
+   service page. Three things have to change and nothing else:
+
+   1. IT SITS IN THE FLOW, not fixed. The hero pages let the film run up under
+      a 128px fixed bar; a service page has no film, and a fixed bar would
+      float over content that never reserved room for it. Static keeps every
+      existing page layout exactly as it was under the old service header.
+   2. IT IS PAINTED. The base rule starts the bar at rgba(0,0,0,0) so the video
+      shows through — on a light page that is white lettering on white.
+   3. ITS LETTERING GOES DARK, for the same reason.
+
+   Scoped entirely to this class, so index.html and flights.html — which do
+   have a hero — are untouched.
+   =========================================================================== */
+header.is-solid{
+  position:static; background:#fff; backdrop-filter:none;
+  border-bottom:1px solid var(--line);
+}
+header.is-solid nav.wrap{height:76px;}
+header.is-solid .logo-mark-img{max-height:52px;}
+
+header.is-solid .navlinks a{color:var(--navy); font-weight:600;}
+header.is-solid .navlinks a:hover{color:var(--coral);}
+/* The current page, marked. There was no rule for this at all, so the active
+   item looked like every other link on every page that sets it. */
+header.is-solid .navlinks a[aria-current="page"]{color:var(--coral);}
+header.is-solid .navlinks a[aria-current="page"]::after{width:100%;}
+
+header.is-solid .nav-partner-mark{color:var(--navy); border-color:var(--line);}
+header.is-solid .nav-partner-mark:hover{border-color:var(--coral); background:rgba(255,77,77,0.08);}
+header.is-solid .nav-login{color:var(--navy);}
+header.is-solid .hamburger span{background:var(--navy);}
+
+/* The mobile drawer hangs off the bar, so it needs the painted treatment too. */
+header.is-solid .mobile-nav{background:#fff; border-top:1px solid var(--line);}
+header.is-solid .mobile-nav a{color:var(--navy);}
+
+@media (max-width:900px){
+  header.is-solid nav.wrap{height:64px;}
+  header.is-solid .logo-mark-img{max-height:42px;}
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow screens: the top bar cannot carry the partner button as well.
+   With a signed-in account chip present, "My Partner" (114px) + the chip
+   (179px) + the burger overflowed a 390px bar — the header scrolled to 410px,
+   which squeezed the LOGO to zero width and pushed the burger off-screen.
+   Neither is reachable, and the burger is the only way into the menu.
+
+   The button is not lost: the mobile drawer already carries its own
+   `.mobile-partner-mark` copy, which is where it belongs at this width.
+   Applies to the hero header too — flights.html and index.html had exactly
+   the same overflow before this.
+   --------------------------------------------------------------------------- */
+@media (max-width:600px){
+  header .nav-actions > .nav-partner-mark{display:none;}
+  header .logo{flex:0 0 auto;}
+  header .logo-mark-img{max-height:38px;}
+}

@@ -148,15 +148,14 @@ img { max-width: 100%; }
 .sp-hero p { margin: 0; font-size: 15px; color: rgba(255,255,255,.78); max-width: 640px; line-height: 1.6; }
 .sp-hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
 
-/* The other services, reachable without going home first. */
-.sp-switch { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
-.sp-switch a {
-  display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.22); font-size: 13.5px; font-weight: 700;
-  color: rgba(255,255,255,.85); transition: background .18s ease, border-color .18s ease;
-}
-.sp-switch a:hover { background: rgba(255,255,255,.12); color: #fff; }
-.sp-switch a[aria-current="page"] { background: #fff; color: var(--sp-header); border-color: #fff; }
+/* THE SERVICE-SWITCH PILL ROW IS GONE. .sp-switch was a row of Flights /
+   Hotels / Cruises / Tour Packages / Visa / Activities pills under this hero's
+   H1 — the same product links the header above it already carries, a second
+   time on the same screen. Product navigation is the header's, so the markup
+   was removed from all six pages that carried it and these rules went with it
+   rather than being left as dead selectors. The hero now ends at its
+   description, which is what it is for: naming the one service this page is
+   about. */
 
 /* --------------------------------------------------------------------------
    Not-yet-live services

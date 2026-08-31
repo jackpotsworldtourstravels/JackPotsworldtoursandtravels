@@ -69,7 +69,15 @@ const HotelReview = (function () {
     return Math.max(1, Math.round((b - a) / 86400000));
   }
   const roomCount = () => Math.max(1, picks.length);
-  const guests = () => (guestData && guestData.party) || [];
+  /* THE PARTY WITH THEIR NAMES ON IT.
+     This read `party`, which is only the SHAPE of the party — one entry per
+     person carrying roomIndex, kind and a child's age, and no name, because
+     it is built before anybody has typed anything. So every guest on the
+     Review screen rendered as the fallback word "Guest". `passengers` is the
+     same list after the form has been filled in: same roomIndex, same kind,
+     same childAge, plus the names and the lead guest's contact details.
+     `party` stays the fallback for the moment before the form exists. */
+  const guests = () => (guestData && (guestData.passengers || guestData.party)) || [];
   const adults = () => guests().filter(g => g.kind === 'adult').length;
   const children = () => guests().filter(g => g.kind === 'child').length;
 

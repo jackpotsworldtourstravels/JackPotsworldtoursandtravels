@@ -433,6 +433,9 @@ class CustomerBooking(Base):
     total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     coupon_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: Deduplicates a resubmission of the SAME booking — see migration 0061.
+    #: Unique per customer; NULL for bookings made before it existed.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
@@ -1082,6 +1085,9 @@ class CustomerPackageBooking(Base):
     total_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     coupon_code: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    #: Deduplicates a resubmission of the SAME booking — see migration 0061.
+    #: Unique per customer; NULL for bookings made before it existed.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,

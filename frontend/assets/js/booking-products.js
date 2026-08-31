@@ -1989,6 +1989,56 @@ const BookingProducts = (function () {
     };
   }
 
+  /* ---------------------------------------------------------------------
+     ONE SUBMISSION = ONE BOOKING (flights and packages).
+     Hotels got this in hotel-payment.js; the shared flow had the same hole.
+     A submission is identified by a key generated once for a given set of
+     choices and kept in sessionStorage, so a double-click, a reload, or a
+     Back into Payment re-sends the SAME key — and the server returns the
+     booking it already made instead of making another. The unique index from
+     migration 0061 is the actual guarantee; this is the courteous half.
+     --------------------------------------------------------------------- */
+  const SUBMIT_SESSION_KEY = 'jpc_booking_session';
+
+  /** What makes this a DIFFERENT booking: the product, the item, the date,
+   *  the party, the seats, the extras and the coupon. Change any of them and
+   *  it deserves its own key. */
+  function submitFingerprint(ctx) {
+    return JSON.stringify({
+      k: ctx.kind,
+      i: ctx.item && ctx.item.id,
+      d: ctx.departure && (ctx.departure.id || ctx.departure.date),
+      t: ctx.travelDate,
+      p: (ctx.passengers || []).length,
+      s: (ctx.seats || []).map(x => x && x.id).filter(Boolean),
+      a: (ctx.addons || []).map(a => a.id).sort(),
+      c: ctx.couponCode || null,
+    });
+  }
+
+  function newSubmitKey(kind) {
+    const p = String(kind || 'bk').slice(0, 3) + '_';
+    try {
+      if (window.crypto && crypto.randomUUID) return p + crypto.randomUUID();
+    } catch { /* fall through */ }
+    return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+
+  /** The key for the choices currently on screen, minting one the first time
+   *  these exact choices are submitted. */
+  function submitKey(ctx) {
+    const fp = submitFingerprint(ctx);
+    let s = null;
+    try { s = JSON.parse(sessionStorage.getItem(SUBMIT_SESSION_KEY) || 'null'); }
+    catch { /* private mode */ }
+    if (!s || s.fp !== fp) {
+      s = { fp: fp, key: newSubmitKey(ctx.kind) };
+      try { sessionStorage.setItem(SUBMIT_SESSION_KEY, JSON.stringify(s)); }
+      catch { /* private mode — the server index still holds */ }
+    }
+    return s.key;
+  }
+
   /** The shape handed to BookingStore. Kept in one place so every product
    *  stores the same thing and My Bookings can render any of them. */
   function flowDraft(ctx) {
@@ -2006,12 +2056,14 @@ const BookingProducts = (function () {
       payment: ctx.payment,
       pricing: ctx.pricing,
       item: ctx.item ? { id: ctx.item.id, name: ctx.summaryTitle } : null,
-      /* For flights and hotels, what the server is actually asked to book.
-         Note it names choices only — no prices — so the total is the
+      /* For flights, hotels and packages, what the server is actually asked
+         to book. Note it names choices only — no prices — so the total is the
          server's arithmetic and not something this page could dictate.
-         Absent for cruises/packages/visa, which BookingStore keeps local. */
+         Absent for cruises and visa, which BookingStore keeps local. */
       apiPayload: (ctx.kind === 'flight' && typeof BookingApi !== 'undefined')
         ? {
+            /* Same key on every retry of this submission — see submitKey(). */
+            idempotency_key: submitKey(ctx),
             flight: BookingApi.flightPayload(ctx),
             passengers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
@@ -2075,6 +2127,8 @@ const BookingProducts = (function () {
           }
         : (ctx.kind === 'package' && typeof BookingApi !== 'undefined' && ctx.departure)
         ? {
+            /* Same key on every retry of this submission — see submitKey(). */
+            idempotency_key: submitKey(ctx),
             trip: BookingApi.packagePayload(ctx),
             travellers: (ctx.passengers || []).map((p, i) => ({
               traveller_type: String(p.kind || 'Adult').toLowerCase(),
@@ -2167,13 +2221,26 @@ const BookingProducts = (function () {
            for exactly the same reason and carry exactly the same wrong
            headline, but the Flights journey is signed off and is not being
            changed here — see the Phase 6 report. */
+        /* THE HEADLINE FOLLOWS THE STATUS, FOR EVERY PRODUCT.
+           No payment gateway is integrated, so a server booking — flight,
+           hotel or package alike — is created `pending` and stays there:
+           nothing has been paid and no supplier has confirmed anything.
+           "Booking confirmed" over that is the one claim this screen must
+           never make. It was scoped to hotels when the hotel journey was
+           built; flights and packages carried the same wrong headline for the
+           same reason, and now they do not.
+
+           Cruise and visa have no backend at all: booking-store stamps those
+           local rows `Confirmed` itself, and they are labelled "Demo booking"
+           in the footer below, so reading their own status leaves them
+           exactly as they were. */
         const confirmed = /confirm|complete|paid/i.test(String(b.status || ''));
-        const heading = (isHotel && !confirmed) ? 'Booking received' : 'Booking confirmed';
-        const subline = (isHotel && !confirmed)
-          ? `${esc(ctx.summaryTitle || '')} — held against your account. Your booking
-             is <b>pending</b> until payment is arranged; nothing has been charged.`
-          : `Your booking has been successfully confirmed.
-             ${esc(ctx.summaryTitle || '')} — recorded against your account.`;
+        const heading = confirmed ? 'Booking confirmed' : 'Booking received';
+        const subline = confirmed
+          ? `Your booking has been successfully confirmed.
+             ${esc(ctx.summaryTitle || '')} — recorded against your account.`
+          : `${esc(ctx.summaryTitle || '')} — held against your account. Your booking
+             is <b>pending</b> until payment is arranged; nothing has been charged.`;
 
         return `<div class="bk-step bk-done">
             <div class="bk-done-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('insurance', { size: 'xl' }) : ''}</div>

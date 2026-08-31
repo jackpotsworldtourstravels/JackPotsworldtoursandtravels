@@ -2,16 +2,14 @@
    booking-card.css — the controls booking-card.js adds to the hero card.
    ===========================================================================
    Loaded AFTER main.css on every page that renders the card, and it only adds:
-   .search-card, .tabs, .field and .search-fields are still main.css's, so the
+   .search-card, .field and .search-fields are still main.css's, so the
    card keeps the design language it already had and this file cannot quietly
    restyle it.
 
-   HEIGHT IS THE CONSTRAINT THIS FILE IS BUILT AROUND. The panels are grid-
-   stacked (main.css: .search-body{display:grid} .search-panel{grid-area:1/1}),
-   so the TALLEST panel sets the card's height for every tab — a trip-type row
-   added carelessly would push Hotels, Cruises and Packages down too. The row
-   is therefore a 30px segmented control and the space it needs is taken back
-   out of the tab strip's bottom padding, which was 16px of pure air.
+   HEIGHT IS THE CONSTRAINT THIS FILE IS BUILT AROUND. The card is as tall as
+   the one panel it holds and nothing more — the trip-type row is a 30px
+   segmented control for that reason, and it is the card's first control now
+   that the product tab strip above it is gone.
 
    The one place the card does grow is Round Trip, which has a second route to
    show and cannot show it in a row that does not exist. It grows by exactly
@@ -27,31 +25,27 @@
 
 /* THE PANEL STACK HAD TO GO.
 
-   main.css stacks all four product panels in one grid cell (grid-area:1/1,
-   inactive ones visibility:hidden) so the tallest sets the height once and
-   switching tabs never resizes the card. That was right when every panel was a
-   single row of fields. It is not right now: a five-leg Multi City itinerary is
-   ~800px tall, and a hidden panel that still takes part in layout would have
-   made Hotels, Cruises and Packages 800px of mostly empty card.
+   main.css used to stack all four product panels in one grid cell
+   (grid-area:1/1, inactive ones visibility:hidden) so the tallest set the
+   height once. That was right when every panel was a single row of fields and
+   wrong once a five-leg Multi City itinerary reached ~800px, because a hidden
+   panel still taking part in layout made every other product 800px of mostly
+   empty card.
 
-   So only the active panel is laid out. Switching tabs can now change the card
-   height — which is what "expand vertically only as needed" asks for, and the
-   width is untouched either way. */
+   Only the ACTIVE panel is laid out, and a card now builds only one panel in
+   the first place — so this pair is what keeps the built panel visible and
+   what keeps a re-seeded card from showing two at once. */
 .search-card .search-panel { display: none; }
 .search-card .search-panel.active { display: block; visibility: visible; }
 
 /* --------------------------------------------------------------------------
    Trip type — the first control in the card
    -------------------------------------------------------------------------- */
-/* Reclaimed air. The tab strip carried 16px of bottom padding whose only job
-   was separating the tabs from the fields; the trip row does that now, so the
-   padding goes and pays for most of the row. Measured on a 1280px viewport:
-   216px before, 241px after. A whole row of controls cannot be free, but that
-   is the whole cost — the card's WIDTH is unchanged at 1201px, and Hotels,
-   Cruises and Packages measure 241px too, so no tab is left taller than the
-   others by the grid stack. Round Trip is the one exception and grows by a
-   field row, because it has a second route to show. */
-.search-card .tabs { padding-bottom: 0; }
+/* The trip row is the card's first control now. It used to sit under a product
+   tab strip and paid for itself out of that strip's 16px of bottom padding;
+   the strip is gone with the duplicated product navigation, so there is
+   nothing left to reclaim and nothing left to override — .search-card .tabs
+   went with it. Its own top margin (below) is the whole gap. */
 
 .trip-types {
   display: flex; gap: 3px; width: max-content; max-width: 100%;

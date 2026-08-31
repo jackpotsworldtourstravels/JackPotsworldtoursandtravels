@@ -16,13 +16,19 @@
    auth gate, the account center) still find `.search-panel`, `.search-go` and
    the field ids exactly where they were.
 
-   WHAT IT OWNS: the markup, the product tabs and their hero videos, the date
-   fields, the swap button, the trip type, the return-route mirror and the
-   passenger popup. WHAT IT DOES NOT: where a search goes, and whether the
-   traveller is allowed to run one. Those are the host page's business and
-   arrive through setSearchHandler() — which is why the landing page can put an
-   auth gate in front of a search while the Flights page just re-renders its
-   list in place.
+   IT DOES NOT NAVIGATE. The card used to carry its own Flights / Hotels /
+   Cruises / Tour Packages strip, duplicating the site header's product nav one
+   screen below it. Product navigation is the HEADER's, and only the header's;
+   the card is handed one product at mount and renders that product's panel.
+   See PANELS.
+
+   WHAT IT OWNS: the markup of one product panel, the hero video that goes with
+   it, the date fields, the swap button, the trip type, the return-route mirror
+   and the passenger popup. WHAT IT DOES NOT: which product is being searched,
+   where a search goes, and whether the traveller is allowed to run one. Those
+   are the host page's business and arrive through render()'s `tab` option and
+   setSearchHandler() — which is why the landing page can put an auth gate in
+   front of a search while the Flights page just re-renders its list in place.
 
    PASSENGER RULES LIVE IN pax-selector.js, not here. See its header for the
    four rules and why the caps intersect.
@@ -313,20 +319,31 @@ const BookingCard = (function () {
       + '</div></div>';
   }
 
-  const TABS = [
-    { id: 'flights',  label: 'Flights' },
-    { id: 'hotels',   label: 'Hotels' },
-    { id: 'cruises',  label: 'Cruises' },
-    { id: 'packages', label: 'Tour Packages' },
-  ];
+  /* ONE PRODUCT PER CARD — AND NO PRODUCT TABS.
+
+     The card used to open with a Flights / Hotels / Cruises / Tour Packages
+     strip. That was the SAME product navigation the site header already
+     carries, on the same screen, three inches below it — two owners of one
+     decision, and the header is the owner. Every product has its own page
+     (flights.html, hotels.html, cruises.html, packages.html) with its own
+     search panel, and the header is how a traveller reaches them.
+
+     So the card is told WHICH product it serves at mount — render(host,
+     {tab:'flights'}) — and builds only that product's panel. The other three
+     are not hidden behind a tab that no longer exists; they are not built at
+     all, so there is no dead panel in the DOM to hide.
+
+     What stays in the card is what belongs to a SEARCH rather than to
+     navigation: the trip type (One Way / Round Trip / Multi City), the fields,
+     the Search button and the trust row. */
+  const PANELS = {
+    flights: flightsPanel,
+    hotels: hotelsPanel,
+    cruises: cruisesPanel,
+    packages: packagesPanel,
+  };
 
   function cardHtml() {
-    const tabs = TABS.map(t =>
-      '<button class="tab' + (t.id === state.tab ? ' active' : '') + '" role="tab"'
-      + ' aria-selected="' + (t.id === state.tab) + '" data-tab="' + t.id + '" data-jpi-hover>'
-      + '<span data-jp-icon="' + t.id + '" data-jp-size="sm"></span> ' + esc(t.label)
-      + '</button>').join('');
-
     const trust = [
       'Trusted by 2 Million+ Travellers', '24/7 Support',
       'Secure Payments', 'Instant Confirmation',
@@ -334,9 +351,8 @@ const BookingCard = (function () {
       + '<path d="M20 6L9 17l-5-5"/></svg>' + esc(t) + '</span>').join('');
 
     return '<div class="search-card" role="region" aria-label="Booking search">'
-      + '<div class="tabs" role="tablist" aria-label="Booking type">' + tabs + '</div>'
       + '<div class="search-body">'
-      + flightsPanel() + hotelsPanel() + cruisesPanel() + packagesPanel()
+      + (PANELS[state.tab] || flightsPanel)()
       + '</div>'
       /* ONE Search button for the whole card, at the bottom right.
          It used to be the last cell of each panel's field row, which pinned it
@@ -525,7 +541,7 @@ const BookingCard = (function () {
   }
 
   /* ---------------------------------------------------------------------
-     Hero videos — one per product tab, lazy-loaded on first use.
+     Hero videos — one per product, lazy-loaded on first use.
      Lives here rather than in app.js because the Flights page has the same
      video layer and does not load app.js.
      --------------------------------------------------------------------- */
@@ -623,16 +639,24 @@ const BookingCard = (function () {
     }
   }
 
+  /** Show the named product's panel.
+   *
+   *  A card carries ONE product now (see PANELS), so this can be asked for a
+   *  product it does not hold — and when it is, it changes nothing and says so
+   *  by returning false. The caller decides what that means: app.js's voice
+   *  search sends the traveller to that product's own page, which is where the
+   *  search for it lives. Silently switching `state.tab` to a panel that was
+   *  never built is what would leave the card submitting hotel criteria it has
+   *  no fields for. */
   function activateTab(name) {
-    if (!root) return;
+    if (!root) return false;
+    const panels = Array.prototype.slice.call(root.querySelectorAll('.search-panel'));
+    /* Checked BEFORE anything is toggled. Toggling first and bailing out after
+       would have deactivated the panel the card is actually showing on its way
+       to discovering it does not have the one being asked for. */
+    if (!panels.some(p => p.dataset.panel === name)) return false;
+    panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
     state.tab = name;
-    root.querySelectorAll('.tab').forEach(t => {
-      const on = t.dataset.tab === name;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', String(on));
-    });
-    root.querySelectorAll('.search-panel').forEach(p =>
-      p.classList.toggle('active', p.dataset.panel === name));
     switchHeroVideo(name);
     clearError();
     paintSearchButton();
@@ -641,6 +665,7 @@ const BookingCard = (function () {
       note.textContent = name === 'flights' ? (FOOT_NOTE[state.trip] || '')
         : name === 'hotels' ? (HOTEL_FOOT_NOTE[state.hotelMode] || '') : '';
     }
+    return true;
   }
 
   /* ---------------------------------------------------------------------
@@ -1287,9 +1312,7 @@ const BookingCard = (function () {
      Wiring
      --------------------------------------------------------------------- */
   function bind() {
-    /* Tabs */
-    root.querySelectorAll('.tab').forEach(tab =>
-      tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+    /* No tab strip to bind — the card holds one product. See PANELS. */
 
     /* Trip type. Arrow keys walk the group, which is what role="radiogroup"
        promises — the pills are buttons, so the browser gives us nothing. */
@@ -1630,14 +1653,17 @@ const BookingCard = (function () {
   /**
    * @param {Element|string} host   element (or id) the card is rendered into
    * @param {Object} [opts]
-   * @param {string} [opts.tab]     product tab to open on
+   * @param {string} [opts.tab]     which product this card searches; the only
+   *                                panel it builds. Defaults to flights.
    * @param {Object} [opts.flights] criteria to seed the flights panel with
    */
   function render(host, opts) {
     const el = typeof host === 'string' ? document.getElementById(host) : host;
     if (!el) return null;
     opts = opts || {};
-    if (opts.tab) state.tab = opts.tab;
+    /* WHICH product this card is. Unknown names fall back to flights rather
+       than rendering an empty card. */
+    if (opts.tab && PANELS[opts.tab]) state.tab = opts.tab;
 
     el.innerHTML = cardHtml();
     /* Anything portalled out by a previous render is orphaned the moment the
@@ -1653,7 +1679,9 @@ const BookingCard = (function () {
     const depNative = root.querySelector('[data-fg="dep"] .date-native');
     if (depNative) depNative.min = isoDay(new Date());
 
-    if (typeof PaxSelector !== 'undefined') {
+    /* Mount-guarded: a card built for a non-flights product has no #fPaxField
+       to hang the picker on, and the selectors do not check for themselves. */
+    if (typeof PaxSelector !== 'undefined' && $('fPaxField')) {
       pax = PaxSelector.create({
         mount: $('fPaxField'),
         label: 'Passengers',
@@ -1661,7 +1689,7 @@ const BookingCard = (function () {
       });
     }
 
-    if (typeof RoomsSelector !== 'undefined') {
+    if (typeof RoomsSelector !== 'undefined' && $('hRoomsField')) {
       rooms = RoomsSelector.create({
         mount: $('hRoomsField'),
         label: 'Rooms & Guests',

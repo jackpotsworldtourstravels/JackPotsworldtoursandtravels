@@ -177,6 +177,10 @@ class BookingCreate(BaseModel):
     coupon_code: str | None = Field(default=None, max_length=40)
     #: "Add these travellers to My Traveller List" on the traveller step.
     save_travellers: bool = False
+    #: Identifies ONE submission. Send the same key when retrying and the
+    #: server returns the booking it already made rather than making another
+    #: (migration 0061). Optional, so existing callers are unaffected.
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=64)
 
 
 class BookingPassengerResponse(BaseModel):

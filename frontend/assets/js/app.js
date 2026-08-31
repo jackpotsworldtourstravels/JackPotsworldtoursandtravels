@@ -45,7 +45,7 @@ if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
 
 /* THE HERO CARD MOVED OUT OF THIS FILE.
 
-   The booking tabs, their hero videos, the swap button, the date fields and the
+   The product panel, its hero video, the swap button, the date fields and the
    Search button all used to be wired here, against markup that lived in
    index.html. Both are booking-card.js's now, because the Flights page renders
    the SAME card and does not load this file — a second copy of these handlers
@@ -55,10 +55,37 @@ if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
    run. See the hero search section further down, which hands the card a
    handler. */
 
-/** Switch the hero's product tab. Kept as a free function because the voice
- *  search and the deep-link handlers below have always called it by this name. */
-function activateTab(name) {
-  if (typeof BookingCard !== 'undefined') BookingCard.activateTab(name);
+/** The header's product links, by product. One page per product — the same
+ *  targets the header uses, so a voice search and a header click land in the
+ *  same place. */
+const SERVICE_PAGE = {
+  flights: 'flights.html',
+  hotels: 'hotels.html',
+  cruises: 'cruises.html',
+  packages: 'packages.html',
+};
+
+/** Point the traveller at a product.
+ *
+ *  THE HERO CARD IS NOT A PRODUCT SWITCHER ANY MORE. It carries the Flights
+ *  search and nothing else: product navigation belongs to the site header, and
+ *  the card duplicating it was the same four links twice on one screen. So ask
+ *  the card first, and when it cannot serve that product — anything but
+ *  flights, here — go to the page that can, exactly as clicking the header
+ *  would.
+ *
+ *  Returns true when the card handled it in place, so a caller that was about
+ *  to fill fields in knows whether those fields are still on this page. */
+function activateTab(name, params) {
+  if (typeof BookingCard !== 'undefined' && BookingCard.activateTab(name)) return true;
+  const page = SERVICE_PAGE[name];
+  if (page) {
+    const qs = new URLSearchParams(
+      Object.entries(params || {}).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    ).toString();
+    window.location.href = qs ? `${page}?${qs}` : page;
+  }
+  return false;
 }
 
 /* Button ripple effect — shared by .btn and the floating action menu */
@@ -711,16 +738,26 @@ function applyVoiceQuery(transcript) {
   else if (/\btoday\b/.test(lower)) dateStr = isoDateOffset(0);
   const cleaned = lower.replace(/\b(tomorrow|today)\b/g, '').trim();
 
+  /* HOTELS, CRUISES AND PACKAGES LEAVE THIS PAGE. Their search panels are not
+     in the hero card any more — each product has its own page — so what was
+     heard travels there in the URL rather than being typed into fields that no
+     longer exist here. The toast is spoken before the navigation, because
+     after it there is no page left to show it on. */
   if (/\bhotels?\b/.test(lower)) {
-    activateTab('hotels');
     const m = cleaned.match(/\bhotels?\s+(?:in|at|near)\s+([a-z\s]+)/i) || cleaned.match(/\bin\s+([a-z\s]+)$/i);
-    if (m) { document.getElementById('hDest').value = titleCaseWords(m[1].trim()); confidentMatch = true; }
-    if (dateStr) setNativeDate('hIn', dateStr);
+    showToast(`Heard: "${text}"`);
+    activateTab('hotels', { dest: m ? titleCaseWords(m[1].trim()) : '', checkIn: dateStr || '' });
+    return;
   } else if (/\bcruises?\b/.test(lower)) {
+    /* Nothing to carry: no free-text criterion is heard here, and the cruise
+       page is a browse rather than a search. */
+    showToast(`Heard: "${text}"`);
     activateTab('cruises');
-    /* No free-text origin field exists on the cruise panel — switch tabs only rather than guessing a field to fill. */
+    return;
   } else if (/\b(packages?|tours?)\b/.test(lower)) {
+    showToast(`Heard: "${text}"`);
     activateTab('packages');
+    return;
   } else {
     activateTab('flights');
     const m = cleaned.match(/([a-z\s]+?)\s+to\s+([a-z\s]+)/i);
