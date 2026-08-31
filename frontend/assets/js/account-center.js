@@ -696,6 +696,13 @@ function wireUpcomingJourneyActions() {
 async function loadUpcomingJourney() {
   const section = document.getElementById('upcomingJourneySection');
   const list = document.getElementById('upcomingJourneyList');
+  /* Only the landing page carries the Upcoming Journey strip. The other seven
+     pages load this file for the header and the Account Center, so the markup
+     it renders into simply is not there — that is expected, not a failure, and
+     it must leave without touching a null. Before this guard every service
+     page threw an uncaught TypeError on load, which stopped the rest of this
+     module's start-up from running. */
+  if (!section || !list) return;
   const { access } = getStoredAuth();
   if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
   try {

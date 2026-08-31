@@ -12,8 +12,8 @@
 <!-- main.css supplies the landing page's navigation bar, which this page now
      wears too (hero-shell.js). Loaded FIRST so service-page.css still wins on
      anything the two both define. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260829h2">
-<link rel="stylesheet" href="assets/css/service-page.css?v=20260825a">
+<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
+<link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
@@ -35,14 +35,6 @@
         <p>All-inclusive sailings from the Arabian Gulf to the Mediterranean.</p>
       </div>
     </div>
-    <nav class="sp-switch" aria-label="Other services">
-      <a href="flights.html" data-jpi-hover><span data-jp-icon="flights"></span> Flights</a>
-      <a href="hotels.html" data-jpi-hover><span data-jp-icon="hotels"></span> Hotels</a>
-      <a href="cruises.html" aria-current="page" data-jpi-hover><span data-jp-icon="cruises"></span> Cruises</a>
-      <a href="packages.html" data-jpi-hover><span data-jp-icon="packages"></span> Tour Packages</a>
-      <a href="visa.html" data-jpi-hover><span data-jp-icon="visa"></span> Visa</a>
-      <a href="activities.html" data-jpi-hover><span data-jp-icon="activities"></span> Activities</a>
-    </nav>
   </div>
 </div>
 
@@ -66,9 +58,13 @@
      navigating to index.html and discarding whatever is in progress.
      Loads from inside <body>: it injects its own modal markup. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/account-center.js?v=20260826ac1"></script>
-<script src="components/toast.js"></script>
+<!-- auth.js MUST precede account-center.js. The Account Center calls
+     getStoredAuth() during its own start-up and that function is declared in
+     auth.js; with auth.js second every one of those calls threw
+     "getStoredAuth is not defined" and the profile panel never initialised. -->
 <script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/account-center.js?v=20260829ac2"></script>
+<script src="components/toast.js"></script>
 <!-- No image library for cruises, so travel-explore.js draws each card a
      deterministic scene. Nothing to load here. -->
 <!-- The airport table travel-data.js reads. Must precede it. -->
@@ -81,7 +77,7 @@
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-flow.js?v=20260826rf8"></script>
-<script src="assets/js/booking-products.js?v=20260829f1"></script>
+<script src="assets/js/booking-products.js?v=20260829f2"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
 <script src="assets/js/booking-flows.js?v=20260827p1"></script>
 <script src="assets/js/travel-explore.js?v=20260825t2"></script>

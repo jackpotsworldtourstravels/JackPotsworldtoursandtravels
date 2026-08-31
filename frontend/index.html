@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260829h2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260825h1">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260829n1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -30,7 +30,7 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260825h1"></script>
+<script src="assets/js/booking-card.js?v=20260829n1"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
@@ -155,9 +155,16 @@
        instead of two copies of a form that would have drifted apart.
        Rendered inline and synchronously, so this DOM exists before app.js runs
        at the bottom of the page and its handlers still find .search-panel,
-       .search-go and the field ids exactly where they were. -->
+       .search-go and the field ids exactly where they were.
+
+       IT IS THE FLIGHT SEARCH, NOT A SECOND NAV BAR. The card used to open
+       with its own Flights / Hotels / Cruises / Tour Packages strip — the
+       header's product links, repeated a few inches below the header. The
+       header owns product navigation; every product has its own page and the
+       card is handed ONE of them. What is left inside it is the trip type
+       (One Way / Round Trip / Multi City) and the search fields. -->
   <div class="wrap search-dock" id="heroSearchDock"></div>
-  <script>BookingCard.render('heroSearchDock');</script>
+  <script>BookingCard.render('heroSearchDock', { tab: 'flights' });</script>
 
   <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
 </section>
@@ -840,8 +847,8 @@
 <!-- The Account Center. Before app.js, which calls AccountCenter.configure()
      at the end of its own load. This page keeps its static modal markup above,
      so the module skips injecting a second copy. -->
-<script src="assets/js/account-center.js?v=20260826ac1"></script>
-<script src="assets/js/app.js?v=20260826ac1"></script>
+<script src="assets/js/account-center.js?v=20260829ac2"></script>
+<script src="assets/js/app.js?v=20260829n1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

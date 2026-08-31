@@ -183,15 +183,15 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   background:rgba(255,255,255,0.82); backdrop-filter:blur(20px) saturate(160%);
   border:1px solid rgba(255,255,255,0.6); border-radius:24px; box-shadow:var(--shadow-lg); padding:14px;
 }
-.tabs{display:flex; gap:6px; padding:6px 6px 16px; flex-wrap:wrap;}
-.tab{
-  padding:11px 20px; border-radius:100px; font-size:14px; font-weight:700; color:var(--navy); opacity:.55;
-  display:flex; align-items:center; gap:8px; transition:all .25s ease;
-}
-.tab.active{background:var(--navy); color:#fff; opacity:1; box-shadow:var(--shadow-sm);}
-.tab:hover:not(.active){opacity:.9; background:rgba(10,37,64,0.06);}
-/* Panels are stacked via CSS grid (grid-area:1/1) so the tallest panel sets the
-   container height once — switching tabs never resizes or animates the card. */
+/* THE PRODUCT TAB STRIP IS GONE. .tabs / .tab styled a Flights / Hotels /
+   Cruises / Tour Packages row inside the card — the site header's product
+   navigation, repeated one screen below it. The card carries one product now
+   (booking-card.js: PANELS) and the header is the only product navigation, so
+   these rules had nothing left to style and were removed rather than left as
+   dead selectors for the next person to wonder about. */
+/* One panel is built per card, so the stack below never has more than one
+   member; grid-area:1/1 is kept because booking-card.css layers the active
+   panel's own display rules on top of it. */
 .search-body{display:grid;}
 .search-panel{grid-area:1/1; visibility:hidden;}
 .search-panel.active{visibility:visible;}
