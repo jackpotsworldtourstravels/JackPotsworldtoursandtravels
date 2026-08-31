@@ -132,50 +132,35 @@ const HeroShell = (function () {
     const slot = document.getElementById('shellAuth');
     const mobile = document.getElementById('shellAuthMobile');
     if (!slot) return;
-    const session = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : { access: null };
 
-    if (!session.access) {
-      /* NOT index.html#login — app.js claims the `#login` hash for the merchant
-         hand-off and would send a traveller to the partner sign-in. `?signin=1`
-         is the query app.js reads on load for the customer modal. */
+    /* THE CHIP AND ITS MENU ARE profile-menu.js's.
+       This used to render "one chip, no dropdown" — the comment said so — so
+       arriving on Flights from a search left the profile visible and every
+       account destination behind it unreachable. The component renders the
+       same chip and the same eight-item menu the landing page has, because it
+       IS the landing page's. */
+    if (typeof ProfileMenu !== 'undefined') {
+      slot.setAttribute('data-profile-menu', '');
+      ProfileMenu.mount(slot.parentNode || document);
+    } else {
       slot.innerHTML = '<a href="index.html?signin=1" class="nav-login">Login</a>'
         + '<a href="index.html?signin=1" class="btn btn-coral nav-signup">Sign Up</a>';
-      if (mobile) mobile.innerHTML = '<a href="index.html?signin=1">Login</a>'
-        + '<a href="index.html?signin=1">Sign Up</a>';
-      return;
     }
 
-    const name = session.name || 'Traveller';
-    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-    /* One chip, no dropdown. It used to be a LINK to index.html?account=profile,
-       because the Account Center only existed on the landing page — which meant
-       checking your profile mid-booking threw the booking away. It is now
-       account-center.js, loadable anywhere, so the chip opens it in place and
-       the page (and any half-filled booking on it) stays exactly as it was.
-
-       Still a link when that module is absent, so a page that has not adopted it
-       keeps the old behaviour rather than a chip that does nothing. */
-    const inPlace = typeof AccountCenter !== 'undefined';
-    const chipInner = '<span class="profile-chip-avatar">' + esc(initials) + '</span>'
-      + '<span class="profile-chip-name">' + esc(name) + '</span>';
-    slot.innerHTML = inPlace
-      ? '<button type="button" class="profile-chip" id="heroProfileChip">' + chipInner + '</button>'
-      : '<a class="profile-chip" href="index.html?account=profile">' + chipInner + '</a>';
+    /* The mobile drawer is this shell's own list, not a dropdown, so it stays
+       here — but it is filled from the SAME item list, so the two cannot offer
+       different destinations. */
     if (mobile) {
-      mobile.innerHTML = (inPlace
-          ? '<a href="#" data-acct-open="profile">My Account</a>'
-          : '<a href="index.html?account=profile">My Account</a>')
-        + '<a href="my-bookings.html">My Bookings</a>';
+      const session = (typeof ProfileMenu !== 'undefined') ? ProfileMenu.session() : null;
+      mobile.innerHTML = session && typeof ProfileMenu !== 'undefined'
+        ? ProfileMenu.ITEMS.map(i =>
+            `<a href="#" data-pm-tab="${esc(i.tab)}">${esc(i.label)}</a>`).join('')
+        : '<a href="index.html?signin=1">Login</a><a href="index.html?signin=1">Sign Up</a>';
     }
-    if (inPlace) wireAccountOpeners(slot, mobile);
   }
 
-  /* Both openers land on the same call; nothing here navigates. */
-  function wireAccountOpeners(slot, mobile) {
-    const open = e => { e.preventDefault(); AccountCenter.open('profile'); };
-    slot.querySelector('#heroProfileChip')?.addEventListener('click', open);
-    mobile?.querySelectorAll('[data-acct-open]').forEach(a => a.addEventListener('click', open));
-  }
+  /* wireAccountOpeners() bound the old chip and the old mobile links. Both
+     are profile-menu.js's delegated handlers now. */
 
   /* ---------------------------------------------------------------------
      Scroll fade — THE ONE IMPLEMENTATION.

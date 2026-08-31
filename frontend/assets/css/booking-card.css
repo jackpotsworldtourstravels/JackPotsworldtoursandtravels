@@ -440,6 +440,43 @@
 }
 .hotel-contact textarea::placeholder { color: var(--navy); opacity: .45; font-weight: 600; }
 
+/* --------------------------------------------------------------------------
+   Group enquiry: sending, and sent
+   --------------------------------------------------------------------------
+   The acknowledgement REPLACES the form rather than sitting above it. A form
+   still on screen after a successful submit reads as one that did not go, and
+   is the shortest path to the same enquiry arriving twice. */
+.search-panel.is-sent > *:not(.hotel-sent) { display: none; }
+
+.hotel-sent {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 6px; padding: 26px 18px 22px;
+  animation: hotelSentIn .3s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes hotelSentIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.hotel-sent-tick {
+  width: 42px; height: 42px; padding: 9px; border-radius: 50%;
+  color: #fff; background: var(--emerald, #1E9E6A); margin-bottom: 4px;
+}
+.hotel-sent h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--navy); }
+.hotel-sent p {
+  margin: 0; max-width: 46ch; font-size: 13.5px; font-weight: 600;
+  color: var(--muted); line-height: 1.55;
+}
+.hotel-sent-again { margin-top: 12px; }
+
+/* Mid-send. The label already says "Sending…"; this stops the press landing
+   twice and takes the hover affordance away while it is in flight. */
+.search-go.is-busy { opacity: .72; cursor: progress; }
+.search-go[disabled] { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hotel-sent { animation: none; }
+}
+
 /* Says a field can be skipped without making it look disabled. */
 .field-optional {
   font-size: 9.5px; font-weight: 700; letter-spacing: .04em;

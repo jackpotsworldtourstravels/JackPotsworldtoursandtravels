@@ -135,7 +135,7 @@ def signup(request: Request, payload: CustomerSignupRequest, db: Session = Depen
         message=(
             f"Account created. A verification code was sent to {customer.email}."
             if mode == customer_otp_service.EMAIL_MODE
-            else "Account created. SMTP is not configured — the code is shown here and in the server log."
+            else "Account created. Development mode — the code is shown here and in the server log."
         ),
         dev_otp=dev_code,
     )
@@ -178,7 +178,7 @@ def login(request: Request, payload: CustomerLoginRequest, db: Session = Depends
         message=(
             f"A verification code was sent to {customer.email}."
             if mode == customer_otp_service.EMAIL_MODE
-            else "SMTP is not configured — the code is shown here and in the server log."
+            else "Development mode — the code is shown here and in the server log."
         ),
         dev_otp=dev_code,
     )

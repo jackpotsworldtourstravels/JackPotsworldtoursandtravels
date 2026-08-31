@@ -1573,3 +1573,130 @@ body.hr-booking .sp-hero { display: none; }
   .hr-gal-count { top: calc(56.25% - 30px); }
   .hr-panel-cta .hr-btn { width: 100%; }
 }
+
+/* ==========================================================================
+   The filter rail, rendered by filter-engine.js
+
+   The rail used to be hand-built markup in hotel-results.js. It is the shared
+   engine now — the same one the Flights sidebar uses — so what arrives in
+   #hrFilters carries `ff-` class names rather than `hr-` ones.
+
+   BEHAVIOUR MOVED, APPEARANCE DID NOT. These rules restyle the engine's markup
+   to this screen's design: the same card, the same 14px/16px group rhythm, the
+   same 12.5px headings and 13.5px options as the .hr-group/.hr-opt rules
+   above. Doing it here rather than teaching the engine about `hr-` keeps the
+   engine ignorant of what it is filtering, which is the property that let it
+   serve two products in the first place.
+
+   The engine adds two things the hand-built rail did not have, and both earn
+   their space: collapsible groups (there are eight now, not six) and a dual
+   price range (a floor as well as a ceiling).
+   ========================================================================== */
+.hr-rail-filters .ff-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--hr-line-soft); margin: 0;
+}
+.hr-rail-filters .ff-heading {
+  font-size: 15.5px; font-weight: 700; margin: 0; color: var(--hr-ink);
+  display: flex; align-items: center; gap: 8px;
+}
+.hr-rail-filters .ff-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px;
+  background: var(--hr-accent); color: #fff; font-size: 11px; font-weight: 700;
+}
+.hr-rail-filters .ff-clear-all,
+.hr-rail-filters .ff-clear-one {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--hr-accent-dk); font: inherit; font-size: 13px; font-weight: 600;
+  text-decoration: none;
+}
+.hr-rail-filters .ff-clear-all:hover,
+.hr-rail-filters .ff-clear-one:hover { text-decoration: underline; }
+.hr-rail-filters .ff-clear-one { margin-top: 8px; font-size: 12.5px; }
+
+.hr-rail-filters .ff-group { border-top: 0; border-bottom: 1px solid var(--hr-line-soft); }
+.hr-rail-filters .ff-group:last-of-type { border-bottom: 0; }
+.hr-rail-filters .ff-head { margin: 0; }
+/* The heading is a button now, because the group folds. It keeps the weight
+   and size of the <h3> it replaces so the rail reads the same. */
+.hr-rail-filters .ff-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 14px 16px; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+  text-transform: none; color: var(--hr-ink); text-align: left;
+}
+.hr-rail-filters .ff-toggle:hover { color: var(--hr-accent-dk); }
+.hr-rail-filters .ff-caret { width: 15px; height: 15px; flex: none; color: var(--hr-ink-3); }
+.hr-rail-filters .ff-body { padding: 0 16px 14px; }
+
+.hr-rail-filters .ff-opt {
+  display: flex; align-items: center; gap: 9px; padding: 5px 0;
+  cursor: pointer; font-size: 13.5px; color: var(--hr-ink-2);
+}
+.hr-rail-filters .ff-opt input {
+  flex: none; width: 15px; height: 15px; accent-color: var(--hr-accent);
+  cursor: pointer; margin: 0;
+}
+.hr-rail-filters .ff-opt-label { flex: 1; min-width: 0; }
+.hr-rail-filters .ff-opt-note { font-size: 11px; color: var(--hr-ink-3); }
+.hr-rail-filters .ff-count {
+  color: var(--hr-ink-3); font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+/* An option leading nowhere is dimmed, not removed — unticking whatever is
+   excluding it is how you get back to it. Matches .hr-opt:has(:disabled). */
+.hr-rail-filters .ff-opt.is-empty { opacity: .45; }
+.hr-rail-filters .ff-opt:hover .ff-opt-label { color: var(--hr-ink); }
+
+.hr-rail-filters .ff-search input {
+  width: 100%; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--hr-line); background: var(--hr-surface);
+  color: var(--hr-ink); font: inherit; font-size: 13px; outline: none;
+}
+.hr-rail-filters .ff-search input:focus { border-color: var(--hr-accent); }
+.hr-rail-filters .ff-none { font-size: 12.5px; color: var(--hr-ink-3); margin: 6px 0; }
+
+/* The dual range, in this screen's palette. Same readout line as
+   .hr-price-read had, now showing both ends rather than only the ceiling. */
+.hr-rail-filters .ff-range-out {
+  display: block; font-size: 13px; font-weight: 700; color: var(--hr-ink);
+  font-variant-numeric: tabular-nums; margin-bottom: 10px;
+}
+.hr-rail-filters .ff-range-track::before { background: var(--hr-line); }
+.hr-rail-filters .ff-range-fill { background: var(--hr-accent); }
+.hr-rail-filters .ff-range-track input[type="range"]::-webkit-slider-thumb {
+  border-color: var(--hr-accent); background: var(--hr-surface);
+}
+.hr-rail-filters .ff-range-track input[type="range"]::-moz-range-thumb {
+  border-color: var(--hr-accent); background: var(--hr-surface);
+}
+.hr-rail-filters .ff-range-ends {
+  font-size: 12.5px; color: var(--hr-ink-2); font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Save for later (wishlist.js)
+
+   Top-RIGHT of the photograph: the distance badge holds the top-left and the
+   photo credit sits along the bottom, so this is the one corner free of both.
+   -------------------------------------------------------------------------- */
+.hr-card-media .wl-btn {
+  position: absolute;
+  top: 8px; right: 8px; bottom: auto; z-index: 2;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 1px 6px rgba(16, 35, 63, .28);
+  transition: transform .16s ease, background .16s ease;
+}
+.hr-card-media .wl-btn svg {
+  width: 17px; height: 17px; fill: none;
+  stroke: var(--hr-ink-2); stroke-width: 2;
+}
+.hr-card-media .wl-btn:hover { transform: scale(1.08); }
+.hr-card-media .wl-btn.is-on svg { fill: var(--hr-accent); stroke: var(--hr-accent); }
+.hr-card-media .wl-btn:focus-visible { outline: 2px solid var(--hr-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .hr-card-media .wl-btn { transition: none; }
+}

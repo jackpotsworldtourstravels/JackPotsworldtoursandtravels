@@ -33,6 +33,12 @@
   --tx-shadow:    0 1px 2px rgba(10,37,64,.04), 0 8px 24px rgba(10,37,64,.06);
   --tx-shadow-lg: 0 2px 6px rgba(10,37,64,.06), 0 18px 44px rgba(10,37,64,.12);
   --tx-radius:    16px;
+  /* The travelling band in a skeleton shimmer. A TOKEN because it has to
+     reverse with the theme: a dark tint over a light placeholder reads as the
+     sweep, and the same tint over the dark palette's #1A2439 computes to
+     within a shade of the surface itself — an animation that runs and cannot
+     be seen. */
+  --tx-sk-hi:     rgba(10, 37, 64, .07);
 }
 
 /* Dark palette. Declared twice on purpose: the media query follows the OS, the
@@ -49,6 +55,7 @@
     --tx-line:      rgba(232,238,247,.14);
     --tx-shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
     --tx-shadow-lg: 0 2px 6px rgba(0,0,0,.45), 0 18px 44px rgba(0,0,0,.5);
+    --tx-sk-hi:     rgba(232,238,247,.10);
   }
 }
 :root[data-theme="dark"] .tx-scope {
@@ -60,6 +67,7 @@
   --tx-line:      rgba(232,238,247,.14);
   --tx-shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
   --tx-shadow-lg: 0 2px 6px rgba(0,0,0,.45), 0 18px 44px rgba(0,0,0,.5);
+  --tx-sk-hi:     rgba(232,238,247,.10);
 }
 
 /* --------------------------------------------------------------------------
@@ -158,16 +166,233 @@
   border-radius: var(--tx-radius); padding: 18px; box-shadow: var(--tx-shadow);
   /* Clears the fixed header, same reason as .tx-section's scroll-margin-top. */
   position: sticky; top: 148px;
+  /* The panel scrolls INSIDE itself once it is taller than what is left of the
+     viewport under the header. Without this a long filter list simply runs off
+     the bottom of a sticky box and its last group cannot be reached at all. */
+  max-height: calc(100vh - 168px);
+  overflow-y: auto; overscroll-behavior: contain;
 }
-.tx-fgroup + .tx-fgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--tx-line); }
-.tx-fgroup h4 { margin: 0 0 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--tx-muted); }
-.tx-check { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; color: var(--tx-ink); cursor: pointer; }
-.tx-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--tx-accent); cursor: pointer; flex: none; }
-.tx-check .tx-count { margin-left: auto; font-size: 12px; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
-.tx-clear { margin-top: 16px; width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--tx-line); background: transparent; color: var(--tx-ink); font-weight: 700; font-size: 13.5px; font-family: inherit; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
-.tx-clear:hover { border-color: var(--tx-accent); color: var(--tx-accent); }
+/* A slim scrollbar, so the panel does not gain a chunky OS gutter that eats
+   into the option labels. */
+.tx-filters { scrollbar-width: thin; scrollbar-color: var(--tx-line) transparent; }
+.tx-filters::-webkit-scrollbar { width: 8px; }
+.tx-filters::-webkit-scrollbar-thumb { background: var(--tx-line); border-radius: 99px; }
+.tx-filters::-webkit-scrollbar-track { background: transparent; }
+/* .tx-fgroup, .tx-check and .tx-clear were the hand-written filter markup that
+   filter-engine.js replaced. Nothing renders those class names any more, so
+   the rules are gone with them rather than left to be inherited by accident. */
+
+/* --------------------------------------------------------------------------
+   Sticky search summary (hotels)
+
+   Sits under .sp-header, which is itself sticky at top:0 and 72px tall, and
+   below it in the stack so a scrolled page never shows the two overlapping.
+   Collapsed to zero height until shown, so it takes no space and cannot be
+   tabbed into while the real form is still on screen.
+   -------------------------------------------------------------------------- */
+.tx-summary-bar {
+  position: sticky; top: 72px; z-index: 40;
+  margin: 0 0 18px;
+  max-height: 0; overflow: hidden; opacity: 0;
+  transform: translateY(-6px);
+  transition: max-height .24s ease, opacity .2s ease, transform .24s ease;
+  pointer-events: none;
+}
+.tx-summary-bar.is-shown {
+  max-height: 90px; opacity: 1; transform: none; pointer-events: auto;
+}
+.tx-summary-in {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--tx-surface); border: 1px solid var(--tx-line);
+  box-shadow: var(--tx-shadow-lg);
+}
+.tx-summary-text {
+  margin: 0; flex: 1; min-width: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0;
+  font-size: 13.5px; font-weight: 700; color: var(--tx-ink);
+}
+/* Middot separators drawn in CSS, so the text itself stays a plain list of
+   values that a screen reader reads without punctuation between every word. */
+.tx-summary-text span + span::before {
+  content: '·'; margin: 0 9px; color: var(--tx-muted); font-weight: 400;
+}
+.tx-summary-edit { flex: none; padding: 9px 16px; font-size: 13px; }
+
+/* The bar's other face: the same criteria as a small form. Taller than the
+   read-only line, so the shown height allows for it. */
+.tx-summary-bar.is-shown { max-height: 260px; }
+.tx-summary-in.is-editing {
+  display: grid; align-items: end;
+  grid-template-columns: minmax(160px, 1.6fr) repeat(2, minmax(130px, 1fr)) repeat(2, 84px) auto;
+  gap: 10px;
+}
+.tx-sum-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tx-sum-field label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--tx-muted);
+}
+.tx-sum-field input {
+  width: 100%; padding: 9px 10px; border-radius: 9px;
+  border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink);
+  /* 16px so iOS does not zoom the page when one is focused. */
+  font-size: 16px; font-family: inherit; outline: none;
+}
+.tx-sum-field input:focus { border-color: var(--tx-accent); }
+.tx-sum-actions { display: flex; gap: 8px; }
+.tx-sum-actions .tx-btn { padding: 10px 15px; font-size: 13px; }
+.tx-sum-error {
+  grid-column: 1 / -1; margin: 2px 0 0;
+  font-size: 12.5px; font-weight: 700; color: var(--tx-accent);
+}
+@media (max-width: 860px) {
+  .tx-summary-in.is-editing { grid-template-columns: 1fr 1fr; }
+  .tx-sum-field:first-child { grid-column: 1 / -1; }
+  .tx-sum-actions { grid-column: 1 / -1; }
+  .tx-sum-actions .tx-btn { flex: 1; }
+  .tx-summary-bar.is-shown { max-height: 420px; }
+}
+@media (max-width: 560px) {
+  .tx-summary-bar.is-shown { max-height: 140px; }
+  .tx-summary-text { font-size: 12.5px; }
+  .tx-summary-edit { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-summary-bar { transition: none; }
+}
 
 .tx-filter-toggle { display: none; }
+
+/* --------------------------------------------------------------------------
+   Filter panel (flight-filters.js)
+
+   Its own `ff-` namespace rather than more `tx-fgroup` rules: the panel is
+   rendered entirely by a module that knows nothing about this page, and the
+   prefix is what keeps that boundary visible in the stylesheet too.
+   -------------------------------------------------------------------------- */
+.ff-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.ff-heading {
+  margin: 0; font-size: 14px; font-weight: 800; color: var(--tx-ink);
+  display: flex; align-items: center; gap: 8px;
+}
+.ff-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px;
+  background: var(--tx-accent); color: var(--tx-accent-ink);
+  font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.ff-clear-all {
+  margin-left: auto; background: none; border: none; padding: 4px 2px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--tx-accent); text-decoration: underline; text-underline-offset: 3px;
+}
+
+.ff-group { border-top: 1px solid var(--tx-line); }
+.ff-head { margin: 0; }
+.ff-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 14px 0 12px; background: none; border: none; cursor: pointer;
+  font-family: inherit; text-align: left; color: var(--tx-muted);
+  font-size: 11.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+}
+.ff-toggle:hover { color: var(--tx-ink); }
+.ff-title { flex: 1; min-width: 0; }
+.ff-caret { width: 16px; height: 16px; flex: none; transition: transform .2s ease; }
+.ff-toggle[aria-expanded="false"] .ff-caret { transform: rotate(-90deg); }
+.ff-body { padding-bottom: 14px; }
+
+.ff-opts { display: flex; flex-direction: column; }
+.ff-opt {
+  display: flex; align-items: center; gap: 9px; padding: 6px 0;
+  font-size: 14px; color: var(--tx-ink); cursor: pointer;
+}
+.ff-opt input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--tx-accent); cursor: pointer; }
+.ff-opt-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ff-opt-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-opt-note { font-size: 11px; color: var(--tx-muted); font-weight: 600; }
+.ff-count { margin-left: auto; font-size: 12px; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
+/* Still selectable — it is how you get back to a wider result set — but shown
+   as leading nowhere on its own. */
+.ff-opt.is-empty { opacity: .45; }
+
+.ff-logo {
+  width: 20px; height: 20px; flex: none; border-radius: 5px; object-fit: contain;
+  background: var(--tx-surface-2);
+}
+.ff-logo-code {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 8.5px; font-weight: 800; color: var(--tx-muted);
+  border: 1px solid var(--tx-line);
+}
+
+.ff-search { margin-bottom: 8px; }
+.ff-search input {
+  width: 100%; padding: 8px 10px; border-radius: 9px;
+  border: 1.5px solid var(--tx-line); background: var(--tx-surface);
+  color: var(--tx-ink); font-family: inherit; font-size: 13.5px; outline: none;
+}
+.ff-search input:focus { border-color: var(--tx-accent); }
+.ff-none { margin: 6px 0; font-size: 13px; color: var(--tx-muted); }
+.ff-clear-one {
+  margin-top: 8px; background: none; border: none; padding: 2px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  color: var(--tx-accent); text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   Dual-range slider
+
+   Two overlaid <input type=range>. Each keeps its own thumb, so both are
+   focusable and arrow-key operable — which a single custom-drawn track with
+   div thumbs would have to reimplement badly. The inputs themselves are
+   transparent; the visible track and fill are the div underneath.
+   -------------------------------------------------------------------------- */
+.ff-range-out {
+  display: block; font-size: 13.5px; font-weight: 800; color: var(--tx-ink);
+  font-variant-numeric: tabular-nums; margin-bottom: 10px;
+}
+.ff-range-track { position: relative; height: 22px; }
+.ff-range-track::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 9px; height: 4px;
+  border-radius: 99px; background: var(--tx-line);
+}
+.ff-range-fill {
+  position: absolute; top: 9px; height: 4px; border-radius: 99px;
+  background: var(--tx-accent);
+}
+.ff-range-track input[type="range"] {
+  position: absolute; left: 0; top: 0; width: 100%; height: 22px; margin: 0;
+  background: none; appearance: none; -webkit-appearance: none;
+  /* The track must not swallow the other thumb's pointer events; only the
+     thumbs themselves are interactive. */
+  pointer-events: none;
+}
+.ff-range-track input[type="range"]:focus { outline: none; }
+.ff-range-track input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; pointer-events: auto;
+  width: 18px; height: 18px; border-radius: 50%; cursor: grab;
+  background: var(--tx-surface); border: 2.5px solid var(--tx-accent);
+  box-shadow: 0 1px 4px rgba(10, 37, 64, .25);
+}
+.ff-range-track input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px; height: 18px; border-radius: 50%; cursor: grab; border: 2.5px solid var(--tx-accent);
+  background: var(--tx-surface); box-shadow: 0 1px 4px rgba(10, 37, 64, .25);
+}
+.ff-range-track input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--tx-accent); outline-offset: 2px;
+}
+.ff-range-track input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--tx-accent); outline-offset: 2px;
+}
+.ff-range-ends {
+  display: flex; justify-content: space-between; margin-top: 6px;
+  font-size: 11.5px; color: var(--tx-muted); font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-caret { transition: none; }
+}
 
 /* --------------------------------------------------------------------------
    Flight card
@@ -251,6 +476,55 @@
    -------------------------------------------------------------------------- */
 .tx-empty { text-align: center; padding: 46px 20px; background: var(--tx-surface); border: 1px dashed var(--tx-line); border-radius: var(--tx-radius); color: var(--tx-muted); }
 .tx-empty b { display: block; color: var(--tx-ink); font-size: 16px; margin-bottom: 6px; }
+.tx-empty-acts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+
+/* --------------------------------------------------------------------------
+   Load-failure states
+
+   Shares .tx-empty's box but carries an illustration and its own copy. The
+   mark is a line drawing rather than a picture: it has to read at 56px in
+   both themes, and it inherits currentColor so it cannot be the one element
+   that stays light on a dark page.
+   -------------------------------------------------------------------------- */
+.tx-state {
+  grid-column: 1 / -1;
+  text-align: center; padding: 46px 20px;
+  background: var(--tx-surface); border: 1px dashed var(--tx-line);
+  border-radius: var(--tx-radius); color: var(--tx-muted);
+}
+.tx-state-art {
+  width: 56px; height: 56px; margin: 0 auto 14px; display: block;
+  color: var(--tx-accent); opacity: .85;
+}
+.tx-state b { display: block; color: var(--tx-ink); font-size: 17px; margin-bottom: 6px; }
+.tx-state p { margin: 0 auto; max-width: 46ch; font-size: 14px; line-height: 1.55; }
+/* The empty state sits in a grid that may be several columns wide. */
+.tx-empty { grid-column: 1 / -1; }
+
+/* --------------------------------------------------------------------------
+   Filter-panel skeleton
+
+   The sidebar is as tall as the results and arrives at the same time, so
+   leaving it blank while the grid shows card placeholders is the one half of
+   the page that still jumps. Four groups of three, which is the shape of the
+   panel that replaces it.
+   -------------------------------------------------------------------------- */
+.ff-sk-group { border-top: 1px solid var(--tx-line); padding: 14px 0; }
+.ff-sk-group:first-child { border-top: none; }
+.ff-sk-head { height: 11px; width: 44%; margin-bottom: 14px; }
+.ff-sk-row { display: flex; align-items: center; gap: 9px; padding: 6px 0; }
+.ff-sk-box { width: 16px; height: 16px; border-radius: 4px; flex: none; }
+.ff-sk-txt { height: 12px; border-radius: 6px; flex: 1; }
+.ff-sk-group .tx-sk-line,
+.ff-sk-box, .ff-sk-txt {
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: txShimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-sk-box, .ff-sk-txt { animation: none; }
+}
 
 .tx-more { display: block; margin: 18px auto 0; padding: 12px 26px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
 .tx-more:hover { border-color: var(--tx-accent); color: var(--tx-accent); }
@@ -275,6 +549,14 @@
 .tx-stars { color: var(--tx-gold); font-size: 13px; letter-spacing: 1px; }
 .tx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .tx-chip { font-size: 11.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--tx-surface-2); color: var(--tx-muted); border: 1px solid var(--tx-line); }
+/* Free cancellation. Green because it is the reassurance a traveller scans a
+   card for; shown only when the policy text actually says so, classified by
+   the same reader the filter uses so badge and filter cannot disagree. */
+.tx-chip.is-good {
+  color: var(--tx-emerald);
+  background: color-mix(in srgb, var(--tx-emerald) 12%, transparent);
+  border-color: color-mix(in srgb, var(--tx-emerald) 40%, transparent);
+}
 .tx-foot { margin-top: auto; padding-top: 12px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .tx-price span { display: block; font-size: 11.5px; color: var(--tx-muted); font-weight: 700; }
 .tx-price b { font-size: 18px; color: var(--tx-ink); font-weight: 800; }
@@ -284,39 +566,227 @@
 .tx-card-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .tx-card-actions .tx-btn { padding: 9px 13px; font-size: 12.5px; }
 
-/* Hotel results: guest rating next to the star row, and the cancellation-
-   policy line every card and every room option in Hotel Details shows. */
-.tx-guest-rating { margin-left: 8px; font-size: 12px; font-weight: 700; color: var(--tx-ink); letter-spacing: 0; }
 .tx-cancel-note { font-size: 12px; color: var(--tx-muted); line-height: 1.5; margin: 2px 0 0; }
-.tx-btn-sm { padding: 7px 11px; font-size: 12px; }
 
-/* Hotel Details — an inline expansion under the card, same idea as
-   .tx-details for a flight but block-flowing prose/chips/room cards rather
-   than a flat key-value grid. */
-.tx-hotel-details { grid-column: 1 / -1; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--tx-line); display: flex; flex-direction: column; gap: 10px; }
-.tx-room-opt-head { font-size: 13px; font-weight: 800; color: var(--tx-ink); margin: 4px 0 0; }
-.tx-room-opts { display: flex; flex-direction: column; gap: 10px; }
-.tx-room-opt { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--tx-line); border-radius: 12px; background: var(--tx-surface-2); }
-.tx-room-opt-body { display: flex; flex-direction: column; gap: 4px; }
-.tx-room-opt-body b { font-size: 14px; color: var(--tx-ink); }
-.tx-room-opt-meta { font-size: 12px; color: var(--tx-muted); }
-.tx-room-opt-price { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; white-space: nowrap; }
-.tx-room-opt-price span { font-size: 11px; color: var(--tx-muted); font-weight: 700; }
-.tx-room-opt-price b { font-size: 16px; color: var(--tx-ink); }
-@media (max-width: 560px) {
-  .tx-room-opt { flex-direction: column; }
-  .tx-room-opt-price { align-items: flex-start; text-align: left; width: 100%; }
+/* --------------------------------------------------------------------------
+   Hotel card
+
+   The order the eye should take it: photograph, name, how good it is, where it
+   is, what it costs. The score is a block rather than a sentence because it is
+   the number properties get compared on.
+   -------------------------------------------------------------------------- */
+.tx-rate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tx-score { display: inline-flex; align-items: center; gap: 7px; }
+.tx-score b {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; padding: 3px 7px; border-radius: 8px 8px 8px 2px;
+  background: var(--tx-ink); color: var(--tx-surface);
+  font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
+.tx-score > span { font-size: 11.5px; font-weight: 700; color: var(--tx-muted); }
+.tx-chip.is-more { background: transparent; border-style: dashed; }
+
+/* The strike-through only ever appears beside a real original price. */
+.tx-was { display: block; font-size: 12px; color: var(--tx-muted); text-decoration-thickness: 1.5px; }
+.tx-price span { display: block; font-size: 11.5px; color: var(--tx-muted); font-weight: 700; }
+.tx-deal {
+  position: absolute; top: 10px; right: 10px; padding: 5px 10px; border-radius: 999px;
+  background: var(--tx-accent); color: var(--tx-accent-ink);
+  font-size: 11.5px; font-weight: 800; letter-spacing: .03em;
+}
+
+/* Wishlist heart. Bottom-right of the photograph so it never collides with the
+   distance badge (top-left) or a discount (top-right). */
+.wl-btn {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 2px 8px rgba(10, 37, 64, .22);
+  transition: transform .16s ease, background .16s ease;
+}
+.wl-btn svg { width: 18px; height: 18px; fill: none; stroke: #5B6B82; stroke-width: 2; }
+.wl-btn:hover { transform: scale(1.08); }
+.wl-btn.is-on svg { fill: var(--tx-accent); stroke: var(--tx-accent); }
+.wl-btn:focus-visible { outline: 2px solid var(--tx-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .wl-btn { transition: none; } }
+
+/* --------------------------------------------------------------------------
+   Expanded details (hotel-details.js)
+
+   One section per component, each rendered only when the payload can fill it.
+   -------------------------------------------------------------------------- */
+.tx-hotel-details {
+  grid-column: 1 / -1; margin-top: 14px; padding-top: 14px;
+  border-top: 1px dashed var(--tx-line);
+}
+.hd { display: flex; flex-direction: column; gap: 18px; }
+.hd-h { margin: 0 0 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--tx-muted); }
+.hd-prose { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--tx-ink); }
+
+.hd-rooms { display: flex; flex-direction: column; gap: 10px; }
+.hd-room {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 12px; border: 1px solid var(--tx-line); border-radius: 12px;
+  background: var(--tx-surface-2);
+}
+.hd-room-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hd-room-main h5 { margin: 0; font-size: 14px; font-weight: 800; color: var(--tx-ink); }
+.hd-room-meta { margin: 0; font-size: 12px; color: var(--tx-muted); font-weight: 600; }
+.hd-room-desc { margin: 0; font-size: 12.5px; color: var(--tx-ink); line-height: 1.5; }
+.hd-room-cancel { margin: 2px 0 0; font-size: 11.5px; color: var(--tx-muted); line-height: 1.5; }
+.hd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.hd-room-buy {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+  text-align: right; white-space: nowrap; flex: none;
+}
+.hd-room-buy b { font-size: 16px; font-weight: 800; color: var(--tx-ink); }
+.hd-room-buy > span { font-size: 11px; color: var(--tx-muted); font-weight: 700; }
+.hd-left { font-size: 11px; font-weight: 800; color: var(--tx-accent); }
+
+.hd-amenities, .hd-nearby, .hd-charges { margin: 0; padding: 0; list-style: none; }
+.hd-amenities { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 14px; }
+.hd-amenities li, .hd-nearby li, .hd-charges li {
+  font-size: 13px; color: var(--tx-ink); padding-left: 18px; position: relative; line-height: 1.5;
+}
+.hd-amenities li::before, .hd-nearby li::before, .hd-charges li::before {
+  content: ''; position: absolute; left: 4px; top: 8px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--tx-accent);
+}
+.hd-nearby li { display: flex; justify-content: space-between; gap: 12px; }
+.hd-nearby li span { color: var(--tx-muted); font-weight: 700; font-size: 12px; }
+
+.hd-policies { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.hd-policies > div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
+.hd-policies dt { font-size: 12px; font-weight: 800; color: var(--tx-muted); }
+.hd-policies dd { margin: 0; font-size: 13px; color: var(--tx-ink); line-height: 1.5; }
+
+.hd-map { border-radius: 12px; overflow: hidden; border: 1px solid var(--tx-line); }
+.hd-map iframe { width: 100%; height: 220px; border: 0; display: block; }
+.hd-map-pending {
+  display: grid; place-items: center; gap: 4px; min-height: 140px;
+  background: var(--tx-surface-2); text-align: center; padding: 20px;
+}
+.hd-map-pending p { margin: 0; font-weight: 800; color: var(--tx-ink); font-size: 13.5px; }
+.hd-map-pending span { font-size: 12px; color: var(--tx-muted); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) {
+  .hd-room { flex-direction: column; align-items: stretch; }
+  .hd-room-buy { align-items: flex-start; text-align: left; }
+  .hd-policies > div { grid-template-columns: 1fr; gap: 2px; }
+}
+/* The .tx-room-opt* rules that were here belonged to the fixed four-section
+   details panel hotel-details.js replaced; .hd-room above is its successor and
+   already carries its own narrow-screen stacking. */
 
 /* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 @media (max-width: 1000px) {
   .tx-layout { grid-template-columns: 1fr; }
-  .tx-filters { position: static; display: none; }
-  .tx-filters.tx-open { display: block; }
-  .tx-filter-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 12px 16px; border-radius: 12px; border: 1.5px solid var(--tx-line); background: var(--tx-surface); color: var(--tx-ink); font-weight: 800; font-size: 14px; font-family: inherit; cursor: pointer; }
-  .tx-filter-toggle:hover { border-color: var(--tx-accent); }
+  /* FLOATING, not a button in the toolbar. The toolbar scrolls away with the
+     top of the page, and the filters are wanted most while deep in the list —
+     which is exactly where a toolbar button cannot be reached. Centred at the
+     bottom, where a thumb already is. */
+  .tx-filter-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    position: fixed; z-index: 88;
+    left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    padding: 13px 22px; border-radius: 999px;
+    border: none; background: var(--tx-ink); color: var(--tx-surface);
+    font-weight: 800; font-size: 14.5px; font-family: inherit; cursor: pointer;
+    box-shadow: 0 6px 22px rgba(10, 37, 64, .34);
+  }
+  .tx-filter-toggle:hover { background: var(--tx-accent); color: var(--tx-accent-ink); }
+  .tx-filter-toggle:focus-visible { outline: 2px solid var(--tx-accent); outline-offset: 3px; }
+  /* The sheet has its own way out; two competing buttons at the bottom is one
+     too many. */
+  body.tx-sheet-open .tx-filter-toggle { display: none; }
+  /* How many filters are on, so the button says something while it is the only
+     thing on screen that could. */
+  .tx-filter-toggle[data-count]::after {
+    content: attr(data-count);
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: 99px;
+    background: var(--tx-accent); color: var(--tx-accent-ink);
+    font-size: 11.5px; font-weight: 800;
+  }
+
+  /* ------------------------------------------------------------------------
+     The filter panel becomes a BOTTOM SHEET.
+
+     Not merely `display:block` in the flow, which is what it used to do: that
+     pushed the results down the page, so opening the filters scrolled the
+     thing being filtered out of sight, and closing them left the traveller
+     somewhere they had not chosen to be. A sheet leaves the list exactly where
+     it was underneath.
+
+     It slides from the bottom because that is where a thumb is. The header and
+     the "show results" footer stay put while the middle scrolls, so the way
+     out is always reachable without scrolling back up through every group.
+     ------------------------------------------------------------------------ */
+  .tx-filters {
+    position: fixed; z-index: 90;
+    left: 0; right: 0; bottom: 0; top: auto;
+    max-height: 86vh; margin: 0;
+    border-radius: 18px 18px 0 0;
+    border: 1px solid var(--tx-line); border-bottom: none;
+    box-shadow: 0 -8px 40px rgba(10, 37, 64, .28);
+    padding: 0 18px calc(76px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(101%);
+    transition: transform .28s cubic-bezier(.22, .8, .3, 1);
+    /* Not display:none — a hidden-by-transform sheet keeps its scroll position
+       and can animate. visibility keeps it out of the tab order while closed. */
+    visibility: hidden;
+    overscroll-behavior: contain;
+  }
+  .tx-filters.tx-open { transform: none; visibility: visible; }
+
+  /* The grab handle and title, pinned while the groups scroll under them. */
+  .tx-filters::before {
+    content: ''; display: block; width: 40px; height: 4px; border-radius: 99px;
+    background: var(--tx-line); margin: 10px auto 4px;
+    position: sticky; top: 0;
+  }
+  .ff-scope .ff-top {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--tx-surface); padding: 8px 0 10px;
+    border-bottom: 1px solid var(--tx-line); margin-bottom: 0;
+  }
+
+  /* Bigger targets: this is being used with a thumb. */
+  .ff-opt { padding: 10px 0; }
+  .ff-opt input { width: 20px; height: 20px; }
+  .ff-toggle { padding: 16px 0 14px; }
+  .ff-range-track { height: 34px; }
+  .ff-range-track input[type="range"] { height: 34px; }
+  .ff-range-track::before, .ff-range-fill { top: 15px; }
+  .ff-range-track input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+  .ff-range-track input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+
+  /* The way out, always on screen. Its label is written by the page, so it
+     says how many results the current selection actually yields. */
+  .tx-sheet-done {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 91;
+    display: none; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--tx-surface); border-top: 1px solid var(--tx-line);
+  }
+  .tx-filters.tx-open ~ .tx-sheet-done,
+  .tx-sheet-done.is-shown { display: block; }
+  .tx-sheet-done .tx-btn { width: 100%; padding: 14px; font-size: 15px; }
+
+  .tx-sheet-scrim {
+    position: fixed; inset: 0; z-index: 89;
+    background: rgba(6, 12, 24, .45);
+    opacity: 0; pointer-events: none; transition: opacity .24s ease;
+  }
+  .tx-sheet-scrim.is-shown { opacity: 1; pointer-events: auto; }
+  body.tx-sheet-open { overflow: hidden; }
+}
+@media (max-width: 1000px) and (prefers-reduced-motion: reduce) {
+  .tx-filters, .tx-sheet-scrim { transition: none; }
 }
 @media (max-width: 760px) {
   /* The header is shorter here, so the desktop 148px would leave a big gap. */
@@ -687,7 +1157,7 @@
 .tx-sk-btn {
   height: 40px; border-radius: 11px;
   background: linear-gradient(90deg,
-    var(--tx-surface-2) 25%, rgba(10, 37, 64, .07) 37%, var(--tx-surface-2) 63%);
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
   background-size: 400% 100%;
   animation: txShimmer 1.4s ease-in-out infinite;
 }
@@ -701,10 +1171,158 @@
 .tx-scope .tx-sk-card { background: var(--tx-surface); border-color: var(--tx-line); }
 .tx-scope .tx-sk-line {
   background: linear-gradient(90deg,
-    var(--tx-surface-2) 25%, rgba(10, 37, 64, .07) 37%, var(--tx-surface-2) 63%);
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
   background-size: 400% 100%;
 }
 
+/* --------------------------------------------------------------------------
+   Hotel skeleton
+
+   Same principle as the flight one above: built on .tx-card, so it lands in
+   the same grid cell with the same border, radius and padding, and .tx-media
+   keeps its 4/3 aspect-ratio so the image well is the height the photograph
+   will be. Each bar is sized to the type it stands in for — a 16px/800 name,
+   an 18px price — because a bar that is not the height of its text is what
+   makes the swap visible.
+   -------------------------------------------------------------------------- */
+.tx-sk-hotel { pointer-events: none; }
+/* The real card lifts and zooms its photograph on hover. A placeholder that
+   did either would invite a click on nothing. */
+.tx-sk-hotel:hover { transform: none; box-shadow: var(--tx-shadow); }
+
+/* The image well. .tx-media already carries the aspect-ratio and the surface;
+   this only adds the shimmer, so the well cannot be a different height from
+   the photograph that replaces it. */
+.tx-sk-media {
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: txShimmer 1.4s ease-in-out infinite;
+}
+
+/* Each bar stands the height of the line it replaces, so the two stack to the
+   same total: a 16px/1.3 name renders 21, the star row 16, the location 20. */
+.tx-sk-h-title { height: 19px; width: 82%; }
+.tx-sk-h-stars { height: 15px; width: 58%; }
+.tx-sk-h-sub   { height: 18px; width: 70%; }
+.tx-sk-h-cancel { display: flex; flex-direction: column; gap: 6px; }
+.tx-sk-h-note  { height: 12px; width: 100%; margin-bottom: 0; }
+.tx-sk-h-cap   { height: 11px; width: 52px; }
+.tx-sk-h-price { height: 20px; width: 86px; border-radius: 7px; }
+.tx-sk-h-tax   { height: 11px; width: 68px; }
+
+/* Amenity chips: the real ones are pill-shaped and sized by their word, so the
+   three placeholders differ in width rather than sitting in a tidy row of
+   identical stubs no real card would ever produce. */
+/* Widths are those of the amenity labels the real cards actually carry —
+   "Free Wi-Fi", "Pool", "Airport shuttle" — because four chips that all fit on
+   one row make the placeholder a whole row shorter than the card. At this
+   column width the fourth wraps, exactly as it does on the real one. */
+.tx-sk-chip {
+  display: block; height: 22px; width: 76px; border-radius: 999px;
+  background: linear-gradient(90deg,
+    var(--tx-surface-2) 25%, var(--tx-sk-hi) 37%, var(--tx-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: txShimmer 1.4s ease-in-out infinite;
+}
+.tx-sk-chip.w-sm { width: 46px; }
+.tx-sk-chip.w-lg { width: 98px; }
+
+.tx-sk-h-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+/* The real buttons are .tx-btn at 9px/12.5px inside .tx-card-actions — shorter
+   than the 40px list-view button .tx-sk-btn is sized for. */
+.tx-sk-h-btn { height: 34px; width: 92px; border-radius: 11px; }
+
 @media (prefers-reduced-motion: reduce) {
-  .tx-sk-line, .tx-sk-btn { animation: none; }
+  .tx-sk-line, .tx-sk-btn, .tx-sk-media, .tx-sk-chip { animation: none; }
+}
+
+/* ==========================================================================
+   Image gallery (hotel-gallery.js)
+
+   Written for n photographs and correct at n = 1, which is what every
+   property has today: the frame renders, and the thumbnails, arrows and
+   counter simply are not emitted. Nothing here changes when the API starts
+   returning eight.
+   ========================================================================== */
+.hg { display: flex; flex-direction: column; gap: 8px; }
+.hg-stage {
+  position: relative; border-radius: 12px; overflow: hidden;
+  background: var(--tx-surface-2); aspect-ratio: 16 / 10;
+}
+.hg-frame { margin: 0; position: absolute; inset: 0; opacity: 0; transition: opacity .28s ease; }
+.hg-frame.is-active { opacity: 1; }
+.hg-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.hg-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, .92); box-shadow: 0 2px 8px rgba(10, 37, 64, .22);
+}
+.hg-nav svg { width: 18px; height: 18px; fill: none; stroke: #0A2540; stroke-width: 2.2; }
+.hg-prev { left: 10px; }
+.hg-next { right: 10px; }
+.hg-nav:focus-visible, .hg-expand:focus-visible, .hg-thumb:focus-visible {
+  outline: 2px solid var(--tx-accent); outline-offset: 2px;
+}
+
+.hg-counter {
+  position: absolute; left: 10px; bottom: 10px; margin: 0; z-index: 2;
+  padding: 4px 9px; border-radius: 999px; background: rgba(10, 37, 64, .78);
+  color: #fff; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.hg-expand {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border: none; border-radius: 8px; cursor: pointer;
+  background: rgba(10, 37, 64, .78);
+}
+.hg-expand svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2; }
+
+.hg-thumbs { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.hg-thumb {
+  flex: none; width: 62px; height: 46px; padding: 0; cursor: pointer;
+  border: 2px solid transparent; border-radius: 8px; overflow: hidden;
+  background: var(--tx-surface-2); opacity: .65; transition: opacity .18s ease, border-color .18s ease;
+}
+.hg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hg-thumb.is-active { opacity: 1; border-color: var(--tx-accent); }
+.hg-thumb:hover { opacity: 1; }
+
+/* Fullscreen viewer. A dialog: Escape closes, arrows move, focus is trapped
+   while open and restored to whatever opened it. */
+.hg-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: 12px; padding: 20px; background: rgba(6, 12, 24, .93);
+}
+.hg-overlay[hidden] { display: none; }
+.hg-overlay-stage { display: grid; place-items: center; max-height: 88vh; }
+.hg-overlay-stage img { max-width: 100%; max-height: 88vh; border-radius: 10px; display: block; }
+.hg-overlay .hg-nav { position: static; transform: none; width: 44px; height: 44px; }
+.hg-close {
+  position: absolute; top: 16px; right: 16px; z-index: 2;
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border: none; border-radius: 50%; cursor: pointer; background: rgba(255, 255, 255, .14);
+}
+.hg-close svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2.2; }
+.hg-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.hg-overlay-counter {
+  position: absolute; left: 0; right: 0; bottom: 18px; margin: 0; text-align: center;
+  color: rgba(255, 255, 255, .82); font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* The page must not scroll behind an open viewer. */
+body.hg-locked { overflow: hidden; }
+
+@media (max-width: 560px) {
+  .hg-overlay { grid-template-columns: 1fr; padding: 12px; }
+  .hg-overlay .hg-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+  .hg-overlay .hg-prev { left: 8px; }
+  .hg-overlay .hg-next { right: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hg-frame { transition: none; }
+  .hg-thumb { transition: none; }
 }

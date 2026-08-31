@@ -459,14 +459,49 @@ FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 
 class CleanUrlStaticFiles(StaticFiles):
-    """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour.
+    """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour,
+    and the caching rules that make a deploy actually reach a browser.
 
     `html=True` already covers the directory case (`/admin/` -> index.html);
     this adds the extensionless one (`/login` -> login.html) so the URLs keep
     working exactly as they do behind deploy/nginx.conf.
+
+    -----------------------------------------------------------------------
+    WHY THE CACHE HEADERS ARE HERE
+    -----------------------------------------------------------------------
+    StaticFiles sends an ETag and a Last-Modified and NO Cache-Control. With no
+    explicit policy a browser is free to invent one — the HTTP spec's heuristic
+    is a fraction of the file's age — so it will happily serve a page from disk
+    without asking whether it changed.
+
+    That is fine for a picture and ruinous for HTML, because every asset on
+    this site is cache-busted with `?v=`: bumping that version only works if
+    the DOCUMENT naming the new version is itself fresh. A stale hotels.html
+    keeps requesting last week's scripts, and no amount of version bumping
+    reaches it. The symptom is a change that "works on one page and not the
+    others" depending on which the visitor happened to hard-refresh.
+
+    So the two kinds of file get opposite treatment:
+
+      HTML                 no-cache — keep a copy, but ALWAYS revalidate. With
+                           the ETag already being sent this is nearly free: an
+                           unchanged page answers 304 with no body.
+      versioned assets     immutable for a year. Safe precisely because the URL
+                           changes when the content does, which is what `?v=`
+                           is for.
+      everything else      an hour, revalidated after. Images and fonts change
+                           rarely and are not correctness-critical.
     """
 
+    def is_not_modified(self, response_headers, request_headers) -> bool:
+        return super().is_not_modified(response_headers, request_headers)
+
     async def get_response(self, path: str, scope):
+        response = await self._resolve(path, scope)
+        self._apply_cache_policy(response, path, scope)
+        return response
+
+    async def _resolve(self, path: str, scope):
         try:
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
@@ -476,6 +511,20 @@ class CleanUrlStaticFiles(StaticFiles):
                 return await super().get_response(f"{path}.html", scope)
             except StarletteHTTPException:
                 raise exc from None
+
+    @staticmethod
+    def _apply_cache_policy(response, path: str, scope) -> None:
+        media = (response.headers.get("content-type") or "").split(";")[0].strip()
+        # The directory and extensionless cases both end up serving HTML, so the
+        # content type is what decides rather than the requested path.
+        if media == "text/html":
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            return
+        # `?v=` (or any query) means the URL identifies this exact content.
+        if scope.get("query_string"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return
+        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
 
 
 if FRONTEND_DIR.is_dir():

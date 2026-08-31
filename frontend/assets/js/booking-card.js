@@ -572,13 +572,71 @@ const BookingCard = (function () {
     });
   }
 
+  /* A group enquiry is the one submission that goes over the network from this
+     card — everything else navigates, and a page that is leaving needs no
+     pending state. So the button has to say it is working, and must not be
+     pressable twice while it is. */
+  let busy = false;
+
   /** The one Search button, labelled for whatever is being submitted. */
   function paintSearchButton() {
     const go = root && root.querySelector('.search-go');
-    if (!go) return;
+    if (!go || busy) return;   // a repaint mid-send must not undo setBusy's label
     const group = state.tab === 'hotels' && state.hotelMode === 'group';
     go.textContent = group ? 'Request Group Quote' : 'Search';
     go.classList.toggle('is-wide', group);
+  }
+
+  function setBusy(on, label) {
+    busy = !!on;
+    const go = root && root.querySelector('.search-go');
+    if (!go) return;
+    go.disabled = busy;
+    go.classList.toggle('is-busy', busy);
+    go.setAttribute('aria-busy', String(busy));
+    if (busy) go.textContent = label || 'Sending…';
+    else paintSearchButton();
+  }
+
+  /** The enquiry landed. Replace the form with an acknowledgement rather than
+   *  leaving the fields sitting there — a form that still looks submittable
+   *  after a successful submit is an invitation to send it twice. */
+  function showGroupSuccess(info) {
+    const panel = root && root.querySelector('[data-panel="hotels"]');
+    if (!panel) return;
+    const who = (info && info.name) ? String(info.name).split(/\s+/)[0] : '';
+    const where = (info && info.dest) ? info.dest : 'your group';
+
+    const done = document.createElement('div');
+    done.className = 'hotel-sent';
+    done.setAttribute('role', 'status');
+    done.innerHTML =
+      '<svg class="hotel-sent-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+      + ' stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'
+      + '<h3>' + (who ? 'Thanks, ' + esc(who) + '.' : 'Thanks — that\'s with us.') + '</h3>'
+      + '<p>Your enquiry for ' + esc(where) + ' has reached the group desk. '
+      + 'We reply to group enquiries within one working day.</p>'
+      + '<button type="button" class="btn btn-ghost hotel-sent-again" data-group-again>'
+      + 'Make another enquiry</button>';
+
+    panel.classList.add('is-sent');
+    panel.appendChild(done);
+    /* The footer belongs to the form that is no longer there. */
+    const foot = root.querySelector('.search-foot');
+    if (foot) foot.hidden = true;
+    const again = done.querySelector('[data-group-again]');
+    if (again) {
+      again.addEventListener('click', () => {
+        done.remove();
+        panel.classList.remove('is-sent');
+        if (foot) foot.hidden = false;
+        clearError();
+        setBusy(false);
+        const dest = $('hDest');
+        if (dest) dest.focus();
+      });
+      again.focus();
+    }
   }
 
   /** Show the named product's panel.
@@ -857,6 +915,29 @@ const BookingCard = (function () {
     }).filter(l => l.from && l.to);
   }
 
+  /** "2:7,2" — one room per comma, adults first then each child's age.
+   *
+   *  Same shape and the same reasoning as encodeLegs above: the rooms array is
+   *  the only nested value a hotel search carries, and URLSearchParams turns a
+   *  nested value into the string "[object Object]". That is what this used to
+   *  put in the address bar, which quietly threw away the child ages the search
+   *  will not run without — a gate that costs the traveller a decision and then
+   *  discards the answer. */
+  const encodeRooms = list =>
+    (list || []).map(r => [r.adults].concat(r.childAges || []).join(':')).join(',');
+
+  function decodeRooms(raw) {
+    return String(raw || '').split(',').filter(Boolean).map(part => {
+      const bits = part.split(':').map(n => parseInt(n, 10));
+      const ages = bits.slice(1).filter(Number.isFinite);
+      return {
+        adults: Number.isFinite(bits[0]) ? bits[0] : 2,
+        children: ages.length,
+        childAges: ages,
+      };
+    }).filter(r => r.adults > 0);
+  }
+
   /** Everything the Flights page needs to reproduce this search.
    *
    *  The party and the cabin are read the same way for all three trip types,
@@ -953,8 +1034,15 @@ const BookingCard = (function () {
       adults: t.adults,
       children: t.children,
       /* The per-room breakdown is what a hotel actually prices; the flat
-         adults/children totals above are for the results filter and the URL. */
+         adults/children totals above are for the results filter.
+
+         TWO REPRESENTATIONS, DELIBERATELY. `roomsDetail` is the array, for a
+         caller in this tab that wants the structure (the validator reads it to
+         find a missing age). `pax` is the same thing flattened, because that is
+         what a URL can carry — whoever needs the array back calls decodeRooms,
+         exactly as the Flights page does with decodeLegs. */
       roomsDetail: list,
+      pax: encodeRooms(list),
       guests: t.adults + t.children,
     });
   }
@@ -1108,6 +1196,12 @@ const BookingCard = (function () {
     const panel = root && root.querySelector('.search-panel.active');
     const kind = panel && panel.dataset.panel;
     if (!kind) return;
+
+    /* Clear FIRST, so a message from the previous attempt cannot outlive the
+       thing it was about. Switching tab or mode does not clear it, so without
+       this a Group Deals complaint stays on screen through a switch to the
+       standard flow and a search that then succeeds. */
+    clearError();
 
     const params = criteria(kind);
     const check = VALIDATORS[kind];
@@ -1635,6 +1729,10 @@ const BookingCard = (function () {
        same `legs=` parameter this card writes. One encoder, one decoder. */
     encodeLegs,
     decodeLegs,
+    /* Same pair for the hotel party, so a results page can get the per-room
+       breakdown (and the child ages) back out of the URL. */
+    encodeRooms,
+    decodeRooms,
     activateTab,
     criteria,
     flightCriteria,
@@ -1646,6 +1744,13 @@ const BookingCard = (function () {
     hotelCriteria,
     roomsValue: () => (rooms ? rooms.value() : []),
     setSearchHandler(fn) { searchHandler = fn; },
+    /* The group-enquiry submission is the search handler's job, not the card's
+       — the card does not know where an enquiry goes any more than it knows
+       which page a search lands on. These are how it reports back. */
+    setBusy,
+    showGroupSuccess,
+    complain,
+    clearError,
     get trip() { return state.trip; },
     get tab() { return state.tab; },
     passengers: () => (pax ? pax.value() : { adults: 1, children: 0, infants: 0 }),

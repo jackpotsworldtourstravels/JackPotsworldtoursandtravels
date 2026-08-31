@@ -326,14 +326,21 @@ function cxBindClearOnInput(root) {
   });
 }
 
-/* Dev-mode OTP. The API returns `dev_otp` only when SMTP is unconfigured, so
-   this box appears in development and simply never renders in production. */
+/* Dev-mode OTP. The API returns `dev_otp` only in DEV_MODE — no mail server,
+   or OTP_DEV_MODE on for local work while SMTP keeps sending everything else.
+   Never present on a deployed server, so this box simply never renders there.
+
+   The code is escaped rather than interpolated raw: it is echoed back from a
+   response, and nothing echoed from a response belongs in innerHTML unescaped
+   however numeric it is expected to be. */
 function cxDevOtp(boxId, code) {
   const el = document.getElementById(boxId);
   if (!el) return;
-  el.innerHTML = code
-    ? `<div class="cx-devbox">Email is not configured on this server, so the code is shown here:<br><b>${code}</b></div>`
-    : '';
+  if (!code) { el.textContent = ''; return; }
+  const safe = String(code).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+  el.innerHTML = `<div class="cx-devbox">Development mode — your code is:<br><b>${safe}</b></div>`;
 }
 
 /* Buttons that fire a request must not be clickable twice — a double-submitted

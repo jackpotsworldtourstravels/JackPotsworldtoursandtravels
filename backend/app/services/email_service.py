@@ -113,6 +113,61 @@ def send_newsletter_signup_email(subscriber_email: str) -> bool:
     return _send_with_reply_to(CONTACT_FORM_RECIPIENT, subject, text_body, html_body, reply_to=subscriber_email)
 
 
+def send_hotel_group_enquiry_email(enquiry) -> bool:
+    """Relays a landing-page Group Deals enquiry to the business inbox.
+
+    Takes the validated schema object rather than a dozen arguments: every
+    field on it belongs in the mail, so a signature listing them again would
+    be a second place to forget one."""
+    subject = f"Group hotel enquiry: {enquiry.destination} ({enquiry.rooms} rooms)"
+    nights = (enquiry.check_out - enquiry.check_in).days
+    lines = [
+        f"Destination: {enquiry.destination}",
+        f"Check-in: {enquiry.check_in}",
+        f"Check-out: {enquiry.check_out}  ({nights} night{'s' if nights != 1 else ''})",
+        f"Rooms: {enquiry.rooms}",
+        f"Expected guests: {enquiry.guests}",
+        "",
+        f"Name: {enquiry.name}",
+        f"Email: {enquiry.email}",
+        f"Phone: {enquiry.phone}",
+        f"Company: {enquiry.company or '(none)'}",
+        "",
+        f"Special requests:\n{enquiry.notes or '(none)'}",
+    ]
+    text_body = "New group hotel enquiry from the website.\n\n" + "\n".join(lines)
+
+    def row(label, value):
+        return (f'<tr><td style="padding:4px 14px 4px 0; color:#666;">{html.escape(label)}</td>'
+                f'<td style="padding:4px 0;"><strong>{html.escape(str(value))}</strong></td></tr>')
+
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif; max-width:560px; margin:0 auto; color:#0A2540;">
+      <h2 style="color:#0A2540;">New group hotel enquiry</h2>
+      <table style="border-collapse:collapse; font-size:14px;">
+        {row('Destination', enquiry.destination)}
+        {row('Check-in', enquiry.check_in)}
+        {row('Check-out', f"{enquiry.check_out} ({nights} night{'s' if nights != 1 else ''})")}
+        {row('Rooms', enquiry.rooms)}
+        {row('Expected guests', enquiry.guests)}
+      </table>
+      <h3 style="margin-top:24px; color:#0A2540;">Contact</h3>
+      <table style="border-collapse:collapse; font-size:14px;">
+        {row('Name', enquiry.name)}
+        {row('Email', enquiry.email)}
+        {row('Phone', enquiry.phone)}
+        {row('Company', enquiry.company or '(none)')}
+      </table>
+      <h3 style="margin-top:24px; color:#0A2540;">Special requests</h3>
+      <p style="white-space:pre-wrap; border-left:3px solid #FF4D4D; padding-left:12px;">
+        {html.escape(enquiry.notes) if enquiry.notes else '(none)'}
+      </p>
+    </div>
+    """
+    return _send_with_reply_to(CONTACT_FORM_RECIPIENT, subject, text_body, html_body,
+                               reply_to=str(enquiry.email))
+
+
 def _send_with_reply_to(to_email: str, subject: str, text_body: str, html_body: str, reply_to: str) -> bool:
     if not settings.smtp_host or not settings.smtp_from_email:
         logger.warning("SMTP not configured (smtp_host/smtp_from_email unset) — skipping email to %s.", to_email)

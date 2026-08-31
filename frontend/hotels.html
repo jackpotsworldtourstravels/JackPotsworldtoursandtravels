@@ -228,6 +228,14 @@
 <!-- Must precede travel-explore.js: that file checks for this module and
      stands aside from rendering the hotel grid when it is present. -->
 <!-- Details and Rooms must precede results.js, which routes to both. -->
+<!-- The results rail. hotel-results.js asks HotelFilters for the rail's
+     contents and Wishlist for its save buttons, and renders neither when they
+     are missing — so these three are what keep the filters on the screen.
+     filter-engine.js is the engine both product filter lists are written
+     against, so it loads first. -->
+<script src="assets/js/wishlist.js?v=20260829m1"></script>
+<script src="assets/js/filter-engine.js?v=20260829m1"></script>
+<script src="assets/js/hotel-filters.js?v=20260829m1"></script>
 <script src="assets/js/hotel-details.js?v=20260827h7"></script>
 <script src="assets/js/hotel-rooms.js?v=20260827v1"></script>
 <script src="assets/js/hotel-guests.js?v=20260827v1"></script>

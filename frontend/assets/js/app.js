@@ -568,8 +568,13 @@ function takePendingSearch() {
 function goToSearch(kind, params) {
   const spec = HERO_SEARCH[kind];
   if (!spec) return;
+  /* Objects and arrays are skipped, not stringified: URLSearchParams turns one
+     into the literal text "[object Object]". Anything nested that a results
+     page genuinely needs travels as an encoded scalar beside it — `legs` for an
+     itinerary, `pax` for the per-room party. */
   const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    Object.entries(params).filter(([, v]) =>
+      v !== '' && v !== null && v !== undefined && typeof v !== 'object')
   );
   window.location.href = `${spec.page}?${qs.toString()}`;
 }
@@ -583,6 +588,16 @@ function goToSearch(kind, params) {
    ignored them would be worse than saying so. */
 if (typeof BookingCard !== 'undefined') {
   BookingCard.setSearchHandler((kind, params) => {
+    /* GROUP DEALS IS NOT A SEARCH, and is checked before everything below.
+       It does not navigate, so it needs no results page; it is quoted by a
+       person, so it does not wait on a sign-in either — turning "tell us about
+       your group" into "make an account first" loses the enquiry. And its
+       criteria carry a name, an email and a phone number, which must never
+       reach goToSearch(): that puts them in a query string. */
+    if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+      GroupEnquiry.handle(params);
+      return;
+    }
     if (!HERO_SEARCH[kind]) {
       showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
       return;
@@ -829,14 +844,13 @@ function renderAuthNav() {
     if (signupEl) signupEl.style.display = loggedIn ? 'none' : '';
   });
 
-  document.getElementById('profileChipWrap').style.display = loggedIn ? '' : 'none';
   document.getElementById('mobileNav').classList.toggle('show-account', loggedIn);
 
-  if (loggedIn) {
-    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-    document.getElementById('profileChipName').textContent = name;
-    document.getElementById('profileChipAvatar').textContent = initials;
-  }
+  /* The chip, the initials and the whole dropdown are profile-menu.js's — the
+     same component the results pages render — so this page no longer builds
+     its own and the two cannot drift. It reads the session itself; all that is
+     needed here is to tell it the session changed. */
+  if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
 
   const mobileLoginLink = document.getElementById('mobileNavLoginLink');
   const mobileSignupLink = document.getElementById('mobileNavSignupLink');
@@ -1208,14 +1222,22 @@ function showOtpStep(challenge, message, origin) {
   box.focus();
 }
 
-/** Show the code when there is no mail server to send it to.
- *  The API only returns `dev_otp` in DEV_MODE, so on a mail-configured server
- *  this is always a no-op. Text content, never innerHTML — the value is echoed
- *  from a response and has no business being parsed as markup. */
+/** Show the code instead of emailing it.
+ *
+ *  The API returns `dev_otp` only in DEV_MODE — either because no mail server
+ *  is configured, or because OTP_DEV_MODE is on for local work while SMTP
+ *  keeps sending everything else. It is never present on a deployed server, so
+ *  this is a no-op there and the code arrives by email as normal.
+ *
+ *  It no longer says "email is not configured": that stopped being the only
+ *  reason the moment the contact form needed SMTP switched on.
+ *
+ *  Text content, never innerHTML — the value is echoed from a response and has
+ *  no business being parsed as markup. */
 function showDevOtp(code) {
   const el = document.getElementById('liDevOtp');
   if (!el) return;
-  el.textContent = code ? `Email is not configured on this server — your code is ${code}` : '';
+  el.textContent = code ? `Development mode — your code is ${code}` : '';
   el.className = code ? 'modal-devbox' : '';
 }
 
@@ -1245,7 +1267,35 @@ function completeCustomerSignIn(data) {
      skipped in that case: they are already navigating away, and a toast that
      outlives its page is just a flicker. */
   if (typeof resumePendingSearch === 'function' && resumePendingSearch()) return;
+  /* Or sent here from another page to sign in — go back to it. Same reason the
+     greeting is skipped: they are leaving. */
+  if (returnToNext()) return;
   showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
+}
+
+/** Honour `?next=` after signing in.
+ *
+ *  A service page that has no sign-in modal of its own sends the traveller here
+ *  with `next` set to where they were — the wishlist heart on the Hotels
+ *  results does exactly that, and carries the filters with it — so signing in
+ *  returns them to the list they were reading rather than stranding them on the
+ *  home page.
+ *
+ *  SAME-ORIGIN PATHS ONLY. `next` comes from a URL anyone can write, and a
+ *  redirect that accepts whatever it is handed is an open redirect: a link that
+ *  looks like this site and lands on someone else's login form. It must start
+ *  with a single "/" — which rejects "//evil.test" (protocol-relative) and
+ *  "https://evil.test" alike — and is resolved against this origin so the
+ *  browser cannot be talked into leaving it.
+ *
+ *  @returns {boolean} whether a navigation was started. */
+function returnToNext() {
+  const raw = new URLSearchParams(location.search).get('next');
+  if (!raw || raw[0] !== '/' || raw[1] === '/' || raw.includes('\\')) return false;
+  const url = new URL(raw, location.origin);
+  if (url.origin !== location.origin) return false;
+  location.href = url.pathname + url.search + url.hash;
+  return true;
 }
 
 /* --- Registration ------------------------------------------------------- */

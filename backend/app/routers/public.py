@@ -7,7 +7,11 @@ that is neither."""
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.auth.rate_limit import limiter
-from app.schemas.public import ContactFormRequest, NewsletterSubscribeRequest
+from app.schemas.public import (
+    ContactFormRequest,
+    HotelGroupEnquiryRequest,
+    NewsletterSubscribeRequest,
+)
 from app.services import email_service
 from app.services.email_service import CONTACT_FORM_RECIPIENT
 
@@ -38,6 +42,24 @@ def submit_contact_form(request: Request, payload: ContactFormRequest):
                 "We couldn't send your message right now — please email us directly "
                 f"at {CONTACT_FORM_RECIPIENT} instead."
             ),
+        )
+
+
+@router.post(
+    "/hotel-group-enquiry",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Landing page Group Deals enquiry",
+    description=(
+        "Public endpoint. A hotel party too large for the standard 4-room search, sent to the "
+        "group desk as an enquiry to be quoted by hand — it deliberately returns no availability."
+    ),
+)
+@limiter.limit("5/minute")
+def submit_hotel_group_enquiry(request: Request, payload: HotelGroupEnquiryRequest):
+    if not email_service.send_hotel_group_enquiry_email(payload):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="We couldn't send your enquiry right now — please call us instead.",
         )
 
 

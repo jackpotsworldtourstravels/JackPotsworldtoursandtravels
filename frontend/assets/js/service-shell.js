@@ -131,35 +131,23 @@ const ServiceShell = (function () {
   /* ---------------------------------------------------------------------
      Auth display
      --------------------------------------------------------------------- */
+  /** The header's auth corner.
+   *
+   *  It used to render an `sp-chip` here that opened the Account Center
+   *  straight on the profile tab — no menu, so the seven other destinations the
+   *  landing page offered simply did not exist after a search. profile-menu.js
+   *  renders the chip AND the dropdown now, identically on every page, and this
+   *  shell only says where it goes. */
   function renderAuth() {
     const slot = document.getElementById('spAuth');
     if (!slot) return;
-    const session = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : { access: null };
-
-    if (!session.access) {
+    if (typeof ProfileMenu === 'undefined') {
+      /* A page that has not adopted the component still gets a way in. */
       slot.innerHTML = `<a class="sp-login" href="index.html?signin=1">Login</a>`;
       return;
     }
-    const name = session.name || 'Traveller';
-    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-    slot.innerHTML = `
-      <button type="button" class="sp-chip" id="spChip">
-        <span class="sp-avatar">${esc(initials)}</span>
-        <span class="sp-chip-name">${esc(name)}</span>
-      </button>`;
-    document.getElementById('spChip').addEventListener('click', onChip);
-  }
-
-  function onChip() {
-    /* This used to be `window.location.href = 'index.html?account=profile'`,
-       on the reasoning that building a menu here would be a fifth copy of one
-       index.html already had. True — but the fix for that is one copy every
-       page can load, not a redirect: leaving the page threw away whatever the
-       traveller had already filled in.
-
-       account-center.js is that copy. Navigate only if it is not present. */
-    if (typeof AccountCenter !== 'undefined') { AccountCenter.open('profile'); return; }
-    window.location.href = 'index.html?account=profile';
+    slot.setAttribute('data-profile-menu', '');
+    ProfileMenu.mount(slot.parentNode || document);
   }
 
   /* ---------------------------------------------------------------------

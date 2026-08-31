@@ -47,44 +47,18 @@ const HotelResults = (function () {
   ];
   const CURRENT_STEP = 1;              // Hotel Results, zero-based.
 
-  const STAR_FILTERS = [
-    { id: '5', label: '5 Star', test: h => h.stars === 5 },
-    { id: '4', label: '4 Star', test: h => h.stars === 4 },
-    { id: '3', label: '3 Star', test: h => h.stars === 3 },
-    { id: '2', label: '2 Star & below', test: h => h.stars <= 2 },
-  ];
+  /* STAR_FILTERS, RATING_FILTERS, SORTS and the `filters` object were the
+     rail's hardcoded contents. They are hotel-filters.js's definition list
+     now — which is what lets a facet appear when the API starts sending its
+     field, instead of when someone edits four places in this file.
 
-  const RATING_FILTERS = [
-    { id: 'any', label: 'All ratings', min: 0 },
-    { id: '4.5', label: '4.5 & above', min: 4.5 },
-    { id: '4.0', label: '4.0 & above', min: 4.0 },
-    { id: '3.5', label: '3.5 & above', min: 3.5 },
-  ];
-
-  const SORTS = [
-    { id: 'recommended', label: 'Recommended' },
-    { id: 'price-asc',   label: 'Price: Low to High' },
-    { id: 'price-desc',  label: 'Price: High to Low' },
-    { id: 'rating-desc', label: 'Guest Rating' },
-  ];
-
-  /* Filters chosen here, kept separate from the SEARCH criteria in
-     travel-explore's `state` — a filter narrows the list, it does not change
+     Filters stay separate from the SEARCH criteria in travel-explore's
+     `state`, exactly as before: a filter narrows the list, it does not change
      what was searched for. */
-  const filters = {
-    maxPrice: null,                    // null = no ceiling
-    stars: new Set(),
-    rating: 'any',
-    freeCancellation: false,
-    breakfast: false,
-    areas: new Set(),
-    sort: 'recommended',
-  };
 
   let rows = [];                       // everything the catalogue returned
   let shell = null;                    // travel-explore's `state`
   let selectedId = null;
-  let priceBounds = { min: 0, max: 0 };
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s)
@@ -168,50 +142,52 @@ const HotelResults = (function () {
   }
 
   /* ---------------------------------------------------------------------
-     Filtering. Destination narrowing stays where it already lived — in
-     travel-explore's search — so this only applies the RAIL's filters.
+     Filtering — HotelFilters owns it.
+
+     THE RAIL USED TO BE SIX HARDCODED FACETS HERE: a price ceiling, four star
+     bands, four rating bands, a breakfast checkbox, a free-cancellation
+     checkbox and an area list, each with its own line in `passes()`, its own
+     block in `filtersHtml()` and its own case in the change handler. Adding a
+     seventh meant touching all three.
+
+     They are now a definition list in hotel-filters.js, rendered by the shared
+     filter-engine.js that also drives the Flights rail. What changes for this
+     screen:
+
+       * a facet appears only when the ROWS can answer it — two or more
+         distinct values, or a range with a spread — so the area group's old
+         `areas.length > 1` check is the general rule rather than a special
+         case, and property type, brand, bed type and the rest are written and
+         waiting rather than absent.
+       * the price ceiling becomes a real range with a floor as well, so "under
+         ₹8,000" and "between ₹4,000 and ₹8,000" are both expressible.
+       * meal plan and cancellation stop being two yes/no boxes and become the
+         actual values the API sends, now that it sends `meal_plans` and
+         `free_cancellation`.
+       * filters, sort and paging go in the URL, and Back undoes one step.
+
+     Destination narrowing still stays where it already lived — travel-explore's
+     search — so this rail only ever narrows within what that returned.
+
+     `passes()` is gone with the rail: the engine's own predicate replaced it,
+     and its counts are computed against the other active filters exactly as
+     `countIf(skip, …)` did.
      --------------------------------------------------------------------- */
-  function passes(h, skip) {
-    if (skip !== 'price' && filters.maxPrice != null
-        && Number(h.pricePerNight) > filters.maxPrice) return false;
-    if (skip !== 'stars' && filters.stars.size) {
-      const hit = STAR_FILTERS.some(s => filters.stars.has(s.id) && s.test(h));
-      if (!hit) return false;
-    }
-    if (skip !== 'rating' && filters.rating !== 'any') {
-      const min = (RATING_FILTERS.find(r => r.id === filters.rating) || {}).min || 0;
-      if (!(Number(h.guestRating) >= min)) return false;
-    }
-    if (skip !== 'cancel' && filters.freeCancellation && h.freeCancellation !== true) return false;
-    if (skip !== 'meal' && filters.breakfast) {
-      const meals = Array.isArray(h.mealPlans) ? h.mealPlans : [];
-      if (!meals.some(m => /breakfast/i.test(m))) return false;
-    }
-    if (skip !== 'area' && filters.areas.size && !filters.areas.has(areaOf(h))) return false;
-    return true;
-  }
+  const rail = () => (typeof HotelFilters === 'undefined' ? null : HotelFilters);
 
+  /** What the rail has left, in the chosen order.
+   *
+   *  Both halves belong to HotelFilters now — see the note above `rail()`.
+   *  The six hardcoded facets and the four-entry sort table that used to live
+   *  here are a definition list in hotel-filters.js, so a facet the API starts
+   *  sending appears without an edit to this file. */
   function visible() {
-    const out = rows.filter(h => passes(h));
-    const by = {
-      'price-asc':   (a, b) => a.pricePerNight - b.pricePerNight,
-      'price-desc':  (a, b) => b.pricePerNight - a.pricePerNight,
-      'rating-desc': (a, b) => (Number(b.guestRating) || 0) - (Number(a.guestRating) || 0),
-      /* "Recommended" is guest rating first, then the cheaper stay — a stated
-         rule rather than a hidden score, because no ranking signal exists in
-         the data to justify anything cleverer. */
-      recommended:   (a, b) => (Number(b.guestRating) || 0) - (Number(a.guestRating) || 0)
-                            || a.pricePerNight - b.pricePerNight,
-    };
-    return out.sort(by[filters.sort] || by.recommended);
+    return rail() ? rail().apply(rows) : rows.slice();
   }
 
-  /** How many results a facet would leave if it alone were toggled on —
-   *  counted against every OTHER active filter, which is why a count never
-   *  reads zero for something you can still usefully click. */
-  function countIf(skip, test) {
-    return rows.filter(h => passes(h, skip) && test(h)).length;
-  }
+  /* countIf() lived here and answered "how many would this facet leave, counted
+     against every OTHER active filter". The engine computes exactly that for
+     every option it renders, so the helper went with the rail it served. */
 
   /* ---------------------------------------------------------------------
      Render — search summary bar
@@ -267,90 +243,32 @@ const HotelResults = (function () {
   /* ---------------------------------------------------------------------
      Render — filters
      --------------------------------------------------------------------- */
-  function opt({ id, name, type, label, count, checked, disabled }) {
-    return `
-      <label class="hr-opt">
-        <input type="${type}" name="${esc(name)}" value="${esc(id)}"
-               ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
-        <span class="hr-opt-label">${esc(label)}</span>
-        ${count == null ? '' : `<span class="hr-opt-count">${count}</span>`}
-      </label>`;
-  }
+  /* opt() drew one checkbox row for the hand-built rail; the engine has its
+     own. */
 
-  function filtersHtml() {
-    const areas = [...new Set(rows.map(areaOf).filter(Boolean))].sort();
-    const ceiling = filters.maxPrice == null ? priceBounds.max : filters.maxPrice;
 
-    return `
-      <div class="hr-filters">
-        <div class="hr-filters-head">
-          <h2>Filters</h2>
-          <button type="button" class="hr-linkbtn" id="hrClear">Clear All</button>
-        </div>
+  /* filtersHtml() drew the rail by hand — a head, six groups, and an `opt()`
+     helper for each checkbox. filter-engine.js renders it now, from the
+     definitions in hotel-filters.js, into the same #hrFilters element. The
+     `hr-` look is preserved in hotel.css, which styles the engine's markup to
+     match the rest of this screen rather than the Flights sidebar. */
 
-        <div class="hr-group">
-          <h3>Price per night</h3>
-          <label class="hr-sr" for="hrPrice">Maximum price per night</label>
-          <input type="range" class="hr-range" id="hrPrice"
-                 min="${priceBounds.min}" max="${priceBounds.max}" step="100"
-                 value="${ceiling}">
-          <div class="hr-price-read">
-            <span>${esc(rupees(priceBounds.min))}</span>
-            <span>Up to <b>${esc(rupees(ceiling))}</b></span>
-          </div>
-        </div>
-
-        <div class="hr-group">
-          <h3>Star category</h3>
-          ${STAR_FILTERS.map(s => opt({
-            id: s.id, name: 'hrStar', type: 'checkbox', label: s.label,
-            count: countIf('stars', s.test), checked: filters.stars.has(s.id),
-            disabled: countIf('stars', s.test) === 0 && !filters.stars.has(s.id),
-          })).join('')}
-        </div>
-
-        <div class="hr-group">
-          <h3>Guest rating</h3>
-          ${RATING_FILTERS.map(r => opt({
-            id: r.id, name: 'hrRating', type: 'radio', label: r.label,
-            count: countIf('rating', h => (Number(h.guestRating) || 0) >= r.min),
-            checked: filters.rating === r.id,
-          })).join('')}
-        </div>
-
-        <div class="hr-group">
-          <h3>Meal plan</h3>
-          ${opt({
-            id: 'breakfast', name: 'hrMeal', type: 'checkbox', label: 'Breakfast included',
-            count: countIf('meal', h => (h.mealPlans || []).some(m => /breakfast/i.test(m))),
-            checked: filters.breakfast,
-          })}
-        </div>
-
-        <div class="hr-group">
-          <h3>Cancellation</h3>
-          ${opt({
-            id: 'freecancel', name: 'hrCancel', type: 'checkbox', label: 'Free cancellation',
-            count: countIf('cancel', h => h.freeCancellation === true),
-            checked: filters.freeCancellation,
-          })}
-        </div>
-
-        ${areas.length > 1 ? `
-        <div class="hr-group">
-          <h3>Area</h3>
-          ${areas.map(a => opt({
-            id: a, name: 'hrArea', type: 'checkbox', label: a,
-            count: countIf('area', h => areaOf(h) === a),
-            checked: filters.areas.has(a),
-          })).join('')}
-        </div>` : ''}
-      </div>`;
-  }
 
   /* ---------------------------------------------------------------------
      Render — one hotel card
      --------------------------------------------------------------------- */
+  /** The save-for-later heart, from wishlist.js.
+   *
+   *  Rendered only where that module is loaded, so a page without it gets no
+   *  button rather than a broken one. The module owns the whole interaction —
+   *  the API call, the optimistic fill, putting it back when the server
+   *  disagrees, and sending a signed-out visitor to sign in — and it is
+   *  generic over item_type because the endpoint is, so this is one call
+   *  rather than a wishlist implementation living in a results screen. */
+  function saveButton(h) {
+    return (typeof Wishlist !== 'undefined') ? Wishlist.button('hotel', h.id, h.name) : '';
+  }
+
   function cardHtml(h) {
     const cost = stayCost(h);
     const meal = headlineMeal(h);
@@ -366,6 +284,7 @@ const HotelResults = (function () {
           ${img}
           ${h.distanceKm != null
             ? `<span class="hr-card-badge">${esc(h.distanceKm)} km from airport</span>` : ''}
+          ${saveButton(h)}
           ${photoCredit(h)}
         </div>
         <div class="hr-card-body">
@@ -597,11 +516,23 @@ const HotelResults = (function () {
       return;
     }
     el.innerHTML = list.map(cardHtml).join('');
+    /* The cards were just replaced, so their hearts are freshly built from
+       whatever Wishlist knew at the time. Repaint in case the saved set landed
+       after this render — it is fetched in parallel, not awaited. */
+    if (typeof Wishlist !== 'undefined') Wishlist.refresh();
   }
 
+  /** Hand the panel the current rows. It re-derives which facets the data can
+   *  answer, reconciles anything the URL asked for against what actually came
+   *  back, and repaints itself — counts included. */
   function paintFilters() {
-    const el = $('hrFilters');
-    if (el) el.innerHTML = filtersHtml();
+    if (!rail()) return;
+    rail().setRows(rows);
+    /* Which sorts are offered depends on the same rows the facets do, so the
+       menu is rebuilt here rather than once per search — otherwise a search
+       whose properties carry no guest rating would keep offering to sort by
+       one until the page reloaded. */
+    paintSortOptions();
   }
   function paintSummary() {
     const el = $('hrSummary');
@@ -622,12 +553,12 @@ const HotelResults = (function () {
   }
 
   function clearAll() {
-    filters.maxPrice = null;
-    filters.stars.clear();
-    filters.rating = 'any';
-    filters.freeCancellation = false;
-    filters.breakfast = false;
-    filters.areas.clear();
+    if (rail()) rail().clear();
+    /* Explicitly, because the engine's clear() repaints the rail but does not
+       fire the change callback that normally writes the URL — so without this
+       the address bar kept advertising filters that had just been removed, and
+       a refresh brought them all back. */
+    writeUrl(true);
     repaint();
   }
 
@@ -641,6 +572,18 @@ const HotelResults = (function () {
     if (!root) return;
     bound = true;
 
+    /* The rail. Mounted once; setRows() feeds it and this fires on every
+       change it makes. Filters are the engine's, sorting is the select
+       above — changing one never resets the other. */
+    if (rail()) {
+      rail().mount($('hrFilters'), () => {
+        writeUrl(true);
+        paintResults();
+        paintSummary();
+        paintActionbar();
+      });
+    }
+
     root.addEventListener('click', e => {
       const view = e.target.closest('[data-view-rooms]');
       if (view) { select(view.getAttribute('data-view-rooms'), true); return; }
@@ -652,37 +595,21 @@ const HotelResults = (function () {
       if (e.target.closest('#hrModify')) { modifySearch(); return; }
     });
 
+    /* Only the sort is this file's now. Every facet in the rail is the
+       engine's, which owns its own delegated listeners on #hrFilters. */
     root.addEventListener('change', e => {
-      const t = e.target;
-      if (t.name === 'hrStar') { toggle(filters.stars, t.value, t.checked); repaint(); return; }
-      if (t.name === 'hrArea') { toggle(filters.areas, t.value, t.checked); repaint(); return; }
-      if (t.name === 'hrRating') { filters.rating = t.value; repaint(); return; }
-      if (t.name === 'hrMeal') { filters.breakfast = t.checked; repaint(); return; }
-      if (t.name === 'hrCancel') { filters.freeCancellation = t.checked; repaint(); return; }
-      if (t.id === 'hrSort') { filters.sort = t.value; paintResults(); return; }
+      if (e.target.id !== 'hrSort') return;
+      if (rail()) rail().sort = e.target.value;
+      /* Sorting never touches the filters — a different order of the same
+         results. Only the list is repainted. */
+      writeUrl(true);
+      paintResults();
     });
 
-    /* The slider tracks the thumb live, but a full repaint() on every `input`
-       would rebuild the filter rail — replacing the very element being
-       dragged, which drops the drag on the first pixel of movement. So while
-       dragging, only the readout and the results are updated; the rail's
-       facet counts are recomputed once on `change`, when the thumb is
-       released. */
-    root.addEventListener('input', e => {
-      if (e.target.id !== 'hrPrice') return;
-      filters.maxPrice = Number(e.target.value);
-      const read = root.querySelector('.hr-price-read b');
-      if (read) read.textContent = rupees(filters.maxPrice);
-      paintResults();
-      paintSummary();
-      paintActionbar();
-    });
-    root.addEventListener('change', e => {
-      if (e.target.id !== 'hrPrice') return;
-      repaint();
-      const again = $('hrPrice');
-      if (again) again.focus();
-    });
+    /* The bespoke price-slider handlers went with the hand-built rail. The
+       engine debounces its own range input, suppresses repaints mid-drag so
+       the element being dragged is never replaced under the pointer, and
+       commits on release and on `change` for keyboard users.
 
     /* The sticky bar sits outside #hrRoot, so its CTA is bound separately. */
     const bar = $('hrActionbar');
@@ -691,7 +618,6 @@ const HotelResults = (function () {
     });
   }
 
-  function toggle(set, value, on) { on ? set.add(value) : set.delete(value); }
 
   function select(id, andContinue) {
     selectedId = String(id);
@@ -764,14 +690,9 @@ const HotelResults = (function () {
                            || String(h.name || '').toLowerCase().includes(dest));
     }
 
-    const prices = rows.map(h => Number(h.pricePerNight) || 0).filter(Boolean);
-    priceBounds = {
-      min: prices.length ? Math.floor(Math.min(...prices) / 500) * 500 : 0,
-      max: prices.length ? Math.ceil(Math.max(...prices) / 500) * 500 : 0,
-    };
-    if (filters.maxPrice != null) {
-      filters.maxPrice = Math.min(Math.max(filters.maxPrice, priceBounds.min), priceBounds.max);
-    }
+    /* Price bounds and the clamping of a stale ceiling were computed here for
+       the hand-built slider. The engine derives both from the rows it is given
+       and reconciles any value the URL carried against them. */
     if (selectedId && !rows.some(h => String(h.id) === selectedId)) selectedId = null;
 
     const shellEl = $('hrRoot');
@@ -788,11 +709,18 @@ const HotelResults = (function () {
     const heading = $('hrHeading');
     if (heading) heading.textContent = shell.dest ? `Hotels in ${shell.dest}` : 'Hotels';
 
-    const sort = $('hrSort');
-    if (sort && !sort.dataset.filled) {
-      sort.innerHTML = SORTS.map(s =>
-        `<option value="${s.id}"${s.id === filters.sort ? ' selected' : ''}>${s.label}</option>`).join('');
-      sort.dataset.filled = '1';
+
+    /* Started, not awaited: the saved set is a decoration on cards that should
+       render at once, and a slow wishlist must not hold the results back.
+       Signed out it is a no-op rather than a 401 on every load. */
+    if (typeof Wishlist !== 'undefined') {
+      Wishlist.init().then(() => Wishlist.refresh());
+    }
+
+    /* Before the first paint, so the rail renders already holding whatever the
+       URL asked for rather than being corrected a frame later. */
+    if (rail()) {
+      rail().readParams(name => new URLSearchParams(location.search).get(name));
     }
 
     bind();
@@ -1049,7 +977,64 @@ const HotelResults = (function () {
   function bindRouter() {
     if (routeBound) return;
     routeBound = true;
-    window.addEventListener('popstate', () => { if (rows.length) route(); });
+    window.addEventListener('popstate', () => {
+      if (!rows.length) return;
+      /* A history entry carries the filters and the sort as well as which
+         screen was open, so both are re-read before anything repaints. Cleared
+         first: readParams only ASSIGNS what the URL names, so a facet absent
+         from this entry would otherwise survive from the last one. */
+      if (rail()) {
+        rail().clear();
+        rail().sort = rail().DEFAULT_SORT;
+        rail().readParams(name => new URLSearchParams(location.search).get(name));
+        rail().setRows(rows);
+        paintSortOptions();
+      }
+      route();
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     The sort menu
+
+     Written from the data rather than a fixed list, so a sort is offered only
+     when the rows can answer it — "Guest Rating" disappears on a route where
+     nothing carries one, and "Highest discount" stays absent until the API
+     sends an original price to discount from.
+     --------------------------------------------------------------------- */
+  function paintSortOptions() {
+    const sel = $('hrSort');
+    if (!sel || !rail()) return;
+    const opts = rail().availableSorts();
+    if (!opts.some(o => o.id === rail().sort)) rail().sort = rail().DEFAULT_SORT;
+    sel.innerHTML = opts.map(o =>
+      `<option value="${esc(o.id)}"${o.id === rail().sort ? ' selected' : ''}>${esc(o.label)}</option>`
+    ).join('');
+  }
+
+  /* ---------------------------------------------------------------------
+     URL state
+
+     The filters and the sort join the criteria already in the address bar, so
+     a result set can be shared, survives a refresh, and Back undoes one
+     deliberate act rather than the whole search. `h_`-namespaced by the engine,
+     so they cannot collide with `hotel`/`step`, which this screen's router owns.
+     --------------------------------------------------------------------- */
+  function writeUrl(push) {
+    if (!rail()) return;
+    const q = new URLSearchParams(location.search);
+    const params = {};
+    rail().writeParams(params);
+    /* Drop every h_* the engine did not just set — a facet that has been
+       unticked has to leave the URL, not linger. */
+    [...q.keys()].forEach(k => { if (k.startsWith('h_')) q.delete(k); });
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== '' && v != null) q.set(k, v);
+    });
+    const url = `${location.pathname}?${q.toString()}`;
+    if (url === location.pathname + location.search) return;
+    if (push) history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
   }
 
   return {
