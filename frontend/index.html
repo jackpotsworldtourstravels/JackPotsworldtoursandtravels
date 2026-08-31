@@ -17,6 +17,8 @@
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260827g2">
+<!-- The profile chip + dropdown, shared by every page that shows a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -34,7 +36,7 @@
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260826ac1"></script>
+<script src="assets/js/hero-shell.js?v=20260827pm1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -81,25 +83,11 @@
       </a>
       <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
       <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
-      <div class="profile-chip-wrap" id="profileChipWrap" style="display:none;">
-        <button type="button" class="profile-chip" id="profileChipBtn">
-          <span class="profile-chip-avatar" id="profileChipAvatar">U</span>
-          <span class="profile-chip-name" id="profileChipName">Traveler</span>
-          <svg class="profile-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="profile-dropdown" id="profileDropdown">
-          <a href="#" data-acct-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</a>
-          <a href="#" data-acct-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</a>
-          <a href="#" data-acct-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</a>
-          <a href="#" data-acct-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</a>
-          <a href="#" data-acct-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</a>
-          <a href="#" data-acct-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</a>
-          <a href="#" data-acct-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</a>
-          <a href="#" data-acct-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
-          <hr>
-          <button type="button" class="logout-item" id="profileLogoutBtn"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Logout</button>
-        </div>
-      </div>
+      <!-- The profile chip and its dropdown, from profile-menu.js. Markup used
+           to be inline here and existed on no other page, which is why the
+           menu vanished after a search. One component now; the slot is all a
+           page declares. -->
+      <div class="pm-slot" data-profile-menu></div>
       <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </nav>
@@ -832,7 +820,7 @@
 <script src="components/toast.js"></script>
 <script src="components/spinner.js"></script>
 <script src="components/confirm-dialog.js"></script>
-<script src="assets/js/auth.js?v=20260807v1c"></script>
+<script src="assets/js/auth.js?v=20260827pm2"></script>
 <script src="assets/js/api.js?v=20260805ui34"></script>
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
@@ -840,11 +828,14 @@
 <!-- The Account Center. Before app.js, which calls AccountCenter.configure()
      at the end of its own load. This page keeps its static modal markup above,
      so the module skips injecting a second copy. -->
-<script src="assets/js/account-center.js?v=20260827pt4"></script>
+<!-- The profile chip + dropdown. Before account-center.js, whose Logout it
+     calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
+<script src="assets/js/profile-menu.js?v=20260827pm2"></script>
+<script src="assets/js/account-center.js?v=20260827pm3"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260827pt4"></script>
+<script src="assets/js/app.js?v=20260827pm1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

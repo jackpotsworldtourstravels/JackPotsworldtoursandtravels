@@ -16,6 +16,8 @@
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260827pt4">
+<!-- The profile chip + dropdown, shared by every page that shows a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="hotels">
@@ -209,8 +211,9 @@
      "getStoredAuth is not defined" and the profile panel never initialised.
      (Both branches found this independently; account-center.js also carries a
      guard now, so the strip it renders no longer throws on a page without it.) -->
-<script src="assets/js/auth.js?v=20260824ic9"></script>
-<script src="assets/js/account-center.js?v=20260827pt4"></script>
+<script src="assets/js/auth.js?v=20260827pm2"></script>
+<script src="assets/js/profile-menu.js?v=20260827pm2"></script>
+<script src="assets/js/account-center.js?v=20260827pm3"></script>
 <!-- The vendored hotel photography map. No airline logos on this page.
      hotel-image-map.js reports whether a photo is of THIS property or is a
      stand-in for the chain, which the Details gallery caption depends on. -->
@@ -236,7 +239,7 @@
      Must precede hotel-results.js, which mounts the panel into #hrFilters. -->
 <!-- Save for later. Generic over item_type because the endpoint is, so the
      same module serves any product that grows a heart. -->
-<script src="assets/js/wishlist.js?v=20260827pt4"></script>
+<script src="assets/js/wishlist.js?v=20260827pm2"></script>
 <script src="assets/js/filter-engine.js?v=20260827fe3"></script>
 <script src="assets/js/hotel-filters.js?v=20260827pt1"></script>
 <!-- Must precede travel-explore.js: that file checks for this module and
@@ -251,6 +254,6 @@
 <script src="assets/js/hotel-results.js?v=20260827pt4"></script>
 <script src="assets/js/travel-explore.js?v=20260827m1"></script>
 <script src="assets/js/jp-icons.js?v=20260825a"></script>
-<script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<script src="assets/js/service-shell.js?v=20260827pm1"></script>
 </body>
 </html>

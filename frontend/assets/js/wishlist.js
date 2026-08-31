@@ -33,7 +33,11 @@ const Wishlist = (function () {
   let loaded = false;
   const key = (type, id) => `${type}:${id}`;
 
-  const auth = () => (typeof getStoredAuth === 'function' ? getStoredAuth() : {});
+  /* Both namespaces — see auth.js's getCustomerSession(). Reading
+     getStoredAuth() alone meant the hearts were dead on every page that does
+     not load app.js, which is every results page they appear on. */
+  const auth = () => (typeof getCustomerSession === 'function' ? getCustomerSession()
+    : (typeof getStoredAuth === 'function' ? getStoredAuth() : {}));
   const signedIn = () => !!auth().access;
 
   async function api(path, options) {

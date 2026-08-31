@@ -13,6 +13,8 @@
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260827hd5">
+<!-- The profile chip + dropdown, shared by every page that shows a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="packages">
@@ -66,9 +68,10 @@
      navigating to index.html and discarding whatever is in progress.
      Loads from inside <body>: it injects its own modal markup. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/account-center.js?v=20260827pt4"></script>
+<script src="assets/js/profile-menu.js?v=20260827pm2"></script>
+<script src="assets/js/account-center.js?v=20260827pm3"></script>
 <script src="components/toast.js"></script>
-<script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/auth.js?v=20260827pm2"></script>
 <!-- The airport table travel-data.js reads. Must precede it. -->
 <script src="assets/js/airports.js?v=20260825t3"></script>
 <script src="assets/js/travel-data.js?v=20260827fe3"></script>
@@ -86,6 +89,6 @@
 <script src="assets/js/package-search.js?v=20260824bk9"></script>
 <script src="assets/js/travel-explore.js?v=20260827g2"></script>
 <script src="assets/js/jp-icons.js?v=20260825a"></script>
-<script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<script src="assets/js/service-shell.js?v=20260827pm1"></script>
 </body>
 </html>

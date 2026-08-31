@@ -34,6 +34,24 @@
    =========================================================================== */
 const AccountCenter = (function () {
 
+  /** Who is signed in. auth.js's getCustomerSession() asks BOTH namespaces —
+   *  this module used to ask getStoredAuth() alone, which only means the
+   *  customer on pages that load app.js. On every other page it read an empty
+   *  `jwt_*` and concluded nobody was signed in, so opening the Account Center
+   *  from a results page silently offered a login instead. */
+  const customerSession = () => (typeof getCustomerSession === 'function')
+    ? getCustomerSession()
+    : ((typeof getStoredAuth === 'function') ? getStoredAuth() : {});
+
+  /** Bearer header for this module's ~10 requests.
+   *
+   *  NOT the global authHeaders(): that reads `jwt_access` directly, and
+   *  app.js rebinds it to the customer namespace — on index.html only, as its
+   *  own comment says. Every request from here on any other page therefore
+   *  went out with an empty token and came back 401. Derived from
+   *  customerSession() so it is right wherever this file is loaded. */
+  const customerHeaders = () => ({ Authorization: `Bearer ${customerSession().access}` });
+
   /* ---- host-supplied dependencies ------------------------------------- */
   let API_BASE = '';
   let apiErrorText = (err, fallback) => fallback;
@@ -226,7 +244,7 @@ const acctLoadedTabs = new Set();
 let acctCurrentUser = null;
 
 function openAccountCenter(tab) {
-  const { access } = getStoredAuth();
+  const { access } = customerSession();
   if (!access) { openAuth('login'); return; }
   acctModalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -271,25 +289,21 @@ document.querySelectorAll('[data-acct-tab]').forEach(link => {
     openAccountCenter(link.dataset.acctTab);
   });
 });
-const profileChipBtn = document.getElementById('profileChipBtn');
-const profileDropdown = document.getElementById('profileDropdown');
-/* Absent on the booking pages, which carry their own header. */
-if (profileChipBtn && profileDropdown) {
-  profileChipBtn.addEventListener('click', e => {
-    e.stopPropagation();
-    const open = profileDropdown.classList.toggle('open');
-    profileChipBtn.classList.toggle('open', open);
-  });
-  document.addEventListener('click', () => {
-    profileDropdown.classList.remove('open');
-    profileChipBtn.classList.remove('open');
-  });
-}
+/* The chip and its dropdown were wired here, against elements looked up at
+   PARSE time. On every page whose header is injected by a shell those lookups
+   found null and the menu silently did nothing — which is why the profile had
+   no dropdown anywhere except the landing page. profile-menu.js owns the
+   component now and binds by delegation, so when the markup arrives no longer
+   matters. */
 
 function doAccountLogout() {
-  const { access } = getStoredAuth();
+  const { access } = customerSession();
   axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
-  clearStoredAuth();
+  /* BOTH namespaces. clearStoredAuth is rebound to the customer one by app.js,
+     but only on index.html — everywhere else it cleared an empty `jwt_*` and
+     left the real session in place, so Logout appeared to do nothing. */
+  if (typeof clearCustomerAuth === 'function') clearCustomerAuth();
+  if (typeof clearStoredAuth === 'function') clearStoredAuth();
   acctCurrentUser = null;
   acctLoadedTabs.clear();
   resetWishlist();
@@ -306,7 +320,7 @@ document.getElementById('mobileLogoutLink')?.addEventListener('click', e => { e.
    undefined and quietly blanked both fields on every load. */
 async function loadAcctHeaderProfile() {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: customerHeaders() });
     acctCurrentUser = data;
     const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
     document.getElementById('acctHeaderAvatar').textContent = initials;
@@ -316,7 +330,7 @@ async function loadAcctHeaderProfile() {
 }
 async function loadAcctProfile() {
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: customerHeaders() });
     acctCurrentUser = data;
     document.getElementById('acctProfileName').value = data.full_name;
     document.getElementById('acctProfileEmail').value = data.email;
@@ -349,8 +363,9 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
       state: document.getElementById('acctProfileState').value || null,
       city: document.getElementById('acctProfileCity').value || null,
       address_line1: document.getElementById('acctProfileAddress').value || null,
-    }, { headers: authHeaders() });
-    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'customer', data.id);
+    }, { headers: customerHeaders() });
+    const cur = customerSession();
+    setStoredAuth(cur.access, cur.refresh, data.full_name, 'customer', data.id);
     renderAuthNav();
     loadAcctHeaderProfile();
     msg.textContent = 'Profile updated.';
@@ -376,7 +391,7 @@ document.getElementById('acctPasswordForm').addEventListener('submit', async e =
       current_password: document.getElementById('acctCurrentPassword').value,
       new_password: next,
       confirm_password: confirm,
-    }, { headers: authHeaders() });
+    }, { headers: customerHeaders() });
     msg.textContent = 'Password changed successfully.';
     msg.className = 'acct-msg success';
     e.target.reset();
@@ -410,9 +425,9 @@ let allBookingsCache = [];
    handful of `product_type === 'hotel'` branches, not a second copy of each. */
 async function fetchAllCustomerBookings() {
   const [flightsRes, hotelsRes, packagesRes] = await Promise.allSettled([
-    axios.get(`${API_BASE}/api/customer/bookings`, { headers: authHeaders() }),
-    axios.get(`${API_BASE}/api/customer/hotel-bookings`, { headers: authHeaders() }),
-    axios.get(`${API_BASE}/api/customer/package-bookings`, { headers: authHeaders() }),
+    axios.get(`${API_BASE}/api/customer/bookings`, { headers: customerHeaders() }),
+    axios.get(`${API_BASE}/api/customer/hotel-bookings`, { headers: customerHeaders() }),
+    axios.get(`${API_BASE}/api/customer/package-bookings`, { headers: customerHeaders() }),
   ]);
   if (flightsRes.status === 'rejected' && hotelsRes.status === 'rejected' && packagesRes.status === 'rejected') {
     throw flightsRes.reason;
@@ -581,7 +596,7 @@ async function cancelBookingById(bookingRef, onSuccess) {
   const path = /^JPH/.test(bookingRef) ? 'hotel-bookings'
     : /^JPP/.test(bookingRef) ? 'package-bookings' : 'bookings';
   try {
-    await axios.post(`${API_BASE}/api/customer/${path}/${bookingRef}/cancel`, {}, { headers: authHeaders() });
+    await axios.post(`${API_BASE}/api/customer/${path}/${bookingRef}/cancel`, {}, { headers: customerHeaders() });
     if (typeof onSuccess === 'function') await onSuccess();
   } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
@@ -706,7 +721,7 @@ async function loadUpcomingJourney() {
   /* Called at module scope, and on some pages this file is parsed before
      auth.js — so the function it needs may genuinely not exist yet. Treated as
      "not signed in", which is what an unreadable session means anyway. */
-  const { access } = (typeof getStoredAuth === 'function') ? getStoredAuth() : {};
+  const { access } = customerSession();
   if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
   try {
     const data = await fetchAllCustomerBookings();
@@ -742,7 +757,7 @@ async function loadUpcomingJourney() {
 async function loadAcctPayments() {
   const tbody = document.querySelector('#acctPaymentsTable tbody');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/payments/history`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/payments/history`, { headers: customerHeaders() });
     tbody.innerHTML = data.map(p => `
       <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref || p.booking_ref)}</td></tr>
     `).join('') || `<tr><td colspan="5" class="acct-empty">No payments yet.</td></tr>`;
@@ -754,7 +769,7 @@ async function loadAcctPayments() {
 /* ---------- Wishlist ---------- */
 const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
 async function fetchWishlistWithCatalog() {
-  const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: authHeaders() });
+  const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: customerHeaders() });
   const catalogs = {};
   /* No REST catalogue exists for these (they're still travel-data.js's static
      sample arrays, browsed client-side, not served over HTTP) — so a saved
@@ -803,7 +818,7 @@ async function loadAcctWishlist() {
     container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
-          await axios.delete(`${API_BASE}/api/customer/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
+          await axios.delete(`${API_BASE}/api/customer/wishlist/${btn.dataset.removeWishlist}`, { headers: customerHeaders() });
           loadAcctWishlist();
         } catch (err) { alert('Failed to remove item.'); }
       });
@@ -818,7 +833,7 @@ async function loadAcctNotifications() {
   const container = document.getElementById('acctNotificationsList');
   const clearBar = document.getElementById('acctNotifClearBar');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/notifications`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/notifications`, { headers: customerHeaders() });
     if (!data.length) {
       container.innerHTML = `
         <div class="acct-empty acct-empty-notif">
@@ -848,7 +863,7 @@ async function loadAcctNotifications() {
     container.querySelectorAll('[data-mark-read]').forEach(btn => {
       btn.addEventListener('click', async () => {
         try {
-          await axios.patch(`${API_BASE}/api/customer/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
+          await axios.patch(`${API_BASE}/api/customer/notifications/${btn.dataset.markRead}/read`, {}, { headers: customerHeaders() });
           loadAcctNotifications();
         } catch (err) { alert('Failed to mark as read.'); }
       });
@@ -861,7 +876,7 @@ async function loadAcctNotifications() {
 
 document.getElementById('acctMarkAllReadBtn').addEventListener('click', async () => {
   try {
-    await axios.patch(`${API_BASE}/api/customer/notifications/read-all`, {}, { headers: authHeaders() });
+    await axios.patch(`${API_BASE}/api/customer/notifications/read-all`, {}, { headers: customerHeaders() });
     loadAcctNotifications();
   } catch (err) { alert('Failed to mark all as read.'); }
 });
@@ -869,7 +884,7 @@ document.getElementById('acctMarkAllReadBtn').addEventListener('click', async ()
 document.getElementById('acctClearAllBtn').addEventListener('click', async () => {
   if (!confirm('Are you sure you want to clear all notifications?')) return;
   try {
-    await axios.delete(`${API_BASE}/api/customer/notifications/read`, { headers: authHeaders() });
+    await axios.delete(`${API_BASE}/api/customer/notifications/read`, { headers: customerHeaders() });
     loadAcctNotifications();
   } catch (err) { alert('Failed to clear notifications.'); }
 });
@@ -885,7 +900,7 @@ function starString(rating) {
 async function loadAcctReviews() {
   const container = document.getElementById('acctReviewsList');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/reviews/mine`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/reviews/mine`, { headers: customerHeaders() });
     if (!data.length) {
       container.innerHTML = "<div class=\"acct-empty\">You haven't written any reviews yet.</div>";
       return;
@@ -909,7 +924,7 @@ async function loadAcctReviews() {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete this review?')) return;
         try {
-          await axios.delete(`${API_BASE}/api/customer/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
+          await axios.delete(`${API_BASE}/api/customer/reviews/${btn.dataset.deleteReview}`, { headers: customerHeaders() });
           loadAcctReviews();
         } catch (err) { alert('Failed to delete review.'); }
       });
@@ -944,7 +959,7 @@ function openAcctReviewEdit(reviewId, rating, comment) {
   document.getElementById(`acctCancelReview-${reviewId}`).addEventListener('click', loadAcctReviews);
   document.getElementById(`acctSaveReview-${reviewId}`).addEventListener('click', async () => {
     try {
-      await axios.put(`${API_BASE}/api/customer/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: authHeaders() });
+      await axios.put(`${API_BASE}/api/customer/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: customerHeaders() });
       loadAcctReviews();
     } catch (err) { alert('Failed to update review.'); }
   });
@@ -954,7 +969,7 @@ function openAcctReviewEdit(reviewId, rating, comment) {
 async function loadAcctSupportTickets() {
   const container = document.getElementById('acctTicketsList');
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/support-tickets`, { headers: authHeaders() });
+    const { data } = await axios.get(`${API_BASE}/api/customer/support-tickets`, { headers: customerHeaders() });
     if (!data.length) {
       container.innerHTML = '<div class="acct-empty">No support tickets yet.</div>';
       return;
@@ -981,7 +996,7 @@ document.getElementById('acctTicketForm').addEventListener('submit', async e => 
       subject: document.getElementById('acctTicketSubject').value,
       description: document.getElementById('acctTicketDescription').value,
       priority: document.getElementById('acctTicketPriority').value,
-    }, { headers: authHeaders() });
+    }, { headers: customerHeaders() });
     msg.textContent = 'Ticket submitted — our support team will get back to you.';
     msg.className = 'acct-msg success';
     e.target.reset();
@@ -1027,7 +1042,7 @@ function handleServicePageIntent() {
   const account = params.get('account');
   if (!signin && !account) return;
 
-  const { access } = (typeof getStoredAuth === 'function') ? getStoredAuth() : {};
+  const { access } = customerSession();
   /* ?account= while signed out is still a request to reach the account, so it
      opens the door rather than doing nothing. */
   if (account && access) {
@@ -1058,6 +1073,10 @@ if (document.readyState === 'loading') {
     configure,
     open: openAccountCenter,
     close: closeAccountCenter,
+    /* Exposed for profile-menu.js's Logout item. What signing out MEANS — the
+       API call, clearing the session, resetting the wishlist and this module's
+       own state — stays here; a second copy in the menu would drift. */
+    logout: doAccountLogout,
     loadUpcomingJourney,
     starString,
   };

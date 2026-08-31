@@ -86,6 +86,35 @@ function getCustomerAuth() {
     userId: localStorage.getItem(CUSTOMER_KEYS.userId),
   };
 }
+/** THE SIGNED-IN TRAVELLER, on any page.
+ *
+ *  There are two namespaces and which one holds the customer depended on
+ *  whether the page loaded app.js: that file does
+ *
+ *      getStoredAuth = getCustomerAuth;
+ *
+ *  at line ~775, rebinding the global so everything downstream reads `jpc_*`.
+ *  The landing page loads app.js; the service pages and Flights do not. So the
+ *  same customer was visible to `getCustomerAuth()` everywhere and to
+ *  `getStoredAuth()` only on the landing page — which is why the Account
+ *  Center, which asks getStoredAuth, decided nobody was signed in the moment
+ *  it was opened from a results page, and quietly offered a login instead.
+ *
+ *  This asks both, in the order that is true on every page. It does NOT rebind
+ *  anything: `getStoredAuth` still means the shared customer/admin `jwt_*`
+ *  session that the Admin, Manager and Super Admin portals rely on, and
+ *  rebinding it site-wide would sign those portals out.
+ *
+ *  An ADMIN is deliberately not a customer here: they have their own portal,
+ *  and the Account Center is a B2C surface. */
+function getCustomerSession() {
+  const c = (typeof getCustomerAuth === 'function') ? getCustomerAuth() : null;
+  if (c && c.access) return c;
+  const s = getStoredAuth();
+  if (s && s.access && s.role !== 'admin') return s;
+  return { access: null, refresh: null, name: null, role: null, userId: null };
+}
+
 function setCustomerAuth(access, refresh, name, role, userId) {
   localStorage.setItem(CUSTOMER_KEYS.access, access);
   localStorage.setItem(CUSTOMER_KEYS.refresh, refresh);

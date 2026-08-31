@@ -807,14 +807,13 @@ function renderAuthNav() {
     if (signupEl) signupEl.style.display = loggedIn ? 'none' : '';
   });
 
-  document.getElementById('profileChipWrap').style.display = loggedIn ? '' : 'none';
   document.getElementById('mobileNav').classList.toggle('show-account', loggedIn);
 
-  if (loggedIn) {
-    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
-    document.getElementById('profileChipName').textContent = name;
-    document.getElementById('profileChipAvatar').textContent = initials;
-  }
+  /* The chip, the initials and the whole dropdown are profile-menu.js's — the
+     same component the results pages render — so this page no longer builds
+     its own and the two cannot drift. It reads the session itself; all that is
+     needed here is to tell it the session changed. */
+  if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
 
   const mobileLoginLink = document.getElementById('mobileNavLoginLink');
   const mobileSignupLink = document.getElementById('mobileNavSignupLink');
