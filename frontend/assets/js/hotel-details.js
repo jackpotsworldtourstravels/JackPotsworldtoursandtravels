@@ -575,6 +575,7 @@ const HotelDetails = (function () {
    *  Selection — both supplied by the router so this module does not need to
    *  know how navigation is done. */
   async function show(hotelRow, sharedState, handlers) {
+    listenForSearchChange();
     row = hotelRow;
     shell = sharedState || {};
     onBack = handlers && handlers.back;
@@ -604,6 +605,25 @@ const HotelDetails = (function () {
   function hide() {
     const rootEl = $('hdRoot');
     if (rootEl) rootEl.hidden = true;
+  }
+
+
+  /* THE SEARCH BAR IS EDITABLE, so the stay can change while this screen is
+     open. One listener, bound once: re-price and repaint, but only when this
+     screen is the one showing — the others read the new state when they next
+     paint. paintChrome() is deliberately NOT called, because it would replace
+     the very input being edited. */
+  let sbListening = false;
+  function listenForSearchChange() {
+    if (sbListening) return;
+    sbListening = true;
+    document.addEventListener('hr:searchchange', () => {
+      const el = document.getElementById('hdRoot');
+      if (!el || el.hidden) return;
+      paintMain();
+      paintSummary();
+      paintActionbar();
+    });
   }
 
   return { show, hide };
