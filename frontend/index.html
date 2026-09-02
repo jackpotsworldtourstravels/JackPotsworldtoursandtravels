@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260827dup1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260827g2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
@@ -27,16 +27,21 @@
      page about the explore assets still stands, and the table was moved out of
      it precisely so the landing page could have a picker without a flight
      schedule and a hotel image map coming along for the ride. -->
+<!-- jp-icons.js comes FIRST of these: the card asks JPIcon for the four
+     product-tab glyphs while it renders, and this file used to load at the
+     foot of the page - so JPIcon did not exist yet and the tabs came out as
+     bare words. Every other page already loads it ahead of the card. -->
+<script src="assets/js/jp-icons.js?v=20260824bk9"></script>
 <script src="assets/js/airports.js?v=20260825t3"></script>
 <script src="assets/js/search-widgets.js?v=20260825t3"></script>
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260827g2"></script>
+<script src="assets/js/booking-card.js?v=20260902flow4"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260827dup1"></script>
+<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -66,10 +71,7 @@
       <a href="#home">Home</a>
       <a href="flights.html">Flights</a>
       <a href="hotels.html">Hotels</a>
-      <a href="cruises.html">Cruises</a>
       <a href="packages.html">Tour Packages</a>
-      <a href="visa.html">Visa</a>
-      <a href="activities.html">Activities</a>
       <a href="#contact">Contact</a>
     </div>
     <div class="nav-actions">
@@ -81,6 +83,13 @@
         <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
         <span>My Partner</span>
       </a>
+      <!-- My Bookings and Notifications. NOT a second copy of the profile menu's
+         entries: same two destinations, reached as icons for the two things a
+         traveller checks mid-journey without wanting the whole account panel.
+         Both open the Account Center on that tab, so there is one
+         implementation of each screen. -->
+      <button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
+      <button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
       <!-- THE ONLY AUTHENTICATION CONTROLS ON THIS PAGE.
            profile-menu.js renders Login + Sign Up when signed out and the chip
            + dropdown when signed in, so exactly one set exists at a time and
@@ -100,10 +109,7 @@
     <a href="#home">Home</a>
     <a href="flights.html">Flights</a>
     <a href="hotels.html">Hotels</a>
-    <a href="cruises.html">Cruises</a>
     <a href="packages.html">Tour Packages</a>
-    <a href="visa.html">Visa</a>
-    <a href="activities.html">Activities</a>
     <a href="#contact">Contact</a>
     <!-- The drawer's own Login/Sign Up pair and its nine account links are
          gone. They were a THIRD and FOURTH copy of the same controls, kept in
@@ -409,7 +415,10 @@
       </div>
       <div class="foot-col">
         <h5>Travel</h5>
-        <a href="flights.html">Flights</a><a href="hotels.html">Hotels</a><a href="cruises.html">Cruises</a><a href="packages.html">Tour Packages</a><a href="visa.html">Visa</a><a href="activities.html">Activities</a>
+        <!-- Cruises, Visa and Activities are removed here too. hero-shell.js's
+             footerHtml() is the other copy of this column and dropped them at
+             the same time; the two must stay identical. -->
+        <a href="flights.html">Flights</a><a href="hotels.html">Hotels</a><a href="packages.html">Tour Packages</a>
       </div>
       <div class="foot-col">
         <h5>Support</h5>
@@ -820,7 +829,7 @@
 <script src="assets/js/api.js?v=20260805ui34"></script>
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
-<script src="assets/js/jp-icons.js?v=20260824bk9"></script>
+<!-- jp-icons.js is in <head>, ahead of the search card that needs it. -->
 <!-- The Account Center. Before app.js, which calls AccountCenter.configure()
      at the end of its own load. This page keeps its static modal markup above,
      so the module skips injecting a second copy. -->
@@ -831,7 +840,7 @@
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260827dup1"></script>
+<script src="assets/js/app.js?v=20260902flow4"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

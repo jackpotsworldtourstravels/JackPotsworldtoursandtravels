@@ -348,6 +348,128 @@ const TravelExplore = (function () {
     ).join('');
   }
 
+  /* =====================================================================
+     The booking progress, and the Booking Summary rail
+     =====================================================================
+     This screen is step 2 of the flight journey: the traveller has searched
+     and is choosing. Everything from step 3 on happens inside the booking
+     flow that Book Now opens, which draws its own rail — so these two are the
+     only pieces of that journey this page owns.
+     ===================================================================== */
+  /* THE STEP LIST AND THE MARKUP ARE booking-steps.js's, for every product.
+     This file used to carry its own copy for flights while hotel-results.js
+     carried another for hotels — same bar, two implementations, two sets of
+     labels. Zero-based index 1 on every results page: Search is behind them,
+     choosing is where they are. */
+  const RESULTS_STEP = 1;
+
+  const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"'
+    + ' stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+  /** @param {string} product 'flights' | 'packages' — whichever this page is. */
+  function renderStepper(product) {
+    if (typeof BookingSteps === 'undefined') return;
+    const kind = product || document.body.dataset.spService;
+    BookingSteps.mount('txStepper', kind, RESULTS_STEP);
+  }
+
+  /** Which flight the rail is costing.
+   *
+   *  Set by View Details — opening a flight is the closest thing this screen
+   *  has to choosing one, and it is reversible. Book Now leaves the page
+   *  entirely, so it is not a selection this rail ever has to show. */
+  let railFlightId = null;
+
+  function railFlight() {
+    const shown = flights.filter(f => f.fare != null);
+    if (railFlightId) {
+      const hit = shown.find(f => String(f.id) === String(railFlightId));
+      if (hit) return { flight: hit, chosen: true };
+    }
+    /* Nothing opened yet: the rail costs the CHEAPEST fare on screen and says
+       so. A summary that sits empty until something is clicked answers the
+       traveller's actual question — "what is this going to cost me" — only
+       after they have already had to guess. */
+    if (!shown.length) return { flight: null, chosen: false };
+    const low = shown.reduce((a, b) => (Number(b.total) < Number(a.total) ? b : a));
+    return { flight: low, chosen: false };
+  }
+
+  const paxTotal = () => Math.max(1,
+    (state.pax.adults || 0) + (state.pax.children || 0) + (state.pax.infants || 0));
+
+  function paxLabel() {
+    const p = state.pax;
+    const bits = [];
+    if (p.adults) bits.push(p.adults + ' Adult' + (p.adults > 1 ? 's' : ''));
+    if (p.children) bits.push(p.children + ' Child' + (p.children > 1 ? 'ren' : ''));
+    if (p.infants) bits.push(p.infants + ' Infant' + (p.infants > 1 ? 's' : ''));
+    return bits.join(', ') || '1 Adult';
+  }
+
+  const CABIN_LABEL = {
+    economy: 'Economy', premium: 'Premium Economy',
+    business: 'Business', first: 'First',
+  };
+
+  function renderFlightSummary() {
+    const host = $('txSummary');
+    if (!host) return;
+
+    /* "Hyderabad (HYD)" — the table's own label, so the rail names the airport
+       the same way the card, the picker and the URL do. */
+    const place = c => (c && typeof JPAirports !== 'undefined' ? JPAirports.label(c) : (c || ''));
+    const from = place(state.from);
+    const to = place(state.to);
+    const route = state.to
+      ? `${esc(from)} <span class="tx-sum-arrow">&#8594;</span> ${esc(to)}`
+      : `All departures from ${esc(from || 'Hyderabad')}`;
+
+    const { flight, chosen } = railFlight();
+    const pax = paxTotal();
+
+    /* EVERY NUMBER HERE IS THE FLIGHT'S OWN, MULTIPLIED BY THE PARTY.
+       travel-data.js seeds `fare` and `taxes` per passenger and `total` as
+       their sum; nothing is invented and no discount is implied, because the
+       sample data carries none. The booking flow's server quote still has the
+       last word — this is the estimate the card in the list is showing. */
+    const fareBlock = !flight ? `
+      <div class="tx-sum-empty">
+        Fares appear here once there is a flight to price.
+      </div>`
+      : `
+      <div class="tx-sum-rule"></div>
+      <div class="tx-sum-sec">${chosen ? 'Fare Summary' : 'Lowest fare on this route'}</div>
+      <div class="tx-sum-line"><span>Base fare${pax > 1 ? ` &times; ${pax}` : ''}</span>
+        <b>${esc(money(Number(flight.fare) * pax))}</b></div>
+      <div class="tx-sum-line"><span>Taxes &amp; fees</span>
+        <b>${esc(money(Number(flight.taxes) * pax))}</b></div>
+      <div class="tx-sum-total">
+        <span>Total</span><span>${esc(money(Number(flight.total) * pax))}</span>
+      </div>
+      <p class="tx-sum-note">${chosen
+        ? `${esc(flight.airline)} ${esc(flight.flightNumber)} · confirmed at the payment step.`
+        : 'Open a flight to price that one instead.'}</p>`;
+
+    host.innerHTML = `
+      <div class="tx-summary">
+        <div class="tx-sum-head"><h2>Booking Summary</h2></div>
+        <div class="tx-sum-body">
+          <div class="tx-sum-route">${route}</div>
+          <div class="tx-sum-meta">${esc(fmtDate(state.depart) || 'Any date')}${
+            state.trip === 'round' && state.ret ? ' &rarr; ' + esc(fmtDate(state.ret)) : ''}</div>
+          <div class="tx-sum-meta">${esc(paxLabel())} · ${
+            esc(CABIN_LABEL[state.cabin] || 'Economy')}</div>
+          ${fareBlock}
+        </div>
+        <ul class="tx-trust">
+          <li>${tick}Secure payment</li>
+          <li>${tick}Best price guarantee</li>
+          <li>${tick}24&times;7 support</li>
+        </ul>
+      </div>`;
+  }
+
   function renderFlights() {
     const list = $('txFlightList');
     if (!list) return;
@@ -378,6 +500,13 @@ const TravelExplore = (function () {
     writeUrl();
 
     armIcons(list);
+
+    /* The rail is re-costed with the list, because filtering and sorting
+       change which fare is the cheapest one on screen. The stepper does not
+       change, but painting it here means it cannot be forgotten on a path that
+       renders the list without going through init(). */
+    renderStepper();
+    renderFlightSummary();
 
     const more = $('txMore');
     if (more) {
@@ -995,6 +1124,71 @@ const TravelExplore = (function () {
    *  Both are translated here into what the panel uses — a real departure
    *  month key, and a destination only when it names a package we sell.
    *  Anything that does not translate is dropped rather than guessed at. */
+  /** The HERO card on the Tour Packages page.
+   *
+   *  Same arrangement as mountHotelCard above: the card in the hero is the
+   *  landing page's, so a traveller arriving from the nav bar can start a
+   *  search without scrolling to the panel below.
+   *
+   *  IT IS NOT A SECOND SEARCH PANEL. BookingCard's Packages panel asks for a
+   *  destination and a month; PackageSearch, further down, also asks for
+   *  budget, duration and travellers, and it stays exactly as it was. Both
+   *  write into the SAME `state` and both end at renderPackages, so whichever
+   *  one is used the page shows one answer. Anything the card does not ask
+   *  about is left alone rather than reset, which is what makes using the hero
+   *  card after setting a budget below behave the way it looks like it should.
+   */
+  function mountPackageCard(rows) {
+    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
+
+    /* The card renders during parse with its own defaults; this writes in the
+       criteria that arrived from the landing page, so the card and the list
+       below it describe the same search. */
+    BookingCard.seedPackages({ type: state.pkgType, month: state.pkgMonth });
+
+    /* AND THE SEARCH RUNS, without anyone pressing Search again.
+       mountPackageSearch above resolves `type` to a package by EXACT NAME and
+       leaves the filter off when nothing matches — which is right for a month
+       nobody departs in, and wrong here: the card's options are package types,
+       the catalogue's rows are package names, and the two only sometimes read
+       the same. So arriving from the landing page showed all seven packages
+       under a card that said "Casino Tour Package".
+
+       This is the same line the card's own handler runs, so a search typed
+       here and a search arriving in the URL now end in the same state instead
+       of two. renderPackages() below does the filtering. */
+    if (state.pkgType && !state.pkgDest) state.pkgDest = state.pkgType;
+
+    BookingCard.setSearchHandler((kind, params) => {
+      /* The card's other tabs still navigate; only Packages is in place. */
+      if (kind !== 'packages') { leaveFor(kind, params); return; }
+
+      /* `type` is the card's word for the package name — the same value the
+         landing page puts in the `type=` parameter that seeds this page. */
+      if (params.type !== undefined) state.pkgType = params.type || '';
+      if (params.type) state.pkgDest = params.type;
+      if (params.month !== undefined) state.pkgMonth = params.month || 'any';
+
+      /* A month NAME from the card becomes the first real departure month that
+         matches it; nothing departing then leaves the filter off rather than
+         silently emptying the page. The same reconciliation mountPackageSearch
+         does with a month arriving in the URL. */
+      if (typeof PackageSearch !== 'undefined'
+          && state.pkgMonth && state.pkgMonth !== 'any'
+          && !/^\d{4}-\d{2}$/.test(state.pkgMonth)) {
+        const wanted = String(state.pkgMonth).toLowerCase();
+        const match = PackageSearch.availableMonths()
+          .find(k => PackageSearch.monthLabel(k).toLowerCase().startsWith(wanted));
+        state.pkgMonth = match || 'any';
+      }
+
+      writeUrl(true);
+      renderPackages(allPackages.length ? allPackages : rows);
+      const list = $('txResults');
+      if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   async function mountPackageSearch(rows) {
     if (typeof PackageSearch === 'undefined') return;
 
@@ -1051,6 +1245,65 @@ const TravelExplore = (function () {
     });
   }
 
+  /** The HERO card on the Hotels page — the same BookingCard the landing page
+   *  and Flights mount, opened on its Hotels tab.
+   *
+   *  WHY THIS EXISTS. hotels.html had no search card of its own: the older
+   *  #txSearchPanel is hidden on arrival (hotel-results.js turns it into the
+   *  Modify Search disclosure), so a traveller who reached this page from the
+   *  nav bar rather than from a search on the landing page had nowhere to type
+   *  a destination. Rather than build a third set of criteria controls, the
+   *  page mounts the card that already knows how to ask — destination, both
+   *  dates, rooms and guests, and the Up to 4 Rooms / Group Deals modes.
+   *
+   *  A search here does NOT reload the page, for the same reason the Flights
+   *  one does not: the criteria go into `state`, the URL is rewritten so the
+   *  result is linkable, and the list re-renders underneath. The callback body
+   *  is deliberately the same work mountHotelSearch's is — two ways in, one
+   *  path through, so the panel and the card cannot drift apart. */
+  function mountHotelCard(rows) {
+    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
+
+    /* The card renders during parse with its own defaults; this writes in the
+       criteria that produced the list below, so the two cannot disagree. */
+    BookingCard.seedHotels({
+      dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
+      rooms: state.rooms, adults: state.guests,
+    });
+
+    BookingCard.setSearchHandler((kind, params) => {
+      /* Group Deals is an ENQUIRY, not a search — the same choke point
+         leaveFor makes, made here too because this handler is registered
+         instead of the one leaveFor belongs to. */
+      if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+        GroupEnquiry.handle(params);
+        return;
+      }
+      /* The card's other tabs still navigate; only Hotels is handled in place. */
+      if (kind !== 'hotels') { leaveFor(kind, params); return; }
+
+      state.dest = params.dest;
+      state.checkIn = params.checkIn;
+      state.checkOut = params.checkOut;
+      state.rooms = params.rooms;
+      state.guests = params.guests;
+      /* A NEW SEARCH CLEARS THE FILTERS — a neighbourhood in Hyderabad means
+         nothing in Goa. Same rule mountHotelSearch applies. */
+      if (typeof HotelFilters !== 'undefined') HotelFilters.clear();
+      state.hotelShown = PAGE_SIZE;
+      const rowsNow = allHotels.length ? allHotels : rows;
+      writeUrl(true);
+      renderHotelFilters();
+      renderHotels(rowsNow);
+      renderHotelSummary();
+      /* The results shell, not #txResults: that toolbar lives in the Explore
+         section, which hotel-results.js collapses on this screen, so scrolling
+         to it lands on a zero-height element above the actual list. */
+      const list = $('hrRoot') || $('txResults');
+      if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   /* ---------------------------------------------------------------------
      The search panel IS the hero card.
 
@@ -1068,7 +1321,22 @@ const TravelExplore = (function () {
 
   /** Hotels, cruises and packages still live on their own pages, so their tabs
    *  navigate. Flights is handled in place. */
-  const OTHER_SERVICES = { hotels: 'hotels.html', packages: 'packages.html' };
+  /* WHERE A SEARCH FOR SOMEONE ELSE'S PRODUCT GOES.
+     The hero card carries the product tabs again, so a traveller on the
+     Flights page can switch it to Hotels and press Search — and every page in
+     this list has to be reachable from every other one, not just from the
+     landing page. Flights is here for exactly that: it is never used by the
+     Flights page itself (which handles its own product in place) and it is
+     what the Hotels and Packages pages need to send a flight search home.
+
+     Cruises has a panel in the card but no results page that answers it, so it
+     is deliberately absent — leaveFor says so in words rather than navigating
+     to a page that cannot help. */
+  const OTHER_SERVICES = {
+    flights: 'flights.html',
+    hotels: 'hotels.html',
+    packages: 'packages.html',
+  };
 
   function leaveFor(kind, params) {
     /* A GROUP DEALS ENQUIRY IS NOT A NAVIGATION, and this is the choke point
@@ -1144,6 +1412,22 @@ const TravelExplore = (function () {
       if (typeof HotelFilters !== 'undefined') HotelFilters.writeParams(p);
     }
 
+    /* The packages page carries its own two criteria and NONE of the flight
+       ones. Without this branch a search from its hero card wrote
+       `trip=oneway&from=HYD&adults=1&cabin=economy` into the address bar of a
+       page that has no flights on it — and seedFromUrl would read them back on
+       the next visit. The keys it does read, `type` and `month`, are the same
+       ones the landing page sends here. */
+    if (document.body.dataset.spService === 'packages') {
+      Object.assign(p, {
+        trip: undefined, from: undefined, to: undefined, ret: undefined,
+        legs: undefined, cabin: undefined,
+        adults: undefined, children: undefined, infants: undefined,
+        type: state.pkgType || undefined,
+        month: state.pkgMonth && state.pkgMonth !== 'any' ? state.pkgMonth : undefined,
+      });
+    }
+
     const qs = new URLSearchParams(
       Object.entries(p).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== 0));
     const url = `${location.pathname}?${qs.toString()}`;
@@ -1159,9 +1443,21 @@ const TravelExplore = (function () {
     else history.replaceState(null, '', url);
   }
 
-  /** Bring the results under the hero into view. Honours reduced motion, which
-   *  is the same condition the rest of the site stops animating under. */
+  /** Bring the results into view.
+   *
+   *  A NO-OP ON THE COMPACT RESULTS PAGES, WHICH IS ALL OF THEM NOW.
+   *  This existed to get past the full-height marketing hero these pages used
+   *  to open with: the results were 1000px down, so arriving from a search
+   *  scrolled to them. The hero is compact here now and the first result is
+   *  already on screen, so scrolling would only push the search summary — the
+   *  thing that says WHAT was searched for, and the way back to change it —
+   *  off the top of the window.
+   *
+   *  Kept rather than deleted because a page that still mounts the full hero
+   *  would still need it, and that is one attribute away. */
   function revealResults() {
+    const hero = document.getElementById('siteHero');
+    if (hero && hero.classList.contains('is-compact')) return;
     const target = $('txResults');
     if (!target) return;
     const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1541,9 +1837,25 @@ const TravelExplore = (function () {
       if (det) {
         const card = det.closest('.tx-flight');
         const open = card.querySelector('.tx-details');
-        if (open) { open.remove(); det.textContent = 'View Details'; return; }
+        if (open) {
+          open.remove();
+          det.textContent = 'View Details';
+          card.classList.remove('is-open');
+          /* Closing it puts the rail back on the cheapest fare — the summary
+             follows what the traveller is looking at, and they are no longer
+             looking at this one. */
+          railFlightId = null;
+          renderFlightSummary();
+          return;
+        }
         const f = flights.find(x => x.id === det.dataset.txDetails);
-        if (f) { card.insertAdjacentHTML('beforeend', detailsHtml(f)); det.textContent = 'Hide Details'; }
+        if (f) {
+          card.insertAdjacentHTML('beforeend', detailsHtml(f));
+          det.textContent = 'Hide Details';
+          card.classList.add('is-open');
+          railFlightId = f.id;
+          renderFlightSummary();
+        }
         return;
       }
 
@@ -2000,6 +2312,9 @@ const TravelExplore = (function () {
           Wishlist.init().then(() => Wishlist.refresh());
         }
         mountHotelSearch(rows);
+        /* The hero card, after the panel: both register against the same
+           state, and the card is the one a traveller actually sees first. */
+        mountHotelCard(rows);
         /* Panel before grid: it derives the options and reconciles anything the
            URL asked for against what actually came back, so the first paint of
            the list is already the filtered one. */
@@ -2013,6 +2328,12 @@ const TravelExplore = (function () {
       } else if (service === 'packages') {
         const rows = await TravelData.packages();
         await mountPackageSearch(rows);
+        /* The hero card, after the panel: both register against the same
+           state, and the card is the one a traveller sees first. */
+        mountPackageCard(rows);
+        /* The same progress bar Flights and Hotels draw — a traveller booking
+           a package could not see where they were at all before this. */
+        renderStepper('packages');
         renderPackages(rows);
       }
     } catch (err) {

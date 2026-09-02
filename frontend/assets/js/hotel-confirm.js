@@ -52,7 +52,33 @@ const HotelConfirm = (function () {
      Status, read from the booking rather than assumed.
      --------------------------------------------------------------------- */
   const CONFIRMED = /confirm|complete/i;
-  const isConfirmed = () => CONFIRMED.test(String((booking && booking.status) || ''));
+  const isServerConfirmed = () => CONFIRMED.test(String((booking && booking.status) || ''));
+
+  /* WHAT THIS SCREEN CLAIMS ONCE A PAYMENT HAS BEEN SUBMITTED.
+     ---------------------------------------------------------------------
+     `true`  — the requested treatment: a green tick, "Payment Received" and
+               "Hotel Booking Confirmed", for every booking that has a payment
+               attempt recorded against it.
+     `false` — the headline follows the SERVER's own booking status, which is
+               what the rest of this file was written to do.
+
+     The distinction is real and worth stating once, here, rather than in a
+     commit message: no payment gateway is connected, so
+     `POST /hotel-bookings/{ref}/pay` records the attempt `pending` and nothing
+     is charged. With this switch on, the screen therefore says "received"
+     about money that has not moved. Flip it to false and every headline,
+     pill and status line on this screen goes back to reporting the booking
+     exactly as the server holds it — no other change is needed. */
+  const PAYMENT_RECEIVED_UI = true;
+
+  /** Did this booking reach the payment step at all? A booking created but
+   *  never paid still shows the honest "received" treatment either way. */
+  const hasPaymentAttempt = () => !!((booking && booking.payments) || []).length;
+
+  /** What the SCREEN presents. Everything below asks this, not the raw status,
+   *  so the switch above has exactly one place to take effect. */
+  const isConfirmed = () =>
+    isServerConfirmed() || (PAYMENT_RECEIVED_UI && hasPaymentAttempt());
 
   /** The payment attempt the server holds, if any. */
   function payment() {
@@ -63,7 +89,9 @@ const HotelConfirm = (function () {
     const p = payment();
     if (!p) return { label: 'No payment recorded', tone: 'wait' };
     const paid = /paid|success|captur/i.test(String(p.status || ''));
-    if (paid) return { label: `Paid · ${esc(p.method || '')}`, tone: 'ok' };
+    if (paid || PAYMENT_RECEIVED_UI) {
+      return { label: `Received${p.method ? ` · ${esc(p.method)}` : ''}`, tone: 'ok' };
+    }
     return {
       label: `Pending — nothing has been charged${p.method ? ` · intended via ${p.method}` : ''}`,
       tone: 'wait',
@@ -104,13 +132,16 @@ const HotelConfirm = (function () {
      --------------------------------------------------------------------- */
   function bannerHtml() {
     const confirmed = isConfirmed();
+    /* The green tick and "Payment Received" belong to the same state — a
+       traveller who has just come off the payment screen is looking for one
+       word, and the sub-line is where the booking itself is confirmed. */
     return `
       <div class="hr-cf-banner ${confirmed ? 'is-ok' : 'is-wait'}">
         <span class="hr-cf-mark">${icon(confirmed ? 'check' : 'calendar')}</span>
         <div>
-          <h1 class="hr-cf-title">${confirmed ? 'Your booking is confirmed' : 'Booking received'}</h1>
+          <h1 class="hr-cf-title">${confirmed ? 'Payment Received' : 'Booking received'}</h1>
           <p>${confirmed
-            ? 'Your stay is confirmed with the property.'
+            ? '<b class="hr-cf-sub-ok">Hotel Booking Confirmed.</b> Your rooms are held under the reference alongside, and a copy is in My Trips.'
             : 'Your booking request has been received. Payment has not been processed, and nothing has been charged.'}</p>
         </div>
         <div class="hr-cf-ref">
@@ -126,7 +157,8 @@ const HotelConfirm = (function () {
       <div class="hr-cf-status">
         <div class="hr-cf-stat">
           <span>Booking status</span>
-          <b class="hr-pill ${isConfirmed() ? 'is-ok' : 'is-wait'}">${esc(booking.status || 'pending')}</b>
+          <b class="hr-pill ${isConfirmed() ? 'is-ok' : 'is-wait'}">${
+            isConfirmed() ? 'Confirmed' : esc(booking.status || 'pending')}</b>
         </div>
         <div class="hr-cf-stat">
           <span>Payment status</span>
@@ -152,7 +184,7 @@ const HotelConfirm = (function () {
   }
 
   function hotelSection() {
-    return section('hotel', 'Hotel details', `
+    return section('hotel', 'Booking Details', `
       <div class="hr-rv-hotel">
         <img class="hr-rv-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}"
              alt="${esc(booking.hotel_name)}" loading="lazy">
@@ -201,7 +233,7 @@ const HotelConfirm = (function () {
 
   function roomsSection() {
     const n = Number(booking.nights) || 1;
-    return section('rooms', 'Room details', rooms().map((r, i) => {
+    return section('rooms', 'Room Details', rooms().map((r, i) => {
       const idx = r.room_index == null ? i : r.room_index;
       const members = guestsIn(idx);
       const a = members.filter(g => g.guest_type === 'adult').length;
@@ -231,7 +263,7 @@ const HotelConfirm = (function () {
    *  only — no identity documents are collected for a hotel stay and none is
    *  printed here. */
   function guestsSection() {
-    return section('guests', 'Guest details', rooms().map((r, i) => {
+    return section('guests', 'Guest Details', rooms().map((r, i) => {
       const idx = r.room_index == null ? i : r.room_index;
       const members = guestsIn(idx);
       if (!members.length) return '';
@@ -253,10 +285,35 @@ const HotelConfirm = (function () {
     }).join(''));
   }
 
+  /** Payment Details.
+   *
+   *  Every field is printed from the payment attempt the SERVER recorded —
+   *  method, amount, when — so this section stays correct the day a gateway
+   *  starts returning a provider reference. Rows with nothing behind them are
+   *  omitted rather than printed as an em dash; a receipt with blanks on it
+   *  reads as a receipt that failed. */
+  function paymentSection() {
+    const p = payment();
+    if (!p) return '';
+    const pay = paymentLine();
+    const rows = [
+      ['Payment status', `<b class="hr-pill ${pay.tone === 'ok' ? 'is-ok' : 'is-wait'}">${pay.label}</b>`],
+      p.method ? ['Method', esc(p.method)] : null,
+      ['Amount paid', esc(rupees(p.amount != null ? p.amount : booking.total_amount))],
+      p.created_at ? ['Payment date', esc(fmtDay(p.created_at))] : null,
+      p.provider_reference ? ['Transaction reference', esc(p.provider_reference)] : null,
+      ['Booking reference', esc(booking.booking_ref)],
+    ].filter(Boolean);
+    return section('payment', 'Payment Details', `
+      <dl class="hr-rv-facts hr-cf-payfacts">
+        ${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}
+      </dl>`);
+  }
+
   function requestsSection() {
     const list = (booking.special_requests || []).filter(Boolean);
     if (!list.length) return '';
-    return section('requests', 'Special requests', `
+    return section('requests', 'Special Requests', `
       <ul class="hr-policy-list">${list.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
       <p class="hr-panel-note">
         Passed to the property. Requests are not guaranteed and are subject to
@@ -265,6 +322,18 @@ const HotelConfirm = (function () {
   }
 
   function nextStepsSection() {
+    if (isConfirmed()) {
+      return section('next', 'What happens next', `
+        <ol class="hr-cf-steps">
+          <li><b>Your rooms are held.</b> Quote the reference above to our
+            support team or to the property at any time.</li>
+          <li><b>The property is notified.</b> Any special requests you made
+            are passed on; they remain subject to availability on arrival.</li>
+          <li><b>Everything is in My Trips.</b> This booking, its guests and
+            its payment are on your account and can be reopened whenever you
+            need them.</li>
+        </ol>`);
+    }
     return section('next', 'What happens next', `
       <ol class="hr-cf-steps">
         <li><b>We hold your rooms.</b> Your booking reference above is real and
@@ -280,16 +349,23 @@ const HotelConfirm = (function () {
   function actionsHtml() {
     return `
       <div class="hr-cf-actions">
-        <a class="hr-btn hr-btn-primary" href="my-bookings.html">View My Trips</a>
+        <a class="hr-btn hr-btn-ghost" href="my-bookings.html">View My Trips</a>
         <a class="hr-btn hr-btn-ghost" href="hotels.html">Back to Hotels</a>
         <span class="hr-cf-voucher">
           <button type="button" class="hr-btn hr-btn-ghost" disabled
                   aria-describedby="hrCfVoucherWhy">Download voucher</button>
           <span class="hr-cf-why" id="hrCfVoucherWhy">
-            A hotel voucher is issued once the booking is confirmed and payment
-            is settled. It is not available yet.
+            The voucher is issued by the property and is not available to
+            download here yet. Your booking reference above is what the
+            property and our support team need.
           </span>
         </span>
+        <!-- The way OUT of the journey, and the last thing on the screen: the
+             traveller is finished, and Done leaves the booking flow the way
+             closing the Flights modal does — back to Hotels, criteria and all
+             discarded, because the stay they were booking is now booked. -->
+        <button type="button" class="hr-btn hr-btn-primary hr-cf-done"
+                data-hr-done>Done</button>
       </div>`;
   }
 
@@ -355,7 +431,7 @@ const HotelConfirm = (function () {
           <span>${isConfirmed() ? 'Paid' : 'Payment pending'}</span>
         </div>
         <div class="hr-ab-cta">
-          <a class="hr-btn hr-btn-primary hr-btn-lg" href="my-bookings.html">View My Trips</a>
+          <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" data-hr-done>Done</button>
           <span>Reference ${esc(booking.booking_ref)}</span>
         </div>
       </div>`;
@@ -380,6 +456,7 @@ const HotelConfirm = (function () {
         ${hotelSection()}
         ${roomsSection()}
         ${guestsSection()}
+        ${paymentSection()}
         ${requestsSection()}
         ${nextStepsSection()}
         ${actionsHtml()}`;
@@ -419,11 +496,17 @@ const HotelConfirm = (function () {
     const root = $('hcRoot');
     if (!root) return;
     bound = true;
-    root.addEventListener('click', e => {
+    const onClick = e => {
+      if (e.target.closest('[data-hr-done]')) { finish(); return; }
       if (e.target.closest('#hrModify')) {
         if (typeof HotelResults !== 'undefined' && HotelResults.modifySearch) HotelResults.modifySearch();
       }
-    });
+    };
+    root.addEventListener('click', onClick);
+    /* The sticky bar lives OUTSIDE #hcRoot — it is the page's, shared by every
+       booking screen — so its Done needs the listener too. */
+    const bar = $('hrActionbar');
+    if (bar) bar.addEventListener('click', onClick);
   }
 
   /* ---------------------------------------------------------------------
@@ -462,6 +545,15 @@ const HotelConfirm = (function () {
 
     paint();
     window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  /** Leave the journey. A completed booking is not something Back should walk
+   *  into again, so this REPLACES the confirmation entry rather than pushing a
+   *  new one — the same reason the Flights modal closes instead of navigating.
+   *  The handler is asked first, so the page keeps the final say. */
+  function finish() {
+    if (handlers.done) { handlers.done(); return; }
+    location.replace('hotels.html');
   }
 
   function hide() {

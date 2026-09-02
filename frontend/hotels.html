@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- data-theme="light" is deliberate, and it is the same line flights.html
+     carries. This page wears main.css's shell, whose palette is light by
+     construction; travel-explore.css's dark palette is keyed to
+     `:not([data-theme="light"])` so a page like this can opt out. Without it a
+     visitor on a dark OS gets a light header, a light hero, one dark results
+     band and a light footer. -->
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,39 +15,83 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<!-- main.css supplies the landing page's navigation bar, which this page now
-     wears too (hero-shell.js). Loaded FIRST so service-page.css still wins on
-     anything the two both define. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
-<link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
+<!-- THE LANDING PAGE'S STYLESHEETS, in the landing page's order, because
+     this is that page continued rather than a service page that resembles it.
+     service-page.css is deliberately absent — the same call flights.html
+     makes. It exists to give the standalone pages their own navy shell, and
+     loading it here puts a second header design and a second palette on a page
+     that already has main.css's. The --sp-* tokens booking.css, hotel.css and
+     travel-explore.css ask for are bridged onto main.css's palette by
+     booking-card.css, under body.sp-continuation. -->
+<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
+<!-- The booking progress bar, shared by Flights, Hotels and Tour Packages.
+     One component so the three cannot drift apart. -->
+<link rel="stylesheet" href="assets/css/booking-steps.css?v=20260902flow1">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260829hb1">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260902flow4">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
-<script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<!-- The hero search card, mounted inline in the hero below. In <head> for
+     the same reason flights.html puts it there: the card renders during
+     parse, so everything it reads has to exist first. -->
+<!-- escapeHtml, used by the shell's markup, and the icon set it mounts. -->
+<script src="shared/formatters.js"></script>
+<script src="assets/js/jp-icons.js?v=20260825a"></script>
+<!-- The session the header chip reflects. Must precede profile-menu.js and
+     account-center.js below, both of which read it during their own start-up. -->
+<script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/airports.js?v=20260825t3"></script>
+<script src="assets/js/search-widgets.js?v=20260825t3"></script>
+<script src="assets/js/destinations.js?v=20260825h1"></script>
+<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
+<script src="assets/js/pax-selector.js?v=20260825t2"></script>
+<script src="assets/js/booking-card.js?v=20260902flow4"></script>
+<!-- The shared header, hero and footer. In <head> because all three are
+     mounted inline, during parse — the same arrangement index.html and
+     flights.html use, so nothing on this page renders a frame later than it
+     does over there. -->
+<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
 </head>
-<body data-sp-service="hotels">
+<body class="sp-continuation" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>
 
-<!-- The landing page's navigation bar, same as index.html and flights.html.
-     Built by hero-shell.js; see that file for why the markup lives there. -->
-<header id="siteHeader"></header>
+<!-- The Account Center, so the profile chip opens it HERE instead of
+     navigating to index.html and throwing away a half-filled booking. Must
+     load from inside <body> (it injects its own markup) and BEFORE mountHeader
+     below, which asks whether AccountCenter exists to decide whether the chip
+     is a button or a link. Same three lines, same order, as flights.html. -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/profile-menu.js?v=20260901hs1"></script>
+<script src="assets/js/account-center.js?v=20260901hs1"></script>
 
-<div class="sp-hero">
-  <div class="sp-wrap">
-    <div class="sp-crumb"><a href="index.html">Home</a> &nbsp;›&nbsp; Hotels</div>
-    <div class="sp-hero-row">
-      <div>
-        <h1>Hotels</h1>
-        <p>Rooms and suites close to the airport and across the city, with the amenities that matter.</p>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- The landing page's navigation bar, from hero-shell.js. See that file's
+     header for why the markup lives there and index.html keeps its own copy. -->
+<header id="siteHeader"></header>
+<script>HeroShell.mountHeader('hotels.html');</script>
+
+<!-- THE LANDING PAGE'S HERO, from hero-shell.js — the same film, the same
+     overlay, the same spacing and the same place for the card that index.html
+     and flights.html show. It replaces a navy .sp-hero banner carrying a
+     breadcrumb and a second "Hotels" title, which was the only thing making
+     this page look like a different site.
+
+     The card that arrives in it is the Hotels panel of the SAME BookingCard:
+     Up to 4 Rooms, Group Deals, destination, both dates, rooms and guests.
+     This page previously had no search card at all — hotel-results.js hides
+     the older #txSearchPanel below and shows its compact criteria bar instead,
+     so a traveller arriving from the nav bar had nothing to search with. -->
+<section id="siteHero"></section>
+<!-- compact: this is a RESULTS page, not the landing page. Same header,
+     same film, same card - the card is this page's search summary and its
+     Modify Search - but without the headline and the pitch, so the first
+     result is near the top of the page instead of a screen below it.
+     Searching happens on index.html; browsing happens here. -->
+<script>HeroShell.mountHero({ card: 'hotels', compact: true });</script>
 
 <main id="spMain" class="tx-scope">
   <section class="tx-section" aria-labelledby="txHotelsHead">
@@ -192,31 +242,22 @@
 
 <div class="hr-actionbar hr-scope" id="hrActionbar" hidden></div>
 
-<footer class="sp-footer" id="spFooter"></footer>
+<!-- The landing page's footer, from hero-shell.js — service-shell.js's
+     narrow strip went with service-page.css. Rendered after the results
+     markup so nothing above it waits on a footer. -->
+<footer id="siteFooter"></footer>
+<script>HeroShell.mountFooter();</script>
 
-<script src="shared/formatters.js"></script>
-<!-- The Account Center, so the profile chip opens it HERE rather than
-     navigating to index.html and discarding whatever is in progress.
-     Loads from inside <body>: it injects its own modal markup. -->
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<!-- axios, auth.js, profile-menu.js and account-center.js are loaded at the
+     top of <body>, above the header that depends on them. -->
 <script src="components/toast.js"></script>
-<!-- auth.js MUST precede account-center.js. The Account Center calls
-     getStoredAuth() during its own start-up, and that function is declared in
-     auth.js — with auth.js second, every one of those calls threw
-     "getStoredAuth is not defined" and the profile panel never initialised.
-     The two were simply in the wrong order. -->
-<script src="assets/js/auth.js?v=20260824ic9"></script>
-<!-- The profile chip + dropdown. Before account-center.js, whose Logout
-     it calls, and after auth.js, whose session it reads. -->
-<script src="assets/js/profile-menu.js?v=20260829pm5"></script>
-<script src="assets/js/account-center.js?v=20260829pm6"></script>
 <!-- The vendored hotel photography map. No airline logos on this page.
      hotel-image-map.js reports whether a photo is of THIS property or is a
      stand-in for the chain, which the Details gallery caption depends on. -->
 <script src="assets/js/hotel-images.js?v=20260824ic9"></script>
 <script src="assets/js/hotel-image-map.js?v=20260827h6"></script>
-<!-- The airport table travel-data.js reads. Must precede it. -->
-<script src="assets/js/airports.js?v=20260825t3"></script>
+<!-- airports.js, which travel-data.js reads, is loaded in <head> for the hero
+     search card — so it already precedes this. -->
 <script src="assets/js/travel-data.js?v=20260825t3"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
@@ -228,7 +269,7 @@
 <script src="assets/js/booking-products.js?v=20260829f2"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
 <script src="assets/js/booking-flows.js?v=20260827p1"></script>
-<script src="assets/js/search-widgets.js?v=20260824sw2"></script>
+<!-- search-widgets.js is in <head> with the hero card, above. -->
 <script src="assets/js/hotel-search.js?v=20260824bk9"></script>
 <!-- Must precede travel-explore.js: that file checks for this module and
      stands aside from rendering the hotel grid when it is present. -->
@@ -241,17 +282,21 @@
 <script src="assets/js/wishlist.js?v=20260829m1"></script>
 <script src="assets/js/filter-engine.js?v=20260829m1"></script>
 <script src="assets/js/hotel-filters.js?v=20260829m1"></script>
+<script src="assets/js/booking-steps.js?v=20260902flow1"></script>
 <script src="assets/js/hotel-details.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-rooms.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-guests.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-review.js?v=20260829hb1"></script>
 <script src="assets/js/hotel-payment.js?v=20260831hb1"></script>
-<script src="assets/js/hotel-confirm.js?v=20260827c2"></script>
-<script src="assets/js/hotel-results.js?v=20260831hb1"></script>
-<script src="assets/js/travel-explore.js?v=20260827h2"></script>
-<script src="assets/js/jp-icons.js?v=20260825a"></script>
-<script src="assets/js/hero-shell.js?v=20260829h1"></script>
-<script src="assets/js/service-shell.js?v=20260826ac1"></script>
-<script>HeroShell.mountHeader('hotels.html');</script>
+<script src="assets/js/hotel-confirm.js?v=20260902flow4"></script>
+<script src="assets/js/hotel-results.js?v=20260902flow4"></script>
+<!-- The hero card renders the Hotels panel in full, Group Deals included, so
+     this page needs the enquiry seam its search handler defers to. Before
+     travel-explore.js, which is what calls it. -->
+<script src="assets/js/group-enquiry.js?v=20260827g2"></script>
+<script src="assets/js/travel-explore.js?v=20260902flow4"></script>
+<!-- hero-shell.js is in <head>; the header, hero and footer are mounted
+     where they sit in the document. service-shell.js is gone with
+     service-page.css — it built the navy shell this page no longer wears. -->
 </body>
 </html>

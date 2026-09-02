@@ -9,10 +9,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
+<!-- main.css carries the landing page's navigation bar, which this page
+     wears now instead of service-shell.js's strip - one header across the
+     product. Loaded FIRST so service-page.css still wins on the .sp-* page
+     furniture below it, which this page still uses. -->
+<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
@@ -20,7 +25,11 @@
 <body data-sp-service="bookings">
 <a href="#spMain" class="skip-link">Skip to content</a>
 
-<header class="sp-header" id="spHeader"></header>
+<!-- The landing page's navigation bar, from hero-shell.js. It replaces
+     service-shell.js's strip, which was the last header in the product
+     still listing Cruises, Visa and Activities. Mounted at the bottom of
+     the page, after profile-menu.js and account-center.js. -->
+<header id="siteHeader"></header>
 
 <div class="sp-hero">
   <div class="sp-wrap">
@@ -50,7 +59,8 @@
 
 <div class="mb-overlay" id="mbOverlay" role="dialog" aria-modal="true" aria-label="Booking details"></div>
 
-<footer class="sp-footer" id="spFooter"></footer>
+<!-- The landing page's footer, from the same shell as the header. -->
+<footer id="siteFooter"></footer>
 
 <script src="shared/formatters.js"></script>
 <!-- The Account Center, so the profile chip opens it HERE rather than
@@ -72,6 +82,13 @@
 <script src="assets/js/booking-store.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
 <script src="assets/js/my-bookings.js?v=20260824bk9"></script>
-<script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<!-- service-shell.js still runs: it owns this page's theme toggle and its
+     .sp-* furniture. It renders NO header here any more - there is no
+     #spHeader on the page - so the one nav bar is hero-shell.js's below,
+     the same one every other page wears. -->
+<script src="assets/js/service-shell.js?v=20260902flow4"></script>
+<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
+<script>HeroShell.mountHeader('my-bookings.html');</script>
+<script>HeroShell.mountFooter();</script>
 </body>
 </html>

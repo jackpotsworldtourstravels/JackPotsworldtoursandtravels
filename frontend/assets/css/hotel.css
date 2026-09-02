@@ -114,13 +114,18 @@
 .tx-section.hr-collapsed { display: none; }
 .tx-scope .hr-hidden { display: none; }
 
-/* The service-page banner is 256px of breadcrumb, a second "Hotels" title and
-   a duplicate of the service switcher that already sits in the site header.
-   The approved booking screens go straight from header to criteria bar, and
-   with the banner in place the first real content sat 531px down. Suppressed
-   only while a hotel booking screen is on — `hr-booking` is set by
-   hotel-results.js on this page alone, so no other service page is affected
-   and the Flights UI is untouched. */
+/* THE HERO IS HIDDEN ON THE BOOKING SCREENS, AND ONLY THERE.
+   A full-height film with a search card in it is the right way to open the
+   Results screen and the wrong thing to sit above Room Selection: those
+   screens go straight from header to criteria bar, and the hero pushed the
+   first real content 531px+ down the page. `hr-booking` is set by
+   hotel-results.js, on this page alone — the Results screen keeps the hero,
+   and no other page is touched.
+
+   `.sp-hero` is kept alongside it. The selector used to name only that class,
+   which was this page's old navy banner; the banner is gone, but the class
+   still exists for the standalone service pages and costs nothing here. */
+body.hr-booking #siteHero,
 body.hr-booking .sp-hero { display: none; }
 
 /* ===========================================================================
@@ -686,8 +691,12 @@ body.hr-booking .sp-hero { display: none; }
   .hr-actionbar-inner { padding: 10px 14px; gap: 12px; }
   .hr-ab-item, .hr-ab-sep { display: none; }
   .hr-ab-total { margin-left: 0; }
-  .hr-ab-cta { flex: 1; }
-  .hr-ab-cta .hr-btn { width: 100%; }
+  /* min-width:0 because a flex item's automatic minimum is its MIN-CONTENT
+     width, and "Continue to Hotel Details" is wider than half a 320px phone.
+     Without it the CTA refused to shrink and pushed itself 17px past the
+     right edge of the bar. */
+  .hr-ab-cta { flex: 1; min-width: 0; }
+  .hr-ab-cta .hr-btn { width: 100%; padding-left: 10px; padding-right: 10px; }
   .hr-ab-cta span { display: none; }
   .hr-scope { padding-bottom: 86px; }
 
@@ -1755,4 +1764,25 @@ body.hr-booking .sp-hero { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hr-sb-input, .hr-sb-input[type="number"]::-webkit-inner-spin-button { transition: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Confirmation — the completed state.
+   ---------------------------------------------------------------------------
+   The tick, the headline and the way out. `.hr-cf-done` is deliberately the
+   only primary button in the row: everything else on that screen is somewhere
+   the traveller MIGHT go, and this is the one thing they are actually finished
+   doing, so it sits alone on the right where a dialog's confirm button sits.
+   --------------------------------------------------------------------------- */
+.hr-cf-sub-ok { color: var(--hr-ok); font-weight: 700; }
+.hr-cf-done { margin-left: auto; align-self: center; min-width: 132px; }
+/* Wider cells than the stay facts: "Received  b7 Card" and a transaction
+   reference both wrap badly at 150px. */
+.hr-cf-payfacts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.hr-cf-payfacts .hr-pill { font-size: 12px; }
+
+@media (max-width: 760px) {
+  /* No auto margin to push against on a stacked row; Done goes last and full
+     width, which is where a thumb expects the primary action. */
+  .hr-cf-done { margin-left: 0; width: 100%; order: 99; }
 }

@@ -41,11 +41,10 @@ const HotelResults = (function () {
 
   /* The eight steps of the hotel journey, in order. Horizontal only — this
      product has no vertical timeline anywhere. */
-  const STEPS = [
-    'Search', 'Hotel Results', 'Hotel Details', 'Room Selection',
-    'Guest Details', 'Review', 'Payment', 'Confirmation',
-  ];
-  const CURRENT_STEP = 1;              // Hotel Results, zero-based.
+  /* THE STEP LIST LIVES IN booking-steps.js NOW, with the flight and package
+     ones, so the three products cannot drift apart. Kept here as a fallback
+     only for a page that somehow loads this file without that one. */
+  const CURRENT_STEP = 1;              // Select Hotel, zero-based.
 
   /* STAR_FILTERS, RATING_FILTERS, SORTS and the `filters` object were the
      rail's hardcoded contents. They are hotel-filters.js's definition list
@@ -333,20 +332,17 @@ const HotelResults = (function () {
   /** The stepper, at whichever step is current. Exported so Hotel Details
    *  renders the same rail one step further along rather than owning a second
    *  copy of the journey that could disagree about its length. */
+  /** The booking progress bar.
+   *
+   *  STILL EXPORTED UNDER THIS NAME, and still called with an explicit index
+   *  by all six hotel booking screens (Details passes 2, Rooms 3, Guests 4,
+   *  Review 5, Payment 6, Confirmation 7). Only the drawing moved — to
+   *  booking-steps.js, which draws the flights and packages bars too. Changing
+   *  the callers as well would have meant editing seven files to move one
+   *  renderer. */
   function stepperHtml(current) {
     const at = typeof current === 'number' ? current : CURRENT_STEP;
-    return `<nav class="hr-stepper" aria-label="Booking progress">${
-      STEPS.map((label, i) => {
-        const state = i < at ? 'is-done' : i === at ? 'is-current' : '';
-        const mark = i < at ? icon('check') : String(i + 1);
-        const aria = i === at ? ' aria-current="step"' : '';
-        return `${i ? '<span class="hr-step-line" aria-hidden="true"></span>' : ''}
-          <span class="hr-step ${state}"${aria}>
-            <span class="hr-step-dot" aria-hidden="true">${mark}</span>
-            <span class="hr-step-label">${esc(label)}</span>
-          </span>`;
-      }).join('')
-    }</nav>`;
+    return (typeof BookingSteps !== 'undefined') ? BookingSteps.html('hotels', at) : '';
   }
 
   /* ---------------------------------------------------------------------
@@ -849,12 +845,31 @@ const HotelResults = (function () {
     const bar = $('hrActionbar');
     if (bar) bar.hidden = false;
 
-    /* The criteria bar and the stepper depend on the SEARCH, not on the
-       filters, so they are painted once per search rather than in repaint(). */
+    /* THE RESULTS SCREEN CARRIES NEITHER THE CRITERIA BAR NOR THE STEPPER.
+       Not hidden — not built.
+
+       The criteria bar would be a SECOND search summary: the compact card at
+       the top of this page already shows the destination, both dates and the
+       party, and is editable in place, so the bar under it said the same four
+       things again with a Modify Search button that reopens a third one. The
+       bar earns its place on Details, Rooms, Guests, Review and Payment, where
+       the card is not on screen — those screens paint their own copies into
+       #hdSearchbar, #hrmSearchbar and the rest, and are untouched.
+
+       The stepper is a BOOKING phase indicator, and this screen is not part of
+       the booking: it is browsing. Search → Hotel Results → Hotel Details →
+       … over a list nobody has chosen from yet announces a journey that has
+       not started. It appears from Hotel Details onward, which is where the
+       booking actually begins. */
     const sb = $('hrSearchbar');
-    if (sb) sb.innerHTML = searchbarHtml();
+    if (sb) sb.innerHTML = '';
+    /* THE STEPPER IS BACK, and only the stepper. It was removed with the
+       criteria bar when this screen stopped carrying booking chrome; the
+       criteria bar stays gone (the card above is the search summary), but the
+       progress bar is what makes choosing a hotel visibly the same step as
+       choosing a flight — step 2 of the same journey, in the same bar. */
     const st = $('hrStepper');
-    if (st) st.innerHTML = stepperHtml();
+    if (st) st.innerHTML = stepperHtml(CURRENT_STEP);
     const heading = $('hrHeading');
     if (heading) heading.textContent = shell.dest ? `Hotels in ${shell.dest}` : 'Hotels';
 
@@ -980,12 +995,18 @@ const HotelResults = (function () {
       if (typeof HotelConfirm !== 'undefined') HotelConfirm.hide();
     };
 
-    /* The service-page banner — breadcrumb, a second "Hotels" title and a
-       duplicate of the service switcher that is already in the header — is
-       256px of chrome the approved booking screens do not have. It is
-       suppressed on every hotel booking screen (this page only; no other
-       service page is touched) and restored nowhere else. */
-    document.body.classList.add('hr-booking');
+    /* The service-page banner is 256px of chrome the approved booking screens
+       do not have, so it is suppressed on Details, Rooms, Guests, Review,
+       Payment and Confirmation (this page only; no other service page is
+       touched).
+
+       NOT on Results. That banner now carries the hero search card — the same
+       component the landing page and Flights mount — and hiding it there left
+       a traveller who arrived from the nav bar with no way to search at all.
+       On the booking screens the criteria bar above the stepper is already
+       showing the search, so the hero would only be repeating it. */
+    const onBooking = !!(step || (wanted && hotel));
+    document.body.classList.toggle('hr-booking', onBooking);
 
     const ref = q.get('ref');
     if (step === 'confirmation' && ref && typeof HotelConfirm !== 'undefined') {

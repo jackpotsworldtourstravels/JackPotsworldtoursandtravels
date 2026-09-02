@@ -25,13 +25,17 @@ const ServiceShell = (function () {
   /* `icon` is a name in the jp-icons family, not a glyph. It used to hold an
      emoji, which rendered as a different picture on every OS and read as a chat
      message rather than a travel brand. */
+  /* Cruises, Visa and Activities are not advertised any more. This list feeds
+     BOTH the nav and the footer strip of every page that still renders this
+     shell, which is why they are removed here rather than page by page — the
+     same removal hero-shell.js made to its own LINKS and footer.
+
+     The pages themselves are untouched and still serve at their own URLs; a
+     bookmark or a link held elsewhere still reaches them. */
   const SERVICES = [
     { id: 'flights',    label: 'Flights',       href: 'flights.html',    icon: 'flights' },
     { id: 'hotels',     label: 'Hotels',        href: 'hotels.html',     icon: 'hotels' },
-    { id: 'cruises',    label: 'Cruises',       href: 'cruises.html',    icon: 'cruises' },
     { id: 'packages',   label: 'Tour Packages', href: 'packages.html',   icon: 'packages' },
-    { id: 'visa',       label: 'Visa',          href: 'visa.html',       icon: 'visa' },
-    { id: 'activities', label: 'Activities',    href: 'activities.html', icon: 'activities' },
   ];
 
   const THEME_KEY = 'jpc_theme';
