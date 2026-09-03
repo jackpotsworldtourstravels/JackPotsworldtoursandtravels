@@ -123,6 +123,14 @@ SUITE = [
     # verify_m8, which spends what is left of the rate-limit budget.
     ("verify_customer_portal.py",
      "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
+    # Immediately after the Customer Portal, which is the module it takes money
+    # for: if B2C identity or booking is broken, every payment failure here is a
+    # symptom of it. It mints its customer token directly rather than signing
+    # in, so it spends no rate-limit budget and does not disturb the two scripts
+    # below. Needs a configured provider - PAYMENT_PROVIDER=mock with
+    # PAYMENT_ENVIRONMENT=test is what the suite expects.
+    ("verify_payments.py",
+     "B2C payments: server-side amount, signed webhooks, dedupe, capture/confirm, refund flag"),
     # The only script that opens a browser, and the only one asserting anything
     # about layout. It signs in three times, so it sits after the API scripts
     # (their failures explain its failures, never the reverse) and before M8,

@@ -29,6 +29,7 @@ def log(
     meta: dict | None = None,
     status: CustomerAuditStatus = CustomerAuditStatus.SUCCESS,
     customer_code: str | None = None,
+    commit: bool = True,
 ) -> None:
     """Record one customer action.
 
@@ -38,6 +39,41 @@ def log(
     means. Pass ``customer_code`` when the caller knows it but has no row.
     """
     meta = meta or {}
+
+    # ``commit=False`` MAKES THIS JOIN THE CALLER'S TRANSACTION.
+    #
+    # The default commits, which is right for the login and booking flows this
+    # was written for: they call it after their own work is durable, and an
+    # audit failure must not fail the request it describes.
+    #
+    # It is WRONG for a caller that is mid-transaction. The payment path
+    # captures money, audits, and then confirms the booking — and with the
+    # default this committed the capture before the confirmation had run. A
+    # failure after that point left a payment recorded as ``captured`` with its
+    # booking still ``pending``: a split money-state that a rollback could not
+    # undo, because the commit had already happened. The internal
+    # ``except: db.rollback()`` below made it worse — an audit failure would
+    # silently discard the caller's uncommitted capture.
+    #
+    # With ``commit=False`` this only adds the row. It does not commit, does not
+    # roll back, and does not swallow: a caller that opts in owns the outcome,
+    # which is the only way "capture and confirm are one transaction" can be true.
+    if not commit:
+        db.add(
+            CustomerAuditLog(
+                customer_id=customer.customer_id if customer else None,
+                customer_code=customer.customer_code if customer else customer_code,
+                action=action,
+                module=module,
+                description=description,
+                ip_address=meta.get("ip_address"),
+                browser=meta.get("browser"),
+                device=meta.get("device"),
+                status=status,
+            )
+        )
+        return
+
     try:
         db.add(
             CustomerAuditLog(

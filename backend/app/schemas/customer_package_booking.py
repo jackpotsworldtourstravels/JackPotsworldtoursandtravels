@@ -227,3 +227,104 @@ class PackageBookingResponse(BaseModel):
 
 class PackagePaymentRequest(BaseModel):
     method: str = Field(min_length=1, max_length=30)
+
+
+# ---------------------------------------------------------------------------
+# Opening a provider checkout (Phase 3)
+# ---------------------------------------------------------------------------
+class PackageCheckoutRequest(BaseModel):
+    """What the browser sends to start a payment.
+
+    NOTE WHAT IS NOT HERE: no amount, no currency, no customer id, no package
+    price, no payment status. There is deliberately no field for any of them,
+    so a client cannot send one and no handler can accidentally read one. The
+    booking reference in the URL plus the session identify everything else, and
+    every rupee comes off the booking row the server priced.
+
+    THE KEY IS THE CLIENT'S, ON PURPOSE. It identifies one submission, so a
+    double-click, a reload or a retried request after a timeout all carry the
+    same value and resolve to the same order. A server-generated key would be
+    new on every request, which is exactly what must not happen.
+    """
+
+    idempotency_key: str = Field(min_length=8, max_length=64)
+
+
+class PackageCheckoutResponse(BaseModel):
+    """Everything the browser needs to open the checkout, and nothing else.
+
+    THERE IS NO FIELD HERE THAT COULD CARRY A SECRET.
+    ``key_id`` is the publishable key the provider's own script requires and is
+    meant to be public. The API key secret and the webhook secret are never
+    serialised into this model, and the model is the only shape this endpoint
+    can return.
+    """
+
+    #: Which adapter opened it, so the client picks the right renderer.
+    provider: str
+    #: The provider's order id. The client passes it back to the widget.
+    order_id: str
+    #: Minor units, as the PROVIDER reported them — not as we computed them.
+    #: The two are compared server-side before this is returned, so a mismatch
+    #: is an error rather than something the browser gets a chance to see.
+    amount: int
+    currency: str
+    #: Publishable only. Never the secret.
+    key_id: str
+    #: Our own reference, echoed for display.
+    booking_ref: str
+    #: Display detail and prefill for the widget. Non-secret by construction.
+    options: dict = Field(default_factory=dict)
+    #: Where the payment stands locally. Always "pending" from this endpoint:
+    #: opening a checkout takes no money, and only the verified webhook path
+    #: may report anything else.
+    payment_status: str
+
+
+class PackageReconcileRequest(BaseModel):
+    """What the browser may offer when its checkout handler fires.
+
+    EVERY FIELD IS OPTIONAL, AND NONE OF THEM DECIDES ANYTHING.
+    The endpoint re-reads the payment from the provider over an authenticated
+    channel and compares it against the booking row; that read is what settles
+    the payment. These three values only let the server check the handler's
+    signature as corroboration, and a request with none of them reconciles
+    exactly the same way -- which is what makes the endpoint useful to a
+    customer who reloaded the page and no longer has them.
+
+    THERE IS STILL NO AMOUNT FIELD, for the same reason there is none on
+    ``PackageCheckoutRequest``: nothing a browser says about money is read.
+    """
+
+    #: Razorpay's ``razorpay_payment_id`` from the handler callback.
+    provider_payment_id: str | None = Field(default=None, max_length=120)
+    #: ``razorpay_order_id``. Compared against the order WE stored, never
+    #: substituted for it -- see the note on ``verify_checkout_signature``.
+    provider_order_id: str | None = Field(default=None, max_length=120)
+    #: ``razorpay_signature``. Corroboration only; never sufficient on its own.
+    signature: str | None = Field(default=None, max_length=256)
+
+
+class PackageReconcileResponse(BaseModel):
+    """Where the payment and the booking actually stand, after asking.
+
+    ``booking_status`` is the field the UI acts on. ``code`` is the verifier's
+    own word for what happened and is carried through for support and for the
+    test suite -- it is not something a screen should try to render.
+    """
+
+    booking_ref: str
+    #: pending | confirmed | cancelled | completed -- the booking row's status.
+    booking_status: str
+    #: The local payment status: pending, captured, failed, refunded, ...
+    payment_status: str | None = None
+    #: True only when THIS call moved the payment to captured. A repeat answers
+    #: false with payment_status still "captured", so a client cannot count
+    #: captures by counting successes.
+    captured: bool = False
+    #: The verifier's disposition code, e.g. "captured", "already_captured",
+    #: "not_yet_paid", "no_provider_reference", "provider_timeout".
+    code: str
+    #: Whether asking again could still change the answer. False once the
+    #: payment is settled either way, so a poller knows to stop.
+    retryable: bool = False

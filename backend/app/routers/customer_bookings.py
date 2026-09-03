@@ -84,9 +84,14 @@ def get_reference():
     "/payment-methods",
     summary="Supported payment methods",
     description=(
-        "Public. **No payment gateway is integrated with this portal yet.** This lists the "
-        "methods the payment step offers; a booking made through it is recorded as `pending` "
-        "and no money moves. See `POST /bookings/{ref}/pay`."
+        "Public. Lists the methods the **legacy** payment step offers, and always "
+        "reports `gateway_configured: false` — that flow records an attempt and "
+        "moves no money, for every product including tour packages.\n\n"
+        "**This is not the online gateway.** Tour packages take real payments "
+        "through `GET /customer/payments/config` and "
+        "`POST /customer/package-bookings/{ref}/checkout`, which report their own "
+        "configuration separately. Flights and hotels have no gateway, so for "
+        "those two this is the whole story. See `POST /bookings/{ref}/pay`."
     ),
 )
 def get_payment_methods():
@@ -275,12 +280,15 @@ def get_booking(
     summary="Record a payment attempt",
     description=(
         "Requires a customer session.\n\n"
-        "**This does not take money.** No payment gateway is integrated with this portal, so "
-        "the attempt is recorded as `pending`, the booking stays `pending`, and nothing is "
-        "charged. Reporting success here would tell a customer they had paid when they had not.\n\n"
-        "A real integration replaces the body of `record_payment`: create the provider's order, "
-        "return what the client needs to complete it, and let the provider's webhook move the "
-        "payment to `captured` and the booking to `confirmed`."
+        "**This does not take money.** No payment gateway is integrated for flights, "
+        "so the attempt is recorded as `pending`, the booking stays `pending`, and "
+        "nothing is charged. Reporting success here would tell a customer they had "
+        "paid when they had not.\n\n"
+        "Tour packages DO have an online gateway, and it was added **alongside** "
+        "this endpoint rather than inside it — see "
+        "`POST /customer/package-bookings/{ref}/checkout`. Only the provider's "
+        "verified webhook path may move a payment to `captured` or a booking to "
+        "`confirmed`; this endpoint never does, for any product."
     ),
     responses={400: {"description": "Unsupported method, or the booking is cancelled."}},
 )

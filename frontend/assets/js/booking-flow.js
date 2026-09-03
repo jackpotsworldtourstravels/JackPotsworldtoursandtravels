@@ -260,7 +260,9 @@ const BookingFlow = (function () {
         <div class="bk-price-total"><span>Total amount</span><span>${esc(money(p.total))}</span></div>
         ${couponHtml()}
         ${p.note ? `<p class="bk-price-note">${esc(p.note)}</p>` : ''}
-        <p class="bk-price-note">No payment gateway is connected — nothing is charged.</p>
+        ${ctx && ctx.gatewayLive
+          ? `<p class="bk-price-note">Paid securely at the next step. Nothing is charged until you approve it.</p>`
+          : `<p class="bk-price-note">No payment gateway is connected — nothing is charged.</p>`}
       </div>`;
   }
 
@@ -501,6 +503,12 @@ const BookingFlow = (function () {
     const back = document.getElementById('bkBack');
     const next = document.getElementById('bkNext');
     back.style.visibility = (index === 0 || step.hideBack) ? 'hidden' : 'visible';
+    /* A step that carries its own call to action hides the shell's. The
+       gateway payment screen is the one that does: its button opens the
+       provider's checkout and must not be duplicated by a Continue that would
+       skip past the payment entirely. Set in the step's load(), so it can
+       depend on whether a provider is configured. */
+    next.style.visibility = step.hideNext ? 'hidden' : 'visible';
     next.textContent = step.nextLabel || 'Continue';
     next.className = 'bk-btn ' + (step.primaryDanger ? 'bk-btn-danger' : 'bk-btn-primary');
     /* The reference's CTA carries a trailing arrow. The label itself stays

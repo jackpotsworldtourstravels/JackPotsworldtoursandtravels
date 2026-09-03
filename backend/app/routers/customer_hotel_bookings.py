@@ -221,8 +221,12 @@ def get_hotel_booking(
     response_model=HotelBookingResponse,
     summary="Record a payment attempt",
     description=(
-        "Requires a customer session. No payment gateway is integrated, so the attempt is "
-        "recorded as `pending` and nothing is charged — the same honesty as the flight path."
+        "Requires a customer session. No payment gateway is integrated for hotels, so "
+        "the attempt is recorded as `pending` and nothing is charged — the same "
+        "honesty as the flight path.\n\n"
+        "Tour packages have an online gateway at "
+        "`POST /customer/package-bookings/{ref}/checkout`. This endpoint is not it, "
+        "and never captures a payment or confirms a booking."
     ),
 )
 def pay_hotel_booking(

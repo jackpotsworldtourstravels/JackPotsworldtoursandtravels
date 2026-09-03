@@ -307,7 +307,13 @@ const BookingStore = (function () {
         : await BookingApi.createBooking(draft.apiPayload);
       /* Record the payment attempt against the booking just made. It is
          recorded as pending and nothing is charged — see
-         customer_booking_service.record_payment (and its hotel/package mirrors). */
+         customer_booking_service.record_payment (and its hotel/package mirrors).
+
+         THE `method` CHECK IS LOAD-BEARING, NOT DEFENSIVE. A booking going
+         through a real gateway deliberately arrives with method === null,
+         because its order is opened by /checkout and the method it actually
+         used comes back from the provider. Calling /pay for one would post a
+         method the endpoint does not accept and swallow the 400. */
       let latest = created;
       if (draft.payment && draft.payment.method) {
         try {

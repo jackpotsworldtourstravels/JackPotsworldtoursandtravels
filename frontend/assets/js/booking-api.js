@@ -307,6 +307,42 @@ const BookingApi = (function () {
   const payPackageBooking = (ref, method) =>
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/pay`, { method });
 
+  /* --- real payments (Phase 3/4) ---------------------------------------
+     paymentConfig() says whether a provider is configured on this deployment
+     and hands back its PUBLISHABLE key. There is no endpoint anywhere that
+     returns the key secret or the webhook secret, so there is nothing here
+     that could accidentally fetch one.
+
+     startPackageCheckout() asks the server to open a provider order. The
+     amount is NOT a parameter — the server reads it off the booking row it
+     priced. The idempotency key is the caller's, so a double-click, a reload
+     or a Try-again all resolve to the one order. */
+  const paymentConfig = () => get('/api/customer/payments/config');
+
+  const startPackageCheckout = (ref, idempotencyKey) =>
+    post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/checkout`,
+         { idempotency_key: idempotencyKey });
+
+  /* reconcilePackageBooking() asks OUR server to ask the PROVIDER where the
+     payment actually stands, and returns the booking status that came back.
+
+     WHY THE BROWSER IS ALLOWED TO TRIGGER THIS AT ALL
+     It carries no amount and no status — there is no field for either — so the
+     worst a forged call achieves is making the server re-read a payment it
+     already owns and reach the same conclusion. The three handler values are
+     optional corroboration; the server compares them against the order IT
+     stored and settles the payment from the provider read regardless.
+
+     It exists because the webhook cannot always arrive: never on a developer's
+     laptop, and late or not at all when a delivery fails. Without it a paid
+     booking sits at "pending" forever. */
+  const reconcilePackageBooking = (ref, handler) =>
+    post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/reconcile`, {
+      provider_payment_id: (handler && handler.razorpay_payment_id) || null,
+      provider_order_id: (handler && handler.razorpay_order_id) || null,
+      signature: (handler && handler.razorpay_signature) || null,
+    });
+
   const cancelPackageBooking = (ref) =>
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/cancel`, {});
 
@@ -417,6 +453,7 @@ const BookingApi = (function () {
     searchHotels, getHotelDetail, hotelAddons, quoteHotel,
     createHotelBooking, listHotelBookings, getHotelBooking,
     payHotelBooking, cancelHotelBooking, hotelPayload, hotelAddonPayload,
+    paymentConfig, startPackageCheckout, reconcilePackageBooking,
     packageAddons, quotePackage, createPackageBooking, listPackageBookings,
     getPackageBooking, payPackageBooking, cancelPackageBooking,
     packagePayload, packageAddonPayload,

@@ -137,6 +137,65 @@ class Settings(BaseSettings):
 
 
     # -----------------------------------------------------------------------
+    # Taking money from a customer (B2C package/flight/hotel checkout).
+    # -----------------------------------------------------------------------
+    # OFF by default, and "off" is a real answer rather than a fault: a
+    # deployment that has never configured payments shows the honest "no
+    # payment is taken yet" notice the checkout already renders, exactly as it
+    # does for SMTP and for OCR.
+    #
+    # THIS IS THE B2C SIDE ONLY. The merchant wallet, wallet_topups and the
+    # payments table are the B2B side and are untouched by any of it -- a
+    # merchant tops up by bank transfer and an admin verifies it by hand, which
+    # is a different mechanism with different rules.
+    #
+    #   "none"     -- no online payment offered (default)
+    #   "razorpay" -- Razorpay Payment Gateway, INR, UPI Intent/QR
+    #   "mock"     -- takes no money, cannot report a success; local/CI only
+    payment_provider: str = "none"
+
+    #: "test" | "live". Guards two things: the mock provider refuses to be
+    #: selected outside test, and a live host announces on every boot that it
+    #: is taking real money. It does NOT choose the credentials -- the keys
+    #: below do that, because Razorpay's test and live keys are simply
+    #: different strings and a mismatch should fail at the provider rather than
+    #: be second-guessed here.
+    payment_environment: str = "test"
+
+    #: How long the provider gets to answer before the attempt is abandoned.
+    #: A timeout on order creation is reported distinctly from a refusal,
+    #: because after one we do not know whether an order exists and the retry
+    #: must reuse the same idempotency key.
+    payment_timeout_seconds: float = 20.0
+
+    #: Razorpay. Required for PAYMENT_PROVIDER=razorpay; the provider refuses
+    #: at construction rather than on the first payment.
+    #:
+    #: ONLY ``razorpay_key_id`` MAY REACH A BROWSER. It is the publishable key
+    #: Razorpay's own checkout script needs. The secret signs API calls and the
+    #: webhook secret verifies deliveries; neither is ever serialised into a
+    #: page, an API response, a log line or an error message.
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
+
+    #: The deferred-event sweep. Phase 5 records a money-moving webhook and
+    #: leaves it ``deferred``; Phase 6 verifies it against the provider. A
+    #: delivery that arrived while the provider was unreachable, or while the
+    #: payment was still in flight, stays deferred — this is what comes back
+    #: for it. Without the sweep those events sit forever and a customer who
+    #: paid never gets confirmed.
+    payment_sweep_enabled: bool = True
+    #: Minutes between passes. Short enough that a transient provider outage
+    #: resolves within one booking session; long enough not to hammer the
+    #: provider's API on a backlog that is waiting on something else.
+    payment_sweep_interval_minutes: int = 5
+    #: Events per pass. Bounded so one bad afternoon cannot turn a tick into an
+    #: hour-long transaction.
+    payment_sweep_batch_size: int = 100
+
+
+    # -----------------------------------------------------------------------
     # Which emails actually leave the building.
     # -----------------------------------------------------------------------
     # OFF, and that is the intended production posture. The platform notifies

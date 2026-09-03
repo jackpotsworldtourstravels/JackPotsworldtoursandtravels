@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260820ui1">
+<link rel="stylesheet" href="../assets/css/admin.css?v=20260902cp2">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -183,6 +183,13 @@
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
         <span class="nav-label">Wallet &amp; Top-ups</span>
         <span class="nav-badge" id="wdNavBadge" hidden></span>
+      </a>
+      <!-- B2C. Sits beside the two merchant money screens so the split is
+           visible in the nav itself: those are an agent's wallet, this is a
+           member of the public paying by card or UPI. -->
+      <a href="#" class="nav-item" data-section="customer-payments">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+        <span class="nav-label">Customer Payments</span>
       </a>
     </div>
 
@@ -571,6 +578,36 @@
          editor for the bank/UPI/QR rows the merchant's Add Money screen reads,
          and /api/admin/payment-accounts is untouched and still serves them —
          only this portal's editor for them is gone. -->
+    <!-- B2C customer payments. Read-only by design — see
+         assets/js/admin-customer-payments.js. -->
+    <section class="section" id="section-customer-payments">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Customer Payments</h2>
+          <span class="ops-sub">Payments made by customers for their own bookings.
+            Merchant wallet money is on the two screens above.</span>
+        </div>
+        <div class="ops-tabs" id="cpTabs" role="tablist"></div>
+        <p class="cp-deferred" id="cpDeferredNote" hidden></p>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="cpSearch"
+                 placeholder="Search booking reference, customer or provider ID…"
+                 aria-label="Search customer payments">
+          <select id="cpProductFilter" class="status-select" aria-label="Filter by product">
+            <option value="">All products</option>
+            <option value="package">Packages</option>
+            <option value="hotel">Hotels</option>
+            <option value="flight">Flights</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="cpTable"><thead><tr>
+          <th>Booking</th><th>Customer</th><th>Amount</th><th>Payment</th>
+          <th>Method</th><th>Provider</th><th>Booking status</th><th>When</th>
+        </tr></thead><tbody id="cpTableBody"></tbody></table></div>
+        <div class="cp-pager" id="cpPager"></div>
+      </div>
+    </section>
+
     <section class="section" id="section-wallet-desk">
       <div class="panel">
         <div class="panel-head">
@@ -1151,7 +1188,19 @@
   });
 </script>
 <script src="../assets/js/admin-auth.js"></script>
-<script src="../assets/js/admin.js?v=20260820ui1"></script>
+    <!-- Read-only detail. No approve/capture/refund control by design. -->
+    <div class="modal" id="cpModal" role="dialog" aria-modal="true" aria-labelledby="cpModalTitle">
+      <div class="modal-content modal-md">
+        <div class="modal-head">
+          <h3 id="cpModalTitle">Customer payment</h3>
+          <button type="button" class="modal-close" onclick="closeCustomerPaymentModal()"
+                  aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" id="cpModalBody"></div>
+      </div>
+    </div>
+
+<script src="../assets/js/admin.js?v=20260902cp1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
@@ -1181,6 +1230,7 @@
      desk approves. Approval reuses the wallet desk's verify endpoint unchanged,
      so there is still exactly one path that credits a merchant wallet. -->
 <script src="../assets/js/admin-payment-requests.js?v=20260820ui1"></script>
+<script src="../assets/js/admin-customer-payments.js?v=20260902cp1"></script>
 <!-- Dialog standard (jp-ds.css §15). Adds only the header close control, which
      is the one part of the standard CSS cannot supply — the rest is stylesheet.
      Loaded LAST so every overlay it observes already exists in the document. -->

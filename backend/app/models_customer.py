@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -49,8 +49,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -296,7 +297,8 @@ _ITEM_TYPE = SAEnum(
     name="customer_item_type_enum", create_type=False,
 )
 _NOTIF_TYPE = SAEnum(
-    "booking_created", "booking_cancelled", "booking_payment", "general",
+    "booking_created", "booking_confirmed", "booking_cancelled",
+    "booking_payment", "general",
     name="customer_notification_type_enum", create_type=False,
 )
 _TICKET_STATUS = SAEnum(
@@ -346,10 +348,31 @@ class CustomerAddonType(str, enum.Enum):
 
 
 class CustomerPaymentStatus(str, enum.Enum):
+    """Where one payment attempt stands (migration 0044, extended by 0062).
+
+    ``CAPTURED`` IS THE TERMINAL SUCCESS STATE — there is no ``PAID``. The two
+    would be synonyms, and a second name for "the money arrived" is how two
+    reads of the same row disagree. Every screen that says "Paid" to a customer
+    is rendering this value.
+
+    The provider's own status is kept verbatim beside this one in
+    ``provider_status``; this column is always OUR vocabulary, mapped by the
+    adapter, so nothing above the adapter branches on a vendor's spelling.
+    """
+
+    #: Written down, nothing attempted yet.
     PENDING = "pending"
+    #: Handed to the provider; the customer is at the checkout.
+    PROCESSING = "processing"
+    #: The provider holds the funds but has not settled them.
     AUTHORIZED = "authorized"
+    #: Money arrived and the backend verified it. The only success state.
     CAPTURED = "captured"
     FAILED = "failed"
+    #: The customer abandoned the checkout.
+    CANCELLED = "cancelled"
+    #: The provider's order timed out before it was paid.
+    EXPIRED = "expired"
     REFUNDED = "refunded"
 
 
@@ -540,6 +563,24 @@ class CustomerBookingPayment(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     provider_reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the ORDER we asked it to collect (migration 0062).
+    #: Unique per provider, so a second Pay Now finds the order that already
+    #: exists rather than opening another.
+    provider_order_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the PAYMENT the customer actually made. Unique per
+    #: provider: this is the single identifier a webhook resolves to one local
+    #: row, and a lookup that could match two rows is a handler that guesses.
+    provider_payment_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's own status word, stored verbatim. Never branched on above
+    #: the adapter — it exists so an operator can see what we were actually told.
+    provider_status: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: Identifies ONE Pay Now. Unique per booking, so a double-click, a reload
+    #: or a retried request reuses the attempt instead of creating a second.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    #: Stamped only by the verified webhook path. Never by a redirect.
+    paid_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     failure_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
@@ -991,6 +1032,24 @@ class CustomerHotelBookingPayment(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     provider_reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the ORDER we asked it to collect (migration 0062).
+    #: Unique per provider, so a second Pay Now finds the order that already
+    #: exists rather than opening another.
+    provider_order_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the PAYMENT the customer actually made. Unique per
+    #: provider: this is the single identifier a webhook resolves to one local
+    #: row, and a lookup that could match two rows is a handler that guesses.
+    provider_payment_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's own status word, stored verbatim. Never branched on above
+    #: the adapter — it exists so an operator can see what we were actually told.
+    provider_status: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: Identifies ONE Pay Now. Unique per booking, so a double-click, a reload
+    #: or a retried request reuses the attempt instead of creating a second.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    #: Stamped only by the verified webhook path. Never by a redirect.
+    paid_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     failure_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
@@ -1196,6 +1255,24 @@ class CustomerPackageBookingPayment(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     provider_reference: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the ORDER we asked it to collect (migration 0062).
+    #: Unique per provider, so a second Pay Now finds the order that already
+    #: exists rather than opening another.
+    provider_order_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's id for the PAYMENT the customer actually made. Unique per
+    #: provider: this is the single identifier a webhook resolves to one local
+    #: row, and a lookup that could match two rows is a handler that guesses.
+    provider_payment_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: The provider's own status word, stored verbatim. Never branched on above
+    #: the adapter — it exists so an operator can see what we were actually told.
+    provider_status: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: Identifies ONE Pay Now. Unique per booking, so a double-click, a reload
+    #: or a retried request reuses the attempt instead of creating a second.
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    #: Stamped only by the verified webhook path. Never by a redirect.
+    paid_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
     failure_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
@@ -1205,3 +1282,67 @@ class CustomerPackageBookingPayment(Base):
     )
 
     booking: Mapped["CustomerPackageBooking"] = relationship(back_populates="payments")
+
+
+class PaymentProviderEvent(Base):
+    """One webhook delivery from a payment provider (migration 0062).
+
+    WHY THIS IS NOT AN AUDIT LOG
+    ``audit_logs.changed_by`` is a merchant user id and ``customer_audit_logs``
+    is keyed to a customer. A webhook has neither: it is the provider talking to
+    us with no session at all. Recording it as "a person did something" would
+    put a NULL where the actor goes on every single row, which is how
+    ``changed_by`` already ended up meaningless on the B2B side.
+
+    WHY IT IS WRITTEN BEFORE THE PAYMENT IS TOUCHED
+    The row is inserted as ``received`` in its own transaction, and the unique
+    index on ``(provider, provider_event_id)`` is what makes a redelivery
+    collide. Only the request that wins that insert goes on to move money-state;
+    the loser answers 200 and does nothing, because the winner either has
+    already done the work or is doing it. A Python "have I seen this?" check
+    cannot give that guarantee — two simultaneous deliveries both pass it.
+
+    THE PAYLOAD IS STORED ONLY AFTER THE SIGNATURE VERIFIES.
+    An unverified body is not evidence of anything and is not kept.
+    """
+
+    __tablename__ = "payment_provider_events"
+
+    payment_provider_event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: Which adapter received it. Part of the uniqueness: two providers' event
+    #: ids share no namespace.
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_event_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    provider_payment_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    provider_order_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"),
+    )
+    #: received -> processed | ignored | failed. See PROVIDER_EVENT_STATUSES.
+    processing_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="received", server_default=text("'received'"),
+    )
+    processing_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    received_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    processed_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+
+#: What ``processing_status`` may hold. A plain string column rather than an
+#: enum, because this is operational state on a log table and a new outcome
+#: should not need a migration — ``deferred`` was added exactly that way.
+#:
+#:   received  — written down, not yet acted on
+#:   processed — applied, or correctly required no change
+#:   deferred  — recognised and DELIBERATELY not applied: a money-moving event
+#:               held until the amount, currency and ownership are verified
+#:               server-side. A queue, not a failure.
+#:   ignored   — nothing here concerns us (unsubscribed type, unknown payment)
+#:   failed    — we tried to apply it and could not; needs a human
+PROVIDER_EVENT_STATUSES = (
+    "received", "processed", "deferred", "ignored", "failed",
+)

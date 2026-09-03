@@ -1917,6 +1917,15 @@ const BookingProducts = (function () {
          PAY_METHODS below is the fallback for the four products with no backend
          — it is no longer what a flight renders. */
       async load(ctx) {
+        /* GATEWAY_PRODUCTS is what decides whether the branded payment screen
+           appears. Only packages have a checkout endpoint today, so only
+           packages get it; flights and hotels keep the existing screen until
+           their own endpoints exist. Widening this list without widening the
+           backend would give those products a Pay button with nothing behind
+           it. */
+        ctx.gatewayLive = false;
+        this.hideNext = false;
+
         if (typeof BookingApi === 'undefined' || !BookingApi.isLive(ctx.kind)) {
           ctx.payMethods = PAY_METHODS;
           ctx.gatewayConfigured = false;
@@ -1930,9 +1939,29 @@ const BookingProducts = (function () {
           ctx.payMethods = PAY_METHODS;
           ctx.gatewayConfigured = false;
         }
+
+        if (GATEWAY_PRODUCTS.indexOf(ctx.kind) === -1) return;
+        try {
+          const cfg = await BookingApi.paymentConfig();
+          /* Both halves are required. A provider with no publishable key
+             cannot open a checkout, and showing the screen anyway would put a
+             Pay button in front of a traveller that could only fail. */
+          ctx.gatewayLive = !!(cfg && cfg.configured && cfg.key_id);
+          ctx.gatewayProvider = cfg && cfg.provider;
+        } catch {
+          ctx.gatewayLive = false;
+        }
+        /* The branded screen carries its own Pay button; the shell's Continue
+           would skip the payment entirely. */
+        this.hideNext = ctx.gatewayLive;
       },
 
       render(ctx) {
+        /* The gateway screen draws itself in mount(), because it has to create
+           the booking and open a provider order before it knows what to show.
+           This is the container it draws into. */
+        if (ctx.gatewayLive) return '<div class="bk-step" data-jpay-host></div>';
+
         const list = ctx.payMethods || PAY_METHODS;
         const methods = list.map((m, i) => `
           <label class="bk-pay ${i === 0 ? 'is-on' : ''}">
@@ -1965,7 +1994,8 @@ const BookingProducts = (function () {
           </div>`;
       },
 
-      mount(root) {
+      mount(root, ctx) {
+        if (ctx && ctx.gatewayLive) { mountGatewayScreen(root, ctx); return; }
         root.querySelectorAll('.bk-pay input').forEach(r => r.addEventListener('change', () => {
           root.querySelectorAll('.bk-pay').forEach(l => l.classList.toggle('is-on', l.contains(r) && r.checked));
         }));
@@ -2037,6 +2067,125 @@ const BookingProducts = (function () {
       catch { /* private mode — the server index still holds */ }
     }
     return s.key;
+  }
+
+  /* =====================================================================
+     THE BRANDED GATEWAY SCREEN (Phase 4)
+
+     Only reached when a provider is configured AND the product has a checkout
+     endpoint. Everything else in this file is untouched by it.
+
+     THE ORDER OF OPERATIONS MATTERS AND IS NOT NEGOTIABLE
+       1. write the booking            (server prices it; status pending)
+       2. open a provider order        (server reads the amount off that row)
+       3. hand the customer to the provider's own checkout
+       4. ask OUR server whether the booking became confirmed
+
+     The booking exists before any money is discussed, which is what makes the
+     amount unforgeable: by the time a checkout is opened there is a priced row
+     on the server to open it against, and the browser never supplies a figure.
+     ===================================================================== */
+  const GATEWAY_PRODUCTS = ['package'];
+
+  function mountGatewayScreen(root, ctx) {
+    const host = root.querySelector('[data-jpay-host]') || root;
+
+    if (typeof JPay === 'undefined') {
+      host.innerHTML = `<div class="bk-demo-note"><div><b>Payment is unavailable</b>
+        <p>The payment screen could not be loaded. Please refresh and try again.</p></div></div>`;
+      return;
+    }
+
+    /* Placeholder while the booking is being written. The amount shown is the
+       quote already on screen, so the figure does not jump when the server's
+       total arrives — they are the same number, computed the same way. */
+    host.innerHTML = `<div class="jpay"><div class="jpay-status">
+        <div class="jpay-status-icon is-wait"><div class="jpay-spinner"></div></div>
+        <h3>Preparing your payment</h3><p>Just a moment.</p></div></div>`;
+
+    (async () => {
+      try {
+        /* (1) The booking. Reuses the very same call the non-gateway path
+           makes, so a package booked with a provider configured is identical
+           in the database to one booked without. */
+        if (!ctx.booking) {
+          ctx.payment = {
+            /* NULL ON PURPOSE, and BookingStore checks for it.
+               /pay records an INTENT — "the traveller says they will use UPI" —
+               and it is the no-gateway path. On the gateway path the order is
+               opened by /checkout instead, and the method the customer really
+               used is written later by the webhook from the provider's own
+               answer. Sending 'gateway' here made /pay 400 (it is not one of
+               card/debit/upi/netbank/wallet) on every single booking, silently
+               swallowed by the catch below it — a wasted round trip, and an
+               ignored error sitting exactly where a real one would appear. */
+            method: null,
+            methodLabel: 'UPI / Razorpay',
+            amount: ctx.pricing.total,
+            simulated: false,
+          };
+          ctx.booking = await BookingStore.create(flowDraft(ctx));
+        }
+        const ref = ctx.booking && (ctx.booking.id || ctx.booking.booking_ref);
+        if (!ref) throw new Error('The booking could not be created.');
+
+        /* (2) The provider order. submitKey(ctx) is the SAME key the booking
+           was written under, so a retry, a reload or a second click resolves
+           to the one order — see the idempotency notes above. */
+        const key = submitKey(ctx);
+        const checkout = await BookingApi.startPackageCheckout(ref, key);
+
+        JPay.mount(host, {
+          bookingRef: ref,
+          packageName: (ctx.item && ctx.item.name) || ctx.summaryTitle,
+          /* The PROVIDER's figure, echoed by our server. Not ctx.pricing. */
+          amountMinor: checkout.amount,
+          checkout: checkout,
+
+          /* (4) The only question the browser is allowed to ask, and it asks
+             it of us — never of the provider, and never of itself. */
+          pollStatus: async (handler) => {
+            /* RECONCILE FIRST, then fall back to a plain read.
+
+               Asking the server to re-check with the provider is what lets this
+               loop finish at all where no webhook can arrive — a laptop, or a
+               delivery that is late or lost. It is the SAME verifier the webhook
+               runs, so nothing is trusted here that would not be trusted there,
+               and a settled payment costs one locked read rather than a provider
+               round trip.
+
+               A failure is not fatal: reconcile can 503 when the provider is
+               briefly unreachable, and the booking may already have been
+               confirmed by a webhook that did arrive. So the plain read below
+               still runs, and the loop keeps its original behaviour. */
+            let st = '';
+            try {
+              const r = await BookingApi.reconcilePackageBooking(ref, handler);
+              st = String((r && r.booking_status) || '').toLowerCase();
+            } catch {
+              st = '';
+            }
+            if (!st) {
+              const b = await BookingApi.getPackageBooking(ref);
+              st = String((b && b.status) || '').toLowerCase();
+            }
+            if (st === 'confirmed' || st === 'completed') return 'confirmed';
+            if (st === 'cancelled') return 'cancelled';
+            return 'pending';
+          },
+          onRetry: async () => BookingApi.startPackageCheckout(ref, key),
+          onDone: () => { window.location.href = 'my-bookings.html'; },
+        });
+      } catch (err) {
+        const msg = (typeof BookingApi !== 'undefined' && BookingApi.errorText)
+          ? BookingApi.errorText(err, 'We could not start the payment.')
+          : 'We could not start the payment.';
+        host.innerHTML = `<div class="jpay"><div class="jpay-error" role="alert">${esc(msg)}</div>
+          <div class="jpay-actions">
+            <button type="button" class="jpay-cta" onclick="location.reload()">Try again</button>
+          </div></div>`;
+      }
+    })();
   }
 
   /** The shape handed to BookingStore. Kept in one place so every product

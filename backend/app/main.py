@@ -27,6 +27,7 @@ from app.routers import (
     customer_hotel_bookings,
     customer_package_bookings,
     customer_profile,
+    customer_payment_admin,
     customer_travellers,
     dashboard,
     documents,
@@ -42,6 +43,7 @@ from app.routers import (
     merchants,
     notifications_v2,
     passport_ocr,
+    payment_webhooks,
     profile,
     providers,
     public,
@@ -247,6 +249,10 @@ app.include_router(documents.router)
 # when no provider is configured, so mounting it is safe on a deployment
 # that has not enabled OCR.
 app.include_router(passport_ocr.router)
+# Unauthenticated by necessity: the caller is the provider's server, and the
+# signature over the raw body is what stands in for a session. Mounted apart
+# from every customer and merchant router so it shares none of their deps.
+app.include_router(payment_webhooks.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
 # The merchant's manager signing off the service requests its own staff raised,
@@ -277,6 +283,9 @@ app.include_router(wallet.router)
 # wallet.router because that one's defining property is that no route in it
 # carries a merchant id; almost every route here does.
 app.include_router(payment_admin.router)
+# B2C customer payments, read-only, gated on payment.verify (admin only).
+# Separate from payment_admin above, which is the MERCHANT wallet desk.
+app.include_router(customer_payment_admin.router)
 # M5 — message delivery seen by staff. Gated on notification.send, which only
 # the Admin role holds: notification.view is every merchant's own bell.
 app.include_router(messages.router)
@@ -387,6 +396,51 @@ def _run_completion_sweep() -> None:
         db.close()
 
 
+# ---------------------------------------------------------------------------
+# The deferred payment-event sweep (Phase 7).
+#
+# Deliberately its own loop rather than a second job inside the completion
+# sweep: they run at different cadences, and a failure in one must not stop the
+# other. The pattern is copied exactly — sleep first, never let a bad tick kill
+# the loop, do the blocking work on a worker thread.
+#
+# IT ADDS NO VERIFICATION LOGIC OF ITS OWN. It calls the same
+# process_deferred_events() a live webhook would reach, so a replayed event is
+# verified against the provider on exactly the same terms as a fresh one.
+# ---------------------------------------------------------------------------
+_payment_sweep_task: "asyncio.Task | None" = None
+
+
+async def _payment_sweep_loop() -> None:
+    interval = max(60, settings.payment_sweep_interval_minutes * 60)
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(_run_payment_sweep)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "Deferred payment sweep failed; will retry next tick."
+            )
+
+
+def _run_payment_sweep() -> None:
+    from app.services import payment_verification_service as verification
+
+    db = SessionLocal()
+    try:
+        tally = verification.process_deferred_events(
+            db, limit=settings.payment_sweep_batch_size,
+        )
+        # Only speak when there was something to do. A line every five minutes
+        # saying "0 events" is how a log stops being read.
+        if tally.get("seen"):
+            logger.info("Deferred payment sweep: %s", tally)
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 async def warn_if_otp_echo_is_on() -> None:
     """Say it loudly, every boot, if login codes are not being emailed.
@@ -406,6 +460,21 @@ async def warn_if_otp_echo_is_on() -> None:
 
 
 @app.on_event("startup")
+async def report_payment_configuration() -> None:
+    """Say on every boot whether customers can pay, and with what.
+
+    A log and not a raise: a booking is written first and paid for second, so a
+    bad payment key must not stop the platform taking bookings. But it must
+    never be discovered only because a customer mentioned Pay Now did nothing —
+    and a host switched to live credentials must announce that it is now moving
+    real money, the way OTP_DEV_ECHO announces itself above.
+    """
+    from app.services import payments as payment_providers
+
+    payment_providers.check_configuration_at_startup()
+
+
+@app.on_event("startup")
 async def start_booking_completion() -> None:
     global _completion_task
     if not settings.booking_completion_enabled:
@@ -416,6 +485,39 @@ async def start_booking_completion() -> None:
         "Automatic booking completion is on: sweeping every %d minute(s).",
         settings.booking_completion_interval_minutes,
     )
+
+
+@app.on_event("startup")
+async def start_payment_sweep() -> None:
+    global _payment_sweep_task
+    if not settings.payment_sweep_enabled:
+        logger.info("The deferred payment sweep is disabled by configuration.")
+        return
+    from app.services import payments as payment_providers
+
+    if not payment_providers.is_available():
+        # No provider, so no events can ever be deferred. Not started at all,
+        # rather than started and finding nothing forever.
+        logger.info("No payment provider configured; deferred sweep not started.")
+        return
+    _payment_sweep_task = asyncio.create_task(_payment_sweep_loop())
+    logger.info(
+        "Deferred payment sweep is on: every %d minute(s), up to %d event(s) a pass.",
+        settings.payment_sweep_interval_minutes, settings.payment_sweep_batch_size,
+    )
+
+
+@app.on_event("shutdown")
+async def stop_payment_sweep() -> None:
+    global _payment_sweep_task
+    if _payment_sweep_task is None:
+        return
+    _payment_sweep_task.cancel()
+    try:
+        await _payment_sweep_task
+    except (asyncio.CancelledError, Exception):         # noqa: BLE001
+        pass
+    _payment_sweep_task = None
 
 
 @app.on_event("shutdown")

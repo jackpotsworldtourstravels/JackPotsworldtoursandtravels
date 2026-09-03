@@ -105,6 +105,10 @@ const sectionTitles = {
      Found by walking all seventeen sections and reading the title each time,
      which is not something a screenshot of one screen shows. */
   providers: 'Provider Management', 'wallet-desk': 'Wallet & Top-ups',
+  /* B2C. Named distinctly from 'Payment Management' (merchant wallet
+     requests) so the topbar never leaves a reader unsure which money
+     they are looking at. */
+  'customer-payments': 'Customer Payments',
 };
 const loadedSections = new Set();
 
@@ -142,6 +146,9 @@ function loadSection(name) {
   /* 0041. Defined in admin-payment-requests.js, loaded after this file. The old
      per-booking loadPayments() is retired — see the note above it. */
   if (name === 'payments') return initPaymentRequests();
+  /* B2C customer payments. Defined in admin-customer-payments.js,
+     loaded after this file. Read-only. */
+  if (name === 'customer-payments') return initCustomerPayments();
   if (name === 'notifications') return initNotificationForm();
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
