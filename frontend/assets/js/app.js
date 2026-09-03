@@ -1,20 +1,8 @@
 'use strict';
 
-/* Backend API base.
-   Same-origin everywhere EXCEPT the documented two-terminal dev setup, where
-   the frontend is served by `python -m http.server 5500` and the API is a
-   separate uvicorn on 8000.
-
-   This used to send every localhost request to :8000 regardless of where the
-   page was actually served from, which broke the case app.main is built for —
-   uvicorn serving frontend/ AND /api from one origin (see .claude/launch.json,
-   "app.main mounts frontend/ at /, so this origin serves the portals AND
-   /api — same-origin, which the hardcoded API_BASE needs"). Anything that is
-   not the static-server port now talks to its own origin. */
-const STATIC_DEV_PORTS = ['5500', '5501'];
-const API_BASE = (['localhost', '127.0.0.1'].includes(location.hostname)
-                  && STATIC_DEV_PORTS.includes(location.port))
-  ? 'http://127.0.0.1:8000' : '';
+/* Backend API base — same-origin in production (nginx proxies /api to the backend),
+   falls back to the local uvicorn dev server when the frontend is served from localhost */
+const API_BASE = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
 
 /* escapeHtml() now lives in shared/formatters.js, loaded before this file. */
 
@@ -33,60 +21,122 @@ function apiErrorText(err, fallback) {
   return fallback;
 }
 
-/* THE HEADER'S BEHAVIOUR MOVED OUT OF THIS FILE.
-
-   The transparent-to-black scroll fade, the hamburger and the hero parallax all
-   used to be written here, against markup in index.html. They are hero-shell.js's
-   now, because the Flights page wears the same header and does NOT load this
-   file — so its navbar simply never faded, which is the kind of drift a second
-   copy guarantees. One call, and both pages behave identically. */
-const mobileNav = document.getElementById('mobileNav');
-if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
-
-/* THE HERO CARD MOVED OUT OF THIS FILE.
-
-   The product panel, its hero video, the swap button, the date fields and the
-   Search button all used to be wired here, against markup that lived in
-   index.html. Both are booking-card.js's now, because the Flights page renders
-   the SAME card and does not load this file — a second copy of these handlers
-   over there is exactly the drift the module exists to prevent.
-
-   What is still this file's: WHERE a search goes and WHETHER it is allowed to
-   run. See the hero search section further down, which hands the card a
-   handler. */
-
-/** The header's product links, by product. One page per product — the same
- *  targets the header uses, so a voice search and a header click land in the
- *  same place. */
-const SERVICE_PAGE = {
-  flights: 'flights.html',
-  hotels: 'hotels.html',
-  cruises: 'cruises.html',
-  packages: 'packages.html',
+/* Nav: header fades from transparent to solid black gradually over a long scroll range */
+const header = document.getElementById('siteHeader');
+const HEADER_FADE_RANGE = 600;
+const updateHeader = () => {
+  const progress = Math.min(1, Math.max(0, window.scrollY / HEADER_FADE_RANGE));
+  header.style.backgroundColor = `rgba(0,0,0,${progress.toFixed(3)})`;
+  header.style.backdropFilter = `blur(${(progress * 16).toFixed(1)}px)`;
+  header.style.boxShadow = progress > 0.05 ? `0 1px 0 rgba(255,255,255,${(progress * 0.08).toFixed(3)})` : 'none';
 };
+window.addEventListener('scroll', updateHeader, { passive: true });
+updateHeader();
 
-/** Point the traveller at a product.
- *
- *  THE HERO CARD IS NOT A PRODUCT SWITCHER ANY MORE. It carries the Flights
- *  search and nothing else: product navigation belongs to the site header, and
- *  the card duplicating it was the same four links twice on one screen. So ask
- *  the card first, and when it cannot serve that product — anything but
- *  flights, here — go to the page that can, exactly as clicking the header
- *  would.
- *
- *  Returns true when the card handled it in place, so a caller that was about
- *  to fill fields in knows whether those fields are still on this page. */
-function activateTab(name, params) {
-  if (typeof BookingCard !== 'undefined' && BookingCard.activateTab(name)) return true;
-  const page = SERVICE_PAGE[name];
-  if (page) {
-    const qs = new URLSearchParams(
-      Object.entries(params || {}).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-    ).toString();
-    window.location.href = qs ? `${page}?${qs}` : page;
-  }
-  return false;
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const mobileNav = document.getElementById('mobileNav');
+hamburgerBtn.addEventListener('click', () => {
+  const open = mobileNav.classList.toggle('open');
+  hamburgerBtn.setAttribute('aria-expanded', open);
+});
+mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+  mobileNav.classList.remove('open');
+  hamburgerBtn.setAttribute('aria-expanded', 'false');
+}));
+
+/* Hero parallax (subtle, disabled for reduced motion) */
+const heroBg = document.getElementById('heroBg');
+const heroVideoLayer = document.getElementById('heroVideoLayer');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (heroBg && !reduceMotion) {
+  window.addEventListener('scroll', () => {
+    const y = Math.min(window.scrollY, 800);
+    const t = `translateY(${y * 0.25}px) scale(${1 + y * 0.0002})`;
+    heroBg.style.transform = t;
+    if (heroVideoLayer) heroVideoLayer.style.transform = t;
+  }, { passive: true });
 }
+
+/* Hero background videos: one per booking tab, lazy-loaded on first use */
+const heroVideos = document.querySelectorAll('.hero-video-layer video');
+const HERO_VIDEO_SPEED = 1.35; // slightly faster than real-time, still smooth/natural
+heroVideos.forEach(v => {
+  v.playbackRate = HERO_VIDEO_SPEED;
+  v.addEventListener('loadedmetadata', () => { v.playbackRate = HERO_VIDEO_SPEED; });
+});
+function switchHeroVideo(name) {
+  heroVideos.forEach(v => {
+    if (v.dataset.video === name) {
+      v.classList.add('active');
+      if (!v.getAttribute('src') && v.dataset.src) {
+        v.setAttribute('src', v.dataset.src);
+      }
+      v.playbackRate = HERO_VIDEO_SPEED;
+      const playPromise = v.play();
+      if (playPromise && playPromise.catch) playPromise.catch(() => {});
+    } else {
+      v.classList.remove('active');
+      v.pause();
+    }
+  });
+}
+
+/* Booking tabs */
+const tabs = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.search-panel');
+function activateTab(name) {
+  tabs.forEach(t => {
+    const active = t.dataset.tab === name;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', active);
+  });
+  panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+  switchHeroVideo(name);
+}
+tabs.forEach(tab => tab.addEventListener('click', () => activateTab(tab.dataset.tab)));
+document.querySelectorAll('[data-tab-link]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    activateTab(link.dataset.tabLink);
+    document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+/* Swap From/To fields */
+document.querySelectorAll('.swap-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const fields = btn.parentElement.querySelectorAll('.field input');
+    if (fields.length >= 2) {
+      const tmp = fields[0].value;
+      fields[0].value = fields[1].value;
+      fields[1].value = tmp;
+    }
+  });
+});
+
+/* Date fields: open native picker on click, format the chosen date into the display input */
+document.querySelectorAll('.field-date').forEach(field => {
+  const display = field.querySelector('.date-display');
+  const native = field.querySelector('.date-native');
+  const openPicker = () => {
+    if (native.showPicker) {
+      try { native.showPicker(); } catch (e) { native.focus(); }
+    } else {
+      native.focus();
+      native.click();
+    }
+  };
+  display.addEventListener('click', openPicker);
+  field.querySelector('.cal-icon').addEventListener('click', openPicker);
+  native.addEventListener('change', () => {
+    if (native.value) {
+      const d = new Date(native.value + 'T00:00:00');
+      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      display.value = `${weekday}, ${d.getDate()} ${month}`;
+    }
+  });
+});
 
 /* Button ripple effect — shared by .btn and the floating action menu */
 function createRipple(e, el) {
@@ -235,7 +285,7 @@ async function refreshWishlistState() {
   const { access } = getStoredAuth();
   if (!access) return;
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
+    const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: { Authorization: `Bearer ${access}` } });
     data.forEach(w => wishlistMap.set(`${w.item_type}:${w.item_id}`, w.id));
   } catch (err) { /* ignore — hearts stay unfilled */ }
 }
@@ -263,12 +313,12 @@ document.addEventListener('click', async e => {
   const key = `${type}:${id}`;
   try {
     if (wishlistMap.has(key)) {
-      await axios.delete(`${API_BASE}/api/customer/wishlist/${wishlistMap.get(key)}`, { headers: { Authorization: `Bearer ${access}` } });
+      await axios.delete(`${API_BASE}/api/wishlist/${wishlistMap.get(key)}`, { headers: { Authorization: `Bearer ${access}` } });
       wishlistMap.delete(key);
       showToast('Removed from wishlist.');
     } else {
       const { data } = await axios.post(
-        `${API_BASE}/api/customer/wishlist`, { item_type: type, item_id: id }, { headers: { Authorization: `Bearer ${access}` } }
+        `${API_BASE}/api/wishlist`, { item_type: type, item_id: id }, { headers: { Authorization: `Bearer ${access}` } }
       );
       wishlistMap.set(key, data.id);
       showToast('Saved to wishlist!');
@@ -292,13 +342,7 @@ function setReviewStars(n) {
 }
 reviewStarInput.querySelectorAll('span').forEach(s => s.addEventListener('click', () => setReviewStars(Number(s.dataset.star))));
 
-/* Was '★'.repeat(n) + '☆'.repeat(5-n) — two different glyphs whose shapes
-   and widths came from whatever font the OS had, and which some platforms drew
-   as full-colour emoji. jp-icons draws one star and dims the rest. */
-function starString(rating) {
-  return (typeof JPIcon !== 'undefined') ? JPIcon.stars(rating)
-    : '★'.repeat(rating) + '☆'.repeat(5 - rating);
-}
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
 
 async function openReviewsModal(type, id, label) {
   currentReviewItem = { type, id };
@@ -313,7 +357,7 @@ async function openReviewsModal(type, id, label) {
   const { access, userId } = getStoredAuth();
   document.getElementById('reviewFormWrap').style.display = access ? 'block' : 'none';
   try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/reviews`, { params: { item_type: type, item_id: id } });
+    const { data } = await axios.get(`${API_BASE}/api/reviews`, { params: { item_type: type, item_id: id } });
     if (access && userId) {
       const mine = data.find(r => String(r.user_id) === String(userId));
       if (mine) {
@@ -338,7 +382,7 @@ async function openReviewsModal(type, id, label) {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete your review?')) return;
         try {
-          await axios.delete(`${API_BASE}/api/customer/reviews/${btn.dataset.deleteReview}`, { headers: { Authorization: `Bearer ${access}` } });
+          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: { Authorization: `Bearer ${access}` } });
           openReviewsModal(type, id, label);
         } catch (err) { showToast('Failed to delete review.', true); }
       });
@@ -369,10 +413,10 @@ reviewForm.addEventListener('submit', async e => {
   const comment = document.getElementById('reviewComment').value;
   try {
     if (myReviewId) {
-      await axios.put(`${API_BASE}/api/customer/reviews/${myReviewId}`, { rating: currentReviewRating, comment }, { headers: { Authorization: `Bearer ${access}` } });
+      await axios.put(`${API_BASE}/api/reviews/${myReviewId}`, { rating: currentReviewRating, comment }, { headers: { Authorization: `Bearer ${access}` } });
     } else {
       await axios.post(
-        `${API_BASE}/api/customer/reviews`,
+        `${API_BASE}/api/reviews`,
         { item_type: currentReviewItem.type, item_id: currentReviewItem.id, rating: currentReviewRating, comment },
         { headers: { Authorization: `Bearer ${access}` } }
       );
@@ -518,107 +562,18 @@ document.getElementById('detailsBookBtn').addEventListener('click', () => {
    redesign — tour_packages no longer exists — so that call only ever 404'd and fell
    through to the hardcoded cards. Removed rather than left firing on every load. */
 
-/* ===========================================================================
-   Hero search — collect, gate, hand over.
-   ===========================================================================
-   The button used to say "Live search isn't available", which was true when
-   the catalog endpoints were removed. It is not true any more: the travel
-   pages search TravelData and render results, so the hero's job is to carry
-   what the traveller typed to the page that can answer it.
-
-   AUTH IS THE GATE, NOT A SUGGESTION. A signed-out click opens the auth modal
-   and DOES NOT search. The criteria are parked first, so signing in resumes
-   the search the traveller asked for rather than dropping them on the landing
-   page to type it again.
-
-   Cruises are deliberately still on the old toast — the cruise page has no
-   search panel to hand criteria to, and a redirect that ignored them would be
-   worse than saying so.
-   =========================================================================== */
-
-/** Where each panel's criteria go. READING them is booking-card.js's job — it
- *  owns the controls, so it is the only thing that can know whether a return
- *  date belongs to this search or is left over from a round trip the traveller
- *  switched away from. This map is only the destination. */
-const HERO_SEARCH = {
-  flights:  { page: 'flights.html' },
-  hotels:   { page: 'hotels.html' },
-  packages: { page: 'packages.html' },
-};
-
-/* THE PARKED-SEARCH MACHINERY IS GONE with the gate above it.
-   storePendingSearch/takePendingSearch existed for one caller — the search
-   handler, when it had to interrupt a search to ask for a sign-in. Nothing
-   interrupts a search any more, so a search is never parked and there is
-   never one to resume. The key is still read once, below, to clear anything a
-   previous version of this file left behind in an open tab. */
-const PENDING_SEARCH_KEY = 'jpc_pending_search';
-
-/** Send the traveller to the page that can answer, criteria in the URL. */
-function goToSearch(kind, params) {
-  const spec = HERO_SEARCH[kind];
-  if (!spec) return;
-  /* Objects and arrays are skipped, not stringified: URLSearchParams turns one
-     into the literal text "[object Object]". Anything nested that a results
-     page genuinely needs travels as an encoded scalar beside it — `legs` for an
-     itinerary, `pax` for the per-room party. */
-  const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) =>
-      v !== '' && v !== null && v !== undefined && typeof v !== 'object')
-  );
-  window.location.href = `${spec.page}?${qs.toString()}`;
-}
-
-/* THE GATE. The card has already validated by the time this runs; what is left
-   is whether this traveller may search at all. Signed out: park the criteria,
-   open the modal, search nothing — the modal's success path picks it back up.
-
-   Cruises never reach here: the card has no cruises handler to call because the
-   cruise page has no search panel to hand criteria to, and a redirect that
-   ignored them would be worse than saying so. */
-if (typeof BookingCard !== 'undefined') {
-  BookingCard.setSearchHandler((kind, params) => {
-    /* GROUP DEALS IS NOT A SEARCH, and is checked before everything below.
-       It does not navigate, so it needs no results page; it is quoted by a
-       person, so it does not wait on a sign-in either — turning "tell us about
-       your group" into "make an account first" loses the enquiry. And its
-       criteria carry a name, an email and a phone number, which must never
-       reach goToSearch(): that puts them in a query string. */
-    if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
-      GroupEnquiry.handle(params);
-      return;
-    }
-    if (!HERO_SEARCH[kind]) {
-      showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
-      return;
-    }
-    /* SEARCHING IS BROWSING, AND BROWSING DOES NOT NEED AN ACCOUNT.
-       This used to stop here when there was no session: it parked the criteria
-       in sessionStorage, opened the sign-in modal, and resumed the search
-       afterwards. The redirect did happen — eventually — but "click Search,
-       land on the results" became "click Search, meet a login form", which is
-       not what any OTA does and is the reason the landing page appeared not to
-       navigate at all.
-
-       NOTHING BECOMES BOOKABLE BY REMOVING IT. The session is still required
-       where it actually matters and those checks are untouched:
-         booking-store.js  a server booking is only created when signed in
-         hotel-payment.js  the payment step asks for a sign-in itself
-       So a signed-out visitor can search, filter, sort and compare, and is
-       asked to sign in at the point they commit — which is the only point the
-       account is needed for. */
-    goToSearch(kind, params);
+/* The hero Search button has no API left to call. GET /api/flights|hotels|cruises|packages
+   went with the rest of the B2C surface in the V2 nine-table redesign, so every search
+   404'd and surfaced as "Search failed — please try again." — inviting a retry that could
+   never succeed. The request, the result-card renderer and the two form-reading helpers
+   only it used are gone; the button now says what is true. Restore from git history if
+   the catalog ever returns. */
+document.querySelectorAll('.search-go').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    showToast("Live search isn't available — browse our featured packages below.", true);
   });
-}
-
-/** Called once a session exists. Always false now — searches are no longer
- *  parked, so there is nothing to resume; it only clears a stale entry left
- *  by a tab that loaded the previous version of this file. Kept because the
- *  sign-in success path calls it and a missing function there would throw. */
-function resumePendingSearch() {
-  try { sessionStorage.removeItem(PENDING_SEARCH_KEY); } catch { /* private mode */ }
-  return false;
-}
+});
 
 /* AI chatbot */
 const chatPanel = document.getElementById('chatPanel');
@@ -738,26 +693,16 @@ function applyVoiceQuery(transcript) {
   else if (/\btoday\b/.test(lower)) dateStr = isoDateOffset(0);
   const cleaned = lower.replace(/\b(tomorrow|today)\b/g, '').trim();
 
-  /* HOTELS, CRUISES AND PACKAGES LEAVE THIS PAGE. Their search panels are not
-     in the hero card any more — each product has its own page — so what was
-     heard travels there in the URL rather than being typed into fields that no
-     longer exist here. The toast is spoken before the navigation, because
-     after it there is no page left to show it on. */
   if (/\bhotels?\b/.test(lower)) {
+    activateTab('hotels');
     const m = cleaned.match(/\bhotels?\s+(?:in|at|near)\s+([a-z\s]+)/i) || cleaned.match(/\bin\s+([a-z\s]+)$/i);
-    showToast(`Heard: "${text}"`);
-    activateTab('hotels', { dest: m ? titleCaseWords(m[1].trim()) : '', checkIn: dateStr || '' });
-    return;
+    if (m) { document.getElementById('hDest').value = titleCaseWords(m[1].trim()); confidentMatch = true; }
+    if (dateStr) setNativeDate('hIn', dateStr);
   } else if (/\bcruises?\b/.test(lower)) {
-    /* Nothing to carry: no free-text criterion is heard here, and the cruise
-       page is a browse rather than a search. */
-    showToast(`Heard: "${text}"`);
     activateTab('cruises');
-    return;
+    /* No free-text origin field exists on the cruise panel — switch tabs only rather than guessing a field to fill. */
   } else if (/\b(packages?|tours?)\b/.test(lower)) {
-    showToast(`Heard: "${text}"`);
     activateTab('packages');
-    return;
   } else {
     activateTab('flights');
     const m = cleaned.match(/([a-z\s]+?)\s+to\s+([a-z\s]+)/i);
@@ -771,9 +716,7 @@ function applyVoiceQuery(transcript) {
 
   showToast(`Heard: "${text}"`);
   if (confidentMatch) {
-    /* One Search button for the whole card now, in its footer — it is no
-       longer inside the active panel. */
-    document.querySelector('.search-card .search-go')?.click();
+    document.querySelector('.search-panel.active .search-go')?.click();
   }
 }
 fabVoiceBtn.addEventListener('click', () => {
@@ -792,52 +735,52 @@ fabVoiceBtn.addEventListener('click', () => {
   try { recognition.start(); } catch (err) { fabVoiceBtn.classList.remove('listening'); }
 });
 
-/* ---------------------------------------------------------------------------
-   THE LANDING PAGE'S STORED SESSION IS THE CUSTOMER'S.
+/* Auth: JWT session helpers now live in assets/js/auth.js (getStoredAuth,
+   setStoredAuth, clearStoredAuth, authHeaders) -- loaded before this file. */
 
-   Session helpers live in assets/js/auth.js. This page used to read the jwt_*
-   pair it shared with admin.html, back when both signed in through
-   /api/auth/login and were told apart by `role`. The traveller now
-   authenticates against the CUSTOMER database instead, so the four accessors
-   are rebound here to the jpc_* namespace.
+/* Presence heartbeat — only sent while a logged-in user is browsing this page,
+   so the admin's Online Users widget can see them. */
+function sendHeartbeat() {
+  const { access } = getStoredAuth();
+  if (!access) return;
+  axios.post(`${API_BASE}/api/users/heartbeat`, { current_page: 'Home' }, {
+    headers: { Authorization: `Bearer ${access}` },
+  }).catch(() => {});
+}
+sendHeartbeat();
+setInterval(sendHeartbeat, 30000);
 
-   Rebinding, rather than editing ~37 call sites, is the point: renderAuthNav(),
-   the profile chip and the whole Account Center below are the original V1 code
-   and keep working untouched — only the drawer they read from changed.
+const authNavPairs = [
+  [document.getElementById('navLoginLink'), document.getElementById('navSignupLink')],
+];
 
-   This cannot affect another portal. app.js is loaded by index.html alone;
-   admin.js, partner-shared.js and super-admin-shared.js each read their own
-   namespace and never load this file.
-   --------------------------------------------------------------------------- */
-getStoredAuth = getCustomerAuth;
-setStoredAuth = setCustomerAuth;
-clearStoredAuth = clearCustomerAuth;
-authHeaders = customerAuthHeaders;
-
-/* THE PRESENCE HEARTBEAT IS GONE, AND MUST STAY GONE.
-
-   It posted to /api/users/heartbeat every 30s so the ADMIN's "Online Users"
-   widget could see whoever was browsing. That endpoint is the platform's, over
-   the `users` table, and a customer must never surface in it — a traveller
-   reading the homepage is not a merchant staff member at work, and mixing the
-   two is exactly the leak the Customer database is separated to prevent.
-
-   It would also simply fail: the platform refuses customer-scoped tokens, so
-   this was a 401 every 30 seconds, silenced by its own .catch(). If customer
-   presence is ever wanted, it needs an endpoint on the customer side. */
-
-/** Tell the header the session changed.
- *
- *  This used to relabel and show/hide FOUR hand-maintained controls: a static
- *  Login and Sign Up in the header, and another pair in the mobile drawer,
- *  plus a nine-link account list toggled by a `show-account` class. All of it
- *  is deleted — profile-menu.js renders the authentication controls, and it
- *  reads the session itself, so the only thing left to say is "look again".
- *
- *  The duplicate Login/Sign Up came from exactly that overlap: the static pair
- *  never went away when the component started rendering its own. */
 function renderAuthNav() {
-  if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
+  const { access, name, role } = getStoredAuth();
+  const loggedIn = Boolean(access) && role !== 'admin';
+  const isAdmin = Boolean(access) && role === 'admin';
+
+  // Admins keep the old simple treatment (link straight to admin.html) — the
+  // Account Center below is a customer-only experience.
+  authNavPairs.forEach(([loginEl, signupEl]) => {
+    if (loginEl) loginEl.textContent = isAdmin ? 'Dashboard' : 'Login';
+    if (signupEl) signupEl.textContent = isAdmin ? 'Logout' : 'Sign Up';
+    if (loginEl) loginEl.style.display = loggedIn ? 'none' : '';
+    if (signupEl) signupEl.style.display = loggedIn ? 'none' : '';
+  });
+
+  document.getElementById('profileChipWrap').style.display = loggedIn ? '' : 'none';
+  document.getElementById('mobileNav').classList.toggle('show-account', loggedIn);
+
+  if (loggedIn) {
+    const initials = name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+    document.getElementById('profileChipName').textContent = name;
+    document.getElementById('profileChipAvatar').textContent = initials;
+  }
+
+  const mobileLoginLink = document.getElementById('mobileNavLoginLink');
+  const mobileSignupLink = document.getElementById('mobileNavSignupLink');
+  if (isAdmin) { mobileLoginLink.textContent = 'Dashboard'; mobileSignupLink.textContent = 'Logout'; }
+  else { mobileLoginLink.textContent = 'Login'; mobileSignupLink.textContent = 'Sign Up'; }
 }
 renderAuthNav();
 
@@ -845,323 +788,142 @@ renderAuthNav();
 (function verifyStoredSession() {
   const { access } = getStoredAuth();
   if (!access) return;
-  axios.get(`${API_BASE}/api/customer/auth/me`, { headers: { Authorization: `Bearer ${access}` } })
-    .catch(err => {
-      /* Only a rejected TOKEN clears the session. A network blip or a 5xx must
-         not sign a traveller out — that used to be a bare .catch(), so the page
-         logged you out whenever the API hiccuped. */
-      if (err?.response?.status === 401) { clearStoredAuth(); renderAuthNav(); }
-    });
+  axios.get(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${access}` } })
+    .catch(() => { clearStoredAuth(); renderAuthNav(); });
 })();
 
-/* ===========================================================================
-   Auth modal — one door, five steps.
-   ===========================================================================
-   Both header buttons open this. The traveller gives an email, then either a
-   password or the rest of a registration; the code step is shared because
-   /login and /signup answer with the same challenge.
-
-   THE FLOW NEVER ASKS THE SERVER WHO IS REGISTERED. See the comment on the
-   markup in index.html: an "is this email known?" endpoint would let anyone
-   enumerate customers, which this API avoids on purpose. So the email step
-   leads to the password step and offers "Create your account" beside it,
-   carrying the address across so nothing is typed twice.
-   =========================================================================== */
+/* Auth modal: Sign Up / Login */
 const authOverlay = document.getElementById('authOverlay');
-const authCard = authOverlay.querySelector('.modal-card');
+const signupView = document.getElementById('signupView');
+const loginView = document.getElementById('loginView');
 const authCloseBtn = document.getElementById('authCloseBtn');
 
-/** step name -> the element that is its view. */
-const AUTH_STEPS = {
-  email:    'authStepEmail',
-  password: 'authStepPassword',
-  signup:   'authStepSignup',
-  otp:      'loginStepOtp',
-  forgot:   'authStepForgot',
-};
-
-/** Where focus was before the modal took it, so it can be handed back. */
-let authReturnFocus = null;
-let authStep = 'email';
-
-function authView(name) { return document.getElementById(AUTH_STEPS[name]); }
-
-/** Show one step and put the caret in the field that still needs filling. */
-function showStep(name, opts) {
-  if (!AUTH_STEPS[name]) return;
-
-  /* The password and signup steps both show the address as a READONLY field,
-     because it was already given on the email step. Landing on either without
-     one leaves a locked, empty box and no way forward, so send them back to
-     the step that collects it. Guards openAuth('signup') from elsewhere on the
-     page as much as anything internal. */
-  if ((name === 'password' || name === 'signup') && !currentAuthEmail()) name = 'email';
-
-  authStep = name;
-  Object.keys(AUTH_STEPS).forEach(k => { authView(k).hidden = k !== name; });
-
-  /* Messages belong to the step that produced them. Carrying "that password
-     was wrong" onto the signup form would be nonsense. */
-  if (!(opts && opts.keepMessage)) {
-    ['authEmailMsg', 'loginMsg', 'signupMsg', 'loginOtpMsg', 'fpMsg']
-      .forEach(id => setModalMsg(document.getElementById(id), '', 'muted'));
-    clearFieldErrors();
-  }
-
-  const first = authView(name).querySelector('input:not([readonly]):not([type=checkbox])');
-  /* rAF so the field exists on screen before it is focused — focusing a
-     hidden element silently does nothing. */
-  if (first) requestAnimationFrame(() => first.focus());
-}
-
-/* --- inline validation ---------------------------------------------------
-   Every message lands beside its own field. There is not a single alert() or
-   confirm() in this flow, and the shared .modal-msg strip is reserved for what
-   the SERVER said — never for "you missed a field", which belongs on it. */
-function setFieldError(inputId, message) {
-  const input = document.getElementById(inputId);
-  const box = document.getElementById(inputId + 'Err');
-  if (input) {
-    input.classList.toggle('is-invalid', !!message);
-    input.setAttribute('aria-invalid', message ? 'true' : 'false');
-  }
-  if (box) box.textContent = message || '';
-  if (message && input) input.focus();
-  return !message;
-}
-
-function clearFieldErrors() {
-  authOverlay.querySelectorAll('.field-error').forEach(e => { e.textContent = ''; });
-  authOverlay.querySelectorAll('.is-invalid').forEach(e => {
-    e.classList.remove('is-invalid');
-    e.setAttribute('aria-invalid', 'false');
-  });
-}
-
-const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-
-/* --- password strength ---------------------------------------------------
-   The server's rule is length only (8..72, bcrypt's truncation point). This
-   adds a CLIENT-SIDE floor on top: eight characters drawn from at least two
-   of lowercase / uppercase / digit / symbol, so "password" and "12345678"
-   are refused at the form rather than accepted and regretted.
-
-   Deliberately not stricter than that. A rule the server does not share can
-   only ever be advisory — anyone posting straight to /signup bypasses it —
-   so it is set where it stops the genuinely weak without turning a booking
-   into a password-policy argument. */
-const PW_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
-
-function passwordScore(pw) {
-  if (!pw) return 0;
-  const classes = PW_CLASSES.filter(re => re.test(pw)).length;
-  if (pw.length < 8) return 0;
-  if (classes <= 1) return 1;                     // weak: one class only
-  if (classes === 2) return pw.length >= 12 ? 3 : 2;
-  return pw.length >= 12 ? 4 : 3;
-}
-
-const PW_LABELS = ['Too short', 'Too simple', 'Fair', 'Good', 'Strong'];
-
-/** Live strength readout under the signup password field. */
-function renderPasswordStrength() {
-  const input = document.getElementById('suPass');
-  const box = document.getElementById('suPassStrength');
-  if (!input || !box) return;
-  const pw = input.value;
-  if (!pw) { box.textContent = ''; box.className = 'pw-strength'; return; }
-  const score = passwordScore(pw);
-  box.textContent = PW_LABELS[score];
-  box.className = `pw-strength is-s${score}`;
-}
-const isMobile = v => /^\d{10,15}$/.test(String(v).replace(/[\s-]/g, ''));
-
-/* Clear a field's error the moment the traveller starts fixing it — leaving
-   it there while they type reads as though the correction is not registering. */
-authOverlay.addEventListener('input', e => {
-  if (e.target.matches('input') && e.target.classList.contains('is-invalid')) {
-    setFieldError(e.target.id, '');
-  }
-  if (e.target.id === 'suPass') renderPasswordStrength();
-});
-
-/* --- open / close --------------------------------------------------------- */
-function openAuth(step) {
-  /* Callers elsewhere on the page still say openAuth('login') / ('signup') —
-     the wishlist prompt, the review form, the account chip. Those are no
-     longer step names, and there is nothing to translate them into: the whole
-     point is that the traveller does not pick a side any more. Anything that
-     is not a real step opens the flow at the beginning. */
-  if (step && !AUTH_STEPS[step]) step = undefined;
-  authReturnFocus = document.activeElement;
-  authOverlay.classList.remove('closing');
+function openAuth(view) {
   authOverlay.classList.add('open');
+  signupView.style.display = view === 'login' ? 'none' : 'block';
+  loginView.style.display = view === 'login' ? 'block' : 'none';
   document.body.style.overflow = 'hidden';
-  otpChallenge = null;
-
-  /* Remember Me gives back the address, never the password. With one on file
-     the email step has nothing left to ask, so it is skipped. */
-  const remembered = localStorage.getItem(CUSTOMER_KEYS.remember);
-  if (!step && remembered) {
-    document.getElementById('liUser').value = remembered;
-    document.getElementById('liRemember').checked = true;
-    showStep('password');
-    return;
+  /* Open clean. The OTP step this used to reset went to partner-login.html with
+     the rest of the merchant flow — the customer login is a single screen. */
+  if (view === 'login') {
+    setModalMsg(document.getElementById('loginMsg'), '', 'muted');
   }
-  if (remembered) {
-    document.getElementById('authEmail').value = remembered;
-    document.getElementById('liRemember').checked = true;
-  }
-  showStep(step || 'email');
+  const firstInput = (view === 'login' ? loginView : signupView).querySelector('input');
+  if (firstInput) firstInput.focus();
 }
-
 function closeAuth() {
-  /* Animate out, then hide. The class is removed on transitionend rather than
-     a timer so the two cannot drift apart if the duration changes in CSS. */
-  authOverlay.classList.add('closing');
-  const done = () => {
-    authOverlay.classList.remove('open', 'closing');
-    document.body.style.overflow = '';
-    authOverlay.removeEventListener('transitionend', done);
-  };
-  authOverlay.addEventListener('transitionend', done);
-  /* Belt and braces: if the overlay has no transition (reduced motion),
-     transitionend never fires. */
-  setTimeout(done, 300);
-
-  otpChallenge = null;
-  clearFieldErrors();
-  if (authReturnFocus && document.contains(authReturnFocus)) authReturnFocus.focus();
-  authReturnFocus = null;
+  authOverlay.classList.remove('open');
+  document.body.style.overflow = '';
 }
-
-/* --- focus trap -----------------------------------------------------------
-   Tab must not walk out of a modal dialog and start operating the page behind
-   it, which is still there and still clickable to a screen reader otherwise. */
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
-authOverlay.addEventListener('keydown', e => {
-  if (e.key !== 'Tab' || !authOverlay.classList.contains('open')) return;
-  const items = Array.from(authCard.querySelectorAll(FOCUSABLE))
-    .filter(el => el.offsetParent !== null);        // visible only
-  if (!items.length) return;
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-});
-
-/* --- entry points --------------------------------------------------------- */
 document.querySelectorAll('[data-auth]').forEach(el => {
   el.addEventListener('click', e => {
     e.preventDefault();
-    /* A partner session is none of this modal's business: forwarding a
-       traveller's click into the Merchant Portal — just because someone at
-       that desk signed in earlier on the same browser — is the wrong product.
-       My Partner is the merchant's route. */
-    const { access } = getStoredAuth();
+    /* This used to forward a signed-in MERCHANT straight to their workspace,
+       because "Login" was the merchant login. It is the customer login now, so
+       a partner session is none of its business: forwarding a traveller's click
+       into the Merchant Portal — just because someone at that desk had signed
+       in earlier on the same browser — is the wrong product entirely.
+       The two namespaces stay separate; My Partner is the merchant's route. */
+    const { access, role } = getStoredAuth();
     if (access) {
-      /* Signed in, so the "Sign Up" slot is the sign-out. */
       if (el.dataset.auth === 'signup') {
-        axios.post(`${API_BASE}/api/customer/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+        axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
         clearStoredAuth();
         wishlistMap = new Map();
         renderAuthNav();
       }
+      else if (el.dataset.auth === 'login' && role === 'admin') { window.location.href = 'admin/'; }
       return;
     }
-    /* BOTH buttons open the same modal at the same step. Which one was
-       pressed no longer decides anything — the email does. */
-    openAuth();
+    openAuth(el.dataset.auth);
   });
 });
-
-/* In-modal navigation: Change, Forgot Password, Create your account, Back. */
-authOverlay.addEventListener('click', e => {
-  const target = e.target.closest('[data-step]');
-  if (!target) return;
-  e.preventDefault();
-  const next = target.dataset.step;
-  /* Carry the address forward so it is never typed twice. */
-  if (next === 'signup') document.getElementById('suEmail').value = currentAuthEmail();
-  if (next === 'password') document.getElementById('liUser').value = currentAuthEmail();
-  if (next === 'forgot') document.getElementById('fpEmail').value = currentAuthEmail();
-  if (next === 'email') document.getElementById('authEmail').value = currentAuthEmail();
-  showStep(next);
-});
-
-/** Whichever step holds the address the traveller has given us. */
-function currentAuthEmail() {
-  const ids = ['authEmail', 'liUser', 'suEmail', 'fpEmail'];
-  for (const id of ids) {
-    const v = (document.getElementById(id) || {}).value;
-    if (v && v.trim()) return v.trim();
-  }
-  return '';
-}
-
 authCloseBtn.addEventListener('click', closeAuth);
 authOverlay.addEventListener('click', e => { if (e.target === authOverlay) closeAuth(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
-/* --- step 1: the email ---------------------------------------------------- */
-document.getElementById('authEmailForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const email = document.getElementById('authEmail').value.trim();
-  if (!email) return setFieldError('authEmail', 'Enter your email address.');
-  if (!isEmail(email)) return setFieldError('authEmail', 'That does not look like an email address.');
-  setFieldError('authEmail', '');
+/* ---------------------------------------------------------------------------
+   Merchant access request.
 
-  /* Straight to the password step. If they have no account they take the
-     "Create your account" link below it, which carries this address across. */
-  document.getElementById('liUser').value = email;
-  document.getElementById('suEmail').value = email;
-  showStep('password');
+   Merchants don't self-register: an Admin creates the company
+   (POST /api/admin/merchants) and it stays pending_approval until approved, so
+   there is no /api/auth/signup in the v2 API to post to. This collects the
+   details the team needs and tells the applicant plainly that registration is
+   approval-based, rather than pretending an account was created.
+   --------------------------------------------------------------------------- */
+document.getElementById('suRequestBtn')?.addEventListener('click', async () => {
+  const company = document.getElementById('suCompany').value.trim();
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const phone = document.getElementById('suPhone').value.trim();
+  const msg = document.getElementById('signupMsg');
+  const fail = text => {
+    msg.textContent = text;
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  };
+
+  if (!company) return fail('Please tell us your company name.');
+  if (!name) return fail('Please tell us your name.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail('Please enter a valid work email.');
+
+  /* Holding state until the registration endpoint exists.
+     Partner registration is approval-based: an Admin creates the company and
+     it waits in pending_approval before it can trade, so there is nothing for
+     this form to POST to yet. Rather than fake a submission, say plainly how
+     onboarding works. When the registration module lands, replace this block
+     with the real call — the fields above are already the ones it needs, so
+     the swap is this handler only. */
+  msg.textContent = 'Partner registration is currently by approval. '
+    + 'Please contact our team or wait for the onboarding module.';
+  msg.style.color = 'var(--ink)';
+  msg.classList.add('show');
 });
 
-/* --- forgot password ------------------------------------------------------
-   Finishes on customer/reset-password.html, because the API issues a link
-   token rather than a code. The response is deliberately the same whether or
-   not the address is registered, and this shows it verbatim. */
-document.getElementById('forgotForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = document.getElementById('fpEmail').value.trim();
-  const msg = document.getElementById('fpMsg');
-  const dev = document.getElementById('fpDevLink');
-  dev.textContent = '';
-  if (!email) return setFieldError('fpEmail', 'Enter your email address.');
-  if (!isEmail(email)) return setFieldError('fpEmail', 'That does not look like an email address.');
-  setFieldError('fpEmail', '');
+/* ---------------------------------------------------------------------------
+   CUSTOMER SIGN-IN — the site's "Login" is the traveller's login.
 
-  setModalMsg(msg, 'Sending…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/forgot-password`, { email });
-    setModalMsg(msg, data.message || 'If an account exists for that email, a reset link is on its way.', 'ok');
-    /* Debug builds return the link so a reset can be tested without SMTP. */
-    if (data.reset_link) {
-      const a = document.createElement('a');
-      a.href = data.reset_link;
-      a.textContent = 'Open the reset link (debug)';
-      a.className = 'modal-devlink';
-      dev.appendChild(a);
-    }
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not send a reset link just now.'), 'error');
-  }
-});
+   IT USED TO BE THE MERCHANT LOGIN. This modal posted portal:'merchant', ran
+   the password -> OTP flow and handed off to the Merchant Portal, which made
+   "Login" and "My Partner" two doors into the same B2B product and left the
+   platform's actual customers with nowhere to sign in.
+
+   The two audiences are separated now:
+
+     Login (here)   Customer / B2C. Opens the Account Center already built into
+                    this page, under the customer `jwt_*` namespace.
+     My Partner     Merchant / B2B -> partner-login.html, which is where the
+                    password -> OTP flow and MERCHANT_PORTAL_URL moved to.
+     Admin, Manager, Super Admin
+                    their own URLs. Named nowhere on this site.
+
+   THIS IS UI AHEAD OF ITS BACKEND, AND IT IS EXPLICIT ABOUT THAT.
+   There is no customer login endpoint: schemas/auth.py declares
+   Portal = Literal["super_admin","admin","manager","merchant"], the `customer`
+   role carries zero permissions, and the /api/auth/user/login this page's
+   legacy login.html still posts to was dropped in the V2 migration — it is not
+   in the live OpenAPI. So the form is wired end to end and gated behind ONE
+   flag. When the endpoint ships, set `enabled: true` and confirm `endpoint`;
+   nothing else here changes. Until then a traveller is told plainly, instead of
+   being handed a 404 or, worse, a silent failure.
+   --------------------------------------------------------------------------- */
+const CUSTOMER_AUTH = {
+  enabled: false,
+  /* The expected shape when it lands: { identifier, password } -> TokenResponse,
+     matching the contract the retired /api/auth/user/login had and which
+     auth_service.authenticate() still implements (it accepts the legacy "user"
+     alias for the v2 `customer` role). Confirm before flipping `enabled`. */
+  endpoint: '/api/auth/customer/login',
+};
 
 /* Where a MERCHANT lands once signed in. The sign-in itself lives on
    partner-login.html now; this constant stays because the Operations handoff
-   still sends merchants through. The merchant UI is the Classic portal —
-   merchant/ (Premium) redirects to it and its files are all still on disk. */
+   and the already-signed-in short-circuit above still send merchants through.
+   The merchant UI is the Classic portal — merchant/ (Premium) redirects to it
+   and its files are all still on disk. */
 const MERCHANT_PORTAL_URL = 'merchant-classic/';
-
-/* Where a traveller resets a forgotten password. The modal has no room for the
-   reset form, and the emailed link has to land on a real page, so both live on
-   their own: customer/forgot-password.html requests the link and
-   customer/reset-password.html consumes the token the backend mails out. */
-const CUSTOMER_RESET_URL = 'customer/forgot-password.html';
 
 function setModalMsg(el, text, tone) {
   el.textContent = text;
@@ -1170,233 +932,40 @@ function setModalMsg(el, text, tone) {
   el.classList.toggle('show', !!text);
 }
 
-/* ===========================================================================
-   CUSTOMER AUTH — sign up, sign in, and stay right here.
-   ===========================================================================
-   Both /api/customer/auth/signup and /api/customer/auth/login answer with the
-   SAME CustomerLoginChallengeResponse: no session, just a challenge token and
-   a posted code. So registration and sign-in converge on one shared OTP step
-   (#loginStepOtp) instead of each carrying its own copy of it.
-
-   Nothing here navigates. On success the modal closes and renderAuthNav()
-   swaps the Login/Sign Up links for the profile chip — the traveller stays on
-   the page they were reading. That is the V1 behaviour this page was built
-   around, and the Account Center below is still the original V1 code.
-   =========================================================================== */
-
-/** The challenge in flight, and which form started it (copy only). */
-let otpChallenge = null;
-let otpOrigin = 'login';
-
-/** Move the login view to its code step. Signup borrows this too, which is why
- *  it makes sure the LOGIN view is the one on screen. */
-function showOtpStep(challenge, message, origin) {
-  otpChallenge = challenge.challenge_token;
-  otpOrigin = origin;
-  /* keepMessage: the step machine would otherwise wipe the line the server
-     just gave us, which on this step is the whole instruction. */
-  showStep('otp', { keepMessage: true });
-  document.getElementById('loginOtpSub').textContent = message;
-  setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
-  showDevOtp(challenge.dev_otp);
-  const box = document.getElementById('liOtp');
-  box.value = '';
-  box.focus();
-}
-
-/** Show the code instead of emailing it.
- *
- *  The API returns `dev_otp` only in DEV_MODE — either because no mail server
- *  is configured, or because OTP_DEV_MODE is on for local work while SMTP
- *  keeps sending everything else. It is never present on a deployed server, so
- *  this is a no-op there and the code arrives by email as normal.
- *
- *  It no longer says "email is not configured": that stopped being the only
- *  reason the moment the contact form needed SMTP switched on.
- *
- *  Text content, never innerHTML — the value is echoed from a response and has
- *  no business being parsed as markup. */
-function showDevOtp(code) {
-  const el = document.getElementById('liDevOtp');
-  if (!el) return;
-  el.textContent = code ? `Development mode — your code is ${code}` : '';
-  el.className = code ? 'modal-devbox' : '';
-}
-
-/** Back to the credentials step, dropping the challenge. */
-function showCredsStep() {
-  otpChallenge = null;
-  document.getElementById('liOtp').value = '';
-  /* Back to whichever form started the challenge, so "use a different
-     account" after a signup does not dump the traveller on a login form
-     they never asked for. */
-  showStep(otpOrigin === 'signup' ? 'signup' : 'password');
-}
-
-/** The one place a customer session is created. */
-function completeCustomerSignIn(data) {
-  const c = data.customer || {};
-  setStoredAuth(data.access_token, data.refresh_token, c.full_name || 'Traveller',
-                'customer', c.id);
-  otpChallenge = null;
-  renderAuthNav();
-  closeAuth();
-  /* Reset to the first step for next time, AFTER closing — doing it before
-     would flash the email form as the modal fades out. */
-  showStep('email');
-
-  /* If the traveller was stopped mid-search, resume it. The greeting is
-     skipped in that case: they are already navigating away, and a toast that
-     outlives its page is just a flicker. */
-  if (typeof resumePendingSearch === 'function' && resumePendingSearch()) return;
-  /* Or sent here from another page to sign in — go back to it. Same reason the
-     greeting is skipped: they are leaving. */
-  if (returnToNext()) return;
-  showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
-}
-
-/** Honour `?next=` after signing in.
- *
- *  A service page that has no sign-in modal of its own sends the traveller here
- *  with `next` set to where they were — the wishlist heart on the Hotels
- *  results does exactly that, and carries the filters with it — so signing in
- *  returns them to the list they were reading rather than stranding them on the
- *  home page.
- *
- *  SAME-ORIGIN PATHS ONLY. `next` comes from a URL anyone can write, and a
- *  redirect that accepts whatever it is handed is an open redirect: a link that
- *  looks like this site and lands on someone else's login form. It must start
- *  with a single "/" — which rejects "//evil.test" (protocol-relative) and
- *  "https://evil.test" alike — and is resolved against this origin so the
- *  browser cannot be talked into leaving it.
- *
- *  @returns {boolean} whether a navigation was started. */
-function returnToNext() {
-  const raw = new URLSearchParams(location.search).get('next');
-  if (!raw || raw[0] !== '/' || raw[1] === '/' || raw.includes('\\')) return false;
-  const url = new URL(raw, location.origin);
-  if (url.origin !== location.origin) return false;
-  location.href = url.pathname + url.search + url.hash;
-  return true;
-}
-
-/* --- Registration ------------------------------------------------------- */
-document.getElementById('signupForm')?.addEventListener('submit', async e => {
-  e.preventDefault();
-  const name = document.getElementById('suName').value.trim();
-  const email = document.getElementById('suEmail').value.trim();
-  const mobile = document.getElementById('suMobile').value.trim();
-  const pass = document.getElementById('suPass').value;
-  const pass2 = document.getElementById('suPass2').value;
-  const msg = document.getElementById('signupMsg');
-
-  /* Inline, beside the field, never in an alert. Checked here only so the
-     traveller is told which field is wrong and lands in it — the server
-     validates all of this again and is the authority. */
-  clearFieldErrors();
-  if (name.length < 2) return setFieldError('suName', 'Enter your full name.');
-  if (!isEmail(email)) return setFieldError('suEmail', 'That does not look like an email address.');
-  if (!isMobile(mobile)) return setFieldError('suMobile', 'Enter a valid mobile number, 10 to 15 digits.');
-  if (pass.length < 8) return setFieldError('suPass', 'Use at least 8 characters.');
-  if (passwordScore(pass) < 2) {
-    return setFieldError('suPass',
-      'Mix in a capital, a number or a symbol — this one is too easy to guess.');
-  }
-  if (pass !== pass2) return setFieldError('suPass2', 'Both passwords must match.');
-
-  setModalMsg(msg, 'Creating your account…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/signup`, {
-      full_name: name, email, mobile: mobile.replace(/[\s-]/g, ''),
-      password: pass, confirm_password: pass2,
-    });
-    setModalMsg(msg, '', 'muted');
-    showOtpStep(data, data.message || `A verification code was sent to ${email}.`, 'signup');
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not create your account.'), 'error');
-  }
-});
-
-/* --- Sign in, step 1: password ------------------------------------------ */
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const identifier = document.getElementById('liUser').value.trim();
+  const email = document.getElementById('liUser').value.trim();
   const pass = document.getElementById('liPass').value;
   const msg = document.getElementById('loginMsg');
-
-  if (!identifier) { setModalMsg(msg, 'Enter your email or mobile number.', 'error'); return; }
-  if (!pass) { setModalMsg(msg, 'Enter your password.', 'error'); return; }
-
-  /* Remember Me holds the ADDRESS only, never the password, and it outlives
-     sign-out on purpose — that is the feature. */
-  if (document.getElementById('liRemember').checked) {
-    localStorage.setItem(CUSTOMER_KEYS.remember, identifier);
-  } else {
-    localStorage.removeItem(CUSTOMER_KEYS.remember);
+  if (!email || !pass) {
+    setModalMsg(msg, 'Enter your email and password.', 'error');
+    return;
+  }
+  if (!CUSTOMER_AUTH.enabled) {
+    /* Said in the traveller's terms, not the API's. A merchant who lands here
+       out of habit is redirected by name rather than left guessing which of
+       the two logins is theirs. */
+    setModalMsg(msg, 'Customer accounts are not open yet — we are still building this. '
+      + 'If you are a travel agency, use My Partner to reach the Partner Portal.', 'error');
+    return;
   }
 
   setModalMsg(msg, 'Checking…', 'muted');
   try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/login`,
-      { identifier, password: pass });
-    setModalMsg(msg, '', 'muted');
-    document.getElementById('liPass').value = '';
-    showOtpStep(data, data.message || 'Enter the 6-digit code we just sent you.', 'login');
+    const { data } = await axios.post(`${API_BASE}${CUSTOMER_AUTH.endpoint}`,
+      { identifier: email, password: pass });
+    const me = await axios.get(`${API_BASE}/api/auth/me`,
+      { headers: { Authorization: `Bearer ${data.access_token}` } });
+    /* The customer namespace — deliberately NOT the merchant one. A traveller
+       signing in here must never overwrite a partner session open in the same
+       browser (auth.js keeps the two apart on purpose). */
+    setStoredAuth(data.access_token, data.refresh_token, me.data.full_name, me.data.role, me.data.id);
+    setModalMsg(msg, 'Signed in — welcome back.', 'ok');
+    renderAuthNav();
+    closeAuth();
   } catch (err) {
-    /* A merchant or admin address fails here exactly as an unknown one does —
-       the endpoint reads the customer database and nothing else. Saying so
-       would confirm the account exists somewhere, so the copy stays generic. */
-    setModalMsg(msg, apiErrorText(err, 'Those details did not match an account.'), 'error');
+    setModalMsg(msg, apiErrorText(err, 'Invalid email or password.'), 'error');
   }
-});
-
-/* --- Sign in, step 2: the code ------------------------------------------ */
-document.getElementById('liVerifyBtn').addEventListener('click', async () => {
-  const code = document.getElementById('liOtp').value.trim();
-  const msg = document.getElementById('loginOtpMsg');
-  if (!/^\d{4,8}$/.test(code)) { setModalMsg(msg, 'Enter the code we sent you.', 'error'); return; }
-  if (!otpChallenge) { setModalMsg(msg, 'That code has expired — please sign in again.', 'error'); return; }
-
-  setModalMsg(msg, 'Verifying…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/verify-otp`,
-      { challenge_token: otpChallenge, code });
-    completeCustomerSignIn(data);
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'That code was not right.'), 'error');
-  }
-});
-
-/* Enter submits the code, the same as the button. */
-document.getElementById('liOtp').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('liVerifyBtn').click(); }
-});
-
-document.getElementById('liResendBtn').addEventListener('click', async e => {
-  e.preventDefault();
-  const msg = document.getElementById('loginOtpMsg');
-  if (!otpChallenge) { setModalMsg(msg, 'Please sign in again.', 'error'); return; }
-  setModalMsg(msg, 'Sending a new code…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/resend-otp`,
-      { challenge_token: otpChallenge });
-    /* Resending issues a FRESH challenge; keeping the old token would verify
-       against a code that is no longer the live one. The displayed dev code
-       has to move with it for the same reason. */
-    if (data.challenge_token) otpChallenge = data.challenge_token;
-    showDevOtp(data.dev_otp);
-    document.getElementById('liOtp').value = '';
-    setModalMsg(msg, data.message || 'A new code is on its way.', 'ok');
-  } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not send another code.'), 'error');
-  }
-});
-
-document.getElementById('liBackBtn').addEventListener('click', e => {
-  e.preventDefault();
-  showCredsStep();
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  document.getElementById('liUser').focus();
 });
 
 /* ---------------------------------------------------------------------------
@@ -1423,46 +992,730 @@ document.getElementById('liBackBtn').addEventListener('click', e => {
     + (reason ? `?ops_reason=${encodeURIComponent(reason)}` : ''));
 })();
 
-/* THE "FORGOT PASSWORD?" HANDLER USED TO LIVE HERE, AND IT WAS WRONG TWICE.
-
-   It POSTed the typed address to /api/auth/forgot-password — the PLATFORM
-   reset, which reads the `users` table. That is the merchant/admin side. For a
-   traveller it is the wrong system entirely, and it is precisely the kind of
-   cross-boundary call the Customer Portal was built to make impossible.
-
-   It also called e.preventDefault(), so once the link was pointed at the
-   portal's own reset page the navigation would have been swallowed and the
-   platform call made instead — the link would have looked right and behaved
-   wrong.
-
-   The customer reset is /api/customer/auth/forgot-password, reached through
-   customer/forgot-password.html. That is a plain <a href> in the markup now,
-   with no JavaScript in front of it, so there is nothing here to get wrong. */
-
-/* ================================================================
-   ACCOUNT CENTER — now assets/js/account-center.js, so that every
-   B2C page can open it instead of only this one.
-
-   It used to be the bottom 800 lines of this file, which is why the
-   profile chip on the flight, hotel and package pages navigated HERE
-   rather than opening it in place: on those pages it did not exist.
-   The markup it drives is still the block at the bottom of
-   index.html; the module injects its own copy only on pages that
-   have none.
-
-   These two are declarations, not consts, because both are called
-   from handlers defined ABOVE this point.
-   ================================================================ */
-AccountCenter.configure({
-  API_BASE,
-  apiErrorText,
-  mobileNav,
-  openAuth,
-  renderAuthNav,
-  /* app.js owns the wishlist map; logging out clears it here so the
-     hearts rendered by this file go dark with it. */
-  resetWishlist: () => { wishlistMap = new Map(); },
+document.getElementById('forgotPasswordLink').addEventListener('click', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('loginMsg');
+  const email = document.getElementById('liUser').value;
+  if (!email) {
+    msg.textContent = 'Enter your email above first, then click Forgot Password.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+    return;
+  }
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/auth/forgot-password`, { email });
+    msg.textContent = data.reset_link
+      ? `Reset link generated (email delivery not yet configured): ${data.reset_link}`
+      : data.message;
+    msg.style.color = 'var(--emerald)';
+    msg.classList.add('show');
+  } catch (err) {
+    msg.textContent = 'Something went wrong — please try again.';
+    msg.style.color = 'var(--coral-dark)';
+    msg.classList.add('show');
+  }
 });
 
-function openAccountCenter(tab)   { return AccountCenter.open(tab); }
-function loadUpcomingJourney()    { return AccountCenter.loadUpcomingJourney(); }
+/* ================================================================
+   ACCOUNT CENTER — replaces the old separate dashboard.html.
+   Every section below is a direct port of that page's logic, now
+   living inside one modal on the homepage instead of its own page.
+   ================================================================ */
+/* authHeaders() (equivalent to getStoredAuth().access-based version that
+   used to live here) now lives in assets/js/auth.js; money/fmtDate/fmtTime
+   now live in shared/formatters.js. */
+
+/* ---------- Modal open/close + tab switching ---------- */
+const acctModalOverlay = document.getElementById('accountModalOverlay');
+const acctLoadedTabs = new Set();
+let acctCurrentUser = null;
+
+function openAccountCenter(tab) {
+  const { access } = getStoredAuth();
+  if (!access) { openAuth('login'); return; }
+  acctModalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  goToAcctTab(tab || 'profile');
+  if (!acctCurrentUser) loadAcctHeaderProfile();
+}
+function closeAccountCenter() {
+  acctModalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('acctModalCloseBtn').addEventListener('click', closeAccountCenter);
+acctModalOverlay.addEventListener('click', e => { if (e.target === acctModalOverlay) closeAccountCenter(); });
+
+function goToAcctTab(name) {
+  document.querySelectorAll('.acct-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.acct-panel').forEach(p => p.classList.toggle('active', p.id === `acctPanel-${name}`));
+  if (!acctLoadedTabs.has(name)) {
+    acctLoadedTabs.add(name);
+    loadAcctTab(name);
+  }
+}
+document.querySelectorAll('.acct-tab').forEach(tab => {
+  tab.addEventListener('click', () => goToAcctTab(tab.dataset.tab));
+});
+function loadAcctTab(name) {
+  if (name === 'profile') return loadAcctProfile();
+  if (name === 'bookings') return loadAcctBookings();
+  if (name === 'wishlist') return loadAcctWishlist();
+  if (name === 'payments') return loadAcctPayments();
+  if (name === 'notifications') return loadAcctNotifications();
+  if (name === 'support') return loadAcctSupportTickets();
+  if (name === 'reviews') return loadAcctReviews();
+}
+
+/* Every dropdown item (desktop + mobile) and profile-chip toggle */
+document.querySelectorAll('[data-acct-tab]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('profileDropdown').classList.remove('open');
+    document.getElementById('profileChipBtn').classList.remove('open');
+    mobileNav.classList.remove('open');
+    openAccountCenter(link.dataset.acctTab);
+  });
+});
+const profileChipBtn = document.getElementById('profileChipBtn');
+const profileDropdown = document.getElementById('profileDropdown');
+profileChipBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = profileDropdown.classList.toggle('open');
+  profileChipBtn.classList.toggle('open', open);
+});
+document.addEventListener('click', () => {
+  profileDropdown.classList.remove('open');
+  profileChipBtn.classList.remove('open');
+});
+
+function doAccountLogout() {
+  const { access } = getStoredAuth();
+  axios.post(`${API_BASE}/api/auth/logout`, {}, { headers: { Authorization: `Bearer ${access}` } }).catch(() => {});
+  clearStoredAuth();
+  acctCurrentUser = null;
+  acctLoadedTabs.clear();
+  wishlistMap = new Map();
+  closeAccountCenter();
+  renderAuthNav();
+}
+document.getElementById('profileLogoutBtn').addEventListener('click', doAccountLogout);
+document.getElementById('mobileLogoutLink').addEventListener('click', e => { e.preventDefault(); doAccountLogout(); });
+
+/* ---------- Profile (header + editable form) ---------- */
+async function loadAcctHeaderProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    acctCurrentUser = data;
+    const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
+    document.getElementById('acctHeaderAvatar').textContent = initials;
+    document.getElementById('acctHeaderName').textContent = data.full_name;
+    document.getElementById('acctHeaderEmail').textContent = data.email;
+  } catch (err) { /* header just won't populate this cycle */ }
+}
+async function loadAcctProfile() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+    acctCurrentUser = data;
+    document.getElementById('acctProfileName').value = data.full_name;
+    document.getElementById('acctProfileEmail').value = data.email;
+    document.getElementById('acctProfileMobile').value = data.mobile || '';
+    document.getElementById('acctProfileGender').value = data.gender || '';
+    document.getElementById('acctProfileDob').value = data.dob || '';
+    document.getElementById('acctProfileCountry').value = data.country || '';
+    document.getElementById('acctProfileState').value = data.state || '';
+    document.getElementById('acctProfileCity').value = data.city || '';
+    document.getElementById('acctProfileAddress').value = data.address || '';
+  } catch (err) { /* fields stay blank */ }
+}
+document.getElementById('acctProfileForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctProfileMsg');
+  try {
+    const { data } = await axios.put(`${API_BASE}/api/users/me`, {
+      full_name: document.getElementById('acctProfileName').value,
+      mobile: document.getElementById('acctProfileMobile').value || null,
+      gender: document.getElementById('acctProfileGender').value || null,
+      dob: document.getElementById('acctProfileDob').value || null,
+      country: document.getElementById('acctProfileCountry').value || null,
+      state: document.getElementById('acctProfileState').value || null,
+      city: document.getElementById('acctProfileCity').value || null,
+      address: document.getElementById('acctProfileAddress').value || null,
+    }, { headers: authHeaders() });
+    setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'user', data.id);
+    renderAuthNav();
+    loadAcctHeaderProfile();
+    msg.textContent = 'Profile updated.';
+    msg.className = 'acct-msg success';
+  } catch (err) {
+    msg.textContent = apiErrorText(err, 'Failed to update profile.');
+    msg.className = 'acct-msg error';
+  }
+});
+document.getElementById('acctPasswordForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctPasswordMsg');
+  try {
+    await axios.post(`${API_BASE}/api/users/change-password`, {
+      current_password: document.getElementById('acctCurrentPassword').value,
+      new_password: document.getElementById('acctNewPassword').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Password changed successfully.';
+    msg.className = 'acct-msg success';
+    e.target.reset();
+  } catch (err) {
+    msg.textContent = apiErrorText(err, 'Failed to change password.');
+    msg.className = 'acct-msg error';
+  }
+});
+
+/* ---------- Bookings (list, cancel, confirmation/timeline) ---------- */
+const TYPE_ICONS = {
+  flight: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/>',
+  hotel: '<path d="M3 21V7a2 2 0 0 1 2-2h6v16"/><path d="M11 9h8a2 2 0 0 1 2 2v10"/><path d="M3 21h18"/>',
+  cruise: '<path d="M2 21c1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0"/><path d="M4 18l1-9h14l1 9"/><path d="M10 9V4h4v5"/>',
+  package: '<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+};
+let allBookingsCache = [];
+let paymentsByBooking = new Map();
+async function loadPaymentsMap() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    paymentsByBooking = new Map(data.map(p => [p.booking_id, p]));
+  } catch (err) { /* receipt just won't show payment rows */ }
+}
+function renderTimeline(booking) {
+  if (booking.status === 'cancelled') {
+    return `<div class="timeline">
+      <div class="tl-step done"><span class="tl-dot"></span><span class="tl-label">Booked</span></div>
+      <div class="tl-line done"></div>
+      <div class="tl-step cancelled-step"><span class="tl-dot"></span><span class="tl-label">Cancelled</span></div>
+    </div>`;
+  }
+  const isPastTravel = booking.travel_date && new Date(booking.travel_date) < new Date();
+  const confirmedDone = booking.status === 'confirmed' || booking.status === 'completed';
+  const completedDone = booking.status === 'completed' || (confirmedDone && isPastTravel);
+  const steps = [{ label: 'Booked', done: true }, { label: 'Confirmed', done: confirmedDone }, { label: 'Completed', done: completedDone }];
+  return `<div class="timeline">${steps.map((s, i) => `
+    ${i > 0 ? `<div class="tl-line ${steps[i - 1].done ? 'done' : ''}"></div>` : ''}
+    <div class="tl-step ${s.done ? 'done' : ''}"><span class="tl-dot"></span><span class="tl-label">${s.label}</span></div>
+  `).join('')}</div>`;
+}
+const CATALOG_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+const catalogItemCache = new Map();
+async function fetchCatalogItem(type, id) {
+  const cacheKey = `${type}-${id}`;
+  if (catalogItemCache.has(cacheKey)) return catalogItemCache.get(cacheKey);
+  const endpoint = CATALOG_ENDPOINTS[type];
+  if (!endpoint) return null;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/${endpoint}/${id}`);
+    catalogItemCache.set(cacheKey, data);
+    return data;
+  } catch (err) {
+    return null;
+  }
+}
+function bookingReference(bookingId) { return 'JWT-' + String(bookingId).padStart(6, '0'); }
+
+function closeAcctTicket() { document.getElementById('acctConfirmOverlay').classList.remove('open'); }
+document.getElementById('acctConfirmCloseBtn').addEventListener('click', closeAcctTicket);
+
+async function showAcctConfirmation(bookingId) {
+  const booking = allBookingsCache.find(b => String(b.id) === String(bookingId));
+  if (!booking) return;
+  const payment = paymentsByBooking.get(booking.id);
+  const item = await fetchCatalogItem(booking.booking_type, booking.item_id);
+  const reference = bookingReference(booking.id);
+  const isFlight = booking.booking_type === 'flight';
+
+  let itemTitle = `${booking.booking_type} — #${booking.item_id}`;
+  let itemSub = '';
+  let dateValue = fmtDate(booking.travel_date);
+  let sourceDestRow = '';
+  let timeRow = '';
+  let seatRow = '';
+
+  if (item) {
+    if (isFlight) {
+      itemTitle = `${item.airline} · ${item.cabin_class}`;
+      dateValue = fmtDate(booking.travel_date || item.departure_time);
+      sourceDestRow = `
+        <div class="confirm-row"><span>From</span><span>${escapeHtml(item.from_airport)}</span></div>
+        <div class="confirm-row"><span>To</span><span>${escapeHtml(item.to_airport)}</span></div>`;
+      timeRow = `<div class="confirm-row"><span>Time</span><span>${fmtTime(item.departure_time)} – ${fmtTime(item.arrival_time)}</span></div>`;
+      seatRow = `<div class="confirm-row"><span>Seat Number</span><span>Assigned at check-in</span></div>`;
+    } else if (booking.booking_type === 'hotel') {
+      itemTitle = item.name;
+      itemSub = item.location;
+    } else if (booking.booking_type === 'cruise') {
+      itemTitle = item.name;
+      itemSub = `Departs ${item.departure_port}`;
+    } else if (booking.booking_type === 'package') {
+      itemTitle = item.title;
+      itemSub = item.package_type;
+    }
+  }
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(reference)}`;
+
+  document.getElementById('acctConfirmBody').innerHTML = `
+    <div class="ticket-head">
+      <img src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours & Travels">
+      <div>
+        <div class="th-name">${escapeHtml(itemTitle)}</div>
+        ${itemSub ? `<div class="modal-sub" style="margin:2px 0 0;">${escapeHtml(itemSub)}</div>` : ''}
+      </div>
+    </div>
+    ${renderTimeline(booking)}
+    <div class="confirm-row"><span>Booking ID</span><span>#${booking.id}</span></div>
+    <div class="confirm-row"><span>PNR / Booking Reference</span><span>${reference}</span></div>
+    <div class="confirm-row"><span>Passenger Name</span><span>${escapeHtml(acctCurrentUser?.full_name || '—')}</span></div>
+    <div class="confirm-row"><span>Type</span><span style="text-transform:capitalize">${booking.booking_type}</span></div>
+    ${sourceDestRow}
+    <div class="confirm-row"><span>Date</span><span>${dateValue}</span></div>
+    ${timeRow}
+    ${seatRow}
+    <div class="confirm-row"><span>Quantity</span><span>${booking.quantity}</span></div>
+    <div class="confirm-row"><span>Booking Status</span><span style="text-transform:capitalize">${booking.status}</span></div>
+    ${payment ? `<div class="confirm-row"><span>Payment Status</span><span style="text-transform:capitalize">${payment.status}</span></div>` : ''}
+    <div class="confirm-row"><span>Total Amount</span><span>${money(booking.total_price)}</span></div>
+    <div class="confirm-row"><span>Booked On</span><span>${fmtDate(booking.created_at)}</span></div>
+    ${payment ? `
+      <div class="confirm-row"><span>Payment Method</span><span style="text-transform:capitalize">${payment.method}</span></div>
+      <div class="confirm-row"><span>Transaction Ref</span><span>${payment.transaction_ref}</span></div>
+    ` : ''}
+    <div class="ticket-qr">
+      <img src="${qrUrl}" alt="Booking QR code" width="140" height="140">
+      <div class="tq-ref">${reference}</div>
+    </div>
+    <div class="ticket-support">Need help with this booking? Call +91 12345 67890 or email info@jackpotsworldtours.com</div>
+    <div class="ticket-actions">
+      <button type="button" class="btn btn-coral btn-sm" id="ticketDownloadBtn">Download PDF</button>
+      <button type="button" class="btn btn-navy btn-sm" id="ticketPrintBtn">Print Ticket</button>
+      <button type="button" class="btn btn-navy btn-sm" id="ticketShareBtn">Share Ticket</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="ticketCloseBtn">Close</button>
+    </div>
+  `;
+  document.getElementById('acctConfirmOverlay').classList.add('open');
+
+  document.getElementById('ticketDownloadBtn').addEventListener('click', () => window.print());
+  document.getElementById('ticketPrintBtn').addEventListener('click', () => window.print());
+  document.getElementById('ticketCloseBtn').addEventListener('click', closeAcctTicket);
+  document.getElementById('ticketShareBtn').addEventListener('click', async () => {
+    const shareText = `My ${booking.booking_type} booking with JackPots World Tours & Travels — Ref ${reference}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'JackPots World Tours & Travels — Booking Ticket', text: shareText }); }
+      catch (err) { /* user cancelled the native share sheet */ }
+      return;
+    }
+    const withTimeout = (promise, ms) => Promise.race([
+      promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+    ]);
+    try {
+      await withTimeout(navigator.clipboard.writeText(shareText), 2000);
+      alert('Ticket details copied to clipboard.');
+    } catch (err) {
+      prompt('Copy your ticket details:', shareText);
+    }
+  });
+}
+
+function bookingRowHtml(b) {
+  return `
+    <div class="acct-row">
+      <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[b.booking_type] || TYPE_ICONS.package}</svg></div>
+      <div class="ar-main">
+        <div class="ar-title">${escapeHtml(b.booking_type)} — #${b.item_id}</div>
+        <div class="ar-sub">Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel ' + fmtDate(b.travel_date) : ''} ${b.quantity > 1 ? '· Qty ' + b.quantity : ''}</div>
+      </div>
+      <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
+      <div class="ar-amount">${money(b.total_price)}</div>
+      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.id}">View Ticket</button>
+      ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.id}">Cancel</button>` : ''}
+    </div>`;
+}
+async function cancelBookingById(bookingId, onSuccess) {
+  if (!confirm('Cancel this booking?')) return;
+  try {
+    await axios.delete(`${API_BASE}/api/bookings/${bookingId}`, { headers: authHeaders() });
+    await loadPaymentsMap();
+    if (typeof onSuccess === 'function') await onSuccess();
+  } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
+}
+function wireBookingRowActions(container) {
+  container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
+  container.querySelectorAll('[data-cancel-id]').forEach(btn => {
+    btn.addEventListener('click', () => cancelBookingById(btn.dataset.cancelId, async () => {
+      await loadAcctBookings();
+      loadUpcomingJourney();
+    }));
+  });
+}
+async function loadAcctBookings() {
+  const container = document.getElementById('acctBookingsList');
+  try {
+    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    allBookingsCache = data;
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">No bookings yet — go find your next trip!</div>';
+      return;
+    }
+    container.innerHTML = data.map(b => bookingRowHtml(b)).join('');
+    wireBookingRowActions(container);
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load bookings.</div>';
+  }
+}
+
+/* ---------- Homepage: Your Upcoming Journey ---------- */
+let upcomingCountdownTimer = null;
+
+function upcomingCardHtml(entry) {
+  const { booking, item, when } = entry;
+  const ref = bookingReference(booking.id);
+  let title = `${booking.booking_type} — #${booking.item_id}`;
+  let fromTo = '';
+  let timeSpan = '';
+  let seatSpan = '';
+  if (item) {
+    if (booking.booking_type === 'flight') {
+      title = item.airline;
+      fromTo = `<span>${escapeHtml(item.from_airport)} &rarr; ${escapeHtml(item.to_airport)}</span>`;
+      timeSpan = `<span>Time: <b>${fmtTime(item.departure_time)}</b></span>`;
+      seatSpan = `<span>Seat: <b>Assigned at check-in</b></span>`;
+    } else if (booking.booking_type === 'hotel') title = item.name;
+    else if (booking.booking_type === 'cruise') title = item.name;
+    else if (booking.booking_type === 'package') title = item.title;
+  }
+  return `
+    <div class="upcoming-card" data-upcoming-id="${booking.id}" data-upcoming-when="${when.toISOString()}">
+      <div class="upcoming-main">
+        <div class="upcoming-title">${escapeHtml(title)}</div>
+        <div class="upcoming-sub">Booking #${booking.id} · PNR ${ref} · <span class="badge ${booking.status}">${escapeHtml(booking.status)}</span></div>
+        <div class="upcoming-meta">
+          ${fromTo}
+          <span>Date: <b>${fmtDate(booking.travel_date)}</b></span>
+          ${timeSpan}
+          <span>Passengers: <b>${booking.quantity}</b></span>
+          ${seatSpan}
+        </div>
+      </div>
+      <div class="upcoming-countdown" data-countdown></div>
+      <div class="upcoming-actions">
+        <button type="button" class="btn btn-coral btn-sm" data-upcoming-view="${booking.id}">View Ticket</button>
+        <button type="button" class="btn btn-navy btn-sm" data-upcoming-download="${booking.id}">Download Ticket</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-upcoming-account>View Booking</button>
+        <button type="button" class="btn btn-danger btn-sm" data-upcoming-cancel="${booking.id}">Cancel Booking</button>
+      </div>
+    </div>`;
+}
+
+function tickUpcomingCountdowns() {
+  const now = Date.now();
+  const cards = document.querySelectorAll('#upcomingJourneyList .upcoming-card');
+  cards.forEach(card => {
+    const when = new Date(card.dataset.upcomingWhen).getTime();
+    const diff = when - now;
+    if (diff <= 0) {
+      card.remove();
+      return;
+    }
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const box = card.querySelector('[data-countdown]');
+    box.innerHTML = `
+      <div class="cd-box"><div class="cd-num">${days}</div><div class="cd-label">Days</div></div>
+      <div class="cd-box"><div class="cd-num">${String(hours).padStart(2, '0')}</div><div class="cd-label">Hours</div></div>
+      <div class="cd-box"><div class="cd-num">${String(minutes).padStart(2, '0')}</div><div class="cd-label">Minutes</div></div>`;
+  });
+  if (!document.querySelectorAll('#upcomingJourneyList .upcoming-card').length) {
+    document.getElementById('upcomingJourneySection').classList.remove('open');
+    clearInterval(upcomingCountdownTimer);
+  }
+}
+
+function wireUpcomingJourneyActions() {
+  document.querySelectorAll('[data-upcoming-view]').forEach(btn => {
+    btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.upcomingView));
+  });
+  document.querySelectorAll('[data-upcoming-download]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await showAcctConfirmation(btn.dataset.upcomingDownload);
+      window.print();
+    });
+  });
+  document.querySelectorAll('[data-upcoming-account]').forEach(btn => {
+    btn.addEventListener('click', () => openAccountCenter('bookings'));
+  });
+  document.querySelectorAll('[data-upcoming-cancel]').forEach(btn => {
+    btn.addEventListener('click', () => cancelBookingById(btn.dataset.upcomingCancel, loadUpcomingJourney));
+  });
+}
+
+async function loadUpcomingJourney() {
+  const section = document.getElementById('upcomingJourneySection');
+  const list = document.getElementById('upcomingJourneyList');
+  const { access } = getStoredAuth();
+  if (!access) { section.classList.remove('open'); clearInterval(upcomingCountdownTimer); return; }
+  try {
+    const [{ data }] = await Promise.all([axios.get(`${API_BASE}/api/bookings`, { headers: authHeaders() }), loadPaymentsMap()]);
+    allBookingsCache = data;
+    const now = new Date();
+    const candidates = data.filter(b => b.status !== 'cancelled' && b.status !== 'completed' && b.travel_date);
+    const resolved = await Promise.all(candidates.map(async b => {
+      const item = await fetchCatalogItem(b.booking_type, b.item_id);
+      let when = new Date(`${b.travel_date}T00:00:00`);
+      if (b.booking_type === 'flight' && item?.departure_time) {
+        const clock = new Date(item.departure_time);
+        when.setHours(clock.getHours(), clock.getMinutes(), clock.getSeconds(), 0);
+      }
+      return { booking: b, item, when };
+    }));
+    const upcoming = resolved.filter(r => r.when.getTime() > now.getTime()).sort((a, b) => a.when - b.when);
+    clearInterval(upcomingCountdownTimer);
+    if (!upcoming.length) {
+      list.innerHTML = '';
+      section.classList.remove('open');
+      return;
+    }
+    list.innerHTML = upcoming.map(upcomingCardHtml).join('');
+    wireUpcomingJourneyActions();
+    tickUpcomingCountdowns();
+    upcomingCountdownTimer = setInterval(tickUpcomingCountdowns, 1000);
+    section.classList.add('open');
+  } catch (err) {
+    section.classList.remove('open');
+  }
+}
+
+/* ---------- Payment History ---------- */
+async function loadAcctPayments() {
+  const tbody = document.querySelector('#acctPaymentsTable tbody');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/payments/history`, { headers: authHeaders() });
+    tbody.innerHTML = data.map(p => `
+      <tr><td>${fmtDate(p.created_at)}</td><td>${money(p.amount)}</td><td style="text-transform:capitalize">${escapeHtml(p.method)}</td><td><span class="badge ${p.status}">${escapeHtml(p.status)}</span></td><td>${escapeHtml(p.transaction_ref)}</td></tr>
+    `).join('') || `<tr><td colspan="5" class="acct-empty">No payments yet.</td></tr>`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="acct-empty">Failed to load payment history.</td></tr>`;
+  }
+}
+
+/* ---------- Wishlist ---------- */
+const ACCT_WISHLIST_ENDPOINTS = { flight: 'flights', hotel: 'hotels', cruise: 'cruises', package: 'packages' };
+async function fetchWishlistWithCatalog() {
+  const { data } = await axios.get(`${API_BASE}/api/wishlist`, { headers: authHeaders() });
+  const catalogs = {};
+  await Promise.all([...new Set(data.map(w => w.item_type))].map(async t => {
+    const { data: items } = await axios.get(`${API_BASE}/api/${ACCT_WISHLIST_ENDPOINTS[t]}`);
+    catalogs[t] = new Map(items.map(i => [i.id, i]));
+  }));
+  return { data, catalogs };
+}
+function wishlistLabel(type, item) {
+  if (!item) return `${type} #? (no longer available)`;
+  if (type === 'flight') return `${item.airline} ${item.from_airport}→${item.to_airport}`;
+  if (type === 'hotel') return item.name;
+  if (type === 'cruise') return item.name;
+  return item.title;
+}
+function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.price_per_night : item.price) : '—'; }
+async function loadAcctWishlist() {
+  const container = document.getElementById('acctWishlistList');
+  try {
+    const { data, catalogs } = await fetchWishlistWithCatalog();
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">Your wishlist is empty.</div>';
+      return;
+    }
+    container.innerHTML = data.map(w => {
+      const item = catalogs[w.item_type]?.get(w.item_id);
+      return `
+        <div class="acct-row">
+          <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[w.item_type] || TYPE_ICONS.package}</svg></div>
+          <div class="ar-main">
+            <div class="ar-title" style="text-transform:none;">${escapeHtml(wishlistLabel(w.item_type, item))}</div>
+            <div class="ar-sub" style="text-transform:capitalize;">${w.item_type} · ${wishlistPrice(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" data-remove-wishlist="${w.id}">Remove</button>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('[data-remove-wishlist]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.delete(`${API_BASE}/api/wishlist/${btn.dataset.removeWishlist}`, { headers: authHeaders() });
+          loadAcctWishlist();
+        } catch (err) { alert('Failed to remove item.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load wishlist.</div>';
+  }
+}
+
+/* ---------- Notifications ---------- */
+async function loadAcctNotifications() {
+  const container = document.getElementById('acctNotificationsList');
+  const clearBar = document.getElementById('acctNotifClearBar');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/notifications`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = `
+        <div class="acct-empty acct-empty-notif">
+          <div class="aei">🔔</div>
+          <div class="aet">No notifications yet</div>
+          <div class="aes">We'll notify you when something important happens.</div>
+        </div>`;
+      clearBar.style.display = 'none';
+      return;
+    }
+    container.innerHTML = data.map(n => `
+      <div class="acct-notif-item ${n.is_read ? '' : 'unread'}">
+        <div class="nt">${escapeHtml(n.title)}</div>
+        <div class="nm">${escapeHtml(n.message)}</div>
+        <div class="ndate">${fmtDate(n.created_at)}</div>
+        ${!n.is_read ? `<div class="acct-notif-actions"><button type="button" class="btn btn-ghost btn-sm" data-mark-read="${n.id}">Mark as Read</button></div>` : ''}
+      </div>
+    `).join('');
+    clearBar.style.display = data.some(n => n.is_read) ? 'flex' : 'none';
+    container.querySelectorAll('[data-mark-read]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await axios.patch(`${API_BASE}/api/notifications/${btn.dataset.markRead}/read`, {}, { headers: authHeaders() });
+          loadAcctNotifications();
+        } catch (err) { alert('Failed to mark as read.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load notifications.</div>';
+    clearBar.style.display = 'none';
+  }
+}
+
+document.getElementById('acctMarkAllReadBtn').addEventListener('click', async () => {
+  try {
+    await axios.patch(`${API_BASE}/api/notifications/read-all`, {}, { headers: authHeaders() });
+    loadAcctNotifications();
+  } catch (err) { alert('Failed to mark all as read.'); }
+});
+
+document.getElementById('acctClearAllBtn').addEventListener('click', async () => {
+  if (!confirm('Are you sure you want to clear all notifications?')) return;
+  try {
+    await axios.delete(`${API_BASE}/api/notifications/read`, { headers: authHeaders() });
+    loadAcctNotifications();
+  } catch (err) { alert('Failed to clear notifications.'); }
+});
+
+/* ---------- Reviews ---------- */
+function starString(rating) { return '★'.repeat(rating) + '☆'.repeat(5 - rating); }
+async function loadAcctReviews() {
+  const container = document.getElementById('acctReviewsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/reviews/mine`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = "<div class=\"acct-empty\">You haven't written any reviews yet.</div>";
+      return;
+    }
+    container.innerHTML = data.map(r => `
+      <div class="acct-row" data-review-row="${r.id}">
+        <div class="ar-main">
+          <div class="ar-title">${escapeHtml(r.item_type)} #${r.item_id}</div>
+          <div class="ar-sub" style="color:var(--gold-dark); letter-spacing:1px;">${starString(r.rating)}</div>
+          ${r.comment ? `<div class="ar-sub">${escapeHtml(r.comment)}</div>` : ''}
+          <div class="ar-sub">${fmtDate(r.created_at)}</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" data-edit-review="${r.id}" data-rating="${r.rating}" data-comment="${escapeHtml(r.comment || '')}">Edit</button>
+        <button type="button" class="btn btn-danger btn-sm" data-delete-review="${r.id}">Delete</button>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-edit-review]').forEach(btn => {
+      btn.addEventListener('click', () => openAcctReviewEdit(btn.dataset.editReview, Number(btn.dataset.rating), btn.dataset.comment));
+    });
+    container.querySelectorAll('[data-delete-review]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this review?')) return;
+        try {
+          await axios.delete(`${API_BASE}/api/reviews/${btn.dataset.deleteReview}`, { headers: authHeaders() });
+          loadAcctReviews();
+        } catch (err) { alert('Failed to delete review.'); }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load reviews.</div>';
+  }
+}
+function openAcctReviewEdit(reviewId, rating, comment) {
+  const row = document.querySelector(`[data-review-row="${reviewId}"]`);
+  let selected = rating;
+  row.innerHTML = `
+    <div class="ar-main" style="width:100%;">
+      <div class="acct-star-input" id="acctEditStars-${reviewId}">
+        ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}" class="${n <= rating ? 'active' : ''}">★</span>`).join('')}
+      </div>
+      <input type="text" id="acctEditComment-${reviewId}" value="${escapeHtml(comment)}" style="width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; margin-bottom:10px;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-coral btn-sm" id="acctSaveReview-${reviewId}">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="acctCancelReview-${reviewId}">Cancel</button>
+      </div>
+    </div>
+  `;
+  row.querySelectorAll(`#acctEditStars-${reviewId} span`).forEach(s => {
+    s.addEventListener('click', () => {
+      selected = Number(s.dataset.star);
+      row.querySelectorAll(`#acctEditStars-${reviewId} span`).forEach(x => x.classList.toggle('active', Number(x.dataset.star) <= selected));
+    });
+  });
+  document.getElementById(`acctCancelReview-${reviewId}`).addEventListener('click', loadAcctReviews);
+  document.getElementById(`acctSaveReview-${reviewId}`).addEventListener('click', async () => {
+    try {
+      await axios.put(`${API_BASE}/api/reviews/${reviewId}`, { rating: selected, comment: document.getElementById(`acctEditComment-${reviewId}`).value }, { headers: authHeaders() });
+      loadAcctReviews();
+    } catch (err) { alert('Failed to update review.'); }
+  });
+}
+
+/* ---------- Support Tickets ---------- */
+async function loadAcctSupportTickets() {
+  const container = document.getElementById('acctTicketsList');
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/support-tickets`, { headers: authHeaders() });
+    if (!data.length) {
+      container.innerHTML = '<div class="acct-empty">No support tickets yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(t => `
+      <div class="acct-row">
+        <div class="ar-main">
+          <div class="ar-title" style="text-transform:none;">${escapeHtml(t.subject)}</div>
+          <div class="ar-sub">${escapeHtml(t.description)}</div>
+          <div class="ar-sub">Priority: ${escapeHtml(t.priority)} · Raised ${fmtDate(t.created_at)}</div>
+        </div>
+        <span class="badge ${t.status}">${escapeHtml(t.status.replace('_', ' '))}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="acct-empty">Failed to load support tickets.</div>';
+  }
+}
+document.getElementById('acctTicketForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('acctTicketMsg');
+  try {
+    await axios.post(`${API_BASE}/api/support-tickets`, {
+      subject: document.getElementById('acctTicketSubject').value,
+      description: document.getElementById('acctTicketDescription').value,
+      priority: document.getElementById('acctTicketPriority').value,
+    }, { headers: authHeaders() });
+    msg.textContent = 'Ticket submitted — our support team will get back to you.';
+    msg.className = 'acct-msg success';
+    e.target.reset();
+    loadAcctSupportTickets();
+  } catch (err) {
+    msg.textContent = apiErrorText(err, 'Failed to submit ticket.');
+    msg.className = 'acct-msg error';
+  }
+});
+
+loadUpcomingJourney();

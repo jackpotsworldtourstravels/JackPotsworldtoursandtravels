@@ -36,17 +36,9 @@ html{scroll-behavior:smooth; overflow-x:hidden;}
   html{scroll-behavior:auto;}
   *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important;}
 }
-/* `clip`, NOT `hidden`, and the difference is not cosmetic.
-   `overflow-x:hidden` makes body a SCROLL CONTAINER, and a scroll container
-   ancestor is what `position:sticky` sticks to — so every sticky panel on the
-   site was resolving against a box that never scrolls and simply rode the page
-   away. The filter sidebar and the booking summary both looked sticky in the
-   stylesheet and were not in the browser.
-   `clip` clips exactly the same overflow without creating that container, so
-   the 320px measurement in the note above still holds and sticky works. */
 body{
   background:var(--bg); color:var(--ink); font-family:var(--ff-body);
-  -webkit-font-smoothing:antialiased; overflow-x:clip; line-height:1.5;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden; line-height:1.5;
 }
 ::selection{background:var(--coral); color:#fff;}
 img,svg{display:block; max-width:100%;}
@@ -142,23 +134,6 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   padding-top:158px; padding-bottom:64px; overflow:hidden;
 }
 @media (max-width:900px){.hero{min-height:700px;}}
-
-/* THE RESULTS-PAGE HEADER — the same hero, doing a different job.
-   No min-height and no vertical centring: it is exactly as tall as the search
-   card inside it, so the first result sits just under the fold line instead of
-   877px down the page. The film and the overlay stay, which is what keeps this
-   recognisably the same product rather than a bare grey toolbar.
-   padding-top clears the fixed header (128px at rest) with a little air. */
-.hero.is-compact{
-  min-height:0; justify-content:flex-start;
-  padding-top:150px; padding-bottom:26px;
-}
-@media (max-width:900px){
-  .hero.is-compact{min-height:0; padding-top:104px; padding-bottom:18px;}
-}
-/* The card is the whole content here, so it does not need the 34px of air that
-   separates it from the landing page's pitch. */
-.hero.is-compact .search-dock{margin-top:0;}
 .hero-bg{
   position:absolute; inset:0; z-index:0;
   background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80');
@@ -203,28 +178,20 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 @keyframes bob{0%,100%{transform:translate(-50%,0);} 50%{transform:translate(-50%,8px);}}
 
 /* ---------- SEARCH CARD ---------- */
-/* width:100% is load-bearing, not tidiness. The hero is a flex COLUMN with
-   the default `align-items:normal`, so the dock is sized by its own content
-   rather than stretched to the hero. That was invisible while the card's
-   widest row was a field grid that wraps; the product tab strip does not
-   wrap (the tabs are one nowrap row that scrolls inside itself), so its
-   411px max-content width became the dock's width and pushed the card off
-   the side of a 375px phone. Stretched to the hero, the strip is handed a
-   real width to scroll within. */
-.search-dock{position:relative; z-index:5; margin-top:34px; width:100%;}
+.search-dock{position:relative; z-index:5; margin-top:34px;}
 .search-card{
   background:rgba(255,255,255,0.82); backdrop-filter:blur(20px) saturate(160%);
   border:1px solid rgba(255,255,255,0.6); border-radius:24px; box-shadow:var(--shadow-lg); padding:14px;
 }
-/* THE PRODUCT TAB STRIP IS GONE. .tabs / .tab styled a Flights / Hotels /
-   Cruises / Tour Packages row inside the card — the site header's product
-   navigation, repeated one screen below it. The card carries one product now
-   (booking-card.js: PANELS) and the header is the only product navigation, so
-   these rules had nothing left to style and were removed rather than left as
-   dead selectors for the next person to wonder about. */
-/* One panel is built per card, so the stack below never has more than one
-   member; grid-area:1/1 is kept because booking-card.css layers the active
-   panel's own display rules on top of it. */
+.tabs{display:flex; gap:6px; padding:6px 6px 16px; flex-wrap:wrap;}
+.tab{
+  padding:11px 20px; border-radius:100px; font-size:14px; font-weight:700; color:var(--navy); opacity:.55;
+  display:flex; align-items:center; gap:8px; transition:all .25s ease;
+}
+.tab.active{background:var(--navy); color:#fff; opacity:1; box-shadow:var(--shadow-sm);}
+.tab:hover:not(.active){opacity:.9; background:rgba(10,37,64,0.06);}
+/* Panels are stacked via CSS grid (grid-area:1/1) so the tallest panel sets the
+   container height once — switching tabs never resizes or animates the card. */
 .search-body{display:grid;}
 .search-panel{grid-area:1/1; visibility:hidden;}
 .search-panel.active{visibility:visible;}
@@ -603,17 +570,6 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 }
 .modal-field input:focus{border-color:var(--coral);}
 .modal-forgot{display:inline-block; margin:-6px 0 18px; font-size:13px; font-weight:700; color:var(--coral);}
-/* Remember Me sits on the same line as Forgot Password. The checkbox is
-   deliberately OUTSIDE .modal-field: that rule sets width:100% on its inputs,
-   which would stretch a checkbox across the whole modal. */
-.modal-remember{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:-6px 0 18px;}
-.modal-remember .modal-forgot{margin:0;}
-.modal-remember label{display:flex; align-items:center; gap:8px; margin:0; font-size:13px; font-weight:600; color:var(--muted); cursor:pointer;}
-.modal-remember input[type="checkbox"]{width:16px; height:16px; margin:0; accent-color:var(--coral); cursor:pointer;}
-/* Dev-only code box on the OTP step. Empty (and classless) on any server that
-   has SMTP configured, so it occupies nothing in production. */
-.modal-devbox{margin:0 0 16px; padding:10px 14px; border-radius:10px; background:#fff5f2;
-  border:1px dashed var(--coral); font-size:13px; font-weight:600; color:var(--navy); line-height:1.5;}
 .modal-submit{width:100%; justify-content:center; margin-top:4px;}
 .modal-switch{text-align:center; margin-top:22px; font-size:14px; color:var(--muted);}
 .modal-switch a{color:var(--coral); font-weight:700;}
@@ -645,10 +601,9 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .profile-dropdown hr{border:none; border-top:1px solid var(--line); margin:6px 4px;}
 .profile-dropdown .logout-item{color:var(--coral-dark);}
 .profile-dropdown .logout-item .dd-icon{color:var(--coral-dark);}
-/* .mobile-account-links / .show-account / .mobile-auth-links were the drawer's
-   duplicate account controls, swapped in and out by a class. The drawer no
-   longer carries any — profile-menu.js in the header is the one set, at every
-   width — so the markup and these rules are gone together. */
+.mobile-account-links{display:none;}
+.mobile-nav.show-account .mobile-account-links{display:block;}
+.mobile-nav.show-account .mobile-auth-links{display:none;}
 
 /* ---------- ACCOUNT CENTER MODAL ---------- */
 #accountModalOverlay .modal-card{max-width:960px; padding:0; max-height:88vh; display:flex; flex-direction:column;}
@@ -768,15 +723,7 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
 .foot-contact a:hover{color:var(--gold);}
 .foot-col a:hover{opacity:1; color:var(--gold);}
 .foot-bottom{display:flex; justify-content:space-between; padding-top:26px; font-size:12.5px; opacity:.55; flex-wrap:wrap; gap:10px;}
-/* minmax(0,1fr), NOT 1fr. An `fr` track's automatic minimum is its
-   MIN-CONTENT width, and this grid contains "info@jackpotsworldtours.com" —
-   one unbreakable 27-character string. At 320px that one word set the column
-   floor and the whole footer laid out at 391px, 71px past the viewport. The
-   page did not scroll sideways only because body was clipping it. */
-@media (max-width:960px){.foot-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px;}}
-/* Belt to that brace: the address and the email are the two strings long
-   enough to do it again if the columns ever narrow further. */
-.foot-contact li, .foot-contact a{overflow-wrap:anywhere;}
+@media (max-width:960px){.foot-grid{grid-template-columns:1fr 1fr;}}
 
 /* ==========================================================================
    TOUCH INPUT SIZING - FUNCTIONAL, NOT COSMETIC
@@ -798,202 +745,3 @@ footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px
 @media (max-width:900px), (hover:none) and (pointer:coarse){
   input, select, textarea{font-size:16px !important;}
 }
-/* ==========================================================================
-   Auth modal — step flow, inline errors, open/close motion
-   ==========================================================================
-   Additive: .modal-overlay / .modal-card / .modal-field keep every rule they
-   already had. Nothing here restyles the modal, it only adds the states the
-   stepped flow needs.
-   ========================================================================== */
-
-/* --- open / close motion -------------------------------------------------
-   The overlay already toggles display:none <-> flex, which cannot be
-   transitioned. Opacity and the card's lift are what animate; `display` is
-   still what shows it. */
-.modal-overlay.open{
-  opacity:1;
-  transition:opacity .22s ease;
-}
-.modal-overlay.open .modal-card{
-  animation:authCardIn .26s cubic-bezier(.22,1,.36,1);
-}
-.modal-overlay.closing{ opacity:0; }
-.modal-overlay.closing .modal-card{ transform:translateY(6px) scale(.985); transition:transform .18s ease; }
-
-@keyframes authCardIn{
-  from{ opacity:0; transform:translateY(14px) scale(.97); }
-  to  { opacity:1; transform:none; }
-}
-
-/* Someone who has asked for less motion gets the state change without the
-   movement — the modal still opens, it just does not slide. */
-@media (prefers-reduced-motion: reduce){
-  .modal-overlay.open,
-  .modal-overlay.closing,
-  .modal-overlay.open .modal-card,
-  .modal-overlay.closing .modal-card{
-    animation:none; transition:none; transform:none;
-  }
-}
-
-/* --- steps ---------------------------------------------------------------
-   One view at a time. `hidden` does the hiding; this only stops a hidden step
-   being laid out by the flex/grid rules around it. */
-.auth-view[hidden]{ display:none; }
-
-/* --- inline validation ---------------------------------------------------
-   The message sits under its own field. Nothing in this flow uses alert(). */
-.field-error{
-  margin:6px 0 0; font-size:12.5px; line-height:1.4; color:var(--coral-dark, #C0392B);
-  min-height:0;
-}
-.field-error:empty{ display:none; }
-
-.modal-field input.is-invalid{
-  border-color:var(--coral-dark, #C0392B);
-  background:rgba(192,57,43,.04);
-}
-.modal-field input.is-invalid:focus{ border-color:var(--coral-dark, #C0392B); }
-
-/* --- an address already given, shown but not re-typed --------------------- */
-.field-locked{ position:relative; display:flex; align-items:center; }
-.field-locked input{
-  flex:1; min-width:0;
-  /* room for the Change button, so a long address does not run under it */
-  padding-right:84px !important;
-  background:rgba(10,37,64,.04);
-  color:var(--muted);
-  cursor:default;
-}
-.field-locked input:focus{ border-color:rgba(10,37,64,.14); }
-.field-change{
-  position:absolute; right:10px;
-  padding:4px 10px; border-radius:999px;
-  font-size:12px; font-weight:700; color:var(--coral);
-  background:transparent; border:1px solid transparent; cursor:pointer;
-}
-.field-change:hover{ background:rgba(255,77,77,.1); }
-.field-change:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
-
-/* .modal-forgot is now a <button> rather than an <a> — it changes a step
-   rather than navigating. Kept visually identical to the link it replaced. */
-button.modal-forgot{
-  background:none; border:none; padding:0; cursor:pointer;
-  font:inherit; font-size:13px; font-weight:700; color:var(--coral);
-}
-button.modal-forgot:hover{ text-decoration:underline; }
-button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
-
-/* Debug-only reset link, shown when the API returns one because SMTP is off. */
-.modal-devlink{
-  display:inline-block; margin-top:10px; font-size:13px; font-weight:700;
-  color:var(--coral); text-decoration:underline; word-break:break-all;
-}
-
-/* --- responsive ----------------------------------------------------------
-   The card is already max-width:420px and scrolls at 90vh. At phone widths it
-   wants the full width and a little less padding, so the fields are not
-   squeezed into a column of their own. */
-@media (max-width:480px){
-  .modal-overlay{ padding:12px; }
-  .auth-card{ padding:28px 20px; border-radius:20px; max-height:94vh; }
-  .auth-card h2{ font-size:22px; }
-  .modal-remember{ gap:8px; }
-  .field-locked input{ padding-right:76px !important; }
-}
-
-/* ==========================================================================
-   Password strength readout (signup step of the auth modal)
-   ========================================================================== */
-.pw-strength { margin: 6px 0 0; font-size: 12px; font-weight: 700; }
-.pw-strength:empty { display: none; }
-.pw-strength.is-s0, .pw-strength.is-s1 { color: var(--coral-dark, #C0392B); }
-.pw-strength.is-s2 { color: var(--gold, #E9A23B); }
-.pw-strength.is-s3, .pw-strength.is-s4 { color: var(--emerald, #12B76A); }
-
-/* ===========================================================================
-   header.is-solid — the same navigation bar on a page with no video behind it
-   ===========================================================================
-   hero-shell.js adds this class when the page has no `#heroBg`, i.e. every
-   service page. Three things have to change and nothing else:
-
-   1. IT SITS IN THE FLOW, not fixed. The hero pages let the film run up under
-      a 128px fixed bar; a service page has no film, and a fixed bar would
-      float over content that never reserved room for it. Static keeps every
-      existing page layout exactly as it was under the old service header.
-   2. IT IS PAINTED. The base rule starts the bar at rgba(0,0,0,0) so the video
-      shows through — on a light page that is white lettering on white.
-   3. ITS LETTERING GOES DARK, for the same reason.
-
-   Scoped entirely to this class, so index.html and flights.html — which do
-   have a hero — are untouched.
-   =========================================================================== */
-header.is-solid{
-  position:static; background:#fff; backdrop-filter:none;
-  border-bottom:1px solid var(--line);
-}
-header.is-solid nav.wrap{height:76px;}
-header.is-solid .logo-mark-img{max-height:52px;}
-
-header.is-solid .navlinks a{color:var(--navy); font-weight:600;}
-header.is-solid .navlinks a:hover{color:var(--coral);}
-/* The current page, marked. There was no rule for this at all, so the active
-   item looked like every other link on every page that sets it. */
-header.is-solid .navlinks a[aria-current="page"]{color:var(--coral);}
-header.is-solid .navlinks a[aria-current="page"]::after{width:100%;}
-
-header.is-solid .nav-partner-mark{color:var(--navy); border-color:var(--line);}
-header.is-solid .nav-partner-mark:hover{border-color:var(--coral); background:rgba(255,77,77,0.08);}
-header.is-solid .nav-login{color:var(--navy);}
-header.is-solid .hamburger span{background:var(--navy);}
-
-/* The mobile drawer hangs off the bar, so it needs the painted treatment too. */
-header.is-solid .mobile-nav{background:#fff; border-top:1px solid var(--line);}
-header.is-solid .mobile-nav a{color:var(--navy);}
-
-@media (max-width:900px){
-  header.is-solid nav.wrap{height:64px;}
-  header.is-solid .logo-mark-img{max-height:42px;}
-}
-
-/* ---------------------------------------------------------------------------
-   Narrow screens: the top bar cannot carry the partner button as well.
-   With a signed-in account chip present, "My Partner" (114px) + the chip
-   (179px) + the burger overflowed a 390px bar — the header scrolled to 410px,
-   which squeezed the LOGO to zero width and pushed the burger off-screen.
-   Neither is reachable, and the burger is the only way into the menu.
-
-   The button is not lost: the mobile drawer already carries its own
-   `.mobile-partner-mark` copy, which is where it belongs at this width.
-   Applies to the hero header too — flights.html and index.html had exactly
-   the same overflow before this.
-   --------------------------------------------------------------------------- */
-@media (max-width:600px){
-  header .nav-actions > .nav-partner-mark{display:none;}
-  header .logo{flex:0 0 auto;}
-  header .logo-mark-img{max-height:38px;}
-}
-
-/* ---------------------------------------------------------------------------
-   Header icon buttons — My Bookings, Notifications
-   ---------------------------------------------------------------------------
-   Sized to match .nav-partner-mark's outline pill so the right-hand cluster
-   reads as one row of controls rather than a pill and two loose glyphs.
-   Icon-only with a title and an aria-label: two more words next to "My
-   Partner" and the account chip crowds the bar at 1280px, and both
-   destinations are also named in full inside the profile menu.
-   --------------------------------------------------------------------------- */
-.nav-icon-btn{
-  width:38px; height:38px; flex:none; display:inline-grid; place-items:center;
-  border-radius:50%; cursor:pointer;
-  background:transparent; border:1px solid rgba(255,255,255,.28); color:#fff;
-  transition:background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
-}
-.nav-icon-btn svg{width:18px; height:18px;}
-.nav-icon-btn:hover{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.5); transform:translateY(-1px);}
-.nav-icon-btn:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
-/* Over a light bar the white outline is invisible — same swap the rest of the
-   solid-header rules make. */
-header.is-solid .nav-icon-btn{border-color:var(--line); color:var(--navy);}
-header.is-solid .nav-icon-btn:hover{background:rgba(255,77,77,.08); border-color:var(--coral);}
-@media (max-width:900px){.nav-icon-btn{display:none;}}

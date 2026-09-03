@@ -11,67 +11,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
-<!-- The hero card's own controls: trip type, the passenger popover and the
-     round-trip return row. Loaded AFTER main.css, which still owns .search-card
-     and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
-<!-- The profile chip + dropdown, shared by every page that shows a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
-<!-- All of these are needed BEFORE the inline BookingCard.render() call in the
-     hero, so they are in <head> rather than at the foot with the rest.
-
-     airports.js and search-widgets.js are the airport picker: the ~2KB table
-     and the shared listbox. NOT travel-data.js — the note at the foot of this
-     page about the explore assets still stands, and the table was moved out of
-     it precisely so the landing page could have a picker without a flight
-     schedule and a hotel image map coming along for the ride. -->
-<!-- jp-icons.js comes FIRST of these: the card asks JPIcon for the four
-     product-tab glyphs while it renders, and this file used to load at the
-     foot of the page - so JPIcon did not exist yet and the tabs came out as
-     bare words. Every other page already loads it ahead of the card. -->
-<script src="assets/js/jp-icons.js?v=20260824bk9"></script>
-<script src="assets/js/airports.js?v=20260825t3"></script>
-<script src="assets/js/search-widgets.js?v=20260825t3"></script>
-<script src="assets/js/destinations.js?v=20260825h1"></script>
-<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
-<script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260902flow4"></script>
-<!-- The header's scroll fade, hamburger and hero parallax. Shared with the
-     Flights page, which mounts its whole nav from this file — see its header
-     comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
-<!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
-     `tx-` namespace — main.css is untouched by that feature. -->
+<link rel="stylesheet" href="assets/css/main.css?v=20260805ui34">
 </head>
 <body>
 <a href="#main" class="skip-link">Skip to content</a>
 
-<!-- THIS NAV BAR EXISTS TWICE, AND THE OTHER COPY IS hero-shell.js.
-
-     The Flights page is this page continued rather than a separate layout, so
-     it wears exactly this header — but it builds it in JS, while this one stays
-     static HTML on purpose: this is the marketing front door, and its nav links
-     and hero heading should be in the document a crawler is served rather than
-     assembled afterwards.
-
-     CHANGE ONE, CHANGE THE OTHER. Styling is main.css's and is shared, so only
-     the link list, the logo and the account controls live in both places. -->
 <header id="siteHeader">
   <nav class="wrap">
     <a href="#home" class="logo">
       <img class="logo-mark-img" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
     </a>
-    <!-- The service words are real links now, one page each. "Packages" used to
-         be an in-page #packages anchor; it is "Tour Packages" -> packages.html
-         so there are not two nav items with near-identical names. The landing
-         page's own packages section is untouched and still scrolls to. -->
     <div class="navlinks">
       <a href="#home">Home</a>
-      <a href="flights.html">Flights</a>
-      <a href="hotels.html">Hotels</a>
-      <a href="packages.html">Tour Packages</a>
+      <a href="#packages">Packages</a>
+      <a href="#" data-tab-link="flights">Flights</a>
+      <a href="#" data-tab-link="hotels">Hotels</a>
+      <a href="#" data-tab-link="cruises">Cruises</a>
       <a href="#contact">Contact</a>
     </div>
     <div class="nav-actions">
@@ -83,44 +38,56 @@
         <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
         <span>My Partner</span>
       </a>
-      <!-- My Bookings and Notifications. NOT a second copy of the profile menu's
-         entries: same two destinations, reached as icons for the two things a
-         traveller checks mid-journey without wanting the whole account panel.
-         Both open the Account Center on that tab, so there is one
-         implementation of each screen. -->
-      <button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-      <button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
-      <!-- THE ONLY AUTHENTICATION CONTROLS ON THIS PAGE.
-           profile-menu.js renders Login + Sign Up when signed out and the chip
-           + dropdown when signed in, so exactly one set exists at a time and
-           the same component serves every other page.
-
-           A static `navLoginLink`/`navSignupLink` pair used to sit here as
-           well. Once the component started rendering its own, the header
-           carried BOTH — the duplicate Login/Sign Up. Removed rather than
-           hidden: two implementations IS the bug, and a `display:none` would
-           have left the second pair in the DOM, in the tab order, and still
-           wired to app.js's click handler. -->
-      <div class="pm-slot" data-profile-menu></div>
+      <a href="#" class="nav-login" id="navLoginLink" data-auth="login">Login</a>
+      <a href="#" class="btn btn-coral nav-signup" id="navSignupLink" data-auth="signup">Sign Up</a>
+      <div class="profile-chip-wrap" id="profileChipWrap" style="display:none;">
+        <button type="button" class="profile-chip" id="profileChipBtn">
+          <span class="profile-chip-avatar" id="profileChipAvatar">U</span>
+          <span class="profile-chip-name" id="profileChipName">Traveler</span>
+          <svg class="profile-chip-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="profile-dropdown" id="profileDropdown">
+          <a href="#" data-acct-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</a>
+          <a href="#" data-acct-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</a>
+          <a href="#" data-acct-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</a>
+          <a href="#" data-acct-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</a>
+          <a href="#" data-acct-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</a>
+          <a href="#" data-acct-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</a>
+          <a href="#" data-acct-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</a>
+          <a href="#" data-acct-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+          <hr>
+          <button type="button" class="logout-item" id="profileLogoutBtn"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>Logout</button>
+        </div>
+      </div>
       <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </nav>
   <div class="mobile-nav" id="mobileNav">
     <a href="#home">Home</a>
-    <a href="flights.html">Flights</a>
-    <a href="hotels.html">Hotels</a>
-    <a href="packages.html">Tour Packages</a>
+    <a href="#packages">Packages</a>
+    <a href="#" data-tab-link="flights">Flights</a>
+    <a href="#" data-tab-link="hotels">Hotels</a>
+    <a href="#" data-tab-link="cruises">Cruises</a>
     <a href="#contact">Contact</a>
-    <!-- The drawer's own Login/Sign Up pair and its nine account links are
-         gone. They were a THIRD and FOURTH copy of the same controls, kept in
-         step by hand in renderAuthNav(), and they are not needed: .nav-actions
-         stays visible at every width, so the chip (avatar-only under 560px)
-         and the signed-out buttons are already reachable in the header on a
-         phone. The drawer is the page LINKS; the account is the header. -->
-    <a href="partner-login.html" class="mobile-partner-mark">
-      <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
-      My Partner
-    </a>
+    <div class="mobile-auth-links">
+      <a href="partner-login.html" class="mobile-partner-mark">
+        <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+        My Partner
+      </a>
+      <a href="#" id="mobileNavLoginLink" data-auth="login">Login</a>
+      <a href="#" id="mobileNavSignupLink" data-auth="signup">Sign Up</a>
+    </div>
+    <div class="mobile-account-links">
+      <a href="#" data-acct-tab="profile">My Profile</a>
+      <a href="#" data-acct-tab="bookings">My Bookings</a>
+      <a href="#" data-acct-tab="wishlist">Wishlist</a>
+      <a href="#" data-acct-tab="payments">Payment History</a>
+      <a href="#" data-acct-tab="notifications">Notifications</a>
+      <a href="#" data-acct-tab="support">Support Tickets</a>
+      <a href="#" data-acct-tab="reviews">Reviews</a>
+      <a href="#" data-acct-tab="settings">Settings</a>
+      <a href="#" id="mobileLogoutLink">Logout</a>
+    </div>
   </div>
 </header>
 
@@ -140,14 +107,158 @@
     <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
   </div>
 
-  <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
-       Flights page mounts the same module — the two pages share one control
-       instead of two copies of a form that would have drifted apart.
-       Rendered inline and synchronously, so this DOM exists before app.js runs
-       at the bottom of the page and its handlers still find .search-panel,
-       .search-go and the field ids exactly where they were. -->
-  <div class="wrap search-dock" id="heroSearchDock"></div>
-  <script>BookingCard.render('heroSearchDock');</script>
+  <div class="wrap search-dock">
+    <div class="search-card" role="region" aria-label="Booking search">
+      <div class="tabs" role="tablist" aria-label="Booking type">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="flights">&#9992;&#65039; Flights</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="hotels">&#127976; Hotels</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="cruises">&#128674; Cruises</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="packages">&#127958;&#65039; Tour Packages</button>
+      </div>
+
+      <div class="search-body">
+      <div class="search-panel active" data-panel="flights">
+        <div class="search-fields">
+          <div class="field"><label for="fFrom">From Airport</label><input id="fFrom" value="Hyderabad (HYD)"></div>
+          <button class="swap-btn" type="button" aria-label="Swap origin and destination">&#8646;</button>
+          <div class="field"><label for="fTo">To Airport</label><input id="fTo" value="Delhi (DEL)"></div>
+          <div class="field field-date">
+            <label for="fDep">Departure</label>
+            <input id="fDep" class="date-display" value="Sat, 4 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field field-date">
+            <label for="fRet">Return</label>
+            <input id="fRet" class="date-display" value="Add date" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field">
+            <label for="fPax">Passengers</label>
+            <select id="fPax">
+              <option>1 Passenger</option>
+              <option>2 Passengers</option>
+              <option>3 Passengers</option>
+              <option>4 Passengers</option>
+              <option>5+ Passengers</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fCabin">Cabin</label>
+            <select id="fCabin">
+              <option>Economy</option>
+              <option>Premium Economy</option>
+              <option>Business</option>
+              <option>First</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="hotels">
+        <div class="search-fields cols-6">
+          <div class="field"><label for="hDest">Destination</label><input id="hDest" value="Goa, India"></div>
+          <div class="field field-date">
+            <label for="hIn">Check-in</label>
+            <input id="hIn" class="date-display" value="Fri, 10 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field field-date">
+            <label for="hOut">Check-out</label>
+            <input id="hOut" class="date-display" value="Sun, 12 Jul" readonly>
+            <input type="date" class="date-native" aria-hidden="true" tabindex="-1">
+            <svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="field">
+            <label for="hGuests">Guests</label>
+            <select id="hGuests">
+              <option>1 Guest</option>
+              <option>2 Guests</option>
+              <option>3 Guests</option>
+              <option>4 Guests</option>
+              <option>5+ Guests</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="hRooms">Rooms</label>
+            <select id="hRooms">
+              <option>1 Room</option>
+              <option>2 Rooms</option>
+              <option>3 Rooms</option>
+              <option>4 Rooms</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="cruises">
+        <div class="search-fields cols-5">
+          <div class="field">
+            <label for="crType">Cruise Type</label>
+            <select id="crType">
+              <option>Goa Cruise</option>
+              <option>Kerala Backwater Cruise</option>
+              <option>Singapore Cruise</option>
+              <option>Dubai Cruise</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="crMonth">Month</label>
+            <select id="crMonth">
+              <option>January</option><option>February</option><option>March</option><option>April</option>
+              <option>May</option><option>June</option><option selected>July</option><option>August</option>
+              <option>September</option><option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="crDur">Duration</label>
+            <select id="crDur">
+              <option>2 Days</option>
+              <option>3 Days</option>
+              <option>5 Days</option>
+              <option>7 Days</option>
+            </select>
+          </div>
+          <div class="field"><label for="crTrav">Travellers</label><input id="crTrav" value="2 Adults"></div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+
+      <div class="search-panel" data-panel="packages">
+        <div class="search-fields cols-3">
+          <div class="field">
+            <label for="pType">Tour Package Type</label>
+            <select id="pType">
+              <option>Casino Tour Package</option>
+              <option>Domestic Tour Package</option>
+              <option>Pilgrimage Tour Package</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pMonth">Month</label>
+            <select id="pMonth">
+              <option>January</option><option>February</option><option>March</option><option>April</option>
+              <option>May</option><option>June</option><option selected>July</option><option>August</option>
+              <option>September</option><option>October</option><option>November</option><option>December</option>
+            </select>
+          </div>
+          <button class="btn btn-coral search-go">Search</button>
+        </div>
+      </div>
+      </div>
+
+      <div class="trust-row">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Trusted by 2 Million+ Travellers</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>24/7 Support</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Secure Payments</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Instant Confirmation</span>
+      </div>
+    </div>
+  </div>
 
   <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
 </section>
@@ -156,12 +267,8 @@
      by renderSearchResults(), which consumed the catalog API retired in the V2 redesign.
      Removed with that code. The wishlist, Reviews and View Details modals further down
      are in the same position — their only trigger buttons were rendered into result and
-     package cards by cardActionsHtml(), so no element on this page opens them either.
+     package cards by cardActionsHtml(), so no element on this page opens them either. -->
 
-     The band that briefly lived here is gone, and on purpose: each service now
-     has its OWN page (flights.html, hotels.html, cruises.html, packages.html,
-     visa.html, activities.html). Clicking a service in the nav opens only that
-     service. The landing page is the landing page again. -->
 
 <section class="upcoming-section" id="upcomingJourneySection">
   <div class="wrap">
@@ -258,7 +365,7 @@
         <div class="pkg-img"><img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=500&q=80" alt="Goa Escape package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
         <div class="pkg-body">
           <h3>Goa Escape</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.8 (2,140 reviews)</div>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.8 (2,140 reviews)</div>
           <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹5,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="1" data-book-price="5999" data-book-label="Goa Escape">Book Now</a></div>
         </div>
       </article>
@@ -266,7 +373,7 @@
         <div class="pkg-img"><img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=500&q=80" alt="Kashmir Valley Retreat package" loading="lazy"><span class="pkg-duration">6 Days</span></div>
         <div class="pkg-body">
           <h3>Kashmir Valley Retreat</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.9 (1,865 reviews)</div>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.9 (1,865 reviews)</div>
           <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹16,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="2" data-book-price="16999" data-book-label="Kashmir Valley Retreat">Book Now</a></div>
         </div>
       </article>
@@ -274,7 +381,7 @@
         <div class="pkg-img"><img src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=500&q=80" alt="Bali Honeymoon Special package" loading="lazy"><span class="pkg-duration">5 Days</span></div>
         <div class="pkg-body">
           <h3>Bali Honeymoon Special</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.9 (3,210 reviews)</div>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 4.9 (3,210 reviews)</div>
           <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹31,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="3" data-book-price="31999" data-book-label="Bali Honeymoon Special">Book Now</a></div>
         </div>
       </article>
@@ -282,7 +389,7 @@
         <div class="pkg-img"><img src="https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=500&q=80" alt="Maldives Overwater Villa package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
         <div class="pkg-body">
           <h3>Maldives Overwater Villa</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 5.0 (980 reviews)</div>
+          <div class="pkg-stars"><span class="stars">★★★★★</span> 5.0 (980 reviews)</div>
           <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹52,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="4" data-book-price="52999" data-book-label="Maldives Overwater Villa">Book Now</a></div>
         </div>
       </article>
@@ -415,10 +522,7 @@
       </div>
       <div class="foot-col">
         <h5>Travel</h5>
-        <!-- Cruises, Visa and Activities are removed here too. hero-shell.js's
-             footerHtml() is the other copy of this column and dropped them at
-             the same time; the two must stay identical. -->
-        <a href="flights.html">Flights</a><a href="hotels.html">Hotels</a><a href="packages.html">Tour Packages</a>
+        <a href="#" data-tab-link="flights">Flights</a><a href="#" data-tab-link="hotels">Hotels</a><a href="#" data-tab-link="cruises">Cruises</a><a href="#packages">Holiday Packages</a>
       </div>
       <div class="foot-col">
         <h5>Support</h5>
@@ -444,16 +548,16 @@
 <div class="fab-menu" id="fabMenu">
   <div class="fab-items" id="fabItems" role="menu" aria-label="Quick actions">
     <button type="button" class="fab-item" id="fabTopBtn" data-tooltip="Back to Top" aria-label="Scroll back to top" role="menuitem">
-      <span class="fab-icon" aria-hidden="true"><span data-jp-icon="arrowUp"></span></span>
+      <span class="fab-icon" aria-hidden="true">&#11014;</span>
     </button>
     <button type="button" class="fab-item" id="fabSupportBtn" data-tooltip="Customer Support" aria-label="Open customer support" role="menuitem">
-      <span class="fab-icon" aria-hidden="true"><span data-jp-icon="chat"></span></span>
+      <span class="fab-icon" aria-hidden="true">&#128172;</span>
     </button>
     <button type="button" class="fab-item" id="fabVoiceBtn" data-tooltip="Voice Search" aria-label="Start voice search" role="menuitem">
-      <span class="fab-icon" aria-hidden="true"><span data-jp-icon="mic"></span></span>
+      <span class="fab-icon" aria-hidden="true">&#127908;</span>
     </button>
     <button type="button" class="fab-item" id="fabAiBtn" data-tooltip="AI Travel Assistant" aria-label="Open AI travel assistant" aria-expanded="false" role="menuitem">
-      <span class="fab-icon" aria-hidden="true"><span data-jp-icon="sparkle"></span></span>
+      <span class="fab-icon" aria-hidden="true">&#10024;</span>
     </button>
   </div>
   <button type="button" class="fab-main" id="fabMainBtn" aria-label="Open quick actions menu" aria-haspopup="true" aria-expanded="false" aria-controls="fabItems">
@@ -477,165 +581,66 @@
 </div>
 
 <div class="modal-overlay" id="authOverlay">
-  <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <button class="modal-close" id="authCloseBtn" type="button" aria-label="Close">&times;</button>
 
+    <!-- Merchants are onboarded by the JackPots team, not self-registered: a
+         merchant is created by an Admin (POST /api/admin/merchants) and starts
+         in pending_approval until approved, so it cannot trade the moment a
+         form is submitted. There is no /api/auth/signup in the v2 API, so this
+         asks for the details the team needs instead of posting to nothing. -->
+    <div class="auth-view" id="signupView">
+      <h2 id="authTitle">Partner registration</h2>
+      <p class="modal-sub">Accounts are set up by our onboarding team. Share your details and we'll take it from there.</p>
+      <div class="modal-field"><label for="suCompany">Company Name</label><input id="suCompany" type="text" autocomplete="organization" placeholder="Your travel company"></div>
+      <div class="modal-field"><label for="suName">Contact Name</label><input id="suName" type="text" autocomplete="name" placeholder="Your name"></div>
+      <div class="modal-field"><label for="suEmail">Work Email</label><input id="suEmail" type="email" autocomplete="email" placeholder="you@company.com"></div>
+      <div class="modal-field"><label for="suPhone">Phone</label><input id="suPhone" type="tel" autocomplete="tel" placeholder="Optional"></div>
+      <button type="button" class="btn btn-coral modal-submit" id="suRequestBtn">Request Access</button>
+      <div class="modal-msg" id="signupMsg"></div>
+      <div class="modal-switch">Already have an account? <a href="#" data-auth="login">Login</a></div>
+    </div>
+
     <!-- ===================================================================
-         ONE DOOR FOR TRAVELLERS — email first, branch later.
+         CUSTOMER (B2C) SIGN-IN — travellers, not travel agencies.
          ===================================================================
-         This modal used to be two views the traveller had to choose between:
-         "Login" and "Sign Up" opened different forms, and picking the wrong
-         one meant retyping everything in the other. Both header buttons now
-         open THIS, and the flow decides what to ask for.
+         This modal used to be the MERCHANT login: it posted portal:'merchant'
+         and handed off to the Merchant Portal, which meant the public site's
+         "Login" and its "My Partner" button were two routes to the same B2B
+         door and there was no customer sign-in at all.
 
-         WHY THE BRANCH IS OFFERED RATHER THAN DETECTED. The obvious version of
-         this asks the server "does an account exist for this email?" and jumps
-         straight to Login or Sign Up. That endpoint would be an account
-         enumeration oracle — anyone could test addresses one at a time — and
-         it is exactly what this API deliberately avoids elsewhere:
-         /forgot-password answers "if an account exists for that email…" for
-         precisely this reason (customer_auth.py). So the email step leads to
-         the password step, and a traveller with no account takes the "Create
-         your account" link, which carries the address they already typed. No
-         one types their email twice, and the server still refuses to say who
-         is registered.
+         The audiences are split now. Merchants sign in at partner-login.html
+         behind "My Partner"; this is the traveller's door, and it opens the
+         Account Center already built into this page (My Bookings, Wishlist,
+         Payment History, Reviews) under the customer `jwt_*` namespace.
 
-         Steps: email -> password -> (otp)  |  email -> signup -> (otp)
-                email -> forgot
-         The OTP step is shared, because /login and /signup both answer with
-         the same challenge. -->
+         IT IS NOT LIVE YET, AND IT SAYS SO RATHER THAN PRETENDING.
+         There is no customer login endpoint to call: /api/auth/login accepts
+         Portal = super_admin|admin|manager|merchant only, the `customer` role
+         is defined with zero permissions, and the legacy /api/auth/user/login
+         this site once used was dropped in the V2 migration — it is absent
+         from the live OpenAPI. The form below is complete and wired; the
+         single `CUSTOMER_AUTH.enabled` flag in app.js is what turns it on when
+         the endpoint ships. Until then it declines clearly instead of throwing
+         a 404 at a traveller. -->
+    <div class="auth-view" id="loginView" style="display:none;">
+      <div id="loginStepCreds">
+        <h2>Welcome back</h2>
+        <p class="modal-sub">Sign in to manage your bookings, wishlist and reviews.</p>
+        <form id="loginForm" novalidate>
+          <div class="modal-field"><label for="liUser">Email Address</label><input id="liUser" type="email" autocomplete="username" required placeholder="you@example.com"></div>
+          <div class="modal-field"><label for="liPass">Password</label><input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"></div>
+          <a href="#" class="modal-forgot" id="forgotPasswordLink">Forgot Password?</a>
+          <button type="submit" class="btn btn-coral modal-submit">Continue</button>
+          <div class="modal-msg" id="loginMsg"></div>
+        </form>
+      </div>
 
-    <!-- STEP 1 ------------------------------------------------------------->
-    <div class="auth-view" id="authStepEmail">
-      <h2 id="authTitle">Welcome to JackPots World</h2>
-      <p class="modal-sub">Sign in or create an account to book flights, hotels and holidays — and keep every trip in one place.</p>
-      <form id="authEmailForm" novalidate>
-        <div class="modal-field">
-          <label for="authEmail">Email Address</label>
-          <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"
-                 aria-describedby="authEmailErr">
-          <p class="field-error" id="authEmailErr" role="alert"></p>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit">Continue</button>
-        <div class="modal-msg" id="authEmailMsg"></div>
-      </form>
-      <!-- "Continue with Google" and "Continue with Mobile" are deliberately
-           absent. Neither exists in this project — no OAuth client, no
-           endpoint, no column to hang a Google id on — and a button that fails
-           when pressed is worse than one that was never offered. -->
+      <div class="modal-switch">Need an account? <a href="#" data-auth="signup">Get started</a></div>
+      <!-- The one pointer to the B2B side. It names the Partner Portal and
+           nothing else — no Admin, Manager or Super Admin appears anywhere on
+           this site. -->
       <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
-    </div>
-
-    <!-- STEP 2A — returning traveller ---------------------------------------->
-    <div class="auth-view" id="authStepPassword" hidden>
-      <h2>Welcome back</h2>
-      <p class="modal-sub">Enter your password to continue.</p>
-      <form id="loginForm" novalidate>
-        <div class="modal-field">
-          <label for="liUser">Email Address</label>
-          <div class="field-locked">
-            <input id="liUser" type="text" autocomplete="username" readonly>
-            <button type="button" class="field-change" data-step="email">Change</button>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label for="liPass">Password</label>
-          <input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"
-                 aria-describedby="liPassErr">
-          <p class="field-error" id="liPassErr" role="alert"></p>
-        </div>
-        <div class="modal-remember">
-          <label for="liRemember"><input id="liRemember" type="checkbox"> Remember me</label>
-          <button type="button" class="modal-forgot" data-step="forgot">Forgot Password?</button>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit">Login</button>
-        <div class="modal-msg" id="loginMsg"></div>
-      </form>
-      <div class="modal-switch">New here? <a href="#" data-step="signup">Create your account</a></div>
-    </div>
-
-    <!-- STEP 2B — new traveller ---------------------------------------------->
-    <div class="auth-view" id="authStepSignup" hidden>
-      <h2>Create your account</h2>
-      <p class="modal-sub">A few details and you are done — we will send a code to confirm it is you.</p>
-      <form id="signupForm" novalidate>
-        <div class="modal-field">
-          <label for="suName">Full Name</label>
-          <input id="suName" type="text" autocomplete="name" required placeholder="Your full name" aria-describedby="suNameErr">
-          <p class="field-error" id="suNameErr" role="alert"></p>
-        </div>
-        <div class="modal-field">
-          <label for="suEmail">Email Address</label>
-          <div class="field-locked">
-            <input id="suEmail" type="email" autocomplete="email" required readonly>
-            <button type="button" class="field-change" data-step="email">Change</button>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label for="suMobile">Mobile Number</label>
-          <input id="suMobile" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="9876543210" aria-describedby="suMobileErr">
-          <p class="field-error" id="suMobileErr" role="alert"></p>
-        </div>
-        <div class="modal-field">
-          <label for="suPass">Password</label>
-          <input id="suPass" type="password" autocomplete="new-password" required placeholder="At least 8 characters" aria-describedby="suPassErr suPassStrength">
-          <p class="pw-strength" id="suPassStrength" role="status" aria-live="polite"></p>
-          <p class="field-error" id="suPassErr" role="alert"></p>
-        </div>
-        <div class="modal-field">
-          <label for="suPass2">Confirm Password</label>
-          <input id="suPass2" type="password" autocomplete="new-password" required placeholder="Re-enter your password" aria-describedby="suPass2Err">
-          <p class="field-error" id="suPass2Err" role="alert"></p>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit" id="suRequestBtn">Create Account</button>
-        <div class="modal-msg" id="signupMsg"></div>
-      </form>
-      <div class="modal-switch">Already have an account? <a href="#" data-step="password">Sign in instead</a></div>
-    </div>
-
-    <!-- STEP 3 — shared code step, reached from login AND signup -------------->
-    <div class="auth-view" id="loginStepOtp" hidden>
-      <h2>Verify it's you</h2>
-      <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
-      <!-- Dev only. The API returns `dev_otp` ONLY when SMTP is unconfigured
-           (customer_otp_service.issue returns the plaintext in DEV_MODE and
-           None otherwise), so this renders nothing on a mail-configured
-           server. Without it the step is unusable locally while the server's
-           own message says "the code is shown here". -->
-      <div id="liDevOtp"></div>
-      <div class="modal-field">
-        <label for="liOtp">One-Time Code</label>
-        <input id="liOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;"
-               aria-describedby="liOtpErr">
-        <p class="field-error" id="liOtpErr" role="alert"></p>
-      </div>
-      <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
-      <div class="modal-msg" id="loginOtpMsg"></div>
-      <div class="modal-switch">
-        <a href="#" id="liResendBtn">Resend code</a> &nbsp;&middot;&nbsp;
-        <a href="#" id="liBackBtn">Use a different account</a>
-      </div>
-    </div>
-
-    <!-- STEP 4 — forgot password --------------------------------------------->
-    <!-- The reset itself finishes on customer/reset-password.html, because the
-         API issues a LINK token rather than a code (/forgot-password ->
-         /reset-password takes `token`). Collecting an OTP here would mean
-         inventing a second reset mechanism the backend does not have. -->
-    <div class="auth-view" id="authStepForgot" hidden>
-      <h2>Reset your password</h2>
-      <p class="modal-sub">Tell us your email address and we will send you a link to set a new password.</p>
-      <form id="forgotForm" novalidate>
-        <div class="modal-field">
-          <label for="fpEmail">Email Address</label>
-          <input id="fpEmail" type="email" autocomplete="email" required placeholder="you@example.com" aria-describedby="fpEmailErr">
-          <p class="field-error" id="fpEmailErr" role="alert"></p>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit">Send reset link</button>
-        <div class="modal-msg" id="fpMsg"></div>
-        <div id="fpDevLink"></div>
-      </form>
-      <div class="modal-switch"><a href="#" data-step="password">Back to sign in</a></div>
     </div>
   </div>
 </div>
@@ -647,7 +652,7 @@
     <p class="modal-sub" id="reviewsModalSub"></p>
     <div id="reviewFormWrap">
       <div class="star-input" id="reviewStarInput">
-        <span data-star="1"><span data-jp-icon="star" data-jp-size="sm"></span></span><span data-star="2"><span data-jp-icon="star" data-jp-size="sm"></span></span><span data-star="3"><span data-jp-icon="star" data-jp-size="sm"></span></span><span data-star="4"><span data-jp-icon="star" data-jp-size="sm"></span></span><span data-star="5"><span data-jp-icon="star" data-jp-size="sm"></span></span>
+        <span data-star="1">&#9733;</span><span data-star="2">&#9733;</span><span data-star="3">&#9733;</span><span data-star="4">&#9733;</span><span data-star="5">&#9733;</span>
       </div>
       <form id="reviewForm">
         <div class="modal-field"><label for="reviewComment">Your review (optional)</label><input id="reviewComment" type="text" placeholder="Share your experience..."></div>
@@ -792,12 +797,8 @@
         <div class="acct-panel" id="acctPanel-settings">
           <h2>Change password</h2>
           <form id="acctPasswordForm" style="margin-bottom:10px;">
-            <div class="acct-form-field"><label>Current Password</label><input id="acctCurrentPassword" type="password" autocomplete="current-password" required></div>
-            <div class="acct-form-field"><label>New Password</label><input id="acctNewPassword" type="password" autocomplete="new-password" required minlength="8"></div>
-            <!-- The customer API takes confirm_password as a real field. Sending
-                 a copy of New Password would satisfy it while letting a typo
-                 through unnoticed, so the traveller types it twice. -->
-            <div class="acct-form-field"><label>Confirm New Password</label><input id="acctConfirmPassword" type="password" autocomplete="new-password" required minlength="8"></div>
+            <div class="acct-form-field"><label>Current Password</label><input id="acctCurrentPassword" type="password" required></div>
+            <div class="acct-form-field"><label>New Password</label><input id="acctNewPassword" type="password" required minlength="8"></div>
             <button type="submit" class="btn btn-navy">Change Password</button>
             <div class="acct-msg" id="acctPasswordMsg"></div>
           </form>
@@ -825,25 +826,8 @@
 <script src="components/toast.js"></script>
 <script src="components/spinner.js"></script>
 <script src="components/confirm-dialog.js"></script>
-<script src="assets/js/auth.js?v=20260827pm2"></script>
+<script src="assets/js/auth.js?v=20260805ui34"></script>
 <script src="assets/js/api.js?v=20260805ui34"></script>
-<!-- The icon family. Loaded before app.js so JPIcon exists when the
-     Account Center renders its empty states. -->
-<!-- jp-icons.js is in <head>, ahead of the search card that needs it. -->
-<!-- The Account Center. Before app.js, which calls AccountCenter.configure()
-     at the end of its own load. This page keeps its static modal markup above,
-     so the module skips injecting a second copy. -->
-<!-- The profile chip + dropdown. Before account-center.js, whose Logout it
-     calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
-<script src="assets/js/profile-menu.js?v=20260827dup1"></script>
-<script src="assets/js/account-center.js?v=20260829pm6"></script>
-<!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
-     handler is what calls it. -->
-<script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260902flow4"></script>
-<!-- The explore assets are NOT loaded here any more. travel-data.js,
-     travel-explore.js and the two vendored asset maps belong to the service
-     pages (flights/hotels/cruises/packages), which are the only places that
-     render inventory. The landing page carries none of that weight. -->
+<script src="assets/js/app.js?v=20260805ui34"></script>
 </body>
 </html>

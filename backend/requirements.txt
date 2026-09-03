@@ -30,21 +30,3 @@ xlrd>=2.0
 # deployment never loads it — but it ships in the image so the same image can
 # run either way.
 boto3>=1.35
-
-# HTTP client for the passport-OCR provider adapters (CR-8). Azure's adapter
-# imports it lazily and its docstring says "already in the image" — which was
-# true only by accident: nothing here declared it, and the copy on the box
-# arrives as a transitive dependency of the local extraction extras. Strip
-# those out (or select a provider that does not need them) and the Azure and
-# MiniAiLive adapters lose their HTTP client at the first scan rather than at
-# build time. Declared so that stops being luck.
-requests>=2.32
-
-# OCR_PROVIDER=local's extraction extras (CR-8). local_provider.py imports
-# both lazily and turns a missing wheel into OCRMisconfigured rather than a
-# crash, but its own error message says "pip install -r requirements.txt" —
-# so they belong here too, not just in the docstring. rapidocr-onnxruntime
-# ships its OCR models in the wheel (no separate download, no vendor
-# account); pymupdf renders a PDF page to an image before that runs.
-rapidocr-onnxruntime>=1.3
-pymupdf>=1.24

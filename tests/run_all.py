@@ -107,30 +107,6 @@ SUITE = [
     # other way round.
     ("verify_providers.py",
      "Providers: codes, people, derived totals, issuance attribution, exports, no-login guarantee"),
-    # Passport OCR (CR-8). After the booking scripts because it attaches scans
-    # to real bookings, and before the rate-limit-heavy pair below. It needs no
-    # provider to be useful: with OCR_PROVIDER=none it asserts the unavailable
-    # contract -- availability says so, the endpoint answers 503, and a booking
-    # still submits -- rather than skipping. Set OCR_PROVIDER on the server
-    # under test to exercise real extraction.
-    ("verify_passport_ocr.py",
-     "Passport OCR: availability, scope, 503 contract, private scan proxy, edit audit"),
-    # Customer Portal V1 (0044). Late, because its central assertion is that a
-    # merchant/admin/manager/super-admin token and their credentials are ALL
-    # refused by the customer API — so it signs each of them in, and a failure
-    # in those portals' own scripts above explains a failure here rather than
-    # the other way round. It signs in five times, so it must stay ahead of
-    # verify_m8, which spends what is left of the rate-limit budget.
-    ("verify_customer_portal.py",
-     "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
-    # Immediately after the Customer Portal, which is the module it takes money
-    # for: if B2C identity or booking is broken, every payment failure here is a
-    # symptom of it. It mints its customer token directly rather than signing
-    # in, so it spends no rate-limit budget and does not disturb the two scripts
-    # below. Needs a configured provider - PAYMENT_PROVIDER=mock with
-    # PAYMENT_ENVIRONMENT=test is what the suite expects.
-    ("verify_payments.py",
-     "B2C payments: server-side amount, signed webhooks, dedupe, capture/confirm, refund flag"),
     # The only script that opens a browser, and the only one asserting anything
     # about layout. It signs in three times, so it sits after the API scripts
     # (their failures explain its failures, never the reverse) and before M8,

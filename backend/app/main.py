@@ -21,14 +21,6 @@ from app.routers import (
     auth,
     booking_ops,
     change_requests,
-    customer_account,
-    customer_auth,
-    customer_bookings,
-    customer_hotel_bookings,
-    customer_package_bookings,
-    customer_profile,
-    customer_payment_admin,
-    customer_travellers,
     dashboard,
     documents,
     enquiries,
@@ -42,11 +34,8 @@ from app.routers import (
     merchant_team,
     merchants,
     notifications_v2,
-    passport_ocr,
-    payment_webhooks,
     profile,
     providers,
-    public,
     reports,
     super_admin,
     support_tickets,
@@ -201,14 +190,6 @@ PORTED_MODULES = [
     # The merchant's own sign-off in front of ours. No migration: the state is
     # a JSONB sub-field on service_requests.travel_details.
     "manager_approval",
-    # V1 — the B2C Customer Portal (migration 0044). Listed here because it is
-    # a live module, but it is not part of the v2 B2B port: it has its own seven
-    # tables, its own models Base, and shares no row with anything above.
-    "customer_portal",
-    # The landing page's own contact form — public, no session, relays
-    # straight to the business inbox by email. No migration: nothing is
-    # persisted, there is no table to add.
-    "public_contact",
 ]
 PENDING_MODULES = [
     "catalog_management",  # deliberately deferred — see docs/SCHEMA_V2.md; not in the approved spec
@@ -242,17 +223,6 @@ app.include_router(assistant.router)
 # and there must not be: booking documents are passport and visa scans, served
 # only through documents.py's authenticated, merchant-scoped download route.
 app.include_router(documents.router)
-# Passport scanning (CR-8). Mounted here because it is the same class of
-# data as documents.py above -- identity scans -- and carries the same rule:
-# the image is reachable only through an authenticated, scope-checked route,
-# never a static mount. The router answers "unavailable" of its own accord
-# when no provider is configured, so mounting it is safe on a deployment
-# that has not enabled OCR.
-app.include_router(passport_ocr.router)
-# Unauthenticated by necessity: the caller is the provider's server, and the
-# signature over the raw body is what stands in for a session. Mounted apart
-# from every customer and merchant router so it shares none of their deps.
-app.include_router(payment_webhooks.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
 # The merchant's manager signing off the service requests its own staff raised,
@@ -283,9 +253,6 @@ app.include_router(wallet.router)
 # wallet.router because that one's defining property is that no route in it
 # carries a merchant id; almost every route here does.
 app.include_router(payment_admin.router)
-# B2C customer payments, read-only, gated on payment.verify (admin only).
-# Separate from payment_admin above, which is the MERCHANT wallet desk.
-app.include_router(customer_payment_admin.router)
 # M5 — message delivery seen by staff. Gated on notification.send, which only
 # the Admin role holds: notification.view is every merchant's own bell.
 app.include_router(messages.router)
@@ -299,37 +266,6 @@ app.include_router(analytics.router)
 # service with the merchant, wallet or payment modules, which is what keeps
 # recording a purchase source from being able to move money.
 app.include_router(providers.router)
-# V1 — the B2C Customer Portal (migration 0044). Last, and deliberately set
-# apart: every router above reads `users`/`merchants`, and these two read the
-# `customer_*` tables and nothing else. The separation is enforced by the token
-# scope rather than by convention — a customer token is refused by all of the
-# routers above (get_current_user rejects any scoped token), and a merchant or
-# admin token is refused by these two (get_current_customer requires
-# scope="customer"). Neither direction needed a change to the other side.
-app.include_router(customer_auth.router)
-app.include_router(customer_profile.router)
-# The saved traveller list and the booking flow. Same customer scope as the two
-# above; the catalogue routes inside customer_bookings are deliberately public,
-# because a seat map is not private and is browsed before signing in.
-app.include_router(customer_travellers.router)
-app.include_router(customer_bookings.router)
-# Account Center: payment history, wishlist, notifications, reviews, support
-# tickets. Same customer scope; `GET /reviews` (by item) is the one public
-# route in it, for the same reason the catalogue above is public.
-app.include_router(customer_account.router)
-# The real B2C hotel system (Phase 2): its own tables, its own booking
-# reference series (JPH######) — see migration 0055. Same customer scope as
-# the flight booking flow; the catalogue routes (`/hotels`, `/hotels/{id}`,
-# `/hotels/addons`) are public for the same reason a flight's seat map is.
-app.include_router(customer_hotel_bookings.router)
-# The real B2C tour-package system (Phase 5): its own tables, its own booking
-# reference series (JPP######) — see migration 0056. Same customer scope;
-# the catalogue routes (`/packages`, `/packages/{id}`, `/packages/departures`,
-# `/packages/addons`) are public for the same reason the hotel ones are.
-app.include_router(customer_package_bookings.router)
-# The landing page's contact form. Deliberately last and unauthenticated —
-# see routers/public.py.
-app.include_router(public.router)
 
 
 @app.on_event("startup")
@@ -396,84 +332,6 @@ def _run_completion_sweep() -> None:
         db.close()
 
 
-# ---------------------------------------------------------------------------
-# The deferred payment-event sweep (Phase 7).
-#
-# Deliberately its own loop rather than a second job inside the completion
-# sweep: they run at different cadences, and a failure in one must not stop the
-# other. The pattern is copied exactly — sleep first, never let a bad tick kill
-# the loop, do the blocking work on a worker thread.
-#
-# IT ADDS NO VERIFICATION LOGIC OF ITS OWN. It calls the same
-# process_deferred_events() a live webhook would reach, so a replayed event is
-# verified against the provider on exactly the same terms as a fresh one.
-# ---------------------------------------------------------------------------
-_payment_sweep_task: "asyncio.Task | None" = None
-
-
-async def _payment_sweep_loop() -> None:
-    interval = max(60, settings.payment_sweep_interval_minutes * 60)
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            await asyncio.to_thread(_run_payment_sweep)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "Deferred payment sweep failed; will retry next tick."
-            )
-
-
-def _run_payment_sweep() -> None:
-    from app.services import payment_verification_service as verification
-
-    db = SessionLocal()
-    try:
-        tally = verification.process_deferred_events(
-            db, limit=settings.payment_sweep_batch_size,
-        )
-        # Only speak when there was something to do. A line every five minutes
-        # saying "0 events" is how a log stops being read.
-        if tally.get("seen"):
-            logger.info("Deferred payment sweep: %s", tally)
-    finally:
-        db.close()
-
-
-@app.on_event("startup")
-async def warn_if_otp_echo_is_on() -> None:
-    """Say it loudly, every boot, if login codes are not being emailed.
-
-    OTP_DEV_ECHO is meant for a laptop or CI, where the fixtures' addresses are
-    fake and tests/ reads the code out of the login response. On a real host it
-    means anyone who learns a password is handed the second factor with it, and
-    nothing else about the running server would reveal that — so the only
-    defence against it being set by accident is that it announces itself.
-    """
-    if settings.otp_dev_echo:
-        logger.warning(
-            "OTP_DEV_ECHO is ON: login codes are NOT emailed — they are logged "
-            "and returned in the API response. This is for local and CI hosts "
-            "only. If this is a deployed server, unset it now."
-        )
-
-
-@app.on_event("startup")
-async def report_payment_configuration() -> None:
-    """Say on every boot whether customers can pay, and with what.
-
-    A log and not a raise: a booking is written first and paid for second, so a
-    bad payment key must not stop the platform taking bookings. But it must
-    never be discovered only because a customer mentioned Pay Now did nothing —
-    and a host switched to live credentials must announce that it is now moving
-    real money, the way OTP_DEV_ECHO announces itself above.
-    """
-    from app.services import payments as payment_providers
-
-    payment_providers.check_configuration_at_startup()
-
-
 @app.on_event("startup")
 async def start_booking_completion() -> None:
     global _completion_task
@@ -485,39 +343,6 @@ async def start_booking_completion() -> None:
         "Automatic booking completion is on: sweeping every %d minute(s).",
         settings.booking_completion_interval_minutes,
     )
-
-
-@app.on_event("startup")
-async def start_payment_sweep() -> None:
-    global _payment_sweep_task
-    if not settings.payment_sweep_enabled:
-        logger.info("The deferred payment sweep is disabled by configuration.")
-        return
-    from app.services import payments as payment_providers
-
-    if not payment_providers.is_available():
-        # No provider, so no events can ever be deferred. Not started at all,
-        # rather than started and finding nothing forever.
-        logger.info("No payment provider configured; deferred sweep not started.")
-        return
-    _payment_sweep_task = asyncio.create_task(_payment_sweep_loop())
-    logger.info(
-        "Deferred payment sweep is on: every %d minute(s), up to %d event(s) a pass.",
-        settings.payment_sweep_interval_minutes, settings.payment_sweep_batch_size,
-    )
-
-
-@app.on_event("shutdown")
-async def stop_payment_sweep() -> None:
-    global _payment_sweep_task
-    if _payment_sweep_task is None:
-        return
-    _payment_sweep_task.cancel()
-    try:
-        await _payment_sweep_task
-    except (asyncio.CancelledError, Exception):         # noqa: BLE001
-        pass
-    _payment_sweep_task = None
 
 
 @app.on_event("shutdown")
@@ -561,49 +386,14 @@ FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
 
 class CleanUrlStaticFiles(StaticFiles):
-    """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour,
-    and the caching rules that make a deploy actually reach a browser.
+    """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour.
 
     `html=True` already covers the directory case (`/admin/` -> index.html);
     this adds the extensionless one (`/login` -> login.html) so the URLs keep
     working exactly as they do behind deploy/nginx.conf.
-
-    -----------------------------------------------------------------------
-    WHY THE CACHE HEADERS ARE HERE
-    -----------------------------------------------------------------------
-    StaticFiles sends an ETag and a Last-Modified and NO Cache-Control. With no
-    explicit policy a browser is free to invent one — the HTTP spec's heuristic
-    is a fraction of the file's age — so it will happily serve a page from disk
-    without asking whether it changed.
-
-    That is fine for a picture and ruinous for HTML, because every asset on
-    this site is cache-busted with `?v=`: bumping that version only works if
-    the DOCUMENT naming the new version is itself fresh. A stale hotels.html
-    keeps requesting last week's scripts, and no amount of version bumping
-    reaches it. The symptom is a change that "works on one page and not the
-    others" depending on which the visitor happened to hard-refresh.
-
-    So the two kinds of file get opposite treatment:
-
-      HTML                 no-cache — keep a copy, but ALWAYS revalidate. With
-                           the ETag already being sent this is nearly free: an
-                           unchanged page answers 304 with no body.
-      versioned assets     immutable for a year. Safe precisely because the URL
-                           changes when the content does, which is what `?v=`
-                           is for.
-      everything else      an hour, revalidated after. Images and fonts change
-                           rarely and are not correctness-critical.
     """
 
-    def is_not_modified(self, response_headers, request_headers) -> bool:
-        return super().is_not_modified(response_headers, request_headers)
-
     async def get_response(self, path: str, scope):
-        response = await self._resolve(path, scope)
-        self._apply_cache_policy(response, path, scope)
-        return response
-
-    async def _resolve(self, path: str, scope):
         try:
             return await super().get_response(path, scope)
         except StarletteHTTPException as exc:
@@ -613,20 +403,6 @@ class CleanUrlStaticFiles(StaticFiles):
                 return await super().get_response(f"{path}.html", scope)
             except StarletteHTTPException:
                 raise exc from None
-
-    @staticmethod
-    def _apply_cache_policy(response, path: str, scope) -> None:
-        media = (response.headers.get("content-type") or "").split(";")[0].strip()
-        # The directory and extensionless cases both end up serving HTML, so the
-        # content type is what decides rather than the requested path.
-        if media == "text/html":
-            response.headers["Cache-Control"] = "no-cache, must-revalidate"
-            return
-        # `?v=` (or any query) means the URL identifies this exact content.
-        if scope.get("query_string"):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return
-        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
 
 
 if FRONTEND_DIR.is_dir():

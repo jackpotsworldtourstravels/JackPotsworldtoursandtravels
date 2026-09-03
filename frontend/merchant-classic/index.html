@@ -38,7 +38,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/classic.css?v=20260824ocr3">
+<link rel="stylesheet" href="css/classic.css?v=20260820ui2">
 <!-- Shared design system — must stay last. It re-points classic.css's own
      `--cl-*` tokens at the JackPots palette, keeping the two-weight accent
      contract intact (`--cl-orange` carries shapes, `--cl-orange-cta` carries
@@ -563,20 +563,15 @@
      v2 API has no country reference, and both columns are free text server-side
      — this narrows what the form OFFERS, never what the API accepts. -->
 <script src="../shared/countries.js?v=20260816cf2"></script>
-<script src="js/classic-shell.js?v=20260829b2"></script>
+<script src="js/classic-shell.js?v=20260819ui1"></script>
 <script src="../shared/merchant-api.js?v=20260816cf2"></script>
 <script src="js/classic-icons.js?v=20260816cf2"></script>
 <script src="js/classic-dashboard.js?v=20260816cf2"></script>
-<script src="js/classic-enquiry.js?v=20260827b1"></script>
+<script src="js/classic-enquiry.js?v=20260820ui1"></script>
 <script src="js/classic-enquiry-hotel.js?v=20260816cf2"></script>
 <script src="js/classic-visa.js?v=20260816cf2"></script>
 <script src="js/classic-holidays.js?v=20260816cf2"></script>
 <script src="js/classic-booking.js?v=20260820ui1"></script>
-<!-- Passport scanning. Loaded after classic-booking.js, which calls into it
-     defensively (typeof clOcrAttach === 'function'), so a portal without this
-     file renders no scan control instead of breaking - which is exactly how it
-     silently disappeared when this tag was lost. -->
-<script src="js/classic-passport-ocr.js?v=20260824ocr4"></script>
 <script src="js/classic-booking-hotel.js?v=20260816cf2"></script>
 <script src="js/classic-booking-detail.js?v=20260820ui1"></script>
 <script src="js/classic-requests.js?v=20260819ui1"></script>

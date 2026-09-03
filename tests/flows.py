@@ -287,20 +287,11 @@ def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
     if upto not in ORDER:
         raise AssertionError(f"'{upto}' is not a stage; use one of {', '.join(ORDER)}")
 
-    # PINNED TO FLIGHTS, AND THE PIN IS THE POINT. The search is ordered by
-    # price, this took the first row with seats, and inventory carries hotels
-    # and cruises as well as flights — so once the two cheapest flights sold
-    # out, every caller of this helper started booking a HOTEL. Nothing
-    # failed loudly: only verify_m2 asserts anything product-shaped, and it
-    # read "Passengers" / "not an airline ticket" off a confirmation that
-    # correctly said "Guests" / "not the hotel voucher". Every caller here
-    # wants the flight track (fares, PNRs, e-tickets), so ask for it rather
-    # than depending on which fare happens to be cheapest today.
     items = requests.get(
-        f"{BASE}/api/catalog/search?page_size=20&travel_type=flight", headers=H(mtok)
+        f"{BASE}/api/catalog/search?page_size=20", headers=H(mtok)
     ).json().get("items", [])
     item = next((i for i in items if (i.get("available_units") or 0) >= pax), None)
-    assert item, "no FLIGHT catalog item with available units — cannot build a catalog booking"
+    assert item, "no catalog item with available units — cannot build a catalog booking"
 
     passengers = [
         {"title": "Mr", "first_name": f"Cat{i}", "last_name": "Traveller",

@@ -4054,18 +4054,20 @@ body.cl-sc-composing .cl-crumb{visibility:hidden;}
 @keyframes cl-ocr-spin{to{transform:rotate(360deg);}}
 @media (prefers-reduced-motion:reduce){.cl-ocr-spin{animation-duration:2.4s;}}
 
-/* ---- per-field confidence: DELIBERATELY NOT SHOWN ------------------------
-   A green/amber/red border once tinted every scanned field by how confident
-   the read was, paired with a percentage badge. Both are gone. The pairing was
-   the point of the old rule -- roughly one man in twelve cannot separate the
-   green from the orange, so "check this field" could not be left to colour
-   alone -- and once the badge went, the colour WAS alone, which is the very
-   thing that comment forbade. Scoring every box also framed the form as a
-   report card when the only useful action is to glance at the passport.
-   The classes are still set by classic-passport-ocr.js: they carry the
-   clear-on-edit behaviour, and leaving them unstyled keeps that working while
-   the form stays quiet. The one state still worth showing is an EMPTY box --
-   see the unread rule below. */
+/* ---- per-field confidence ------------------------------------------------
+   Border colour AND a text badge, never colour alone: roughly one man in twelve
+   cannot separate the green from the orange, and "check this field" is exactly
+   the message that must not depend on telling them apart. */
+.cl-field.cl-ocr-high input, .cl-field.cl-ocr-high select{border-color:var(--cl-success);}
+.cl-field.cl-ocr-medium input, .cl-field.cl-ocr-medium select{border-color:var(--cl-warning);}
+.cl-field.cl-ocr-low input, .cl-field.cl-ocr-low select{border-color:var(--cl-danger);}
+/* Focus must still win — a field being edited is more important to signal than
+   how confidently it was read. */
+.cl-field.cl-ocr-high input:focus, .cl-field.cl-ocr-medium input:focus,
+.cl-field.cl-ocr-low input:focus, .cl-field.cl-ocr-high select:focus,
+.cl-field.cl-ocr-medium select:focus, .cl-field.cl-ocr-low select:focus{
+  border-color:var(--cl-orange);
+}
 
 .cl-ocr-badge{
   margin-left:auto; font-size:10px; font-weight:800; letter-spacing:.04em;
@@ -4101,22 +4103,13 @@ body.cl-sc-composing .cl-crumb{visibility:hidden;}
   background:var(--cl-danger-bg); color:var(--cl-danger-fg);
 }
 
-/* A field the scan produced NOTHING for, so the box is EMPTY and someone has
-   to type it. Red, and now the only coloured state on the form: with the
-   confidence tints gone there is nothing for it to be confused with, and an
-   empty required box is the one thing that actually stops a booking. It is
-   also never a bare colour — the "not read" caption sits on the label and says
-   the same thing in words, which is what keeps it readable for the one man in
-   twelve who cannot pick the red out.
-   Cleared the moment the merchant types: classic-passport-ocr.js drops
-   `cl-ocr-unread` on first input, so the red marks work outstanding rather
-   than nagging about a box that has just been filled. */
+/* A field the scan produced NOTHING for. Deliberately not styled like the red
+   "low confidence" band: that says "we read this, check it", and this says "we
+   read nothing, it is yours to type". A dashed border because the box is empty
+   and waiting rather than filled and doubtful. */
 .cl-field.cl-ocr-unread input, .cl-field.cl-ocr-unread select{
-  border-color:var(--cl-danger); border-width:1.5px;
-  background:var(--cl-danger-bg, #fff5f5);
-}
-.cl-field.cl-ocr-unread input:focus, .cl-field.cl-ocr-unread select:focus{
-  border-color:var(--cl-danger); background:var(--cl-surface, #fff);
+  border-style:dashed; border-color:var(--cl-border-strong, #9aa3b2);
+  background:var(--cl-surface-2, #f6f7f9);
 }
 .cl-ocr-badge.is-unread{
   background:transparent; color:var(--cl-muted); border:1px dashed currentColor;

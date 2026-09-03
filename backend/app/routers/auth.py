@@ -206,7 +206,7 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
         message=(
             f"A verification code was sent to {user.email}."
             if mode == otp_service.EMAIL_MODE
-            else "Development mode — the code is shown here and in the server log."
+            else "SMTP is not configured — the code is shown here and in the server log."
         ),
         dev_otp=dev_code,
     )
