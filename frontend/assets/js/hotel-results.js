@@ -41,11 +41,10 @@ const HotelResults = (function () {
 
   /* The eight steps of the hotel journey, in order. Horizontal only — this
      product has no vertical timeline anywhere. */
-  const STEPS = [
-    'Search', 'Hotel Results', 'Hotel Details', 'Room Selection',
-    'Guest Details', 'Review', 'Payment', 'Confirmation',
-  ];
-  const CURRENT_STEP = 1;              // Hotel Results, zero-based.
+  /* THE STEP LIST LIVES IN booking-steps.js NOW, with the flight and package
+     ones, so the three products cannot drift apart. Kept here as a fallback
+     only for a page that somehow loads this file without that one. */
+  const CURRENT_STEP = 1;              // Select Hotel, zero-based.
 
   /* STAR_FILTERS, RATING_FILTERS, SORTS and the `filters` object were the
      rail's hardcoded contents. They are hotel-filters.js's definition list
@@ -192,52 +191,158 @@ const HotelResults = (function () {
   /* ---------------------------------------------------------------------
      Render — search summary bar
      --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     The search summary — EDITABLE IN PLACE.
+
+     Every screen in the journey renders this same bar, so it is the one place
+     the criteria can be changed and the one place that has to be got right.
+
+     IT USED TO BE FIVE READ-ONLY SPANS behind a "Modify Search" button, and
+     that was worse than inconvenient: the flow can be entered with no dates at
+     all — the landing page's card does not require them — and Room Selection
+     then asks the server to price a stay with no nights in it, gets a 422, and
+     disables Continue with "We could not price these rooms". The traveller was
+     stuck at step 4 with no way forward and no way to supply what was missing
+     except going back to the start.
+
+     The fields are real inputs now. Changing one writes it to the shared search
+     state, updates the URL and tells the current screen to re-price. Modify
+     Search remains and focuses the first field rather than being the only door.
+     --------------------------------------------------------------------- */
+  const SB_TODAY = () => new Date().toISOString().slice(0, 10);
+  const SB_PLUS = n => {
+    const d = new Date(); d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  /** The destinations the catalogue actually has, so the list cannot offer a
+   *  city with nothing in it. */
+  function sbPlaces() {
+    return [...new Set(rows.map(h => {
+      const parts = String(h.location || '').split(',').map(x => x.trim()).filter(Boolean);
+      return parts[parts.length - 1];
+    }).filter(Boolean))];
+  }
+
   function searchbarHtml() {
-    const dest = (shell && shell.dest) || 'All destinations';
-    const parties = `${roomCount()} Room${roomCount() > 1 ? 's' : ''} · ${guestCount()} Guest${guestCount() > 1 ? 's' : ''}`;
+    const dest = (shell && shell.dest) || '';
+    const ci = (shell && shell.checkIn) || '';
+    const co = (shell && shell.checkOut) || '';
+    const places = sbPlaces();
+
     return `
-      <div class="hr-searchbar">
-        <div class="hr-sb-field">
+      <div class="hr-searchbar is-editable">
+        <label class="hr-sb-field">
           <span class="hr-sb-label">Destination</span>
-          <span class="hr-sb-value">${esc(dest)}</span>
-        </div>
-        <div class="hr-sb-field">
+          <input class="hr-sb-input" type="text" list="hrSbPlaces" data-hr-sb="dest"
+                 placeholder="All destinations" autocomplete="off" value="${esc(dest)}">
+          <datalist id="hrSbPlaces">${
+            places.map(p => `<option value="${esc(p)}"></option>`).join('')
+          }</datalist>
+        </label>
+        <label class="hr-sb-field">
           <span class="hr-sb-label">Check-in</span>
-          <span class="hr-sb-value">${esc(fmtDay(shell && shell.checkIn))}</span>
-          <span class="hr-sb-sub">${esc(fmtWeekday(shell && shell.checkIn))}</span>
-        </div>
-        <div class="hr-sb-field">
+          <input class="hr-sb-input" type="date" data-hr-sb="checkIn"
+                 min="${esc(SB_TODAY())}" value="${esc(ci)}">
+          <span class="hr-sb-sub">${esc(fmtWeekday(ci))}</span>
+        </label>
+        <label class="hr-sb-field">
           <span class="hr-sb-label">Check-out</span>
-          <span class="hr-sb-value">${esc(fmtDay(shell && shell.checkOut))}</span>
-          <span class="hr-sb-sub">${esc(fmtWeekday(shell && shell.checkOut))}</span>
-        </div>
-        <div class="hr-sb-field">
-          <span class="hr-sb-label">Rooms &amp; Guests</span>
-          <span class="hr-sb-value">${esc(parties)}</span>
-        </div>
+          <input class="hr-sb-input" type="date" data-hr-sb="checkOut"
+                 min="${esc(ci || SB_TODAY())}" value="${esc(co)}">
+          <span class="hr-sb-sub">${esc(fmtWeekday(co))}</span>
+        </label>
+        <label class="hr-sb-field is-narrow">
+          <span class="hr-sb-label">Rooms</span>
+          <input class="hr-sb-input" type="number" data-hr-sb="rooms"
+                 min="1" max="8" value="${roomCount()}">
+        </label>
+        <label class="hr-sb-field is-narrow">
+          <span class="hr-sb-label">Guests</span>
+          <input class="hr-sb-input" type="number" data-hr-sb="guests"
+                 min="1" max="32" value="${guestCount()}">
+        </label>
         <div class="hr-sb-action">
           <button type="button" class="hr-btn hr-btn-ghost" id="hrModify">Modify Search</button>
         </div>
       </div>`;
   }
 
+  /** Fill in dates the traveller never gave us.
+   *
+   *  Tonight and tomorrow, which is what a hotel search means with no dates,
+   *  and the same default every booking site applies. Done ONCE on entry to
+   *  the flow and written straight into the visible, editable bar — a default
+   *  the traveller can see and change is a starting point; one they cannot see
+   *  would be us quietly booking dates nobody chose. */
+  function ensureStayDates() {
+    if (!shell) return false;
+    let changed = false;
+    if (!shell.checkIn) { shell.checkIn = SB_TODAY(); changed = true; }
+    if (!shell.checkOut || shell.checkOut <= shell.checkIn) {
+      const base = new Date(shell.checkIn);
+      base.setDate(base.getDate() + 1);
+      shell.checkOut = base.toISOString().slice(0, 10);
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** Apply one edited field and tell the current screen to re-price. */
+  function applySearchField(name, raw) {
+    if (!shell) return;
+    if (name === 'dest') shell.dest = String(raw || '').trim();
+    else if (name === 'checkIn') {
+      shell.checkIn = raw || '';
+      /* Check-out must stay after check-in; push it rather than refuse the
+         edit, which reads as the field being stuck. */
+      if (shell.checkIn && shell.checkOut && shell.checkOut <= shell.checkIn) {
+        const d = new Date(shell.checkIn); d.setDate(d.getDate() + 1);
+        shell.checkOut = d.toISOString().slice(0, 10);
+      }
+    } else if (name === 'checkOut') {
+      shell.checkOut = raw || '';
+      if (shell.checkIn && shell.checkOut && shell.checkOut <= shell.checkIn) {
+        const d = new Date(shell.checkOut); d.setDate(d.getDate() - 1);
+        shell.checkIn = d.toISOString().slice(0, 10);
+      }
+    } else if (name === 'rooms') shell.rooms = Math.max(1, Math.min(8, Number(raw) || 1));
+    else if (name === 'guests') shell.guests = Math.max(1, Math.min(32, Number(raw) || 1));
+
+    writeStayUrl();
+    /* One event, every screen. A screen that is on the page re-prices; the
+       others are hidden and will read the new state when they next paint. */
+    document.dispatchEvent(new CustomEvent('hr:searchchange', { detail: { field: name } }));
+  }
+
+  /** Keep the criteria in the address bar so a refresh or a share carries the
+   *  stay, not just the hotel. */
+  function writeStayUrl() {
+    const q = new URLSearchParams(location.search);
+    const set = (k, v) => { if (v) q.set(k, v); else q.delete(k); };
+    set('dest', shell.dest);
+    set('checkIn', shell.checkIn);
+    set('checkOut', shell.checkOut);
+    set('rooms', shell.rooms);
+    set('guests', shell.guests);
+    const url = `${location.pathname}?${q.toString()}`;
+    if (url !== location.pathname + location.search) history.replaceState(null, '', url);
+  }
+
   /** The stepper, at whichever step is current. Exported so Hotel Details
    *  renders the same rail one step further along rather than owning a second
    *  copy of the journey that could disagree about its length. */
+  /** The booking progress bar.
+   *
+   *  STILL EXPORTED UNDER THIS NAME, and still called with an explicit index
+   *  by all six hotel booking screens (Details passes 2, Rooms 3, Guests 4,
+   *  Review 5, Payment 6, Confirmation 7). Only the drawing moved — to
+   *  booking-steps.js, which draws the flights and packages bars too. Changing
+   *  the callers as well would have meant editing seven files to move one
+   *  renderer. */
   function stepperHtml(current) {
     const at = typeof current === 'number' ? current : CURRENT_STEP;
-    return `<nav class="hr-stepper" aria-label="Booking progress">${
-      STEPS.map((label, i) => {
-        const state = i < at ? 'is-done' : i === at ? 'is-current' : '';
-        const mark = i < at ? icon('check') : String(i + 1);
-        const aria = i === at ? ' aria-current="step"' : '';
-        return `${i ? '<span class="hr-step-line" aria-hidden="true"></span>' : ''}
-          <span class="hr-step ${state}"${aria}>
-            <span class="hr-step-dot" aria-hidden="true">${mark}</span>
-            <span class="hr-step-label">${esc(label)}</span>
-          </span>`;
-      }).join('')
-    }</nav>`;
+    return (typeof BookingSteps !== 'undefined') ? BookingSteps.html('hotels', at) : '';
   }
 
   /* ---------------------------------------------------------------------
@@ -641,6 +746,16 @@ const HotelResults = (function () {
    *  the Explore band's heading and toolbar stay suppressed so the criteria
    *  controls appear on their own rather than under a second page title. */
   function modifySearch() {
+    /* THE BAR IS EDITABLE, so the first thing this does is put the cursor in
+       it. Only when the full panel exists — the Results screen — does it also
+       reveal that; on Details, Rooms, Guests, Review and Payment there is no
+       panel to reveal and the bar itself is the whole answer. */
+    const field = document.querySelector('[data-hr-sb="dest"]');
+    if (field) {
+      field.focus();
+      field.select && field.select();
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     const panel = $('txSearchPanel');
     if (!panel) return;
     const section = document.querySelector('.tx-scope .tx-section');
@@ -678,9 +793,39 @@ const HotelResults = (function () {
 
   /** Called by travel-explore once the catalogue is in hand, and again after
    *  every search. `state` is travel-explore's own — read, never written. */
+  /** A stay always has dates by the time a room can be priced.
+   *
+   *  THE BUG THIS FIXES. Arriving at hotels.html without searching first — a
+   *  direct link, the nav bar, a bookmark — left `checkIn`/`checkOut` empty
+   *  strings. Everything looked fine until Room Selection, where the quote
+   *  POSTs those empties, the server answers 422 ("input is too short"), and
+   *  the screen says "We could not price these rooms" with Continue disabled.
+   *  The traveller is stranded one step before Payment with no way to tell
+   *  that the real problem is two blank dates in the bar above them.
+   *
+   *  Tomorrow to the day after: the shortest real stay, the default every
+   *  hotel site opens on. It is not invented data — it is a starting point,
+   *  shown in the search bar and editable there, which is exactly what the
+   *  bar's date inputs are for. Anything the traveller actually searched for
+   *  is left alone. */
+  function ensureStayDates(state) {
+    if (!state || (state.checkIn && state.checkOut)) return;
+    if (!state.checkIn) state.checkIn = SB_PLUS(1);
+    if (!state.checkOut || state.checkOut <= state.checkIn) {
+      /* One night after whatever check-in ended up being, so a supplied
+         check-in with no check-out is completed rather than overwritten. */
+      const after = new Date(state.checkIn);
+      after.setDate(after.getDate() + 1);
+      state.checkOut = after.toISOString().slice(0, 10);
+    }
+  }
+
   function render(allRows, sharedState) {
     rows = Array.isArray(allRows) ? allRows.slice() : [];
     shell = sharedState || {};
+    /* Before anything reads the dates — the searchbar, the summary, and the
+       quote every downstream screen depends on. */
+    ensureStayDates(shell);
 
     /* The destination narrowing the search panel applied belongs to the
        search, so it is honoured here before the rail's filters run. */
@@ -700,12 +845,31 @@ const HotelResults = (function () {
     const bar = $('hrActionbar');
     if (bar) bar.hidden = false;
 
-    /* The criteria bar and the stepper depend on the SEARCH, not on the
-       filters, so they are painted once per search rather than in repaint(). */
+    /* THE RESULTS SCREEN CARRIES NEITHER THE CRITERIA BAR NOR THE STEPPER.
+       Not hidden — not built.
+
+       The criteria bar would be a SECOND search summary: the compact card at
+       the top of this page already shows the destination, both dates and the
+       party, and is editable in place, so the bar under it said the same four
+       things again with a Modify Search button that reopens a third one. The
+       bar earns its place on Details, Rooms, Guests, Review and Payment, where
+       the card is not on screen — those screens paint their own copies into
+       #hdSearchbar, #hrmSearchbar and the rest, and are untouched.
+
+       The stepper is a BOOKING phase indicator, and this screen is not part of
+       the booking: it is browsing. Search → Hotel Results → Hotel Details →
+       … over a list nobody has chosen from yet announces a journey that has
+       not started. It appears from Hotel Details onward, which is where the
+       booking actually begins. */
     const sb = $('hrSearchbar');
-    if (sb) sb.innerHTML = searchbarHtml();
+    if (sb) sb.innerHTML = '';
+    /* THE STEPPER IS BACK, and only the stepper. It was removed with the
+       criteria bar when this screen stopped carrying booking chrome; the
+       criteria bar stays gone (the card above is the search summary), but the
+       progress bar is what makes choosing a hotel visibly the same step as
+       choosing a flight — step 2 of the same journey, in the same bar. */
     const st = $('hrStepper');
-    if (st) st.innerHTML = stepperHtml();
+    if (st) st.innerHTML = stepperHtml(CURRENT_STEP);
     const heading = $('hrHeading');
     if (heading) heading.textContent = shell.dest ? `Hotels in ${shell.dest}` : 'Hotels';
 
@@ -716,6 +880,12 @@ const HotelResults = (function () {
     if (typeof Wishlist !== 'undefined') {
       Wishlist.init().then(() => Wishlist.refresh());
     }
+
+    /* A stay with no dates cannot be priced, and the flow used to discover
+       that four screens later. Filled in here, before anything renders, and
+       shown in the editable bar where they can be changed. */
+    if (ensureStayDates()) writeStayUrl();
+    bindSearchbar();
 
     /* Before the first paint, so the rail renders already holding whatever the
        URL asked for rather than being corrected a frame later. */
@@ -825,12 +995,18 @@ const HotelResults = (function () {
       if (typeof HotelConfirm !== 'undefined') HotelConfirm.hide();
     };
 
-    /* The service-page banner — breadcrumb, a second "Hotels" title and a
-       duplicate of the service switcher that is already in the header — is
-       256px of chrome the approved booking screens do not have. It is
-       suppressed on every hotel booking screen (this page only; no other
-       service page is touched) and restored nowhere else. */
-    document.body.classList.add('hr-booking');
+    /* The service-page banner is 256px of chrome the approved booking screens
+       do not have, so it is suppressed on Details, Rooms, Guests, Review,
+       Payment and Confirmation (this page only; no other service page is
+       touched).
+
+       NOT on Results. That banner now carries the hero search card — the same
+       component the landing page and Flights mount — and hiding it there left
+       a traveller who arrived from the nav bar with no way to search at all.
+       On the booking screens the criteria bar above the stepper is already
+       showing the search, so the hero would only be repeating it. */
+    const onBooking = !!(step || (wanted && hotel));
+    document.body.classList.toggle('hr-booking', onBooking);
 
     const ref = q.get('ref');
     if (step === 'confirmation' && ref && typeof HotelConfirm !== 'undefined') {
@@ -973,6 +1149,20 @@ const HotelResults = (function () {
   }
 
 
+  /* The editable search bar. Delegated on DOCUMENT rather than on #hrRoot,
+     because the same bar is rendered into six different screens' own chrome
+     containers and each of them repaints it. */
+  let sbBound = false;
+  function bindSearchbar() {
+    if (sbBound) return;
+    sbBound = true;
+    document.addEventListener('change', e => {
+      const f = e.target.closest('[data-hr-sb]');
+      if (!f) return;
+      applySearchField(f.dataset.hrSb, f.value);
+    });
+  }
+
   let routeBound = false;
   function bindRouter() {
     if (routeBound) return;
@@ -1042,5 +1232,8 @@ const HotelResults = (function () {
     /* Shared chrome, so Hotel Details renders the same criteria bar and the
        same stepper instead of a near-copy. */
     searchbarHtml, stepperHtml, modifySearch,
+    /* So a screen entered directly by URL — Rooms, say, after a refresh — gets
+       the same date guarantee the Results screen applies on entry. */
+    ensureStayDates, writeStayUrl,
   };
 })();

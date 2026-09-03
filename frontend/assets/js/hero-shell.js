@@ -33,14 +33,14 @@ const HeroShell = (function () {
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
 
   /* The service words, in the order the landing page lists them. */
+  /* Cruises, Visa and Activities are no longer advertised in the header. The
+     PAGES still exist and still work — this is the nav list only, so a link
+     held elsewhere, a bookmark or the footer still reaches them. */
   const LINKS = [
     { href: 'index.html',      label: 'Home' },
     { href: 'flights.html',    label: 'Flights' },
     { href: 'hotels.html',     label: 'Hotels' },
-    { href: 'cruises.html',    label: 'Cruises' },
     { href: 'packages.html',   label: 'Tour Packages' },
-    { href: 'visa.html',       label: 'Visa' },
-    { href: 'activities.html', label: 'Activities' },
     { href: 'index.html#contact', label: 'Contact' },
   ];
 
@@ -67,15 +67,31 @@ const HeroShell = (function () {
       + '<div class="nav-actions">'
       + '<a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">'
       + PARTNER_MARK + '<span>My Partner</span></a>'
-      + '<span id="shellAuth"></span>'
+      /* My Bookings and Notifications. Not a second copy of the profile menu's
+         entries — the same two destinations, reached as icons for the two
+         things a traveller checks mid-journey without wanting the whole
+         account panel. Both open the Account Center on that tab. */
+      + '<button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>'
+      + '<button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>'
+      /* THE SAME ELEMENT index.html USES, not a wrapper around it.
+         This was a <span id="shellAuth"> that booking-card.css then had to
+         flatten with display:contents so the two Login/Sign Up controls would
+         pick up .nav-actions' 14px gap. They did — and the flattened row came
+         out 9px wider than the landing page's .pm-slot div, which pushed the
+         whole nav 5px sideways between Home and every other page. One element,
+         one width, no bridge. */
+      + '<div class="pm-slot" id="shellAuth" data-profile-menu></div>'
       + '<button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false">'
       + '<span></span><span></span><span></span></button>'
       + '</div></nav>'
+      /* NO AUTH CONTROLS IN THE DRAWER. It used to carry its own Login/Sign Up
+         and, signed in, its own account list — a second set of the controls
+         .nav-actions already shows at every width, kept in step by hand. The
+         header's chip is avatar-only under 560px and reachable on a phone, so
+         the drawer is the page LINKS and the account is the header. */
       + '<div class="mobile-nav" id="mobileNav">' + navLinks(active)
-      + '<div class="mobile-auth-links">'
       + '<a href="partner-login.html" class="mobile-partner-mark">' + PARTNER_MARK + 'My Partner</a>'
-      + '<span id="shellAuthMobile"></span>'
-      + '</div></div>';
+      + '</div>';
   }
 
   /* ---------------------------------------------------------------------
@@ -105,9 +121,12 @@ const HeroShell = (function () {
       + '<p>Flights, hotels, cruises and holiday packages — booked in one clean sweep,'
       + ' backed by support that actually picks up.</p></div>'
       + footCol('Company', [['About', '#'], ['Careers', '#'], ['Press', '#']])
+      /* Cruises, Visa and Activities are gone from here too. The header list
+         above dropped them first; leaving them in the footer meant they still
+         appeared on every page, which is not what "removed from the
+         navigation" means. The pages are still served at their own URLs. */
       + footCol('Travel', [['Flights', 'flights.html'], ['Hotels', 'hotels.html'],
-                           ['Cruises', 'cruises.html'], ['Tour Packages', 'packages.html'],
-                           ['Visa', 'visa.html'], ['Activities', 'activities.html']])
+                           ['Tour Packages', 'packages.html']])
       + footCol('Support', [['Help Center', '#'], ['Cancellation', '#'],
                             ['Refund', '#'], ['FAQs', '#']])
       + '<div class="foot-col"><h5>Contact</h5><ul class="foot-contact">'
@@ -125,12 +144,189 @@ const HeroShell = (function () {
       + '</div></div>';
   }
 
+  /* =====================================================================
+     THE HERO — one implementation, consumed by every page under the nav.
+     =====================================================================
+     Flights, Hotels and Tour Packages are not pages that resemble the landing
+     page; they ARE the landing page with a different band under the hero. So
+     they get this markup, not a navy banner carrying the same words: same
+     film, same overlay, same spacing, same place for the search card. The
+     only thing a page chooses is which product's card sits in the dock.
+
+     THE SAME TWO-COPY RULE THE HEADER HAS, for the same reason:
+
+         index.html      <section class="hero" id="home"> ... </section>
+         hero-shell.js   heroHtml()
+
+     index.html keeps its copy in static HTML because it is the marketing
+     front door and its <h1> should be in the document a crawler is served.
+     CHANGE ONE, CHANGE THE OTHER — and nothing else has a copy.
+
+     WHICH CLIP PLAYS IS THE CARD'S DECISION, NOT THIS FILE'S. All four are
+     declared here in the order the landing page lists them, but BookingCard
+     already pairs a film with a product — `switchHeroVideo()` runs on every
+     render and on every tab change, which is how the landing page's tab strip
+     cross-fades them. So the page's own card decides, and this only makes the
+     markup agree with it: the clip that will end up active is the one marked
+     active here, so it is the one clip fetched rather than two.
+
+     Pass `video` to override that; nothing does, and a page that did would be
+     fighting a shared component the whole product already agrees on.
+     ===================================================================== */
+  const HERO_VIDEOS = [
+    { key: 'flights',  src: 'assets/videos/flight.mp4' },
+    { key: 'hotels',   src: 'assets/videos/hotel.mp4' },
+    { key: 'cruises',  src: 'assets/videos/cruise.mp4' },
+    { key: 'packages', src: 'https://assets.mixkit.co/videos/14834/14834-720.mp4' },
+  ];
+
+  const HERO_EYEBROW = 'Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search';
+  const HERO_TITLE = 'Your next adventure<span class="accent"> starts here.</span>';
+  const HERO_SUB = 'Book flights, hotels, cruises, and holiday packages, and unforgettable'
+    + ' experiences — all in one place, at prices that don’t need a coupon hunt.';
+
+  function heroVideosHtml(active) {
+    return HERO_VIDEOS.map(v => {
+      /* Only the ACTIVE clip is fetched. The other three carry `data-src` and
+         are loaded by whoever swaps them — the landing page's tab strip — so a
+         service page costs one video, not four. */
+      const on = v.key === active;
+      return '<video' + (on ? ' class="active"' : '') + ' data-video="' + v.key + '"'
+        + (on ? ' src="' + v.src + '" autoplay preload="auto"'
+              : ' data-src="' + v.src + '" preload="none"')
+        + ' muted loop playsinline aria-hidden="true"></video>';
+    }).join('');
+  }
+
+  /** @param {{video?:string, cue?:boolean, compact?:boolean}} [opts]
+   *
+   *  `compact` is the RESULTS-PAGE form: the same film and the same card, with
+   *  the marketing block and the scroll cue dropped and the height collapsed to
+   *  whatever the card needs. See mountHero for why that distinction exists. */
+  function heroHtml(opts) {
+    const o = opts || {};
+    return '<div class="hero-bg" id="heroBg"></div>'
+      + '<div class="hero-video-layer" id="heroVideoLayer">'
+      + heroVideosHtml(o.video || 'flights') + '</div>'
+      + '<div class="hero-overlay"></div>'
+      /* The headline, the eyebrow and the sub-line are the LANDING PAGE's
+         pitch. A results page is answering a question that has already been
+         asked — "Your next adventure starts here" over a list of fares is the
+         page still selling to someone who has already bought in. */
+      + (o.compact ? '' : '<div class="wrap hero-inner">'
+        + '<div class="eyebrow">' + HERO_EYEBROW + '</div>'
+        + '<h1>' + HERO_TITLE + '</h1>'
+        + '<p class="sub">' + HERO_SUB + '</p>'
+        + '</div>')
+      /* The card is BookingCard's, mounted by mountHero below — never markup
+         here, so every page shares one control instead of four copies of a
+         form that would drift apart. */
+      + '<div class="wrap search-dock" id="heroSearchDock"></div>'
+      /* Nothing to scroll TO on a results page — the results are already the
+         next thing on screen. */
+      + (o.cue === false || o.compact ? ''
+        : '<div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24"'
+          + ' fill="none" stroke="currentColor" stroke-width="2">'
+          + '<path d="M12 5v14M5 12l7 7 7-7"/></svg></div>');
+  }
+
+  /** Build the hero into `#siteHero` and mount that page's search card in it.
+   *
+   *  @param {{card?:string, video?:string, cue?:boolean, compact?:boolean}} [opts]
+   *         `card` is the BookingCard tab to open — 'flights', 'hotels' or
+   *         'packages'. Omit it on a page that has no search card.
+   *         `compact` makes this a RESULTS-PAGE header instead of a hero.
+   *
+   *  TWO SHAPES, ONE COMPONENT, AND THE DIFFERENCE IS THE JOB OF THE PAGE.
+   *  The landing page SELLS: a full-height film, the headline, the pitch, and
+   *  the card as the invitation. A results page ANSWERS: the traveller has
+   *  already searched, and everything above the first fare is in their way.
+   *  Compact keeps the card — it is the search summary and the Modify Search
+   *  on those pages, which is why it must not be dropped — and throws away the
+   *  877px of marketing above it, so the results start near the top of the
+   *  page instead of a screen and a half down it.
+   *
+   *  THE SCROLL FADE AND THE PARALLAX ARE ARMED HERE, not in mountHeader.
+   *  Both look for `#heroBg`; the header mounts at the top of the document
+   *  while the hero arrives further down, so at mountHeader time there was no
+   *  hero to find and every service page fell back to the flat solid bar with
+   *  no parallax while the landing page got the fade. That was the largest
+   *  visible difference between them and it was invisible in the markup. */
+  /** Keep the hero's film running.
+   *
+   *  NOT a difference between the pages — every page's hero is started the
+   *  same way, by BookingCard's switchHeroVideo(), and index.html's static
+   *  markup behaves identically to a mounted one. This is about the case they
+   *  all share: a browser may refuse or undo autoplay, most commonly when the
+   *  page is opened into a BACKGROUND tab. play() is then rejected, the
+   *  rejection is swallowed where it is issued, and without this nothing ever
+   *  tries again — the hero stays frozen on its first frame for the rest of
+   *  the visit, which reads as "the video is broken on this page".
+   *
+   *  So the attempt is repeated when the media says it could start, and again
+   *  when the tab is actually looked at. Called from BOTH entry points —
+   *  initBehaviour() for the landing page's static hero and mountHero() for a
+   *  built one — because a fix that covered only one of them would put back
+   *  exactly the kind of difference between pages this file exists to remove. */
+  let videoBound = false;
+
+  function playHeroVideo() {
+    const layer = document.getElementById('heroVideoLayer');
+    if (!layer) return;
+
+    const attempt = () => {
+      const v = layer.querySelector('video.active');
+      if (!v || !v.isConnected || !v.paused) return;
+      /* The PROPERTIES, not only the attributes: a muted inline video is the
+         one thing every autoplay policy allows. */
+      v.muted = true;
+      v.playsInline = true;
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+    };
+
+    attempt();
+    if (videoBound) return;
+    videoBound = true;
+    /* Capturing listeners on the layer — media events do not bubble, and the
+       clip that needs them may not be in the DOM yet when this runs. */
+    ['loadeddata', 'canplay', 'canplaythrough'].forEach(name =>
+      layer.addEventListener(name, attempt, true));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') attempt();
+    });
+  }
+
+  function mountHero(opts) {
+    const o = opts || {};
+    const host = document.getElementById('siteHero');
+    if (!host) return;
+    host.classList.add('hero');
+    host.classList.toggle('is-compact', !!o.compact);
+    /* The card's product IS the clip, unless the page names one. Without this
+       the markup opened on the flights film and BookingCard immediately
+       switched it — a second video fetched on every page load, and a visible
+       swap on the slow ones. */
+    host.innerHTML = heroHtml(Object.assign({ video: o.card || 'flights' }, o));
+    if (o.card && typeof BookingCard !== 'undefined') {
+      BookingCard.render('heroSearchDock', { tab: o.card });
+      /* A RESULTS PAGE OPENS WITH THE CARD FOLDED. Only CSS decides whether
+         that is visible — the class does nothing above 760px — so this is not
+         a viewport test and does not need re-running on resize. The landing
+         page never asks for it, which is the whole difference. */
+      if (o.compact && BookingCard.setCollapsed) BookingCard.setCollapsed(true);
+    }
+    /* AFTER the card, because rendering it is what picks the clip. */
+    playHeroVideo();
+    bindScrollFade();
+    bindParallax();
+  }
+
   /* ---------------------------------------------------------------------
      Account state — reflected, never changed here.
      --------------------------------------------------------------------- */
   function paintAuth() {
     const slot = document.getElementById('shellAuth');
-    const mobile = document.getElementById('shellAuthMobile');
     if (!slot) return;
 
     /* THE CHIP AND ITS MENU ARE profile-menu.js's.
@@ -140,23 +336,14 @@ const HeroShell = (function () {
        same chip and the same eight-item menu the landing page has, because it
        IS the landing page's. */
     if (typeof ProfileMenu !== 'undefined') {
-      slot.setAttribute('data-profile-menu', '');
+      /* data-profile-menu is already on the slot, in the markup above, exactly
+         as index.html writes it. */
       ProfileMenu.mount(slot.parentNode || document);
     } else {
       slot.innerHTML = '<a href="index.html?signin=1" class="nav-login">Login</a>'
         + '<a href="index.html?signin=1" class="btn btn-coral nav-signup">Sign Up</a>';
     }
 
-    /* The mobile drawer is this shell's own list, not a dropdown, so it stays
-       here — but it is filled from the SAME item list, so the two cannot offer
-       different destinations. */
-    if (mobile) {
-      const session = (typeof ProfileMenu !== 'undefined') ? ProfileMenu.session() : null;
-      mobile.innerHTML = session && typeof ProfileMenu !== 'undefined'
-        ? ProfileMenu.ITEMS.map(i =>
-            `<a href="#" data-pm-tab="${esc(i.tab)}">${esc(i.label)}</a>`).join('')
-        : '<a href="index.html?signin=1">Login</a><a href="index.html?signin=1">Sign Up</a>';
-    }
   }
 
   /* wireAccountOpeners() bound the old chip and the old mobile links. Both
@@ -180,6 +367,12 @@ const HeroShell = (function () {
      --------------------------------------------------------------------- */
   const HEADER_FADE_RANGE = 600;
 
+  /* Called twice on a service page — once by mountHeader, before the hero
+     exists, and again by mountHero once it does. The flag stops the second
+     call stacking a duplicate scroll listener; the `is-solid` class is
+     removed rather than left, because the first call is what put it there. */
+  let fadeBound = false;
+
   function bindScrollFade() {
     const header = document.getElementById('siteHeader');
     if (!header) return;
@@ -195,6 +388,9 @@ const HeroShell = (function () {
       header.classList.add('is-solid');
       return;
     }
+    header.classList.remove('is-solid');
+    if (fadeBound) return;
+    fadeBound = true;
 
     const paint = () => {
       const progress = Math.min(1, Math.max(0, window.scrollY / HEADER_FADE_RANGE));
@@ -227,6 +423,27 @@ const HeroShell = (function () {
       }));
     }
 
+    /* My Bookings / Notifications. Delegated on the header, so it serves both
+       the built nav and index.html's static copy without either page wiring it
+       up itself. Signed out there is nothing to show, so it asks for a sign-in
+       the same way every other account destination does. */
+    const header = document.getElementById('siteHeader');
+    if (header && !header.dataset.acctBound) {
+      header.dataset.acctBound = '1';
+      header.addEventListener('click', e => {
+        const btn = e.target.closest('[data-nav-acct]');
+        if (!btn) return;
+        e.preventDefault();
+        const tab = btn.dataset.navAcct;
+        if (typeof AccountCenter !== 'undefined' && AccountCenter.open) {
+          AccountCenter.open(tab);
+          return;
+        }
+        window.location.href = tab === 'bookings'
+          ? 'my-bookings.html' : 'index.html?account=notifications';
+      });
+    }
+
     /* A sign-out in another tab must not leave a stale chip here. */
     window.addEventListener('storage', e => {
       if (e.key && e.key.indexOf('jpc_') === 0) paintAuth();
@@ -235,10 +452,13 @@ const HeroShell = (function () {
 
   /* The hero's parallax, matching the landing page's. Skipped for reduced
      motion, which is the same condition main.css uses to stop its animations. */
+  let parallaxBound = false;
+
   function bindParallax() {
     const bg = document.getElementById('heroBg');
     const layer = document.getElementById('heroVideoLayer');
-    if (!bg || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!bg || parallaxBound || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    parallaxBound = true;
     window.addEventListener('scroll', () => {
       const y = Math.min(window.scrollY, 800);
       const t = 'translateY(' + (y * 0.25) + 'px) scale(' + (1 + y * 0.0002) + ')';
@@ -257,6 +477,9 @@ const HeroShell = (function () {
     bindScrollFade();
     bindHeader();
     bindParallax();
+    /* index.html's hero is static, so this is where it gets the same
+       autoplay retry a mounted hero gets in mountHero(). */
+    playHeroVideo();
   }
 
   /** @param {string} [active] href of the page in the nav to mark current. */
@@ -274,5 +497,6 @@ const HeroShell = (function () {
     if (foot) foot.innerHTML = footerHtml();
   }
 
-  return { mountHeader, mountFooter, initBehaviour, paintAuth, headerHtml, footerHtml };
+  return { mountHeader, mountHero, mountFooter, initBehaviour, paintAuth,
+           headerHtml, heroHtml, footerHtml };
 })();

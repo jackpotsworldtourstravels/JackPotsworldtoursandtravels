@@ -114,13 +114,18 @@
 .tx-section.hr-collapsed { display: none; }
 .tx-scope .hr-hidden { display: none; }
 
-/* The service-page banner is 256px of breadcrumb, a second "Hotels" title and
-   a duplicate of the service switcher that already sits in the site header.
-   The approved booking screens go straight from header to criteria bar, and
-   with the banner in place the first real content sat 531px down. Suppressed
-   only while a hotel booking screen is on — `hr-booking` is set by
-   hotel-results.js on this page alone, so no other service page is affected
-   and the Flights UI is untouched. */
+/* THE HERO IS HIDDEN ON THE BOOKING SCREENS, AND ONLY THERE.
+   A full-height film with a search card in it is the right way to open the
+   Results screen and the wrong thing to sit above Room Selection: those
+   screens go straight from header to criteria bar, and the hero pushed the
+   first real content 531px+ down the page. `hr-booking` is set by
+   hotel-results.js, on this page alone — the Results screen keeps the hero,
+   and no other page is touched.
+
+   `.sp-hero` is kept alongside it. The selector used to name only that class,
+   which was this page's old navy banner; the banner is gone, but the class
+   still exists for the standalone service pages and costs nothing here. */
+body.hr-booking #siteHero,
 body.hr-booking .sp-hero { display: none; }
 
 /* ===========================================================================
@@ -686,8 +691,12 @@ body.hr-booking .sp-hero { display: none; }
   .hr-actionbar-inner { padding: 10px 14px; gap: 12px; }
   .hr-ab-item, .hr-ab-sep { display: none; }
   .hr-ab-total { margin-left: 0; }
-  .hr-ab-cta { flex: 1; }
-  .hr-ab-cta .hr-btn { width: 100%; }
+  /* min-width:0 because a flex item's automatic minimum is its MIN-CONTENT
+     width, and "Continue to Hotel Details" is wider than half a 320px phone.
+     Without it the CTA refused to shrink and pushed itself 17px past the
+     right edge of the bar. */
+  .hr-ab-cta { flex: 1; min-width: 0; }
+  .hr-ab-cta .hr-btn { width: 100%; padding-left: 10px; padding-right: 10px; }
   .hr-ab-cta span { display: none; }
   .hr-scope { padding-bottom: 86px; }
 
@@ -1699,4 +1708,81 @@ body.hr-booking .sp-hero { display: none; }
 .hr-card-media .wl-btn:focus-visible { outline: 2px solid var(--hr-accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .hr-card-media .wl-btn { transition: none; }
+}
+
+/* ===========================================================================
+   The search bar's fields are inputs now
+
+   They were read-only spans behind a "Modify Search" button. The inputs are
+   styled to sit exactly where the .hr-sb-value text did — same size, same
+   weight, same colour, no border or background until you interact with one —
+   so the bar still reads as a summary and turns out to be editable when a
+   traveller reaches for it. That is the whole point: the value you can see is
+   the field you can change.
+   =========================================================================== */
+.hr-searchbar.is-editable .hr-sb-field { cursor: text; }
+.hr-searchbar.is-editable .hr-sb-field.is-narrow { flex: 0 1 108px; }
+
+.hr-sb-input {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hr-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 3px 6px;
+  margin: -3px -6px;          /* sit on the same baseline the span did */
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+.hr-sb-input::placeholder { color: var(--hr-ink-3); font-weight: 500; }
+.hr-sb-input:hover { background: var(--hr-surface-2); }
+.hr-sb-input:focus {
+  background: var(--hr-surface);
+  border-color: var(--hr-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hr-accent) 18%, transparent);
+}
+/* Native date/number chrome, toned down so the bar stays a summary. */
+.hr-sb-input[type="date"] { min-width: 0; }
+.hr-sb-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.hr-sb-input[type="number"]::-webkit-outer-spin-button,
+.hr-sb-input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0; transition: opacity .15s ease;
+}
+.hr-sb-field:hover .hr-sb-input[type="number"]::-webkit-inner-spin-button,
+.hr-sb-input[type="number"]:focus::-webkit-inner-spin-button { opacity: 1; }
+
+@media (max-width: 900px) {
+  .hr-searchbar { flex-wrap: wrap; }
+  .hr-searchbar.is-editable .hr-sb-field { flex: 1 1 46%; border-right: 0; }
+  .hr-searchbar.is-editable .hr-sb-field.is-narrow { flex: 1 1 46%; }
+  .hr-sb-action { flex: 1 1 100%; }
+  .hr-sb-action .hr-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hr-sb-input, .hr-sb-input[type="number"]::-webkit-inner-spin-button { transition: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Confirmation — the completed state.
+   ---------------------------------------------------------------------------
+   The tick, the headline and the way out. `.hr-cf-done` is deliberately the
+   only primary button in the row: everything else on that screen is somewhere
+   the traveller MIGHT go, and this is the one thing they are actually finished
+   doing, so it sits alone on the right where a dialog's confirm button sits.
+   --------------------------------------------------------------------------- */
+.hr-cf-sub-ok { color: var(--hr-ok); font-weight: 700; }
+.hr-cf-done { margin-left: auto; align-self: center; min-width: 132px; }
+/* Wider cells than the stay facts: "Received  b7 Card" and a transaction
+   reference both wrap badly at 150px. */
+.hr-cf-payfacts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.hr-cf-payfacts .hr-pill { font-size: 12px; }
+
+@media (max-width: 760px) {
+  /* No auto margin to push against on a stacked row; Done goes last and full
+     width, which is where a thumb expects the primary action. */
+  .hr-cf-done { margin-left: 0; width: 100%; order: 99; }
 }

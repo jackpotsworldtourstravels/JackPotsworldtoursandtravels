@@ -12,9 +12,11 @@
 <!-- main.css supplies the landing page's navigation bar, which this page now
      wears too (hero-shell.js). Loaded FIRST so service-page.css still wins on
      anything the two both define. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
+<!-- The profile chip + dropdown, shared by every page with a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="visa">
@@ -65,10 +67,13 @@
      auth.js; with auth.js second every one of those calls threw
      "getStoredAuth is not defined" and the profile panel never initialised. -->
 <script src="assets/js/auth.js?v=20260808ic2"></script>
-<script src="assets/js/account-center.js?v=20260829ac2"></script>
+<!-- The profile chip + dropdown. Before account-center.js, whose Logout
+     it calls, and after auth.js, whose session it reads. -->
+<script src="assets/js/profile-menu.js?v=20260829pm5"></script>
+<script src="assets/js/account-center.js?v=20260829pm6"></script>
 <script src="assets/js/jp-icons.js?v=20260808bk1"></script>
-<script src="assets/js/hero-shell.js?v=20260829h1"></script>
-<script src="assets/js/service-shell.js?v=20260826ac1"></script>
+<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
+<script src="assets/js/service-shell.js?v=20260902flow4"></script>
 <script>HeroShell.mountHeader('visa.html');</script>
 </body>
 </html>

@@ -39,13 +39,106 @@
 .search-card .search-panel.active { display: block; visibility: visible; }
 
 /* --------------------------------------------------------------------------
-   Trip type — the first control in the card
+   The collapsed summary strip — phones, on a results page only
+   --------------------------------------------------------------------------
+   A results page on a 375px phone gave the search card ~920px of screen before
+   the first fare, because the fields stack. The card is not what someone who
+   has already searched is there to read; it is what they occasionally need to
+   CHANGE. So on a narrow screen it folds down to one line of what they asked
+   for, and opens again on a tap.
+
+   SCOPED TO .hero.is-compact, so the landing page is untouched: there the card
+   IS the content and folding it would leave a page with nothing to do. The
+   markup is rendered on every page and simply never shown on the others, which
+   keeps one card rather than a card and a mobile card.
    -------------------------------------------------------------------------- */
-/* The trip row is the card's first control now. It used to sit under a product
-   tab strip and paid for itself out of that strip's 16px of bottom padding;
-   the strip is gone with the duplicated product navigation, so there is
-   nothing left to reclaim and nothing left to override — .search-card .tabs
-   went with it. Its own top margin (below) is the whole gap. */
+.search-strip { display: none; }
+
+@media (max-width: 760px) {
+  .hero.is-compact .search-card > .search-strip {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 13px 15px; border: none; background: none;
+    font-family: inherit; text-align: left; cursor: pointer;
+    color: var(--navy); border-radius: inherit;
+  }
+  /* Everything except the handle. The strip stays put when the card opens —
+     a disclosure whose only close control disappears on open is a trap. */
+  .hero.is-compact .search-card.is-collapsed > :not(.search-strip) { display: none; }
+  /* Open: the strip becomes a header, so it needs a line under it. */
+  .hero.is-compact .search-card:not(.is-collapsed) > .search-strip {
+    border-bottom: 1px solid rgba(10, 37, 64, .09);
+  }
+
+  .search-strip-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  /* Both lines truncate rather than wrap: a two-line route pushes the whole
+     strip taller than the row it is replacing. */
+  .search-strip-main,
+  .search-strip-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-strip-main { font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; }
+  .search-strip-sub { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+  .search-strip-edit {
+    display: inline-flex; align-items: center; gap: 3px; flex: none;
+    font-size: 12.5px; font-weight: 700; color: var(--coral);
+  }
+  .search-strip-edit svg { width: 15px; height: 15px; transition: transform .22s ease; }
+  .search-card:not(.is-collapsed) .search-strip-edit svg { transform: rotate(180deg); }
+  .search-strip:focus-visible { outline: 3px solid var(--coral); outline-offset: -3px; }
+
+  /* The band exists only to hold the card now, so it stops being a hero. */
+  .hero.is-compact:has(.search-card.is-collapsed) { padding-bottom: 14px; }
+}
+
+/* --------------------------------------------------------------------------
+   Product tabs — the first control in the card
+   --------------------------------------------------------------------------
+   What you are booking, asked before anything else, because it decides what
+   every field under it means. Deliberately a DIFFERENT shape from the trip
+   pills below it: underlined tabs against a rounded pill group, so the two
+   rows never read as one strip of eight equal choices. They answer different
+   questions and they should not look interchangeable.
+   -------------------------------------------------------------------------- */
+.search-tabs {
+  display: flex; gap: 2px; align-items: stretch;
+  padding: 6px 10px 0;
+  border-bottom: 1px solid rgba(10, 37, 64, .09);
+  /* Scrolls INSIDE the card on a narrow screen rather than widening it. The
+     card is the scroll container, so the page itself never gains a horizontal
+     scrollbar — which is the failure this replaces, not a nicety. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.search-tabs::-webkit-scrollbar { display: none; }
+
+.search-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 15px 10px; border: none; background: none;
+  border-bottom: 2.5px solid transparent; margin-bottom: -1px;
+  font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: .01em;
+  color: var(--navy); opacity: .55; cursor: pointer; white-space: nowrap;
+  transition: opacity .2s ease, color .2s ease, border-color .2s ease;
+}
+.search-tab svg { width: 16px; height: 16px; flex: none; }
+.search-tab:hover:not(.is-on) { opacity: .85; }
+.search-tab.is-on { opacity: 1; color: var(--coral); border-bottom-color: var(--coral); }
+/* Inset, because the outline of a tab flush against the card's rounded top
+   edge is otherwise clipped by the card's own overflow. */
+.search-tab:focus-visible { outline: 3px solid var(--coral); outline-offset: -3px; border-radius: 6px; }
+
+@media (max-width: 700px) {
+  .search-tabs { padding: 4px 6px 0; }
+  .search-tab { padding: 10px 11px 9px; font-size: 12.5px; gap: 5px; }
+  .search-tab svg { width: 15px; height: 15px; }
+}
+
+/* --------------------------------------------------------------------------
+   Trip type — the flights panel's first control
+   -------------------------------------------------------------------------- */
+/* Sits under the product tabs, inside the Flights panel only: it says what
+   KIND of flight search this is, which is a different question from which
+   product is being searched. Its own top margin (below) is the whole gap
+   between the two rows. */
 
 .trip-types {
   display: flex; gap: 3px; width: max-content; max-width: 100%;
@@ -723,14 +816,14 @@ body.sp-continuation {
    they are rendered — the content beneath the hero changing, which is what the
    navigation is supposed to feel like.
 
-   `.nav-actions` is a flex row with a 14px gap, and its children on the
-   landing page are the Login link and the Sign Up button. hero-shell.js has to
-   wrap them in one slot it can repaint, so that slot is display:contents —
-   without it the two collapse into a single flex child, the gap vanishes and
-   `justify-content:space-between` slides the whole nav 7px sideways between
-   the two pages. */
-body.sp-continuation #shellAuth,
-body.sp-continuation #shellAuthMobile { display: contents; }
+   THE AUTH SLOT USED TO BE BRIDGED HERE and is not any more. `#shellAuth` was
+   a <span> wrapping the Login link and the Sign Up button, flattened with
+   display:contents so the two would pick up .nav-actions' 14px gap. It worked,
+   and it made the row 9px wider than the landing page's plain .pm-slot div,
+   which under `justify-content:space-between` slid the whole nav 5px sideways
+   between Home and every other page — the one measurable difference left
+   between the two headers. hero-shell.js emits the SAME .pm-slot div now, so
+   there is nothing to bridge and this rule would flatten the wrong element. */
 
 /* .tx-section is 1200px/20px and .wrap is 1280px/32px — the same content edge
    in both, so the results line up under the card rather than a few pixels

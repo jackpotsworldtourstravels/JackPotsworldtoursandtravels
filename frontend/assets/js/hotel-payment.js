@@ -168,11 +168,12 @@ const HotelPayment = (function () {
       <div class="hr-paynotice">
         ${icon('shield')}
         <div>
-          <b>No payment gateway is connected yet.</b>
+          <b>Demo checkout — no payment gateway is connected yet.</b>
           <span>
-            Tell us how you intend to pay and we will hold your booking. Nothing
-            is charged now, no card details are collected, and your booking stays
-            <em>pending</em> until payment is arranged with you directly.
+            Choose how you intend to pay and we will confirm the booking. No card
+            details are collected and <em>nothing is charged</em>: the payment is
+            recorded against your booking, which stays <em>pending</em> until
+            payment is arranged with you directly. The same is true of flights.
           </span>
         </div>
       </div>`;
@@ -184,7 +185,7 @@ const HotelPayment = (function () {
       <div class="hr-paynotice is-warn">
         ${icon('person')}
         <div>
-          <b>Sign in to hold this booking.</b>
+          <b>Sign in to confirm this booking.</b>
           <span>
             A booking reference is issued by our booking system against your
             account, so we need you signed in before we can create one.
@@ -242,7 +243,7 @@ const HotelPayment = (function () {
       ${submitError ? `
         <div class="hr-pricechange" role="alert">
           ${icon('shield')}
-          <div><b>We couldn't hold your booking.</b><span>${esc(submitError)}</span></div>
+          <div><b>We couldn't confirm your booking.</b><span>${esc(submitError)}</span></div>
         </div>` : ''}`;
   }
 
@@ -313,9 +314,9 @@ const HotelPayment = (function () {
     const ready = !!chosen && !!quote && !busy && signedIn();
     let note;
     if (!signedIn()) note = 'Sign in to continue';
-    else if (busy) note = 'Holding your booking…';
+    else if (busy) note = 'Confirming your booking…';
     else if (!chosen) note = 'Choose a payment method';
-    else note = 'Nothing is charged now';
+    else note = 'Demo checkout — nothing is charged';
 
     return `
       <div class="hr-actionbar-inner">
@@ -330,9 +331,9 @@ const HotelPayment = (function () {
           <span>Amount due</span>
         </div>
         <div class="hr-ab-cta">
-          <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrHoldBooking"
+          <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hpPayNow"
                   ${ready ? '' : 'disabled'}>
-            ${busy ? 'Holding…' : 'Hold my booking'}
+            ${busy ? 'Confirming…' : 'Pay now'}
           </button>
           <span>${esc(note)}</span>
         </div>
@@ -359,7 +360,7 @@ const HotelPayment = (function () {
   /* ---------------------------------------------------------------------
      Submit — the only thing on this screen that writes anything.
      --------------------------------------------------------------------- */
-  async function hold() {
+  async function payNow() {
     if (busy || !chosen || !quote) return;
     if (!signedIn()) { openSignIn(); return; }
 
@@ -467,7 +468,7 @@ const HotelPayment = (function () {
         if (handlers.viewBooking) handlers.viewBooking(view.getAttribute('data-view-booking'));
         return;
       }
-      if (e.target.closest('#hrHoldBooking')) hold();
+      if (e.target.closest('#hpPayNow')) payNow();
     });
   }
 

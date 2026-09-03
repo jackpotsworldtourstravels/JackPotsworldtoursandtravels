@@ -16,11 +16,12 @@
    auth gate, the account center) still find `.search-panel`, `.search-go` and
    the field ids exactly where they were.
 
-   IT DOES NOT NAVIGATE. The card used to carry its own Flights / Hotels /
-   Cruises / Tour Packages strip, duplicating the site header's product nav one
-   screen below it. Product navigation is the HEADER's, and only the header's;
-   the card is handed one product at mount and renders that product's panel.
-   See PANELS.
+   IT CARRIES THE PRODUCT TABS, AND SWITCHING THEM DOES NOT NAVIGATE. Flights,
+   Hotels, Cruises and Tour Packages sit above the fields; clicking one swaps
+   the panel underneath in place and changes nothing else on the page. That is
+   a SEARCH control, not navigation — it decides what is being searched for,
+   the same way the trip type decides what a flight search means. Navigation
+   happens on Search, through the host page's handler. See PANELS and TABS.
 
    WHAT IT OWNS: the markup of one product panel, the hero video that goes with
    it, the date fields, the swap button, the trip type, the return-route mirror
@@ -146,9 +147,10 @@ const BookingCard = (function () {
 
     const cabin = CABINS.map(c => '<option>' + esc(c) + '</option>').join('');
 
-    return '<div class="search-panel active" data-panel="flights">'
-      /* First control in the card, before any field — the trip type decides
-         what the rest of the row even means. */
+    return panelOpen('flights')
+      /* First control in the PANEL, before any field — the trip type decides
+         what the rest of the row even means. The product tabs sit above the
+         panel, outside it, because they choose which panel this is. */
       + '<div class="trip-types" role="radiogroup" aria-label="Trip type">' + trip + '</div>'
 
       /* data-swap-scope pairs the swap button with the two boxes it belongs
@@ -242,7 +244,7 @@ const BookingCard = (function () {
       + ' tabindex="' + (m.id === state.hotelMode ? '0' : '-1') + '"'
       + ' data-hmode="' + m.id + '">' + esc(m.label) + '</button>').join('');
 
-    return '<div class="search-panel" data-panel="hotels">'
+    return panelOpen('hotels')
       + '<div class="trip-types" role="radiogroup" aria-label="Hotel booking type">' + modes + '</div>'
 
       /* Common to both modes — never re-rendered, so switching cannot lose
@@ -294,7 +296,7 @@ const BookingCard = (function () {
     MONTHS.map(m => '<option' + (m === selected ? ' selected' : '') + '>' + m + '</option>').join('');
 
   function cruisesPanel() {
-    return '<div class="search-panel" data-panel="cruises">'
+    return panelOpen('cruises')
       + '<div class="search-fields cols-5">'
       + '<div class="field"><label for="crType">Cruise Type</label><select id="crType">'
       + '<option>Goa Cruise</option><option>Kerala Backwater Cruise</option>'
@@ -309,7 +311,7 @@ const BookingCard = (function () {
   }
 
   function packagesPanel() {
-    return '<div class="search-panel" data-panel="packages">'
+    return panelOpen('packages')
       + '<div class="search-fields cols-3">'
       + '<div class="field"><label for="pType">Tour Package Type</label><select id="pType">'
       + '<option>Casino Tour Package</option><option>Domestic Tour Package</option>'
@@ -319,29 +321,71 @@ const BookingCard = (function () {
       + '</div></div>';
   }
 
-  /* ONE PRODUCT PER CARD — AND NO PRODUCT TABS.
+  /* THE PRODUCT TABS, AND WHY ALL FOUR PANELS ARE BUILT.
 
-     The card used to open with a Flights / Hotels / Cruises / Tour Packages
-     strip. That was the SAME product navigation the site header already
-     carries, on the same screen, three inches below it — two owners of one
-     decision, and the header is the owner. Every product has its own page
-     (flights.html, hotels.html, cruises.html, packages.html) with its own
-     search panel, and the header is how a traveller reaches them.
+     The card opens with a Flights / Hotels / Cruises / Tour Packages strip and
+     every panel is in the DOM behind it, one of them `.active`. It is not the
+     header's product nav wearing a different hat: the header NAVIGATES — a
+     click there loads that product's page — while these tabs change what the
+     card in front of you is asking about, on the page you are already on, with
+     nothing else disturbed. A traveller who came to compare a flight and a
+     hotel for the same weekend should not lose the page to find out.
 
-     So the card is told WHICH product it serves at mount — render(host,
-     {tab:'flights'}) — and builds only that product's panel. The other three
-     are not hidden behind a tab that no longer exists; they are not built at
-     all, so there is no dead panel in the DOM to hide.
+     ALL FOUR ARE BUILT, NOT LAZILY. The panels carry mounted sub-controls —
+     the passenger popup hangs off #fPaxField, the rooms-and-guests popover off
+     #hRoomsField — and those are created once in render(). Building a panel
+     later would mean re-running that mount, and a half-built card is how the
+     Rooms selector ends up missing on the second visit to the Hotels tab.
+     Four panels is a few hundred bytes of markup; correctness is worth more.
 
-     What stays in the card is what belongs to a SEARCH rather than to
-     navigation: the trip type (One Way / Round Trip / Multi City), the fields,
-     the Search button and the trust row. */
+     `tab` at mount still decides which one OPENS — render(host,{tab:'hotels'})
+     — so the Hotels page opens on Hotels. It no longer decides which ones
+     EXIST. */
   const PANELS = {
     flights: flightsPanel,
     hotels: hotelsPanel,
     cruises: cruisesPanel,
     packages: packagesPanel,
   };
+
+  /* The products, in the order the landing page has always listed them. `icon`
+     is a jp-icons name; the label carries the meaning, so a missing icon
+     library leaves a working tab rather than a broken glyph. */
+  const TABS = [
+    { id: 'flights',  label: 'Flights',       icon: 'flights' },
+    { id: 'hotels',   label: 'Hotels',        icon: 'hotels' },
+    { id: 'cruises',  label: 'Cruises',       icon: 'cruises' },
+    { id: 'packages', label: 'Tour Packages', icon: 'packages' },
+  ];
+
+  const panelId = name => 'bcPanel-' + name;
+  const tabId = name => 'bcTab-' + name;
+
+  /** A panel's opening tag. Every panel is a tabpanel labelled by its tab, so
+   *  a screen reader announces "Hotels, tab panel" rather than an unnamed
+   *  region, and only the open one is in the tab order. */
+  function panelOpen(name) {
+    const on = state.tab === name;
+    return '<div class="search-panel' + (on ? ' active' : '') + '"'
+      + ' data-panel="' + name + '" id="' + panelId(name) + '"'
+      + ' role="tabpanel" aria-labelledby="' + tabId(name) + '"'
+      + (on ? '' : ' hidden') + '>';
+  }
+
+  function tabsHtml() {
+    return '<div class="search-tabs" role="tablist" aria-label="What are you booking?">'
+      + TABS.map(t => {
+        const on = t.id === state.tab;
+        return '<button type="button" class="search-tab' + (on ? ' is-on' : '') + '"'
+          + ' id="' + tabId(t.id) + '" role="tab"'
+          + ' aria-selected="' + on + '" aria-controls="' + panelId(t.id) + '"'
+          + ' tabindex="' + (on ? '0' : '-1') + '"'
+          + ' data-tab="' + t.id + '">'
+          + (typeof JPIcon !== 'undefined' ? JPIcon.html(t.icon, { size: 'sm' }) : '')
+          + '<span>' + esc(t.label) + '</span></button>';
+      }).join('')
+      + '</div>';
+  }
 
   function cardHtml() {
     const trust = [
@@ -351,8 +395,26 @@ const BookingCard = (function () {
       + '<path d="M20 6L9 17l-5-5"/></svg>' + esc(t) + '</span>').join('');
 
     return '<div class="search-card" role="region" aria-label="Booking search">'
+      /* THE COLLAPSED SUMMARY, for a phone on a results page. Always rendered,
+         shown by CSS only where it belongs — see .search-strip in
+         booking-card.css. It is the card's own disclosure button, so it stays
+         on screen while the card is open and is the way to shut it again. */
+      + '<button type="button" class="search-strip" data-search-strip'
+      + ' aria-expanded="true" aria-label="Your search — tap to change">'
+      + '<span class="search-strip-text">'
+      + '<span class="search-strip-main"></span>'
+      + '<span class="search-strip-sub"></span>'
+      + '</span>'
+      + '<span class="search-strip-edit">Edit'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"'
+      + ' stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+      + '</span></button>'
+      /* THE PRODUCT TABS ARE THE FIRST THING IN THE CARD PROPER, above every
+         field. What you are booking is the question that decides what the rest
+         of the card even means, so it is asked first. */
+      + tabsHtml()
       + '<div class="search-body">'
-      + (PANELS[state.tab] || flightsPanel)()
+      + TABS.map(t => PANELS[t.id]()).join('')
       + '</div>'
       /* ONE Search button for the whole card, at the bottom right.
          It used to be the last cell of each panel's field row, which pinned it
@@ -579,6 +641,93 @@ const BookingCard = (function () {
   let busy = false;
 
   /** The one Search button, labelled for whatever is being submitted. */
+  /* ---------------------------------------------------------------------
+     The collapsed summary
+
+     WHAT IT READS. The DISPLAYED values, straight out of the fields, not
+     `state` and not criteria(). Two reasons: the card already formats them for
+     humans ("Thu, 10 Sep", "1 Room \u2022 2 Adults", "Hyderabad (HYD)"), and
+     reading what is on screen means the strip cannot disagree with the card it
+     is standing in for — which is the one thing a summary must never do.
+     --------------------------------------------------------------------- */
+  /** "Hyderabad (HYD)" -> "Hyderabad". The code is precision the strip has no
+   *  room for; the full label is one tap away. */
+  const shortPlace = v => String(v || '').split(' (')[0].trim();
+
+  const textOf = id => { const e = $(id); return e ? (e.value || e.textContent || '').trim() : ''; };
+
+  /** [main, sub] for whichever panel is open, or null when there is nothing
+   *  worth summarising yet. */
+  function summaryParts() {
+    const join = list => list.filter(Boolean).join(' \u00b7 ');
+
+    if (state.tab === 'flights') {
+      if (state.trip === 'multi') {
+        const rows = readRoutes();
+        const first = rows[0] || {};
+        const main = rows.length
+          ? shortPlace(inputValue(first.row, 'from')) + ' \u2192 '
+            + shortPlace(inputValue(first.row, 'to'))
+            + (rows.length > 1 ? ' +' + (rows.length - 1) : '')
+          : 'Multi City';
+        return [main, join(['Multi City', paxText(), val('fCabin')])];
+      }
+      const from = shortPlace(textOf('fFrom'));
+      const to = shortPlace(textOf('fTo'));
+      const main = (from || to) ? (from || '?') + ' \u2192 ' + (to || '?') : 'Search flights';
+      const dates = state.trip === 'round' && textOf('fRet')
+        ? textOf('fDep') + ' \u2013 ' + textOf('fRet')
+        : textOf('fDep');
+      return [main, join([dates, paxText(), val('fCabin')])];
+    }
+
+    if (state.tab === 'hotels') {
+      const main = shortPlace(textOf('hDest')) || 'Search hotels';
+      const dates = textOf('hIn') && textOf('hOut')
+        ? textOf('hIn') + ' \u2013 ' + textOf('hOut') : '';
+      const party = state.hotelMode === 'group'
+        ? 'Group deals'
+        : (roomsBtnText() || '');
+      return [main, join([dates, party])];
+    }
+
+    if (state.tab === 'cruises') {
+      return [val('crType') || 'Search cruises', join([val('crMonth'), val('crDur'), textOf('crTrav')])];
+    }
+
+    return [val('pType') || 'Tour packages', val('pMonth')];
+  }
+
+  /** The passenger trigger's own words, so the strip says what the popup says. */
+  function paxText() {
+    const btn = root && root.querySelector('#fPaxField .pax-trigger-text');
+    return btn ? btn.textContent.trim() : '';
+  }
+  function roomsBtnText() {
+    const btn = root && root.querySelector('#hRoomsField .pax-trigger-text');
+    return btn ? btn.textContent.trim() : '';
+  }
+
+  function paintSummary() {
+    if (!root) return;
+    const main = root.querySelector('.search-strip-main');
+    const sub = root.querySelector('.search-strip-sub');
+    if (!main || !sub) return;
+    const parts = summaryParts();
+    main.textContent = parts[0] || '';
+    sub.textContent = parts[1] || '';
+  }
+
+  /** Open or shut the card behind the strip. The strip itself never hides —
+   *  it is the handle, and a disclosure with no handle to close it is a trap. */
+  function setCollapsed(on) {
+    if (!root) return;
+    root.classList.toggle('is-collapsed', !!on);
+    const strip = root.querySelector('[data-search-strip]');
+    if (strip) strip.setAttribute('aria-expanded', String(!on));
+    if (on) paintSummary();
+  }
+
   function paintSearchButton() {
     const go = root && root.querySelector('.search-go');
     if (!go || busy) return;   // a repaint mid-send must not undo setBusy's label
@@ -639,15 +788,16 @@ const BookingCard = (function () {
     }
   }
 
-  /** Show the named product's panel.
+  /** Show the named product's panel, and mark its tab.
    *
-   *  A card carries ONE product now (see PANELS), so this can be asked for a
-   *  product it does not hold — and when it is, it changes nothing and says so
-   *  by returning false. The caller decides what that means: app.js's voice
-   *  search sends the traveller to that product's own page, which is where the
-   *  search for it lives. Silently switching `state.tab` to a panel that was
-   *  never built is what would leave the card submitting hotel criteria it has
-   *  no fields for. */
+   *  Returns false for a product the card does not hold, changing nothing —
+   *  the four are always built, so today that only happens on a bad name, but
+   *  the caller still gets a truthful answer. app.js's voice search relies on
+   *  it: false means "this card cannot serve that", and it navigates instead.
+   *
+   *  IT NEVER NAVIGATES AND NEVER RE-RENDERS. Toggling classes is the whole of
+   *  it, so everything typed into the other panels — an origin, a date, a room
+   *  count — is exactly where it was left when the traveller comes back. */
   function activateTab(name) {
     if (!root) return false;
     const panels = Array.prototype.slice.call(root.querySelectorAll('.search-panel'));
@@ -655,7 +805,22 @@ const BookingCard = (function () {
        would have deactivated the panel the card is actually showing on its way
        to discovering it does not have the one being asked for. */
     if (!panels.some(p => p.dataset.panel === name)) return false;
-    panels.forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+    panels.forEach(p => {
+      const on = p.dataset.panel === name;
+      p.classList.toggle('active', on);
+      /* `hidden` as well as the class: a display:none panel is still reachable
+         by a screen reader in some browsers, and its fields would be read out
+         as part of a search nobody is running. */
+      p.hidden = !on;
+    });
+    root.querySelectorAll('.search-tab').forEach(b => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-selected', String(on));
+      /* Roving tabindex: one stop for the whole strip, arrows move within it,
+         which is what role="tablist" promises. */
+      b.tabIndex = on ? 0 : -1;
+    });
     state.tab = name;
     switchHeroVideo(name);
     clearError();
@@ -665,6 +830,7 @@ const BookingCard = (function () {
       note.textContent = name === 'flights' ? (FOOT_NOTE[state.trip] || '')
         : name === 'hotels' ? (HOTEL_FOOT_NOTE[state.hotelMode] || '') : '';
     }
+    paintSummary();
     return true;
   }
 
@@ -1208,6 +1374,10 @@ const BookingCard = (function () {
     const bad = check ? check(params) : null;
     if (bad) { complain(bad[0], bad[1]); return; }
 
+    /* A search that ran is a search that is settled: on a phone the card folds
+       back to its one-line summary so the results it just produced are the
+       thing on screen, not the form that produced them. */
+    setCollapsed(true);
     if (searchHandler) searchHandler(kind, params);
   }
 
@@ -1264,6 +1434,9 @@ const BookingCard = (function () {
     }
     if (pax) pax.set({ adults: p.adults, children: p.children, infants: p.infants }, true);
     paintTrip();
+    /* Same reason as seedHotels below: the strip must describe the search that
+       was actually run, and seeding happens after render(). */
+    paintSummary();
   }
 
   /** @param p a hotelCriteria()-shaped object; unknown fields are ignored. */
@@ -1291,6 +1464,35 @@ const BookingCard = (function () {
     if (p.groupGuests && $('hGroupGuests')) $('hGroupGuests').value = p.groupGuests;
     paintHotelMode();
     paintNights();
+    /* The strip describes the SEEDED search, not the card's defaults. Seeding
+       runs after render(), so without this the folded card on a results page
+       said "Wed, 2 Sep" over a list of the 10th. */
+    paintSummary();
+  }
+
+  /** @param p a packages criteria object — {type, month}; others ignored.
+   *
+   *  The third seeder, and it exists for the same reason as the other two: the
+   *  card on a results page has to show the search that produced the list
+   *  under it. Without this, arriving at packages.html?type=…&month=… restored
+   *  the RESULTS from the URL and left the card on its own defaults, so the
+   *  page said "Casino Tour Package / July" over a search for something else.
+   *
+   *  A value the select does not offer is left alone rather than forced in:
+   *  the options are the catalogue's, and appending an unknown one would
+   *  invite a search for a package that does not exist. */
+  function seedPackages(p) {
+    if (!p) return;
+    const set = (id, want) => {
+      const el = $(id);
+      if (!el || !want) return;
+      const hit = Array.prototype.slice.call(el.options)
+        .find(o => o.value.toLowerCase() === String(want).toLowerCase());
+      if (hit) el.value = hit.value;
+    };
+    set('pType', p.type);
+    set('pMonth', p.month);
+    paintSummary();
   }
 
   /** "HYD" -> "Hyderabad (HYD)", or the bare code if airports.js is absent. */
@@ -1312,7 +1514,41 @@ const BookingCard = (function () {
      Wiring
      --------------------------------------------------------------------- */
   function bind() {
-    /* No tab strip to bind — the card holds one product. See PANELS. */
+    /* The collapsed summary. Delegated so it survives a re-render, and it
+       repaints on any change inside the card so the strip is never describing
+       a search the fields no longer hold. */
+    root.addEventListener('click', e => {
+      if (e.target.closest('[data-search-strip]')) {
+        setCollapsed(!root.classList.contains('is-collapsed'));
+        return;
+      }
+      /* Anything else clicked in here might have changed a value — the pax and
+         rooms popups commit on their own buttons, which fire no `change`. */
+      paintSummary();
+    });
+    root.addEventListener('change', paintSummary);
+
+    /* Product tabs. Arrow keys walk the strip and Home/End jump to its ends —
+       role="tablist" promises that and the browser gives us nothing, because
+       the tabs are buttons. Selection follows focus, which is the right
+       pattern here: every panel is already built, so moving along the strip
+       costs nothing and the traveller sees each product as they arrive at it. */
+    const tabBtns = Array.prototype.slice.call(root.querySelectorAll('.search-tab'));
+    const goToTab = btn => { activateTab(btn.dataset.tab); btn.focus(); };
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+      btn.addEventListener('keydown', e => {
+        const at = tabBtns.indexOf(btn);
+        let to = -1;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') to = (at + 1) % tabBtns.length;
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') to = (at - 1 + tabBtns.length) % tabBtns.length;
+        else if (e.key === 'Home') to = 0;
+        else if (e.key === 'End') to = tabBtns.length - 1;
+        else return;
+        e.preventDefault();
+        goToTab(tabBtns[to]);
+      });
+    });
 
     /* Trip type. Arrow keys walk the group, which is what role="radiogroup"
        promises — the pills are buttons, so the browser gives us nothing. */
@@ -1715,10 +1951,12 @@ const BookingCard = (function () {
     renderRoutes();
     if (opts.flights) seedFlights(opts.flights);
     if (opts.hotels) seedHotels(opts.hotels);
+    if (opts.packages) seedPackages(opts.packages);
     paintTrip();
     paintHotelMode();
     paintNights();
     activateTab(state.tab);
+    paintSummary();
     if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
     return root;
   }
@@ -1738,12 +1976,16 @@ const BookingCard = (function () {
     flightCriteria,
     seedFlights,
     seedHotels,
+    seedPackages,
     paintTrip,
     paintHotelMode,
     get hotelMode() { return state.hotelMode; },
     hotelCriteria,
     roomsValue: () => (rooms ? rooms.value() : []),
     setSearchHandler(fn) { searchHandler = fn; },
+    /* hero-shell folds the card on the results pages; only it knows the
+       page is a results page rather than the landing page. */
+    setCollapsed,
     /* The group-enquiry submission is the search handler's job, not the card's
        — the card does not know where an enquiry goes any more than it knows
        which page a search lands on. These are how it reports back. */

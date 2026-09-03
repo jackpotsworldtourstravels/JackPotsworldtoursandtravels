@@ -524,6 +524,7 @@ const HotelRooms = (function () {
    *  `keep` carries selections already made, so returning from a later step
    *  does not throw away the traveller's choices. */
   async function show(hotelRow, sharedState, handlers, keep) {
+    listenForSearchChange();
     shell = sharedState || {};
     onBack = handlers && handlers.back;
     onGuests = handlers && handlers.guests;
@@ -567,6 +568,26 @@ const HotelRooms = (function () {
 
   /** The current selections, so the router can carry them forward. */
   function selections() { return picks.slice(); }
+
+
+  /* THE SEARCH BAR IS EDITABLE, so the stay can change while this screen is
+     open. One listener, bound once: re-price and repaint, but only when this
+     screen is the one showing — the others read the new state when they next
+     paint. paintChrome() is deliberately NOT called, because it would replace
+     the very input being edited. */
+  let sbListening = false;
+  function listenForSearchChange() {
+    if (sbListening) return;
+    sbListening = true;
+    document.addEventListener('hr:searchchange', () => {
+      const el = document.getElementById('hrmRoot');
+      if (!el || el.hidden) return;
+      refreshQuote();
+      paintMain();
+      paintSummary();
+      paintActionbar();
+    });
+  }
 
   return { show, hide, selections };
 })();

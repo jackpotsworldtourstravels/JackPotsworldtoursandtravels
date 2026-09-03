@@ -161,6 +161,145 @@
    Filters
    -------------------------------------------------------------------------- */
 .tx-layout { display: grid; grid-template-columns: 260px 1fr; gap: 22px; align-items: start; }
+
+/* ===========================================================================
+   THE SELECT-FLIGHT SCREEN — filters | flights | booking summary
+   ===========================================================================
+   Roughly 25 / 50 / 25 at 1440px, but stated in fr rather than percentages so
+   the middle column absorbs the difference at every width in between: the
+   flight card is the thing that must not be squeezed, and the two rails hold a
+   fixed amount of text each.
+   =========================================================================== */
+/* align-items STRETCH, not start: the two rails need a full-height column to
+   be sticky inside. See the .tx-rail-col note in flights.html. */
+.tx-layout-3 { grid-template-columns: 256px minmax(0, 1fr) 280px; gap: 24px; align-items: stretch; }
+.tx-rail-col { min-width: 0; }
+
+/* THE MEASURE IS WIDER ON THIS SCREEN, and the arithmetic is the reason.
+   .tx-section is capped at 1280px, which after 64px of padding and two 24px
+   gaps leaves 1168px to split three ways. Two rails at 256+280 would have left
+   the flight card 632px — under the 700px it needs to stay in its three-part
+   horizontal shape, so every card collapsed into a vertical stack on a 1440px
+   desktop. At 1360px the same split leaves 712px and the card keeps its shape.
+
+   1360 is a deliberate ceiling rather than a full-bleed layout: it is what the
+   three columns need and nothing more, so the page still has margins at
+   1440px and does not sprawl on a 27-inch display. */
+body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
+
+/* A CONTAINER, NOT A MEDIA QUERY, and the distinction matters here.
+   The flight card restacks when ITS COLUMN gets narrow, which on this screen
+   happens at 1440px — the column is 596px wide once two rails are taking 572px
+   between them. A viewport breakpoint cannot see that: it would keep the card
+   in three columns on a wide desktop and push the price and both buttons out
+   past the card's right edge, which is exactly what it did. */
+.tx-results-col { min-width: 0; container-type: inline-size; container-name: txlist; }
+
+/* The rule itself is at the FOOT of this file — see the note there. */
+
+/* ---- Booking progress ---------------------------------------------------- */
+.tx-stepper {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 20px; padding: 14px 18px;
+  background: var(--tx-surface); border: 1px solid var(--tx-line);
+  border-radius: var(--tx-radius); box-shadow: var(--tx-shadow);
+  /* Seven steps do not fit a phone. They scroll INSIDE the bar rather than
+     wrapping, so the row keeps its height and the page keeps its width. */
+  overflow-x: auto; scrollbar-width: none;
+}
+.tx-stepper::-webkit-scrollbar { display: none; }
+.tx-step { display: flex; align-items: center; gap: 9px; flex: none; }
+.tx-step-dot {
+  width: 25px; height: 25px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+  background: color-mix(in srgb, var(--tx-ink) 8%, transparent);
+  color: var(--tx-ink-3);
+}
+.tx-step-dot svg { width: 13px; height: 13px; }
+.tx-step-label { font-size: 12.5px; font-weight: 700; color: var(--tx-ink-3); white-space: nowrap; }
+.tx-step-line { flex: 1 1 18px; min-width: 14px; height: 2px; border-radius: 2px; background: var(--tx-line); }
+
+/* Done is green, current is the brand's red, ahead stays grey — the three
+   states a progress bar has to make obvious at a glance. */
+.tx-step.is-done .tx-step-dot { background: #12B76A; color: #fff; }
+.tx-step.is-done .tx-step-label { color: var(--tx-ink-2); }
+.tx-step.is-done + .tx-step-line { background: #12B76A; }
+.tx-step.is-current .tx-step-dot {
+  background: var(--tx-accent); color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tx-accent) 18%, transparent);
+}
+.tx-step.is-current .tx-step-label { color: var(--tx-ink); font-weight: 800; }
+
+/* ---- Booking summary rail ------------------------------------------------ */
+.tx-summary-rail { min-width: 0; }
+/* The panel sticks, not the column — the column is what gives it somewhere to
+   stick. 148px clears the fixed header. */
+.tx-summary { position: sticky; top: 148px; }
+.tx-summary {
+  background: var(--tx-surface); border: 1px solid var(--tx-line);
+  border-radius: var(--tx-radius); box-shadow: var(--tx-shadow); overflow: hidden;
+}
+.tx-sum-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--tx-line);
+  background: color-mix(in srgb, var(--tx-ink) 3%, transparent);
+}
+.tx-sum-head h2 { margin: 0; font-size: 14px; font-weight: 800; color: var(--tx-ink); }
+.tx-sum-body { padding: 16px 18px; }
+.tx-sum-route { font-size: 15px; font-weight: 800; color: var(--tx-ink); line-height: 1.45; }
+.tx-sum-arrow { color: var(--tx-accent); margin: 0 4px; }
+.tx-sum-meta { margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--tx-ink-2); }
+.tx-sum-rule { height: 1px; background: var(--tx-line); margin: 15px 0 13px; }
+.tx-sum-sec {
+  font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--tx-ink-3); margin-bottom: 9px;
+}
+.tx-sum-line {
+  display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  margin-bottom: 7px; font-size: 13px; color: var(--tx-ink-2);
+}
+.tx-sum-line b { font-weight: 700; color: var(--tx-ink); font-variant-numeric: tabular-nums; }
+.tx-sum-total {
+  display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--tx-line);
+  font-size: 14px; font-weight: 800; color: var(--tx-ink);
+}
+.tx-sum-total span:last-child { font-size: 19px; color: var(--tx-accent); font-variant-numeric: tabular-nums; }
+.tx-sum-note { margin: 9px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--tx-ink-3); }
+.tx-sum-empty {
+  margin-top: 14px; padding: 13px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--tx-ink) 4%, transparent);
+  font-size: 12.5px; line-height: 1.5; color: var(--tx-ink-2);
+}
+
+.tx-trust {
+  list-style: none; margin: 0; padding: 13px 18px 15px;
+  border-top: 1px solid var(--tx-line);
+  background: color-mix(in srgb, var(--tx-ink) 2%, transparent);
+}
+.tx-trust li {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600; color: var(--tx-ink-2);
+}
+.tx-trust li + li { margin-top: 7px; }
+.tx-trust svg { width: 13px; height: 13px; flex: none; color: #12B76A; }
+
+/* The card the traveller has opened is the one the rail is costing, so it says
+   so rather than leaving them to match a number to a row. */
+.tx-flight.is-open { border-color: color-mix(in srgb, var(--tx-accent) 45%, transparent); }
+
+@media (max-width: 1180px) {
+  /* The rail drops under the list before the filters do: the filters are used
+     WHILE reading, the summary is read once. */
+  .tx-layout-3 { grid-template-columns: 256px minmax(0, 1fr); }
+  .tx-summary-rail { grid-column: 1 / -1; }
+  .tx-summary { position: static; }
+}
+@media (max-width: 900px) {
+  .tx-layout-3 { grid-template-columns: 1fr; }
+  .tx-stepper { padding: 12px 14px; gap: 8px; }
+  .tx-step-label { font-size: 12px; }
+}
 .tx-filters {
   background: var(--tx-surface); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); padding: 18px; box-shadow: var(--tx-shadow);
@@ -1325,4 +1464,26 @@ body.hg-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .hg-frame { transition: none; }
   .hg-thumb { transition: none; }
+}
+
+/* ===========================================================================
+   The flight card, restacked by its COLUMN's width
+   ===========================================================================
+   Declared last on purpose. `.tx-flight` sets `grid-template-columns` several
+   hundred lines above; a container query carries no extra specificity, so the
+   same selector written earlier simply loses to it and the card stayed in
+   three columns no matter how narrow its column got. Source order is the whole
+   fix, and it belongs at the end of the file rather than next to the layout it
+   serves.
+
+   The container is .tx-results-col (declared with the layout above). At 1440px
+   that column is 596px — two rails take 572px between them — which is why this
+   is a container query and not a media query: the viewport is wide, the column
+   is not, and only the column knows.
+   =========================================================================== */
+@container txlist (max-width: 700px) {
+  .tx-flight { grid-template-columns: 1fr; gap: 14px; }
+  .tx-carrier { min-width: 0; }
+  .tx-act { min-width: 0; grid-template-columns: 1fr 1fr; align-items: center; }
+  .tx-fare { grid-column: 1 / -1; text-align: left; }
 }

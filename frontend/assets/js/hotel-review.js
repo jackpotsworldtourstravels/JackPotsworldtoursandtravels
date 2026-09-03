@@ -626,6 +626,7 @@ const HotelReview = (function () {
      Entry
      --------------------------------------------------------------------- */
   async function show(hotelRow, sharedState, hs, roomPicks, guests_) {
+    listenForSearchChange();
     shell = sharedState || {};
     picks = (roomPicks || []).filter(Boolean);
     guestData = guests_ || { party: [], notes: '' };
@@ -656,6 +657,26 @@ const HotelReview = (function () {
 
   /** Extras and coupon survive leaving and returning to this screen. */
   function state() { return { addons: chosenAddons.slice(), coupon: couponCode }; }
+
+
+  /* THE SEARCH BAR IS EDITABLE, so the stay can change while this screen is
+     open. One listener, bound once: re-price and repaint, but only when this
+     screen is the one showing — the others read the new state when they next
+     paint. paintChrome() is deliberately NOT called, because it would replace
+     the very input being edited. */
+  let sbListening = false;
+  function listenForSearchChange() {
+    if (sbListening) return;
+    sbListening = true;
+    document.addEventListener('hr:searchchange', () => {
+      const el = document.getElementById('hvRoot');
+      if (!el || el.hidden) return;
+      refreshQuote();
+      paintMain();
+      paintSummary();
+      paintActionbar();
+    });
+  }
 
   return { show, hide, state };
 })();

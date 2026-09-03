@@ -27,20 +27,25 @@
      handful of --sp-* tokens booking.css still asks for are bridged onto
      main.css's palette in booking-card.css. -->
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260829n1">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260829n1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
 <link rel="stylesheet" href="assets/css/booking-ref.css?v=20260826rf7">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260825t1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
+<!-- The booking progress bar, shared by Flights, Hotels and Tour Packages.
+     One component so the three cannot drift apart. -->
+<link rel="stylesheet" href="assets/css/booking-steps.css?v=20260902flow1">
+<!-- The profile chip + dropdown, shared by every page that shows a header. -->
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 
 <!-- Loaded in <head> because the header and the card are mounted inline,
      during parse — the same trick index.html uses, so nothing on this page
      renders a frame later than it does over there. -->
 <script src="shared/formatters.js"></script>
-<script src="assets/js/auth.js?v=20260824ic9"></script>
+<script src="assets/js/auth.js?v=20260827pm2"></script>
 <script src="assets/js/jp-icons.js?v=20260825t1"></script>
 <!-- The airport picker: the table and the shared listbox. airports.js also has
      to precede travel-data.js further down, which reads the same table. -->
@@ -49,8 +54,8 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260829n1"></script>
-<script src="assets/js/hero-shell.js?v=20260826ac1"></script>
+<script src="assets/js/booking-card.js?v=20260902flow4"></script>
+<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
 </head>
 <body class="sp-continuation" data-sp-service="flights">
 <a href="#txResults" class="skip-link">Skip to results</a>
@@ -60,7 +65,8 @@
      <body> (it injects its own markup) and BEFORE mountHeader below, which asks
      whether AccountCenter exists to decide if the chip is a button or a link. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/account-center.js?v=20260829ac2"></script>
+<script src="assets/js/profile-menu.js?v=20260827dup1"></script>
+<script src="assets/js/account-center.js?v=20260829pm6"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -68,30 +74,21 @@
 <script>HeroShell.mountHeader('flights.html');</script>
 
 <main id="main">
-<section class="hero" id="home">
-  <div class="hero-bg" id="heroBg"></div>
-  <!-- The same four clips, in the same order, with flights already active: a
-       traveller arriving from a Search click must not see the video restart,
-       swap or fade. -->
-  <div class="hero-video-layer" id="heroVideoLayer">
-    <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
-    <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-    <video data-video="cruises" data-src="assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-    <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-  </div>
-  <div class="hero-overlay"></div>
-  <div class="wrap hero-inner">
-    <div class="eyebrow">Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search</div>
-    <h1>Your next adventure<span class="accent"> starts here.</span></h1>
-    <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
-  </div>
+<!-- THE LANDING PAGE'S HERO, not a copy of it. Same film, same overlay, same
+     spacing, same place for the card — built by hero-shell.js, which is what
+     Hotels and Tour Packages mount too. The only thing this page chooses is
+     which product's card opens in the dock.
 
-  <!-- The SAME card as the landing page, holding the criteria that produced the
-       list below. Seeding happens in travel-explore.js once it has read the
-       URL, so the card and the results cannot show different searches. -->
-  <div class="wrap search-dock" id="heroSearchDock"></div>
-  <script>BookingCard.render('heroSearchDock', { tab: 'flights' });</script>
-</section>
+     It used to be 25 lines duplicated from index.html. Two hand-kept copies of
+     a hero drift, and the whole point of this page is that arriving here from
+     a Search click should not feel like a page change at all. -->
+<section id="siteHero"></section>
+<!-- compact: this is a RESULTS page, not the landing page. Same header,
+     same film, same card - the card is this page's search summary and its
+     Modify Search - but without the headline and the pitch, so the first
+     result is near the top of the page instead of a screen below it.
+     Searching happens on index.html; browsing happens here. -->
+<script>HeroShell.mountHero({ card: 'flights', compact: true });</script>
 
 <div class="tx-scope">
   <section class="tx-section" aria-labelledby="txFlightsHead">
@@ -104,6 +101,12 @@
       </div>
       <span class="tx-sample" title="Replaced automatically when the Flight API is connected">Sample schedule</span>
     </div>
+
+    <!-- The booking progress. This screen is step 2 of 7 — the traveller has
+         searched and is choosing a flight; everything after Book Now is the
+         booking flow proper. Rendered by travel-explore.js so the labels and
+         the current step live in one place. -->
+    <nav class="tx-stepper" id="txStepper" aria-label="Booking progress"></nav>
 
     <div class="tx-toolbar" id="txResults">
       <div class="tx-search">
@@ -125,15 +128,28 @@
       </div>
     </div>
 
-    <div class="tx-layout">
-      <!-- Facets and their counts are derived from the data, so a new airline
+    <!-- THREE COLUMNS: filters, the flights, the booking summary. The rail on
+         the right is the running answer to "what am I booking and what will it
+         cost", which is the question a traveller is holding the whole time they
+         read the list. It is a SIBLING of the list, not part of it, so neither
+         one scrolls the other. -->
+    <div class="tx-layout tx-layout-3">
+      <!-- The COLUMN, and the sticky panel inside it. A `position:sticky` box
+           can only travel inside its own containing block, so the panel cannot
+           be the grid item as well: the item is exactly as tall as the panel,
+           which leaves nothing to travel through and the panel simply scrolls
+           away. The column stretches to the row, the panel sticks within it.
+           Facets and their counts are derived from the data, so a new airline
            in the API needs no markup here. -->
-      <aside class="tx-filters" id="txFilters" aria-label="Filter flights"></aside>
-      <div>
+      <aside class="tx-rail-col" aria-label="Filter flights">
+        <div class="tx-filters" id="txFilters"></div>
+      </aside>
+      <div class="tx-results-col">
         <p class="tx-count-line" id="txCount"></p>
         <div id="txFlightList"></div>
         <button type="button" class="tx-more" id="txMore" style="display:none;"></button>
       </div>
+      <aside class="tx-summary-rail" id="txSummary" aria-label="Booking summary"></aside>
     </div>
   </section>
 </div>
@@ -148,7 +164,7 @@
 
 <script src="components/toast.js"></script>
 <script src="assets/js/airline-logos.js?v=20260824ic9"></script>
-<script src="assets/js/travel-data.js?v=20260825t3"></script>
+<script src="assets/js/travel-data.js?v=20260827fe3"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
@@ -163,11 +179,18 @@
      panel, so a second set of criteria controls below the fold would be two
      places to type the same trip into. search-widgets.js is loaded in <head>,
      above, because the card's airport picker is built from it. -->
-<!-- Same filter engine as Hotels, with the flight definition list on top.
-     group-enquiry.js is what booking-card.js's group form submits through. -->
-<script src="assets/js/group-enquiry.js?v=20260829m1"></script>
-<script src="assets/js/filter-engine.js?v=20260829m1"></script>
-<script src="assets/js/flight-filters.js?v=20260829m1"></script>
-<script src="assets/js/travel-explore.js?v=20260825t2"></script>
+<!-- This page renders the Hotels panel too, Group Deals included, so it needs
+     the enquiry seam its search handler defers to. Before travel-explore.js,
+     which is what calls it. -->
+<script src="assets/js/group-enquiry.js?v=20260827g2"></script>
+<!-- The results-page filter engine. Before travel-explore.js, which mounts it.
+     Carries every filter definition; the sidebar renders only the ones the
+     current results can actually answer. -->
+<!-- The generic panel: options, counts, collapsing, the slider, focus, URL.
+     Knows nothing about flights; flight-filters.js supplies the definitions. -->
+<script src="assets/js/filter-engine.js?v=20260827fe3"></script>
+<script src="assets/js/flight-filters.js?v=20260827fe3"></script>
+<script src="assets/js/booking-steps.js?v=20260902flow1"></script>
+<script src="assets/js/travel-explore.js?v=20260902flow4"></script>
 </body>
 </html>
