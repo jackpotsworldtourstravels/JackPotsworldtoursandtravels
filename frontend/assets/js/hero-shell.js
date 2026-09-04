@@ -205,6 +205,22 @@ const HeroShell = (function () {
    *  whatever the card needs. See mountHero for why that distinction exists. */
   function heroHtml(opts) {
     const o = opts || {};
+    /* NO FILM ON A RESULTS PAGE, AND THIS IS THE POINT OF `compact`.
+       The band kept the landing page's video, overlay and transparent header,
+       which made flights.html look exactly like index.html with results
+       appended underneath the search card — reported four times as "the
+       landing page is showing booking results". It never was: the redirect
+       worked and the URL said /flights.html. The two pages were simply
+       indistinguishable at a glance, which is a worse bug than the one being
+       reported, because it made a working flow look broken.
+
+       Dropping the film also drops the transparent header: bindScrollFade
+       finds no #heroBg and paints the solid navy-on-white bar instead, so the
+       whole top of the page reads as a different screen. Nothing else moves —
+       same card, same cards, same filters, same steps. */
+    if (o.compact) {
+      return '<div class="wrap search-dock" id="heroSearchDock"></div>';
+    }
     return '<div class="hero-bg" id="heroBg"></div>'
       + '<div class="hero-video-layer" id="heroVideoLayer">'
       + heroVideosHtml(o.video || 'flights') + '</div>'
@@ -308,13 +324,12 @@ const HeroShell = (function () {
        switched it — a second video fetched on every page load, and a visible
        swap on the slow ones. */
     host.innerHTML = heroHtml(Object.assign({ video: o.card || 'flights' }, o));
-    if (o.card && typeof BookingCard !== 'undefined') {
+    /* THE LANDING PAGE'S CARD IS NOT BUILT ON A RESULTS PAGE.
+       `compact` leaves #heroSearchDock empty for search-strip.js to fill —
+       a different component with its own markup, not this one made smaller.
+       Only the full hero mounts BookingCard. */
+    if (o.card && !o.compact && typeof BookingCard !== 'undefined') {
       BookingCard.render('heroSearchDock', { tab: o.card });
-      /* A RESULTS PAGE OPENS WITH THE CARD FOLDED. Only CSS decides whether
-         that is visible — the class does nothing above 760px — so this is not
-         a viewport test and does not need re-running on resize. The landing
-         page never asks for it, which is the whole difference. */
-      if (o.compact && BookingCard.setCollapsed) BookingCard.setCollapsed(true);
     }
     /* AFTER the card, because rendering it is what picks the clip. */
     playHeroVideo();
@@ -423,11 +438,57 @@ const HeroShell = (function () {
       }));
     }
 
+    /* THE PRODUCT LINKS SWITCH THE CARD'S TAB INSTEAD OF NAVIGATING —
+       but only where switching it is a real answer.
+
+       On the landing page the search card IS the page's content, so choosing
+       Flights or Hotels there is choosing what to search for, not where to go:
+       the click activates that tab and the page stays put. Navigation happens
+       when the traveller presses Search.
+
+       ON A RESULTS PAGE THE LINKS STILL NAVIGATE, and that is deliberate
+       rather than an oversight. Its card is the compact bar (`.is-bar`), which
+       exists to edit the search that produced the list underneath it; silently
+       switching it to Hotels would leave a hotel form above a page of flights,
+       and — worse — the header would no longer be able to leave the page at
+       all. So the test is the card's own mode, not the URL: a full card takes
+       the click, a bar lets it through.
+
+       Delegated on the header so it serves both the built nav and
+       index.html's static copy without either page wiring it up. */
+    const PRODUCT_TABS = {
+      'flights.html': 'flights',
+      'hotels.html': 'hotels',
+      'packages.html': 'packages',
+    };
+    /* Declared here because BOTH delegated handlers below hang off it. */
+    const header = document.getElementById('siteHeader');
+    if (header && !header.dataset.tabNavBound) {
+      header.dataset.tabNavBound = '1';
+      header.addEventListener('click', e => {
+        const a = e.target.closest('a[href]');
+        if (!a || !header.contains(a)) return;
+        const tab = PRODUCT_TABS[a.getAttribute('href')];
+        if (!tab) return;
+        /* The landing page's card only. A results page has `.is-bar`. */
+        const card = document.querySelector('.search-card:not(.is-bar)');
+        if (!card || typeof BookingCard === 'undefined') return;
+        if (!BookingCard.activateTab(tab)) return;   // card cannot serve it — let the link work
+        e.preventDefault();
+        /* Mark it current, so the nav agrees with the card it just changed. */
+        header.querySelectorAll('.navlinks a, .mobile-nav a').forEach(link => {
+          const on = PRODUCT_TABS[link.getAttribute('href')] === tab;
+          if (on) link.setAttribute('aria-current', 'page');
+          else if (PRODUCT_TABS[link.getAttribute('href')]) link.removeAttribute('aria-current');
+        });
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+
     /* My Bookings / Notifications. Delegated on the header, so it serves both
        the built nav and index.html's static copy without either page wiring it
        up itself. Signed out there is nothing to show, so it asks for a sign-in
        the same way every other account destination does. */
-    const header = document.getElementById('siteHeader');
     if (header && !header.dataset.acctBound) {
       header.dataset.acctBound = '1';
       header.addEventListener('click', e => {
@@ -497,6 +558,48 @@ const HeroShell = (function () {
     if (foot) foot.innerHTML = footerHtml();
   }
 
-  return { mountHeader, mountHero, mountFooter, initBehaviour, paintAuth,
-           headerHtml, heroHtml, footerHtml };
+  /* ---------------------------------------------------------------------
+     The booking footer
+
+     The landing page's footer is a company directory — five columns, the
+     contact block, the newsletter. It belongs at the end of a page somebody is
+     reading. A results or booking page is a page somebody is WORKING in, and
+     that footer both buries the thing they are doing and offers a dozen ways
+     to abandon it. So those pages get this instead: the way back, and the two
+     documents anyone is entitled to find from any page.
+     --------------------------------------------------------------------- */
+  function bookingFooterHtml() {
+    return '<div class="wrap bf-row">'
+      + '<button type="button" class="bf-back" data-bf-back>'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
+      + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back</button>'
+      + '<span class="bf-copy">&copy; ' + new Date().getFullYear()
+      + ' JackPots World Tours &amp; Travels Pvt. Ltd.</span>'
+      + '<span class="bf-links">'
+      + '<a href="index.html#contact">Privacy Policy</a>'
+      + '<a href="index.html#contact">Terms &amp; Conditions</a>'
+      + '</span></div>';
+  }
+
+  function mountBookingFooter() {
+    const foot = document.getElementById('bookingFooter');
+    if (!foot || foot.dataset.bfInit) return;
+    foot.dataset.bfInit = '1';
+    foot.innerHTML = bookingFooterHtml();
+    /* Delegated, so the button survives any later repaint of this footer. */
+    foot.addEventListener('click', e => {
+      if (!e.target.closest('[data-bf-back]')) return;
+      /* The browser's own history, which is what every screen in these flows
+         is built on — each hotel booking step is its own history entry, and
+         the results pages write their criteria into the URL. Nothing to
+         reimplement, and nothing that can disagree with the Back links the
+         screens already carry. */
+      if (history.length > 1) history.back();
+      else window.location.href = 'index.html';
+    });
+  }
+
+  return { mountHeader, mountHero, mountFooter, mountBookingFooter,
+           initBehaviour, paintAuth, headerHtml, heroHtml, footerHtml };
 })();

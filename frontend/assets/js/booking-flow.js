@@ -99,33 +99,13 @@ const BookingFlow = (function () {
      they always render as done and are never navigable. They shift the
      numbering of the real steps, which is why the offset is threaded through
      rather than using the array index directly. */
-  function railItemsHtml() {
-    const prior = (flow.priorSteps || []).map(label => `
-      <li class="bk-rail-step is-done">
-        <span class="bk-rail-dot">&#10003;</span>
-        <span class="bk-rail-label">${esc(label)}</span>
-      </li>`).join('');
-    const offset = (flow.priorSteps || []).length;
-    const own = flow.steps.map((s, i) => {
-      const done = i < index;
-      const dot = `<span class="bk-rail-dot">${done ? '&#10003;' : i + 1 + offset}</span>`;
-      const lab = `<span class="bk-rail-label">${esc(s.label)}</span>`;
-      /* A cleared step is a way back. The reference's action bar carries no
-         Back control, so on flights this is what replaces it; it renders
-         identically either way — only the element type changes. */
-      const inner = done
-        ? `<button type="button" class="bk-rail-go" data-goto="${esc(s.id)}">${dot}${lab}</button>`
-        : dot + lab;
-      return `
-      <li class="bk-rail-step ${done ? 'is-done' : ''} ${i === index ? 'is-now' : ''}"
-          ${i === index ? 'aria-current="step"' : ''}>${inner}</li>`;
-    }).join('');
-    return prior + own;
-  }
+  /* THE STEP RAIL IS GONE, from here and from every other screen.
+     It used to render the whole journey across the top with the current step
+     marked, and its cleared steps doubled as the way back — which is why
+     removing it means the footer's Back has to work on the first step too.
+     See the Back button in shellHtml's footer and back() below. */
 
   function shellHtml() {
-    const steps = railItemsHtml();
-
     return `
       <div class="bk-sheet ${flow.kind === 'flight' ? 'is-flight' : ''}">
         <div class="bk-pagehead">
@@ -133,8 +113,6 @@ const BookingFlow = (function () {
           <div class="bk-kicker">${esc(flow.kicker || 'Booking')}</div>
           <h1 class="bk-title">${esc(flow.title)}</h1>
         </div>
-
-        <ol class="bk-rail" aria-label="Booking steps">${steps}</ol>
 
         <div id="bkItin"></div>
 
@@ -421,27 +399,11 @@ const BookingFlow = (function () {
     const main = document.getElementById('bkMain');
     const root = document.getElementById('bkRoot');
 
-    /* Re-render the rail so the tick marks and the "now" highlight move. */
-    const rail = root.querySelector('.bk-rail');
-    rail.innerHTML = railItemsHtml();
-
     /* The itinerary card, repainted per step: the Review step's version names
        the party and cabin and offers "Edit Search", the others "Change
        Flights", so it cannot be rendered once at start(). */
     const itin = root.querySelector('#bkItin');
     if (itin) itin.innerHTML = itineraryHtml(ctx, step);
-    /* The rail scrolls horizontally once it is wider than the screen (see
-       booking.css) — without this, the step somebody is actually on can
-       land off the edge of that scroll area, on a phone, with nothing on
-       screen saying so. */
-    rail.querySelector('.bk-rail-step.is-now')?.scrollIntoView({
-      block: 'nearest', inline: 'center', behavior: 'smooth',
-    });
-    /* Cleared steps walk back. Wired here because railItemsHtml() is re-run on
-       every paint, which throws the previous listeners away with the markup. */
-    rail.querySelectorAll('[data-goto]').forEach(b => {
-      b.addEventListener('click', () => goTo(b.dataset.goto));
-    });
 
     main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
     if (step.load) main.innerHTML = skeleton(3);
@@ -502,7 +464,14 @@ const BookingFlow = (function () {
        step is a dismissal rather than a Continue. */
     const back = document.getElementById('bkBack');
     const next = document.getElementById('bkNext');
-    back.style.visibility = (index === 0 || step.hideBack) ? 'hidden' : 'visible';
+    /* BACK IS ALWAYS THERE ON THE FIRST STEP NOW. It used to be hidden, on the
+       reasoning that there was nowhere behind it — but back() leaves the flow
+       entirely from step 0, which IS where the traveller came from, and with
+       the rail gone this is the only way back that is left. `hideBack` is
+       still honoured: a step that owns its own navigation says so. */
+    back.style.visibility = step.hideBack ? 'hidden' : 'visible';
+    back.textContent = index === 0
+      ? ('Back to ' + (flow.backLabel || 'results')) : 'Back';
     /* A step that carries its own call to action hides the shell's. The
        gateway payment screen is the one that does: its button opens the
        provider's checkout and must not be duplicated by a Continue that would
@@ -580,7 +549,11 @@ const BookingFlow = (function () {
   }
 
   function back() {
-    if (busy || index === 0) return;
+    if (busy) return;
+    /* From the first step there is no earlier step — going back means leaving
+       the flow, which is where the traveller was before it opened. Same thing
+       the page head's exit does, so the two cannot disagree. */
+    if (index === 0) { confirmClose(); return; }
     index -= 1;
     paint('back');
   }

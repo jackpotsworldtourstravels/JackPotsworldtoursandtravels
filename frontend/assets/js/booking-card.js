@@ -351,10 +351,13 @@ const BookingCard = (function () {
   /* The products, in the order the landing page has always listed them. `icon`
      is a jp-icons name; the label carries the meaning, so a missing icon
      library leaves a working tab rather than a broken glyph. */
+  /* Cruises is no longer offered in the card. cruisesPanel() is still defined
+     just above — it is what cruises.html would need if that product is ever
+     put back — but it is not in this list, so the tab is not drawn and the
+     panel is not built. Nothing is hidden; it simply is not rendered. */
   const TABS = [
     { id: 'flights',  label: 'Flights',       icon: 'flights' },
     { id: 'hotels',   label: 'Hotels',        icon: 'hotels' },
-    { id: 'cruises',  label: 'Cruises',       icon: 'cruises' },
     { id: 'packages', label: 'Tour Packages', icon: 'packages' },
   ];
 
@@ -394,7 +397,15 @@ const BookingCard = (function () {
     ].map(t => '<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
       + '<path d="M20 6L9 17l-5-5"/></svg>' + esc(t) + '</span>').join('');
 
-    return '<div class="search-card" role="region" aria-label="Booking search">'
+    /* THE RESULTS-PAGE FORM IS A BAR, NOT THE LANDING PAGE'S CARD.
+       Same fields, same handlers, same validation — what it drops is the
+       chrome that belongs to a page selling a search rather than showing
+       one: the product tabs (choosing a product is navigation, and the
+       header does that), and the trust row. */
+    const bar = state.bar;
+
+    return '<div class="search-card' + (bar ? ' is-bar' : '') + '"'
+      + ' role="region" aria-label="' + (bar ? 'Edit your search' : 'Booking search') + '">'
       /* THE COLLAPSED SUMMARY, for a phone on a results page. Always rendered,
          shown by CSS only where it belongs — see .search-strip in
          booking-card.css. It is the card's own disclosure button, so it stays
@@ -412,7 +423,7 @@ const BookingCard = (function () {
       /* THE PRODUCT TABS ARE THE FIRST THING IN THE CARD PROPER, above every
          field. What you are booking is the question that decides what the rest
          of the card even means, so it is asked first. */
-      + tabsHtml()
+      + (bar ? '' : tabsHtml())
       + '<div class="search-body">'
       + TABS.map(t => PANELS[t.id]()).join('')
       + '</div>'
@@ -428,7 +439,7 @@ const BookingCard = (function () {
       + '<p class="search-foot-error" role="alert"></p>'
       + '<button class="btn btn-coral search-go">Search</button>'
       + '</div>'
-      + '<div class="trust-row">' + trust + '</div>'
+      + (bar ? '' : '<div class="trust-row">' + trust + '</div>')
       + '</div>';
   }
 
@@ -1900,6 +1911,7 @@ const BookingCard = (function () {
     /* WHICH product this card is. Unknown names fall back to flights rather
        than rendering an empty card. */
     if (opts.tab && PANELS[opts.tab]) state.tab = opts.tab;
+    state.bar = !!opts.bar;
 
     el.innerHTML = cardHtml();
     /* Anything portalled out by a previous render is orphaned the moment the

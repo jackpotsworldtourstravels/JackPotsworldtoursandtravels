@@ -366,11 +366,19 @@ const TravelExplore = (function () {
   const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"'
     + ' stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 
-  /** @param {string} product 'flights' | 'packages' — whichever this page is. */
-  function renderStepper(product) {
-    if (typeof BookingSteps === 'undefined') return;
-    const kind = product || document.body.dataset.spService;
-    BookingSteps.mount('txStepper', kind, RESULTS_STEP);
+  /** NO PROGRESS BAR WHILE BROWSING.
+   *
+   *  A results page is not part of the booking: nobody has chosen anything
+   *  yet, and "Search → Select Flight → Traveller Details → …" over a list
+   *  announces a journey that has not started. The bar belongs from Book Now
+   *  onwards, where the booking flow draws its own.
+   *
+   *  The function stays so every caller does not have to be unpicked, and it
+   *  EMPTIES the slot rather than leaving whatever was there — a stale bar
+   *  from a previous render would be worse than none. */
+  function renderStepper() {
+    const host = $('txStepper');
+    if (host) host.innerHTML = '';
   }
 
   /** Which flight the rail is costing.
@@ -1139,12 +1147,7 @@ const TravelExplore = (function () {
    *  card after setting a budget below behave the way it looks like it should.
    */
   function mountPackageCard(rows) {
-    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
-
-    /* The card renders during parse with its own defaults; this writes in the
-       criteria that arrived from the landing page, so the card and the list
-       below it describe the same search. */
-    BookingCard.seedPackages({ type: state.pkgType, month: state.pkgMonth });
+    if (typeof SearchStrip === 'undefined' || !$('heroSearchDock')) return;
 
     /* AND THE SEARCH RUNS, without anyone pressing Search again.
        mountPackageSearch above resolves `type` to a package by EXACT NAME and
@@ -1159,15 +1162,20 @@ const TravelExplore = (function () {
        of two. renderPackages() below does the filtering. */
     if (state.pkgType && !state.pkgDest) state.pkgDest = state.pkgType;
 
-    BookingCard.setSearchHandler((kind, params) => {
-      /* The card's other tabs still navigate; only Packages is in place. */
-      if (kind !== 'packages') { leaveFor(kind, params); return; }
-
-      /* `type` is the card's word for the package name — the same value the
-         landing page puts in the `type=` parameter that seeds this page. */
-      if (params.type !== undefined) state.pkgType = params.type || '';
-      if (params.type) state.pkgDest = params.type;
-      if (params.month !== undefined) state.pkgMonth = params.month || 'any';
+    SearchStrip.render('heroSearchDock', {
+      product: 'packages',
+      value: {
+        dest: state.pkgDest || state.pkgType, month: state.pkgMonth,
+        budget: state.pkgBudget, travellers: state.pkgTravellers,
+      },
+      destinations: q => (typeof PackageSearch !== 'undefined' && PackageSearch.destinationSource)
+        ? PackageSearch.destinationSource(q) : [],
+      onSearch: params => {
+      state.pkgDest = params.dest || '';
+      state.pkgType = params.dest || '';
+      state.pkgMonth = params.month || 'any';
+      state.pkgBudget = params.budget;
+      state.pkgTravellers = params.travellers;
 
       /* A month NAME from the card becomes the first real departure month that
          matches it; nothing departing then leaves the filter off rather than
@@ -1186,6 +1194,7 @@ const TravelExplore = (function () {
       renderPackages(allPackages.length ? allPackages : rows);
       const list = $('txResults');
       if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
     });
   }
 
@@ -1262,26 +1271,19 @@ const TravelExplore = (function () {
    *  is deliberately the same work mountHotelSearch's is — two ways in, one
    *  path through, so the panel and the card cannot drift apart. */
   function mountHotelCard(rows) {
-    if (typeof BookingCard === 'undefined' || !$('heroSearchDock')) return;
+    if (typeof SearchStrip === 'undefined' || !$('heroSearchDock')) return;
 
-    /* The card renders during parse with its own defaults; this writes in the
-       criteria that produced the list below, so the two cannot disagree. */
-    BookingCard.seedHotels({
-      dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
-      rooms: state.rooms, adults: state.guests,
-    });
-
-    BookingCard.setSearchHandler((kind, params) => {
-      /* Group Deals is an ENQUIRY, not a search — the same choke point
-         leaveFor makes, made here too because this handler is registered
-         instead of the one leaveFor belongs to. */
-      if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
-        GroupEnquiry.handle(params);
-        return;
-      }
-      /* The card's other tabs still navigate; only Hotels is handled in place. */
-      if (kind !== 'hotels') { leaveFor(kind, params); return; }
-
+    SearchStrip.render('heroSearchDock', {
+      product: 'hotels',
+      value: {
+        dest: state.dest, checkIn: state.checkIn, checkOut: state.checkOut,
+        rooms: state.rooms,
+      },
+      /* The same list the panel below offers, so the two boxes cannot suggest
+         different places. */
+      destinations: q => (typeof HotelSearch !== 'undefined' && HotelSearch.destinationSource)
+        ? HotelSearch.destinationSource(q) : [],
+      onSearch: params => {
       state.dest = params.dest;
       state.checkIn = params.checkIn;
       state.checkOut = params.checkOut;
@@ -1301,6 +1303,7 @@ const TravelExplore = (function () {
          to it lands on a zero-height element above the actual list. */
       const list = $('hrRoot') || $('txResults');
       if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
     });
   }
 
@@ -1469,28 +1472,25 @@ const TravelExplore = (function () {
   }
 
   function mountSearch() {
-    if (typeof BookingCard === 'undefined') return;
+    /* THE STRIP, NOT THE CARD. search-strip.js owns the results page's search
+       row; booking-card.js is the landing page's and is not mounted here. It
+       is handed the criteria that produced the list below, so the two cannot
+       show different searches. */
+    if (typeof SearchStrip === 'undefined' || !$('heroSearchDock')) return;
 
-    /* The card renders during parse with its own defaults; this is where the
-       criteria that produced the list below are written into it, so the two
-       cannot show different searches. */
-    BookingCard.seedFlights({
-      trip: state.trip, from: state.from, to: state.to,
-      depart: state.depart, ret: state.ret, cabin: state.cabin,
-      legs: state.legs.length ? state.legs : undefined,
-      adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
-    });
-
-    BookingCard.setSearchHandler((kind, params) => {
-      if (kind !== 'flights') { leaveFor(kind, params); return; }
+    SearchStrip.render('heroSearchDock', {
+      product: 'flights',
+      value: {
+        trip: state.trip, from: state.from, to: state.to,
+        depart: state.depart, ret: state.ret, cabin: state.cabin,
+        adults: state.pax.adults, children: state.pax.children, infants: state.pax.infants,
+      },
+      onSearch: params => {
       state.trip = params.trip;
-      /* The card hands over the ENCODED itinerary, because that is what a URL
-         can carry; the array is this file's business. */
-      state.legs = params.legs && typeof BookingCard !== 'undefined'
-        ? BookingCard.decodeLegs(params.legs) : [];
-      /* from/to/depart are the FIRST leg for a multi-city search — the card
-         fills them in for exactly this reason, so the filters and the renderers
-         below need no idea that an itinerary is in play. */
+      /* The strip edits one leg, so a search run from it is a single leg —
+         any multi-city itinerary the page arrived with is replaced by what the
+         row now says, which is what the traveller just asked for. */
+      state.legs = [];
       state.from = params.from;
       state.to = params.to;
       state.depart = params.depart;
@@ -1510,6 +1510,7 @@ const TravelExplore = (function () {
       if (box) box.value = '';
       writeUrl();
       runFlightSearch({ scroll: true });
+      },
     });
   }
 

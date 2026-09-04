@@ -224,7 +224,22 @@ const HotelResults = (function () {
     }).filter(Boolean))];
   }
 
+  /** The old per-screen criteria bar, which is no longer drawn anywhere.
+   *
+   *  STILL EXPORTED AND STILL RETURNING A STRING, because Details, Rooms,
+   *  Guests, Review and Payment each fill their own #hdSearchbar / #hrmSearchbar
+   *  / … from it. Returning '' empties those five slots from one place rather
+   *  than unpicking five call sites — the same shape stepperHtml took.
+   *
+   *  What replaced it: search-strip.js's compact row, which now stays on the
+   *  booking screens instead of being hidden there. One search bar per page,
+   *  the same one on every page, editable in place. The body below is kept
+   *  because it is the only description of what that bar contained. */
   function searchbarHtml() {
+    return '';
+  }
+
+  function unusedSearchbarHtml() {
     const dest = (shell && shell.dest) || '';
     const ci = (shell && shell.checkIn) || '';
     const co = (shell && shell.checkOut) || '';
@@ -340,9 +355,16 @@ const HotelResults = (function () {
    *  booking-steps.js, which draws the flights and packages bars too. Changing
    *  the callers as well would have meant editing seven files to move one
    *  renderer. */
-  function stepperHtml(current) {
-    const at = typeof current === 'number' ? current : CURRENT_STEP;
-    return (typeof BookingSteps !== 'undefined') ? BookingSteps.html('hotels', at) : '';
+  /** The booking progress bar, which is no longer drawn anywhere.
+   *
+   *  STILL EXPORTED, AND STILL RETURNING A STRING, because all six hotel
+   *  booking screens call it to fill their own #hdStepper / #hrmStepper / …
+   *  slot. Returning '' empties those slots — the bar is not rendered and not
+   *  hidden — without unpicking six call sites for a component that may yet
+   *  come back. Each screen's Back link is what tells the traveller where they
+   *  are relative to where they were. */
+  function stepperHtml() {
+    return '';
   }
 
   /* ---------------------------------------------------------------------
@@ -749,7 +771,8 @@ const HotelResults = (function () {
     /* THE BAR IS EDITABLE, so the first thing this does is put the cursor in
        it. Only when the full panel exists — the Results screen — does it also
        reveal that; on Details, Rooms, Guests, Review and Payment there is no
-       panel to reveal and the bar itself is the whole answer. */
+       panel to reveal and the strip at the top of the page is the whole
+       answer. */
     const field = document.querySelector('[data-hr-sb="dest"]');
     if (field) {
       field.focus();
@@ -863,13 +886,14 @@ const HotelResults = (function () {
        booking actually begins. */
     const sb = $('hrSearchbar');
     if (sb) sb.innerHTML = '';
-    /* THE STEPPER IS BACK, and only the stepper. It was removed with the
-       criteria bar when this screen stopped carrying booking chrome; the
-       criteria bar stays gone (the card above is the search summary), but the
-       progress bar is what makes choosing a hotel visibly the same step as
-       choosing a flight — step 2 of the same journey, in the same bar. */
+    /* NEITHER THE CRITERIA BAR NOR THE PROGRESS BAR ON THIS SCREEN.
+       The search bar above is the editable criteria, and the booking has not
+       started: the traveller is still choosing. Both appear from Hotel
+       Details onwards, which is where the journey actually begins — those
+       screens paint their own into #hdStepper, #hrmStepper and the rest, and
+       are untouched. */
     const st = $('hrStepper');
-    if (st) st.innerHTML = stepperHtml(CURRENT_STEP);
+    if (st) st.innerHTML = '';
     const heading = $('hrHeading');
     if (heading) heading.textContent = shell.dest ? `Hotels in ${shell.dest}` : 'Hotels';
 

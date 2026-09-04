@@ -20,15 +20,15 @@
      palette on a page that already has main.css's. The --sp-* token names
      booking.css and travel-explore.css use are bridged onto main.css's
      palette by booking-card.css, under body.sp-continuation. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/main.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260903all2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
-<!-- The booking progress bar, shared by Flights, Hotels and Tour Packages.
-     One component so the three cannot drift apart. -->
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260903all2">
+<!-- The results-page search strip. A separate component from the landing
+     page's booking card; index.html loads neither of these two files. -->
+<link rel="stylesheet" href="assets/css/search-strip.css?v=20260903all2">
 <link rel="stylesheet" href="assets/css/payment.css?v=20260902p7">
-<link rel="stylesheet" href="assets/css/booking-steps.css?v=20260902flow1">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
 <!-- The shell and the hero search card, in <head> because the header, the
@@ -45,8 +45,8 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260902flow4"></script>
-<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
+<script src="assets/js/booking-card.js?v=20260903all2"></script>
+<script src="assets/js/hero-shell.js?v=20260903all2"></script>
 </head>
 <body class="sp-continuation" data-sp-service="packages">
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -65,22 +65,11 @@
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('packages.html');</script>
 
-<!-- THE LANDING PAGE'S HERO, from hero-shell.js - the same film, overlay,
-     spacing and card position index.html and flights.html show, in place of a
-     navy banner carrying a breadcrumb and a second "Tour Packages" title.
-
-     The card is the Packages panel of the SAME BookingCard. The richer panel
-     below (#txSearchPanel, PackageSearch) stays exactly as it was: it asks
-     for budget, duration and travellers as well, and it is what this page's
-     results have always been filtered by. The hero card is the quick way in,
-     and both write their criteria into the same state. -->
+<!-- The results-page search strip (search-strip.js), in the same compact
+     band Flights and Hotels use. It replaces the richer #txSearchPanel
+     below as this page's search: same fields, one row, at the top. -->
 <section id="siteHero"></section>
-<!-- compact: this is a RESULTS page, not the landing page. Same header,
-     same film, same card - the card is this page's search summary and its
-     Modify Search - but without the headline and the pitch, so the first
-     result is near the top of the page instead of a screen below it.
-     Searching happens on index.html; browsing happens here. -->
-<script>HeroShell.mountHero({ card: 'packages', compact: true });</script>
+<script>HeroShell.mountHero({ compact: true });</script>
 
 <main id="spMain" class="tx-scope">
   <section class="tx-section" aria-labelledby="txPkgHead">
@@ -91,13 +80,12 @@
       </div>
       <span class="tx-sample" title="Replaced automatically when the Packages API is connected">Sample fares</span>
     </div>
-    <!-- Rendered from the package catalogue and its real departure
-         dates, so the month list cannot offer one we do not sell. -->
-    <div class="tx-search-panel" id="txSearchPanel"></div>
-
-    <!-- The booking progress, drawn by booking-steps.js — the same bar
-         Flights and Hotels show, on this product's own step list. -->
-    <nav class="tx-stepper" id="txStepper" aria-label="Booking progress"></nav>
+    <!-- THE PACKAGE SEARCH PANEL IS NOT BUILT HERE ANY MORE.
+         search-strip.js's row at the top of the page is this page's search now,
+         and this panel asked for the same things a second time, lower down.
+         PackageSearch.mount() guards on this element, so removing it stops the
+         panel being rendered — the module's month reconciliation and its
+         destination list are still used, by the strip. -->
 
     <div class="tx-toolbar" id="txResults"></div>
 
@@ -107,8 +95,11 @@
 
 <!-- The landing page's footer, from the same shell as the header.
      service-shell.js's narrow strip went with service-page.css. -->
-<footer id="siteFooter"></footer>
-<script>HeroShell.mountFooter();</script>
+<!-- NO FOOTER ON A RESULTS OR BOOKING PAGE. The footer is the landing
+     page's — company links, contact, the newsletter — and it belongs to a
+     page someone is reading, not one they are working in. It is not
+     hidden here; neither the element nor the mountFooter() call exists,
+     so hero-shell renders nothing. index.html keeps it. -->
 
 <!-- formatters, axios, auth.js, profile-menu.js, account-center.js and the
      card's own modules are loaded above, in <head> and at the top of <body>,
@@ -121,18 +112,22 @@
 <script src="assets/js/booking-api.js?v=20260902rz1"></script>
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260902p5"></script>
-<script src="assets/js/booking-flow.js?v=20260902p2"></script>
+<script src="assets/js/booking-flow.js?v=20260903all2"></script>
 <!-- Before booking-products.js: its payment step calls JPay.mount(). -->
 <script src="assets/js/payment-screen.js?v=20260902rz1"></script>
 <script src="assets/js/booking-products.js?v=20260902rz1"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
 <script src="assets/js/booking-flows.js?v=20260827p1"></script>
 <!-- search-widgets.js is in <head> with the hero card, above. -->
-<script src="assets/js/package-search.js?v=20260824bk9"></script>
-<script src="assets/js/booking-steps.js?v=20260902flow1"></script>
-<script src="assets/js/travel-explore.js?v=20260902flow4"></script>
+<script src="assets/js/package-search.js?v=20260903all2"></script>
+<script src="assets/js/search-strip.js?v=20260903all2"></script>
+<script src="assets/js/travel-explore.js?v=20260903all2"></script>
 <!-- hero-shell.js and jp-icons.js are in <head>; the header, hero and footer
      are mounted where they sit in the document. service-shell.js is gone with
      service-page.css - it built the navy shell this page no longer wears. -->
+<!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
+     landing page's contact footer is not rendered on these pages. -->
+<footer id="bookingFooter"></footer>
+<script>HeroShell.mountBookingFooter();</script>
 </body>
 </html>

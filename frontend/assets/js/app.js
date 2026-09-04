@@ -546,13 +546,29 @@ const HERO_SEARCH = {
   packages: { page: 'packages.html' },
 };
 
-/* THE PARKED-SEARCH MACHINERY IS GONE with the gate above it.
-   storePendingSearch/takePendingSearch existed for one caller — the search
-   handler, when it had to interrupt a search to ask for a sign-in. Nothing
-   interrupts a search any more, so a search is never parked and there is
-   never one to resume. The key is still read once, below, to clear anything a
-   previous version of this file left behind in an open tab. */
+/** Park a search so signing in can resume it.
+ *
+ *  sessionStorage, not local: a search is about this visit, and finding
+ *  yesterday's criteria reapplied in a new tab would be surprising.
+ *
+ *  This is what makes the sign-in gate cost the traveller nothing. They fill
+ *  the form, press Search, sign in or create an account, and land on the
+ *  results for the search they already typed — the criteria are never asked
+ *  for twice. */
 const PENDING_SEARCH_KEY = 'jpc_pending_search';
+
+function storePendingSearch(kind, params) {
+  try { sessionStorage.setItem(PENDING_SEARCH_KEY, JSON.stringify({ kind, params })); }
+  catch { /* private mode — the traveller re-runs the search */ }
+}
+
+function takePendingSearch() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_SEARCH_KEY);
+    sessionStorage.removeItem(PENDING_SEARCH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
 
 /** Send the traveller to the page that can answer, criteria in the URL. */
 function goToSearch(kind, params) {
@@ -592,32 +608,30 @@ if (typeof BookingCard !== 'undefined') {
       showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
       return;
     }
-    /* SEARCHING IS BROWSING, AND BROWSING DOES NOT NEED AN ACCOUNT.
-       This used to stop here when there was no session: it parked the criteria
-       in sessionStorage, opened the sign-in modal, and resumed the search
-       afterwards. The redirect did happen — eventually — but "click Search,
-       land on the results" became "click Search, meet a login form", which is
-       not what any OTA does and is the reason the landing page appeared not to
-       navigate at all.
-
-       NOTHING BECOMES BOOKABLE BY REMOVING IT. The session is still required
-       where it actually matters and those checks are untouched:
-         booking-store.js  a server booking is only created when signed in
-         hotel-payment.js  the payment step asks for a sign-in itself
-       So a signed-out visitor can search, filter, sort and compare, and is
-       asked to sign in at the point they commit — which is the only point the
-       account is needed for. */
+    /* A SEARCH NEEDS AN ACCOUNT, AND ASKING COSTS THE TRAVELLER NOTHING.
+       The criteria are parked first, so the modal is an interruption and not a
+       loss: openAuth() runs one email-first flow that recognises a returning
+       address and offers to create an account for a new one, so there is no
+       Login-or-Sign-Up choice to make. resumePendingSearch() below picks the
+       search back up the moment a session exists and goes straight to the
+       results page — the form is never filled in twice. */
+    const { access } = getStoredAuth();
+    if (!access) {
+      storePendingSearch(kind, params);
+      openAuth();
+      return;
+    }
     goToSearch(kind, params);
   });
 }
 
-/** Called once a session exists. Always false now — searches are no longer
- *  parked, so there is nothing to resume; it only clears a stale entry left
- *  by a tab that loaded the previous version of this file. Kept because the
- *  sign-in success path calls it and a missing function there would throw. */
+/** Called once a session exists. Returns true if it navigated, which is what
+ *  tells the caller not to carry on with its own post-sign-in routine. */
 function resumePendingSearch() {
-  try { sessionStorage.removeItem(PENDING_SEARCH_KEY); } catch { /* private mode */ }
-  return false;
+  const pending = takePendingSearch();
+  if (!pending || !HERO_SEARCH[pending.kind]) return false;
+  goToSearch(pending.kind, pending.params);
+  return true;
 }
 
 /* AI chatbot */

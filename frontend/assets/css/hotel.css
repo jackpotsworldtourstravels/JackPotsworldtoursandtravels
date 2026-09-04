@@ -125,7 +125,15 @@
    `.sp-hero` is kept alongside it. The selector used to name only that class,
    which was this page's old navy banner; the banner is gone, but the class
    still exists for the standalone service pages and costs nothing here. */
-body.hr-booking #siteHero,
+/* THE SEARCH STRIP STAYS ON THE BOOKING SCREENS TOO.
+   It used to be hidden here, and each screen painted its own criteria bar into
+   #hdSearchbar / #hrmSearchbar / … instead — a second, differently shaped
+   search row, 86px tall, that only these screens had. One compact bar on every
+   page is the point: the strip is the search on Results and it is the search
+   here, so the criteria bar is no longer built (see searchbarHtml).
+
+   `.sp-hero` is still hidden — that is the old navy service banner, which is a
+   page title rather than a search. */
 body.hr-booking .sp-hero { display: none; }
 
 /* ===========================================================================
@@ -1785,4 +1793,30 @@ body.hr-booking .sp-hero { display: none; }
   /* No auto margin to push against on a stacked row; Done goes last and full
      width, which is where a thumb expects the primary action. */
   .hr-cf-done { margin-left: 0; width: 100%; order: 99; }
+}
+
+/* ===========================================================================
+   THE BACK BUTTON, AT THE BOTTOM LEFT OF EVERY BOOKING SCREEN
+   ===========================================================================
+   Each screen renders `.hr-backlink` as the first thing in its main column —
+   Hotel Details, Room Selection, Guest Details, Review and Payment all do, each
+   wired to its own previous step. The markup and the handlers are left exactly
+   where they are; only the position moves, so nothing about "Back to Room
+   Selection" knowing where Room Selection is has changed.
+
+   Flex column with `order` rather than moving the markup: the alternative was
+   editing five files to relocate one button, and a screen that later forgets
+   to move it would silently drift back to the top. One rule covers all of
+   them, including any screen added later.
+
+   `align-self: flex-start` keeps it LEFT — a stretched flex child would run
+   the full width of the column and the button would look like a bar. */
+.hr-hd-layout > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.hr-hd-layout > div:first-child > .hr-backlink {
+  order: 99;
+  align-self: flex-start;
+  margin-top: 20px;
 }

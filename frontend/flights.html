@@ -27,17 +27,17 @@
      handful of --sp-* tokens booking.css still asks for are bridged onto
      main.css's palette in booking-card.css. -->
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260902flow4">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260902flow4">
+<link rel="stylesheet" href="assets/css/main.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260903all2">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
 <link rel="stylesheet" href="assets/css/booking-ref.css?v=20260826rf7">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260902flow4">
-<!-- The booking progress bar, shared by Flights, Hotels and Tour Packages.
-     One component so the three cannot drift apart. -->
-<link rel="stylesheet" href="assets/css/booking-steps.css?v=20260902flow1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260903all2">
+<!-- The results-page search strip. A separate component from the landing
+     page's booking card; index.html loads neither of these two files. -->
+<link rel="stylesheet" href="assets/css/search-strip.css?v=20260903all2">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 
@@ -54,8 +54,8 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260902flow4"></script>
-<script src="assets/js/hero-shell.js?v=20260902flow4"></script>
+<script src="assets/js/booking-card.js?v=20260903all2"></script>
+<script src="assets/js/hero-shell.js?v=20260903all2"></script>
 </head>
 <body class="sp-continuation" data-sp-service="flights">
 <a href="#txResults" class="skip-link">Skip to results</a>
@@ -101,12 +101,6 @@
       </div>
       <span class="tx-sample" title="Replaced automatically when the Flight API is connected">Sample schedule</span>
     </div>
-
-    <!-- The booking progress. This screen is step 2 of 7 — the traveller has
-         searched and is choosing a flight; everything after Book Now is the
-         booking flow proper. Rendered by travel-explore.js so the labels and
-         the current step live in one place. -->
-    <nav class="tx-stepper" id="txStepper" aria-label="Booking progress"></nav>
 
     <div class="tx-toolbar" id="txResults">
       <div class="tx-search">
@@ -155,12 +149,11 @@
 </div>
 </main>
 
-<footer id="siteFooter"></footer>
-
-<script>
-  /* Rendered after the results markup so nothing above it waits on a footer. */
-  HeroShell.mountFooter();
-</script>
+<!-- NO FOOTER ON A RESULTS OR BOOKING PAGE. The footer is the landing
+     page's — company links, contact, the newsletter — and it belongs to a
+     page someone is reading, not one they are working in. It is not
+     hidden here; neither the element nor the mountFooter() call exists,
+     so hero-shell renders nothing. index.html keeps it. -->
 
 <script src="components/toast.js"></script>
 <script src="assets/js/airline-logos.js?v=20260824ic9"></script>
@@ -171,7 +164,7 @@
 <script src="assets/js/booking-api.js?v=20260902rz1"></script>
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260902p5"></script>
-<script src="assets/js/booking-flow.js?v=20260902p2"></script>
+<script src="assets/js/booking-flow.js?v=20260903all2"></script>
 <script src="assets/js/booking-products.js?v=20260902rz1"></script>
 <script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
 <script src="assets/js/booking-flows.js?v=20260827p1"></script>
@@ -190,7 +183,11 @@
      Knows nothing about flights; flight-filters.js supplies the definitions. -->
 <script src="assets/js/filter-engine.js?v=20260827fe3"></script>
 <script src="assets/js/flight-filters.js?v=20260827fe3"></script>
-<script src="assets/js/booking-steps.js?v=20260902flow1"></script>
-<script src="assets/js/travel-explore.js?v=20260902flow4"></script>
+<script src="assets/js/search-strip.js?v=20260903all2"></script>
+<script src="assets/js/travel-explore.js?v=20260903all2"></script>
+<!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
+     landing page's contact footer is not rendered on these pages. -->
+<footer id="bookingFooter"></footer>
+<script>HeroShell.mountBookingFooter();</script>
 </body>
 </html>

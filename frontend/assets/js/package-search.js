@@ -333,6 +333,9 @@ const PackageSearch = (function () {
     mount();
   }
 
+  /* destinationSource is exported for the results-page search strip, which
+     offers the same destination box this panel does — one list, so the two
+     cannot suggest different places. */
   return { init, mount, request, validate, matches, availableMonths, monthLabel,
-           BUDGETS, DURATIONS };
+           destinationSource, BUDGETS, DURATIONS };
 })();

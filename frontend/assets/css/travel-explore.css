@@ -78,7 +78,9 @@
    block:'start' lands UNDER it and loses its heading. scroll-margin-top is what
    the nav links land against — without it "Flights" arrives on a decapitated
    section. */
-.tx-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; scroll-margin-top: 148px; }
+/* scroll-margin-top matches the sticky offsets above: a static header leaves
+   nothing overhead for an anchored scroll to duck under. */
+.tx-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; scroll-margin-top: 16px; }
 .tx-section + .tx-section { padding-top: 8px; }
 
 .tx-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -234,8 +236,14 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 /* ---- Booking summary rail ------------------------------------------------ */
 .tx-summary-rail { min-width: 0; }
 /* The panel sticks, not the column — the column is what gives it somewhere to
-   stick. 148px clears the fixed header. */
-.tx-summary { position: sticky; top: 148px; }
+   stick.
+
+   16px, not 148px. The 148 was clearance for the landing page's FIXED
+   header; a results page paints `header.is-solid`, which is
+   `position:static` and scrolls away with the page — so a panel pinning
+   at 148 left that much empty viewport above it, under nothing. Same
+   phantom header as the band's old top padding. */
+.tx-summary { position: sticky; top: 16px; }
 .tx-summary {
   background: var(--tx-surface); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); box-shadow: var(--tx-shadow); overflow: hidden;
@@ -303,12 +311,13 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 .tx-filters {
   background: var(--tx-surface); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); padding: 18px; box-shadow: var(--tx-shadow);
-  /* Clears the fixed header, same reason as .tx-section's scroll-margin-top. */
-  position: sticky; top: 148px;
+  /* See the note on .tx-summary: the header on these pages is static, so
+     there is nothing overhead to clear. */
+  position: sticky; top: 16px;
   /* The panel scrolls INSIDE itself once it is taller than what is left of the
-     viewport under the header. Without this a long filter list simply runs off
-     the bottom of a sticky box and its last group cannot be reached at all. */
-  max-height: calc(100vh - 168px);
+     viewport. Without this a long filter list simply runs off the bottom of a
+     sticky box and its last group cannot be reached at all. */
+  max-height: calc(100vh - 36px);
   overflow-y: auto; overscroll-behavior: contain;
 }
 /* A slim scrollbar, so the panel does not gain a chunky OS gutter that eats

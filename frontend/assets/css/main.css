@@ -149,12 +149,32 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    877px down the page. The film and the overlay stay, which is what keeps this
    recognisably the same product rather than a bare grey toolbar.
    padding-top clears the fixed header (128px at rest) with a little air. */
+/* A plain band, not a hero. There is no film behind it any more (see
+   heroHtml), so it carries the page background and a hairline instead — which
+   is what tells a traveller at a glance that they have left the landing page
+   and are on a results page.
+
+   THE 104px OF TOP PADDING WAS CLEARANCE FOR A FIXED HEADER THAT IS NOT
+   THERE. On the landing page the header floats over the film, so the hero has
+   to start below it. A results page has no film, so hero-shell paints the
+   solid header instead — and `header.is-solid` is `position:static`, in the
+   flow, 77px tall. The padding was clearing a header that had already taken
+   its own space, which put exactly 104px of blank white between the header
+   and the search strip. 18px is the gap the band actually wants.
+
+   OVERFLOW IS VISIBLE HERE, and that is the other half of it: `.hero` clips
+   its contents so the film and the parallax cannot spill, and this band has
+   neither. Inherited, that `overflow:hidden` cut the airport suggestion list
+   off at the bottom edge of the band. */
 .hero.is-compact{
   min-height:0; justify-content:flex-start;
-  padding-top:150px; padding-bottom:26px;
+  padding-top:18px; padding-bottom:22px;
+  background:var(--bg);
+  border-bottom:1px solid var(--line);
+  overflow:visible;
 }
 @media (max-width:900px){
-  .hero.is-compact{min-height:0; padding-top:104px; padding-bottom:18px;}
+  .hero.is-compact{min-height:0; padding-top:14px; padding-bottom:16px;}
 }
 /* The card is the whole content here, so it does not need the 34px of air that
    separates it from the landing page's pitch. */
@@ -997,3 +1017,35 @@ header.is-solid .mobile-nav a{color:var(--navy);}
 header.is-solid .nav-icon-btn{border-color:var(--line); color:var(--navy);}
 header.is-solid .nav-icon-btn:hover{background:rgba(255,77,77,.08); border-color:var(--coral);}
 @media (max-width:900px){.nav-icon-btn{display:none;}}
+
+/* ---------------------------------------------------------------------------
+   The booking footer — results and booking pages only
+   ---------------------------------------------------------------------------
+   Deliberately one line. The landing page's footer is five columns of company
+   links; this is the way back plus the two documents anyone is entitled to
+   reach from any page. index.html never renders it.
+   --------------------------------------------------------------------------- */
+#bookingFooter{border-top:1px solid var(--line); background:var(--white); margin-top:32px;}
+.bf-row{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:16px 32px; font-size:12.5px; color:var(--muted);
+}
+.bf-back{
+  display:inline-flex; align-items:center; gap:7px; flex:none; cursor:pointer;
+  padding:8px 16px; border-radius:100px;
+  background:none; border:1px solid var(--line); color:var(--navy);
+  font-family:inherit; font-size:13px; font-weight:700;
+  transition:border-color .18s ease, color .18s ease, background .18s ease;
+}
+.bf-back svg{width:15px; height:15px;}
+.bf-back:hover{border-color:var(--coral); color:var(--coral); background:rgba(255,77,77,.06);}
+.bf-back:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
+/* The copyright takes the slack so the links sit at the far right. */
+.bf-copy{flex:1 1 auto; min-width:0;}
+.bf-links{display:flex; gap:18px; flex:none;}
+.bf-links a{color:var(--muted); transition:color .18s ease;}
+.bf-links a:hover{color:var(--coral);}
+@media (max-width:700px){
+  .bf-row{padding:14px 20px; gap:12px;}
+  .bf-copy{flex:1 1 100%; order:3;}
+}

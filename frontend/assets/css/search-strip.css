@@ -1,0 +1,177 @@
+/* ===========================================================================
+   search-strip.css — the results pages' search strip.
+   ===========================================================================
+   Pairs with search-strip.js, and is loaded by flights.html, hotels.html and
+   packages.html only. index.html loads neither: the landing page keeps its
+   card, and nothing here can reach it.
+
+   THE SHAPE. One row of rectangular cells, each a small caps label over its
+   current value, a swap control between the two airports, and the Search
+   button closing the row. Every cell is the same height and shares a hairline
+   with its neighbour, so the row reads as one control rather than eight
+   inputs that happen to be adjacent.
+
+   THE COLOURS ARE THE PRODUCT'S. Every value falls back through the token
+   sets in play on these pages — `--tx-*` where travel-explore.css is loaded,
+   then main.css's own — so the strip is navy, coral and the same greys as
+   everything around it.
+   =========================================================================== */
+.ss-strip {
+  --ss-surface: var(--tx-surface, var(--white, #fff));
+  --ss-line:    var(--tx-line,    var(--line, #E4E9F0));
+  --ss-ink:     var(--tx-ink,     var(--navy, #0A2540));
+  --ss-muted:   var(--tx-ink-3,   var(--muted, #5A6B80));
+  --ss-accent:  var(--tx-accent,  var(--coral, #FF4D4D));
+
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(10, 37, 64, .05), 0 8px 22px rgba(10, 37, 64, .07);
+  overflow: visible;            /* the listboxes and popovers escape the row */
+}
+
+/* ---- one cell ----------------------------------------------------------- */
+.ss-cell {
+  position: relative; flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  padding: 10px 14px;
+  border-right: 1px solid var(--ss-line);
+  cursor: text;
+}
+.ss-cell:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+.ss-cell:hover { background: color-mix(in srgb, var(--ss-ink) 3%, transparent); }
+.ss-cell:focus-within { background: color-mix(in srgb, var(--ss-accent) 5%, transparent); }
+
+.ss-lab {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ss-muted);
+  cursor: inherit;
+}
+
+/* The VALUE is the thing being read, so it carries the weight — the label
+   above it is a caption. */
+.ss-val {
+  font-family: inherit; font-size: 15px; font-weight: 800;
+  letter-spacing: -.01em; color: var(--ss-ink);
+  border: none; background: none; padding: 0; width: 100%; min-width: 0;
+  text-overflow: ellipsis;
+}
+.ss-input::placeholder { color: var(--ss-muted); font-weight: 600; }
+.ss-val:focus { outline: none; }
+.ss-cell:focus-within { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ss-accent) 45%, transparent); }
+
+.ss-select {
+  appearance: none; cursor: pointer;
+  padding-right: 16px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 5px center, right 1px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* ---- dates -------------------------------------------------------------- */
+.ss-date-display { cursor: pointer; }
+/* The native input is the picker and nothing else: it covers the cell so a
+   click anywhere in it opens the calendar, and it is invisible because the
+   readonly display above is what shows the formatted date. */
+.ss-date-native {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; border: none; padding: 0; cursor: pointer;
+}
+/* One way has no return date. Dimmed rather than removed, so the row keeps its
+   shape and the cell can say what it is instead of vanishing. */
+.ss-cell.is-off .ss-val { color: var(--ss-muted); font-weight: 600; }
+.ss-cell.is-off .ss-date-native { pointer-events: none; }
+
+/* ---- the swap control --------------------------------------------------- */
+.ss-swap {
+  flex: none; align-self: center; margin: 0 -13px; z-index: 2;
+  width: 27px; height: 27px; border-radius: 50%; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--ss-surface); color: var(--ss-ink);
+  border: 1px solid var(--ss-line);
+  transition: color .18s ease, border-color .18s ease, transform .18s ease;
+}
+.ss-swap svg { width: 14px; height: 14px; }
+.ss-swap:hover { color: var(--ss-accent); border-color: var(--ss-accent); transform: rotate(180deg); }
+.ss-swap:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
+
+/* ---- the popovers ------------------------------------------------------- */
+/* THE SELECTOR'S OWN LABEL IS NOT SHOWN, because the cell already has one.
+   PaxSelector and RoomsSelector each render `<label>Travellers</label>` above
+   their trigger — right for the landing page's card, where the field has no
+   other caption, and a visible duplicate here under the cell's own
+   "TRAVELLERS". The element stays in the DOM and keeps its `for`, so the
+   trigger is still named for a screen reader; only the second copy of the
+   words is taken off the screen. */
+.ss-popmount > label {
+  position: absolute; width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+
+/* PaxSelector and RoomsSelector render their own trigger button in here. The
+   button is theirs; this only stops it looking like a button inside a cell. */
+.ss-popmount .pax-trigger {
+  border: none; background: none; padding: 0; width: 100%;
+  font-size: 15px; font-weight: 800; color: var(--ss-ink); text-align: left;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+}
+.ss-popmount .pax-trigger-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* THE SUGGESTION LIST FLOATS OVER THE PAGE.
+   Absolute against its own `.ss-cell` (which is `position:relative`), so it
+   opens directly under the box that owns it and takes no space in the row —
+   the layout does not move when it opens.
+
+   z-index 9999 because it has to beat everything it can overlap: the results
+   below, the sticky filter rail and the sticky booking summary, each of which
+   establishes its own stacking context. Nothing else on these pages goes near
+   that number.
+
+   The band above no longer clips it — `.hero.is-compact` sets
+   `overflow:visible` (see main.css); `.hero`'s own `overflow:hidden` exists
+   for the film and the parallax, which a results page does not have. */
+.ss-list {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 9999;
+  min-width: 260px; max-width: 340px;
+}
+
+/* ---- Search ------------------------------------------------------------- */
+.ss-go {
+  flex: none; border: none; cursor: pointer;
+  padding: 0 30px; margin: 0;
+  border-radius: 0 12px 12px 0;
+  background: var(--ss-accent); color: #fff;
+  font-family: inherit; font-size: 13.5px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase;
+  transition: filter .18s ease;
+}
+.ss-go:hover { filter: brightness(1.07); }
+.ss-go:focus-visible { outline: 3px solid var(--ss-ink); outline-offset: -4px; }
+
+/* ---- narrow ------------------------------------------------------------- */
+@media (max-width: 1080px) {
+  .ss-cell { flex: 1 1 30%; border-bottom: 1px solid var(--ss-line); }
+  .ss-swap { margin: 0 6px; }
+  .ss-go { flex: 1 1 100%; border-radius: 0 0 12px 12px; padding: 14px 30px; }
+}
+@media (max-width: 620px) {
+  .ss-cell { flex: 1 1 50%; }
+  .ss-cell:first-child { border-top-right-radius: 0; }
+  /* Stacked, the swap control has no two columns to sit between. It keeps its
+     size and centres on its own line rather than stretching to the full width,
+     which turned a 27px round button into a squashed bar. */
+  .ss-swap { flex: 0 0 auto; margin: 6px auto; align-self: center; }
+}
+@media (max-width: 420px) {
+  .ss-cell { flex: 1 1 100%; }
+}
+
+/* A box holding text that resolved to no airport. Marked rather than silently
+   dropped: the traveller typed something, and being told it did not match is
+   the only way they can fix it. */
+.ss-cell.is-invalid { box-shadow: inset 0 0 0 2px var(--ss-accent); }
+.ss-cell.is-invalid .ss-val { color: var(--ss-accent); }

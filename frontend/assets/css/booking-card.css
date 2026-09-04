@@ -833,3 +833,52 @@ body.sp-continuation .tx-section { max-width: var(--max, 1280px); padding: 44px 
 @media (max-width: 900px) {
   body.sp-continuation .tx-section { padding: 32px 20px 44px; }
 }
+
+/* ===========================================================================
+   THE RESULTS-PAGE SEARCH BAR
+   ===========================================================================
+   Same component, same fields, same handlers — laid out as one editable row
+   instead of the landing page's card. It is not a summary of the search that
+   ran: every field is live, and pressing Search re-runs the results on the
+   page you are already on. That is the whole reason there is no separate
+   "Modify Search" screen.
+
+   The product tabs and the trust row are not drawn at all in this mode (see
+   cardHtml), so there is nothing here hiding them.
+   =========================================================================== */
+.search-card.is-bar {
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(10, 37, 64, .05), 0 6px 18px rgba(10, 37, 64, .06);
+}
+.search-card.is-bar .search-body { padding: 0; }
+
+/* One row, and the fields size themselves to their content rather than to an
+   equal share: "Hyderabad (HYD)" and "1 Adult" do not want the same width. */
+.search-card.is-bar .search-fields {
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 1px;
+  padding: 0; margin: 0; background: transparent;
+}
+.search-card.is-bar .search-fields > .field { flex: 1 1 150px; min-width: 0; border-radius: 0; }
+.search-card.is-bar .search-fields > .field:first-child { border-top-left-radius: 14px; }
+.search-card.is-bar .field-date,
+.search-card.is-bar .field-pax { flex: 0 1 168px; }
+
+/* The trip pills sit above the row, flush left, with the row's own padding. */
+.search-card.is-bar .trip-types { margin: 10px 12px 8px; }
+
+/* Search joins the row rather than sitting under it on a line of its own. */
+.search-card.is-bar .search-foot {
+  padding: 10px 12px; gap: 10px; align-items: center;
+}
+.search-card.is-bar .search-go { min-width: 132px; }
+
+/* The mirrored return leg and the multi-city rows keep their own grids; the
+   bar only changes the single-row case. */
+.search-card.is-bar [data-trip-multi] .search-fields { padding: 0 12px 10px; }
+
+@media (max-width: 900px) {
+  .search-card.is-bar .search-fields > .field { flex: 1 1 46%; }
+}
+@media (max-width: 560px) {
+  .search-card.is-bar .search-fields > .field { flex: 1 1 100%; }
+}
