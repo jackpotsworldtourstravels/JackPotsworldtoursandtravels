@@ -132,11 +132,15 @@ const SiteFooter = (function () {
       + '<li>' + svg(ICONS.pin) + '<span><span class="jw-f-ct-label">Address</span>'
       + '<address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span></li>'
       /* Same clock icon, same label, same two classes — one line of value text
-         instead of two. Note that the rest of the site still publishes staffed
-         hours (Mon–Sat, 9:00 AM – 8:00 PM IST) on Contact Us, Customer Support,
-         the FAQs and the policy pages; those say when a person answers, and this
-         says the desk never closes. If they are meant to agree, the pages are
-         the copies to change. */
+         instead of two.
+
+         THIS IS NOT THE ONLY PLACE THE CLAIM IS MADE. Contact Us, Customer
+         Support, About and the five policy pages all state the same
+         availability in their contact blocks and their prose, and about.html
+         and contact-us.html also encode it as schema.org openingHours. They
+         said Mon–Sat, 9:00 AM – 8:00 PM IST until this line changed and then
+         contradicted it; they now say 24/7 too. Change one, change the set —
+         `grep -ril "hours a day"` over frontend/ finds them. */
       + '<li>' + svg(ICONS.clock) + '<span><span class="jw-f-ct-label">Business hours</span>'
       + '<span class="jw-f-ct-value">24/7 Support</span></span></li>'
       + '</ul></div>';
