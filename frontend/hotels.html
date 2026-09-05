@@ -23,7 +23,7 @@
      that already has main.css's. The --sp-* tokens booking.css, hotel.css and
      travel-explore.css ask for are bridged onto main.css's palette by
      booking-card.css, under body.sp-continuation. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260905ft5">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260903all2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
@@ -36,6 +36,8 @@
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260903all2">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
+<!-- The company footer, one stylesheet for every page that renders it. -->
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft5">
 <!-- The hero search card, mounted inline in the hero below. In <head> for
      the same reason flights.html puts it there: the card renders during
      parse, so everything it reads has to exist first. -->
@@ -55,7 +57,8 @@
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
-<script src="assets/js/hero-shell.js?v=20260903all2"></script>
+<script src="assets/js/site-footer.js?v=20260905ft5"></script>
+<script src="assets/js/hero-shell.js?v=20260905ft5"></script>
 </head>
 <body class="sp-continuation" data-sp-service="hotels">
 <a href="#spMain" class="skip-link">Skip to content</a>

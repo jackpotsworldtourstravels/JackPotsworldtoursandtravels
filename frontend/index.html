@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels, cruises and holiday packages in one premium search. Trusted by 2 million+ travellers.">
+<meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels and tour packages in one premium search. Trusted by 2 million+ travellers.">
 <title>JackPots World Tours &amp; Travels — Your Next Adventure Starts Here</title>
 <link rel="icon" type="image/png" href="assets/images/favicon-180.png">
 <link rel="icon" href="assets/images/favicon.ico" sizes="any">
@@ -12,11 +12,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260905ft5">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260903all2">
+<!-- The company footer. Self-contained (its own --jwf-* tokens), so the same
+     stylesheet dresses this page's hand-written footer and the one every other
+     page mounts from site-footer.js. -->
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft5">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
@@ -41,11 +45,19 @@
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
-<script src="assets/js/hero-shell.js?v=20260903all2"></script>
+<!-- The one definition of the company footer. BEFORE hero-shell.js, whose
+     mountFooter() delegates to it. -->
+<script src="assets/js/site-footer.js?v=20260905ft5"></script>
+<script src="assets/js/hero-shell.js?v=20260905ft5"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
-<body>
+<!-- data-jw-home-search: THIS is the page with the booking card in it, so the
+     footer's Travel links scroll to that card and open the matching tab instead
+     of navigating. Only this page carries the attribute — see onFooterClick() in
+     assets/js/site-footer.js for why the check is declared here rather than
+     sniffed for, and why the links keep their real hrefs regardless. -->
+<body data-jw-home-search>
 <a href="#main" class="skip-link">Skip to content</a>
 
 <!-- THIS NAV BAR EXISTS TWICE, AND THE OTHER COPY IS hero-shell.js.
@@ -130,14 +142,28 @@
   <div class="hero-video-layer" id="heroVideoLayer">
     <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
     <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-    <video data-video="cruises" data-src="assets/videos/cruise.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
+    <!-- No cruises clip. switchHeroVideo() in booking-card.js only ever asks for
+         the key of an open tab, and TABS there is flights/hotels/packages — so
+         this element could not be reached, and the copy above no longer offers
+         the product it was the backdrop for. hero-shell.js's HERO_VIDEOS is the
+         other copy of this list and dropped it at the same time.
+         assets/videos/cruise.mp4 is left on disk; nothing references it. -->
     <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
   </div>
   <div class="hero-overlay"></div>
   <div class="wrap hero-inner">
-    <div class="eyebrow">Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search</div>
+    <!-- THREE SERVICES, AND THIS LIST IS THE PROMISE THE REST OF THE SITE KEEPS.
+         It read "Flights · Hotels · Cruises · Tour Packages" and the sub-line
+         offered cruises, holiday packages and "unforgettable experiences" — four
+         products beyond the three that are sold, on the first screen of the
+         site. The nav, the search card's TABS and the footer had all been
+         reduced to flights/hotels/packages already; this copy was the last
+         place the withdrawn ones survived.
+         hero-shell.js's HERO_EYEBROW and HERO_SUB are the other copy of these
+         two strings. CHANGE ONE, CHANGE THE OTHER. -->
+    <div class="eyebrow">Flights &middot; Hotels &middot; Tour Packages — one search</div>
     <h1>Your next adventure<span class="accent"> starts here.</span></h1>
-    <p class="sub">Book flights, hotels, cruises, and holiday packages, and unforgettable experiences — all in one place, at prices that don't need a coupon hunt.</p>
+    <p class="sub">Book flights, hotels and tour packages — all in one place, at prices that don’t need a coupon hunt.</p>
   </div>
 
   <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
@@ -187,11 +213,24 @@
   </div>
   <div class="offers-track-wrap wrap">
     <div class="offers-track" id="offersTrack">
-      <div class="offer-card o1"><div><div class="tag">Flights</div><h3>Flat 30% off on domestic flights</h3><p>Valid on all major airlines, booked before midnight.</p></div><div class="code">CODE: FLYHIGH30</div></div>
-      <div class="offer-card o2"><div><div class="tag">Cruises</div><h3>₹2,000 instant cashback on cruise bookings</h3><p>On your first three bookings this month.</p></div><div class="code">CODE: CRUISE2000</div></div>
-      <div class="offer-card o3"><div><div class="tag">Hotels</div><h3>Up to 40% off premium hotel stays</h3><p>Free breakfast included at 2,000+ properties.</p></div><div class="code">CODE: STAYMORE</div></div>
-      <div class="offer-card o4"><div><div class="tag">Family Packages</div><h3>Kids stay & fly free this summer</h3><p>On select holiday packages for families of 4+.</p></div><div class="code">CODE: FAMILYFUN</div></div>
-      <div class="offer-card o5"><div><div class="tag">Honeymoon</div><h3>Romantic getaways from ₹24,999</h3><p>Candlelight dinners & couple spa included.</p></div><div class="code">CODE: TOGETHER25</div></div>
+      <!-- FOUR CARDS, ONE PER THING THAT CAN ACTUALLY BE BOOKED.
+           This carousel used to carry five, and three of them sold services
+           this business does not: a cruise cashback offer, a family holiday
+           package and a honeymoon package. The cruise card also published a
+           redeemable code (CRUISE2000) for a product with nowhere to redeem it,
+           which is worse than an out-of-date headline — someone could have
+           tried to use it.
+
+           A CTA REPLACES THE PROMO-CODE CHIP. The codes were not real
+           campaigns, and a code with nothing behind it is a promise the
+           checkout cannot keep; a link to the search that fulfils the offer is
+           the same pill in the same place, and it works. `.offers-track` pauses
+           on hover AND on focus-within (main.css) so these are reachable by
+           mouse and by keyboard. -->
+      <div class="offer-card o1"><div><div class="tag">Flights</div><h3>Domestic Flight Deals</h3><p>Save up to 30% on selected domestic flight bookings.</p></div><a class="offer-cta" href="flights.html">Book Flights</a></div>
+      <div class="offer-card o2"><div><div class="tag">Flights</div><h3>International Flight Offers</h3><p>Discover affordable international fares with trusted airlines.</p></div><a class="offer-cta" href="flights.html">Explore Flights</a></div>
+      <div class="offer-card o3"><div><div class="tag">Hotels</div><h3>Hotel Stay Offers</h3><p>Save on hotel bookings across popular destinations.</p></div><a class="offer-cta" href="hotels.html">Book Hotels</a></div>
+      <div class="offer-card o4"><div><div class="tag">Tour Packages</div><h3>Tour Package Specials</h3><p>Explore exclusive tour packages with competitive pricing.</p></div><a class="offer-cta" href="packages.html">Explore Tour Packages</a></div>
     </div>
   </div>
 </section>
@@ -313,8 +352,26 @@
 <section class="routes-section" aria-labelledby="routesHead">
   <div class="wrap">
     <div class="section-head reveal">
-      <div><div class="eyebrow">Updated every 90 seconds</div><h2 id="routesHead">Trending routes</h2></div>
-      <p>The routes everyone's booking right now, live from our reservation engine.</p>
+      <!-- "Trending routes" first, because a route strip invites route-shaped
+           products and the one it carried was a cruise route. Then briefly
+           "Popular Destinations", which collided with the destinations grid
+           higher up this same page — two identical <h2>s, which is a bad
+           heading outline for a screen reader walking the page and two
+           competing targets for the same search query.
+
+           "Popular fares" is what the strip actually shows: live prices, with a
+           ticker that jitters them every few seconds. The grid above shows
+           places; this shows what they cost. Different name, different section.
+
+           The class stays `routes-section` and the heading keeps id
+           `routesHead` — both are internal names, `routesHead` is the target of
+           this section's aria-labelledby, and renaming either would touch
+           main.css for nothing a visitor could see. -->
+      <div><div class="eyebrow">Updated every 90 seconds</div><h2 id="routesHead">Popular fares</h2></div>
+      <!-- Not "the fares everyone's booking": one of the four cards is a hotel
+           at a nightly rate and another is a tour package, and neither is a
+           fare. The heading can generalise; a sentence naming them cannot. -->
+      <p>What everyone's booking right now, live from our reservation engine.</p>
     </div>
     <div class="routes-grid">
       <div class="route-card reveal">
@@ -323,9 +380,13 @@
         <div class="route-price"><span class="amt" data-price="2499">₹2,499</span><span class="unit">onwards</span></div>
       </div>
       <div class="route-card reveal delay-1">
-        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20c2 1 4 1 6 0s4-1 6 0 4 1 6 0"/><path d="M5 20l1.5-8h11L19 20"/><path d="M9 12V6h4l3 6"/></svg>Cruise</span><span class="live-dot"><i></i>Live</span></div>
-        <div class="route-cities">Mumbai <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Goa</div>
-        <div class="route-price"><span class="amt" data-price="4999">₹4,999</span><span class="unit">onwards</span></div>
+        <!-- Was the cruise row, Mumbai to Goa at ₹4,999. It is now the
+             international flight the "International Flight Offers" card above
+             points at, so the two sections advertise the same three services.
+             Same icon as the first card, because it is the same product. -->
+        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16l20-6-7 12-2-6-6-2z"/><path d="M22 10L2 16"/></svg>Flight</span><span class="live-dot"><i></i>Live</span></div>
+        <div class="route-cities">Mumbai <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Dubai</div>
+        <div class="route-price"><span class="amt" data-price="12999">₹12,999</span><span class="unit">onwards</span></div>
       </div>
       <div class="route-card reveal delay-2">
         <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/><path d="M9 9h1M14 9h1M9 13h1M14 13h1"/></svg>Tour Package</span><span class="live-dot"><i></i>Live</span></div>
@@ -400,43 +461,108 @@
 </section>
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="foot-grid">
-      <div>
-        <div class="foot-logo">
-          <img class="foot-logo-img" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-        </div>
-        <p>Flights, hotels, cruises and holiday packages — booked in one clean sweep, backed by support that actually picks up.</p>
+<!-- =========================================================================
+     THE COMPANY FOOTER, AND THIS IS THE SECOND OF ITS TWO COPIES.
+     =========================================================================
+     The other is SiteFooter.html() in assets/js/site-footer.js, which every
+     other page on the site mounts. This page keeps a hand-written copy for the
+     same reason it keeps its nav bar and its hero in static markup: it is the
+     marketing front door, and the links a crawler follows out of it — the
+     legal pages especially — should be in the document that is served, not
+     injected by script afterwards.
+
+     CHANGE ONE, CHANGE THE OTHER. tests/verify_footer.py compares the two link
+     sets and fails if they drift, which is the only reason a second copy is
+     tolerable at all.
+
+     NO DROPDOWNS AND NO ARROWS ANYWHERE IN HERE: every item is a plain anchor
+     to a page that exists.
+     ========================================================================= -->
+<footer class="jw-footer" role="contentinfo">
+  <div class="jw-f-wrap">
+    <div class="jw-f-grid">
+
+      <div class="jw-f-brand">
+        <a class="jw-f-logo" href="index.html">
+          <img src="assets/images/jackpots-logo-full.png" width="320" height="96" alt="JackpotsWorld Tours &amp; Travels" loading="lazy" decoding="async">
+        </a>
+        <p class="jw-f-about">Book flights, hotels and tour packages with confidence. Your trusted travel partner for memorable journeys.</p>
+        <!-- No "Follow us" heading and no social icons: removed on request, and
+             .jw-f-about's bottom margin went with them (site-footer.css) so the
+             brand column ends at the tagline instead of holding 26px of the gap
+             that used to separate it from the row of icons. site-footer.js's
+             brandColumn() is the other copy of this block. -->
       </div>
-      <div class="foot-col">
-        <h5>Company</h5>
-        <a href="#">About</a><a href="#">Careers</a><a href="#">Press</a>
-      </div>
-      <div class="foot-col">
-        <h5>Travel</h5>
-        <!-- Cruises, Visa and Activities are removed here too. hero-shell.js's
-             footerHtml() is the other copy of this column and dropped them at
-             the same time; the two must stay identical. -->
-        <a href="flights.html">Flights</a><a href="hotels.html">Hotels</a><a href="packages.html">Tour Packages</a>
-      </div>
-      <div class="foot-col">
-        <h5>Support</h5>
-        <a href="#">Help Center</a><a href="#">Cancellation</a><a href="#">Refund</a><a href="#">FAQs</a>
-      </div>
-      <div class="foot-col">
-        <h5>Contact</h5>
-        <ul class="foot-contact">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.81.35 1.6.68 2.34a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.74-1.25a2 2 0 012.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0122 16.92z"/></svg><a href="tel:+919177847799">+91 9177847799</a></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" opacity="0"/><path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg><a href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Hyderabad, Telangana, India</span></li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span>24/7 Support</span></li>
+
+      <nav class="jw-f-col" aria-labelledby="jwFCompany">
+        <h3 id="jwFCompany">Company</h3>
+        <ul>
+          <li><a class="jw-f-link" href="about.html">About Us</a></li>
+          <li><a class="jw-f-link" href="contact-us.html">Contact Us</a></li>
+          <li><a class="jw-f-link" href="customer-support.html">Customer Support</a></li>
+          <li><a class="jw-f-link" href="faqs.html">FAQs</a></li>
+        </ul>
+      </nav>
+
+      <nav class="jw-f-col" aria-labelledby="jwFTravel">
+        <h3 id="jwFTravel">Travel</h3>
+        <ul>
+          <li><a class="jw-f-link" href="flights.html">Flights</a></li>
+          <li><a class="jw-f-link" href="hotels.html">Hotels</a></li>
+          <li><a class="jw-f-link" href="packages.html">Tour Packages</a></li>
+        </ul>
+      </nav>
+
+      <nav class="jw-f-col" aria-labelledby="jwFLegal">
+        <h3 id="jwFLegal">Legal</h3>
+        <ul>
+          <li><a class="jw-f-link" href="privacy-policy.html">Privacy Policy</a></li>
+          <li><a class="jw-f-link" href="terms-and-conditions.html">Website Terms &amp; Conditions</a></li>
+          <li><a class="jw-f-link" href="cancellation-refund-policy.html">Cancellation &amp; Refund Policy</a></li>
+          <li><a class="jw-f-link" href="cookie-policy.html">Cookie Policy</a></li>
+          <li><a class="jw-f-link" href="payment-security.html">Payment Security</a></li>
+          <li><a class="jw-f-link" href="disclaimer.html">Disclaimer</a></li>
+        </ul>
+      </nav>
+
+      <div class="jw-f-col">
+        <h3 id="jwFContact">Contact</h3>
+        <ul class="jw-f-contact" aria-labelledby="jwFContact">
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.81.35 1.6.68 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.74-1.25a2 2 0 0 1 2.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0 1 22 16.92z"/></svg>
+            <span><span class="jw-f-ct-label">Phone</span><a class="jw-f-link jw-f-ct-value" href="tel:+919177847799">+91 9177847799</a></span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+            <span><span class="jw-f-ct-label">Email</span><a class="jw-f-link jw-f-ct-value" href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span><span class="jw-f-ct-label">Address</span><address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <!-- Same clock icon, same label, same classes — one line of value
+                 instead of two. The staffed hours (Mon–Sat, 9:00 AM – 8:00 PM
+                 IST) still appear on Contact Us, Customer Support, the FAQs and
+                 the policy pages. -->
+            <span><span class="jw-f-ct-label">Business hours</span><span class="jw-f-ct-value">24/7 Support</span></span>
+          </li>
         </ul>
       </div>
+
     </div>
-    <div class="foot-bottom">
-      <span>&copy; 2026 JackPots World Tours &amp; Travels Pvt. Ltd.</span>
-      <span>Made for every route, every ticket type, every traveller.</span>
+  </div>
+
+  <div class="jw-f-bottom">
+    <div class="jw-f-wrap jw-f-bottom-row">
+      <span>&copy; 2026 JackpotsWorld Tours &amp; Travels. All Rights Reserved.</span>
+      <span class="jw-f-tagline">Designed for every journey.</span>
+      <span class="jw-f-badges">
+        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>SSL Secured</span>
+        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4.5 5.6v5.7c0 4.6 3.2 8.9 7.5 10.2 4.3-1.3 7.5-5.6 7.5-10.2V5.6L12 2.5z"/></svg>Privacy Protected</span>
+        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Secure Payments</span>
+      </span>
     </div>
   </div>
 </footer>
@@ -840,7 +966,7 @@
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260903all2"></script>
+<script src="assets/js/app.js?v=20260905ft5"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

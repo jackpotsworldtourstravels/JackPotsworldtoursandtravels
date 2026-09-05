@@ -138,6 +138,12 @@ SUITE = [
     # when Playwright or a served frontend is absent.
     ("verify_responsive.py",
      "Responsive: every portal screen at phone sizes - no sideways scroll, no iOS-zoom inputs"),
+    # Static, no server, no browser - it reads the files on disk, so it could
+    # sit anywhere. It sits next to verify_responsive.py because the two are the
+    # only checks on the customer-facing frontend, and a reader looking for
+    # "what covers the website" should find both in one place.
+    ("verify_footer.py",
+     "Footer: both copies identical, every link resolves, no placeholder or withdrawn service"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.

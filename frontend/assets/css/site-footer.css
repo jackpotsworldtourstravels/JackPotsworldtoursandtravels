@@ -1,0 +1,249 @@
+/* ===========================================================================
+   site-footer.css — the company footer, one implementation for every page
+   ===========================================================================
+   WHY THIS IS ITS OWN FILE
+
+   The footer has to render identically on two pages that share no stylesheet:
+   index.html loads main.css, the service pages load service-page.css, and
+   neither imports the other. So this file declares its OWN tokens (--jwf-*)
+   and never reads --navy/--gold/--sp-*; drop the <link> onto any page and the
+   footer looks the same there. It is the only stylesheet the new static
+   content pages need in order to end correctly.
+
+   THE FOOTER IS ALWAYS NAVY, IN BOTH THEMES. The rest of the site follows the
+   OS colour scheme; the footer does not, deliberately — it is the brand plate
+   at the foot of the page and a "light mode" version of it would be a second
+   design to keep correct for no gain. Its contrast is fixed and known:
+   #FFFFFF on #0A2540 is 14.6:1, and the gold #FFB020 headings are 8.9:1.
+
+   NO DROPDOWNS AND NO ARROW GLYPHS ANYWHERE IN HERE. Every item is a plain
+   anchor to a real page, which is what makes the whole footer crawlable and
+   keyboard-reachable without a single line of JavaScript.
+   =========================================================================== */
+
+.jw-footer {
+  --jwf-navy:      #0A2540;
+  --jwf-navy-deep: #071B2E;
+  --jwf-gold:      #FFB020;
+  --jwf-ink:       #FFFFFF;
+  --jwf-dim:       rgba(255,255,255,.72);
+  --jwf-line:      rgba(255,255,255,.12);
+  --jwf-max:       1280px;
+  --jwf-ff: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  background: var(--jwf-navy);
+  color: var(--jwf-dim);
+  font-family: var(--jwf-ff);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 48px;
+  /* A hairline of gold across the top edge. Cheaper than a border image and it
+     cannot be clipped away by the page's own overflow rules. */
+  border-top: 3px solid var(--jwf-gold);
+}
+
+.jw-footer *,
+.jw-footer *::before,
+.jw-footer *::after { box-sizing: border-box; }
+
+.jw-footer a { color: inherit; text-decoration: none; }
+.jw-footer ul { list-style: none; margin: 0; padding: 0; }
+/* NO `.jw-footer p { margin: 0 }` HERE, however tidy it looks. That selector is
+   specificity 0,1,1 and every paragraph rule below it is a bare class at 0,1,0
+   — so it silently won, and .jw-f-about's 26px margin measured as 0 with
+   "FOLLOW US" jammed against the tagline. The two paragraphs in this footer
+   both set their own margins; a blanket reset only existed to be overridden. */
+
+.jw-f-wrap {
+  max-width: var(--jwf-max);
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ---------------------------------------------------------------------------
+   The five columns
+   ---------------------------------------------------------------------------
+   The brand column is widest because it holds a sentence rather than labels.
+   The two numbers that are not free choices:
+
+     col 4 (Legal)    1.15fr — "Cancellation & Refund Policy" is the longest
+                      label in the footer and has to sit on one line.
+     col 5 (Contact)  1.5fr  — support@jackpotsworldtours.com is 29 characters
+                      and MUST NOT wrap. At 1.25fr the column came out 223px,
+                      the address broke after "jackpotsworldtou", and an email
+                      split across two lines is one nobody can copy by eye.
+                      1.5fr gives it 267px against the ~210px it needs.
+   --------------------------------------------------------------------------- */
+.jw-f-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 1fr 1fr 1.15fr 1.5fr;
+  gap: 40px 32px;
+  padding: 64px 0 52px;
+}
+
+/* --- column 1: brand ------------------------------------------------------ */
+.jw-f-logo { display: block; margin-bottom: 18px; }
+.jw-f-logo img {
+  height: 96px; width: auto; max-width: 100%;
+  object-fit: contain; display: block;
+}
+/* margin-bottom: 0, and it has to be. This was 26px, which was the gap between
+   the tagline and the "Follow us" heading below it. With the social block gone
+   that margin became 26px of nothing at the end of the brand column — the
+   "empty space left behind" that removing a section usually leaves. The column
+   now ends where the sentence ends.
+
+   The `.jw-f-social-h` and `.jw-f-social` rules that lived here are deleted
+   rather than commented out; the markup they styled is gone from both copies of
+   the footer, so they had nothing to select. */
+.jw-f-about {
+  font-size: 14px;
+  color: var(--jwf-dim);
+  max-width: 330px;
+  margin-bottom: 0;
+}
+
+/* --- columns 2-4: link lists ---------------------------------------------- */
+.jw-f-col h3 {
+  font-family: var(--jwf-ff);
+  font-size: 12px; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--jwf-gold);
+  margin: 0 0 20px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--jwf-line);
+  line-height: 1.3;
+}
+.jw-f-col li { margin-bottom: 13px; }
+.jw-f-col li:last-child { margin-bottom: 0; }
+
+/* THE LINK, AND THE UNDERLINE THAT GROWS UNDER IT.
+
+   `inline-block` on purpose: the ::after is positioned against the link box, so
+   an inline link that wrapped across two lines would have drawn one underline
+   spanning both. These labels are short enough never to wrap, and the rule
+   keeps that true if one ever changes.
+
+   The colour and the underline are two transitions on the same element rather
+   than `text-decoration`, because text-decoration cannot be animated from a
+   width of zero — and a line that simply appears is the thing this replaces. */
+.jw-f-link {
+  position: relative;
+  display: inline-block;
+  color: var(--jwf-ink);
+  font-size: 14px;
+  padding-bottom: 2px;
+  transition: color .22s ease;
+}
+.jw-f-link::after {
+  content: '';
+  position: absolute; left: 0; bottom: 0;
+  width: 100%; height: 1.5px;
+  background: var(--jwf-gold);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+}
+.jw-f-link:hover,
+.jw-f-link:focus-visible { color: var(--jwf-gold); }
+.jw-f-link:hover::after,
+.jw-f-link:focus-visible::after { transform: scaleX(1); }
+
+/* The keyboard ring is drawn by the browser; the underline is decoration on
+   top of it, not a replacement for it. */
+.jw-footer :focus-visible {
+  outline: 2px solid var(--jwf-gold);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* --- column 5: contact ---------------------------------------------------- */
+.jw-f-contact li {
+  display: flex; align-items: flex-start; gap: 11px;
+  margin-bottom: 18px;
+}
+.jw-f-contact li:last-child { margin-bottom: 0; }
+.jw-f-contact svg {
+  width: 17px; height: 17px; flex: none; margin-top: 3px;
+  fill: none; stroke: var(--jwf-gold);
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.jw-f-ct-label {
+  display: block;
+  font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: rgba(255,255,255,.5);
+  margin-bottom: 3px;
+}
+.jw-f-ct-value { color: var(--jwf-ink); font-size: 14px; }
+/* An email address is one long unbreakable token on a 320px screen. Without
+   this it pushes the whole grid wider than the viewport. */
+.jw-f-contact a, .jw-f-contact span { overflow-wrap: anywhere; }
+.jw-f-contact address { font-style: normal; }
+
+/* ---------------------------------------------------------------------------
+   Bottom bar
+   --------------------------------------------------------------------------- */
+.jw-f-bottom {
+  border-top: 1px solid var(--jwf-line);
+  background: var(--jwf-navy-deep);
+}
+.jw-f-bottom-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  /* padding-block, NOT the `22px 0` shorthand. This element carries BOTH
+     .jw-f-wrap and .jw-f-bottom-row; the shorthand is declared later at equal
+     specificity, so it reset the wrap's `0 32px` to zero and the copyright and
+     the badges sat flush against both edges of the viewport. */
+  padding-top: 22px;
+  padding-bottom: 22px;
+  font-size: 12.5px;
+  color: rgba(255,255,255,.6);
+}
+.jw-f-tagline { font-style: italic; color: rgba(255,255,255,.55); }
+.jw-f-badges { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.jw-f-badge { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.jw-f-badge svg {
+  width: 14px; height: 14px; flex: none;
+  fill: none; stroke: var(--jwf-gold);
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive
+   ---------------------------------------------------------------------------
+   Three steps, not four. 1100px folds the five columns into a full-width brand
+   block over three link columns; 860px goes to two; 640px to one, which is the
+   only layout that survives a 320px phone with a 34-character email in it.
+   --------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  .jw-f-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 38px 28px; }
+  /* The brand column keeps the full width above the three link columns rather
+     than being squeezed into a third of it with a 170px paragraph. */
+  .jw-f-grid > .jw-f-brand { grid-column: 1 / -1; }
+  .jw-f-about { max-width: 520px; }
+}
+@media (max-width: 860px) {
+  .jw-f-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 52px 0 44px; }
+  .jw-f-wrap { padding: 0 24px; }
+}
+@media (max-width: 640px) {
+  .jw-f-grid { grid-template-columns: minmax(0, 1fr); gap: 34px; padding: 44px 0 36px; }
+  .jw-f-wrap { padding: 0 20px; }
+  .jw-f-logo img { height: 76px; }
+  .jw-f-bottom-row { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .jw-f-badges { gap: 14px; }
+}
+
+/* A footer link is a navigation target, not an animation. Someone who has
+   asked the OS to stop motion still needs to see which link is focused, so the
+   underline stays and only the growth is dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .jw-f-link::after { transition: none; }
+}
+
+/* Nobody needs the security badges on paper, and the link colours cost a page
+   of toner each. */
+@media print {
+  .jw-footer { background: #fff; color: #000; border-top: 1px solid #000; }
+  .jw-f-badges { display: none; }
+  .jw-f-link, .jw-f-ct-value { color: #000; }
+  .jw-f-bottom { background: #fff; }
+}

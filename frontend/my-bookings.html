@@ -13,13 +13,15 @@
      wears now instead of service-shell.js's strip - one header across the
      product. Loaded FIRST so service-page.css still wins on the .sp-* page
      furniture below it, which this page still uses. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260905ft5">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260829n2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260826ac1">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
 <link rel="stylesheet" href="assets/css/travel-explore.css?v=20260903all2">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260829pm5">
+<!-- The company footer, one stylesheet for every page that renders it. -->
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft5">
 <script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body data-sp-service="bookings">
@@ -86,8 +88,9 @@
      .sp-* furniture. It renders NO header here any more - there is no
      #spHeader on the page - so the one nav bar is hero-shell.js's below,
      the same one every other page wears. -->
-<script src="assets/js/service-shell.js?v=20260903all2"></script>
-<script src="assets/js/hero-shell.js?v=20260903all2"></script>
+<script src="assets/js/site-footer.js?v=20260905ft5"></script>
+<script src="assets/js/service-shell.js?v=20260905ft3"></script>
+<script src="assets/js/hero-shell.js?v=20260905ft5"></script>
 <script>HeroShell.mountHeader('my-bookings.html');</script>
 <script>HeroShell.mountFooter();</script>
 </body>

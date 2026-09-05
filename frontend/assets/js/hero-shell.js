@@ -97,51 +97,26 @@ const HeroShell = (function () {
   /* ---------------------------------------------------------------------
      Footer — the landing page's, same caveat as the header above.
      --------------------------------------------------------------------- */
-  const FOOT_ICONS = {
-    phone: '<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12.81.35 1.6.68 2.34a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.74-1.25a2 2 0 012.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0122 16.92z"/>',
-    mail:  '<path d="M22 6l-10 7L2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/>',
-    pin:   '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
-  };
+  /* THE FOOTER MOVED TO site-footer.js, AND SO DID EVERY COPY OF IT.
 
-  const footIcon = name =>
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-    + FOOT_ICONS[name] + '</svg>';
+     What used to be here was a five-column layout built from its own icon set
+     and its own column helper — a near-duplicate of the static markup in
+     index.html, kept in step by hand. Three things were wrong with it beyond
+     the duplication, and all three had survived because nothing rendered the
+     two copies side by side:
 
-  const footCol = (head, links) =>
-    '<div class="foot-col"><h5>' + esc(head) + '</h5>'
-    + links.map(l => '<a href="' + l[1] + '">' + esc(l[0]) + '</a>').join('')
-    + '</div>';
+       * "Company" and "Support" were eight links to `#`. Every one of them.
+       * The blurb still advertised cruises and holiday packages, months after
+         the nav dropped them and years after they stopped being sold.
+       * The phone number was +91 12345 67890, the address was a building this
+         business does not occupy, and the copyright said "Pvt. Ltd." for a
+         proprietorship.
 
+     One definition now, in site-footer.js, with real destinations behind every
+     link. footerHtml() is kept as a passthrough because callers outside this
+     file use it. */
   function footerHtml() {
-    return '<div class="wrap"><div class="foot-grid">'
-      + '<div><div class="foot-logo">'
-      + '<img class="foot-logo-img" src="assets/images/jackpots-logo-full.png"'
-      + ' alt="JackPots World Tours &amp; Travels"></div>'
-      + '<p>Flights, hotels, cruises and holiday packages — booked in one clean sweep,'
-      + ' backed by support that actually picks up.</p></div>'
-      + footCol('Company', [['About', '#'], ['Careers', '#'], ['Press', '#']])
-      /* Cruises, Visa and Activities are gone from here too. The header list
-         above dropped them first; leaving them in the footer meant they still
-         appeared on every page, which is not what "removed from the
-         navigation" means. The pages are still served at their own URLs. */
-      + footCol('Travel', [['Flights', 'flights.html'], ['Hotels', 'hotels.html'],
-                           ['Tour Packages', 'packages.html']])
-      + footCol('Support', [['Help Center', '#'], ['Cancellation', '#'],
-                            ['Refund', '#'], ['FAQs', '#']])
-      + '<div class="foot-col"><h5>Contact</h5><ul class="foot-contact">'
-      + '<li>' + footIcon('phone') + '<a href="tel:+911234567890">+91 12345 67890</a></li>'
-      + '<li>' + footIcon('mail')
-      + '<a href="mailto:info@jackpotsworldtours.com">info@jackpotsworldtours.com</a></li>'
-      + '<li>' + footIcon('pin')
-      + '<span>3rd Floor, Prestige Towers, Banjara Hills, Hyderabad, India 500034</span></li>'
-      + '<li>' + footIcon('clock') + '<span>Mon-Sat, 9:00 AM - 8:00 PM IST</span></li>'
-      + '</ul></div></div>'
-      + '<div class="foot-bottom">'
-      + '<span>&copy; ' + new Date().getFullYear()
-      + ' JackPots World Tours &amp; Travels Pvt. Ltd.</span>'
-      + '<span>Made for every route, every ticket type, every traveller.</span>'
-      + '</div></div>';
+    return (typeof SiteFooter !== 'undefined') ? SiteFooter.html() : '';
   }
 
   /* =====================================================================
@@ -173,17 +148,30 @@ const HeroShell = (function () {
      Pass `video` to override that; nothing does, and a page that did would be
      fighting a shared component the whole product already agrees on.
      ===================================================================== */
+  /* No cruises clip. switchHeroVideo() in booking-card.js only ever asks for the
+     key of an open tab, and TABS there is flights/hotels/packages — so the
+     element was rendered on every page carrying this hero and could never be
+     shown. assets/videos/cruise.mp4 is left on disk; nothing references it. */
   const HERO_VIDEOS = [
     { key: 'flights',  src: 'assets/videos/flight.mp4' },
     { key: 'hotels',   src: 'assets/videos/hotel.mp4' },
-    { key: 'cruises',  src: 'assets/videos/cruise.mp4' },
     { key: 'packages', src: 'https://assets.mixkit.co/videos/14834/14834-720.mp4' },
   ];
 
-  const HERO_EYEBROW = 'Flights &middot; Hotels &middot; Cruises &middot; Tour Packages — one search';
+  /* THREE SERVICES, AND THIS LIST IS THE PROMISE THE REST OF THE SITE KEEPS.
+     The eyebrow read "Flights · Hotels · Cruises · Tour Packages" and the sub
+     offered cruises, holiday packages and "unforgettable experiences" — four
+     products beyond the three that are sold, on the first screen of the site.
+     The nav, the card's TABS and the footer had all been cut back to
+     flights/hotels/packages already; this copy was where the withdrawn ones
+     survived, because nothing reads marketing prose looking for a product list.
+
+     index.html carries the other copy of these two strings in static markup.
+     CHANGE ONE, CHANGE THE OTHER. */
+  const HERO_EYEBROW = 'Flights &middot; Hotels &middot; Tour Packages — one search';
   const HERO_TITLE = 'Your next adventure<span class="accent"> starts here.</span>';
-  const HERO_SUB = 'Book flights, hotels, cruises, and holiday packages, and unforgettable'
-    + ' experiences — all in one place, at prices that don’t need a coupon hunt.';
+  const HERO_SUB = 'Book flights, hotels and tour packages — all in one place,'
+    + ' at prices that don’t need a coupon hunt.';
 
   function heroVideosHtml(active) {
     return HERO_VIDEOS.map(v => {
@@ -555,7 +543,10 @@ const HeroShell = (function () {
 
   function mountFooter() {
     const foot = document.getElementById('siteFooter');
-    if (foot) foot.innerHTML = footerHtml();
+    if (!foot || typeof SiteFooter === 'undefined') return;
+    /* mount(), not innerHTML: it also sets the .jw-footer class the stylesheet
+       hangs everything off, which the bare element does not carry. */
+    SiteFooter.mount(foot);
   }
 
   /* ---------------------------------------------------------------------
@@ -574,11 +565,17 @@ const HeroShell = (function () {
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
       + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
       + '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back</button>'
-      + '<span class="bf-copy">&copy; ' + new Date().getFullYear()
-      + ' JackPots World Tours &amp; Travels Pvt. Ltd.</span>'
+      /* "Pvt. Ltd." was wrong: this business is a proprietorship, and a company
+         suffix on a copyright line is a representation about the legal entity
+         you are contracting with, not decoration. */
+      + '<span class="bf-copy">&copy; 2026 JackpotsWorld Tours &amp; Travels.'
+      + ' All Rights Reserved.</span>'
+      /* Both of these pointed at index.html#contact — the contact form on the
+         landing page, which is neither document. The pages exist now. */
       + '<span class="bf-links">'
-      + '<a href="index.html#contact">Privacy Policy</a>'
-      + '<a href="index.html#contact">Terms &amp; Conditions</a>'
+      + '<a href="privacy-policy.html">Privacy Policy</a>'
+      + '<a href="terms-and-conditions.html">Terms &amp; Conditions</a>'
+      + '<a href="cancellation-refund-policy.html">Cancellation &amp; Refund</a>'
       + '</span></div>';
   }
 

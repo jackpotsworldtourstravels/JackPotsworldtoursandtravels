@@ -1,0 +1,364 @@
+/* ===========================================================================
+   content-page.css — the reading pages: About, Support, FAQs and the legal set
+   ===========================================================================
+   LOADED AFTER service-page.css AND DEPENDS ON IT. The header, the navy hero
+   band, the --sp-* tokens and dark mode all come from there; this file adds
+   only what a page of prose needs and nothing that a booking screen does. That
+   is why these pages carry no axios, no account-center.js and no booking
+   bundle — a Privacy Policy that pulls 300KB of booking machinery to render
+   nine paragraphs is a page nobody waits for.
+
+   DARK MODE IS INHERITED, NOT REDECLARED. Every colour below is a --sp-* token,
+   so the toggle in the header works on these pages for free. The one exception
+   is the footer, which is navy in both themes by its own design.
+   =========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   Shell
+   --------------------------------------------------------------------------- */
+.cp-main { padding: 0 0 24px; }
+
+/* The reading column. 74ch, not a pixel width: the measure that matters is
+   characters per line, and 74 holds legal prose at this size without the eye
+   losing the return sweep. */
+.cp-body { max-width: 74ch; }
+
+/* Legal pages put a contents rail beside the prose.
+
+   THE RAIL IS THE FIRST TRACK BECAUSE IT IS THE FIRST ELEMENT. `<nav
+   class="cp-toc">` is authored before `<div class="cp-body">` so that a screen
+   reader and a keyboard reach the section list before sixteen clauses of
+   prose. With `minmax(0,1fr) 260px` the nav therefore took the wide track and
+   the policy text was squeezed into 260px — the columns have to be declared in
+   the order the markup arrives, not the order the design was imagined in.
+
+   `align-items: start` so the sticky rail is not stretched to the full article
+   height; `position: sticky` inside a stretched grid item has nothing left to
+   travel. */
+.cp-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+  padding: 48px 0 8px;
+}
+.cp-layout .cp-body { max-width: none; }
+
+.cp-single { padding: 48px 0 8px; }
+
+/* ---------------------------------------------------------------------------
+   Prose
+   --------------------------------------------------------------------------- */
+.cp-body h2 {
+  font-size: clamp(20px, 2.4vw, 25px);
+  line-height: 1.25;
+  color: var(--sp-ink);
+  margin: 44px 0 14px;
+  /* scroll-margin, not padding: the header is sticky and 72px tall, so a
+     heading jumped to from the contents list would otherwise land underneath
+     it. This is the only reason the number 92 appears in this file. */
+  scroll-margin-top: 92px;
+}
+.cp-body h2:first-child { margin-top: 0; }
+.cp-body h3 {
+  font-size: 17px; line-height: 1.35; color: var(--sp-ink);
+  margin: 28px 0 10px; scroll-margin-top: 92px;
+}
+.cp-body p,
+.cp-body li {
+  font-size: 15.5px; line-height: 1.75; color: var(--sp-muted);
+}
+.cp-body p { margin: 0 0 16px; }
+.cp-body > p:last-child { margin-bottom: 0; }
+.cp-body strong { color: var(--sp-ink); font-weight: 700; }
+.cp-body a:not(.cp-btn):not(.cp-card) {
+  color: var(--sp-accent); text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+.cp-body a:not(.cp-btn):not(.cp-card):hover { text-decoration-thickness: 2px; }
+
+.cp-body ul, .cp-body ol { margin: 0 0 18px; padding-left: 22px; }
+.cp-body ul { list-style: disc; }
+.cp-body ol { list-style: decimal; }
+.cp-body li { margin-bottom: 9px; padding-left: 4px; }
+.cp-body li::marker { color: var(--sp-accent); }
+
+/* A numbered clause reference — "Section 7.2" in a contract needs to be
+   findable, so the numbers are real text in the heading, not a list counter
+   that vanishes when the page is copied into an email. */
+.cp-sec-no {
+  display: inline-block; min-width: 2.1em;
+  color: var(--sp-accent); font-weight: 800;
+}
+
+.cp-lead {
+  font-size: 17px; line-height: 1.65; color: var(--sp-ink);
+  margin: 0 0 28px;
+}
+
+/* The Cookie Policy names localStorage and sessionStorage by their real API
+   names. Setting them in mono at 0.92em keeps them from sitting a size larger
+   than the prose around them, which is what a browser's default monospace font
+   does at the same declared size. */
+.cp-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .92em;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--sp-surface-2); color: var(--sp-ink);
+  overflow-wrap: anywhere;
+}
+
+/* The "last updated" plate at the top of every legal page. */
+.cp-meta {
+  display: flex; flex-wrap: wrap; gap: 10px 24px;
+  padding: 16px 20px; margin: 0 0 34px;
+  border: 1px solid var(--sp-line); border-left: 3px solid var(--sp-gold);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  font-size: 13.5px; color: var(--sp-muted);
+}
+.cp-meta b { color: var(--sp-ink); font-weight: 700; }
+
+/* A callout for the sentence in each policy that people actually need to see —
+   the refund window, the fraud warning, the "we never ask for your PIN" line. */
+.cp-note {
+  border: 1px solid var(--sp-line); border-left: 3px solid var(--sp-accent);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  padding: 18px 20px; margin: 0 0 24px;
+}
+.cp-note p { margin: 0; color: var(--sp-ink); font-size: 14.5px; }
+.cp-note p + p { margin-top: 10px; }
+.cp-note-gold { border-left-color: var(--sp-gold); }
+
+/* ---------------------------------------------------------------------------
+   Tables — the cancellation scale
+   ---------------------------------------------------------------------------
+   The scroller is a separate element with `tabindex="0"` in the markup, not an
+   `overflow-x` on the table itself: a scrollable region that cannot be focused
+   is one a keyboard user cannot scroll, and this table is the only place on
+   the site where a policy number could end up off-screen and unreachable.
+   --------------------------------------------------------------------------- */
+.cp-table-scroll {
+  overflow-x: auto;
+  margin: 0 0 24px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+}
+.cp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  /* Below this the two columns start hyphenating "cancellation"; the scroller
+     takes over instead. */
+  min-width: 420px;
+}
+.cp-table caption {
+  caption-side: top;
+  text-align: left;
+  padding: 16px 20px 12px;
+  font-size: 13px; line-height: 1.5;
+  color: var(--sp-muted);
+}
+.cp-table th, .cp-table td {
+  padding: 13px 20px;
+  text-align: left;
+  border-top: 1px solid var(--sp-line);
+  line-height: 1.5;
+}
+.cp-table thead th {
+  font-size: 11.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--sp-muted);
+  background: var(--sp-surface-2);
+}
+.cp-table tbody td { color: var(--sp-muted); }
+/* The charge is the number people came for, so it reads as the answer. */
+.cp-table tbody td:last-child { color: var(--sp-ink); font-weight: 700; white-space: nowrap; }
+.cp-table tbody tr:last-child td { border-bottom: 0; }
+
+/* ---------------------------------------------------------------------------
+   On this page
+   --------------------------------------------------------------------------- */
+.cp-toc {
+  position: sticky; top: 92px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  padding: 20px 18px;
+  /* The legal pages have up to sixteen sections; without this the list runs
+     past the bottom of a laptop viewport and the last clauses are unreachable
+     while the article is still scrolling. */
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+.cp-toc h2 {
+  font-size: 11.5px; font-weight: 800; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--sp-muted);
+  margin: 0 0 12px;
+}
+.cp-toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+.cp-toc li { margin: 0 0 2px; }
+.cp-toc a {
+  display: block; padding: 7px 10px; border-radius: 9px;
+  font-size: 13.5px; line-height: 1.4; color: var(--sp-muted);
+  transition: background .18s ease, color .18s ease;
+}
+.cp-toc a:hover { background: var(--sp-surface-2); color: var(--sp-accent); }
+
+/* ---------------------------------------------------------------------------
+   Cards — the About, Support and Contact pages
+   --------------------------------------------------------------------------- */
+.cp-grid {
+  display: grid; gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin: 0 0 40px;
+}
+.cp-card {
+  display: block;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  padding: 24px 22px;
+}
+/* Only the ones that are links lift. A card that moves under the cursor and
+   does nothing when clicked is a promise the page does not keep. */
+a.cp-card {
+  transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+a.cp-card:hover {
+  border-color: var(--sp-accent);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px -24px rgba(10,37,64,.45);
+}
+.cp-card h3 { margin: 0 0 8px; font-size: 16.5px; color: var(--sp-ink); }
+.cp-card p  { margin: 0; font-size: 14.5px; line-height: 1.65; color: var(--sp-muted); }
+.cp-card-mark {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center; margin-bottom: 15px;
+  background: var(--sp-accent-soft); color: var(--sp-accent);
+}
+.cp-card-mark svg {
+  width: 21px; height: 21px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.cp-card dl { margin: 14px 0 0; }
+.cp-card dt {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--sp-muted); margin-bottom: 3px;
+}
+.cp-card dd {
+  margin: 0 0 12px; font-size: 15px; color: var(--sp-ink);
+  overflow-wrap: anywhere;
+}
+.cp-card dd:last-child { margin-bottom: 0; }
+.cp-card dd a { color: var(--sp-accent); }
+
+/* Section heading above a card grid, outside the reading column. */
+.cp-h2 {
+  font-size: clamp(21px, 2.6vw, 27px); color: var(--sp-ink);
+  margin: 0 0 8px; scroll-margin-top: 92px;
+}
+.cp-sub { font-size: 15px; color: var(--sp-muted); margin: 0 0 26px; max-width: 62ch; }
+.cp-block { padding: 8px 0 44px; }
+
+/* ---------------------------------------------------------------------------
+   Facts strip — the six figures on About
+   --------------------------------------------------------------------------- */
+.cp-facts {
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  background: var(--sp-line);
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  overflow: hidden;
+  margin: 0 0 40px;
+}
+.cp-fact { background: var(--sp-surface); padding: 22px 20px; }
+.cp-fact dt {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--sp-muted); margin-bottom: 6px;
+}
+.cp-fact dd {
+  margin: 0; font-size: 15.5px; font-weight: 700;
+  color: var(--sp-ink); line-height: 1.4; overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   FAQs
+   ---------------------------------------------------------------------------
+   Flat headings and paragraphs — NOT <details> accordions. Two reasons: the
+   brief rules out anything that opens and closes, and an answer hidden behind a
+   summary is an answer the visitor has to hunt for and a crawler weighs less.
+   The contents list at the side does the jumping instead.
+   --------------------------------------------------------------------------- */
+.cp-faq-group { margin: 0 0 42px; }
+.cp-faq-group > h2 { margin-top: 0; }
+.cp-qa { padding: 20px 0; border-bottom: 1px solid var(--sp-line); }
+.cp-qa:last-child { border-bottom: 0; }
+.cp-qa h3 { margin: 0 0 8px; font-size: 16px; color: var(--sp-ink); }
+.cp-qa p  { margin: 0 0 12px; }
+.cp-qa p:last-child { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------------- */
+.cp-cta {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  margin: 32px 0 8px;
+}
+.cp-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 24px; border-radius: 12px;
+  font-size: 14.5px; font-weight: 800;
+  background: var(--sp-accent); color: #fff;
+  transition: background .18s ease;
+}
+.cp-btn:hover { background: var(--sp-accent-dk); }
+.cp-btn-line {
+  background: transparent; color: var(--sp-ink);
+  border: 1.5px solid var(--sp-line);
+  transition: border-color .18s ease, color .18s ease;
+}
+.cp-btn-line:hover { background: transparent; border-color: var(--sp-accent); color: var(--sp-accent); }
+
+/* A closing band with the two things every one of these pages should offer:
+   somebody to talk to, and the way back to booking. */
+.cp-end {
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface);
+  padding: 30px 28px;
+  margin: 12px 0 8px;
+}
+.cp-end h2 { margin: 0 0 8px; font-size: 20px; color: var(--sp-ink); }
+.cp-end p  { margin: 0; font-size: 15px; color: var(--sp-muted); line-height: 1.65; }
+.cp-end .cp-cta { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------------- */
+@media (max-width: 1000px) {
+  /* The contents rail stops being an aside and becomes an intro block above
+     the prose — which is where the markup already puts it, so no reordering is
+     needed. Sticky is dropped with it: a sticky bar at the top of a phone
+     screen eats a third of the reading area. */
+  .cp-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .cp-layout > .cp-toc { position: static; max-height: none; }
+  .cp-toc ol { columns: 2; column-gap: 18px; }
+}
+@media (max-width: 640px) {
+  .cp-layout, .cp-single { padding-top: 32px; }
+  .cp-toc ol { columns: 1; }
+  .cp-body h2 { margin-top: 34px; }
+  .cp-end { padding: 24px 20px; }
+  .cp-cta .cp-btn { flex: 1 1 100%; justify-content: center; }
+}
+
+@media print {
+  .cp-toc, .cp-cta, .cp-end { display: none; }
+  .cp-layout { display: block; }
+  .cp-body p, .cp-body li { color: #000; font-size: 11pt; }
+  .cp-body h2 { page-break-after: avoid; }
+}

@@ -122,14 +122,16 @@ const ServiceShell = (function () {
     </div>`;
   }
 
-  function footerHtml() {
-    return `<div class="sp-wrap sp-footer-row">
-      <span>&copy; ${new Date().getFullYear()} JackPots World Tours &amp; Travels</span>
-      <span class="sp-footer-links">
-        ${SERVICES.map(s => `<a href="${s.href}">${esc(s.label)}</a>`).join('')}
-        <a href="index.html#contact">Contact</a>
-      </span>
-    </div>`;
+  /* The footer is site-footer.js's, not this file's.
+     It used to be a one-line strip here: a copyright, the three services, and a
+     Contact link pointing at index.html#contact. That strip was a third copy of
+     something index.html and hero-shell.js also each had their own version of,
+     and it offered none of the company, legal or contact destinations a visitor
+     is entitled to reach from any page. Now every page renders the same footer
+     from one definition. */
+  function mountFooter(el) {
+    if (typeof SiteFooter === 'undefined') return;   /* page did not load it */
+    SiteFooter.mount(el);
   }
 
   /* ---------------------------------------------------------------------
@@ -162,7 +164,7 @@ const ServiceShell = (function () {
     const header = document.getElementById('spHeader');
     const footer = document.getElementById('spFooter');
     if (header) header.innerHTML = headerHtml(active);
-    if (footer) footer.innerHTML = footerHtml();
+    if (footer) mountFooter(footer);
 
     /* jp-icons.js mounts on DOMContentLoaded, and it loads BEFORE this file —
        so the header did not exist yet when it ran. Anything rendered here has

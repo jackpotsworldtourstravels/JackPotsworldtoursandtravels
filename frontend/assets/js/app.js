@@ -58,10 +58,16 @@ if (typeof HeroShell !== 'undefined') HeroShell.initBehaviour();
 /** The header's product links, by product. One page per product — the same
  *  targets the header uses, so a voice search and a header click land in the
  *  same place. */
+/* No `cruises` entry. It was the last live route from the landing page to a
+   cruise product: activateTab('cruises') finds no such tab on the booking card,
+   falls through to this map, and NAVIGATED — so saying "cruises" into the voice
+   search put a visitor on a cruise page for a service this business does not
+   sell. cruises.html is untouched and still serves at its own URL, exactly as
+   it did when the header and footer dropped it; nothing on this page points
+   there any more. */
 const SERVICE_PAGE = {
   flights: 'flights.html',
   hotels: 'hotels.html',
-  cruises: 'cruises.html',
   packages: 'packages.html',
 };
 
@@ -116,9 +122,30 @@ const revealObserver = new IntersectionObserver((entries) => {
 }, { threshold: 0.15 });
 revealItems.forEach(el => revealObserver.observe(el));
 
-/* Duplicate auto-scroll tracks for seamless infinite loop */
+/* Duplicate auto-scroll tracks for seamless infinite loop.
+
+   THE SECOND COPY IS SCENERY, AND HAS TO SAY SO. This was
+   `track.innerHTML += track.innerHTML`, which was harmless while the tracks held
+   nothing focusable. The offer cards carry a CTA link now, so a blunt duplicate
+   would put every one of them in the tab order twice and announce the whole
+   carousel twice to a screen reader — the visitor tabs through "Book Flights",
+   "Explore Flights", "Book Hotels", "Explore Tour Packages", and then through
+   the same four again, with no way to tell why.
+
+   So the clone is marked aria-hidden and every focusable thing inside it is
+   taken out of the tab order. It exists to fill the right-hand half of a
+   32-second loop; it is not content. */
 [document.getElementById('offersTrack'), document.getElementById('partnersTrack')].forEach(track => {
-  if (track) track.innerHTML += track.innerHTML;
+  if (!track) return;
+  const clone = track.cloneNode(true);
+  clone.querySelectorAll('a[href], button, [tabindex]').forEach(el => {
+    el.setAttribute('tabindex', '-1');
+  });
+  while (clone.firstChild) {
+    const node = clone.firstChild;
+    if (node.nodeType === 1) node.setAttribute('aria-hidden', 'true');
+    track.appendChild(node);
+  }
 });
 
 /* Trending route price flip (simulated live ticker) */
@@ -604,8 +631,14 @@ if (typeof BookingCard !== 'undefined') {
       GroupEnquiry.handle(params);
       return;
     }
+    /* The message names no product. It used to say "Cruise search isn't
+       available yet — browse our featured sailings below", from when cruises
+       were the one tab without a handler. All three tabs have handlers now, so
+       this is a guard rather than a path anyone takes — and if a fourth product
+       is ever added without one, a toast advertising sailings would be a
+       stranger failure than the one being reported. */
     if (!HERO_SEARCH[kind]) {
-      showToast("Cruise search isn't available yet — browse our featured sailings below.", true);
+      showToast("That search isn't available yet. Please call us and we'll book it for you.", true);
       return;
     }
     /* A SEARCH NEEDS AN ACCOUNT, AND ASKING COSTS THE TRAVELLER NOTHING.
@@ -761,12 +794,6 @@ function applyVoiceQuery(transcript) {
     const m = cleaned.match(/\bhotels?\s+(?:in|at|near)\s+([a-z\s]+)/i) || cleaned.match(/\bin\s+([a-z\s]+)$/i);
     showToast(`Heard: "${text}"`);
     activateTab('hotels', { dest: m ? titleCaseWords(m[1].trim()) : '', checkIn: dateStr || '' });
-    return;
-  } else if (/\bcruises?\b/.test(lower)) {
-    /* Nothing to carry: no free-text criterion is heard here, and the cruise
-       page is a browse rather than a search. */
-    showToast(`Heard: "${text}"`);
-    activateTab('cruises');
     return;
   } else if (/\b(packages?|tours?)\b/.test(lower)) {
     showToast(`Heard: "${text}"`);

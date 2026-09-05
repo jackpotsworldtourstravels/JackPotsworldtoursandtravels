@@ -231,7 +231,18 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    411px max-content width became the dock's width and pushed the card off
    the side of a 375px phone. Stretched to the hero, the strip is handed a
    real width to scroll within. */
-.search-dock{position:relative; z-index:5; margin-top:34px; width:100%;}
+/* scroll-margin-top is NOT spacing — it changes nothing about where this sits
+   on the page, only where a programmatic scroll stops. The footer's Travel
+   links call scrollIntoView() on this dock and `header` is position:fixed, so
+   the card needs to stop clear of it rather than under it.
+
+   Measured on the landing page, resting scroll position after the smooth
+   scroll settles: 150px without the rule, 54px with it — the card sits 96px
+   further down the viewport, exactly as declared. The hero is tall enough that
+   the tab strip would have cleared the 128px header either way; the margin is
+   what stops that from being luck. It holds if the hero copy ever shortens, and
+   it is the header's solid height (76px) plus room to read. */
+.search-dock{position:relative; z-index:5; margin-top:34px; width:100%; scroll-margin-top:96px;}
 .search-card{
   background:rgba(255,255,255,0.82); backdrop-filter:blur(20px) saturate(160%);
   border:1px solid rgba(255,255,255,0.6); border-radius:24px; box-shadow:var(--shadow-lg); padding:14px;
@@ -367,7 +378,13 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .offers-section{background:var(--white); overflow:hidden;}
 .offers-track-wrap{overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image:linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);}
 .offers-track{display:flex; gap:22px; width:max-content; animation:offersScroll 32s linear infinite;}
-.offers-track:hover{animation-play-state:paused;}
+/* Pausing on hover was enough while the cards held a promo-code chip and
+   nothing was clickable. They carry a CTA link now, so the track must also stop
+   for the KEYBOARD: without :focus-within, tabbing to a card's button leaves it
+   sliding out from under the focus ring, and the target moves while it is being
+   read. Same rule, second input method. */
+.offers-track:hover,
+.offers-track:focus-within{animation-play-state:paused;}
 .offer-card{
   width:340px; flex-shrink:0; border-radius:22px; padding:32px; position:relative; overflow:hidden;
   color:#fff; display:flex; flex-direction:column; justify-content:space-between; min-height:190px;
@@ -382,10 +399,24 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .offer-card .tag{font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; opacity:.85;}
 .offer-card h3{color:#fff; font-size:25px; font-weight:700; margin:14px 0 6px; max-width:22ch;}
 .offer-card p{font-size:13.5px; opacity:.88; max-width:26ch;}
-.offer-card .code{
+/* `.code` is kept: it is the promo-code chip the offer cards used before they
+   carried CTAs, and the shape below is inherited from it so the card's silhouette
+   is unchanged. Nothing on the site renders it today. */
+.offer-card .code,
+.offer-card .offer-cta{
   align-self:flex-start; margin-top:18px; font-size:12.5px; font-weight:700; background:rgba(255,255,255,0.22);
   padding:8px 16px; border-radius:100px; backdrop-filter:blur(6px);
 }
+/* The CTA is a link, so it needs the affordances a chip does not: a pointer, a
+   hover state that says it is pressable, and a focus ring that survives against
+   five different card gradients — hence white, not the coral :focus-visible
+   default, which disappears on the o1 card. */
+.offer-card .offer-cta{
+  color:#fff; display:inline-block; white-space:nowrap;
+  transition:background .2s ease, transform .2s ease;
+}
+.offer-card .offer-cta:hover{background:rgba(255,255,255,0.34); transform:translateX(2px);}
+.offer-card .offer-cta:focus-visible{outline:3px solid #fff; outline-offset:3px;}
 @keyframes offersScroll{0%{transform:translateX(0);} 100%{transform:translateX(-50%);}}
 
 /* ---------- DESTINATIONS ---------- */
@@ -774,29 +805,19 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   #acctConfirmOverlay .modal-close, #acctConfirmOverlay .ticket-actions{display:none;}
 }
 
-/* ---------- FOOTER ---------- */
-footer{background:var(--navy); color:rgba(255,255,255,0.68); padding:80px 0 32px;}
-.foot-grid{display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr 1fr; gap:36px; padding-bottom:50px; border-bottom:1px solid rgba(255,255,255,0.1);}
-.foot-logo{display:flex; justify-content:center; margin-bottom:20px;}
-.foot-logo-img{height:170px; width:auto; object-fit:contain; flex-shrink:0;}
-.foot-grid > div p{font-size:13.5px; line-height:1.7; max-width:280px;}
-.foot-col h5{font-family:var(--ff-body); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--gold); margin-bottom:18px;}
-.foot-col a{display:block; font-size:14px; margin-bottom:12px; opacity:.85; transition:opacity .2s ease, color .2s ease;}
-.foot-contact li{display:flex; align-items:flex-start; gap:10px; font-size:13.5px; margin-bottom:14px; opacity:.85; line-height:1.5; list-style:none;}
-.foot-contact svg{width:16px; height:16px; flex-shrink:0; margin-top:2px; color:var(--gold);}
-.foot-contact a{display:inline; margin-bottom:0; opacity:1;}
-.foot-contact a:hover{color:var(--gold);}
-.foot-col a:hover{opacity:1; color:var(--gold);}
-.foot-bottom{display:flex; justify-content:space-between; padding-top:26px; font-size:12.5px; opacity:.55; flex-wrap:wrap; gap:10px;}
-/* minmax(0,1fr), NOT 1fr. An `fr` track's automatic minimum is its
-   MIN-CONTENT width, and this grid contains "info@jackpotsworldtours.com" —
-   one unbreakable 27-character string. At 320px that one word set the column
-   floor and the whole footer laid out at 391px, 71px past the viewport. The
-   page did not scroll sideways only because body was clipping it. */
-@media (max-width:960px){.foot-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px;}}
-/* Belt to that brace: the address and the email are the two strings long
-   enough to do it again if the columns ever narrow further. */
-.foot-contact li, .foot-contact a{overflow-wrap:anywhere;}
+/* ---------- FOOTER ----------
+   The footer's styles live in assets/css/site-footer.css now, under the
+   `jw-f-*` namespace, because the same footer has to render on this page (which
+   loads main.css) and on the service and content pages (which load
+   service-page.css and never see this file). A rule that only one of the two
+   families of page can reach is not a shared component.
+
+   The `footer { ... }` element rule that used to sit here is gone as well as
+   the `.foot-*` classes. It is worth knowing why: it painted every <footer> on
+   any page loading main.css navy with 80px of padding, which would have fought
+   .jw-footer's own background on this very page. A component that styles a bare
+   element name cannot coexist with another component that styles the same one.
+   -------------------------------------------------------- */
 
 /* ==========================================================================
    TOUCH INPUT SIZING - FUNCTIONAL, NOT COSMETIC
