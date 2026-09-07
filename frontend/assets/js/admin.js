@@ -91,7 +91,7 @@ guardPortalSession(isAdminLoggedIn);
 const sectionTitles = {
   reports: 'Dashboard', users: 'Merchant Management', 'active-users': 'Active Users',
   support: 'Support Management', 'reports-export': 'Reports', analytics: 'Analytics',
-  payments: 'Payment Management',
+  payments: 'Payment Management', 'live-support': 'Live Support',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
   'ticket-enquiries': 'Booking Enquiries',
   'booking-ops': 'Booking Operations',
@@ -136,6 +136,10 @@ document.querySelectorAll('.nav-item[data-section]').forEach(link => {
 });
 
 function loadSection(name) {
+  /* CR-9. AdminLiveSupport.init() is idempotent: it wires its handlers once
+     and reloads the queue on every later visit, so returning to the section
+     refreshes without stacking a second set of listeners. */
+  if (name === 'live-support') return AdminLiveSupport.init();
   if (name === 'reports') return loadReports();
   if (name === 'users') return loadMerchants();
   if (name === 'active-users') return loadActiveUsers();

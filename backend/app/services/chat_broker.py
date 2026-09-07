@@ -57,9 +57,9 @@ class ChatBroker(Protocol):
 
     def subscribe(self, conversation_id: int) -> "Subscription": ...
 
-    async def issue_ticket(self, customer_id: int) -> str: ...
+    async def issue_ticket(self, actor: str) -> str: ...
 
-    async def redeem_ticket(self, ticket: str) -> Optional[int]: ...
+    async def redeem_ticket(self, ticket: str) -> Optional[str]: ...
 
     def describe(self) -> str: ...
 
@@ -95,15 +95,21 @@ class RedisBroker:
     def subscribe(self, conversation_id: int) -> "RedisSubscription":
         return RedisSubscription(self._redis, channel_for(conversation_id))
 
-    async def issue_ticket(self, customer_id: int) -> str:
+    async def issue_ticket(self, actor: str) -> str:
+        """`actor` is "customer:43" or "admin:7".
+
+        The ticket carries WHO it is for, not just which id — an admin and a
+        customer can hold the same numeric id in their own tables, and a ticket
+        that only said "7" would let one open the other's socket.
+        """
         ticket = secrets.token_urlsafe(32)
         await self._redis.set(
-            f"{TICKET_PREFIX}{ticket}", str(customer_id),
+            f"{TICKET_PREFIX}{ticket}", actor,
             ex=settings.chat_ticket_ttl_seconds,
         )
         return ticket
 
-    async def redeem_ticket(self, ticket: str) -> Optional[int]:
+    async def redeem_ticket(self, ticket: str) -> Optional[str]:
         if not ticket:
             return None
         try:
@@ -115,7 +121,7 @@ class RedisBroker:
                 pipe.get(f"{TICKET_PREFIX}{ticket}")
                 pipe.delete(f"{TICKET_PREFIX}{ticket}")
                 value, _ = await pipe.execute()
-        return int(value) if value else None
+        return value or None
 
     async def mark_online(self, actor: str, ttl: int = 60) -> None:
         """Presence with a TTL, refreshed by heartbeat.
@@ -186,7 +192,7 @@ class InProcessBroker:
 
     def __init__(self) -> None:
         self._queues: dict[int, set[asyncio.Queue]] = {}
-        self._tickets: dict[str, int] = {}
+        self._tickets: dict[str, str] = {}
         self._online: set[str] = set()
         logger.warning(
             "chat: REDIS_URL is not set — using the in-process broker. This is "
@@ -195,18 +201,34 @@ class InProcessBroker:
         )
 
     async def publish(self, conversation_id: int, payload: dict[str, Any]) -> None:
+        """Round-trips through JSON, exactly as RedisBroker does.
+
+        THIS IS NOT WASTE. It used to hand the dict straight to the queue, which
+        meant the fallback accepted payloads Redis would reject — and on
+        2026-09-07 that hid a real bug all the way into production: a
+        `model_dump()` carrying datetime objects passed every one of 110 tests
+        against this broker and then raised
+        `TypeError: Object of type datetime is not JSON serializable` on the
+        first live send, storing the message, acking it, and broadcasting
+        nothing.
+
+        A development stand-in that is more permissive than the real thing is
+        not a stand-in; it is a way of not testing. The cost is one serialise
+        per publish on a laptop.
+        """
+        encoded = json.dumps(payload)
         for queue in list(self._queues.get(conversation_id, ())):
-            queue.put_nowait(payload)
+            queue.put_nowait(json.loads(encoded))
 
     def subscribe(self, conversation_id: int) -> "InProcessSubscription":
         return InProcessSubscription(self._queues, conversation_id)
 
-    async def issue_ticket(self, customer_id: int) -> str:
+    async def issue_ticket(self, actor: str) -> str:
         ticket = secrets.token_urlsafe(32)
-        self._tickets[ticket] = customer_id
+        self._tickets[ticket] = actor
         return ticket
 
-    async def redeem_ticket(self, ticket: str) -> Optional[int]:
+    async def redeem_ticket(self, ticket: str) -> Optional[str]:
         # dict.pop is atomic under the GIL, which gives the same single-use
         # guarantee GETDEL gives across processes.
         return self._tickets.pop(ticket, None) if ticket else None

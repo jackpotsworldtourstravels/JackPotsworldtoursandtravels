@@ -707,6 +707,50 @@ def _run(customer_id: int) -> int:
         str(received),
     )
 
+    # THE REGRESSION THAT REACHED PRODUCTION ON 2026-09-07.
+    # A published payload must be JSON-serialisable, because Redis carries
+    # bytes. The message envelope is built by model_dump(), which returns real
+    # datetime objects unless mode="json" is asked for — and the in-process
+    # broker used to accept them happily, so 110 tests passed and every live
+    # send then died with "Object of type datetime is not JSON serializable",
+    # after storing and acking the message. Both brokers serialise now, and
+    # this asserts the shape they must accept.
+    import datetime as _dt  # noqa: PLC0415
+
+    from app.schemas.customer_chat import ChatMessageResponse  # noqa: PLC0415
+
+    sample = ChatMessageResponse(
+        message_id=1, conversation_id=1, sender_type="customer",
+        body="probe", message_type="text",
+        created_at=_dt.datetime.now(_dt.timezone.utc),
+        read_at=_dt.datetime.now(_dt.timezone.utc),
+    )
+    dumped = sample.model_dump(mode="json")
+    try:
+        json.dumps({"event": "receive_message", "data": dumped})
+        serialisable = True
+    except TypeError:
+        serialisable = False
+    check("a message payload is JSON-serialisable as published", serialisable)
+    check(
+        "timestamps leave the model as strings, not datetimes",
+        isinstance(dumped["created_at"], str),
+        f"created_at is {type(dumped['created_at']).__name__}",
+    )
+
+    async def _publish_a_real_message():
+        """Publish the actual envelope shape through the actual broker."""
+        try:
+            await broker.publish(conversation_id_for_ws, {
+                "event": "receive_message", "data": dumped, "internal": False,
+            })
+            return None
+        except Exception as exc:  # noqa: BLE001
+            return repr(exc)
+
+    failure = asyncio.run(_publish_a_real_message())
+    check("publishing a real message envelope does not raise", failure is None, failure or "")
+
     # == 15. the WebSocket gateway (slice 3) ==
     print("\n== the WebSocket gateway ==")
     try:
@@ -720,8 +764,12 @@ def _run(customer_id: int) -> int:
 
     ws_base = BASE.replace("https://", "wss://").replace("http://", "ws://")
 
+    ws_partial: dict = {}
+
     async def _ws_checks():
-        results = {}
+        # Populated in place, not returned, so that a raise part-way through
+        # still leaves the caller able to see whether the socket ever connected.
+        results = ws_partial
 
         # A bad ticket must be refused, and refused with the code that says so.
         try:
@@ -809,11 +857,30 @@ def _run(customer_id: int) -> int:
                     results["unknown_event_error"] = None
         return results
 
+    # A SKIP AND A FAILURE ARE NOT THE SAME THING, and conflating them cost a
+    # production bug. This used to treat ANY exception as "could not reach the
+    # WebSocket" and skip the whole section — so when a real defect made the
+    # gateway stop answering, the timeout was reported as an absent dependency
+    # and the run went green.
+    #
+    # Not being able to CONNECT is a skip. Connecting and then not behaving is a
+    # failure, and is reported as one.
+    ws_results, ws_error = {}, None
     try:
         ws_results = asyncio.run(_ws_checks())
     except Exception as exc:  # noqa: BLE001
-        print(f"  SKIP  the WebSocket could not be reached: {exc!r}")
+        ws_error = exc
+
+    ws_results = ws_results or ws_partial
+    reached = bool(ws_partial.get("ticket_status") == 200)
+    if ws_error is not None and not reached:
+        print(f"  SKIP  the WebSocket could not be reached: {ws_error!r}")
         return check.report()
+    if ws_error is not None:
+        check(
+            "the gateway answered every step after connecting",
+            False, f"connected, then failed: {ws_error!r}",
+        )
 
     check("a rubbish ticket is refused", ws_results.get("bad_ticket_closed") is True)
     check(
@@ -869,6 +936,159 @@ def _run(customer_id: int) -> int:
             str(sorted(labels)),
         )
 
+
+
+    # == 17. the agent console (slice 4) ==
+    #
+    # The customer side is scoped by the caller's own id; this side cannot be,
+    # because an agent's job is reading other people's conversations. So the
+    # thing worth testing here is the OPPOSITE property: that the role gate is
+    # the only thing standing between a customer token and every conversation in
+    # the system.
+    print("\n== the agent console ==")
+    # config.login() drives the REAL two-step OTP flow and waits out the login
+    # rate limit, which a hand-rolled POST here would trip on a full suite run.
+    from config import ADMIN, H, login as portal_login  # noqa: PLC0415
+
+    try:
+        admin_token = portal_login(*ADMIN)
+    except Exception as exc:  # noqa: BLE001 - a missing admin is a skip, not a failure
+        print(f"  SKIP  could not sign in as admin: {exc!r}")
+        return check.report()
+    if not admin_token:
+        print("  SKIP  no admin session — set JPW_ADMIN_EMAIL / JPW_ADMIN_PASSWORD")
+        return check.report()
+    admin_auth = H(admin_token)
+    aurl = lambda p: f"{BASE}/api/admin/chat{p}"  # noqa: E731
+
+    # A CUSTOMER TOKEN MUST NOT REACH THE AGENT CONSOLE. This is the check that
+    # matters most in this section: the customer endpoints are scoped, so a leak
+    # there exposes one conversation; a leak here exposes all of them.
+    r = requests.get(aurl("/conversations"), headers=auth, timeout=8)
+    check(
+        "a CUSTOMER token cannot read the agent queue",
+        r.status_code in (401, 403), f"got {r.status_code}",
+    )
+    r = requests.get(aurl("/conversations"), timeout=8)
+    check("the agent queue requires a session", r.status_code in (401, 403), f"got {r.status_code}")
+
+    r = requests.get(aurl("/conversations"), headers=admin_auth, timeout=8)
+    check("an admin can read the queue", r.status_code == 200, r.text[:180])
+    if r.status_code != 200:
+        return check.report()
+    queue = r.json()
+    check(
+        "the queue returns counts and conversations together",
+        set(queue) == {"counts", "conversations"}, str(sorted(queue)),
+    )
+    check(
+        "counts cover every status",
+        set(queue["counts"]) == {"waiting", "active", "resolved", "closed"},
+        str(sorted(queue["counts"])),
+    )
+
+    # The conversation this script has been building all along must be in there.
+    r = requests.get(
+        aurl("/conversations"), headers=admin_auth,
+        params={"q": str(conversation_id_for_ws)}, timeout=8,
+    )
+    found = [c for c in r.json()["conversations"]
+             if c["conversation_id"] == conversation_id_for_ws]
+    check("search by conversation id finds it", len(found) == 1, str(len(found)))
+    if found:
+        check(
+            "the queue row carries the customer, not just an id",
+            found[0].get("customer_email") is not None,
+            str(found[0]),
+        )
+
+    r = requests.get(aurl(f"/conversations/{conversation_id_for_ws}"), headers=admin_auth, timeout=8)
+    check("an admin can open a thread", r.status_code == 200, r.text[:150])
+    thread = r.json()
+
+    # An internal note was written in section 13. The agent must see it; the
+    # customer must not. Section 13 already proved the second half.
+    note_visible = any("do not show" in (m.get("body") or "") for m in thread["messages"])
+    check("the agent DOES see the internal note the customer cannot", note_visible)
+
+    r = requests.get(aurl("/conversations/99999999"), headers=admin_auth, timeout=8)
+    check("a missing conversation is a 404", r.status_code == 404, f"got {r.status_code}")
+
+    # Replying, and the note that must not be delivered.
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/messages"),
+        json={"body": "Agent reply over REST"}, headers=admin_auth, timeout=8,
+    )
+    check("an agent can reply", r.status_code == 201, r.text[:180])
+    check("the reply is attributed to the agent", (r.json() or {}).get("sender_type") == "admin")
+
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/messages"),
+        json={"body": "note: escalate to finance", "is_internal": True},
+        headers=admin_auth, timeout=8,
+    )
+    check("an agent can leave an internal note", r.status_code == 201, r.text[:150])
+
+    customer_view = requests.get(
+        f"{BASE}/api/customer/chat/messages", params={"limit": 100}, headers=auth, timeout=8,
+    ).json()
+    bodies = [m.get("body") for m in customer_view]
+    check("the agent's reply reaches the customer", "Agent reply over REST" in bodies)
+    check(
+        "the internal note does NOT reach the customer",
+        not any("escalate to finance" in (b or "") for b in bodies),
+        str(bodies[-3:]),
+    )
+
+    # Status machine, through the API this time.
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/status"),
+        json={"status": "closed"}, headers=admin_auth, timeout=8,
+    )
+    check("an agent can close a conversation", r.status_code == 200, r.text[:150])
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/status"),
+        json={"status": "active"}, headers=admin_auth, timeout=8,
+    )
+    check(
+        "closed is terminal through the API too",
+        r.status_code == 400, f"got {r.status_code}",
+    )
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/status"),
+        json={"status": "banana"}, headers=admin_auth, timeout=8,
+    )
+    check("an unknown status is refused by the schema", r.status_code == 422, f"got {r.status_code}")
+
+    r = requests.get(aurl("/agents"), headers=admin_auth, timeout=8)
+    check("the transfer target list loads", r.status_code == 200, r.text[:150])
+    check(
+        "it contains only admins",
+        all(a["role"] in ("admin", "super_admin") for a in r.json()),
+        str(r.json()[:3]),
+    )
+
+    r = requests.post(aurl("/ws-ticket"), headers=admin_auth, timeout=8)
+    check("an agent can get a socket ticket", r.status_code == 200, r.text[:120])
+    agent_ticket = r.json().get("ticket") if r.status_code == 200 else None
+
+    # THE CROSS-NAMESPACE CHECK. Both tables number from 1, so an admin ticket
+    # presented at the customer socket must be refused on TYPE, not just id.
+    if agent_ticket:
+        async def _wrong_door():
+            try:
+                async with ws_connect(
+                    f"{ws_base}/api/customer/chat/ws?ticket={agent_ticket}"
+                ) as ws:
+                    await asyncio.wait_for(ws.recv(), timeout=4)
+                return False
+            except Exception:
+                return True
+
+        check(
+            "an ADMIN ticket cannot open a CUSTOMER socket",
+            asyncio.run(_wrong_door()),
+        )
 
     # == 16. TWO PROCESSES, ONE CONVERSATION ==
     #

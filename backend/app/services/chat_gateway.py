@@ -187,7 +187,7 @@ class ChatConnection:
             )
             chat.mark_delivered(db, [message.message_id])
             db.commit()
-            payload = ChatMessageResponse.for_customer(message).model_dump()
+            payload = ChatMessageResponse.for_customer(message).model_dump(mode="json")
 
         # The sender gets an ack keyed to their client_msg_id so an optimistic
         # bubble can be reconciled; everyone on the channel gets the message.
@@ -262,6 +262,25 @@ class ChatConnection:
     }
 
 
+def _parse_actor(actor: Optional[str], expected: str) -> Optional[int]:
+    """"customer:43" -> 43, but only when `expected` matches.
+
+    THE TYPE IS CHECKED, NOT JUST THE ID. Both `customers` and `users` number
+    from 1, so a ticket that only said "7" would let an admin open the socket of
+    whichever customer happens to share their id. The actor string is what keeps
+    the two namespaces apart.
+    """
+    if not actor or ":" not in actor:
+        return None
+    kind, _, raw = actor.partition(":")
+    if kind != expected:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
 async def serve_customer(websocket: WebSocket, ticket: str) -> None:
     """Accept, authenticate by ticket, then hand over to ChatConnection.
 
@@ -271,7 +290,7 @@ async def serve_customer(websocket: WebSocket, ticket: str) -> None:
     difference between rejecting a flood and hosting it.
     """
     broker = get_broker()
-    customer_id = await broker.redeem_ticket(ticket)
+    customer_id = _parse_actor(await broker.redeem_ticket(ticket), "customer")
     if customer_id is None:
         await websocket.close(code=CLOSE_BAD_TICKET)
         return
@@ -299,6 +318,196 @@ async def publish_admin_message(conversation_id: int, message, *, internal: bool
     broker = get_broker()
     await broker.publish(conversation_id, {
         "event": "receive_message",
-        "data": ChatMessageResponse.for_customer(message).model_dump(),
+        "data": ChatMessageResponse.for_customer(message).model_dump(mode="json"),
         "internal": internal,
     })
+
+
+# ---------------------------------------------------------------------------
+# The agent side (slice 4)
+# ---------------------------------------------------------------------------
+class AgentConnection:
+    """One agent's socket.
+
+    DIFFERENT FROM ChatConnection IN THE ONE WAY THAT MATTERS: an agent moves
+    between conversations. A customer has exactly one, opened for them at
+    connect and held for the life of the socket. An agent opens a thread,
+    answers it, and moves to the next — so this subscribes and unsubscribes per
+    `join_chat` / `leave_chat`, holding one pump task per open thread.
+
+    Unsubscribing on leave is not tidiness: an agent who worked forty
+    conversations in a shift would otherwise hold forty Redis subscriptions and
+    receive every message on all of them for as long as they stayed signed in.
+
+    It also SEES internal notes, which the customer's pump drops.
+    """
+
+    def __init__(self, websocket: WebSocket, admin_id: int, admin_name: str):
+        self.ws = websocket
+        self.admin_id = admin_id
+        self.admin_name = admin_name
+        self.broker = get_broker()
+        self.limiter = _RateLimiter(
+            settings.chat_rate_burst, float(settings.chat_rate_window_seconds),
+        )
+        self._pumps: dict[int, asyncio.Task] = {}
+
+    async def send(self, event: str, data: Any) -> None:
+        await self.ws.send_text(_envelope(event, data))
+
+    async def fail(self, code: str, message: str) -> None:
+        await self.send("error", {"code": code, "message": message})
+
+    async def run(self) -> None:
+        await self.broker.mark_online(f"admin:{self.admin_id}")
+        try:
+            await self._read_loop()
+        finally:
+            for task in self._pumps.values():
+                task.cancel()
+            await self.broker.mark_offline(f"admin:{self.admin_id}")
+
+    async def _read_loop(self) -> None:
+        while True:
+            try:
+                raw = await self.ws.receive_text()
+            except WebSocketDisconnect:
+                return
+            try:
+                frame = json.loads(raw)
+                event, data = frame.get("event"), frame.get("data") or {}
+            except (ValueError, AttributeError):
+                await self.fail("bad_frame", "Expected an {event, data} object")
+                continue
+            try:
+                await self._dispatch(event, data)
+            except chat.ChatNotFound:
+                await self.fail("not_found", "No such conversation")
+            except chat.ChatError as exc:
+                await self.fail("rejected", str(exc))
+            except Exception:
+                logger.exception("chat: agent handler %s failed", event)
+                await self.fail("server_error", "Something went wrong handling that.")
+
+    async def _dispatch(self, event: str, data: dict) -> None:
+        if event == "join_chat":
+            await self._join(int(data.get("conversation_id", 0)))
+        elif event == "leave_chat":
+            self._leave(int(data.get("conversation_id", 0)))
+        elif event == "send_message":
+            await self._send_message(data)
+        elif event == "typing_start":
+            await self._typing(data, True)
+        elif event == "typing_stop":
+            await self._typing(data, False)
+        elif event == "message_read":
+            await self._mark_read(data)
+        elif event == "ping":
+            await self.broker.mark_online(f"admin:{self.admin_id}")
+            await self.send("pong", {"t": int(time.time())})
+        else:
+            await self.fail("unknown_event", f"No such event: {event}")
+
+    async def _join(self, conversation_id: int) -> None:
+        if conversation_id in self._pumps:
+            return
+        with SessionLocal() as db:
+            chat.get_for_admin(db, conversation_id)      # raises if it is not real
+        subscription = self.broker.subscribe(conversation_id)
+
+        async def pump():
+            async with subscription as stream:
+                async for payload in stream:
+                    await self.ws.send_text(json.dumps(payload, default=str))
+
+        self._pumps[conversation_id] = asyncio.create_task(pump())
+        await self.send("joined", {"conversation_id": conversation_id})
+
+    def _leave(self, conversation_id: int) -> None:
+        task = self._pumps.pop(conversation_id, None)
+        if task:
+            task.cancel()
+
+    async def _send_message(self, data: dict) -> None:
+        if not self.limiter.allow():
+            await self.fail("rate_limited", "Too many messages.")
+            return
+        conversation_id = int(data.get("conversation_id", 0))
+        with SessionLocal() as db:
+            conversation = chat.get_for_admin(db, conversation_id)
+            message = chat.post_admin_message(
+                db, conversation,
+                admin_id=self.admin_id, admin_name=self.admin_name,
+                body=data.get("body"),
+                is_internal=bool(data.get("is_internal")),
+            )
+            db.commit()
+            payload = ChatMessageResponse.for_customer(message).model_dump(mode="json")
+            internal = message.is_internal
+        # `internal` rides on the envelope, not inside the message: the
+        # customer's pump reads it and drops the frame before the body is
+        # written to their socket.
+        await self.broker.publish(conversation_id, {
+            "event": "receive_message", "data": payload, "internal": internal,
+        })
+
+    async def _typing(self, data: dict, typing: bool) -> None:
+        await self.broker.publish(int(data.get("conversation_id", 0)), {
+            "event": "typing",
+            "data": {
+                "conversation_id": data.get("conversation_id"),
+                "actor": "admin",
+                "is_typing": typing,
+            },
+        })
+
+    async def _mark_read(self, data: dict) -> None:
+        conversation_id = int(data.get("conversation_id", 0))
+        up_to = data.get("up_to_message_id")
+        if not isinstance(up_to, int):
+            await self.fail("bad_frame", "up_to_message_id must be an integer")
+            return
+        with SessionLocal() as db:
+            conversation = chat.get_for_admin(db, conversation_id)
+            marked = chat.mark_read(
+                db, conversation, reader="admin", up_to_message_id=up_to,
+            )
+            db.commit()
+        await self.send("read_ack", {"marked": marked})
+        await self.broker.publish(conversation_id, {
+            "event": "read_receipt",
+            "data": {
+                "conversation_id": conversation_id,
+                "up_to_message_id": up_to,
+                "by": "admin",
+            },
+        })
+
+
+async def serve_agent(websocket: WebSocket, ticket: str) -> None:
+    broker = get_broker()
+    admin_id = _parse_actor(await broker.redeem_ticket(ticket), "admin")
+    if admin_id is None:
+        await websocket.close(code=CLOSE_BAD_TICKET)
+        return
+
+    with SessionLocal() as db:
+        # Imported here rather than at module scope: this module belongs to the
+        # B2C tree, and a top-level models_v2 import would make the B2B side a
+        # hard dependency of the customer chat path.
+        from app.models_v2 import User
+        user = db.get(User, admin_id)
+        name = user.full_name if user else "Support"
+
+    await websocket.accept()
+    connection = AgentConnection(websocket, admin_id, name)
+    try:
+        await connection.run()
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.exception("chat: agent socket failed for user %s", admin_id)
+        try:
+            await websocket.close(code=1011)
+        except RuntimeError:
+            pass

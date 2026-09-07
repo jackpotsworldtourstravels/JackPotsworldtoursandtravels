@@ -205,7 +205,10 @@ async def ws_ticket(
     that presents it (see `redeem_ticket`).
     """
     broker = get_broker()
-    ticket = await broker.issue_ticket(customer.customer_id)
+    # "customer:43", not "43". Both `customers` and `users` number from 1, and a
+    # ticket that carried only the number would let an admin's ticket open the
+    # socket of whichever customer shares their id.
+    ticket = await broker.issue_ticket(f"customer:{customer.customer_id}")
     return {"ticket": ticket, "expires_in": settings.chat_ticket_ttl_seconds}
 
 

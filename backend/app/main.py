@@ -19,6 +19,7 @@ from app.routers import (
     analytics,
     assistant,
     auth,
+    admin_chat,
     booking_ops,
     change_requests,
     customer_account,
@@ -321,6 +322,10 @@ app.include_router(customer_account.router)
 # Live chat (CR-9). Customer side only in slice 2; the admin queue and the
 # WebSocket gateway land in slices 3-4.
 app.include_router(customer_chat.router)
+# The agent side of live chat (CR-9 slice 4). Gated by get_current_admin on
+# every route: an agent reads other people's conversations by definition, so
+# there is no per-caller scoping to apply here, only a role check.
+app.include_router(admin_chat.router)
 # The real B2C hotel system (Phase 2): its own tables, its own booking
 # reference series (JPH######) — see migration 0055. Same customer scope as
 # the flight booking flow; the catalogue routes (`/hotels`, `/hotels/{id}`,
