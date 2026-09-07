@@ -13,7 +13,7 @@
 python tests/run_all.py
 ```
 
-**22 scripts must pass.** The suite runs against a live backend and a real PostgreSQL database; a
+**36 scripts must pass.** The suite runs against a live backend and a real PostgreSQL database; a
 green run is the release gate, not a formality. If a script is red, do not deploy — every one of
 them exists because something was once wrong in that exact place.
 
@@ -31,20 +31,100 @@ Two properties of the suite worth knowing:
 cd backend && alembic upgrade head
 ```
 
-Head is `0037_topup_credit_once`. **37 migrations, single chain, no branches** — asserted by
-`verify_m9.py`.
+Head is `0063_booking_confirmed_notif`. **64 migrations, one head, one base** — asserted by
+`verify_m9.py`, which checks `script.get_heads()` and `get_bases()` and walks base → heads.
 
-**A clean database migrates cleanly.** Verified for M10 against a throwaway database: empty → head,
-all 37, no errors.
+### The chain is not linear, and the numbers lie
+
+There is one fork and one merge:
+
+```
+... 0052 ── 0053_customer_flight_booking ─┬─ 0054 ─ 0055 ─ 0056 ─┐
+                                          │                      ├─ 0057_merge_ocr_customer_heads ─ 0058 ... 0063
+                                          └─ 0042 ─ 0043 ────────┘
+```
+
+**`0042_passport_ocr` and `0043_passport_details` run AFTER `0053`, not before it.** Passport OCR
+forked from `0053` and took numbers that had been reserved earlier, so the filename number is not
+the apply order. Reading the directory listing top to bottom will tell you the wrong sequence. The
+production upgrade log of 2026-09-05 shows the real one:
+
+```
+0052_soft_delete_email_reuse -> 0044_customer_portal -> 0053_customer_flight_booking
+  -> 0054 -> 0055 -> 0056, and 0053 -> 0042 -> 0043
+  -> 0057_merge_ocr_customer_heads -> 0058 -> ... -> 0063
+```
+
+**Never infer order from the number. Run `alembic history` and read the arrows.**
+
+`verify_m9.py` does *not* assert "no branches" — it cannot, because the merge point is a legitimate
+branchpoint. Its own comments spell out that a naive parser miscounts this chain as three heads and
+two bases. What it asserts is the thing that matters: one head, one base, everything reachable.
 
 ### Rolling a migration back
 
 ```bash
 cd backend && alembic downgrade -1        # one step
-cd backend && alembic downgrade 0036_wallet_ledger
+cd backend && alembic downgrade 0052_soft_delete_email_reuse
 ```
 
-**Verified: `head → 0023 → head` is clean**, all 14 modern migrations, both directions.
+**Both directions are verified on production, not on a throwaway:**
+
+- **`0063 → 0052`** — the rollback of 2026-09-03 (`44f5cd1`), 14 migrations down, clean.
+- **`0052 → 0063`** — the re-release of 2026-09-05 (`8ea1ec1`), the same 14 up, clean, with the
+  wallet ledger reconciled afterwards (see §2.1 below).
+
+> ### A DOWNGRADE MUST RUN FROM THE IMAGE THAT STILL HAS THE REVISIONS, AND IT MUST RUN FIRST
+>
+> This is the rule the 2026-09-03 rollback was written to teach, and it is not obvious.
+>
+> `deploy/docker-entrypoint.sh` runs `alembic upgrade head` on every boot. If you ship an image that
+> no longer contains revisions the database is stamped at, that image **cannot resolve the stamp**:
+> it dies on start, behind a 502, while every deploy command exits 0. Only the *outgoing* image
+> holds those revisions and can run their `downgrade()`.
+>
+> So the order is forced: **downgrade the database with the image you are removing, then ship the
+> replacement.** Never the other way round.
+>
+> The mirror of this on the way up is the pleasant case — the entrypoint applies whatever is missing
+> with no manual step at all, which is exactly what happened on 2026-09-05. Take an RDS snapshot
+> first regardless; `redeploy.sh` does not, and nothing else will.
+
+> **Do not `alembic downgrade base`.** It fails at `0022_merchant_user_fields`, which references
+> `partner_users` — a legacy table `0023_nine_table_redesign` drops and does not restore. This is
+> **accepted, not fixed**: going below 0023 would destroy the entire current schema, so it is not a
+> path anyone can take in production, and building a restore for a 43-table design that no longer
+> exists would be work with no consumer. **0023 is the floor.**
+
+### 2.1 After any migration that touches money
+
+Six SQL checks, read-only, run inside the container. `tests/` is not copied into the image, so
+`verify_m9.py` cannot run there — but its money-drift section is just SQL and the app's own session
+is available:
+
+```bash
+docker compose -f deploy/docker-compose.yml --project-directory deploy exec -T app python -c "
+from sqlalchemy import text
+from app.database.session import SessionLocal
+db = SessionLocal()
+for label, sql in [
+ ('cached balance == ledger', 'SELECT count(*) FROM merchants m WHERE m.wallet_balance <> COALESCE((SELECT SUM(w.credit - w.debit) FROM wallet_transactions w WHERE w.merchant_id = m.merchant_id), 0)'),
+ ('balance chain unbroken', 'SELECT count(*) FROM (SELECT balance_before, LAG(balance_after) OVER (PARTITION BY merchant_id ORDER BY txn_id) prev FROM wallet_transactions) c WHERE prev IS NOT NULL AND balance_before <> prev'),
+ ('no booking billed twice', \"SELECT count(*) FROM (SELECT request_id FROM wallet_transactions WHERE txn_type='booking_debit' AND request_id IS NOT NULL GROUP BY request_id HAVING count(*)>1) x\"),
+ ('no top-up credited twice', 'SELECT count(*) FROM (SELECT topup_id FROM wallet_transactions WHERE topup_id IS NOT NULL GROUP BY topup_id HAVING count(*)>1) x'),
+ ('no row both debit and credit', 'SELECT count(*) FROM wallet_transactions WHERE debit > 0 AND credit > 0'),
+ ('no row moves nothing', 'SELECT count(*) FROM wallet_transactions WHERE debit = 0 AND credit = 0'),
+]:
+    n = db.execute(text(sql)).scalar()
+    print(('PASS ' if n == 0 else 'FAIL ') + label + ('' if n == 0 else f'  ({n})'))
+db.close()"
+```
+
+All six must read `PASS`. This is the admin screen's "drift must read 0.00", plus five things that
+screen does not show. **Verified `PASS` on 2026-09-05** after the `0052 → 0063` re-release.
+
+If any of them fails, **do not reach for a downgrade** — see `0036_wallet_ledger` below, which will
+refuse over live balances anyway. Forward fixes only.
 
 > **Do not `alembic downgrade base`.** It fails at `0022_merchant_user_fields`, which references
 > `partner_users` — a legacy table `0023_nine_table_redesign` drops and does not restore. This is
@@ -59,6 +139,11 @@ cd backend && alembic downgrade 0036_wallet_ledger
   deliberate: a negative balance is real money owed, and a rollback must stop rather than silently
   pretend otherwise. Settle those accounts first, then downgrade.
 - **`0037_topup_credit_once`** is a plain index; it drops safely.
+
+Still two, after the B2C release. All fourteen of `0042`–`0044` and `0053`–`0063` were checked for
+downgrades that restore a constraint or raise: none do, and the `0063 → 0052` rollback of
+2026-09-03 ran the whole set down without incident. **`0036` remains the only migration that will
+stop you**, and it stops you for the right reason.
 
 ## 3. Deploying
 
