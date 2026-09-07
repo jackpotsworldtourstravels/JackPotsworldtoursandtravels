@@ -87,7 +87,7 @@ const AccountCenter = (function () {
         <div class="acct-tab" data-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</div>
         <div class="acct-tab" data-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</div>
         <div class="acct-tab" data-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</div>
-        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Tickets</div>
+        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Center</div>
         <div class="acct-tab" data-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</div>
         <div class="acct-tab" data-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"/></svg>Settings</div>
       </nav>
@@ -146,25 +146,14 @@ const AccountCenter = (function () {
           </div>
         </div>
 
+        <!-- CR-9: Support Center is a live chat, not a ticket queue. The form
+             that used to sit here asked for a subject, a description and a
+             priority before a customer could say anything at all; the brief
+             removes every one of those. LiveChat.mountInto() docks the same
+             panel the floating widget uses, so there is one chat in two places
+             rather than two chats. -->
         <div class="acct-panel" id="acctPanel-support">
-          <h2>Raise a support ticket</h2>
-          <form id="acctTicketForm" style="margin-bottom:26px;">
-            <div class="acct-form-field"><label>Subject</label><input id="acctTicketSubject" type="text" required maxlength="200"></div>
-            <div class="acct-form-field" style="max-width:none;"><label>Description</label><input id="acctTicketDescription" type="text" required maxlength="4000"></div>
-            <div class="acct-form-field">
-              <label>Priority</label>
-              <select id="acctTicketPriority">
-                <option value="low">Low</option>
-                <option value="normal" selected>Normal</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-            <button type="submit" class="btn btn-coral">Submit Ticket</button>
-            <div class="acct-msg" id="acctTicketMsg"></div>
-          </form>
-          <h2>My support tickets</h2>
-          <div id="acctTicketsList"><div class="acct-empty">Loading…</div></div>
+          <div id="acctChatMount"><div class="acct-empty">Loading…</div></div>
         </div>
 
         <div class="acct-panel" id="acctPanel-reviews">
@@ -250,6 +239,12 @@ function openAccountCenter(tab) {
 function closeAccountCenter() {
   acctModalOverlay.classList.remove('open');
   document.body.style.overflow = '';
+  /* Hand the chat panel back to the floating widget. It is ONE panel that was
+     moved in here, not a copy — leaving it inside a hidden modal would take the
+     floating launcher's own target away with it. */
+  if (typeof LiveChat !== 'undefined' && LiveChat.undock) LiveChat.undock();
+  const mount = document.getElementById('acctChatMount');
+  if (mount) delete mount.dataset.mounted;
 }
 document.getElementById('acctModalCloseBtn').addEventListener('click', closeAccountCenter);
 acctModalOverlay.addEventListener('click', e => { if (e.target === acctModalOverlay) closeAccountCenter(); });
@@ -271,7 +266,7 @@ function loadAcctTab(name) {
   if (name === 'wishlist') return loadAcctWishlist();
   if (name === 'payments') return loadAcctPayments();
   if (name === 'notifications') return loadAcctNotifications();
-  if (name === 'support') return loadAcctSupportTickets();
+  if (name === 'support') return loadAcctSupportCenter();
   if (name === 'reviews') return loadAcctReviews();
 }
 
@@ -967,47 +962,25 @@ function openAcctReviewEdit(reviewId, rating, comment) {
   });
 }
 
-/* ---------- Support Tickets ---------- */
-async function loadAcctSupportTickets() {
-  const container = document.getElementById('acctTicketsList');
-  try {
-    const { data } = await axios.get(`${API_BASE}/api/customer/support-tickets`, { headers: customerHeaders() });
-    if (!data.length) {
-      container.innerHTML = '<div class="acct-empty">No support tickets yet.</div>';
-      return;
-    }
-    container.innerHTML = data.map(t => `
-      <div class="acct-row">
-        <div class="ar-main">
-          <div class="ar-title" style="text-transform:none;">${escapeHtml(t.subject)}</div>
-          <div class="ar-sub">${escapeHtml(t.description)}</div>
-          <div class="ar-sub">Priority: ${escapeHtml(t.priority)} · Raised ${fmtDate(t.created_at)}</div>
-        </div>
-        <span class="badge ${t.status}">${escapeHtml(t.status.replace('_', ' '))}</span>
-      </div>
-    `).join('');
-  } catch (err) {
-    container.innerHTML = '<div class="acct-empty">Failed to load support tickets.</div>';
+/* ---------- Support Center (CR-9 live chat) ---------- */
+/* The ticket loader and the ticket form handler that stood here are gone. Both
+   called the customer ticket endpoints, which 0065 retires along with their
+   tables.
+
+   The chat is mounted ONCE and left mounted: re-mounting on every tab visit
+   would discard the loaded thread and re-fetch it, so returning to the tab
+   would flash a skeleton over a conversation the reader had already scrolled. */
+function loadAcctSupportCenter() {
+  const mount = document.getElementById('acctChatMount');
+  if (!mount) return;
+  if (typeof LiveChat === 'undefined') {
+    mount.innerHTML = '<div class="acct-empty">Chat is unavailable right now.</div>';
+    return;
   }
+  if (mount.dataset.mounted) return;
+  mount.dataset.mounted = '1';
+  LiveChat.mountInto(mount);
 }
-document.getElementById('acctTicketForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const msg = document.getElementById('acctTicketMsg');
-  try {
-    await axios.post(`${API_BASE}/api/customer/support-tickets`, {
-      subject: document.getElementById('acctTicketSubject').value,
-      description: document.getElementById('acctTicketDescription').value,
-      priority: document.getElementById('acctTicketPriority').value,
-    }, { headers: customerHeaders() });
-    msg.textContent = 'Ticket submitted — our support team will get back to you.';
-    msg.className = 'acct-msg success';
-    e.target.reset();
-    loadAcctSupportTickets();
-  } catch (err) {
-    msg.textContent = apiErrorText(err, 'Failed to submit ticket.');
-    msg.className = 'acct-msg error';
-  }
-});
 
 loadUpcomingJourney();
 

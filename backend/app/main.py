@@ -24,6 +24,7 @@ from app.routers import (
     customer_account,
     customer_auth,
     customer_bookings,
+    customer_chat,
     customer_hotel_bookings,
     customer_package_bookings,
     customer_profile,
@@ -317,6 +318,9 @@ app.include_router(customer_bookings.router)
 # tickets. Same customer scope; `GET /reviews` (by item) is the one public
 # route in it, for the same reason the catalogue above is public.
 app.include_router(customer_account.router)
+# Live chat (CR-9). Customer side only in slice 2; the admin queue and the
+# WebSocket gateway land in slices 3-4.
+app.include_router(customer_chat.router)
 # The real B2C hotel system (Phase 2): its own tables, its own booking
 # reference series (JPH######) — see migration 0055. Same customer scope as
 # the flight booking flow; the catalogue routes (`/hotels`, `/hotels/{id}`,

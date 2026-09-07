@@ -144,6 +144,13 @@ SUITE = [
     # "what covers the website" should find both in one place.
     ("verify_footer.py",
      "Footer: both copies identical, every link resolves, no placeholder or withdrawn service"),
+    # Serverless like verify_cr4a.py - it drives customer_chat_service directly,
+    # because CR-9 slice 1 has no HTTP surface yet. Three of its sections run
+    # real threads against real sessions: the conversation, the message and the
+    # claim each have a race that only a concurrent test can prove closed.
+    # Skips with exit 0 when 0064 is not applied.
+    ("verify_live_chat.py",
+     "CR-9: one conversation per customer, idempotent sends, single-winner claim, internal notes"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.

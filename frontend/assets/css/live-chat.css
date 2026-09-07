@@ -1,0 +1,317 @@
+/* ===========================================================================
+   live-chat.css — the customer chat widget (CR-9, slice 2)
+   ===========================================================================
+   SELF-CONTAINED, for the same reason site-footer.css is. The widget renders on
+   the landing page (main.css), on the service and content pages
+   (service-page.css) and inside the Account Center (account-center.css). Those
+   three do not share a token set, so this file declares its own `--lc-*` and
+   reads nothing from any of them. Drop the <link> on any page and the widget
+   looks the same there.
+
+   IT ALSO RENDERS IN TWO PLACES AT ONCE, CONCEPTUALLY: floating over a page,
+   and docked inside Support Center. That is one component with a modifier
+   (`.lc-docked`), never two implementations — the brief asks for the same chat
+   in both, and two copies would drift within a release.
+
+   Dark mode follows the site's existing `data-theme` attribute plus the OS
+   preference, using the same guarded pattern service-page.css uses, so the
+   widget matches whichever page it is sitting on.
+   =========================================================================== */
+
+.lc-root {
+  --lc-navy:      #0A2540;
+  --lc-accent:    #FF4D4D;
+  --lc-accent-dk: #E63946;
+  --lc-gold:      #FFB020;
+  --lc-surface:   #FFFFFF;
+  --lc-surface-2: #F1F5F9;
+  --lc-ink:       #0A2540;
+  --lc-muted:     #5B6B82;
+  --lc-line:      rgba(10,37,64,.12);
+  --lc-bubble-in: #F1F5F9;
+  --lc-shadow:    0 24px 60px -20px rgba(10,37,64,.45);
+  --lc-radius:    18px;
+  --lc-ff: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  font-family: var(--lc-ff);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .lc-root {
+    --lc-surface:   #131C2E;
+    --lc-surface-2: #1A2439;
+    --lc-ink:       #E8EEF7;
+    --lc-muted:     #93A3BA;
+    --lc-line:      rgba(232,238,247,.16);
+    --lc-bubble-in: #1A2439;
+  }
+}
+:root[data-theme="dark"] .lc-root {
+  --lc-surface:   #131C2E;
+  --lc-surface-2: #1A2439;
+  --lc-ink:       #E8EEF7;
+  --lc-muted:     #93A3BA;
+  --lc-line:      rgba(232,238,247,.16);
+  --lc-bubble-in: #1A2439;
+}
+
+.lc-root *, .lc-root *::before, .lc-root *::after { box-sizing: border-box; }
+
+/* DEFENSIVE RESET, AND IT IS NOT PARANOIA — IT IS A BUG THIS ALREADY HAD.
+   The panel is a <section> and the composer is a <form>, and this widget renders
+   on pages whose stylesheets it does not control. main.css carries
+   `section { padding: 110px 0 }` for the landing page's layout bands, which
+   silently applied to the panel: 110px of empty space above the header, in the
+   floating widget and the docked one alike.
+
+   So every bare element this component uses is neutralised here. Being
+   self-contained means declaring what you are, not assuming nobody else has an
+   opinion about `section`. */
+.lc-root section,
+.lc-root form,
+.lc-root p,
+.lc-root h2, .lc-root h3 { margin: 0; padding: 0; }
+
+/* ---------------------------------------------------------------------------
+   The launcher
+   --------------------------------------------------------------------------- */
+.lc-launcher {
+  position: fixed; right: 24px; bottom: 24px; z-index: 900;
+  width: 60px; height: 60px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--lc-accent); color: #fff;
+  border: none; cursor: pointer;
+  box-shadow: 0 14px 30px -10px rgba(255,77,77,.6);
+  transition: transform .2s ease, background .2s ease;
+}
+.lc-launcher:hover { background: var(--lc-accent-dk); transform: translateY(-2px); }
+.lc-launcher:focus-visible { outline: 3px solid var(--lc-gold); outline-offset: 3px; }
+.lc-launcher svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; }
+/* Hidden while the panel is open: the panel has its own close control, and two
+   ways to dismiss one thing in the same corner is one too many. */
+.lc-root.lc-open .lc-launcher { display: none; }
+
+.lc-badge {
+  position: absolute; top: -2px; right: -2px; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 11px;
+  background: var(--lc-gold); color: var(--lc-navy);
+  font-size: 12px; font-weight: 800; line-height: 22px; text-align: center;
+  border: 2px solid var(--lc-surface);
+}
+
+/* ---------------------------------------------------------------------------
+   The panel
+   --------------------------------------------------------------------------- */
+.lc-panel {
+  position: fixed; right: 24px; bottom: 24px; z-index: 901;
+  width: 388px; max-width: calc(100vw - 32px);
+  height: 600px; max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--lc-surface); color: var(--lc-ink);
+  border: 1px solid var(--lc-line);
+  border-radius: var(--lc-radius);
+  box-shadow: var(--lc-shadow);
+}
+.lc-panel[hidden] { display: none; }
+
+/* Docked in Support Center: the same panel, unpinned from the corner and
+   sized by its container. Every rule below this line is shared. */
+.lc-docked .lc-panel {
+  position: static; width: 100%; max-width: none;
+  height: min(620px, 70vh); box-shadow: none;
+}
+.lc-docked .lc-launcher { display: none; }
+
+.lc-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; flex: none;
+  background: var(--lc-navy); color: #fff;
+}
+.lc-head-mark {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,.14); color: var(--lc-gold);
+  font-weight: 800; font-size: 15px;
+}
+.lc-head-text { flex: 1; min-width: 0; }
+.lc-head-title { font-size: 15px; font-weight: 800; line-height: 1.3; }
+.lc-head-sub { font-size: 12.5px; color: rgba(255,255,255,.72); line-height: 1.4; }
+.lc-head-close {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: transparent; border: none; color: #fff; cursor: pointer;
+}
+.lc-head-close:hover { background: rgba(255,255,255,.14); }
+.lc-head-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+/* ---------------------------------------------------------------------------
+   The thread
+   --------------------------------------------------------------------------- */
+.lc-thread {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 18px; display: flex; flex-direction: column; gap: 10px;
+  background: var(--lc-surface);
+  /* overscroll-behavior: contain — without it, reaching the top of the thread
+     starts scrolling the PAGE behind the widget, which on a phone reads as the
+     chat having thrown the reader out. */
+  overscroll-behavior: contain;
+}
+
+.lc-msg { display: flex; flex-direction: column; max-width: 82%; }
+.lc-msg-in  { align-self: flex-start; }
+.lc-msg-out { align-self: flex-end; align-items: flex-end; }
+
+.lc-bubble {
+  padding: 10px 14px; border-radius: 16px;
+  font-size: 14.5px; line-height: 1.5;
+  /* The one rule that makes a chat bubble a chat bubble: honour the newlines
+     the customer typed, and break a pasted booking reference rather than
+     letting it push the panel wide. */
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.lc-msg-in .lc-bubble {
+  background: var(--lc-bubble-in); color: var(--lc-ink);
+  border-bottom-left-radius: 5px;
+}
+.lc-msg-out .lc-bubble {
+  background: var(--lc-navy); color: #fff;
+  border-bottom-right-radius: 5px;
+}
+.lc-msg-deleted .lc-bubble {
+  background: transparent; color: var(--lc-muted);
+  border: 1px dashed var(--lc-line); font-style: italic;
+}
+
+.lc-meta {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 4px; padding: 0 4px;
+  font-size: 11.5px; color: var(--lc-muted);
+}
+.lc-sender { font-weight: 700; }
+.lc-receipt svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; }
+.lc-receipt-read { color: var(--lc-accent); }
+
+/* A system event — assigned, resolved, closed. Centred and quiet: it is
+   context, not something anyone said. */
+.lc-system {
+  align-self: center; max-width: 90%;
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--lc-surface-2); color: var(--lc-muted);
+  font-size: 12px; text-align: center;
+}
+
+/* Pending: shown immediately on send, before the server has confirmed. The
+   message must appear the instant it is sent — waiting for a round trip makes
+   a chat feel broken on a slow connection — so it renders at reduced opacity
+   and is reconciled when the id comes back. */
+.lc-msg-pending .lc-bubble { opacity: .6; }
+.lc-msg-failed .lc-bubble { opacity: 1; border: 1px solid var(--lc-accent); }
+.lc-retry {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--lc-accent); font: inherit; font-size: 11.5px; font-weight: 700;
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   States
+   --------------------------------------------------------------------------- */
+.lc-state {
+  margin: auto; padding: 28px 20px; text-align: center; color: var(--lc-muted);
+  font-size: 14px; line-height: 1.6;
+}
+.lc-state-title { color: var(--lc-ink); font-weight: 800; font-size: 15.5px; margin-bottom: 6px; }
+.lc-state .lc-retry { margin-top: 10px; display: inline-block; }
+
+/* The skeleton is three bubbles, not a spinner: it says "messages are coming"
+   rather than "something is happening". */
+.lc-skel { display: flex; flex-direction: column; gap: 10px; padding: 4px; }
+.lc-skel-row { height: 38px; border-radius: 16px; background: var(--lc-surface-2); max-width: 70%; }
+.lc-skel-row:nth-child(2) { align-self: flex-end; max-width: 55%; }
+.lc-skel-row:nth-child(3) { max-width: 62%; }
+@media (prefers-reduced-motion: no-preference) {
+  .lc-skel-row { animation: lc-pulse 1.4s ease-in-out infinite; }
+  @keyframes lc-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+}
+
+.lc-banner {
+  flex: none; padding: 9px 16px; font-size: 12.5px; text-align: center;
+  background: var(--lc-gold); color: var(--lc-navy); font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   The composer
+   --------------------------------------------------------------------------- */
+.lc-composer {
+  flex: none; display: flex; align-items: flex-end; gap: 8px;
+  padding: 12px; border-top: 1px solid var(--lc-line);
+  background: var(--lc-surface);
+}
+.lc-input {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--lc-line); border-radius: 14px;
+  padding: 11px 14px; resize: none; max-height: 132px;
+  background: var(--lc-surface-2); color: var(--lc-ink);
+  font-family: inherit;
+  /* 16px MINIMUM, and it is not a style choice: iOS Safari zooms the whole
+     page when a focused input is below 16px, and the reader then has to pinch
+     back out to see the conversation. tests/verify_responsive.py checks this
+     across the site for the same reason. */
+  font-size: 16px; line-height: 1.45;
+}
+.lc-input::placeholder { color: var(--lc-muted); }
+.lc-input:focus-visible { outline: 2px solid var(--lc-accent); outline-offset: 1px; }
+
+.lc-send {
+  flex: none; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--lc-accent); color: #fff; border: none; cursor: pointer;
+  transition: background .18s ease;
+}
+.lc-send:hover:not(:disabled) { background: var(--lc-accent-dk); }
+.lc-send:disabled { opacity: .45; cursor: default; }
+.lc-send:focus-visible { outline: 3px solid var(--lc-gold); outline-offset: 2px; }
+.lc-send svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+.lc-sr {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Phone
+   ---------------------------------------------------------------------------
+   A 388px panel pinned to a corner is a desktop idea. Below 640px it becomes a
+   full-screen sheet, which is what every messaging app does and what a thumb
+   expects. `100dvh` rather than `100vh` so the browser's collapsing address bar
+   does not leave the composer under the viewport edge.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .lc-panel {
+    right: 0; bottom: 0; left: 0; top: 0;
+    width: 100%; max-width: none;
+    height: 100dvh; max-height: 100dvh;
+    border: none; border-radius: 0;
+  }
+  .lc-launcher { right: 16px; bottom: 16px; }
+  .lc-docked .lc-panel { height: min(620px, 70vh); border-radius: var(--lc-radius); }
+}
+
+/* ---------------------------------------------------------------------------
+   Typing indicator (slice 3)
+   ---------------------------------------------------------------------------
+   Three dots in an incoming bubble, so it occupies the space the reply will
+   occupy and the thread does not jump when the real message replaces it.
+   --------------------------------------------------------------------------- */
+.lc-dots { display: inline-flex; align-items: center; gap: 4px; padding: 13px 16px; }
+.lc-dots i {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lc-muted); display: block; opacity: .45;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lc-dots i { animation: lc-typing 1.3s ease-in-out infinite; }
+  .lc-dots i:nth-child(2) { animation-delay: .18s; }
+  .lc-dots i:nth-child(3) { animation-delay: .36s; }
+  @keyframes lc-typing {
+    0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+    30%           { opacity: 1;  transform: translateY(-3px); }
+  }
+}

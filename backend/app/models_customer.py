@@ -1346,3 +1346,204 @@ class PaymentProviderEvent(Base):
 PROVIDER_EVENT_STATUSES = (
     "received", "processed", "deferred", "ignored", "failed",
 )
+
+
+# =====================================================================
+# Live chat (0064). CR-9.
+#
+# WHY THIS DOES NOT REUSE CustomerSupportTicket
+# A ticket models an *issue*: it opens, it is worked, it closes, and the next
+# question starts a new one. A conversation models a *relationship*: it opens
+# once and stays open, and the customer scrolls up to see what was said in
+# March. The brief asks for the second, and the difference is not cosmetic —
+# it is why there is no subject, no category and no priority below.
+#
+# CustomerSupportTicket and CustomerSupportMessage remain declared for one
+# release so the migrated history can be checked against its source; 0065
+# removes both them and these two classes.
+# =====================================================================
+
+_CONVERSATION_STATUS = SAEnum(
+    "waiting", "active", "resolved", "closed",
+    name="customer_conversation_status_enum", create_type=False,
+)
+_CHAT_SENDER = SAEnum(
+    "customer", "admin", "system",
+    name="customer_chat_sender_enum", create_type=False,
+)
+_CHAT_MESSAGE_TYPE = SAEnum(
+    "text", "image", "file", "system",
+    name="customer_chat_message_type_enum", create_type=False,
+)
+
+#: The status machine, as edges. The service layer asks this rather than
+#: hard-coding transitions at each call site, so "can this be reopened?" has one
+#: answer. Deliberately not routed through ``lifecycle.transition`` — that
+#: module's edges are booking-specific, the same reason chat_service.py gives.
+CONVERSATION_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    "waiting":  ("active", "closed"),
+    "active":   ("resolved", "closed"),
+    #: A resolved conversation reopens the instant the customer writes again —
+    #: that is the whole difference from a ticket that has to be re-raised.
+    "resolved": ("active", "closed"),
+    #: Closed is terminal. The next message starts a NEW conversation, which
+    #: ``uq_customer_conversation_live`` permits precisely because it excludes
+    #: closed rows.
+    "closed":   (),
+}
+
+
+class CustomerConversation(Base):
+    """One customer's support thread. At most one live per customer.
+
+    That "at most one" is ``uq_customer_conversation_live``, a unique index on
+    ``customer_id`` filtered to ``status <> 'closed'`` — not a rule this class
+    enforces. Two tabs opening Support Center at once both pass any Python
+    check; only the database can decline the second insert.
+
+    ``assigned_admin_id`` is a merchant-side ``users.user_id`` WITH NO FOREIGN
+    KEY, and ``assigned_admin_name`` is denormalised beside it. See migration
+    0064's docstring: this module has never carried a foreign key across the
+    B2C/B2B line, and the display name is a historical fact that must not change
+    when an admin is renamed or removed.
+    """
+
+    __tablename__ = "customer_conversations"
+
+    conversation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    assigned_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    assigned_admin_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    status: Mapped[str] = mapped_column(
+        _CONVERSATION_STATUS, nullable=False, default="waiting", server_default=text("'waiting'"),
+    )
+    last_message: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    last_message_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    customer_unread_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0"),
+    )
+    admin_unread_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0"),
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    messages: Mapped[list["CustomerChatMessage"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan",
+        order_by="CustomerChatMessage.message_id",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "customer_unread_count >= 0 AND admin_unread_count >= 0",
+            name="ck_customer_conversations_unread_non_negative",
+        ),
+    )
+
+    def can_transition_to(self, status: str) -> bool:
+        return status in CONVERSATION_TRANSITIONS.get(self.status, ())
+
+
+class CustomerChatMessage(Base):
+    """One message. Soft-deleted, never removed.
+
+    ``deleted_at`` rather than a DELETE because the other party has already read
+    it: silently rewriting their history is worse than showing a tombstone.
+
+    ``client_msg_id`` is the idempotency key a reconnecting socket resends
+    against — see 0064. It is nullable so that server-authored messages (system
+    events, admin replies posted over REST) need not invent one, and Postgres
+    treats NULLs as distinct in the unique index over it.
+    """
+
+    __tablename__ = "customer_chat_messages"
+
+    message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_conversations.conversation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sender_type: Mapped[str] = mapped_column(_CHAT_SENDER, nullable=False)
+    sender_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    sender_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    message_type: Mapped[str] = mapped_column(
+        _CHAT_MESSAGE_TYPE, nullable=False, default="text", server_default=text("'text'"),
+    )
+    #: An internal note. Filtered out of every customer-facing query in ONE
+    #: place (``chat_service._visible``) rather than at each call site, because
+    #: the one time it is forgotten is the time an agent's private note about a
+    #: refund is delivered to the customer.
+    is_internal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false"),
+    )
+    client_msg_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    delivered_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    read_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    conversation: Mapped["CustomerConversation"] = relationship(back_populates="messages")
+    attachments: Mapped[list["CustomerChatAttachment"]] = relationship(
+        back_populates="message", cascade="all, delete-orphan",
+        order_by="CustomerChatAttachment.attachment_id",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "body IS NOT NULL OR message_type <> 'text'",
+            name="ck_customer_chat_messages_text_has_body",
+        ),
+        CheckConstraint(
+            "(sender_type = 'admin') = (sender_admin_id IS NOT NULL)",
+            name="ck_customer_chat_messages_admin_identified",
+        ),
+    )
+
+
+class CustomerChatAttachment(Base):
+    """A file on a message.
+
+    ``storage_key`` is a ``storage.py`` key — validated by ``validate_key()``
+    before it is written and never derived from the customer's filename, which
+    is kept separately and used only for display and the download header.
+    """
+
+    __tablename__ = "customer_chat_attachments"
+
+    attachment_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    message_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_chat_messages.message_id", ondelete="CASCADE"), nullable=False,
+    )
+    storage_key: Mapped[str] = mapped_column(String(400), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    message: Mapped["CustomerChatMessage"] = relationship(back_populates="attachments")
+
+    __table_args__ = (
+        CheckConstraint(
+            "file_size > 0 AND file_size <= 10485760",
+            name="ck_customer_chat_attachments_size",
+        ),
+    )

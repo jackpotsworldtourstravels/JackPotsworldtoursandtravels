@@ -16,6 +16,13 @@ services:
       context: ..
       dockerfile: Dockerfile
     env_file: ../backend/.env
+    environment:
+      # Set HERE and not only in backend/.env, deliberately. Forgetting it is
+      # not a visible failure: the app falls back to an in-process broker and
+      # chat half-works across the two gunicorn workers, delivering roughly
+      # half of all messages to nobody with no error anywhere. `environment`
+      # overrides `env_file`, so this cannot be lost by editing .env either.
+      REDIS_URL: redis://redis:6379/0
     restart: unless-stopped
     # No ports mapping: the app is reachable only through Caddy, on the
     # compose network. Publishing 8000 to the host would expose an untrusted
@@ -35,11 +42,51 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    # CR-9: the chat fan-out. `service_healthy`, not just `service_started` —
+    # the app reads REDIS_URL on first use, and a Redis that is listening but
+    # not yet answering turns the first chat connection into an error the
+    # customer sees.
+    depends_on:
+      redis:
+        condition: service_healthy
     logging: &logging
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Live chat fan-out (CR-9)
+  # ---------------------------------------------------------------------------
+  # WHY THIS SERVICE EXISTS: the app runs WEB_CONCURRENCY=2, so gunicorn forks
+  # two processes with separate memory. A chat connection registry held in
+  # Python is therefore per-process — a customer on worker 1 and an agent on
+  # worker 2 never see each other, and about half of all messages are delivered
+  # to nobody with no error raised anywhere. Redis is the shared channel that
+  # makes one publish reach both workers.
+  #
+  # NOT PUBLISHED TO THE HOST. Reachable only on the compose network, like the
+  # app itself. Redis has no authentication here and does not need any, because
+  # nothing outside this network can open a socket to it.
+  #
+  # NO PERSISTENCE, DELIBERATELY. Everything in it — pub/sub traffic, one-time
+  # WebSocket tickets, presence keys — is worthless a minute after it is
+  # written. An AOF file would be a backup liability with no recovery value,
+  # and `allkeys-lru` means a memory spike drops the oldest ephemera rather
+  # than refusing writes.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", "",
+              "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    restart: unless-stopped
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *logging
 
   caddy:
     image: caddy:2

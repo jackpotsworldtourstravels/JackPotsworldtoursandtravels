@@ -308,6 +308,29 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
+    # ---------------------------------------------------------------- CR-9 --
+    #: Live chat fan-out and WebSocket tickets.
+    #:
+    #: REQUIRED IN ANY DEPLOYMENT RUNNING MORE THAN ONE WORKER, and this one
+    #: runs two (`WEB_CONCURRENCY=2`). Gunicorn forks independent processes, so
+    #: a chat connection registry held in Python memory is per-process: a
+    #: customer on worker 1 and an agent on worker 2 never see each other and
+    #: roughly half of all messages vanish with no error anywhere.
+    #:
+    #: Left unset, the app falls back to an in-process broker that is correct
+    #: ONLY for a single worker. chat_broker.py warns loudly at start-up rather
+    #: than letting that go unnoticed — the same shape as storage_backend's
+    #: local/S3 split.
+    redis_url: str | None = None
+    #: How long a WebSocket ticket is valid. Short because it is exchanged
+    #: immediately: the browser WebSocket constructor cannot send an
+    #: Authorization header, so a one-time ticket stands in for it.
+    chat_ticket_ttl_seconds: int = 60
+    #: Per-socket send ceiling. A fast typist does not reach 20 messages in
+    #: 10 seconds; a script does.
+    chat_rate_burst: int = 20
+    chat_rate_window_seconds: int = 10
+
     @property
     def upload_root_path(self) -> Path:
         return Path(self.upload_root).resolve()

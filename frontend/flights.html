@@ -42,6 +42,9 @@
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
 <!-- The company footer, one stylesheet for every page that renders it. -->
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft6">
+<!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
+     renders the same on this page and inside the Account Center. -->
+<link rel="stylesheet" href="assets/css/live-chat.css?v=20260905lc2">
 
 <!-- Loaded in <head> because the header and the card are mounted inline,
      during parse — the same trick index.html uses, so nothing on this page
@@ -60,7 +63,7 @@
 <script src="assets/js/site-footer.js?v=20260905ft6"></script>
 <script src="assets/js/hero-shell.js?v=20260905ft5"></script>
 </head>
-<body class="sp-continuation" data-sp-service="flights">
+<body class="sp-continuation" data-sp-service="flights" data-live-chat>
 <a href="#txResults" class="skip-link">Skip to results</a>
 
 <!-- The Account Center, so the profile chip opens it HERE instead of navigating
@@ -69,7 +72,8 @@
      whether AccountCenter exists to decide if the chip is a button or a link. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="assets/js/profile-menu.js?v=20260827dup1"></script>
-<script src="assets/js/account-center.js?v=20260829pm6"></script>
+<script src="assets/js/live-chat.js?v=20260905lc2"></script>
+<script src="assets/js/account-center.js?v=20260905lc2"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
