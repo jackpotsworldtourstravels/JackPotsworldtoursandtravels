@@ -23,7 +23,7 @@
      jp-ds.css despite the note above — it declares only its own --brand-* vars
      and re-points none of the tokens jp-ds owns. -->
 <link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260815svc2">
-<link rel="stylesheet" href="../assets/css/live-support.css?v=20260905ls1">
+<link rel="stylesheet" href="../assets/css/live-support.css?v=20260907ls2">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -527,7 +527,7 @@
         <aside class="als-queue">
           <div class="als-queue-head">
             <input type="search" id="alsSearch" class="als-search"
-                   placeholder="Name, email, phone or conversation #" autocomplete="off">
+                   placeholder="Name, email, phone, booking ref or conversation #" autocomplete="off">
             <label class="als-mine"><input type="checkbox" id="alsMine"> Only mine</label>
           </div>
           <div class="als-tabs" role="tablist">
@@ -569,6 +569,12 @@
                    delivered. Two buttons rather than a checkbox, deliberately:
                    a mis-set checkbox sends a private note to the customer, and
                    that is not a mistake worth making convenient. -->
+              <input type="file" id="alsFile" hidden
+                     accept="image/jpeg,image/png,image/webp,application/pdf">
+              <button type="button" class="btn btn-sm" id="alsAttachBtn"
+                      title="Send a photo or PDF to the customer">Attach file</button>
+              <button type="button" class="btn btn-sm" id="alsAttachNoteBtn"
+                      title="Attach a file to an internal note">Attach privately</button>
               <button type="button" class="btn btn-sm" id="alsNoteBtn"
                       title="Visible to agents only">Internal note</button>
               <button type="button" class="btn btn-sm btn-primary" id="alsSendBtn">Send</button>
@@ -1271,7 +1277,7 @@
       </div>
     </div>
 
-<script src="../assets/js/admin-live-support.js?v=20260905ls1"></script>
+<script src="../assets/js/admin-live-support.js?v=20260907ls2"></script>
 <script src="../assets/js/admin.js?v=20260902cp1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->

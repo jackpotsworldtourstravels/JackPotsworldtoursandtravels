@@ -20,7 +20,8 @@ a REST path that is exercised by the test suite is how the socket's behaviour
 gets something to be checked against.
 """
 from fastapi import (
-    APIRouter, Depends, HTTPException, Query, Request, WebSocket, status,
+    APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile,
+    WebSocket, status,
 )
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,9 @@ from app.schemas.customer_chat import (
     MessageCreate,
     MessageSendResponse,
 )
+from app.services import chat_assignment as assignment_service
+from app.services import chat_attachments as attachments
+from app.services import document_service
 from app.services import chat_gateway, customer_chat_service as chat
 from app.services.chat_broker import get_broker
 
@@ -115,12 +119,24 @@ def list_messages(
 #: `slowapi` keys on the remote address, so this is the crude outer bound; the
 #: per-conversation flood cap in the service layer is the sharper one.
 @limiter.limit("30/minute")
-def send_message(
+async def send_message(
     request: Request,
     payload: MessageCreate,
     customer: Customer = Depends(get_current_customer),
     db: Session = Depends(get_db),
 ):
+    """The fallback the widget uses when its socket is down.
+
+    ASYNC, AND IT PUBLISHES. Both are the same fix. This endpoint used to write
+    the row and return it, which is correct for the sender and wrong for
+    everybody else: the agent watching the thread saw nothing until they
+    refreshed, and the customer's own second device stayed blank until reload.
+    The socket path publishes; so must this one, or "the socket is down" quietly
+    becomes "nobody is told" for every other party on the conversation.
+
+    Auto-assignment runs here for the same reason — a customer whose socket
+    never connected must still reach an agent.
+    """
     conversation = chat.get_or_create_conversation(db, customer.customer_id)
     try:
         message, created = chat.post_customer_message(
@@ -130,10 +146,121 @@ def send_message(
         )
     except chat.ChatError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    assignment = None
+    if conversation.assigned_admin_id is None:
+        assignment = await assignment_service.auto_assign(db, conversation)
+    conversation_id = conversation.conversation_id
+    status_now = conversation.status
+    # Serialised BEFORE the commit, while the row is still loaded. After a
+    # commit SQLAlchemy expires it, and every field read below would be a second
+    # SELECT — twice, since the response and the broadcast read the same object.
+    body = ChatMessageResponse.for_customer(message)
     db.commit()
-    return MessageSendResponse(
-        message=ChatMessageResponse.for_customer(message), created=created,
-    )
+
+    # Published only for a message this call actually created. A retried send
+    # resolves to the existing row through the idempotency key; broadcasting it
+    # again would show the agent a duplicate the database correctly refused.
+    if created:
+        await chat_gateway.publish_message(conversation_id, body)
+    if assignment:
+        await chat_gateway.publish_assignment(
+            conversation_id, assignment[0], assignment[1], status_now,
+        )
+    return MessageSendResponse(message=body, created=created)
+
+
+@router.post(
+    "/attachments",
+    response_model=MessageSendResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Send a photo or a document",
+)
+#: Much tighter than the 30/minute on text. An upload costs a streamed write and
+#: 10 MB of storage where a message costs a row, so the ceiling that protects
+#: the disk is not the one that protects the queue.
+@limiter.limit("10/minute")
+async def send_attachment(
+    request: Request,
+    file: UploadFile = File(..., description="JPEG, PNG, WebP or PDF, up to 10 MB"),
+    caption: str | None = Form(default=None),
+    client_msg_id: str | None = Form(default=None),
+    customer: Customer = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+):
+    """One file per message, the way a chat client sends one.
+
+    A single message carrying five files would need the whole set to be
+    validated, stored and committed atomically — and a partial failure halfway
+    through has no good answer: the customer watched four uploads succeed. One
+    file per message makes a failure the failure of one bubble, which is a thing
+    the customer can retry by itself.
+
+    THE ORDER HERE IS DELIBERATE: validate and store the bytes, then write the
+    message, then the attachment row, then commit, then publish. Anything that
+    fails before the commit leaves neither a row nor a file; the only leak that
+    order permits is a stored file with no row, which `record()` cleans up.
+    """
+    conversation = chat.get_or_create_conversation(db, customer.customer_id)
+    attachments.guard_open(conversation)
+    stored = attachments.store(file, conversation_id=conversation.conversation_id)
+
+    try:
+        message, created = chat.post_customer_message(
+            db, conversation,
+            body=attachments.caption(caption),
+            client_msg_id=client_msg_id,
+            message_type=attachments.message_type_for(stored),
+        )
+    except chat.ChatError as exc:
+        document_service.discard_file(stored.relative_path)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not created:
+        # A retried upload of a send that already landed. The first attempt's
+        # file is on the message; this one's bytes are nobody's and go now,
+        # before they become an orphan no query will ever find.
+        document_service.discard_file(stored.relative_path)
+    else:
+        attachments.record(db, message, stored)
+
+    assignment = None
+    if conversation.assigned_admin_id is None:
+        assignment = await assignment_service.auto_assign(db, conversation)
+    conversation_id = conversation.conversation_id
+    status_now = conversation.status
+    body = ChatMessageResponse.for_customer(message)
+    db.commit()
+
+    if created:
+        await chat_gateway.publish_message(conversation_id, body)
+    if assignment:
+        await chat_gateway.publish_assignment(
+            conversation_id, assignment[0], assignment[1], status_now,
+        )
+    return MessageSendResponse(message=body, created=created)
+
+
+@router.get(
+    "/attachments/{attachment_id}",
+    summary="Download a file from my conversation",
+)
+def download_attachment(
+    attachment_id: int,
+    customer: Customer = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+):
+    """Scoped in the service by a join up to the conversation's owner.
+
+    Not by `attachment.message.conversation.customer_id` read in Python: that
+    works, and it also loads three rows to answer a question one WHERE clause
+    answers — on an endpoint an enumerating client would call in a loop.
+    """
+    try:
+        attachment = chat.attachment_for_customer(db, attachment_id, customer.customer_id)
+    except chat.ChatNotFound:
+        raise _not_found()
+    return attachments.download(attachment)
 
 
 @router.post("/read", response_model=MarkReadResponse, summary="Mark support's messages read")

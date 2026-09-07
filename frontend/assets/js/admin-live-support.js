@@ -165,6 +165,146 @@ const AdminLiveSupport = (function () {
     paintActions();
   }
 
+  /* -------------------------------------------------------------------------
+     Attachments
+     -------------------------------------------------------------------------
+     Everything here mirrors the customer widget, for a reason that is not
+     symmetry for its own sake: the two sides render the same rows out of the
+     same table, and a file that displays as a photo to the customer and as a
+     grey box to the agent makes them describe different screens to each other
+     while trying to solve a problem. */
+  const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const blobs = new Map();
+
+  function readableSize(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /* Fetched with the admin's own auth header and shown from a blob. The same
+     reason as the customer side: <img src> cannot send Authorization, and a
+     token in the query string ends up in proxy logs. */
+  async function fetchBlob(file) {
+    if (blobs.has(file.attachment_id)) return blobs.get(file.attachment_id);
+    const response = await fetch(API + '/attachments/' + file.attachment_id, {
+      headers: typeof authHeaders === 'function' ? authHeaders() : {},
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const url = URL.createObjectURL(await response.blob());
+    blobs.set(file.attachment_id, url);
+    return url;
+  }
+
+  async function saveFile(file) {
+    try {
+      const url = await fetchBlob(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.file_name || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      alert('That file could not be downloaded.');
+    }
+  }
+
+  function attachmentEl(file) {
+    const isImage = /^image\//.test(file.mime_type || '');
+    if (isImage) {
+      const wrap = document.createElement('div');
+      wrap.className = 'als-photo';
+      const img = document.createElement('img');
+      img.alt = file.file_name || 'Photo';
+      img.loading = 'lazy';
+      wrap.appendChild(img);
+      wrap.addEventListener('click', () => saveFile(file));
+      fetchBlob(file).then(url => { img.src = url; }).catch(() => {
+        wrap.classList.add('als-photo-failed');
+        img.alt = 'This photo could not be loaded';
+      });
+      return wrap;
+    }
+    const link = document.createElement('a');
+    link.className = 'als-file';
+    link.href = '#';
+    const name = document.createElement('span');
+    name.className = 'als-file-name';
+    name.textContent = file.file_name || 'Attachment';
+    const size = document.createElement('span');
+    size.className = 'als-file-size';
+    size.textContent = readableSize(file.file_size);
+    link.appendChild(name);
+    link.appendChild(size);
+    link.addEventListener('click', e => { e.preventDefault(); saveFile(file); });
+    return link;
+  }
+
+  /** Send a file to the customer, or attach one to an internal note.
+   *
+   *  `isInternal` rides on the same multipart form as the file. The two-button
+   *  composer applies here too: an agent who meant to file a screenshot
+   *  privately and sent it to the customer has done something they cannot take
+   *  back, and a checkbox is not enough friction for that.
+   */
+  async function upload(file, isInternal) {
+    if (!file || !state.current) return;
+    if (file.size > MAX_BYTES) { alert('Files must be 10 MB or smaller.'); return; }
+    const form = new FormData();
+    form.append('file', file);
+    if (isInternal) form.append('is_internal', 'true');
+    setStatus('Uploading ' + file.name + '\u2026');
+    try {
+      const response = await fetch(
+        API + '/conversations/' + state.current.conversation_id + '/attachments',
+        {
+          method: 'POST',
+          /* No Content-Type: the browser sets the multipart boundary. */
+          headers: typeof authHeaders === 'function' ? authHeaders() : {},
+          body: form,
+        },
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload && payload.detail) || 'Upload failed');
+      /* Nothing is appended: it arrives over the socket like every other
+         message, so one path renders the thread. */
+    } catch (error) {
+      alert('Could not send that file: ' + error.message);
+    } finally {
+      paintActions();
+    }
+  }
+
+  /* A short two-note chime when a customer message lands in a thread the agent
+     is not looking at. An agent works with this console open behind a booking
+     screen all day; silence is how a waiting customer goes unnoticed. */
+  let audio = null;
+
+  function chime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audio = audio || new Ctx();
+      if (audio.state === 'suspended') audio.resume();
+      const now = audio.currentTime;
+      [[784, 0], [1046.5, 0.1]].forEach(function (note) {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = note[0];
+        gain.gain.setValueAtTime(0.0001, now + note[1]);
+        gain.gain.exponentialRampToValueAtTime(0.06, now + note[1] + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + note[1] + 0.15);
+        osc.connect(gain).connect(audio.destination);
+        osc.start(now + note[1]);
+        osc.stop(now + note[1] + 0.2);
+      });
+    } catch (e) { /* no audio; the badge still moves */ }
+  }
+
   function messageEl(message) {
     if (message.message_type === 'system') {
       const row = document.createElement('div');
@@ -180,11 +320,21 @@ const AdminLiveSupport = (function () {
 
     const bubble = document.createElement('div');
     bubble.className = 'als-bubble';
-    /* textContent. The body was typed by a member of the public and is being
-       rendered in a dashboard whose session can move money. */
-    bubble.textContent = message.deleted_at
-      ? 'This message was deleted'
-      : (message.body || '');
+    const files = (!message.deleted_at && message.attachments) || [];
+    if (files.length) {
+      bubble.classList.add('als-bubble-file');
+      files.forEach(file => bubble.appendChild(attachmentEl(file)));
+    }
+    if (message.deleted_at || message.body) {
+      const text = document.createElement('div');
+      text.className = 'als-text';
+      /* textContent. The body was typed by a member of the public and is being
+         rendered in a dashboard whose session can move money. */
+      text.textContent = message.deleted_at
+        ? 'This message was deleted'
+        : (message.body || '');
+      bubble.appendChild(text);
+    }
     row.appendChild(bubble);
 
     const meta = document.createElement('div');
@@ -337,11 +487,31 @@ const AdminLiveSupport = (function () {
 
   function handleFrame(event, data) {
     if (event === 'receive_message') {
-      if (state.current && data.conversation_id === state.current.conversation_id) {
+      const open = state.current && data.conversation_id === state.current.conversation_id;
+      if (open) {
         const i = state.messages.findIndex(m => m.message_id === data.message_id);
         if (i === -1) state.messages.push(data); else state.messages[i] = data;
         renderThread();
         if (data.sender_type === 'customer') markRead();
+      }
+      /* The sound is for a customer message the agent is NOT already reading —
+         either in another thread, or in this one with the tab in the
+         background. Chiming for a thread that is open and on screen would
+         make the console noisy for the agent who is doing the right thing. */
+      if (data.sender_type === 'customer'
+          && (!open || document.visibilityState !== 'visible')) chime();
+      loadQueue();
+      return;
+    }
+    if (event === 'conversation_assigned') {
+      /* A chat was routed automatically. Refresh the badges so it appears in
+         the right tab, and repaint the header if it is the open one. */
+      if (state.current && data.conversation_id === state.current.conversation_id) {
+        state.current.assigned_admin_id = data.assigned_admin_id;
+        state.current.assigned_admin_name = data.assigned_admin_name;
+        state.current.status = data.status;
+        paintActions();
+        renderContext();
       }
       loadQueue();
       return;
@@ -393,6 +563,24 @@ const AdminLiveSupport = (function () {
 
     document.getElementById('alsSendBtn')?.addEventListener('click', () => send(false));
     document.getElementById('alsNoteBtn')?.addEventListener('click', () => send(true));
+
+    const picker = document.getElementById('alsFile');
+    document.getElementById('alsAttachBtn')?.addEventListener('click', () => {
+      /* The button remembers whether the note toggle was held, so one file
+         picker serves both destinations without a second control. */
+      picker.dataset.internal = '';
+      picker.click();
+    });
+    document.getElementById('alsAttachNoteBtn')?.addEventListener('click', () => {
+      picker.dataset.internal = '1';
+      picker.click();
+    });
+    picker?.addEventListener('change', () => {
+      const file = picker.files && picker.files[0];
+      const isInternal = picker.dataset.internal === '1';
+      picker.value = '';   /* so the same file can be chosen twice running */
+      upload(file, isInternal);
+    });
     document.getElementById('alsInput')?.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
     });

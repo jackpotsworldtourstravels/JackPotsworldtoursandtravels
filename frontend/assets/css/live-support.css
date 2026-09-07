@@ -134,6 +134,32 @@
 .als-msg-deleted .als-bubble { font-style: italic; color: var(--als-muted); background: transparent; }
 
 .als-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 11px; color: var(--als-muted); }
+
+/* Attachments. A bubble holding a file drops its text padding so a photo
+   reaches the bubble's edges; a caption below supplies its own. */
+.als-bubble-file { padding: 4px; }
+.als-bubble-file .als-text { padding: 4px 10px 6px; }
+
+.als-photo {
+  display: block; overflow: hidden; border-radius: 11px; cursor: pointer;
+  background: var(--als-line); min-height: 80px;
+}
+.als-photo img { display: block; width: 100%; max-height: 240px; object-fit: cover; }
+.als-photo-failed { min-height: 0; padding: 8px 10px; font-size: 12px; }
+.als-photo-failed img { display: none; }
+
+.als-file {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 8px 11px; border-radius: 11px;
+  background: rgba(10,37,64,.06); color: inherit; text-decoration: none;
+}
+.als-msg-out .als-file { background: rgba(255,255,255,.16); }
+.als-file:hover { filter: brightness(1.06); }
+.als-file-name {
+  font-size: 13px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px;
+}
+.als-file-size { font-size: 11px; opacity: .75; }
 .als-system {
   align-self: center; padding: 5px 12px; border-radius: 999px;
   background: var(--als-surface); border: 1px solid var(--als-line);

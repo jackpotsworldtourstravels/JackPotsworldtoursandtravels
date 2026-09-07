@@ -27,6 +27,7 @@ import os
 import sys
 import threading
 import json
+import time
 import uuid
 from pathlib import Path
 
@@ -42,6 +43,7 @@ from app.config import settings  # noqa: E402
 from app.database.session import SessionLocal  # noqa: E402
 from app.models_customer import (  # noqa: E402
     Customer,
+    CustomerBooking,
     CustomerChatMessage,
     CustomerConversation,
 )
@@ -72,6 +74,19 @@ def _make_customer(db) -> Customer:
     db.add(customer)
     db.flush()
     return customer
+
+
+def _make_customer_committed() -> int:
+    """A throwaway customer that is already committed. Returns its id.
+
+    Section 19 needs a customer visible to a *second* session — auto_assign
+    reads through one of its own — so the row has to be committed rather than
+    merely flushed into the caller's transaction.
+    """
+    with SessionLocal() as db:
+        customer = _make_customer(db)
+        db.commit()
+        return customer.customer_id
 
 
 def _cleanup(customer_id: int) -> None:
@@ -1088,6 +1103,397 @@ def _run(customer_id: int) -> int:
         check(
             "an ADMIN ticket cannot open a CUSTOMER socket",
             asyncio.run(_wrong_door()),
+        )
+
+    # == 18. attachments (slice 5) ==
+    #
+    # The interesting checks here are all refusals. A chat attachment is a
+    # passport scan often enough that the question worth asking is not "does an
+    # upload work" but "what happens to everything that should not."
+    print("\n== attachments ==")
+    import io  # noqa: PLC0415
+
+    PNG = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00"
+        b"\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    def _upload(content, name, content_type, headers=None, extra=None):
+        """POST one file, waiting out the rate limit once if it trips.
+
+        The endpoint allows 10 uploads a minute — deliberately much tighter
+        than the 30/minute on text, because an upload costs a streamed write
+        and 10 MB of storage where a message costs a row. This section sends
+        more than that, and two runs inside the same minute share the window,
+        so a suite that did not handle the 429 would pass or fail depending on
+        how recently it was last run. Loosening the production limit to suit
+        the test would be the wrong way round; waiting is the honest one.
+        """
+        for attempt in (1, 2):
+            response = requests.post(
+                url("/attachments"),
+                files={"file": (name, io.BytesIO(content), content_type)},
+                data=extra or {},
+                headers=headers if headers is not None else auth,
+                timeout=20,
+            )
+            if response.status_code != 429 or attempt == 2:
+                return response
+            print("        (upload rate limit reached — waiting out the window)")
+            time.sleep(61)
+        return response
+
+    r = _upload(PNG, "receipt.png", "image/png")
+    check("a customer can send a photo", r.status_code == 201, r.text[:200])
+    uploaded = (r.json() or {}).get("message") if r.status_code == 201 else None
+    attachment_id = None
+    if uploaded:
+        check("the upload becomes an image message", uploaded["message_type"] == "image",
+              uploaded["message_type"])
+        check("the message carries exactly one attachment",
+              len(uploaded.get("attachments") or []) == 1, str(uploaded.get("attachments")))
+        if uploaded.get("attachments"):
+            a = uploaded["attachments"][0]
+            attachment_id = a["attachment_id"]
+            check("the stored name is the customer's own", a["file_name"] == "receipt.png",
+                  a["file_name"])
+            # NOT `== len(PNG)`. Images are re-encoded to strip EXIF, so the
+            # stored file is deliberately not the file that arrived. What has
+            # to hold is that the recorded size describes what we stored —
+            # asserted against the download below.
+            check("a size is recorded", a["file_size"] > 0, str(a["file_size"]))
+            check(
+                "the STORAGE KEY is never shipped to the browser",
+                "storage_key" not in a,
+                str(sorted(a)),
+            )
+
+    # A FILE THAT LIES ABOUT ITS TYPE. This is the check that matters: the
+    # allowlist alone would pass an HTML payload named .png, and this endpoint
+    # serves what it stores.
+    r = _upload(b"<html><script>alert(1)</script></html>", "x.png", "image/png")
+    check("HTML wearing a PNG's name is refused", r.status_code == 400, f"got {r.status_code}")
+
+    r = _upload(b"MZ\x90\x00 not a pdf", "invoice.pdf", "application/pdf")
+    check("a fake PDF is refused", r.status_code == 400, f"got {r.status_code}")
+
+    r = _upload(b"PK\x03\x04 docx", "itinerary.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    check(
+        "an Office document is refused, not silently accepted",
+        r.status_code == 415, f"got {r.status_code}",
+    )
+
+    r = _upload(PNG, "hi.png", "image/png", headers={})
+    check("uploading requires a session", r.status_code in (401, 403), f"got {r.status_code}")
+
+    # THE DOWNLOAD, AND WHO MAY DO IT.
+    if attachment_id:
+        r = requests.get(url(f"/attachments/{attachment_id}"), headers=auth, timeout=10)
+        check("the owner can download it back", r.status_code == 200, f"got {r.status_code}")
+        check(
+            "the recorded size matches the bytes actually served",
+            len(r.content) == (uploaded["attachments"][0]["file_size"]
+                               if uploaded and uploaded.get("attachments") else -1),
+            f"{len(r.content)} bytes served",
+        )
+        check(
+            "the stored PNG is still a valid PNG after re-encoding",
+            r.content.startswith(b"\x89PNG\r\n\x1a\n"), repr(r.content[:8]),
+        )
+        check(
+            "it is served as a download, never rendered inline",
+            r.headers.get("Content-Disposition", "").startswith("attachment"),
+            r.headers.get("Content-Disposition", ""),
+        )
+        check(
+            "the browser is told not to sniff the type",
+            r.headers.get("X-Content-Type-Options") == "nosniff",
+            str(r.headers.get("X-Content-Type-Options")),
+        )
+        check(
+            "a shared proxy must not cache it",
+            "private" in (r.headers.get("Cache-Control") or ""),
+            str(r.headers.get("Cache-Control")),
+        )
+
+        # A DIFFERENT CUSTOMER, minted here rather than reusing `stranger_auth`
+        # from section 13 — that account is deleted at the end of it, and its
+        # token then returns 401 for every request. A 401 would still look like
+        # a refusal in the output while proving nothing about scoping, which is
+        # the sort of green check worth going out of the way to avoid.
+        onlooker_id = _make_customer_committed()
+        try:
+            with SessionLocal() as db:
+                onlooker_access, _ = issue_tokens(db.get(Customer, onlooker_id))
+            onlooker = {"Authorization": f"Bearer {onlooker_access}"}
+            check(
+                "the second account's own session works",
+                requests.get(url("/conversation"), headers=onlooker, timeout=10).status_code == 200,
+            )
+            r = requests.get(url(f"/attachments/{attachment_id}"), headers=onlooker, timeout=10)
+            check(
+                "ANOTHER CUSTOMER cannot download it",
+                r.status_code == 404, f"got {r.status_code}",
+            )
+        finally:
+            _cleanup(onlooker_id)
+        r = requests.get(url(f"/attachments/{attachment_id}"), timeout=10)
+        check("downloading requires a session", r.status_code in (401, 403), f"got {r.status_code}")
+
+    r = requests.get(url("/attachments/99999999"), headers=auth, timeout=10)
+    check("a missing attachment is a 404, not a 500", r.status_code == 404, f"got {r.status_code}")
+
+    # A PDF IS PASSED THROUGH UNTOUCHED, and must arrive byte-identical. This
+    # is the fidelity check the PNG used to carry: an e-ticket that differs by
+    # one byte from what the airline issued is a broken e-ticket, and nothing
+    # in the upload path is allowed to rewrite one.
+    PDF = (
+        b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n"
+        b"trailer<</Root 1 0 R>>\n%%EOF\n"
+    )
+    r = _upload(PDF, "e-ticket.pdf", "application/pdf")
+    check("a PDF uploads", r.status_code == 201, r.text[:200])
+    if r.status_code == 201:
+        pdf_message = (r.json() or {}).get("message") or {}
+        check(
+            "a PDF becomes a file message, not an image one",
+            pdf_message.get("message_type") == "file", str(pdf_message.get("message_type")),
+        )
+        pdf_files = pdf_message.get("attachments") or []
+        if pdf_files:
+            got = requests.get(
+                url(f"/attachments/{pdf_files[0]['attachment_id']}"), headers=auth, timeout=10,
+            )
+            check(
+                "a PDF comes back BYTE-FOR-BYTE as it was sent",
+                got.content == PDF, f"{len(got.content)} vs {len(PDF)} bytes",
+            )
+            check(
+                "and its recorded size is the real one",
+                pdf_files[0]["file_size"] == len(PDF), str(pdf_files[0]["file_size"]),
+            )
+
+    # THE PASSPORT-PHOTO CHECK. A JPEG straight off a phone carries GPS
+    # coordinates in its EXIF, and a passport photographed at home is a photo
+    # taken at the customer's home address. The fixture is BUILT here rather
+    # than read from a sample file: the assertion below is only worth something
+    # if the bytes going in demonstrably carry the tag the bytes coming out
+    # must not, and a check that would pass on a photo with no EXIF at all is
+    # the kind of green tick this suite has already been burned by once.
+    try:
+        from PIL import Image  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        Image = None
+
+    if Image is None:
+        print("  SKIP  Pillow is not importable here, so the EXIF strip is untested")
+    else:
+        gps_source = io.BytesIO()
+        exif = Image.Exif()
+        exif[0x0110] = "JPW-TEST-CAMERA"             # Model
+        exif[0x8825] = {                              # GPSInfo — Hyderabad
+            1: "N", 2: (17.0, 23.0, 0.0),
+            3: "E", 4: (78.0, 28.0, 0.0),
+        }
+        Image.new("RGB", (24, 24), (200, 40, 40)).save(
+            gps_source, format="JPEG", exif=exif.tobytes(),
+        )
+        original = gps_source.getvalue()
+
+        check(
+            "the fixture really does carry EXIF before upload",
+            b"JPW-TEST-CAMERA" in original,
+            "the test photo has no metadata, so the check below would prove nothing",
+        )
+
+        r = _upload(original, "passport.jpg", "image/jpeg")
+        check("a photo carrying EXIF still uploads", r.status_code == 201, r.text[:200])
+        if r.status_code == 201:
+            shot = ((r.json() or {}).get("message") or {}).get("attachments") or []
+            if shot:
+                back = requests.get(
+                    url(f"/attachments/{shot[0]['attachment_id']}"), headers=auth, timeout=10,
+                )
+                check("it downloads back", back.status_code == 200, f"got {back.status_code}")
+                check(
+                    "THE GPS AND CAMERA METADATA ARE GONE from what we stored",
+                    b"JPW-TEST-CAMERA" not in back.content,
+                    "the EXIF survived re-encoding",
+                )
+                try:
+                    stored_image = Image.open(io.BytesIO(back.content))
+                    check(
+                        "and the photo itself is intact, not corrupted by the strip",
+                        stored_image.size == (24, 24), str(stored_image.size),
+                    )
+                    check(
+                        "no EXIF block remains at all",
+                        not dict(stored_image.getexif()),
+                        str(dict(stored_image.getexif()))[:120],
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    check("the stored photo is still a readable image", False, repr(exc))
+
+    # An internal note's file must be unreachable by the customer even by id.
+    #
+    # Targeted at the conversation the CUSTOMER IS IN NOW, not
+    # `conversation_id_for_ws`: section 17 closes that one deliberately, and
+    # `closed` is terminal, so the upload above opened a fresh conversation.
+    # Reading the id off that response keeps this section honest about which
+    # thread it is testing instead of quietly testing a closed one.
+    live_conversation_id = (uploaded or {}).get("conversation_id", conversation_id_for_ws)
+    r = requests.post(
+        aurl(f"/conversations/{live_conversation_id}/attachments"),
+        files={"file": ("private.png", io.BytesIO(PNG), "image/png")},
+        data={"is_internal": "true"},
+        headers=admin_auth, timeout=15,
+    )
+    check("an agent can attach a file to an internal note", r.status_code == 201, r.text[:180])
+    note_attachment = None
+    if r.status_code == 201:
+        files = (r.json() or {}).get("attachments") or []
+        note_attachment = files[0]["attachment_id"] if files else None
+    if note_attachment:
+        r = requests.get(url(f"/attachments/{note_attachment}"), headers=auth, timeout=10)
+        check(
+            "the customer CANNOT download an internal note's file",
+            r.status_code == 404, f"got {r.status_code}",
+        )
+        r = requests.get(aurl(f"/attachments/{note_attachment}"), headers=admin_auth, timeout=10)
+        check("an agent can download it", r.status_code == 200, f"got {r.status_code}")
+        r = requests.get(aurl(f"/attachments/{note_attachment}"), headers=auth, timeout=10)
+        check(
+            "a CUSTOMER token cannot reach the agent download route",
+            r.status_code in (401, 403), f"got {r.status_code}",
+        )
+
+    r = requests.post(
+        aurl(f"/conversations/{conversation_id_for_ws}/attachments"),
+        files={"file": ("late.png", io.BytesIO(PNG), "image/png")},
+        headers=admin_auth, timeout=15,
+    )
+    check(
+        "a CLOSED conversation refuses a new file",
+        r.status_code == 400, f"got {r.status_code}",
+    )
+
+    # == 19. auto-assignment ==
+    #
+    # The brief: "Automatically assign to available Admin", and "if only one
+    # Admin exists, all chats should automatically be assigned to that Admin".
+    # Tested through the service rather than by sending a message, because the
+    # question is which admin gets chosen and why — and that is decided before
+    # any transport is involved.
+    print("\n== auto-assignment ==")
+    from app.services import chat_assignment  # noqa: PLC0415
+
+    with SessionLocal() as db:
+        pool = chat_assignment.candidates(db)
+    check("there is at least one admin to route to", len(pool) >= 1, str(pool[:3]))
+    check(
+        "every candidate has an id and a display name",
+        all(isinstance(a, int) and isinstance(n, str) and n for a, n in pool),
+        str(pool[:3]),
+    )
+
+    if pool:
+        fresh = _make_customer_committed()
+        try:
+            with SessionLocal() as db:
+                conv = chat.get_or_create_conversation(db, fresh)
+                db.commit()
+                fresh_conversation_id = conv.conversation_id
+                check("a new conversation is unassigned", conv.assigned_admin_id is None)
+
+            with SessionLocal() as db:
+                conv = chat.get_or_create_conversation(db, fresh)
+                assigned = asyncio.run(chat_assignment.auto_assign(db, conv))
+                db.commit()
+            check("it is routed automatically", assigned is not None, str(assigned))
+            if assigned:
+                check(
+                    "the chosen admin is one of the candidates",
+                    assigned[0] in [a for a, _ in pool], str(assigned),
+                )
+
+            with SessionLocal() as db:
+                conv = db.get(CustomerConversation, fresh_conversation_id)
+                check("the assignment is persisted", conv.assigned_admin_id is not None)
+                check("and it records the name, not just the id",
+                      bool(conv.assigned_admin_name), str(conv.assigned_admin_name))
+                # STATUS IS A STATEMENT OF FACT. Nobody holds a socket during a
+                # test run, so the chat is owned but still waiting — claiming
+                # `active` would make the queue's own badges lie about how long
+                # a customer has been waiting.
+                check(
+                    "an offline admin owns it WITHOUT it being marked active",
+                    conv.status == "waiting", conv.status,
+                )
+                said = [m.body for m in chat.list_messages(db, conv, include_internal=True)]
+                check(
+                    "the thread records who it went to",
+                    any("assigned to" in (b or "").lower() for b in said),
+                    str(said[:3]),
+                )
+
+                # Running it again must not steal the conversation.
+                second = asyncio.run(chat_assignment.auto_assign(db, conv))
+                check("re-running it does NOT reassign an owned chat", second is None, str(second))
+        finally:
+            _cleanup(fresh)
+
+    # == 20. finding a chat by booking reference ==
+    #
+    # The single most common thing a customer opens with is "about booking
+    # JWT12345". Until this existed the agent had to look the reference up in
+    # another screen to find out whose chat to open.
+    print("\n== searching the queue by booking reference ==")
+    r = requests.get(
+        aurl("/conversations"), headers=admin_auth,
+        params={"q": "ZZ-NO-SUCH-BOOKING-REF"}, timeout=10,
+    )
+    check("an unmatched search is empty, not an error", r.status_code == 200, r.text[:150])
+    if r.status_code == 200:
+        check("and returns nothing", r.json()["conversations"] == [], str(r.json())[:200])
+
+    with SessionLocal() as db:
+        ref = db.execute(
+            select(CustomerBooking.booking_ref, CustomerBooking.customer_id)
+            .where(CustomerBooking.booking_ref.is_not(None))
+            .limit(1)
+        ).first()
+    if not ref:
+        print("  SKIP  no booking exists in this database to search for")
+    else:
+        booking_ref, booking_customer = ref
+        with SessionLocal() as db:
+            owned = chat.get_or_create_conversation(db, booking_customer)
+            db.commit()
+            owned_id = owned.conversation_id
+        r = requests.get(
+            aurl("/conversations"), headers=admin_auth,
+            params={"q": booking_ref}, timeout=10,
+        )
+        check("searching a booking reference succeeds", r.status_code == 200, r.text[:150])
+        if r.status_code == 200:
+            hits = [c["conversation_id"] for c in r.json()["conversations"]]
+            check(
+                "it finds the conversation of the customer who owns that booking",
+                owned_id in hits, f"{booking_ref} -> {hits[:5]}",
+            )
+        # A prefix must work: an agent reads a reference off a ticket and stops.
+        r = requests.get(
+            aurl("/conversations"), headers=admin_auth,
+            params={"q": booking_ref[: max(4, len(booking_ref) - 2)]}, timeout=10,
+        )
+        check(
+            "a partial reference finds it too",
+            r.status_code == 200
+            and owned_id in [c["conversation_id"] for c in r.json()["conversations"]],
+            r.text[:150],
         )
 
     # == 16. TWO PROCESSES, ONE CONVERSATION ==

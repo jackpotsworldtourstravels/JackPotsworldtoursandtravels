@@ -99,7 +99,24 @@ const LiveChat = (function () {
     send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
     tick: '<path d="M20 6 9 17l-5-5"/>',
     ticks: '<path d="M18 7 9.4 15.6 6 12.2"/><path d="M22 7l-8.6 8.6-.9-.9"/>',
+    clip: '<path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.6l8.49-8.48"/>',
+    smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+    doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
   };
+
+  /* A small, deliberately boring set. A full emoji keyboard is a library plus a
+     font-loading problem; these are the ones people actually send to a travel
+     desk, and each renders from the system font on Windows, Android and iOS
+     with no webfont. Written as escapes rather than literal glyphs so the file
+     stays ASCII and cannot be mangled by an editor guessing its encoding. */
+  const EMOJI = [
+    '\u{1F600}', '\u{1F604}', '\u{1F642}', '\u{1F609}', '\u{1F60A}', '\u{1F607}',
+    '\u{1F614}', '\u{1F622}', '\u{1F62D}', '\u{1F633}', '\u{1F644}', '\u{1F914}',
+    '\u{1F44D}', '\u{1F44E}', '\u{1F64F}', '\u{1F44C}', '\u{1F44F}', '\u{1F4AF}',
+    '\u{2764}\u{FE0F}', '\u{1F525}', '\u{2705}', '\u{274C}', '\u{2757}', '\u{2753}',
+    '\u{2708}\u{FE0F}', '\u{1F3E8}', '\u{1F3D6}\u{FE0F}', '\u{1F5FA}\u{FE0F}',
+    '\u{1F4C5}', '\u{1F4B3}', '\u{1F4CE}', '\u{1F44B}',
+  ];
   const svg = (paths, cls) =>
     '<svg viewBox="0 0 24 24" aria-hidden="true"' + (cls ? ' class="' + cls + '"' : '') + '>'
     + paths + '</svg>';
@@ -131,10 +148,26 @@ const LiveChat = (function () {
 
     const bubble = document.createElement('div');
     bubble.className = 'lc-bubble';
-    /* textContent, not innerHTML. See the module header. */
-    bubble.textContent = message.deleted_at
-      ? 'This message was deleted'
-      : (message.body || '');
+    const files = (!message.deleted_at && message.attachments) || [];
+    if (files.length) {
+      bubble.classList.add('lc-bubble-file');
+      files.forEach(file => bubble.appendChild(attachmentEl(file)));
+    }
+    if (message.deleted_at || message.body) {
+      const text = document.createElement('div');
+      text.className = 'lc-text';
+      /* textContent, not innerHTML. See the module header. */
+      text.textContent = message.deleted_at
+        ? 'This message was deleted'
+        : (message.body || '');
+      bubble.appendChild(text);
+    }
+    if (message.uploading) {
+      const bar = document.createElement('div');
+      bar.className = 'lc-progress';
+      bar.appendChild(document.createElement('i'));
+      bubble.appendChild(bar);
+    }
     row.appendChild(bubble);
 
     const meta = document.createElement('div');
@@ -166,6 +199,239 @@ const LiveChat = (function () {
     }
     row.appendChild(meta);
     return row;
+  }
+
+  /** One file inside a bubble: a thumbnail for a photo, a row for anything else.
+   *
+   *  THE IMAGE IS FETCHED WITH THE BEARER TOKEN AND SHOWN FROM A BLOB, not set
+   *  as a plain `src`. The download endpoint requires the Authorization header,
+   *  which `<img src>` cannot send -- and putting the token in the query string
+   *  instead would write it into every proxy log and browser history entry
+   *  between here and the server.
+   */
+  function attachmentEl(file) {
+    const isImage = /^image\//.test(file.mime_type || '');
+    if (!isImage) {
+      const link = document.createElement('a');
+      link.className = 'lc-file';
+      link.href = '#';
+      link.innerHTML = svg(ICONS.doc, 'lc-file-icon');
+      const meta = document.createElement('span');
+      meta.className = 'lc-file-meta';
+      const name = document.createElement('span');
+      name.className = 'lc-file-name';
+      name.textContent = file.file_name || 'Attachment';
+      const size = document.createElement('span');
+      size.className = 'lc-file-size';
+      size.textContent = readableSize(file.file_size);
+      meta.appendChild(name);
+      meta.appendChild(size);
+      link.appendChild(meta);
+      link.addEventListener('click', e => { e.preventDefault(); saveFile(file); });
+      return link;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'lc-photo';
+    const img = document.createElement('img');
+    img.alt = file.file_name || 'Photo';
+    img.loading = 'lazy';
+    wrap.appendChild(img);
+    wrap.addEventListener('click', () => saveFile(file));
+    fetchBlob(file).then(url => { if (url) img.src = url; }).catch(() => {
+      wrap.classList.add('lc-photo-failed');
+      img.alt = 'This photo could not be loaded';
+    });
+    return wrap;
+  }
+
+  function readableSize(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /* Object URLs are held for the life of the widget rather than revoked per
+     render: a thumbnail still on screen must keep its blob, and the thread
+     re-renders on every incoming frame. */
+  const blobs = new Map();
+
+  async function fetchBlob(file) {
+    if (blobs.has(file.attachment_id)) return blobs.get(file.attachment_id);
+    const jwt = token();
+    const response = await fetch(API + '/attachments/' + file.attachment_id, {
+      headers: jwt ? { Authorization: 'Bearer ' + jwt } : {},
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const url = URL.createObjectURL(await response.blob());
+    blobs.set(file.attachment_id, url);
+    return url;
+  }
+
+  /** Save a file. Goes through a blob because the URL needs an auth header. */
+  async function saveFile(file) {
+    try {
+      const url = await fetchBlob(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.file_name || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      setBanner('That file could not be downloaded. Try again.');
+      setTimeout(() => setBanner(null), 4000);
+    }
+  }
+
+  /* -------------------------------------------------------------------------
+     Sending a file
+     ------------------------------------------------------------------------- */
+  const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+  const MAX_BYTES = 10 * 1024 * 1024;
+
+  /** Upload one file, showing an optimistic bubble throughout.
+   *
+   *  ALWAYS REST, NEVER THE SOCKET. A WebSocket frame would carry the bytes
+   *  base64-encoded down the same connection the conversation is using, which
+   *  blocks every other message on that channel for the length of a 10 MB
+   *  upload. The server publishes the result either way, so the other side
+   *  still hears about it immediately: the transport for the bytes and the
+   *  transport for the news do not have to be the same one.
+   */
+  async function upload(file) {
+    if (!file) return;
+    if (file.size > MAX_BYTES) {
+      setBanner('Files must be 10 MB or smaller.');
+      setTimeout(() => setBanner(null), 5000);
+      return;
+    }
+
+    const placeholder = 'local-' + Math.random().toString(36).slice(2);
+    const pending = {
+      client_msg_id: newClientId(),
+      sender_type: 'customer',
+      message_type: /^image\//.test(file.type) ? 'image' : 'file',
+      body: null,
+      created_at: new Date().toISOString(),
+      attachments: [{
+        attachment_id: placeholder,
+        file_name: file.name,
+        mime_type: file.type,
+        file_size: file.size,
+      }],
+      pending: true,
+      uploading: true,
+    };
+    /* The local preview is seeded into the blob cache under the placeholder id,
+       so the photo appears instantly instead of after a round trip to fetch
+       back bytes the browser is already holding. */
+    if (pending.message_type === 'image') {
+      blobs.set(placeholder, URL.createObjectURL(file));
+    }
+    state.messages.push(pending);
+    renderThread();
+    scrollToBottom();
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('client_msg_id', pending.client_msg_id);
+    try {
+      const jwt = token();
+      const response = await fetch(API + '/attachments', {
+        method: 'POST',
+        /* No Content-Type header on purpose: the browser must set the multipart
+           boundary itself, and naming the type here strips it. */
+        headers: jwt ? { Authorization: 'Bearer ' + jwt } : {},
+        body: form,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload && payload.detail) || 'Upload failed');
+      mergeMessage(payload.message);
+      renderThread();
+      scrollToBottom();
+    } catch (err) {
+      pending.uploading = false;
+      pending.pending = false;
+      pending.failed = true;
+      renderThread();
+      setBanner(err.message || 'That file could not be sent.');
+      setTimeout(() => setBanner(null), 5000);
+    }
+  }
+
+  /* -------------------------------------------------------------------------
+     The arrival sound
+     -------------------------------------------------------------------------
+     Synthesised rather than shipped as an mp3: no asset to cache-bust, nothing
+     to 404, and no autoplay-blocked <audio> element in the DOM. Two short
+     notes, quiet, and only for a message the reader did not send.
+
+     Browsers refuse to start audio before the page has been interacted with,
+     so the context is built lazily on the first play and every failure is
+     swallowed -- a chat that throws because a sound could not play is worse
+     than a silent one.
+
+     Reduced-motion suppresses it too. The setting is nominally about movement,
+     but the people who turn it on are asking for a calmer page, and an
+     unsolicited noise is not that. */
+  let audio = null;
+
+  function chime() {
+    try {
+      if (window.matchMedia
+          && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audio = audio || new Ctx();
+      if (audio.state === 'suspended') audio.resume();
+      const now = audio.currentTime;
+      [[880, 0], [1174.7, 0.11]].forEach(function (note) {
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = note[0];
+        gain.gain.setValueAtTime(0.0001, now + note[1]);
+        gain.gain.exponentialRampToValueAtTime(0.07, now + note[1] + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + note[1] + 0.16);
+        osc.connect(gain).connect(audio.destination);
+        osc.start(now + note[1]);
+        osc.stop(now + note[1] + 0.2);
+      });
+    } catch (e) { /* no audio available; not worth a word to the customer */ }
+  }
+
+  /** The emoji tray. Built once, then shown and hidden. */
+  function toggleEmoji(force) {
+    const tray = state.root && state.root.querySelector('[data-lc-emoji-tray]');
+    if (!tray) return;
+    const show = force === undefined ? tray.hidden : force;
+    if (show && !tray.childElementCount) {
+      EMOJI.forEach(glyph => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'lc-emoji';
+        btn.textContent = glyph;
+        /* Inserted at the caret, not appended: someone who clicked back into
+           the middle of a sentence meant to put it there. */
+        btn.addEventListener('click', () => insertAtCaret(glyph));
+        tray.appendChild(btn);
+      });
+    }
+    tray.hidden = !show;
+  }
+
+  function insertAtCaret(text) {
+    const input = state.input;
+    if (!input) return;
+    const start = input.selectionStart == null ? input.value.length : input.selectionStart;
+    const end = input.selectionEnd == null ? start : input.selectionEnd;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    const caret = start + text.length;
+    input.setSelectionRange(caret, caret);
+    input.focus();
+    autoGrow();
   }
 
   function renderThread() {
@@ -558,6 +824,7 @@ const LiveChat = (function () {
          rudest thing a chat widget can do. */
       if (atBottom()) scrollToBottom();
       if (state.open && data.sender_type === 'admin') markRead();
+      if (data.sender_type === 'admin' && !data.is_internal) chime();
       notify(data);
       return;
     }
@@ -584,6 +851,17 @@ const LiveChat = (function () {
           pending.pending = false;
           renderThread();
         }
+      }
+      return;
+    }
+    if (event === 'conversation_assigned') {
+      /* Auto-assignment happened server-side on this customer's first message.
+         Repainting the header from the frame means the widget can say who is
+         with them without asking for the conversation again. */
+      if (state.conversation) {
+        state.conversation.assigned_admin_name = data.assigned_admin_name;
+        state.conversation.status = data.status;
+        paintHeader();
       }
       return;
     }
@@ -675,8 +953,17 @@ const LiveChat = (function () {
       + svg(ICONS.close) + '</button>'
       + '</div>'
       + '<div class="lc-thread" data-lc-thread role="log" aria-live="polite" aria-label="Conversation"></div>'
+      + '<div class="lc-emoji-tray" data-lc-emoji-tray hidden></div>'
       + '<form class="lc-composer" data-lc-form>'
       + '<label class="lc-sr" for="lcInput">Message</label>'
+      + '<input type="file" class="lc-sr" data-lc-file'
+      + ' accept="' + ACCEPT + '">'
+      + '<button type="button" class="lc-tool" data-lc-attach'
+      + ' aria-label="Attach a photo or document" title="Attach a photo or PDF">'
+      + svg(ICONS.clip) + '</button>'
+      + '<button type="button" class="lc-tool" data-lc-emoji'
+      + ' aria-label="Insert an emoji" title="Emoji">'
+      + svg(ICONS.smile) + '</button>'
       + '<textarea class="lc-input" id="lcInput" data-lc-input rows="1"'
       + ' placeholder="Type your message…" maxlength="4000"></textarea>'
       + '<button type="submit" class="lc-send" data-lc-send aria-label="Send message">'
@@ -700,6 +987,45 @@ const LiveChat = (function () {
 
     const form = root.querySelector('[data-lc-form]');
     form.addEventListener('submit', e => { e.preventDefault(); send(); });
+
+    const picker = root.querySelector('[data-lc-file]');
+    const attach = root.querySelector('[data-lc-attach]');
+    if (attach && picker) {
+      attach.addEventListener('click', () => picker.click());
+      picker.addEventListener('change', () => {
+        const file = picker.files && picker.files[0];
+        /* Cleared before the await so choosing the same file twice in a row
+           still fires a change event the second time. */
+        picker.value = '';
+        upload(file);
+      });
+    }
+
+    const emoji = root.querySelector('[data-lc-emoji]');
+    if (emoji) {
+      emoji.addEventListener('click', e => { e.stopPropagation(); toggleEmoji(); });
+      root.addEventListener('click', e => {
+        if (!e.target.closest('[data-lc-emoji-tray]')
+            && !e.target.closest('[data-lc-emoji]')) toggleEmoji(false);
+      });
+    }
+
+    /* Drag a photo onto the panel. `dragover` must be prevented or the browser
+       navigates to the file instead of letting the page have it. */
+    const panel = root.querySelector('[data-lc-panel]');
+    if (panel) {
+      panel.addEventListener('dragover', e => {
+        e.preventDefault();
+        panel.classList.add('lc-dropping');
+      });
+      panel.addEventListener('dragleave', () => panel.classList.remove('lc-dropping'));
+      panel.addEventListener('drop', e => {
+        e.preventDefault();
+        panel.classList.remove('lc-dropping');
+        const dropped = e.dataTransfer && e.dataTransfer.files;
+        if (dropped && dropped.length) upload(dropped[0]);
+      });
+    }
 
     state.input.addEventListener('input', () => { autoGrow(); onTyping(); });
     state.input.addEventListener('keydown', e => {

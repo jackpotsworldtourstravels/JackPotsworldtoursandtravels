@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.session import SessionLocal
 from app.schemas.customer_chat import ChatMessageResponse, MAX_BODY_CHARS
+from app.services import chat_assignment as assignment_service
 from app.services import customer_chat_service as chat
 from app.services.chat_broker import get_broker
 
@@ -186,8 +187,17 @@ class ChatConnection:
                 client_msg_id=data.get("client_msg_id"),
             )
             chat.mark_delivered(db, [message.message_id])
+            # ROUTE ON THE FIRST MESSAGE, not when the widget opened the
+            # conversation: opening Support Center creates one whether or not
+            # the customer types, and assigning those fills an agent's list with
+            # chats nobody ever sent. `auto_assign` is a no-op once owned, so
+            # this costs one already-loaded attribute check per later message.
+            assignment = None
+            if conversation.assigned_admin_id is None:
+                assignment = await assignment_service.auto_assign(db, conversation)
             db.commit()
             payload = ChatMessageResponse.for_customer(message).model_dump(mode="json")
+            assigned_status = conversation.status
 
         # The sender gets an ack keyed to their client_msg_id so an optimistic
         # bubble can be reconciled; everyone on the channel gets the message.
@@ -199,6 +209,13 @@ class ChatConnection:
         await self.broker.publish(self.conversation_id, {
             "event": "receive_message", "data": payload,
         })
+        if assignment:
+            # On the conversation channel, so the customer's own socket can say
+            # "Priya is with you" without a refetch and any agent watching the
+            # thread sees it change hands. Same envelope the REST path sends.
+            await publish_assignment(
+                self.conversation_id, assignment[0], assignment[1], assigned_status,
+            )
 
     async def _on_typing(self, data: dict, *, typing: bool) -> None:
         """Typing is published but never stored.
@@ -307,6 +324,37 @@ async def serve_customer(websocket: WebSocket, ticket: str) -> None:
             await websocket.close(code=1011)
         except RuntimeError:
             pass   # already closed
+
+
+async def publish_message(conversation_id: int, body) -> None:
+    """Broadcast an already-serialised customer message.
+
+    Takes the `ChatMessageResponse`, not the ORM row, because its only caller is
+    the REST fallback — which builds that model before it commits, precisely so
+    nothing here has to touch an expired instance.
+    """
+    await get_broker().publish(conversation_id, {
+        "event": "receive_message", "data": body.model_dump(mode="json"),
+    })
+
+
+async def publish_assignment(
+    conversation_id: int, admin_id: int, admin_name: str, status: str,
+) -> None:
+    """Tell the conversation it has an owner.
+
+    One envelope shape for a routing decision, whether it was made by
+    `auto_assign` on a first message or by an agent pressing Accept.
+    """
+    await get_broker().publish(conversation_id, {
+        "event": "conversation_assigned",
+        "data": {
+            "conversation_id": conversation_id,
+            "assigned_admin_id": admin_id,
+            "assigned_admin_name": admin_name,
+            "status": status,
+        },
+    })
 
 
 async def publish_admin_message(conversation_id: int, message, *, internal: bool) -> None:

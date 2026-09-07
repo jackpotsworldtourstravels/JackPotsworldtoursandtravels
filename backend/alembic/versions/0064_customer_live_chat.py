@@ -183,9 +183,19 @@ def upgrade() -> None:
             "body IS NOT NULL OR message_type <> 'text'",
             name="ck_customer_chat_messages_text_has_body",
         ),
-        #: An admin message must say which admin. A customer message must not.
+        #: An admin message must SAY WHO WROTE IT — by id, or by name alone
+        #: for the replies migrated out of `customer_support_messages`,
+        #: which only ever recorded `author_name`. A customer message must
+        #: carry no admin id at all.
+        #:
+        #: This was `(sender_type = 'admin') = (sender_admin_id IS NOT NULL)`
+        #: until 0065, which rejected every row _migrate_tickets() below
+        #: writes for a staff reply — the migration's own comment explains
+        #: why that id is NULL, three lines from the constraint forbidding it.
         sa.CheckConstraint(
-            "(sender_type = 'admin') = (sender_admin_id IS NOT NULL)",
+            "(sender_type <> 'admin' AND sender_admin_id IS NULL) OR "
+            "(sender_type = 'admin' AND "
+            "(sender_admin_id IS NOT NULL OR sender_name IS NOT NULL))",
             name="ck_customer_chat_messages_admin_identified",
         ),
     )

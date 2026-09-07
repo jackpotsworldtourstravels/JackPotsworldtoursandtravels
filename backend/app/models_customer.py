@@ -1509,8 +1509,14 @@ class CustomerChatMessage(Base):
             "body IS NOT NULL OR message_type <> 'text'",
             name="ck_customer_chat_messages_text_has_body",
         ),
+        #: An admin message names its author by id, or by name alone for the
+        #: replies 0064 migrated out of the old ticket tables, which recorded
+        #: only `author_name`. A customer message carries no admin id.
+        #: Widened in 0065 — see that migration for what the original broke.
         CheckConstraint(
-            "(sender_type = 'admin') = (sender_admin_id IS NOT NULL)",
+            "(sender_type <> 'admin' AND sender_admin_id IS NULL) OR "
+            "(sender_type = 'admin' AND "
+            "(sender_admin_id IS NOT NULL OR sender_name IS NOT NULL))",
             name="ck_customer_chat_messages_admin_identified",
         ),
     )

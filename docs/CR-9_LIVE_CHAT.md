@@ -176,14 +176,38 @@ the rollback lossy for no gain.
 - **CLOSED** — archived. A new customer message creates a **new** conversation
   (the partial unique index in §3.1 permits exactly this).
 
-**Assignment.** On the first message into a `waiting` conversation, assign to the
-online admin with the fewest active conversations. Ties break on longest-idle. With one
-admin online, everything lands on them — the brief's requirement falls out of the rule
-rather than needing a special case. If **no** admin is online the conversation stays
-`waiting` and surfaces in the queue with its age; nothing is silently dropped.
+**Assignment** — `backend/app/services/chat_assignment.py`, run on the customer's
+first message from **both** the socket handler and the REST fallback, so a customer whose
+socket never connected still reaches an agent.
 
-Assignment is a single `UPDATE ... WHERE assigned_admin_id IS NULL` guarded by the row
-lock, so two workers racing to assign the same conversation cannot both win.
+The pool is every `ACTIVE` admin whose role is in `_ADMIN_ROLES` — the same tuple
+`get_current_admin` gates on, so the set a chat can be *given* to cannot drift from the
+set allowed to *open* one. It is sorted by open-conversation count ascending, then by
+`user_id`.
+
+**Ties break on `user_id`, not longest-idle** (as an earlier draft of this section said).
+Longest-idle needs a per-admin timestamp that nothing maintains, and inventing one would
+have meant a second write on every message. `user_id` is deterministic, which is what the
+tie-break actually has to be: two workers assigning two conversations in the same second
+must not disagree about the ordering by accident of row order. The conditional `UPDATE`
+makes the collision harmless when they land on the same admin anyway.
+
+**Offline admins still get the chat, and the status still says `waiting`.** If nobody
+holds a socket, the conversation is assigned — so it is in that admin's "Only mine" the
+moment they sign in — but it is not marked `active`, because `active` means somebody is
+on it. Assignment is a routing decision; status is a statement of fact, and letting the
+first quietly overwrite the second would make the queue's own badges lie about how long a
+customer has been waiting. `active` is set only when the chosen admin is online.
+
+Presence comes from the broker (`is_online("admin:{id}")`, one call per candidate — the
+pool is a handful of people, and `SCAN` on a shared Redis is a cost paid by everything
+else on that instance). A presence lookup that raises is treated as "nobody is online"
+rather than failing the send: routing is a hint, never a blocker.
+
+The write is a single `UPDATE ... WHERE assigned_admin_id IS NULL` — the same shape
+`claim()` uses, so auto-assignment and an agent pressing **Accept** in the same instant
+resolve in the database rather than in Python. Losing that race is silent on purpose: the
+chat has an owner either way, which is all the function was asked to achieve.
 
 ---
 
@@ -281,14 +305,54 @@ All under the existing routers, `slowapi` limits on every write.
 
 A 10 MB file pushed through the WebSocket blocks that socket's frame queue behind
 itself — typing indicators and incoming messages stall until it finishes, and a failed
-upload cannot resume without tearing down the connection. So: upload over HTTP, receive
-an `attachment_id`, then `send_message` referencing it. The socket only ever carries
-small JSON.
+upload cannot resume without tearing down the connection. So the bytes go over HTTP. The
+transport for the bytes and the transport for the news do not have to be the same one:
+the server publishes the finished message on the conversation channel, so the other side
+still learns about it immediately.
 
-Validation, all server-side: extension **and** sniffed MIME must agree and be in
-{jpg, jpeg, png, webp, pdf, doc, docx}; **≤ 10 MB** enforced by streaming the body with a
-running byte count, not by trusting `Content-Length`; images re-encoded to strip EXIF
-(passport photos carry GPS); filenames never used as storage keys.
+**One request, one message** — not "upload, get an `attachment_id`, then `send_message`
+referencing it" as this section first proposed. That two-step needs a holding area for
+uploaded-but-unsent files and a job to sweep the ones nobody ever sends, and it puts a
+window between the two calls in which the client can crash holding a file the server has
+no reason to keep. `POST /attachments` writes the message and the attachment row in one
+transaction, and takes an optional caption and the same `client_msg_id` an ordinary send
+uses, so a retried upload is idempotent by the mechanism already in place.
+
+**One file per message**, the way a chat client sends one. A single message carrying five
+files would need all five validated, stored and committed atomically, and a partial
+failure halfway through has no good answer — the customer watched four succeed. One file
+per message makes a failure the failure of one bubble, which the customer can retry by
+itself.
+
+Validation is `document_service.store_upload`, reused verbatim rather than reimplemented:
+declared type **and** the leading byte signature must agree, and the **≤ 10 MB** cap is
+enforced while streaming rather than from a client-supplied `Content-Length`. A rejected
+upload never reaches storage. Filenames are never used as storage keys — the key is a
+uuid under `chat/{conversation_id}/`, so a file called `../../etc/passwd` is an ugly label
+and nothing more.
+
+**Accepted: JPEG, PNG, WebP, PDF. `.doc` and `.docx` are refused**, though the brief lists
+DOC. The brief's own examples — passport copies, tickets, screenshots — are all photos or
+PDFs. `.doc` is an OLE compound file and `.docx` a zip; neither can be validated by a
+leading signature the way the four accepted types can, both can carry macros, and a
+support inbox is exactly where a hostile one would be sent. Widening the allowlist would
+widen it for passport uploads too, which is not a trade this feature gets to make on that
+feature's behalf. If Word files are genuinely needed, that is its own change with its own
+scanning story.
+
+**Photos are re-encoded to drop their EXIF**, and this is not polish. A customer
+photographs their passport on a phone; that JPEG carries the GPS coordinates of wherever
+it was taken, which for a passport is usually their home. `exif_transpose` runs *first* —
+orientation is itself an EXIF tag, so stripping without applying it saves a sideways
+passport. A re-encode that fails stores the original rather than losing the customer's
+file. PDFs are passed through untouched and arrive byte-identical, which
+`verify_live_chat.py` asserts: an e-ticket that differs by one byte is a broken e-ticket.
+
+Downloads are `Content-Disposition: attachment` with `nosniff`, `default-src 'none'` and
+`Cache-Control: private` — a support attachment is never rendered in this origin and never
+held by a shared proxy. The client fetches it with the bearer token and renders from a
+blob, because `<img src>` cannot send an `Authorization` header and a token in the query
+string would land in every proxy log between the browser and the server.
 
 ### 6.3 Admin
 | Method | Path | Purpose |
@@ -298,13 +362,26 @@ running byte count, not by trusting `Content-Length`; images re-encoded to strip
 | POST | `/api/admin/chat/conversations/{id}/claim` | Accept from the waiting queue |
 | POST | `/api/admin/chat/conversations/{id}/transfer` | `{to_admin_id}` |
 | POST | `/api/admin/chat/conversations/{id}/status` | resolve / close / reopen |
-| POST | `/api/admin/chat/conversations/{id}/notes` | Internal note — never sent to the customer |
+| POST | `/api/admin/chat/conversations/{id}/messages` | Reply, or an internal note via `is_internal` |
+| POST | `/api/admin/chat/conversations/{id}/attachments` | Send a file, `is_internal` honoured |
+| GET | `/api/admin/chat/attachments/{id}` | Download any conversation's file |
+| GET | `/api/admin/chat/agents` | Transfer targets |
 | GET | `/api/admin/chat/analytics` | §8.2 |
 
-Internal notes are `customer_chat_messages` rows with `sender_type='system'` and an
-`internal` flag — **not** a separate table, so they sort into the thread chronologically
-where an agent expects them. They are filtered out of every customer-facing query by the
-service layer, in one place.
+There is **no `/notes` endpoint**. A note is the same POST as a reply with
+`is_internal: true`, because it is the same row with one flag set, and a second endpoint
+would be a second place for the audience rule to be got wrong.
+
+Internal notes are `customer_chat_messages` rows with `sender_type='admin'` and
+`is_internal` — **not** `sender_type='system'` as an earlier draft said, and not a
+separate table. A note has an author and the thread shows it; `system` is reserved for
+events nobody wrote ("Chat assigned to Priya"). They sort into the thread
+chronologically where an agent expects them, and are filtered out of every
+customer-facing query by `_visible()` in the service layer, in one place — including the
+attachment download, which is why `attachment_for_customer` and `attachment_for_admin`
+are separate functions rather than one with a flag. A note's file must be unreachable by
+the customer even by guessing its id, and the safest guarantee of that is a customer
+lookup with no code path that could return one.
 
 ---
 
@@ -314,8 +391,23 @@ service layer, in one place.
 
 ```
 frontend/assets/css/live-chat.css        widget + panel, own --lc-* tokens (as site-footer.css does)
-frontend/assets/js/live-chat.js          LiveChat: socket, state, reconnect, render
+frontend/assets/js/live-chat.js          LiveChat: socket, state, reconnect, render, upload
+frontend/assets/css/live-support.css     agent console; reads the admin theme's tokens
 frontend/assets/js/admin-live-support.js Admin section, follows admin-*.js conventions
+```
+
+Backend, for the same map:
+
+```
+backend/app/routers/customer_chat.py     REST + the customer socket
+backend/app/routers/admin_chat.py        the agent queue, thread, replies, files
+backend/app/services/customer_chat_service.py  the rules; knows no transport
+backend/app/services/chat_gateway.py     socket handlers; one place that knows the envelope
+backend/app/services/chat_broker.py      Redis fan-out, tickets, presence
+backend/app/services/chat_assignment.py  who a chat goes to (§4) — the ONE file that
+                                         crosses the B2C/B2B registry line, on purpose
+backend/app/services/chat_attachments.py files (§6.2); wraps document_service, adds no
+                                         validation of its own
 ```
 
 The widget mounts exactly as the footer does — one script, no build step, no framework.
@@ -362,12 +454,22 @@ Three panes: queue (Waiting / Active / Resolved / Closed tabs with live counts) 
 thread → customer context (profile, and booking history when CR-10 lands).
 
 ### 8.2 Search and analytics
-Search by customer name, phone, email, conversation id and **booking reference** —
-the last by joining `customer_bookings`, which is the one an agent actually types.
 
-Analytics: waiting-queue depth, median first-response time, median resolution time,
-conversations per agent, messages per day. All derived from `created_at` /
-`last_message_at` / status transitions — no separate metrics table.
+Queue search (`?q=`) matches customer name, email, mobile, customer code, conversation id
+— and **booking reference or airline PNR**, across all three booking products. The single
+most common thing a customer opens with is "about booking JWT12345", and without it the
+agent has to look that reference up in another screen to find out whose chat to open. The
+customer does not know or care which of our tables their trip lives in, so it is one
+`UNION ALL` over `customer_bookings`, `customer_hotel_bookings` and
+`customer_package_bookings`.
+
+The match is a **prefix** (`term%`), not `%term%`. A reference is quoted whole in a chat
+or read off a ticket, so a prefix covers the real use; a leading wildcard would make this
+an unindexable full scan of the busiest tables in the database, run on every keystroke of
+the agent's search box.
+
+Analytics are derived from the conversation rows — queue depth by status, first-response
+and resolution times — with no metrics table behind them.
 
 ---
 
@@ -388,7 +490,10 @@ Not published to the host — reachable only on the compose network. No persiste
 everything in it (tickets, presence, pub/sub) is ephemeral by design, and an AOF file
 would be a liability rather than an asset.
 
-`REDIS_URL` into `backend/.env`. `redis>=5.0` into `requirements.txt`.
+`REDIS_URL` into `backend/.env`. `redis>=5.0` into `requirements.txt` — and, with
+slice 5, `Pillow>=10.4` for the EXIF re-encode (§6.2). Pillow was already on the box
+as a transitive dependency of the OCR extras; it is declared so that stops being luck,
+exactly as `requests` was after CR-8.
 
 **Caddy needs no change** — it upgrades WebSockets automatically.
 
@@ -417,7 +522,10 @@ This should be load-tested before launch, not assumed.
 | CSRF | Bearer tokens, not cookies — no ambient authority to forge |
 | SQL injection | SQLAlchemy parameter binding throughout; no string-built SQL |
 | Input validation | Pydantic schemas on every payload, including socket frames |
-| File validation | §6.2 |
+| File validation | §6.2 — allowlist **and** byte-signature sniff, streamed size cap, uuid keys |
+| Stored-file metadata | Photos re-encoded; EXIF (including phone GPS) does not reach storage — §6.2 |
+| File download | `Content-Disposition: attachment`, `nosniff`, `default-src 'none'`, `Cache-Control: private`; never rendered in this origin |
+| Internal-note files | A separate lookup for the customer with no code path that can return one (§6.3) |
 | Authorisation | Every query filtered by `customer_id` or `assigned_admin_id`; **never trust `conversation_id` from the client** |
 | Audit | `customer_audit_service` records claim, transfer, status change, deletion |
 
@@ -432,10 +540,23 @@ Each slice ships working and is independently verifiable.
    REST first. Proves the data model and the UI before real-time is in play.
 3. **WebSocket gateway + Redis fan-out.** Same UI, live. **Must be tested with
    `WEB_CONCURRENCY=2`** — a single-worker test proves nothing (§2).
-4. **Admin Live Support module.**
-5. **Attachments.**
-6. **Typing, receipts, presence, notifications, sound.**
-7. **Analytics, then `0065` dropping the ticket tables.**
+4. **Admin Live Support module.** Shipped — and the slice that exposed the
+   `datetime` serialisation bug which had made slice 3 a mirage in production: every
+   socket send stored the message, acked it, and then failed inside `publish()`. See the
+   commit; the reason 110 tests missed it is recorded there and is the more useful half.
+5. **Attachments.** Shipped, plus auto-assignment and booking-reference search, both of
+   which the brief asked for and slices 1–4 had not delivered.
+6. **Emoji, arrival sound, drag-and-drop.** Shipped with slice 5. Browser notifications
+   landed in slice 3. Presence exists in the broker and is consumed by auto-assignment;
+   it is **not** yet surfaced in either UI.
+7. **Not done: an analytics screen** (the endpoint exists, no UI), **transfer UI** (same),
+   **and dropping the ticket tables.** The drop is deliberately deferred — `0064` reads
+   them to migrate history and nothing else does, so they are dead weight rather than a
+   hazard, and keeping them one release means a rollback does not need a restore.
+
+`0065` is **not** the ticket-table drop this section originally planned for it. It fixes
+a check constraint `0064` shipped that forbade exactly what `0064`'s own data migration
+inserts — see the migration's docstring. The drop, when it happens, gets its own number.
 
 `tests/verify_live_chat.py`, registered in `run_all.py` (`verify_m9.py` fails the suite
 otherwise): conversation reuse across sessions, the partial unique index under
@@ -452,10 +573,16 @@ wrong-type uploads rejected, and two-worker fan-out.
 2. **24/7.** The site now advertises 24/7 support (2026-09-05). Out of hours, should the
    widget say "we typically reply in X minutes", or is the queue genuinely staffed
    overnight? This decides whether an away-state is needed at all.
-3. **Retention.** "Forever unless deleted by an administrator" is stated in the brief.
-   Attachments include passport copies — the Privacy Policy says travel-document data is
-   deleted once the trip and any claim are closed. **These two statements conflict** and
-   the policy is the published promise. Recommend: messages retained indefinitely,
+3. **Retention. STILL OPEN, AND NOW LOAD-BEARING — attachments ship.** "Forever
+   unless deleted by an administrator" is stated in the brief. Attachments include
+   passport copies; the Privacy Policy says travel-document data is deleted once the trip
+   and any claim are closed. **These two statements conflict** and the policy is the
+   published promise. Nothing in slice 5 expires a file. Storage keys are scoped
+   `chat/{conversation_id}/` specifically so a whole conversation's files can be removed
+   in one operation once this is decided. Recommend: messages retained indefinitely,
    attachments purged on a schedule, and the policy amended to say so.
+
+   The EXIF strip reduces the exposure — a stored passport photo no longer carries the
+   customer's home coordinates — but it does not answer the question.
 4. **Anonymous chat.** Chat before sign-in — supported, or authenticated only? Anonymous
    needs a browser-scoped identity and a merge-on-login path; not designed here.

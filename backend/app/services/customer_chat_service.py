@@ -306,6 +306,94 @@ def post_admin_message(
     return message
 
 
+def attach(
+    db: Session,
+    message: CustomerChatMessage,
+    *,
+    storage_key: str,
+    file_name: str,
+    mime_type: str,
+    file_size: int,
+) -> CustomerChatAttachment:
+    """Record a stored file against a message.
+
+    THE BYTES ARE ALREADY IN STORAGE BY THE TIME THIS RUNS, and that order is
+    deliberate: `document_service.store_upload` validates and streams first, so
+    a rejected upload never reaches the disk and never reaches this table. The
+    inverse order — row first, bytes after — leaves a row pointing at nothing
+    every time an upload fails halfway, and the download endpoint has no way to
+    tell that from a restore gap.
+
+    `storage_key` is never derived from `file_name`. The name is the customer's
+    and is kept only to display and to put in the download header; the key comes
+    from a uuid, which is why a file called `../../etc/passwd` is merely an
+    ugly label rather than a path traversal.
+    """
+    attachment = CustomerChatAttachment(
+        message_id=message.message_id,
+        storage_key=storage_key,
+        file_name=file_name,
+        mime_type=mime_type,
+        file_size=file_size,
+    )
+    db.add(attachment)
+    db.flush()
+    return attachment
+
+
+def attachment_for_customer(
+    db: Session, attachment_id: int, customer_id: int,
+) -> CustomerChatAttachment:
+    """One attachment, scoped to the conversation's owner.
+
+    Joined all the way up to the conversation rather than trusting the id: an
+    attachment id is a small integer, and enumerating them is the obvious first
+    thing to try against a download endpoint. The same `ChatNotFound` covers
+    "no such file" and "not yours", for the reason the class docstring gives.
+
+    AN INTERNAL NOTE'S ATTACHMENT IS NOT THE CUSTOMER'S. `_visible` filters
+    notes out of every message list; without the same rule here, a note whose
+    file the customer never saw listed would still download by id.
+    """
+    row = db.execute(
+        select(CustomerChatAttachment)
+        .join(CustomerChatMessage,
+              CustomerChatMessage.message_id == CustomerChatAttachment.message_id)
+        .join(CustomerConversation,
+              CustomerConversation.conversation_id == CustomerChatMessage.conversation_id)
+        .where(
+            CustomerChatAttachment.attachment_id == attachment_id,
+            CustomerConversation.customer_id == customer_id,
+            CustomerChatMessage.is_internal.is_(False),
+            CustomerChatMessage.deleted_at.is_(None),
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ChatNotFound(str(attachment_id))
+    return row
+
+
+def attachment_for_admin(db: Session, attachment_id: int) -> CustomerChatAttachment:
+    """One attachment, unscoped — an agent may open any conversation's files.
+
+    Deleted messages are still excluded. A tombstone means the sender withdrew
+    it, and honouring that only in the message list while leaving the file
+    downloadable makes the tombstone decorative.
+    """
+    row = db.execute(
+        select(CustomerChatAttachment)
+        .join(CustomerChatMessage,
+              CustomerChatMessage.message_id == CustomerChatAttachment.message_id)
+        .where(
+            CustomerChatAttachment.attachment_id == attachment_id,
+            CustomerChatMessage.deleted_at.is_(None),
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise ChatNotFound(str(attachment_id))
+    return row
+
+
 def _system_message(
     db: Session, conversation: CustomerConversation, body: str,
 ) -> CustomerChatMessage:
@@ -382,6 +470,12 @@ def _touch(
     the one where a message appears to have never arrived.
     """
     preview = (message.body or "")[:_PREVIEW_LIMIT] or None
+    if preview is None and message.message_type in ("image", "file"):
+        # A file sent with no caption has no body, and a queue row reading
+        # "(no message)" tells the agent nothing about whether to open it.
+        # The word, not the filename: names are customer-supplied and the
+        # queue is the one place a 200-character name would break the layout.
+        preview = "Photo" if message.message_type == "image" else "Attachment"
     column = (
         CustomerConversation.admin_unread_count
         if unread_for == "admin"
