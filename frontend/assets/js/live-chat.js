@@ -614,6 +614,9 @@ const LiveChat = (function () {
       call.id = data.call_id;
       call.status = 'ringing';
       call.direction = 'admin_to_customer';
+      JWCall.startRinging();
+      call.notification = JWCall.notifyIncoming(
+        'JackpotsWorld Support', (data.admin_name || 'Support') + ' is calling you');
       call.agentName = data.admin_name;
       showCallPanel(true);
       paintCall();

@@ -450,7 +450,7 @@ def mark_read(
 def ice_config(admin: User = Depends(get_current_admin)):
     """Same config the customer gets — see the customer route for why it is
     served rather than hardcoded, and why it is authenticated."""
-    return call_signaling.ice_config()
+    return call_signaling.ice_config(f"admin:{admin.user_id}")
 
 
 @router.get(

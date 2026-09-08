@@ -460,7 +460,12 @@ const AdminLiveSupport = (function () {
       call.customerName = data.customer_name || 'Customer';
       showCallCard(true);
       paintCall();
-      chime();
+      /* A RING, NOT A BEEP. chime() was one two-note blip — the same one a chat
+         message plays — so an agent looking at another tab heard it once and
+         missed the call. This keeps ringing until it is dealt with. */
+      JWCall.startRinging();
+      call.notification = JWCall.notifyIncoming(
+        'Incoming call', (data.customer_name || 'A customer') + ' is calling');
       return true;
     }
     if (event === 'call_taken' || event === 'call_busy') {

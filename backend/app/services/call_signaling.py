@@ -32,7 +32,11 @@ differ under Socket.IO except the connect call.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
+import time
 from typing import Any, Iterable, Optional
 
 from app.services.chat_broker import agent_channel, channel_for, get_broker
@@ -164,7 +168,35 @@ async def cancel_ring(admin_ids: Iterable[int], data: dict[str, Any]) -> None:
             logger.warning("call: could not clear the ring for admin %s", admin_id)
 
 
-def ice_config() -> dict[str, Any]:
+def turn_credentials(actor: str) -> tuple[str, str]:
+    """A time-limited TURN username/password pair for one browser.
+
+    coturn's REST-API scheme (`use-auth-secret`): the username is
+    `<unix-expiry>:<actor>` and the password is
+    `base64(HMAC-SHA1(shared-secret, username))`. coturn recomputes the same
+    HMAC and accepts it without ever having been told this user exists, so
+    there is no user table to keep in step and nothing to revoke.
+
+    THE POINT IS THE EXPIRY. A static username and password handed to every
+    browser is a permanent credential to a relay we pay for, sitting in the
+    devtools of anyone who looks. These stop working within the hour.
+
+    `actor` is only there to make a log line attributable — coturn does not
+    interpret it, and it must not be trusted as identity.
+    """
+    from app.config import settings  # noqa: PLC0415
+
+    expiry = int(time.time()) + max(60, settings.turn_credential_ttl_seconds)
+    username = f"{expiry}:{actor}"
+    digest = hmac.new(
+        settings.turn_static_auth_secret.encode("utf-8"),
+        username.encode("utf-8"),
+        hashlib.sha1,
+    ).digest()
+    return username, base64.b64encode(digest).decode("ascii")
+
+
+def ice_config(actor: str = "anon") -> dict[str, Any]:
     """The ICE servers a browser should use, in RTCConfiguration shape.
 
     Built from settings so TURN credentials are never baked into a static file
@@ -183,10 +215,16 @@ def ice_config() -> dict[str, Any]:
     if settings.stun_url_list:
         servers.append({"urls": settings.stun_url_list})
     if settings.turn_configured:
+        if settings.turn_static_auth_secret:
+            username, credential = turn_credentials(actor)
+        else:
+            # An older deployment with a fixed pair. Still works; still shipped
+            # to every browser, which is why the secret is preferred.
+            username, credential = settings.turn_username, settings.turn_password
         servers.append({
             "urls": settings.turn_url_list,
-            "username": settings.turn_username,
-            "credential": settings.turn_password,
+            "username": username,
+            "credential": credential,
         })
     else:
         logger.warning(

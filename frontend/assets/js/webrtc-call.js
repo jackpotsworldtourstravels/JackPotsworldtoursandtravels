@@ -51,6 +51,7 @@ const JWCall = (function () {
        came back", and the brief asks for both to be said differently. */
     wasDegraded: false,
     outputLabel: null,
+    notification: null,
   };
 
   function emit(name, detail) {
@@ -279,6 +280,10 @@ const JWCall = (function () {
    *  Does NOT create an offer — see the header on why that waits.
    */
   async function prepare(opts) {
+    /* Answering silences the ring. `prepare` is the first thing both sides do
+       when a call is accepted, so this covers the one exit that never reaches
+       reset(): the call that actually connects. */
+    stopRinging();
     reset();
     state.callId = opts.callId;
     state.role = opts.role;
@@ -392,6 +397,16 @@ const JWCall = (function () {
        "connection restored" the moment it connects. */
     state.wasDegraded = false;
     state.outputLabel = null;
+    /* THE RING STOPS HERE, not in each UI's teardown. Both call reset() on
+       every terminal path — answered elsewhere, declined, cancelled, timed
+       out, tab closing — so putting it here means neither UI can forget one.
+       A ringtone that outlives its call is the most annoying bug this feature
+       could ship. */
+    stopRinging();
+    if (state.notification) {
+      try { state.notification.close(); } catch (e) {}
+      state.notification = null;
+    }
   }
 
 
@@ -474,6 +489,100 @@ const JWCall = (function () {
 
   function currentOutputLabel() { return state.outputLabel; }
 
+
+  /* -------------------------------------------------------------------------
+     The ringtone
+     -------------------------------------------------------------------------
+     SHARED BY BOTH UIS, because a ring is a ring. It lives here rather than in
+     each UI's own chime() for the reason the rest of this file exists: two
+     copies means the one nobody updated is the one that stops ringing.
+
+     A RINGTONE IS NOT A NOTIFICATION SOUND, and that difference is the whole
+     point of this code. The previous behaviour played one two-note beep when a
+     call arrived — the same beep a chat message plays. An agent who had glanced
+     away, or had the console in a background tab, heard it once and missed the
+     call. This repeats until somebody accepts, declines, or the caller gives
+     up.
+
+     Synthesised rather than an mp3: no asset to cache-bust, nothing to 404, and
+     no <audio> element for an autoplay policy to block. Browsers refuse to
+     start audio before the page has been interacted with — an agent signed into
+     a console has interacted with it — and every failure here is swallowed,
+     because a call that throws because it could not make a noise is worse than
+     a silent one.
+
+     It deliberately does NOT respect prefers-reduced-motion, unlike the chat
+     chime. That setting asks for a calmer page; it does not ask to miss a
+     phone call.
+  */
+  let ringCtx = null;
+  let ringTimer = null;
+
+  function ringOnce() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    ringCtx = ringCtx || new Ctx();
+    if (ringCtx.state === 'suspended') ringCtx.resume();
+    const now = ringCtx.currentTime;
+    /* Two bursts of a two-tone pair — the shape of a telephone ring, which is
+       recognisable as "answer me" in a way an arbitrary melody is not. */
+    [0, 0.4].forEach(function (offset) {
+      [440, 480].forEach(function (freq) {
+        const osc = ringCtx.createOscillator();
+        const gain = ringCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.09, now + offset + 0.03);
+        gain.gain.setValueAtTime(0.09, now + offset + 0.28);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.33);
+        osc.connect(gain).connect(ringCtx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.35);
+      });
+    });
+  }
+
+  /** Ring until stopRinging(). Safe to call twice. */
+  function startRinging() {
+    if (ringTimer) return;
+    try {
+      ringOnce();
+      ringTimer = setInterval(() => {
+        try { ringOnce(); } catch (e) { stopRinging(); }
+      }, 3000);
+    } catch (e) {
+      /* No audio available. The popup is still on screen; silence is a
+         degraded ring, not a broken call. */
+      ringTimer = null;
+    }
+  }
+
+  /** MUST be called on every path out of ringing — answered, declined,
+   *  cancelled, timed out, socket dropped. A ringtone that outlives its call is
+   *  the most annoying bug this feature could ship. */
+  function stopRinging() {
+    if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+  }
+
+  /** A browser notification for a call arriving in a tab nobody is looking at.
+   *
+   *  `requireInteraction` so it stays until dismissed: a toast that vanishes
+   *  after four seconds is no use for something with a 45-second deadline.
+   *  `renotify` with a fixed tag so a second call replaces the first rather
+   *  than stacking.
+   */
+  function notifyIncoming(title, body) {
+    try {
+      if (!window.Notification || Notification.permission !== 'granted') return null;
+      state.notification = new Notification(title, {
+        body: body || '', tag: 'jw-incoming-call', renotify: true,
+        requireInteraction: true,
+      });
+      return state.notification;
+    } catch (e) { return null; }
+  }
+
   /** mm:ss from a start timestamp. Used by both UIs' timers. */
   function formatDuration(seconds) {
     const s = Math.max(0, Math.floor(seconds || 0));
@@ -486,6 +595,7 @@ const JWCall = (function () {
     prepare, createOffer, handleOffer, handleAnswer, handleCandidate,
     setMuted, toggleMute, isMuted, isActive, currentCallId,
     speakerSupported, speakerAvailable, cycleOutput, currentOutputLabel,
+    startRinging, stopRinging, notifyIncoming,
     reset, getMicrophone, micPermission, formatDuration,
   };
 })();

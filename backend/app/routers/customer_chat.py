@@ -283,7 +283,7 @@ def ice_config(customer: Customer = Depends(get_current_customer)):
     short-lived by design, and a browser holding a stale one fails to connect in
     a way that looks exactly like a network fault.
     """
-    return IceConfigResponse(**call_signaling.ice_config())
+    return IceConfigResponse(**call_signaling.ice_config(f"customer:{customer.customer_id}"))
 
 
 @router.get(
