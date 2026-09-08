@@ -46,6 +46,11 @@ const LiveChat = (function () {
     exhausted: false,
     booted: false,
     docked: null,
+    /* Whether this page wants the floating bubble at all. Only `autoMount()`
+       — which fires on a page carrying `data-live-chat` — turns it on. A page
+       that merely docks the panel into Support Center builds the same widget
+       on demand and must NOT get a launcher out of it. */
+    showLauncher: false,
   };
 
   /* -------------------------------------------------------------------------
@@ -1601,6 +1606,18 @@ const LiveChat = (function () {
   /* -------------------------------------------------------------------------
      Public API
      ------------------------------------------------------------------------- */
+  /** Show or hide the floating bubble, per this page's wishes.
+   *
+   *  Called from mount() and from undock(). The second is the one that
+   *  matters: undock() clears `lc-open`, which is what un-hides the launcher —
+   *  so without this, a page that never wanted a bubble would sprout one the
+   *  moment somebody closed Support Center.
+   */
+  function paintLauncher() {
+    const launcher = state.root && state.root.querySelector('[data-lc-launcher]');
+    if (launcher) launcher.hidden = !state.showLauncher;
+  }
+
   function mount() {
     if (state.booted || !signedIn()) return null;
     const root = document.createElement('div');
@@ -1615,6 +1632,7 @@ const LiveChat = (function () {
     document.body.appendChild(root);
     wire(root, false);
     state.booted = true;
+    paintLauncher();
     return root;
   }
 
@@ -1661,6 +1679,7 @@ const LiveChat = (function () {
     paintCallAffordance();
     state.panel.hidden = true;
     state.root.classList.remove('lc-open');
+    paintLauncher();
     state.open = false;
   }
 
@@ -1692,7 +1711,13 @@ const LiveChat = (function () {
   }
 
   function autoMount() {
-    if (document.querySelector('[data-live-chat]')) mount();
+    /* `data-live-chat` on the body is a page saying it wants the floating
+       bubble. Support Center does not go through here — it calls mountInto()
+       directly — so a page can host the conversation without advertising a
+       launcher in the corner. */
+    if (!document.querySelector('[data-live-chat]')) return;
+    state.showLauncher = true;
+    mount();
   }
 
   document.addEventListener('DOMContentLoaded', autoMount);

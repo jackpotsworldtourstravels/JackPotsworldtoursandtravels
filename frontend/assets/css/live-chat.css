@@ -548,7 +548,13 @@
 .lc-call-btn[hidden],
 .lc-calls[hidden],
 .lc-call-note[hidden],
-.lc-call-timer[hidden] { display: none; }
+.lc-call-timer[hidden],
+/* THE LAUNCHER TOO — `display: grid` above, so [hidden] alone loses. This is
+   the third element in this file to be caught by the same rule, which is two
+   more than it should have taken: every one of them declares a display, so
+   every one of them needs naming here. Anything given a display in this file
+   and toggled with `hidden` belongs in this list. */
+.lc-launcher[hidden] { display: none; }
 
 /* The retry offered when the microphone was refused. Styled as the panel's
    existing retry affordance rather than a new kind of button — the brief asks
