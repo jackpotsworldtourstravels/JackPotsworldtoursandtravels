@@ -421,11 +421,15 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
         import time as _time  # noqa: PLC0415
         from app.services import call_signaling as signalling  # noqa: PLC0415
 
-        with SessionLocal() as db:
-            from app.services import chat_assignment  # noqa: PLC0415
-            pool = [a for a, _ in chat_assignment.candidates(db)]
-        if await signalling.online_agents(pool):
-            return {"skipped": True}
+        # PRESENCE CANNOT BE CHECKED FROM HERE. This script is a separate
+        # process, so `get_broker()` builds its OWN in-process broker with an
+        # empty presence set — it cannot see the server's sockets at all, and
+        # asking it whether an agent is online always answers "no". (With
+        # REDIS_URL set it would work; without it, it is a confident lie.)
+        #
+        # So the outcome decides. A call that RINGS proves an agent was online,
+        # which is a fine state of the world and simply not the case this
+        # section is about. Only a call that ends as missed can be asserted on.
 
         ticket = requests.post(
             f"{BASE}/api/customer/chat/ws-ticket", headers=auth, timeout=8,
@@ -448,10 +452,19 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
             }
 
     empty = asyncio.run(_empty_room())
-    if empty.get("skipped"):
-        print("  SKIP  an agent is signed in, so the empty-room case cannot be forced")
+    final = empty.get("final") or {}
+    # ASSERT ONLY ON THE CASE THIS SECTION IS ABOUT. Anything other than a
+    # `missed` outcome means an agent was online and the call went somewhere —
+    # a fine state of the world, and not one this section can say anything
+    # about. Written as "only missed is testable" rather than "ringing is
+    # skippable" because the frame read can also stop at `calling`, and an
+    # earlier version treated that as a failure of the code instead of a
+    # timing artefact of the test.
+    if final.get("status") != "missed":
+        print(f"  SKIP  an agent is online (call went to "
+              f"{final.get('status') or 'no terminal status'}) — "
+              f"the empty-room case cannot be forced")
     else:
-        final = empty.get("final") or {}
         check(
             "a call with no agent online ends as missed",
             final.get("status") == "missed", str(final)[:200],
@@ -533,6 +546,32 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
     # different one.
     print("\n== recovering from a worker that died mid-ring ==")
     import datetime as dt
+
+    with SessionLocal() as db:
+        conversation = chat.get_or_create_conversation(db, caller_id)
+        # SETTLE ANYTHING THIS RUN LEFT LIVE FIRST. Earlier sections place real
+        # calls, and whether those end on their own depends on something this
+        # suite does not control: whether a REAL agent happens to be signed in.
+        # With nobody online they die as no_agent_online; with somebody online
+        # they legitimately ring on, and this section then collides with the
+        # partial unique index and fails for a reason that has nothing to do
+        # with what it is testing. Ninety confusing seconds, once, was enough.
+        for stale in db.execute(
+            select(CustomerCall).where(
+                CustomerCall.conversation_id == conversation.conversation_id,
+                CustomerCall.status.in_(("calling", "ringing", "accepted", "connected")),
+            )
+        ).scalars():
+            # The state machine allows `cancelled` only before an answer and
+            # `ended` only after one, and it is right to refuse the other way
+            # round — so the wind-down has to match how far the call got.
+            unanswered = stale.status in ("calling", "ringing")
+            calls.finish(
+                db, stale,
+                status="cancelled" if unanswered else "ended",
+                ended_by="system",
+            )
+        db.commit()
 
     with SessionLocal() as db:
         conversation = chat.get_or_create_conversation(db, caller_id)

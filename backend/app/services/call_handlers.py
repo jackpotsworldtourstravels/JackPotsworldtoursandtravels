@@ -144,6 +144,17 @@ class CallSession:
 
             payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
             targets = self._candidates(db, conversation) if self.kind == "customer" else []
+            # The fallback pool is read HERE, inside the session. `conversation`
+            # is detached once this block exits, and touching a lazy attribute
+            # on it afterwards would raise rather than answer.
+            fallback: list[int] = []
+            if self.kind == "customer" and conversation.assigned_admin_id is not None:
+                from app.services import chat_assignment  # noqa: PLC0415
+
+                fallback = [
+                    admin_id for admin_id, _ in chat_assignment.candidates(db)
+                    if admin_id not in targets
+                ]
             db.commit()
             public_id = call.public_id
 
@@ -157,6 +168,14 @@ class CallSession:
             # succeeds — so without this the customer hears 45 seconds of
             # ringing whenever every agent happens to be signed out.
             live = await sig.online_agents(targets)
+            if not live and fallback:
+                # THE ASSIGNED AGENT GETS FIRST REFUSAL, NOT THE ONLY ONE.
+                # Ringing only the owner is right while they are at their desk
+                # and indefensible the moment they are not: the call dies while
+                # every other agent sits idle, and the customer — who does not
+                # know or care which of us they were assigned to — is told
+                # nobody is available. First refusal is a priority, not a lock.
+                live = await sig.online_agents(fallback)
             if not live:
                 await self._terminate(public_id, "missed", "system", "no_agent_online")
                 return
