@@ -408,6 +408,32 @@ buttons disappear and chat is untouched.
 
 ---
 
+## 12a. Nobody is there — presence before ringing
+
+`ring_agents` counts **publishes, not listeners**. A Redis publish to a channel
+nobody subscribes to succeeds, so a non-zero return says the invitation was sent
+and nothing about whether anyone was there. An earlier version of this feature
+relied on that count to detect "no agent online", which was simply wrong: the
+count was zero only when no admin accounts existed at all, and a customer
+calling while every agent was signed out heard the full 45-second ring-out
+toward an outcome that was certain from the first millisecond.
+
+Both directions now consult presence first:
+
+- **Customer → agent**: candidates are filtered with `online_agents()`. None
+  online ends the call immediately as `missed` / `no_agent_online`, and the
+  widget says so and points at the chat instead.
+- **Agent → customer**: `is_online("customer:{id}")` — the brief's *"if customer
+  is online"*. An offline customer ends it as `missed` / `callee_offline` rather
+  than ringing a closed tab.
+
+**A presence lookup that raises is treated as ONLINE.** Presence is an
+optimisation; a Redis hiccup must not become "nobody is available" for a
+customer whose agent is sitting right there. Failing open costs one wasted ring.
+Failing closed silently disables calling.
+
+---
+
 ## 12b. Speaker, and "Connection restored"
 
 ### Speaker, and what the web platform can actually do

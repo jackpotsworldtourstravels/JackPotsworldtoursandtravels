@@ -92,6 +92,31 @@ async def to_agent(admin_id: int, event: str, data: dict[str, Any]) -> None:
     await get_broker().publish_to(agent_channel(admin_id), {"event": event, "data": data})
 
 
+async def is_online(actor: str) -> bool:
+    """Does this actor hold a live socket? `actor` is "customer:43" / "admin:7".
+
+    A presence lookup that raises is treated as ONLINE, not offline. Presence is
+    an optimisation — it exists to avoid ringing an empty room — and a Redis
+    hiccup must not turn into "nobody is available" for a customer whose agent
+    is sitting right there. Failing open costs one wasted ring; failing closed
+    silently disables calling.
+    """
+    try:
+        return await get_broker().is_online(actor)
+    except Exception:  # noqa: BLE001
+        logger.warning("call: presence lookup failed for %s; assuming online", actor)
+        return True
+
+
+async def online_agents(admin_ids: Iterable[int]) -> list[int]:
+    """Filter candidates down to the ones actually holding a socket."""
+    live = []
+    for admin_id in admin_ids:
+        if await is_online(f"admin:{admin_id}"):
+            live.append(admin_id)
+    return live
+
+
 async def ring_agents(admin_ids: Iterable[int], data: dict[str, Any]) -> int:
     """Ring every candidate agent. Returns how many were rung.
 
@@ -101,10 +126,12 @@ async def ring_agents(admin_ids: Iterable[int], data: dict[str, Any]) -> int:
     of them. Fanning out to named channels costs one publish per candidate —
     and there are, at most, a handful of candidates.
 
-    A returned zero is the `callee_offline` case and the caller should end the
-    call with that reason rather than letting it ring out: telling someone
-    "nobody answered" after 45 seconds, when the truth was known immediately, is
-    45 seconds of a customer's life spent on a lie.
+    THIS COUNT IS PUBLISHES, NOT LISTENERS, and that distinction cost a bug: a
+    Redis publish to a channel nobody subscribes to succeeds, so a non-zero
+    return says only that the invitation was sent, never that anyone was there
+    to receive it. Callers must filter with `online_agents()` FIRST — an earlier
+    version of this docstring claimed a zero meant "callee offline", which was
+    untrue and produced exactly the 45 seconds of false ringing it warned about.
     """
     broker = get_broker()
     rung = 0

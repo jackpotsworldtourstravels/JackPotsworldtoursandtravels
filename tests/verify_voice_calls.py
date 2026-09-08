@@ -385,6 +385,88 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
     check("a hangup reaches the other side", results.get("hangup_reaches_the_other_side"))
     check("and records who hung up", results.get("hangup_says_who_ended_it"))
 
+    # == 3b. nobody is there ==
+    #
+    # THE 45-SECOND LIE. `ring_agents` counts publishes, and a Redis publish to
+    # a channel nobody subscribes to succeeds — so before the presence filter,
+    # a customer calling when every agent was signed out heard a full ring-out
+    # toward an outcome that was certain from the first millisecond.
+    print("\n== ringing an empty room ==")
+
+    async def _presence_checks():
+        out = {}
+        from app.services import call_signaling as signalling  # noqa: PLC0415
+
+        out["empty_list"] = await signalling.online_agents([]) == []
+        out["ghost_admin"] = await signalling.online_agents([99999999]) == []
+        out["absent_customer"] = await signalling.is_online(
+            f"customer:{caller_id}") is False
+        return out
+
+    presence = asyncio.run(_presence_checks())
+    check("no candidates means nobody online", presence.get("empty_list"))
+    check(
+        "an admin id that holds no socket is not 'online'",
+        presence.get("ghost_admin"),
+        "a publish succeeding is not the same as somebody listening",
+    )
+    check(
+        "a customer with no socket is not 'online'",
+        presence.get("absent_customer"),
+    )
+
+    # End to end: place a call with NO agent socket open and require it to fail
+    # FAST. The point is the elapsed time as much as the status.
+    async def _empty_room():
+        import time as _time  # noqa: PLC0415
+        from app.services import call_signaling as signalling  # noqa: PLC0415
+
+        with SessionLocal() as db:
+            from app.services import chat_assignment  # noqa: PLC0415
+            pool = [a for a, _ in chat_assignment.candidates(db)]
+        if await signalling.online_agents(pool):
+            return {"skipped": True}
+
+        ticket = requests.post(
+            f"{BASE}/api/customer/chat/ws-ticket", headers=auth, timeout=8,
+        ).json()["ticket"]
+        async with ws_connect(f"{WS_BASE}/api/customer/chat/ws?ticket={ticket}") as cws:
+            await _recv_until(cws, {"joined"})
+            began = _time.monotonic()
+            await _send(cws, "call_request", {})
+            frames = []
+            while _time.monotonic() - began < 12:
+                got = await _recv_until(cws, {"call_status"}, timeout=12)
+                if got is None:
+                    break
+                frames.append(got[1])
+                if got[1].get("status") == "missed":
+                    break
+            return {
+                "elapsed": _time.monotonic() - began,
+                "final": frames[-1] if frames else None,
+            }
+
+    empty = asyncio.run(_empty_room())
+    if empty.get("skipped"):
+        print("  SKIP  an agent is signed in, so the empty-room case cannot be forced")
+    else:
+        final = empty.get("final") or {}
+        check(
+            "a call with no agent online ends as missed",
+            final.get("status") == "missed", str(final)[:200],
+        )
+        check(
+            "and it says WHY, rather than looking like a ring-out",
+            final.get("failure_reason") == "no_agent_online",
+            str(final.get("failure_reason")),
+        )
+        check(
+            "IT FAILS FAST — seconds, not the 45-second ring timeout",
+            empty.get("elapsed", 99) < 10,
+            f"took {empty.get('elapsed'):.1f}s",
+        )
+
     # == 4. the call log ==
     print("\n== the call log ==")
     r = requests.get(f"{BASE}/api/customer/chat/calls", headers=auth, timeout=8)

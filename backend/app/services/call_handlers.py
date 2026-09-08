@@ -151,14 +151,23 @@ class CallSession:
         await self._send("call_status", payload)
 
         if self.kind == "customer":
-            rung = await sig.ring_agents(targets, payload)
-            if rung == 0:
-                # Nobody to ring. Saying so now beats 45 seconds of ringing
-                # toward an outcome that was already certain.
+            # FILTERED BY PRESENCE BEFORE RINGING. `ring_agents` counts
+            # publishes, and a publish to a channel nobody subscribes to
+            # succeeds — so without this the customer hears 45 seconds of
+            # ringing whenever every agent happens to be signed out.
+            live = await sig.online_agents(targets)
+            if not live:
                 await self._terminate(public_id, "missed", "system", "no_agent_online")
                 return
+            await sig.ring_agents(live, payload)
             await self._mark_ringing(public_id)
         else:
+            # The brief's "if customer is online". Same reasoning in reverse:
+            # an agent calling a customer who closed the tab should be told now,
+            # not after the timeout.
+            if not await sig.is_online(f"customer:{payload['customer_id']}"):
+                await self._terminate(public_id, "missed", "system", "callee_offline")
+                return
             await sig.to_customer(conversation_id, "incoming_call", payload)
             await self._mark_ringing(public_id)
 

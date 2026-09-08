@@ -470,6 +470,9 @@ const AdminLiveSupport = (function () {
       return true;
     }
     if (event === 'call_status') {
+      if (data.status === 'missed' && data.failure_reason === 'callee_offline') {
+        setCallNote('This customer is not online. Reply in the chat instead.');
+      }
       if (data.call_id !== call.id && !isTerminal(data.status)) return true;
       call.status = data.status;
       call.customerName = data.customer_name || call.customerName;

@@ -621,6 +621,12 @@ const LiveChat = (function () {
       return true;
     }
     if (event === 'call_status') {
+      /* "No answer" and "nobody was there to answer" are different facts, and
+         the second one is not the customer's fault to sit through. */
+      if (data.status === 'missed' && data.failure_reason === 'no_agent_online') {
+        setCallNote('No agent is available right now. Send a message instead \u2014 '
+                    + 'we reply to every one.');
+      }
       call.id = data.status && !isTerminal(data.status) ? data.call_id : null;
       call.status = data.status;
       call.agentName = data.admin_name || call.agentName;
