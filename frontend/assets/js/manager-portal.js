@@ -17,7 +17,23 @@
    the actions this manager may take. The modal is a renderer over that payload
    and invents no endpoint of its own. */
 
-const MGR_API = ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
+/* SAME ORIGIN UNLESS THE PAGE IS NOT ON THE API'S PORT.
+   `localhost:8000` and `127.0.0.1:8000` are one machine and TWO ORIGINS to a
+   browser. This used to return an absolute 127.0.0.1 base for BOTH hostnames,
+   so every call made from http://localhost:8000 was cross-origin and died in
+   preflight -- which admin-auth.js reports as "Invalid email or password.",
+   showing a wrong password and a request that never arrived identically.
+
+   uvicorn on 8000 mounts frontend/ at / (see .claude/launch.json), so a local
+   page served from 8000 is already same-origin. A local page on any OTHER port
+   came off a plain file server -- Live Server on 5500/5501, or the `static`
+   entry on 8420 -- which has no /api, so that case needs the absolute base.
+   Asking "is this the API's port" rather than listing known dev ports means
+   there is no list to fall out of date the next time someone serves the
+   frontend from somewhere new. */
+const MGR_API = (['localhost', '127.0.0.1'].includes(location.hostname)
+               && location.port !== '8000')
+  ? 'http://127.0.0.1:8000' : '';
 
 const $mg = id => document.getElementById(id);
 

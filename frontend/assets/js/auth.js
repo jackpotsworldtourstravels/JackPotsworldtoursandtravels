@@ -195,8 +195,28 @@ function clearManagerSession() { Object.values(MGR_KEYS).forEach(k => localStora
    wiring at all, and Partner's OTP step called a different, now-dead,
    endpoint in the wrong order — see docs/API_CONTRACT.md §1 and §8).
    --------------------------------------------------------------------- */
+/* SAME ORIGIN UNLESS THE PAGE IS NOT ON THE API'S PORT.
+   `localhost:8000` and `127.0.0.1:8000` are one machine and TWO ORIGINS to a
+   browser. This used to return an absolute 127.0.0.1 base for BOTH hostnames,
+   so every call made from http://localhost:8000 was cross-origin and died in
+   preflight -- which admin-auth.js reports as "Invalid email or password.",
+   showing a wrong password and a request that never arrived identically.
+
+   THIS IS THE COPY THAT MATTERS MOST: every portal's login goes through
+   startPortalLogin() below, which calls this rather than the portal's own
+   API_BASE. Fixing those four constants made a raw fetch work while the
+   login form kept failing, because the form was never using them.
+
+   uvicorn on 8000 mounts frontend/ at / (see .claude/launch.json), so a local
+   page served from 8000 is already same-origin. A local page on any OTHER port
+   came off a plain file server -- Live Server on 5500/5501, or the `static`
+   entry on 8420 -- which has no /api, so that case needs the absolute base.
+   Asking "is this the API's port" rather than listing known dev ports means
+   there is no list to fall out of date the next time someone serves the
+   frontend from somewhere new. */
 function authApiBase() {
-  return ['localhost', '127.0.0.1'].includes(location.hostname) ? 'http://127.0.0.1:8000' : '';
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  return (local && location.port !== '8000') ? 'http://127.0.0.1:8000' : '';
 }
 
 /** Step 1: email + password + portal -> OTP challenge (LoginChallengeResponse). */

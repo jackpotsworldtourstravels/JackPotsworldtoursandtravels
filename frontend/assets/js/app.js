@@ -1,19 +1,21 @@
 'use strict';
 
-/* Backend API base.
-   Same-origin everywhere EXCEPT the documented two-terminal dev setup, where
-   the frontend is served by `python -m http.server 5500` and the API is a
-   separate uvicorn on 8000.
+/* SAME ORIGIN UNLESS THE PAGE IS NOT ON THE API'S PORT.
+   `localhost:8000` and `127.0.0.1:8000` are one machine and TWO ORIGINS to a
+   browser. This used to return an absolute 127.0.0.1 base for BOTH hostnames,
+   so every call made from http://localhost:8000 was cross-origin and died in
+   preflight -- which admin-auth.js reports as "Invalid email or password.",
+   showing a wrong password and a request that never arrived identically.
 
-   This used to send every localhost request to :8000 regardless of where the
-   page was actually served from, which broke the case app.main is built for —
-   uvicorn serving frontend/ AND /api from one origin (see .claude/launch.json,
-   "app.main mounts frontend/ at /, so this origin serves the portals AND
-   /api — same-origin, which the hardcoded API_BASE needs"). Anything that is
-   not the static-server port now talks to its own origin. */
-const STATIC_DEV_PORTS = ['5500', '5501'];
+   uvicorn on 8000 mounts frontend/ at / (see .claude/launch.json), so a local
+   page served from 8000 is already same-origin. A local page on any OTHER port
+   came off a plain file server -- Live Server on 5500/5501, or the `static`
+   entry on 8420 -- which has no /api, so that case needs the absolute base.
+   Asking "is this the API's port" rather than listing known dev ports means
+   there is no list to fall out of date the next time someone serves the
+   frontend from somewhere new. */
 const API_BASE = (['localhost', '127.0.0.1'].includes(location.hostname)
-                  && STATIC_DEV_PORTS.includes(location.port))
+                && location.port !== '8000')
   ? 'http://127.0.0.1:8000' : '';
 
 /* escapeHtml() now lives in shared/formatters.js, loaded before this file. */
