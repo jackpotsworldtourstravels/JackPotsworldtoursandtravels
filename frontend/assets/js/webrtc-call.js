@@ -46,6 +46,11 @@ const JWCall = (function () {
     iceServers: null,
     statsTimer: null,
     lastQuality: null,
+    /* True once ICE has dropped to `disconnected` at least once on this call.
+       Without it there is no way to tell "we just connected" from "we just
+       came back", and the brief asks for both to be said differently. */
+    wasDegraded: false,
+    outputLabel: null,
   };
 
   function emit(name, detail) {
@@ -182,12 +187,21 @@ const JWCall = (function () {
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
       if (s === 'connected' || s === 'completed') {
+        /* TWO DIFFERENT EVENTS FROM ONE ICE STATE. Arriving at `connected` for
+           the first time is the call starting; arriving there again after a
+           drop is the call recovering, and a customer who just heard three
+           seconds of silence needs to be told which of those happened. */
+        if (state.wasDegraded) {
+          state.wasDegraded = false;
+          emit('Restored');
+        }
         emit('Connected');
       } else if (s === 'disconnected') {
         /* NOT a failure yet. `disconnected` is routinely transient — a phone
            switching from wifi to mobile data spends a second or two here and
            recovers on its own. Reporting it as a dropped call would end calls
            that were about to be fine. */
+        state.wasDegraded = true;
         emit('Reconnecting');
       } else if (s === 'failed') {
         /* An ICE restart is the one recovery worth attempting: it re-gathers
@@ -210,6 +224,7 @@ const JWCall = (function () {
 
   async function restartIce() {
     try {
+      state.wasDegraded = true;
       emit('Reconnecting');
       const offer = await state.pc.createOffer({ iceRestart: true });
       await state.pc.setLocalDescription(offer);
@@ -373,7 +388,91 @@ const JWCall = (function () {
     state.muted = false;
     state.pendingCandidates = [];
     state.remoteDescriptionSet = false;
+    /* Cleared, or the NEXT call inherits this one's history and announces
+       "connection restored" the moment it connects. */
+    state.wasDegraded = false;
+    state.outputLabel = null;
   }
+
+
+  /* -------------------------------------------------------------------------
+     Audio output ("Speaker")
+     -------------------------------------------------------------------------
+     THE BRIEF ASKS FOR A SPEAKER BUTTON. The web platform can only partly give
+     one, and where it cannot, this hides the control rather than shipping a
+     button that silently does nothing.
+
+     `HTMLMediaElement.setSinkId()` is the only way a page can move audio to a
+     different output. It does not exist on iOS Safari at all — there is no web
+     API for earpiece-versus-speaker on iPhone, and no amount of code here
+     changes that. On desktop it works and is genuinely useful: it moves the
+     call from a headset to the laptop's speakers.
+
+     So this is an OUTPUT SWITCH, not a phone speakerphone toggle. It cycles
+     through the available audio outputs, which on a laptop with a headset
+     plugged in is exactly the "speaker" behaviour someone wants, and on a
+     device with one output is correctly absent.
+
+     `enumerateDevices` only returns device LABELS once microphone permission
+     has been granted — which, during a call, it has. Called before a call it
+     would return unlabelled entries, which is why availability is only ever
+     checked while one is running.
+  */
+  function speakerSupported() {
+    return typeof HTMLMediaElement !== 'undefined'
+      && typeof HTMLMediaElement.prototype.setSinkId === 'function';
+  }
+
+  async function outputDevices() {
+    if (!speakerSupported()) return [];
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(d => d.kind === 'audiooutput');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** Is there anywhere else to send the audio? False hides the button. */
+  async function speakerAvailable() {
+    const outs = await outputDevices();
+    return outs.length > 1;
+  }
+
+  /** Move to the next available output. Returns its label, or null.
+   *
+   *  Cycles rather than toggling between two fixed devices: a laptop with a
+   *  headset, a monitor and internal speakers has three, and a two-state
+   *  toggle would make one of them unreachable.
+   */
+  async function cycleOutput() {
+    const outs = await outputDevices();
+    if (outs.length < 2) return null;
+    const el = remoteAudioElement();
+    const current = el.sinkId || 'default';
+    let index = outs.findIndex(d => d.deviceId === current);
+    if (index === -1) index = 0;
+    const next = outs[(index + 1) % outs.length];
+    try {
+      await el.setSinkId(next.deviceId);
+    } catch (e) {
+      /* setSinkId rejects if the device vanished between enumerating and
+         setting — a headset unplugged mid-call. The browser has already fallen
+         back to the default output, so the call is fine and only the label is
+         wrong. */
+      emit('Error', {
+        code: 'output_failed',
+        message: 'That audio device is no longer available.',
+      });
+      return null;
+    }
+    state.outputLabel = next.label || 'Speaker';
+    emit('Output', { deviceId: next.deviceId, label: state.outputLabel });
+    return state.outputLabel;
+  }
+
+  function currentOutputLabel() { return state.outputLabel; }
 
   /** mm:ss from a start timestamp. Used by both UIs' timers. */
   function formatDuration(seconds) {
@@ -386,6 +485,7 @@ const JWCall = (function () {
   return {
     prepare, createOffer, handleOffer, handleAnswer, handleCandidate,
     setMuted, toggleMute, isMuted, isActive, currentCallId,
+    speakerSupported, speakerAvailable, cycleOutput, currentOutputLabel,
     reset, getMicrophone, micPermission, formatDuration,
   };
 })();

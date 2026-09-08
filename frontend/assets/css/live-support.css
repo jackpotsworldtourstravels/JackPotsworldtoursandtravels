@@ -280,3 +280,7 @@
 .als-calls[hidden],
 .als-call-note[hidden],
 .als-call-timer[hidden] { display: none; }
+/* The Speaker button is a plain .btn, which the console styles with a display.
+   Same trap as above: without this it shows even while hidden, on every device
+   that has nowhere else to send audio. */
+.als-call-actions .btn[hidden] { display: none; }

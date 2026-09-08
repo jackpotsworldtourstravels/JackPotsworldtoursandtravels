@@ -105,6 +105,7 @@ const LiveChat = (function () {
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
     phoneOff: '<path d="M10.7 13.3a16 16 0 0 0 4 3l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 5 15.5"/><path d="M2 2l20 20"/><path d="M8.6 3.7A2 2 0 0 0 7.1 2h-3a2 2 0 0 0-2 2.2 19.6 19.6 0 0 0 1 4.3"/>',
     mic: '<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 19v3"/>',
+    speaker: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/>',
     micOff: '<path d="M2 2l20 20"/><path d="M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M15 10.5V5a3 3 0 0 0-5.9-.7"/><path d="M19 10v1a7 7 0 0 1-10.8 5.9"/><path d="M5 10v1a7 7 0 0 0 2 4.9"/><path d="M12 19v3"/>',
   };
 
@@ -496,6 +497,22 @@ const LiveChat = (function () {
     return {
       onConnected: () => socketSend('call_connected', { call_id: call.id }),
       onReconnecting: () => { setCallNote('Reconnecting\u2026'); },
+      /* A DIFFERENT SENTENCE FROM "Connected". Someone who just heard three
+         seconds of silence needs to know the call came back rather than being
+         left to wonder whether it ever dropped. Cleared after a moment: a
+         banner that stays says "something is wrong" long after it is not. */
+      onRestored: () => {
+        setCallNote('Connection restored');
+        setTimeout(() => {
+          if (call.status === 'connected' && !call.quality) setCallNote(null);
+        }, 2600);
+      },
+      onOutput: info => {
+        setCallNote('Audio: ' + (info && info.label ? info.label : 'switched'));
+        setTimeout(() => {
+          if (call.status === 'connected' && !call.quality) setCallNote(null);
+        }, 2000);
+      },
       onQuality: q => {
         call.quality = q.quality;
         setCallNote(q.quality === 'poor' ? 'Poor connection' : null);
@@ -717,6 +734,20 @@ const LiveChat = (function () {
     }
     if (answerRow) answerRow.hidden = !incoming;
     if (liveRow) liveRow.hidden = incoming;
+
+    /* CHECKED DURING THE CALL, NOT AT MOUNT. `enumerateDevices` only returns
+       usable output entries once microphone permission has been granted, so
+       asking earlier would hide the button on a device that does have a second
+       output. Async, so the button appears a beat after the call connects —
+       which is fine, because it is useless before then anyway. */
+    const speakerBtn = root.querySelector('[data-lc-call-speaker]');
+    if (speakerBtn) {
+      if (call.status !== 'connected') {
+        speakerBtn.hidden = true;
+      } else {
+        JWCall.speakerAvailable().then(ok => { speakerBtn.hidden = !ok; });
+      }
+    }
     root.querySelector('[data-lc-panel]')
       && root.querySelector('[data-lc-panel]').classList.toggle(
         'lc-in-call', call.status === 'connected');
@@ -1318,6 +1349,11 @@ const LiveChat = (function () {
       + '<div class="lc-call-actions" data-lc-call-live>'
       + '<button type="button" class="lc-call-btn lc-call-mute" data-lc-call-mute'
       + ' aria-pressed="false">' + svg(ICONS.mic) + '<span>Mute</span></button>'
+      /* Hidden until a call is running and the device actually has somewhere
+         else to send audio — see JWCall.speakerAvailable(). A button that does
+         nothing is worse than no button. */
+      + '<button type="button" class="lc-call-btn lc-call-speaker" data-lc-call-speaker'
+      + ' hidden>' + svg(ICONS.speaker) + '<span>Speaker</span></button>'
       + '<button type="button" class="lc-call-btn lc-call-end" data-lc-call-hangup>'
       + svg(ICONS.phoneOff) + '<span>End</span></button>'
       + '</div>'
@@ -1362,6 +1398,8 @@ const LiveChat = (function () {
     if (hangupBtn) hangupBtn.addEventListener('click', () => hangUp());
     const muteToggle = root.querySelector('[data-lc-call-mute]');
     if (muteToggle) muteToggle.addEventListener('click', () => { JWCall.toggleMute(); });
+    const speakerToggle = root.querySelector('[data-lc-call-speaker]');
+    if (speakerToggle) speakerToggle.addEventListener('click', () => { JWCall.cycleOutput(); });
     const answerBtn = root.querySelector('[data-lc-call-answer-btn]');
     if (answerBtn) answerBtn.addEventListener('click', () => acceptCall());
     const declineBtn = root.querySelector('[data-lc-call-decline]');

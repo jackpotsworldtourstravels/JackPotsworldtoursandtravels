@@ -359,6 +359,14 @@ const AdminLiveSupport = (function () {
     return {
       onConnected: () => socketSend('call_connected', { call_id: call.id }),
       onReconnecting: () => setCallNote('Reconnecting\u2026'),
+      onRestored: () => {
+        setCallNote('Connection restored');
+        setTimeout(() => { if (call.status === 'connected') setCallNote(null); }, 2600);
+      },
+      onOutput: info => {
+        setCallNote('Audio: ' + (info && info.label ? info.label : 'switched'));
+        setTimeout(() => { if (call.status === 'connected') setCallNote(null); }, 2000);
+      },
       onQuality: q => setCallNote(q.quality === 'poor' ? 'Poor connection' : null),
       onFailed: info => {
         socketSend('call_failed', { call_id: call.id, reason: (info && info.code) || 'failed' });
@@ -540,6 +548,17 @@ const AdminLiveSupport = (function () {
     }
     if (answering) answering.hidden = !incoming;
     if (liveRow) liveRow.hidden = incoming;
+
+    /* Same rule as the customer widget: only knowable mid-call, so only asked
+       then. An agent on a headset switching to desk speakers is the whole use. */
+    const speakerBtn = document.getElementById('alsCallSpeaker');
+    if (speakerBtn) {
+      if (call.status !== 'connected') {
+        speakerBtn.hidden = true;
+      } else {
+        JWCall.speakerAvailable().then(ok => { speakerBtn.hidden = !ok; });
+      }
+    }
     if (viewBtn) {
       /* "View Customer" from the brief. Only useful while the popup is over a
          thread the agent has not opened. */
@@ -861,6 +880,7 @@ const AdminLiveSupport = (function () {
     document.getElementById('alsCallRejectBtn')?.addEventListener('click', () => rejectCall());
     document.getElementById('alsCallEndBtn')?.addEventListener('click', () => hangUp());
     document.getElementById('alsCallMute')?.addEventListener('click', () => JWCall.toggleMute());
+    document.getElementById('alsCallSpeaker')?.addEventListener('click', () => JWCall.cycleOutput());
     document.getElementById('alsCallView')?.addEventListener('click', () => {
       if (call.conversationId) openConversation(call.conversationId);
     });

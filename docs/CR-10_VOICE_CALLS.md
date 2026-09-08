@@ -408,6 +408,42 @@ buttons disappear and chat is untouched.
 
 ---
 
+## 12b. Speaker, and "Connection restored"
+
+### Speaker, and what the web platform can actually do
+
+`HTMLMediaElement.setSinkId()` is the only way a page can move audio to another
+output. **It does not exist on iOS Safari at all** — there is no web API for
+earpiece-versus-speaker on an iPhone, and no code changes that.
+
+So the button is an **output switch**, not a phone speakerphone toggle. It cycles
+through the available audio outputs, which on a laptop with a headset plugged in
+is exactly what someone means by "speaker". It is **hidden** unless `setSinkId`
+exists *and* the device reports more than one output — a control that silently
+does nothing is worse than no control.
+
+Availability is checked while a call is running, never before: `enumerateDevices`
+only returns usable output entries once microphone permission has been granted,
+so asking earlier would hide the button on devices that do have a second output.
+
+It cycles rather than toggling between two fixed devices: a laptop with a
+headset, a monitor and internal speakers has three, and a two-state toggle would
+make one of them unreachable.
+
+### "Connection restored"
+
+ICE reports `connected` both when a call starts and when it recovers from a
+drop. `wasDegraded` separates them, so someone who just heard three seconds of
+silence is told the call came back rather than left wondering whether it ever
+went. Cleared in `reset()` — otherwise the next call announces a recovery from
+the previous call's history the moment it connects.
+
+`disconnected` sets the flag but is deliberately **not** reported as a failure:
+a phone moving from wifi to mobile data spends a second or two there and
+recovers on its own.
+
+---
+
 ## 13. What is NOT built
 
 Stated here rather than discovered later.

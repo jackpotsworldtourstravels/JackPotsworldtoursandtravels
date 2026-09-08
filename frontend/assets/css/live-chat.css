@@ -545,6 +545,7 @@
    attribute for this and every other toggle in the file already relies on it. */
 .lc-call[hidden],
 .lc-call-actions[hidden],
+.lc-call-btn[hidden],
 .lc-calls[hidden],
 .lc-call-note[hidden],
 .lc-call-timer[hidden] { display: none; }
