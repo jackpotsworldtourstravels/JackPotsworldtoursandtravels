@@ -409,7 +409,7 @@ const LiveChat = (function () {
 
   /** The emoji tray. Built once, then shown and hidden. */
   function toggleEmoji(force) {
-    const tray = state.root && state.root.querySelector('[data-lc-emoji-tray]');
+    const tray = inPanel('[data-lc-emoji-tray]');
     if (!tray) return;
     const show = force === undefined ? tray.hidden : force;
     if (show && !tray.childElementCount) {
@@ -551,7 +551,22 @@ const LiveChat = (function () {
       });
     } catch (err) {
       call.status = null;
-      setCallNote(err.message || 'Your microphone could not be started.');
+      /* A DENIAL IS RECOVERABLE, so it gets a button rather than a sentence
+         that leaves the customer nowhere. Note that nothing here pre-empts the
+         browser prompt: getMicrophone() calls getUserMedia() directly and this
+         runs only on its rejection. What looks like "blocked before asking" is
+         the browser remembering an earlier denial and refusing without showing
+         the prompt again — which is exactly the case Try Again cannot fix on
+         its own, hence the sentence pointing at browser settings. */
+      if (err.code === 'permission_denied') {
+        setCallError(
+          'Microphone access is required for voice calls. '
+          + 'Please allow microphone permission in your browser settings.',
+          'Try Again', () => { setCallNote(null); startCall(); },
+        );
+      } else {
+        setCallNote(err.message || 'Your microphone could not be started.');
+      }
       paintCall();
       return;
     }
@@ -706,10 +721,28 @@ const LiveChat = (function () {
   }
 
   /* -- the timer ---------------------------------------------------------- */
+  /** Find something inside the PANEL, wherever the panel currently lives.
+   *
+   *  THE BUG THIS EXISTS TO KILL. `mountInto()` moves the panel out of the
+   *  floating root and into Support Center — so `state.root.querySelector()`
+   *  finds these elements while the widget floats and returns null once it is
+   *  docked. Seven call sites did exactly that, which meant the call panel, the
+   *  timer, call notes, the call log and the emoji tray were all silently
+   *  unreachable in Support Center: the one place voice calling is supposed to
+   *  live. Nothing threw; everything just quietly did nothing.
+   *
+   *  `state.panel` is the element that actually owns them and travels with
+   *  them. The launcher and the unread badge stay on `state.root`, because
+   *  those really are the floating widget's own.
+   */
+  function inPanel(selector) {
+    return state.panel ? state.panel.querySelector(selector) : null;
+  }
+
   function startCallTimer() {
     stopCallTimer();
     call.timer = setInterval(() => {
-      const el = state.root && state.root.querySelector('[data-lc-call-timer]');
+      const el = inPanel('[data-lc-call-timer]');
       if (el && call.connectedAt) {
         el.textContent = JWCall.formatDuration((Date.now() - call.connectedAt) / 1000);
       }
@@ -722,15 +755,39 @@ const LiveChat = (function () {
 
   /* -- the panel ---------------------------------------------------------- */
   function showCallPanel(show) {
-    const panel = state.root && state.root.querySelector('[data-lc-call]');
+    const panel = inPanel('[data-lc-call]');
     if (panel) panel.hidden = !show;
   }
 
   function setCallNote(text) {
-    const el = state.root && state.root.querySelector('[data-lc-call-note]');
+    const el = inPanel('[data-lc-call-note]');
     if (!el) return;
     el.textContent = text || '';
     el.hidden = !text;
+  }
+
+  /** A call note with something to press.
+   *
+   *  Built as elements rather than innerHTML: the only variable part is text
+   *  the server or the browser produced, and this panel already renders
+   *  customer-supplied message bodies a few pixels away.
+   */
+  function setCallError(text, actionLabel, onAction) {
+    const el = inPanel('[data-lc-call-note]');
+    if (!el) return;
+    el.textContent = '';
+    el.hidden = false;
+    const line = document.createElement('div');
+    line.textContent = text;
+    el.appendChild(line);
+    if (actionLabel) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'lc-call-retry';
+      btn.textContent = actionLabel;
+      btn.addEventListener('click', onAction);
+      el.appendChild(btn);
+    }
   }
 
   function paintCall() {
@@ -791,7 +848,7 @@ const LiveChat = (function () {
 
   /* -- recent calls ------------------------------------------------------- */
   async function loadCallLog() {
-    const list = state.root && state.root.querySelector('[data-lc-calls]');
+    const list = inPanel('[data-lc-calls]');
     if (!list) return;
     try {
       const body = await api('/calls?limit=8');
@@ -892,7 +949,23 @@ const LiveChat = (function () {
     return wrap;
   }
 
+  /* VOICE CALLING IS A SUPPORT CENTER FEATURE, NOT A WIDGET ONE.
+     The floating bubble is for a quick question from a product page; a call is
+     a deliberate act that belongs in the account area, next to the booking it
+     is about. Same panel either way — `mountInto()` relocates the one element
+     rather than building a second — so this is one condition on one button,
+     which is also why the two can never drift apart.
+
+     Called from paintHeader() so it re-evaluates on every dock and undock
+     without either of those needing to remember. */
+  function paintCallAffordance() {
+    const btn = inPanel('[data-lc-call-start]');
+    if (!btn) return;
+    btn.hidden = !state.docked;
+  }
+
   function paintHeader() {
+    paintCallAffordance();
     const sub = state.panel && state.panel.querySelector('.lc-head-sub');
     if (!sub) return;
     const conversation = state.conversation;
@@ -1361,7 +1434,10 @@ const LiveChat = (function () {
       + '<div class="lc-head-title">Support Center</div>'
       + '<div class="lc-head-sub">Our travel experts are available 24/7.</div>'
       + '</div>'
-      + '<button type="button" class="lc-head-call" data-lc-call-start'
+      /* hidden until paintCallAffordance() says otherwise — the widget
+         mounts floating, and a button that appears and then vanishes is worse
+         than one that was never there. */
+      + '<button type="button" class="lc-head-call" hidden data-lc-call-start'
       + ' aria-label="Start a voice call" title="Call support">'
       + svg(ICONS.phone) + '</button>'
       + '<button type="button" class="lc-head-close" data-lc-close aria-label="Close chat">'
@@ -1566,6 +1642,7 @@ const LiveChat = (function () {
     container.classList.add('lc-root', 'lc-docked');
     container.appendChild(state.panel);
     state.docked = container;
+    paintCallAffordance();
     state.panel.hidden = false;
     if (state.root) state.root.classList.add('lc-open');   /* hides the launcher */
     state.open = true;
@@ -1581,6 +1658,7 @@ const LiveChat = (function () {
     state.root.appendChild(state.panel);
     state.docked.classList.remove('lc-root', 'lc-docked');
     state.docked = null;
+    paintCallAffordance();
     state.panel.hidden = true;
     state.root.classList.remove('lc-open');
     state.open = false;

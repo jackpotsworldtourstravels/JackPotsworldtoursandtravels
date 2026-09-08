@@ -105,6 +105,9 @@ git -C "${REPO_DIR}" pull --ff-only \
   || fail "git pull failed. If it reports divergent branches, this host has commits that were never pushed — resolve that by hand rather than forcing."
 
 readonly AFTER_SHA="$(git -C "${REPO_DIR}" rev-parse HEAD)"
+# Handed to the container so /api/version can report it. Exported before
+# the build, because compose reads the environment at `up` time.
+export APP_COMMIT="${AFTER_SHA}"
 if [[ "${BEFORE_SHA}" == "${AFTER_SHA}" ]]; then
     info "already up to date at ${AFTER_SHA:0:7} — rebuilding and restarting anyway"
 else

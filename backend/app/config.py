@@ -340,6 +340,9 @@ class Settings(BaseSettings):
     #: a deploy to pull: a call feature that is misbehaving should be
     #: switch-offable while chat keeps working, because chat is the thing
     #: customers actually depend on.
+    #: The git commit this process was deployed from, set by
+    #: deploy/docker-compose.yml. "unknown" outside a deployment.
+    app_commit: str = "unknown"
     voice_calls_enabled: bool = True
     #: Comma-separated STUN URLs. Google's public server is the default and is
     #: enough for most home and office networks: it tells a browser its own

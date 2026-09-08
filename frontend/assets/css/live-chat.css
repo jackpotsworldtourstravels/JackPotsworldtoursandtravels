@@ -549,3 +549,27 @@
 .lc-calls[hidden],
 .lc-call-note[hidden],
 .lc-call-timer[hidden] { display: none; }
+
+/* The retry offered when the microphone was refused. Styled as the panel's
+   existing retry affordance rather than a new kind of button — the brief asks
+   for behaviour fixed, not a redesign. */
+.lc-call-retry {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.lc-call-retry:hover { background: rgba(255,255,255,.12); }
+.lc-call-retry:focus-visible { outline: 2px solid var(--lc-gold); outline-offset: 2px; }
+
+/* The call button is hidden on the floating widget and shown once the panel is
+   docked into Support Center. `.lc-head-call` sets a display, which beats the
+   browser's default [hidden] rule — the same trap this file has hit twice. */
+.lc-head-call[hidden] { display: none; }

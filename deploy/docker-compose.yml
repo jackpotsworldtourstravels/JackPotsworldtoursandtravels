@@ -23,6 +23,12 @@ services:
       # half of all messages to nobody with no error anywhere. `environment`
       # overrides `env_file`, so this cannot be lost by editing .env either.
       REDIS_URL: redis://redis:6379/0
+      # The commit this container was built from, exported by redeploy.sh and
+      # reported at /api/version. Without it there is no way to ask a RUNNING
+      # deployment what code it is running — and "is it actually deployed?"
+      # has already been answered wrongly once here, from output that looked
+      # healthy but described the previous build.
+      APP_COMMIT: ${APP_COMMIT:-unknown}
     restart: unless-stopped
     # No ports mapping: the app is reachable only through Caddy, on the
     # compose network. Publishing 8000 to the host would expose an untrusted
