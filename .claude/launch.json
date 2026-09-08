@@ -4,23 +4,54 @@
     {
       "name": "static",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8420", "--directory", "frontend"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8420",
+        "--directory",
+        "frontend"
+      ],
       "port": 8420
     },
     {
       "name": "backend",
       "runtimeExecutable": "backend/venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--port", "8000"],
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8000"
+      ],
       "port": 8000
     },
     {
       "//": "Attach-only: no command, so this connects to a uvicorn already",
       "//2": "listening on 8000 instead of failing to bind the port a second",
       "//3": "time. app.main mounts frontend/ at /, so this origin serves the",
-      "//4": "portals AND /api — same-origin, which the hardcoded API_BASE needs.",
+      "//4": "portals AND /api \u2014 same-origin, which the hardcoded API_BASE needs.",
       "name": "backend-attach",
       "url": "http://127.0.0.1:8000",
       "port": 8000
+    },
+    {
+      "//": "A second backend for verification when port 8000 is held by",
+      "//2": "another session. Safe since the origin fix in 3bcd3f6: the page",
+      "//3": "now calls /api on whatever origin served it, so any port works.",
+      "name": "backend-alt",
+      "runtimeExecutable": "backend/venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8010"
+      ],
+      "port": 8010
     }
   ]
 }

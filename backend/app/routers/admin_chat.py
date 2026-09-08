@@ -44,6 +44,7 @@ from app.schemas.customer_chat import (
 )
 from app.services import call_signaling
 from app.services import chat_attachments as attachments
+from app.services import chat_context_service
 from app.services import customer_call_service as call_service
 from app.services import chat_gateway, customer_chat_service as chat
 from app.services import document_service
@@ -480,6 +481,32 @@ def conversation_calls(
         calls=[CallResponse.model_validate(c) for c in rows],
         next_before_id=rows[-1].call_id if len(rows) == limit else None,
     )
+
+
+@router.get(
+    "/conversations/{conversation_id}/context",
+    summary="Who this customer is and what they have booked",
+)
+def conversation_context(
+    conversation_id: int,
+    admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """The panel that stops an agent asking for a booking reference.
+
+    Scoped by looking the CONVERSATION up first and reading its customer_id,
+    never by taking a customer id from the caller. An agent may open any
+    conversation, so this is not a privacy boundary between agents — but it does
+    mean the endpoint cannot be used to enumerate customers who have no
+    conversation at all, which is a different and worthwhile limit.
+
+    Read-only, and derived entirely from tables that already exist.
+    """
+    try:
+        conversation = chat.get_for_admin(db, conversation_id)
+    except chat.ChatNotFound:
+        raise _not_found()
+    return chat_context_service.for_customer(db, conversation.customer_id)
 
 
 @router.get("/agents", summary="Who a chat can be transferred to")

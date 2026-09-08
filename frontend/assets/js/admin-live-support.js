@@ -680,12 +680,103 @@ const AdminLiveSupport = (function () {
         <dt>Assigned</dt><dd>${esc(c.assigned_admin_name || 'Nobody')}</dd>
       </dl>
       <div class="als-calls" id="alsCallLog" hidden></div>
-      <div class="als-soon">Booking history — not yet exposed here</div>`;
+      <div class="als-bookings" id="alsBookings">
+        <div class="als-ctx-loading">Loading bookings\u2026</div>
+      </div>`;
     /* Rendered by THIS function rather than left as static markup in
        index.html: renderContext replaces the whole pane's innerHTML on every
        thread switch, so a container declared in the page is destroyed the
        first time an agent opens a conversation. */
     loadCallLog(c.conversation_id);
+    loadContext(c.conversation_id);
+  }
+
+  /* -------------------------------------------------------------------------
+     Booking context
+     -------------------------------------------------------------------------
+     THE POINT OF THIS PANE. Without it the first four exchanges of every chat
+     are the same: what is your booking reference, which trip, has the payment
+     gone through, what is your number. The customer told us all of it when they
+     booked, and asking again is slow and faintly insulting to someone who
+     booked twenty minutes ago.
+
+     Fetched per conversation rather than bundled into the queue response: the
+     queue is a list of fifty rows an agent refreshes constantly, and carrying
+     six bookings on each would make it many times larger to serve a panel only
+     the open conversation shows. */
+  async function loadContext(conversationId) {
+    const box = document.getElementById('alsBookings');
+    if (!box) return;
+    try {
+      const ctx = await api(`/conversations/${conversationId}/context`);
+      renderBookings(box, ctx);
+    } catch (error) {
+      /* A failure here must not look like "this customer has no bookings" —
+         that is a statement an agent would act on. */
+      box.innerHTML = '<div class="als-ctx-error">Bookings could not be loaded.</div>';
+    }
+  }
+
+  function renderBookings(box, ctx) {
+    const list = (ctx && ctx.bookings) || [];
+    const c = (ctx && ctx.customer) || {};
+    const extra = [];
+    if (c.customer_code) extra.push(`<dt>Customer</dt><dd>${esc(c.customer_code)}</dd>`);
+    if (c.city) extra.push(`<dt>City</dt><dd>${esc(c.city)}</dd>`);
+
+    if (!list.length) {
+      box.innerHTML = (extra.length ? `<dl class="als-dl">${extra.join('')}</dl>` : '')
+        + '<div class="als-ctx-empty">No bookings on this account yet.</div>';
+      return;
+    }
+
+    const unpaid = (ctx.totals && ctx.totals.unpaid_count) || 0;
+    box.innerHTML = `
+      ${extra.length ? `<dl class="als-dl">${extra.join('')}</dl>` : ''}
+      <h4 class="als-ctx-h">Recent bookings
+        ${unpaid ? `<span class="als-unpaid-pill">${unpaid} unpaid</span>` : ''}
+      </h4>
+      <ul class="als-bk-list">
+        ${list.map(bookingRow).join('')}
+      </ul>`;
+  }
+
+  const PRODUCT_LABEL = { flight: 'Flight', hotel: 'Hotel', package: 'Package' };
+
+  function bookingRow(b) {
+    /* The reference is the first thing on the row and is selectable, because
+       the single most common action an agent takes here is copying it into
+       another screen. */
+    const money = b.total_amount
+      ? `${esc(b.currency || 'INR')} ${Number(b.total_amount).toLocaleString('en-IN')}`
+      : '';
+    const when = b.travel_date
+      ? new Date(b.travel_date).toLocaleDateString('en-IN',
+          { day: 'numeric', month: 'short', year: 'numeric' })
+      : '';
+    /* `paid` is the only one worth colouring green. "pending" and "none" are
+       different facts — a payment that failed versus one never attempted — and
+       an agent needs to be able to say which. */
+    const payClass = b.paid ? 'is-paid' : (b.payment_status === 'none' ? 'is-none' : 'is-pending');
+    const payLabel = b.paid ? 'Paid'
+      : (b.payment_status === 'none' ? 'No payment' : esc(b.payment_status));
+    return `
+      <li class="als-bk">
+        <div class="als-bk-top">
+          <span class="als-bk-ref">${esc(b.booking_ref)}</span>
+          <span class="als-bk-kind">${esc(PRODUCT_LABEL[b.product] || b.product)}</span>
+        </div>
+        <div class="als-bk-title">${esc(b.title)}</div>
+        ${b.detail ? `<div class="als-bk-detail">${esc(b.detail)}</div>` : ''}
+        <div class="als-bk-meta">
+          ${when ? `<span>${esc(when)}</span>` : ''}
+          ${money ? `<span>${money}</span>` : ''}
+          <span class="als-bk-status">${esc(b.status)}</span>
+          <span class="als-pay ${payClass}">${payLabel}</span>
+        </div>
+        ${b.reference_extra
+          ? `<div class="als-bk-pnr">PNR ${esc(b.reference_extra)}</div>` : ''}
+      </li>`;
   }
 
   function paintActions() {

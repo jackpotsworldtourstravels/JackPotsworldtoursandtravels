@@ -216,7 +216,10 @@ function clearManagerSession() { Object.values(MGR_KEYS).forEach(k => localStora
    frontend from somewhere new. */
 function authApiBase() {
   const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-  return (local && location.port !== '8000') ? 'http://127.0.0.1:8000' : '';
+  /* The FRONTEND-ONLY dev servers, listed rather than inferred — see any
+     portal's API_BASE for why "not port 8000" was the wrong question. */
+  return (local && ['5500', '5501', '8420'].includes(location.port))
+    ? 'http://127.0.0.1:8000' : '';
 }
 
 /* ---------------------------------------------------------------------------

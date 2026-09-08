@@ -5,22 +5,24 @@
    reusing the core site's keys would let a partner login silently overwrite
    an admin or customer session open in the same browser, or vice versa. */
 
-/* SAME ORIGIN UNLESS THE PAGE IS NOT ON THE API'S PORT.
+/* SAME ORIGIN UNLESS THE PAGE CAME OFF A FILE SERVER.
    `localhost:8000` and `127.0.0.1:8000` are one machine and TWO ORIGINS to a
-   browser. This used to return an absolute 127.0.0.1 base for BOTH hostnames,
-   so every call made from http://localhost:8000 was cross-origin and died in
-   preflight -- which admin-auth.js reports as "Invalid email or password.",
-   showing a wrong password and a request that never arrived identically.
+   browser, which is why an absolute base for both hostnames broke every login
+   from http://localhost:8000 (3bcd3f6).
 
-   uvicorn on 8000 mounts frontend/ at / (see .claude/launch.json), so a local
-   page served from 8000 is already same-origin. A local page on any OTHER port
-   came off a plain file server -- Live Server on 5500/5501, or the `static`
-   entry on 8420 -- which has no /api, so that case needs the absolute base.
-   Asking "is this the API's port" rather than listing known dev ports means
-   there is no list to fall out of date the next time someone serves the
-   frontend from somewhere new. */
+   The list is the FRONTEND-ONLY dev servers: Live Server on 5500/5501 and the
+   `static` entry on 8420. Those serve files and no /api, so they need the
+   absolute base. Everything else — uvicorn on any port, which mounts frontend/
+   at /, and production behind Caddy — already serves its own API and must stay
+   same-origin.
+
+   An earlier version asked "is this port 8000?" instead of listing the file
+   servers. That reads as more general and is in fact narrower: a second backend
+   on any other port (verifying a change while 8000 is busy, say) was sent to
+   8000 and failed. The set of file-server ports is small and known; the set of
+   ports a backend might use is not. */
 const API_BASE = (['localhost', '127.0.0.1'].includes(location.hostname)
-                && location.port !== '8000')
+                && ['5500', '5501', '8420'].includes(location.port))
   ? 'http://127.0.0.1:8000' : '';
 
 /* PARTNER_KEYS, partnerAuthHeaders(), isPartnerLoggedIn(), storePartnerSession(),
