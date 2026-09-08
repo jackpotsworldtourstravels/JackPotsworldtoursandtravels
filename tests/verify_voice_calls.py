@@ -480,6 +480,63 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
             f"took {empty.get('elapsed'):.1f}s",
         )
 
+    # == 3c. presence expires, and something has to refresh it ==
+    #
+    # THE BUG THIS SECTION EXISTS FOR. `mark_online` sets a key with a
+    # sixty-second TTL. The customer widget pings every 25s; the agent console
+    # pinged NOTHING, so an admin was online for one minute after signing in
+    # and invisible for the rest of their shift — every call after that minute
+    # ended as no_agent_online.
+    #
+    # It was undetectable locally because `InProcessBroker.mark_online` took a
+    # `ttl` and ignored it: presence went into a set nothing expired. The same
+    # shape as the `datetime` bug in `publish` — a stand-in more permissive
+    # than the real thing is a way of not testing.
+    print("\n== presence expires unless something refreshes it ==")
+
+    async def _presence_ttl():
+        from app.services.chat_broker import InProcessBroker  # noqa: PLC0415
+
+        b = InProcessBroker()
+        out = {}
+        await b.mark_online("admin:9001", ttl=1)
+        out["online_when_marked"] = await b.is_online("admin:9001")
+        await asyncio.sleep(1.2)
+        out["expires_on_its_own"] = not await b.is_online("admin:9001")
+        await b.mark_online("admin:9001", ttl=1)
+        await asyncio.sleep(0.5)
+        await b.mark_online("admin:9001", ttl=1)          # what a heartbeat does
+        await asyncio.sleep(0.7)
+        out["refresh_keeps_it_alive"] = await b.is_online("admin:9001")
+        await b.mark_offline("admin:9001")
+        out["offline_when_cleared"] = not await b.is_online("admin:9001")
+        return out
+
+    ttl = asyncio.run(_presence_ttl())
+    check("presence is set when an actor connects", ttl.get("online_when_marked"))
+    check(
+        "IT EXPIRES ON ITS OWN — the dev broker honours the TTL Redis enforces",
+        ttl.get("expires_on_its_own"),
+        "presence that never lapses locally hides a missing heartbeat entirely",
+    )
+    check("a refresh before the deadline keeps it alive", ttl.get("refresh_keeps_it_alive"))
+    check("and marking offline clears it", ttl.get("offline_when_cleared"))
+
+    # The client half. A static read, because whether a browser sends a frame
+    # every 25 seconds is not observable from here — but its absence is exactly
+    # what broke, so it is worth pinning.
+    console = (ROOT / "frontend/assets/js/admin-live-support.js").read_text(encoding="utf-8")
+    check(
+        "THE AGENT CONSOLE SENDS A HEARTBEAT",
+        "setInterval(() => socketSend('ping'" in console,
+        "without it an agent drops off presence 60s after signing in",
+    )
+    check(
+        "and stops it when the socket closes",
+        "clearInterval(state.heartbeat)" in console,
+        "otherwise every reconnection stacks another interval",
+    )
+
     # == 4. the call log ==
     print("\n== the call log ==")
     r = requests.get(f"{BASE}/api/customer/chat/calls", headers=auth, timeout=8)

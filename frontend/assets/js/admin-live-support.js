@@ -32,6 +32,7 @@ const AdminLiveSupport = (function () {
     messages: [],
     ws: null,
     wsAttempt: 0,
+    heartbeat: null,
     booted: false,
   };
 
@@ -942,6 +943,18 @@ const AdminLiveSupport = (function () {
     ws.onopen = () => {
       state.wsAttempt = 0;
       setStatus('Live');
+      /* THE HEARTBEAT. Presence is a key with a sixty-second TTL that only a
+         frame from this socket refreshes. Without this an agent is online for
+         one minute after sign-in and invisible for the rest of their shift,
+         and every call placed after that minute is ended as "no agent
+         available" — which is exactly how this shipped. The customer widget
+         has always pinged; this side never did.
+
+         25s against a 60s TTL leaves room for two lost frames before presence
+         actually lapses. Started on OPEN rather than at construction, so a
+         socket that never connects does not ping into nothing. */
+      clearInterval(state.heartbeat);
+      state.heartbeat = setInterval(() => socketSend('ping', {}), 25000);
       if (state.current) socketSend('join_chat', {
         conversation_id: state.current.conversation_id,
       });
@@ -952,6 +965,10 @@ const AdminLiveSupport = (function () {
       handleFrame(frame.event, frame.data || {});
     };
     ws.onclose = () => {
+      /* Stop the heartbeat with the socket, or every reconnection stacks
+         another interval on top of the last. */
+      clearInterval(state.heartbeat);
+      state.heartbeat = null;
       state.ws = null;
       setStatus('Reconnecting…');
       scheduleReconnect();

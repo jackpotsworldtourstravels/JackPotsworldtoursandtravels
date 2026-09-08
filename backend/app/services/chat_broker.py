@@ -32,6 +32,7 @@ import asyncio
 import json
 import logging
 import secrets
+import time
 from typing import Any, AsyncIterator, Optional, Protocol
 
 from app.config import settings
@@ -218,7 +219,9 @@ class InProcessBroker:
     def __init__(self) -> None:
         self._queues: dict[str, set[asyncio.Queue]] = {}
         self._tickets: dict[str, str] = {}
-        self._online: set[str] = set()
+        #: actor -> monotonic deadline. A dict, not a set, because presence
+        #: expires — see mark_online.
+        self._online: dict[str, float] = {}
         logger.warning(
             "chat: REDIS_URL is not set — using the in-process broker. This is "
             "correct for ONE worker only; with WEB_CONCURRENCY>1 messages will "
@@ -265,13 +268,36 @@ class InProcessBroker:
         return self._tickets.pop(ticket, None) if ticket else None
 
     async def mark_online(self, actor: str, ttl: int = 60) -> None:
-        self._online.add(actor)
+        """Presence WITH the expiry, exactly as RedisBroker applies it.
+
+        THIS ARGUMENT USED TO BE IGNORED, and that hid a real bug for a whole
+        release. `ttl` existed in the signature and did nothing: presence went
+        into a set that never expired, so on a laptop an agent stayed online
+        forever no matter what the client did. On Redis the key expires after
+        sixty seconds unless refreshed — and the agent console was refreshing
+        nothing, so every call placed more than a minute after an admin signed
+        in found nobody available.
+
+        It was invisible locally for the same reason `publish` used to hide a
+        serialisation bug: a stand-in more permissive than the real thing is a
+        way of not testing. Same fix, same lesson, a second method of the same
+        class.
+        """
+        self._online[actor] = time.monotonic() + max(1, ttl)
 
     async def mark_offline(self, actor: str) -> None:
-        self._online.discard(actor)
+        self._online.pop(actor, None)
 
     async def is_online(self, actor: str) -> bool:
-        return actor in self._online
+        expires = self._online.get(actor)
+        if expires is None:
+            return False
+        if expires <= time.monotonic():
+            # Expired. Dropped on read rather than swept on a timer: there is no
+            # scheduler here, and an entry nobody asks about costs nothing.
+            self._online.pop(actor, None)
+            return False
+        return True
 
     async def ping(self) -> bool:
         return True
