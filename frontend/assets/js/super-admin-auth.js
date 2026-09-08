@@ -49,7 +49,7 @@ document.getElementById('saLoginForm').addEventListener('submit', async e => {
     saShowAuthStep('saAuthStep2');
   } catch (err) {
     msg.className = 'msg error';
-    msg.textContent = err.response?.data?.detail || 'Invalid email or password.';
+    msg.textContent = authErrorText(err, 'Invalid email or password.');
   }
 });
 
@@ -67,7 +67,7 @@ document.getElementById('saVerifyOtpBtn').addEventListener('click', async () => 
     showSuperAdminPortal();
   } catch (err) {
     msg.className = 'msg error';
-    msg.textContent = err.response?.data?.detail || 'Incorrect or expired code.';
+    msg.textContent = authErrorText(err, 'Incorrect or expired code.');
   } finally {
     btn.disabled = false;
   }
@@ -81,7 +81,7 @@ document.getElementById('saResendOtpBtn').addEventListener('click', async () => 
     msg.textContent = challenge.dev_otp ? `Dev mode — new code: ${challenge.dev_otp}` : 'A new code has been sent.';
   } catch (err) {
     msg.className = 'msg error';
-    msg.textContent = err.response?.data?.detail || 'Could not resend the code.';
+    msg.textContent = authErrorText(err, 'Could not resend the code.');
   }
 });
 document.getElementById('saBackToCredsBtn').addEventListener('click', () => {

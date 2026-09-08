@@ -81,6 +81,11 @@ function mgTime(hhmm) {
 }
 
 function mgrErr(err, fallback) {
+  /* `err.message` for a network failure is the string "Network Error", which
+     tells a Manager nothing. authErrorText says what to check instead. */
+  if (typeof authErrorText === 'function') {
+    return authErrorText(err, fallback || 'Something went wrong.');
+  }
   return err?.response?.data?.detail || err?.message || fallback || 'Something went wrong.';
 }
 

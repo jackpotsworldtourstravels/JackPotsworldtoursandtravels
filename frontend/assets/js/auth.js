@@ -219,6 +219,71 @@ function authApiBase() {
   return (local && location.port !== '8000') ? 'http://127.0.0.1:8000' : '';
 }
 
+/* ---------------------------------------------------------------------------
+   Turning a failure into a sentence that names the RIGHT thing
+   ---------------------------------------------------------------------------
+   Every portal used to write `err.response?.data?.detail || 'Invalid email or
+   password.'`, which tells the truth in exactly one of the three ways a login
+   fails and lies in the other two:
+
+     1. The request never arrived -- the server is down, or the page is on an
+        origin the API does not answer. There is no `err.response` at all, so
+        the `||` fires and the reader is told their password is wrong. The
+        origin bug fixed in 3bcd3f6 presented precisely like this, and the
+        message pointed at the one thing that was not the problem.
+     2. slowapi's 429 answers `{"error": "Rate limit exceeded: ..."}` with NO
+        `detail` key, so the `||` fires again. Someone who mistypes ten times
+        and then types it CORRECTLY is told their correct password is wrong,
+        which is the worst version of this: it makes people change a password
+        that was fine.
+     3. The credentials really were rejected. Only here was the sentence true.
+
+   `detail` is also an ARRAY for a 422, which renders as "[object Object]" when
+   assigned to textContent -- handled here so no caller has to remember. */
+function authErrorText(err, fallback) {
+  if (!err) return fallback;
+
+  /* No response object means the request did not complete: DNS, a refused
+     connection, a CORS preflight the browser blocked, or the tab going
+     offline. The browser deliberately does not tell a page WHICH of those it
+     was -- so this says what is knowable and points at what to check, rather
+     than guessing. */
+  if (!err.response) {
+    if (err.code === 'ECONNABORTED' || /timeout/i.test(err.message || '')) {
+      return 'The server took too long to respond. Try again in a moment.';
+    }
+    const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+    return local
+      ? `Could not reach the API at ${authApiBase() || location.origin}. `
+        + 'Check that the backend is running on port 8000.'
+      : 'Could not reach the server. Check your connection and try again.';
+  }
+
+  const status = err.response.status;
+  const data = err.response.data || {};
+
+  /* slowapi puts its message in `error`, not `detail`. Checked before the
+     `detail` lookup rather than after, so this cannot fall through again. */
+  if (status === 429) {
+    return typeof data.error === 'string' && data.error
+      ? `${data.error}. Wait a minute and try again.`
+      : 'Too many attempts. Wait a minute and try again.';
+  }
+
+  if (Array.isArray(data.detail)) {
+    const text = data.detail.map(d => d && d.msg).filter(Boolean).join(' ');
+    return text || fallback;
+  }
+  if (typeof data.detail === 'string' && data.detail) return data.detail;
+  if (typeof data.error === 'string' && data.error) return data.error;
+
+  /* A 5xx is ours, not the reader's. Saying "invalid password" for one sends
+     them to change a password that was never the problem. */
+  if (status >= 500) return 'The server had a problem handling that. Try again in a moment.';
+
+  return fallback;
+}
+
 /** Step 1: email + password + portal -> OTP challenge (LoginChallengeResponse). */
 async function startPortalLogin(portal, email, password) {
   const { data } = await axios.post(`${authApiBase()}/api/auth/login`, { email, password, portal });

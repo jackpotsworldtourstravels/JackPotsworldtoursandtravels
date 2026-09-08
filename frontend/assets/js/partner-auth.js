@@ -50,7 +50,7 @@ document.getElementById('partnerLoginBtn').addEventListener('click', async () =>
     setMsg('authStep1Msg', '', '');
     showAuthStep('authStep2');
   } catch (err) {
-    setMsg('authStep1Msg', err.response?.data?.detail || 'Invalid email or password.', 'error');
+    setMsg('authStep1Msg', authErrorText(err, 'Invalid email or password.'), 'error');
   } finally {
     btn.disabled = false;
   }
@@ -68,7 +68,7 @@ document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
     resetAuthFlow();
     showPartnerPortal();
   } catch (err) {
-    setMsg('authStep2Msg', err.response?.data?.detail || 'Incorrect or expired code.', 'error');
+    setMsg('authStep2Msg', authErrorText(err, 'Incorrect or expired code.'), 'error');
   } finally {
     btn.disabled = false;
   }
@@ -79,7 +79,7 @@ document.getElementById('resendOtpBtn').addEventListener('click', async () => {
     pendingChallengeToken = challenge.challenge_token;
     setMsg('authStep2Msg', challenge.dev_otp ? `Dev mode — new code: ${challenge.dev_otp}` : 'A new code has been sent.', 'success');
   } catch (err) {
-    setMsg('authStep2Msg', err.response?.data?.detail || 'Could not resend the code.', 'error');
+    setMsg('authStep2Msg', authErrorText(err, 'Could not resend the code.'), 'error');
   }
 });
 document.getElementById('backToCredsBtn').addEventListener('click', () => {

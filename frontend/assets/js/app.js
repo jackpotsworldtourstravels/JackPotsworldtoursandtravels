@@ -26,6 +26,16 @@ const API_BASE = (['localhost', '127.0.0.1'].includes(location.hostname)
    array straight to textContent renders "[object Object]", which is what the
    login and signup forms used to show. */
 function apiErrorText(err, fallback) {
+  /* Delegates to auth.js, which handles the two cases this used to get wrong:
+     a request that never reached the server, and slowapi's 429 (which answers
+     `{"error": ...}` with no `detail`, so the old code fell through to the
+     fallback and told people their password was wrong when it was not).
+     Kept as a named function because the whole customer portal calls it. */
+  if (typeof authErrorText === 'function') return authErrorText(err, fallback);
+
+  /* auth.js absent -- a page that loads app.js alone. Same shape, minus the
+     origin hint, so behaviour degrades rather than throwing. */
+  if (err && !err.response) return 'Could not reach the server. Check your connection and try again.';
   const detail = err?.response?.data?.detail;
   if (Array.isArray(detail)) {
     const text = detail.map(d => d?.msg).filter(Boolean).join(' ');
