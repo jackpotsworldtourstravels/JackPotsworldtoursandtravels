@@ -52,6 +52,7 @@ const JWCall = (function () {
     wasDegraded: false,
     outputLabel: null,
     notification: null,
+    held: false,
   };
 
   function emit(name, detail) {
@@ -397,6 +398,7 @@ const JWCall = (function () {
        "connection restored" the moment it connects. */
     state.wasDegraded = false;
     state.outputLabel = null;
+    state.held = false;
     /* THE RING STOPS HERE, not in each UI's teardown. Both call reset() on
        every terminal path — answered elsewhere, declined, cancelled, timed
        out, tab closing — so putting it here means neither UI can forget one.
@@ -583,6 +585,63 @@ const JWCall = (function () {
     } catch (e) { return null; }
   }
 
+
+  /* -------------------------------------------------------------------------
+     Hold
+     -------------------------------------------------------------------------
+     BOTH DIRECTIONS, which is what makes it hold rather than mute. Muting
+     stops them hearing you; holding also stops you hearing them, which is the
+     entire reason an agent presses it — to talk to a colleague, or to stop a
+     customer overhearing the room.
+
+     The peer connection is left up. Tearing it down and rebuilding on resume
+     would mean a fresh ICE negotiation every time, which on a mobile network
+     takes seconds and sometimes fails — turning a pause into a dropped call.
+     Holding is therefore cheap and instant, and the media path survives it. */
+  function setHold(on) {
+    state.held = !!on;
+    if (state.localStream) {
+      /* Outbound: the track stays in the sender, so no renegotiation. */
+      state.localStream.getAudioTracks().forEach(t => { t.enabled = !on; });
+    }
+    if (state.remoteAudio) {
+      /* Inbound: muted at the element rather than by stopping the track, which
+         would need renegotiation to undo. */
+      state.remoteAudio.muted = !!on;
+    }
+    emit('Hold', { on: state.held });
+    return state.held;
+  }
+
+  function isHeld() { return !!state.held; }
+
+  /** Drop the current session but keep the call, ready for a new offer.
+   *
+   *  Used by the customer when a call is transferred: the same call continues
+   *  with a different agent, so the peer connection is rebuilt while the call
+   *  id, the timer and the history stay exactly as they were. `reset()` would
+   *  throw all of that away and stop the ringtone-and-teardown machinery too.
+   */
+  function releasePeer() {
+    if (state.pc) {
+      try {
+        state.pc.onicecandidate = null;
+        state.pc.ontrack = null;
+        state.pc.oniceconnectionstatechange = null;
+        state.pc.onconnectionstatechange = null;
+        state.pc.close();
+      } catch (e) { /* already closed */ }
+    }
+    state.pc = null;
+    state.pendingCandidates = [];
+    state.remoteDescriptionSet = false;
+    state.held = false;
+    if (state.remoteAudio) {
+      state.remoteAudio.muted = false;
+      try { state.remoteAudio.srcObject = null; } catch (e) {}
+    }
+  }
+
   /** mm:ss from a start timestamp. Used by both UIs' timers. */
   function formatDuration(seconds) {
     const s = Math.max(0, Math.floor(seconds || 0));
@@ -595,6 +654,7 @@ const JWCall = (function () {
     prepare, createOffer, handleOffer, handleAnswer, handleCandidate,
     setMuted, toggleMute, isMuted, isActive, currentCallId,
     speakerSupported, speakerAvailable, cycleOutput, currentOutputLabel,
+    setHold, isHeld, releasePeer,
     startRinging, stopRinging, notifyIncoming,
     reset, getMicrophone, micPermission, formatDuration,
   };

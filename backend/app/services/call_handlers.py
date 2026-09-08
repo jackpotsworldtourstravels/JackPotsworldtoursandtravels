@@ -39,6 +39,7 @@ logger = logging.getLogger("jackpots.chat")
 CALL_EVENTS = (
     "call_request", "call_accept", "call_reject", "call_cancel", "call_end",
     "call_connected", "call_failed",
+    "call_hold", "call_resume", "call_transfer",
     "offer", "answer", "ice_candidate",
 )
 
@@ -200,6 +201,22 @@ class CallSession:
 
     # -- answering ---------------------------------------------------------
     async def accept(self, data: dict[str, Any]) -> None:
+        # A TRANSFER LOOKS LIKE AN ACCEPT AND IS NOT ONE. The call is already
+        # `connected` and already has an agent, so the ordinary path would
+        # refuse it. Checked first, and only for the agent it was offered to.
+        if self.kind == "admin":
+            with SessionLocal() as db:
+                try:
+                    pending = calls.get_by_public_id(db, str(data.get("call_id", "")))
+                except calls.CallNotFound:
+                    pending = None
+                if (pending is not None
+                        and pending.transfer_to_admin_id == self.actor_id
+                        and pending.status == "connected"):
+                    if await self._accept_transfer(db, pending):
+                        return
+                    await self._fail("call_taken", "That transfer was already answered.")
+                    return
         if self.kind == "customer":
             await self._customer_accept(data)
             return
@@ -297,6 +314,112 @@ class CallSession:
         # the other party's by however long the round trip took, and the two
         # would visibly disagree about the length of the call they are on.
         await self._notify_both(payload)
+
+    # -- hold ---------------------------------------------------------------
+    async def hold(self, data: dict[str, Any], *, on: bool) -> None:
+        """Tell the other side this call is paused.
+
+        PURE SIGNALLING. The audio is stopped by whoever pressed the button —
+        their browser disables its own outbound track and stops playing the
+        inbound one. The server's only job is to make sure the OTHER party is
+        told, because a call that goes silent with no explanation is
+        indistinguishable from a call that has broken, and a customer left in
+        that state hangs up.
+
+        Deliberately not stored. Hold is a property of a live session, not of
+        the call's history; a hold flag surviving in the database after the
+        socket died would leave the next reader thinking a finished call is
+        still paused.
+        """
+        with SessionLocal() as db:
+            try:
+                call = calls.get_by_public_id(db, str(data.get("call_id", "")))
+            except calls.CallNotFound:
+                await self._fail("no_such_call", "That call is no longer active.")
+                return
+            if not call.is_live or not await self._party_check(db, call):
+                await self._fail("no_such_call", "That call is no longer active.")
+                return
+            payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+
+        payload["on_hold"] = on
+        payload["held_by"] = self.kind
+        await self._notify_both({"event": "call_hold", "data": payload})
+
+    # -- transfer -----------------------------------------------------------
+    async def transfer(self, data: dict[str, Any]) -> None:
+        """Offer a connected call to another agent.
+
+        Only the agent currently on the call may do this, and only to somebody
+        who is online — offering a call to a signed-out colleague strands the
+        customer in silence while a ring goes nowhere.
+        """
+        if self.kind != "admin":
+            await self._fail("not_allowed", "Only an agent can transfer a call.")
+            return
+        try:
+            target_id = int(data.get("to_admin_id") or 0)
+        except (TypeError, ValueError):
+            target_id = 0
+        if not target_id:
+            await self._fail("bad_frame", "to_admin_id is required.")
+            return
+
+        if not await sig.is_online(f"admin:{target_id}"):
+            await self._fail("target_offline", "That agent is not online.")
+            return
+
+        with SessionLocal() as db:
+            try:
+                call = calls.get_by_public_id(db, str(data.get("call_id", "")))
+            except calls.CallNotFound:
+                await self._fail("no_such_call", "That call is no longer active.")
+                return
+            try:
+                calls.begin_transfer(
+                    db, call, from_admin_id=self.actor_id, to_admin_id=target_id,
+                )
+            except calls.CallError as exc:
+                await self._fail("rejected", str(exc))
+                return
+            db.commit()
+            payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+
+        payload["is_transfer"] = True
+        payload["from_admin_name"] = self.actor_name
+        # Rung on the target's own channel, exactly as a new call is — so a
+        # transfer reaches an agent reading something else, which is the whole
+        # point of that channel existing.
+        await sig.ring_agents([target_id], payload)
+        await self._send("call_transfer_ringing", payload)
+
+    async def _accept_transfer(self, db, call) -> bool:
+        """The second half of a transfer, run inside accept().
+
+        Returns True if this socket won the handover. The renegotiation that
+        follows reuses the ordinary offer/answer path: the customer is told to
+        prepare as a callee and the new agent creates a fresh offer, so there
+        is no second code path for transferred media to go wrong in.
+        """
+        if call.transfer_to_admin_id != self.actor_id:
+            return False
+        previous_admin = call.admin_id
+        if not calls.complete_transfer(
+            db, call, to_admin_id=self.actor_id, to_admin_name=self.actor_name,
+        ):
+            return False
+        db.commit()
+
+        payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+        payload["is_transfer"] = True
+        # The customer is NOT asked to answer again. They already consented to
+        # this call; being made to accept a second time mid-conversation would
+        # read as the call having dropped.
+        await sig.to_customer(call.conversation_id, "call_renegotiate", payload)
+        await self._send("call_accepted", payload)
+        if previous_admin:
+            await sig.to_agent(previous_admin, "call_transferred", payload)
+        return True
 
     async def _notify_both(self, payload: dict[str, Any]) -> None:
         await sig.to_customer(payload["conversation_id"], "call_status", payload)

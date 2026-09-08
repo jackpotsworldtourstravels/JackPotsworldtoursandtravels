@@ -623,6 +623,33 @@ const LiveChat = (function () {
       chime();
       return true;
     }
+    if (event === 'call_hold') {
+      if (data.held_by !== 'customer') {
+        setCallNote(data.on_hold
+          ? 'Support has put you on hold. Please stay on the line.'
+          : 'You are back with support.');
+        if (!data.on_hold) setTimeout(() => {
+          if (call.status === 'connected') setCallNote(null);
+        }, 2600);
+      }
+      return;
+    }
+    if (event === 'call_renegotiate') {
+      /* THE CALL IS BEING HANDED TO ANOTHER AGENT. The customer is NOT asked
+         to answer again — they already consented to this call, and a second
+         prompt mid-conversation reads as the call having dropped. The peer
+         connection is rebuilt in place and the new agent's offer arrives on
+         the ordinary path. */
+      setCallNote('Transferring you to ' + (data.admin_name || 'another agent') + '\u2026');
+      call.adminName = data.admin_name || call.adminName;
+      JWCall.releasePeer();
+      JWCall.prepare({
+        callId: data.call_id, role: 'callee', send: socketSend,
+        handlers: callHandlers(), iceServers: call.iceServers,
+      }).catch(() => setCallNote('That transfer could not be completed.'));
+      paintCall();
+      return;
+    }
     if (event === 'call_status') {
       /* "No answer" and "nobody was there to answer" are different facts, and
          the second one is not the customer's fault to sit through. */

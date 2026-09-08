@@ -75,6 +75,11 @@ function showAdminPortal() {
     document.getElementById('adminProfileMenuEmail').textContent = user.email || '';
   }
   startAdminPolling();
+  /* THE AGENT'S SOCKET OPENS HERE, at sign-in — not when Live Support is
+     opened. Until this line existed, an admin working on any other screen held
+     no socket, so a customer's call found no online agent and was ended before
+     it rang anywhere. */
+  if (typeof AdminLiveSupport !== 'undefined') AdminLiveSupport.boot();
 }
 function isAdminLoggedIn() { return !!localStorage.getItem('jwt_access'); }
 

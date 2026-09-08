@@ -23,7 +23,7 @@
      jp-ds.css despite the note above — it declares only its own --brand-* vars
      and re-points none of the tokens jp-ds owns. -->
 <link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260815svc2">
-<link rel="stylesheet" href="../assets/css/live-support.css?v=20260908bc1">
+<link rel="stylesheet" href="../assets/css/live-support.css?v=20260908ht1">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -559,32 +559,6 @@
               <button type="button" class="btn btn-sm" data-als-resolve hidden>Resolve</button>
               <button type="button" class="btn btn-sm" data-als-reopen hidden>Reopen</button>
               <button type="button" class="btn btn-sm btn-danger" data-als-close hidden>Close</button>
-            </div>
-          </div>
-          <!-- The incoming-call card. Sits above the thread rather than as a
-               floating modal: an agent mid-sentence should not have a dialog
-               steal their keyboard, and a card that pushes the thread down is
-               impossible to miss without being impossible to work around. -->
-          <div class="als-call" id="alsCall" hidden role="alertdialog"
-               aria-live="assertive" aria-label="Voice call">
-            <div class="als-call-main">
-              <span class="als-call-dot" aria-hidden="true"></span>
-              <div class="als-call-text">
-                <div class="als-call-who" id="alsCallWho">Customer</div>
-                <div class="als-call-status" id="alsCallStatus">Calling…</div>
-              </div>
-              <div class="als-call-timer" id="alsCallTimer" hidden>00:00</div>
-            </div>
-            <div class="als-call-note" id="alsCallNote" hidden></div>
-            <div class="als-call-actions" id="alsCallAnswer" hidden>
-              <button type="button" class="btn btn-sm" id="alsCallView" hidden>View customer</button>
-              <button type="button" class="btn btn-sm btn-danger" id="alsCallRejectBtn">Reject</button>
-              <button type="button" class="btn btn-sm btn-primary" id="alsCallAcceptBtn">Accept</button>
-            </div>
-            <div class="als-call-actions" id="alsCallLive">
-              <button type="button" class="btn btn-sm" id="alsCallMute" aria-pressed="false">Mute</button>
-              <button type="button" class="btn btn-sm" id="alsCallSpeaker" hidden>Speaker</button>
-              <button type="button" class="btn btn-sm btn-danger" id="alsCallEndBtn">End call</button>
             </div>
           </div>
           <div class="als-thread" id="alsThread">
@@ -1266,7 +1240,47 @@
 <script src="../components/spinner.js?v=20260815svc2"></script>
 <script src="../components/confirm-dialog.js?v=20260815svc2"></script>
 <script src="../components/focus-trap.js?v=20260815svc2"></script>
-<script src="../assets/js/auth.js?v=20260908bc1"></script>
+
+<!-- THE INCOMING-CALL CARD LIVES HERE, NOT IN THE LIVE SUPPORT SECTION.
+     It used to sit inside #section-live-support, which is display:none
+     whenever any other section is open — so a call arriving while the agent
+     was on Dashboard was delivered to an element nobody could see. A call
+     exists to interrupt; it cannot be owned by one screen. Fixed position,
+     top layer, visible from anywhere in the console. -->
+<div class="als-call als-call-float" id="alsCall" hidden role="alertdialog"
+     aria-live="assertive" aria-label="Voice call">
+  <div class="als-call-main">
+    <span class="als-call-dot" aria-hidden="true"></span>
+    <div class="als-call-text">
+      <div class="als-call-who" id="alsCallWho">Customer</div>
+      <div class="als-call-status" id="alsCallStatus">Calling…</div>
+    </div>
+    <div class="als-call-timer" id="alsCallTimer" hidden>00:00</div>
+  </div>
+  <div class="als-call-note" id="alsCallNote" hidden></div>
+  <div class="als-call-actions" id="alsCallAnswer" hidden>
+    <button type="button" class="btn btn-sm" id="alsCallView" hidden>View customer</button>
+    <button type="button" class="btn btn-sm btn-danger" id="alsCallRejectBtn">Reject</button>
+    <button type="button" class="btn btn-sm btn-primary" id="alsCallAcceptBtn">Accept</button>
+  </div>
+  <div class="als-call-actions" id="alsCallLive">
+    <button type="button" class="btn btn-sm" id="alsCallMute" aria-pressed="false">Mute</button>
+    <button type="button" class="btn btn-sm" id="alsCallHold" aria-pressed="false">Hold</button>
+    <button type="button" class="btn btn-sm" id="alsCallTransfer">Transfer</button>
+    <button type="button" class="btn btn-sm" id="alsCallSpeaker" hidden>Speaker</button>
+    <button type="button" class="btn btn-sm btn-danger" id="alsCallEndBtn">End call</button>
+  </div>
+  <div class="als-xfer" id="alsTransferPanel" hidden>
+    <label class="als-xfer-label" for="alsTransferTo">Transfer this call to</label>
+    <select id="alsTransferTo" class="als-xfer-select"></select>
+    <div class="als-xfer-actions">
+      <button type="button" class="btn btn-sm" id="alsTransferCancel">Cancel</button>
+      <button type="button" class="btn btn-sm btn-primary" id="alsTransferGo">Transfer</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js?v=20260908ht1"></script>
 <script src="../assets/js/api.js"></script>
 <!-- Renders the shared login into #adminAuthShell. Ordered BEFORE admin-auth.js
      deliberately: that module calls getElementById at parse time, so every id it
@@ -1305,9 +1319,9 @@
       </div>
     </div>
 
-<script src="../assets/js/webrtc-call.js?v=20260908bc1"></script>
-<script src="../assets/js/admin-live-support.js?v=20260908bc1"></script>
-<script src="../assets/js/admin.js?v=20260908bc1"></script>
+<script src="../assets/js/webrtc-call.js?v=20260908ht1"></script>
+<script src="../assets/js/admin-live-support.js?v=20260908ht1"></script>
+<script src="../assets/js/admin.js?v=20260908ht1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>

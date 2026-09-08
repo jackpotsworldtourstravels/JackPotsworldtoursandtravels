@@ -165,6 +165,64 @@ const AdminLiveSupport = (function () {
     paintActions();
   }
 
+
+  /* -------------------------------------------------------------------------
+     Hold
+     ------------------------------------------------------------------------- */
+  function toggleHold() {
+    if (!call.id || call.status !== 'connected') return;
+    const on = JWCall.setHold(!JWCall.isHeld());
+    socketSend(on ? 'call_hold' : 'call_resume', { call_id: call.id });
+    const btn = document.getElementById('alsCallHold');
+    if (btn) {
+      btn.setAttribute('aria-pressed', String(on));
+      btn.textContent = on ? 'Resume' : 'Hold';
+      btn.classList.toggle('is-on', on);
+    }
+    setCallNote(on ? 'On hold — neither side can hear the other.' : null);
+  }
+
+  /* -------------------------------------------------------------------------
+     Transfer
+     -------------------------------------------------------------------------
+     The agent list is fetched when the panel opens, not cached at boot: who is
+     online changes through a shift, and offering a call to somebody who signed
+     out ten minutes ago strands the customer in silence while a ring goes
+     nowhere. The server refuses an offline target too — this is only so the
+     agent is not shown a name that cannot work. */
+  async function openTransfer() {
+    if (!call.id || call.status !== 'connected') return;
+    const panel = document.getElementById('alsTransferPanel');
+    const select = document.getElementById('alsTransferTo');
+    if (!panel || !select) return;
+    select.innerHTML = '<option value="">Loading…</option>';
+    panel.hidden = false;
+    try {
+      const agents = await api('/agents');
+      const me = (getPortalUser && getPortalUser('admin')) || {};
+      const others = agents.filter(a => a.admin_id !== me.user_id);
+      select.innerHTML = others.length
+        ? others.map(a => `<option value="${a.admin_id}">${esc(a.full_name)}</option>`).join('')
+        : '<option value="">No other agent is available</option>';
+    } catch (error) {
+      select.innerHTML = '<option value="">Could not load agents</option>';
+    }
+  }
+
+  function closeTransfer() {
+    const panel = document.getElementById('alsTransferPanel');
+    if (panel) panel.hidden = true;
+  }
+
+  function doTransfer() {
+    const select = document.getElementById('alsTransferTo');
+    const to = select && Number(select.value);
+    if (!to) return;
+    socketSend('call_transfer', { call_id: call.id, to_admin_id: to });
+    closeTransfer();
+    setCallNote('Transferring…');
+  }
+
   /* -------------------------------------------------------------------------
      Attachments
      -------------------------------------------------------------------------
@@ -458,6 +516,10 @@ const AdminLiveSupport = (function () {
       call.direction = 'customer_to_admin';
       call.conversationId = data.conversation_id;
       call.customerName = data.customer_name || 'Customer';
+      call.isTransfer = !!data.is_transfer;
+      if (call.isTransfer) {
+        setCallNote('Transfer from ' + esc(data.from_admin_name || 'another agent'));
+      }
       showCallCard(true);
       paintCall();
       /* A RING, NOT A BEEP. chime() was one two-note blip — the same one a chat
@@ -472,6 +534,24 @@ const AdminLiveSupport = (function () {
       /* Another agent got there first, or we are already on a call. Not an
          error, and not worth an alert — the popup just closes. */
       endCallUi(null);
+      return true;
+    }
+    if (event === 'call_hold') {
+      /* The OTHER side held. This agent's own hold is applied locally the
+         instant the button is pressed, so echoing it back would toggle it. */
+      if (data.held_by !== 'admin') {
+        setCallNote(data.on_hold ? 'The customer put you on hold.' : null);
+      }
+      return true;
+    }
+    if (event === 'call_transfer_ringing') {
+      setCallNote('Ringing ' + esc(data.admin_name || 'the other agent') + '\u2026');
+      return true;
+    }
+    if (event === 'call_transferred') {
+      /* This agent handed the call away and is now finished with it. */
+      setCallNote('Transferred.');
+      endCallUi('ended');
       return true;
     }
     if (event === 'call_status') {
@@ -945,7 +1025,55 @@ const AdminLiveSupport = (function () {
   /* -------------------------------------------------------------------------
      Boot
      ------------------------------------------------------------------------- */
+  /* THE SOCKET AND THE CALL CONTROLS, ONCE PER SESSION.
+     Split out of init() because init() only ran when the agent opened Live
+     Support — so an admin working anywhere else in the console held no socket,
+     the server saw no online agent, and every incoming call was ended
+     immediately as "nobody available". The per-agent channel was built to
+     deliver a ring to an agent reading something else; this is the half that
+     was missing. Called from showAdminPortal(), so it starts at sign-in and
+     lasts as long as the session. */
+  function boot() {
+    if (state.callBooted) return;
+    state.callBooted = true;
+
+    document.getElementById('alsCallAcceptBtn')?.addEventListener('click', () => acceptCall());
+    document.getElementById('alsCallRejectBtn')?.addEventListener('click', () => rejectCall());
+    document.getElementById('alsCallEndBtn')?.addEventListener('click', () => hangUp());
+    document.getElementById('alsCallMute')?.addEventListener('click', () => JWCall.toggleMute());
+    document.getElementById('alsCallSpeaker')?.addEventListener('click', () => JWCall.cycleOutput());
+    document.getElementById('alsCallHold')?.addEventListener('click', () => toggleHold());
+    document.getElementById('alsCallTransfer')?.addEventListener('click', () => openTransfer());
+    document.getElementById('alsTransferCancel')?.addEventListener('click', () => closeTransfer());
+    document.getElementById('alsTransferGo')?.addEventListener('click', () => doTransfer());
+    /* Answering from another section has to TAKE the agent to the conversation,
+       or they accept a call and are left looking at a dashboard with no idea
+       who is on the line. */
+    document.getElementById('alsCallView')?.addEventListener('click', () => {
+      if (call.conversationId) showConversation(call.conversationId);
+    });
+
+    /* A call must not outlive the tab: the customer would be left listening to
+       a connection nobody is on. */
+    window.addEventListener('beforeunload', () => {
+      if (call.id) {
+        try { socketSend('call_end', { call_id: call.id }); } catch (e) {}
+        JWCall.reset();
+      }
+    });
+
+    connect();
+  }
+
+  /** Bring the agent to a conversation from anywhere in the console. */
+  function showConversation(conversationId) {
+    if (typeof navigateToSection === 'function') navigateToSection('live-support');
+    init();
+    openConversation(conversationId);
+  }
+
   function init() {
+    boot();                       /* harmless if it already ran */
     if (state.booted) { loadQueue(); return; }
     state.booted = true;
 
@@ -975,24 +1103,7 @@ const AdminLiveSupport = (function () {
       if (row) openConversation(Number(row.dataset.alsOpen));
     });
 
-    document.getElementById('alsCallAcceptBtn')?.addEventListener('click', () => acceptCall());
-    document.getElementById('alsCallRejectBtn')?.addEventListener('click', () => rejectCall());
-    document.getElementById('alsCallEndBtn')?.addEventListener('click', () => hangUp());
-    document.getElementById('alsCallMute')?.addEventListener('click', () => JWCall.toggleMute());
-    document.getElementById('alsCallSpeaker')?.addEventListener('click', () => JWCall.cycleOutput());
-    document.getElementById('alsCallView')?.addEventListener('click', () => {
-      if (call.conversationId) openConversation(call.conversationId);
-    });
     document.querySelector('[data-als-call]')?.addEventListener('click', () => startCall());
-
-    /* A call must not outlive the tab: the customer would be left listening to
-       a connection nobody is on. */
-    window.addEventListener('beforeunload', () => {
-      if (call.id) {
-        try { socketSend('call_end', { call_id: call.id }); } catch (e) {}
-        JWCall.reset();
-      }
-    });
 
     document.getElementById('alsSendBtn')?.addEventListener('click', () => send(false));
     document.getElementById('alsNoteBtn')?.addEventListener('click', () => send(true));
@@ -1025,8 +1136,7 @@ const AdminLiveSupport = (function () {
     bar?.querySelector('[data-als-reopen]')?.addEventListener('click', () => act('/status', { status: 'active' }));
 
     loadQueue();
-    connect();
   }
 
-  return { init, loadQueue };
+  return { init, boot, loadQueue };
 })();

@@ -274,6 +274,12 @@ class ChatConnection:
                 await session.connected(data)
             elif event == "call_failed":
                 await session.failed(data)
+            elif event == "call_hold":
+                await session.hold(data, on=True)
+            elif event == "call_resume":
+                await session.hold(data, on=False)
+            elif event == "call_transfer":
+                await session.transfer(data)
             else:
                 await session.relay(event, data)
         except call_service.CallNotFound:
@@ -578,6 +584,12 @@ class AgentConnection:
                 await session.connected(data)
             elif event == "call_failed":
                 await session.failed(data)
+            elif event == "call_hold":
+                await session.hold(data, on=True)
+            elif event == "call_resume":
+                await session.hold(data, on=False)
+            elif event == "call_transfer":
+                await session.transfer(data)
             else:
                 await session.relay(event, data)
         except call_service.CallNotFound:

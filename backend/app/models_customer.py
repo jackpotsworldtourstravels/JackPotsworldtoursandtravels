@@ -1646,6 +1646,13 @@ class CustomerCall(Base):
     ended_by: Mapped[Optional[str]] = mapped_column(_CALL_ENDED_BY, nullable=True)
     duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     failure_reason: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: Set only while a transfer is in flight — see migration 0067 for why this
+    #: is a column and not a variable. Cleared on accept, decline, timeout and
+    #: hangup, so a finished call can never look transferable.
+    transfer_to_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    #: Kept after the handover: "this call changed hands" is the interesting
+    #: fact when someone later asks why it has two agents in its history.
+    transferred_from_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
 
     conversation: Mapped["CustomerConversation"] = relationship(back_populates="calls")
 

@@ -347,3 +347,75 @@
 .als-pay.is-paid    { background: #d7f5e5; color: #0b6b42; }
 .als-pay.is-pending { background: #fff3cd; color: #7a5b00; }
 .als-pay.is-none    { background: #eee;    color: #666;    }
+
+
+/* ---------------------------------------------------------------------------
+   The floating call card
+   ---------------------------------------------------------------------------
+   It used to live inside #section-live-support, which is display:none whenever
+   another section is open — so a call arriving while the agent was on Dashboard
+   rendered into something nobody could see. A call exists to interrupt; it
+   cannot belong to one screen.
+
+   Fixed, top-right, above everything. Not centred and not modal: an agent
+   answering a call needs to keep reading whatever is already on screen, and a
+   dialog that blanks the console takes away the booking they were about to
+   quote. */
+.als-call-float {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 4000;
+  width: min(370px, calc(100vw - 28px));
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--white, #fff);
+  border: 1px solid var(--line, rgba(10,37,64,.12));
+  /* Heavier than any other shadow in the console, deliberately: this is the
+     one element that has to read as "on top of" rather than "part of". */
+  box-shadow: 0 26px 60px -18px rgba(10,37,64,.55);
+}
+@media (prefers-color-scheme: dark) {
+  .als-call-float { background: #131c2e; border-color: rgba(232,238,247,.16); }
+}
+.als-call-float[hidden] { display: none; }
+
+@media (max-width: 620px) {
+  /* On a phone it spans the width and sits at the top, where a call belongs. */
+  .als-call-float { left: 10px; right: 10px; top: 10px; width: auto; }
+}
+
+/* Hold is a state, not an action, so the button shows which one it is in. */
+#alsCallHold.is-on {
+  background: var(--coral, #ff4d4d);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* --------------------------------------------------------------- transfer -- */
+.als-xfer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(10,37,64,.12));
+}
+.als-xfer[hidden] { display: none; }
+.als-xfer-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted, #5b6b82);
+}
+.als-xfer-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line, rgba(10,37,64,.12));
+  background: var(--bg, #f8fafc);
+  color: var(--navy, #0a2540);
+  font: inherit; font-size: 13.5px;
+}
+.als-xfer-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 8px;
+}

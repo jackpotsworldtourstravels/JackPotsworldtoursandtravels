@@ -374,3 +374,64 @@ def active_for_admin(db: Session, admin_id: int) -> Optional[CustomerCall]:
             CustomerCall.status.in_(("accepted", "connected")),
         ).limit(1)
     ).scalar_one_or_none()
+
+
+# ---------------------------------------------------------------------------
+# Transfer (CR-10 follow-up)
+# ---------------------------------------------------------------------------
+def begin_transfer(db: Session, call: CustomerCall, *, from_admin_id: int,
+                   to_admin_id: int) -> None:
+    """Offer a connected call to another agent.
+
+    REFUSED UNLESS THE CALLER IS THE ONE ON THE CALL. Anything else would let
+    any admin hand away a conversation they are not part of, which is both a
+    permission hole and a very confusing thing to have happen to you mid-
+    sentence.
+
+    Offering to yourself is refused too — it looks like a no-op but leaves a
+    transfer marker set on a live call, which then blocks the next real one.
+    """
+    if call.status != "connected":
+        raise CallError("Only a connected call can be transferred.")
+    if call.admin_id != from_admin_id:
+        raise CallError("You are not on this call.")
+    if to_admin_id == from_admin_id:
+        raise CallError("That call is already yours.")
+    call.transfer_to_admin_id = to_admin_id
+    db.flush()
+
+
+def clear_transfer(db: Session, call: CustomerCall) -> None:
+    """Forget an offer — declined, timed out, or the call ended under it."""
+    call.transfer_to_admin_id = None
+    db.flush()
+
+
+def complete_transfer(db: Session, call: CustomerCall, *, to_admin_id: int,
+                      to_admin_name: str) -> bool:
+    """Hand the call over. True if this caller won it.
+
+    A CONDITIONAL UPDATE, like `accept`. Two agents can be offered the same
+    call in sequence if the first was slow, and the database is the only thing
+    that can decide which one actually got it. Losing is not an error — it
+    means somebody else is already talking to the customer.
+    """
+    result = db.execute(
+        update(CustomerCall)
+        .where(
+            CustomerCall.call_id == call.call_id,
+            CustomerCall.transfer_to_admin_id == to_admin_id,
+            CustomerCall.status == "connected",
+        )
+        .values(
+            admin_id=to_admin_id,
+            admin_name=to_admin_name,
+            transferred_from_admin_id=call.admin_id,
+            transfer_to_admin_id=None,
+        )
+    )
+    db.flush()
+    if result.rowcount == 0:
+        return False
+    db.refresh(call)
+    return True
