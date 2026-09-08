@@ -119,8 +119,20 @@ _SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     # Referrer-Policy: request paths carry booking ids. Send the origin only.
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    # None of these portals uses a camera, a microphone or geolocation.
-    "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
+    # `microphone=(self)` — OUR OWN ORIGIN ONLY, and nothing else.
+    #
+    # This read `microphone=()` until CR-10 shipped voice calling, and an empty
+    # allowlist denies the feature to EVERY origin including this one. The
+    # browser then refuses getUserMedia with NotAllowedError and never shows a
+    # permission prompt at all, which is indistinguishable from a customer who
+    # declined — the widget said "please allow microphone permission in your
+    # browser settings" for a permission the page had told the browser not to
+    # ask for. The comment above it ("none of these portals uses a
+    # microphone") was true when it was written and quietly stopped being true.
+    #
+    # camera, geolocation and payment stay fully denied: nothing here uses them,
+    # and `self` is not a free pass to hand out because it is easy to type.
+    "Permissions-Policy": "geolocation=(), microphone=(self), camera=(), payment=()",
 }
 
 

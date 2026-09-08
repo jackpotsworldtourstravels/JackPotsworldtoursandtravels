@@ -52,6 +52,22 @@
         "8010"
       ],
       "port": 8010
+    },
+    {
+      "//": "A throwaway backend for verifying header/response changes when",
+      "//2": "8000 and 8010 are held by other sessions. Same app, different port.",
+      "name": "backend-verify",
+      "runtimeExecutable": "backend/venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8020"
+      ],
+      "port": 8020
     }
   ]
 }

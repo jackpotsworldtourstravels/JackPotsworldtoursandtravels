@@ -480,6 +480,35 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
             f"took {empty.get('elapsed'):.1f}s",
         )
 
+    # == 3b2. the header that silently forbade the microphone ==
+    #
+    # `Permissions-Policy: microphone=()` denies the feature to EVERY origin,
+    # including our own. getUserMedia then rejects with NotAllowedError and the
+    # browser never shows a prompt — indistinguishable, from inside the page,
+    # from a customer who declined. The widget spent a release telling people to
+    # "allow microphone permission in your browser settings" for a permission
+    # the page had instructed the browser not to ask about.
+    #
+    # The header predates voice calling and its comment ("none of these portals
+    # uses a microphone") was true when written. Asserted here so the next
+    # security sweep that re-tightens it has to argue with a failing test.
+    print("\n== the microphone is permitted to our own origin ==")
+    policy = requests.get(f"{BASE}/", timeout=8).headers.get("Permissions-Policy", "")
+    check("a Permissions-Policy is sent at all", bool(policy), policy or "(absent)")
+    check(
+        "THE MICROPHONE IS ALLOWED FOR self — an empty list blocks the prompt entirely",
+        "microphone=(self)" in policy.replace(" ", ""),
+        policy,
+    )
+    check(
+        "camera stays fully denied",
+        "camera=()" in policy.replace(" ", ""), policy,
+    )
+    check(
+        "geolocation stays fully denied",
+        "geolocation=()" in policy.replace(" ", ""), policy,
+    )
+
     # == 3c. presence expires, and something has to refresh it ==
     #
     # THE BUG THIS SECTION EXISTS FOR. `mark_online` sets a key with a
