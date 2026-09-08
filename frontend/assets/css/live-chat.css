@@ -421,3 +421,130 @@
     30%           { opacity: 1;  transform: translateY(-3px); }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Voice calling (CR-10)
+   ---------------------------------------------------------------------------
+   The call surface is a BANNER under the header, not a screen that replaces the
+   thread. A call happens *about* a conversation: covering the messages means
+   the customer cannot read the booking reference the agent just asked them for.
+   Under the header rather than over the composer so it cannot be confused with
+   something to type into, and so it matches where the agent console puts the
+   same card. */
+.lc-head-call {
+  flex: none; width: 34px; height: 34px; margin-right: 2px;
+  display: grid; place-items: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(255,255,255,.14); color: #fff;
+  transition: background .16s ease, transform .16s ease;
+}
+.lc-head-call:hover { background: rgba(255,255,255,.26); }
+.lc-head-call:focus-visible { outline: 3px solid var(--lc-gold); outline-offset: 2px; }
+.lc-head-call svg {
+  width: 17px; height: 17px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.lc-call {
+  flex: none;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 18px 16px 16px;
+  border-top: 1px solid var(--lc-line);
+  background: var(--lc-navy); color: #fff;
+}
+.lc-call-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--lc-gold); color: var(--lc-navy);
+  font-weight: 800; font-size: 17px; letter-spacing: .04em;
+}
+.lc-call-title { font-weight: 800; font-size: 15px; }
+.lc-call-status { font-size: 12.5px; opacity: .82; }
+.lc-call-timer {
+  /* Tabular figures so the seconds column does not jitter as digits change —
+     a timer that shifts sideways every second reads as a glitch. */
+  font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 700; letter-spacing: .02em;
+}
+.lc-call-note {
+  max-width: 260px; text-align: center;
+  font-size: 12px; line-height: 1.45; color: var(--lc-gold);
+}
+
+.lc-call-actions { display: flex; gap: 10px; margin-top: 8px; }
+.lc-call-btn {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 16px; border-radius: 999px; border: none; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,.16); color: #fff;
+  transition: background .16s ease;
+}
+.lc-call-btn:hover { background: rgba(255,255,255,.26); }
+.lc-call-btn:focus-visible { outline: 3px solid var(--lc-gold); outline-offset: 2px; }
+.lc-call-btn svg {
+  width: 16px; height: 16px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* End and Decline are the same colour because they are the same act from the
+   customer's side: stop this call. Accept is the only green thing on screen,
+   so it cannot be pressed by accident when Decline was meant. */
+.lc-call-end, .lc-call-reject { background: var(--lc-accent); }
+.lc-call-end:hover, .lc-call-reject:hover { background: var(--lc-accent-dk); }
+.lc-call-accept { background: #12a150; }
+.lc-call-accept:hover { background: #0e8543; }
+.lc-call-mute.is-on { background: var(--lc-gold); color: var(--lc-navy); }
+
+/* Once connected the panel shrinks: the call is running, and the thread
+   matters more than a large status card the customer has already read. */
+.lc-in-call .lc-call { padding: 12px 16px; }
+.lc-in-call .lc-call-avatar { display: none; }
+.lc-in-call .lc-call-title { font-size: 13.5px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lc-call-avatar { animation: lc-pulse-ring 1.8s ease-in-out infinite; }
+  .lc-in-call .lc-call-avatar { animation: none; }
+  @keyframes lc-pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,176,32,.55); }
+    50%      { box-shadow: 0 0 0 12px rgba(255,176,32,0); }
+  }
+}
+
+/* --------------------------------------------------------- recent calls --- */
+.lc-calls {
+  flex: none; max-height: 148px; overflow-y: auto;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--lc-line);
+  background: var(--lc-surface-2);
+}
+.lc-call-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 6px; font-size: 12.5px; color: var(--lc-ink);
+}
+.lc-call-row + .lc-call-row { border-top: 1px solid var(--lc-line); }
+.lc-call-row-icon {
+  flex: none; width: 15px; height: 15px;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  color: var(--lc-muted);
+}
+/* A missed call is the one row in this list somebody needs to notice. */
+.lc-call-missed .lc-call-row-icon,
+.lc-call-failed .lc-call-row-icon { color: var(--lc-accent); }
+.lc-call-row-meta { display: flex; flex-direction: column; min-width: 0; }
+.lc-call-row-top { font-weight: 700; }
+.lc-call-row-when { font-size: 11.5px; color: var(--lc-muted); }
+
+/* [hidden] LOSES TO display:flex, AND THAT IS NOT A THEORETICAL PROBLEM.
+   `.lc-call` and `.lc-call-actions` both set a display, which beats the
+   browser's default `[hidden] { display: none }` — so the panel showed while
+   hidden, and during a real call the "Accept / Decline" row and the
+   "Mute / End" row appeared at the same time. Stated explicitly rather than
+   fixed by swapping the JS to a class, because `hidden` is the correct
+   attribute for this and every other toggle in the file already relies on it. */
+.lc-call[hidden],
+.lc-call-actions[hidden],
+.lc-calls[hidden],
+.lc-call-note[hidden],
+.lc-call-timer[hidden] { display: none; }

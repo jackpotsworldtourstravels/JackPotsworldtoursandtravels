@@ -1440,6 +1440,10 @@ class CustomerConversation(Base):
         back_populates="conversation", cascade="all, delete-orphan",
         order_by="CustomerChatMessage.message_id",
     )
+    calls: Mapped[list["CustomerCall"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan",
+        order_by="CustomerCall.call_id.desc()",
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -1553,3 +1557,112 @@ class CustomerChatAttachment(Base):
             name="ck_customer_chat_attachments_size",
         ),
     )
+
+
+#: See migration 0066. Ten values, because a call row exists from the first ring
+#: and the transient states are real states the queue is read during.
+_CALL_STATUS = SAEnum(
+    "calling", "ringing", "accepted", "connected",
+    "ended", "rejected", "missed", "cancelled", "busy", "failed",
+    name="customer_call_status_enum", create_type=False,
+)
+_CALL_ENDED_BY = SAEnum(
+    "customer", "admin", "system",
+    name="customer_call_ended_by_enum", create_type=False,
+)
+_CALL_DIRECTION = SAEnum(
+    "customer_to_admin", "admin_to_customer",
+    name="customer_call_direction_enum", create_type=False,
+)
+
+#: Statuses in which a call still occupies the line. The partial unique index
+#: `uq_customer_calls_live` is filtered on exactly this set, so the two must
+#: agree — they are stated once here and the migration quotes the same list.
+LIVE_CALL_STATUSES: tuple[str, ...] = ("calling", "ringing", "accepted", "connected")
+
+#: Where a call can go from where it is. Same shape as CONVERSATION_TRANSITIONS
+#: above, and used the same way: the service asks this rather than each call
+#: site restating the rules, so "can a rejected call be answered?" has one
+#: answer instead of one per handler.
+CALL_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    "calling":   ("ringing", "accepted", "cancelled", "rejected", "busy", "missed", "failed"),
+    "ringing":   ("accepted", "cancelled", "rejected", "missed", "failed"),
+    "accepted":  ("connected", "ended", "failed"),
+    "connected": ("ended", "failed"),
+    # Terminal. A call that has finished never moves again — a late-arriving
+    # `call_end` from a client whose socket was slow must not reopen it.
+    "ended": (), "rejected": (), "missed": (), "cancelled": (), "busy": (), "failed": (),
+}
+
+
+class CustomerCall(Base):
+    """One voice call inside a conversation (CR-10).
+
+    Rows are created when the caller presses call, NOT when audio connects, so
+    that a call nobody answered still leaves a record. See migration 0066 for
+    why that matters and why ``duration_seconds`` is NULL rather than 0 for a
+    call that never connected.
+
+    ``admin_id`` is a merchant-side ``users.user_id`` with no foreign key, and
+    ``admin_name`` is denormalised beside it — the same rule
+    ``CustomerConversation`` follows, for the same reason.
+    """
+
+    __tablename__ = "customer_calls"
+
+    call_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: The only call identifier a browser ever sees. Guessing an integer id is
+    #: arithmetic; guessing a uuid4 is not, and every signalling frame names it.
+    public_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    conversation_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_conversations.conversation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    admin_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    direction: Mapped[str] = mapped_column(_CALL_DIRECTION, nullable=False)
+    status: Mapped[str] = mapped_column(
+        _CALL_STATUS, nullable=False, default="calling", server_default=text("'calling'"),
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    ringing_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    answered_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    connected_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    ended_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    ended_by: Mapped[Optional[str]] = mapped_column(_CALL_ENDED_BY, nullable=True)
+    duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
+    conversation: Mapped["CustomerConversation"] = relationship(back_populates="calls")
+
+    __table_args__ = (
+        CheckConstraint(
+            "duration_seconds IS NULL OR duration_seconds >= 0",
+            name="ck_customer_calls_duration_sane",
+        ),
+        CheckConstraint(
+            "connected_at IS NULL OR answered_at IS NOT NULL",
+            name="ck_customer_calls_connected_implies_answered",
+        ),
+    )
+
+    @property
+    def is_live(self) -> bool:
+        return self.status in LIVE_CALL_STATUSES
+
+    def can_transition_to(self, status: str) -> bool:
+        return status in CALL_TRANSITIONS.get(self.status, ())

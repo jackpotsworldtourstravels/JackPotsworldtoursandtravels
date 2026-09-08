@@ -141,3 +141,69 @@ class MarkReadRequest(BaseModel):
 class MarkReadResponse(BaseModel):
     marked: int
     unread_count: int
+
+
+# ---------------------------------------------------------------------------
+# Voice calls (CR-10)
+# ---------------------------------------------------------------------------
+class CallResponse(BaseModel):
+    """One call, as either side's log renders it.
+
+    `call_id` is the PUBLIC uuid, never the integer primary key — the same rule
+    the signalling frames follow, and for the same reason: an integer id is
+    guessable and a frame naming somebody else's call must not be arithmetic.
+
+    `admin_id` IS exposed here, unlike `ChatMessageResponse.sender_admin_id`,
+    and only on the admin-facing serialiser: the agent console needs it to tell
+    "my call" from "a colleague's". `for_customer` strips it.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    call_id: str = Field(validation_alias="public_id")
+    conversation_id: int
+    direction: str
+    status: str
+    admin_id: int | None = None
+    admin_name: str | None = None
+    created_at: dt.datetime
+    answered_at: dt.datetime | None = None
+    connected_at: dt.datetime | None = None
+    ended_at: dt.datetime | None = None
+    ended_by: str | None = None
+    duration_seconds: int | None = None
+
+    @classmethod
+    def for_customer(cls, call) -> "CallResponse":
+        """The customer's view: who they spoke to, never which staff id.
+
+        Same reasoning as ChatMessageResponse — a display name is all the
+        customer has any use for, and shipping internal user ids to a browser
+        invites them to be used as an oracle for how many staff exist.
+        """
+        model = cls.model_validate(call)
+        model.admin_id = None
+        return model
+
+
+class CallHistoryResponse(BaseModel):
+    """A page of calls, newest first."""
+
+    calls: list[CallResponse] = Field(default_factory=list)
+    #: Pass back as `before_id` to page further. None when the list is complete.
+    next_before_id: int | None = None
+
+
+class IceConfigResponse(BaseModel):
+    """What a browser needs to build an RTCPeerConnection.
+
+    Served rather than hardcoded in the JS because TURN credentials would
+    otherwise sit in a file the whole internet can read — `frontend/` is served
+    by this same process.
+    """
+
+    iceServers: list[dict] = Field(default_factory=list)
+    #: False means calls between peers with no direct path WILL fail. The
+    #: client surfaces this as a warning rather than pretending otherwise.
+    turn_configured: bool = False
+    ttl_seconds: int = 3600

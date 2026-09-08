@@ -31,15 +31,20 @@ from app.database.session import get_db
 from app.config import settings
 from app.models_customer import Customer, CustomerChatMessage
 from app.schemas.customer_chat import (
+    CallHistoryResponse,
+    CallResponse,
     ChatMessageResponse,
     ConversationOpenResponse,
+    IceConfigResponse,
     ConversationResponse,
     MarkReadRequest,
     MarkReadResponse,
     MessageCreate,
     MessageSendResponse,
 )
+from app.services import call_signaling
 from app.services import chat_assignment as assignment_service
+from app.services import customer_call_service as call_service
 from app.services import chat_attachments as attachments
 from app.services import document_service
 from app.services import chat_gateway, customer_chat_service as chat
@@ -261,6 +266,57 @@ def download_attachment(
     except chat.ChatNotFound:
         raise _not_found()
     return attachments.download(attachment)
+
+
+# ---------------------------------------------------------------------------
+# Voice calls (CR-10)
+# ---------------------------------------------------------------------------
+@router.get("/ice", response_model=IceConfigResponse, summary="ICE servers for a call")
+def ice_config(customer: Customer = Depends(get_current_customer)):
+    """STUN/TURN configuration for this browser's RTCPeerConnection.
+
+    AUTHENTICATED, and that is not ceremony. TURN credentials let anyone relay
+    arbitrary traffic through the server at our bandwidth cost; an unauthenticated
+    endpoint handing them out is an open relay with a login page next to it.
+
+    Fetched per call rather than cached in the page: TURN credentials are
+    short-lived by design, and a browser holding a stale one fails to connect in
+    a way that looks exactly like a network fault.
+    """
+    return IceConfigResponse(**call_signaling.ice_config())
+
+
+@router.get(
+    "/calls",
+    response_model=CallHistoryResponse,
+    summary="Recent calls on my conversation",
+)
+def call_history(
+    limit: int = Query(default=20, ge=1, le=100),
+    before_id: int | None = Query(
+        default=None, description="Page backwards — the last `next_before_id`.",
+    ),
+    customer: Customer = Depends(get_current_customer),
+    db: Session = Depends(get_db),
+):
+    """The customer's own call log — the brief's "Recent Calls" panel.
+
+    Scoped through `get_or_create_conversation`, so there is no id in the URL to
+    change. A customer with no conversation yet gets an empty list rather than a
+    404: opening the panel must never be an error state.
+    """
+    conversation = chat.get_or_create_conversation(db, customer.customer_id)
+    rows = call_service.history(
+        db, conversation.conversation_id, limit=limit, before_id=before_id,
+    )
+    db.commit()
+    return CallHistoryResponse(
+        calls=[CallResponse.for_customer(c) for c in rows],
+        # Only when the page was full. A short page is the end of the list, and
+        # returning a cursor for it makes the client fetch one empty page every
+        # time somebody scrolls to the bottom.
+        next_before_id=rows[-1].call_id if len(rows) == limit else None,
+    )
 
 
 @router.post("/read", response_model=MarkReadResponse, summary="Mark support's messages read")

@@ -331,6 +331,53 @@ class Settings(BaseSettings):
     chat_rate_burst: int = 20
     chat_rate_window_seconds: int = 10
 
+    # ----------------------------------------------------------------- CR-10
+    # Voice calling (WebRTC). Signalling rides the chat socket; MEDIA NEVER
+    # TOUCHES THIS SERVER. These settings only describe how two browsers should
+    # find each other.
+    #
+    #: Whether the call buttons appear at all. A kill switch that does not need
+    #: a deploy to pull: a call feature that is misbehaving should be
+    #: switch-offable while chat keeps working, because chat is the thing
+    #: customers actually depend on.
+    voice_calls_enabled: bool = True
+    #: Comma-separated STUN URLs. Google's public server is the default and is
+    #: enough for most home and office networks: it tells a browser its own
+    #: public address so the two peers can try to connect directly.
+    stun_urls: str = "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+    #: TURN — and this one is not optional in practice, whatever its default
+    #: suggests.
+    #:
+    #: STUN only works when at least one side can accept an inbound packet.
+    #: Behind symmetric NAT or carrier-grade NAT it cannot, and the call fails
+    #: with no error a customer can act on. India's mobile networks run CGNAT
+    #: as standard — Jio and Airtel both — so a meaningful share of this
+    #: customer base is exactly the population STUN does not serve. TURN relays
+    #: the audio when a direct path cannot be found; without it those calls do
+    #: not degrade, they simply never connect.
+    #:
+    #: Left empty the app still runs and still places calls, and
+    #: `/api/customer/chat/ice` logs a warning saying which calls will fail.
+    #: See docs/CR-10_VOICE_CALLS.md for the coturn deployment.
+    turn_urls: str = ""
+    turn_username: str = ""
+    turn_password: str = ""
+    #: How long a browser may reuse an ICE config before asking again. Short,
+    #: because TURN credentials are short-lived by design.
+    ice_ttl_seconds: int = 3600
+
+    @property
+    def stun_url_list(self) -> list[str]:
+        return [u.strip() for u in self.stun_urls.split(",") if u.strip()]
+
+    @property
+    def turn_url_list(self) -> list[str]:
+        return [u.strip() for u in self.turn_urls.split(",") if u.strip()]
+
+    @property
+    def turn_configured(self) -> bool:
+        return bool(self.turn_url_list and self.turn_username and self.turn_password)
+
     @property
     def upload_root_path(self) -> Path:
         return Path(self.upload_root).resolve()

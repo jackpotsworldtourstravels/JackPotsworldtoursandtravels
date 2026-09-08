@@ -151,6 +151,14 @@ SUITE = [
     # Skips with exit 0 when 0064 is not applied.
     ("verify_live_chat.py",
      "CR-9: one conversation per customer, idempotent sends, single-winner claim, internal notes"),
+    # AFTER verify_live_chat.py, because it reuses the same conversation
+    # machinery and a failure there would produce confusing failures here.
+    # Drives two real sockets and follows every signalling frame from one to the
+    # other — the only way to tell a working call from one whose offer went to
+    # the wrong socket, since both look like "Calling…" from outside.
+    # Skips with exit 0 when 0066 is not applied.
+    ("verify_voice_calls.py",
+     "CR-10: call state machine, SDP/ICE relay, agent-channel ring, stranger refused"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.

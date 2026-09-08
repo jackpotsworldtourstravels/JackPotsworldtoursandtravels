@@ -37,8 +37,14 @@ from app.models_customer import (
     CustomerPackageBooking,
 )
 from app.models_v2 import User
-from app.schemas.customer_chat import ChatMessageResponse
+from app.schemas.customer_chat import (
+    CallHistoryResponse,
+    CallResponse,
+    ChatMessageResponse,
+)
+from app.services import call_signaling
 from app.services import chat_attachments as attachments
+from app.services import customer_call_service as call_service
 from app.services import chat_gateway, customer_chat_service as chat
 from app.services import document_service
 from app.services.chat_broker import get_broker
@@ -437,6 +443,45 @@ def mark_read(
 # ---------------------------------------------------------------------------
 # Agents, analytics, real time
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Voice calls (CR-10)
+# ---------------------------------------------------------------------------
+@router.get("/ice", summary="ICE servers for a call")
+def ice_config(admin: User = Depends(get_current_admin)):
+    """Same config the customer gets — see the customer route for why it is
+    served rather than hardcoded, and why it is authenticated."""
+    return call_signaling.ice_config()
+
+
+@router.get(
+    "/conversations/{conversation_id}/calls",
+    response_model=CallHistoryResponse,
+    summary="Call history for one conversation",
+)
+def conversation_calls(
+    conversation_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    before_id: int | None = Query(default=None),
+    admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """The agent's view of the same log, with staff ids left in.
+
+    `CallResponse` rather than `CallResponse.for_customer`: the console needs
+    `admin_id` to tell the agent's own calls from a colleague's, and this side
+    of the wall is where that identifier belongs.
+    """
+    try:
+        chat.get_for_admin(db, conversation_id)
+    except chat.ChatNotFound:
+        raise _not_found()
+    rows = call_service.history(db, conversation_id, limit=limit, before_id=before_id)
+    return CallHistoryResponse(
+        calls=[CallResponse.model_validate(c) for c in rows],
+        next_before_id=rows[-1].call_id if len(rows) == limit else None,
+    )
+
+
 @router.get("/agents", summary="Who a chat can be transferred to")
 def agents(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Every active admin — the set a conversation may be transferred to.

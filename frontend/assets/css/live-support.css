@@ -201,3 +201,82 @@
   .als-queue { max-height: 380px; }
   .als-main { min-height: 520px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Voice calling (CR-10)
+   ---------------------------------------------------------------------------
+   The incoming-call card sits ABOVE the thread rather than floating as a modal.
+   A modal steals the keyboard from an agent who is mid-sentence in another
+   conversation; a card that pushes the thread down is impossible to miss
+   without being impossible to work around. */
+.als-call {
+  flex: none;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--als-line);
+  background: linear-gradient(180deg, #0a2540 0%, #123454 100%);
+  color: #fff;
+}
+.als-call-main { display: flex; align-items: center; gap: 12px; }
+.als-call-dot {
+  flex: none; width: 10px; height: 10px; border-radius: 50%;
+  background: #35d07f;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .als-call-dot { animation: als-ring 1.4s ease-in-out infinite; }
+  @keyframes als-ring {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(53,208,127,.6); }
+    50%      { box-shadow: 0 0 0 8px rgba(53,208,127,0); }
+  }
+}
+.als-call-text { flex: 1; min-width: 0; }
+.als-call-who {
+  font-size: 14.5px; font-weight: 800;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.als-call-status { font-size: 12px; opacity: .8; }
+.als-call-timer {
+  /* Tabular figures: a timer whose digits change width jitters every second
+     and reads as a rendering fault. */
+  font-variant-numeric: tabular-nums;
+  font-size: 17px; font-weight: 700;
+}
+.als-call-note { margin-top: 6px; font-size: 12px; color: #ffd479; }
+.als-call-actions {
+  display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+/* The console's own .btn is built for a light surface. Inside the call card it
+   would be a white button on navy with no border, so the neutral one is
+   re-stated here; Accept and Reject keep their own colours. */
+.als-call-actions .btn:not(.btn-primary):not(.btn-danger) {
+  background: rgba(255,255,255,.16); color: #fff; border-color: transparent;
+}
+.als-call-actions .btn:not(.btn-primary):not(.btn-danger):hover {
+  background: rgba(255,255,255,.26);
+}
+#alsCallMute.is-on { background: var(--als-accent); color: #fff; }
+
+/* ------------------------------------------------------ the call history --- */
+.als-calls { margin-top: 14px; }
+.als-calls-head {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--als-muted); margin-bottom: 6px;
+}
+.als-call-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 5px 0; font-size: 12.5px;
+  border-bottom: 1px solid var(--als-line);
+}
+.als-call-when { font-size: 11px; color: var(--als-muted); }
+/* Missed and failed are the two rows an agent needs to notice in a list they
+   are otherwise skimming. */
+.als-call-missed, .als-call-failed { color: var(--als-accent); font-weight: 700; }
+
+/* Same trap as live-chat.css: a rule that sets `display` beats the default
+   `[hidden] { display: none }`, so the card and both action rows showed at
+   once. See that file for the full note. */
+.als-call[hidden],
+.als-call-actions[hidden],
+.als-calls[hidden],
+.als-call-note[hidden],
+.als-call-timer[hidden] { display: none; }

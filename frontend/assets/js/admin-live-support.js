@@ -305,6 +305,289 @@ const AdminLiveSupport = (function () {
     } catch (e) { /* no audio; the badge still moves */ }
   }
 
+  /* =========================================================================
+     Voice calling (CR-10)
+     =========================================================================
+     The incoming-call popup is the reason the agent socket subscribes to its
+     own channel. An agent is almost never looking at the thread a customer
+     rings from — that is what a call is for — so the invitation cannot ride the
+     per-conversation channels the rest of this console uses.
+
+     ONE CALL AT A TIME, deliberately. An agent already on a call gets
+     `call_busy` from the server rather than a second popup over the first; a
+     console that stacked invitations would have an agent answering one
+     customer while another listens to them fumbling.
+     ========================================================================= */
+  const call = {
+    id: null,
+    status: null,
+    conversationId: null,
+    customerName: null,
+    direction: null,
+    connectedAt: null,
+    timer: null,
+    iceServers: null,
+  };
+
+  const CALL_LABELS = {
+    calling: 'Calling\u2026', ringing: 'Ringing\u2026', accepted: 'Connecting\u2026',
+    connected: 'Connected', ended: 'Call ended', rejected: 'Declined',
+    missed: 'No answer', cancelled: 'Cancelled by customer', busy: 'Busy',
+    failed: 'Call failed',
+  };
+  const CALL_LOG_LABELS = {
+    ended: 'Completed', missed: 'Missed', rejected: 'Declined',
+    cancelled: 'Cancelled', busy: 'Busy', failed: 'Failed',
+  };
+  const CALL_FRAMES = [
+    'incoming_call', 'call_status', 'call_accepted', 'call_busy', 'call_taken',
+    'call_cancelled', 'offer', 'answer', 'ice_candidate',
+  ];
+
+  async function iceServers() {
+    const config = await api('/ice');
+    if (config && config.turn_configured === false) {
+      console.warn(
+        'JackpotsWorld: no TURN server configured. Calls will fail between peers '
+        + 'with no direct network path.'
+      );
+    }
+    return (config && config.iceServers) || [];
+  }
+
+  function callHandlers() {
+    return {
+      onConnected: () => socketSend('call_connected', { call_id: call.id }),
+      onReconnecting: () => setCallNote('Reconnecting\u2026'),
+      onQuality: q => setCallNote(q.quality === 'poor' ? 'Poor connection' : null),
+      onFailed: info => {
+        socketSend('call_failed', { call_id: call.id, reason: (info && info.code) || 'failed' });
+        endCallUi('failed');
+      },
+      onError: info => setCallNote(info && info.message),
+      onMute: () => paintCall(),
+    };
+  }
+
+  /** Answer the invitation on screen. */
+  async function acceptCall() {
+    if (!call.id) return;
+    setCallNote('Checking your microphone\u2026');
+    try {
+      call.iceServers = call.iceServers || await iceServers();
+      await JWCall.prepare({
+        callId: call.id, role: 'callee', send: socketSend,
+        handlers: callHandlers(), iceServers: call.iceServers,
+      });
+    } catch (err) {
+      /* The customer is told immediately rather than left ringing while the
+         agent hunts for a headset. */
+      socketSend('call_reject', { call_id: call.id });
+      setCallNote(err.message);
+      endCallUi('failed');
+      return;
+    }
+    setCallNote(null);
+    socketSend('call_accept', { call_id: call.id });
+  }
+
+  function rejectCall() {
+    if (call.id) socketSend('call_reject', { call_id: call.id });
+    endCallUi('rejected');
+  }
+
+  function hangUp() {
+    if (!call.id) { endCallUi(null); return; }
+    const live = call.status === 'connected' || call.status === 'accepted';
+    socketSend(live ? 'call_end' : 'call_cancel', { call_id: call.id });
+    endCallUi('ended');
+  }
+
+  /** The agent calling a customer back. */
+  async function startCall() {
+    if (call.id || !state.current) return;
+    call.conversationId = state.current.conversation_id;
+    call.direction = 'admin_to_customer';
+    call.customerName = state.current.customer_name || 'Customer';
+    call.status = 'calling';
+    showCallCard(true);
+    paintCall();
+    try {
+      call.iceServers = await iceServers();
+      await JWCall.prepare({
+        callId: null, role: 'caller', send: socketSend,
+        handlers: callHandlers(), iceServers: call.iceServers,
+      });
+    } catch (err) {
+      setCallNote(err.message);
+      endCallUi('failed');
+      return;
+    }
+    socketSend('call_request', { conversation_id: call.conversationId });
+  }
+
+  function endCallUi(finalStatus) {
+    JWCall.reset();
+    stopCallTimer();
+    call.id = null;
+    call.connectedAt = null;
+    call.status = finalStatus;
+    paintCall();
+    setTimeout(() => {
+      if (!call.id) {
+        showCallCard(false);
+        call.status = null; call.direction = null;
+        if (state.current) loadCallLog(state.current.conversation_id);
+      }
+    }, finalStatus ? 2400 : 0);
+  }
+
+  async function handleCallFrame(event, data) {
+    if (event === 'incoming_call') {
+      if (call.id) return true;      /* already on one; the server sends busy */
+      call.id = data.call_id;
+      call.status = 'ringing';
+      call.direction = 'customer_to_admin';
+      call.conversationId = data.conversation_id;
+      call.customerName = data.customer_name || 'Customer';
+      showCallCard(true);
+      paintCall();
+      chime();
+      return true;
+    }
+    if (event === 'call_taken' || event === 'call_busy') {
+      /* Another agent got there first, or we are already on a call. Not an
+         error, and not worth an alert — the popup just closes. */
+      endCallUi(null);
+      return true;
+    }
+    if (event === 'call_status') {
+      if (data.call_id !== call.id && !isTerminal(data.status)) return true;
+      call.status = data.status;
+      call.customerName = data.customer_name || call.customerName;
+      if (data.status === 'connected' && !call.connectedAt) {
+        call.connectedAt = data.connected_at ? new Date(data.connected_at) : new Date();
+        startCallTimer();
+        setCallNote(null);
+      }
+      if (isTerminal(data.status)) { endCallUi(data.status); return true; }
+      paintCall();
+      return true;
+    }
+    if (event === 'call_accepted') {
+      call.status = 'accepted';
+      paintCall();
+      if (call.direction === 'admin_to_customer') {
+        try { await JWCall.createOffer(); }
+        catch (e) { socketSend('call_failed', { call_id: call.id, reason: 'offer_failed' }); }
+      }
+      return true;
+    }
+    if (event === 'call_cancelled') { endCallUi(data.status || 'ended'); return true; }
+    if (event === 'offer')  { await JWCall.handleOffer(data.payload); return true; }
+    if (event === 'answer') { await JWCall.handleAnswer(data.payload); return true; }
+    if (event === 'ice_candidate') { await JWCall.handleCandidate(data.payload); return true; }
+    return false;
+  }
+
+  function isTerminal(s) {
+    return ['ended', 'rejected', 'missed', 'cancelled', 'busy', 'failed'].indexOf(s) !== -1;
+  }
+
+  function startCallTimer() {
+    stopCallTimer();
+    call.timer = setInterval(() => {
+      const el = document.getElementById('alsCallTimer');
+      if (el && call.connectedAt) {
+        el.textContent = JWCall.formatDuration((Date.now() - call.connectedAt) / 1000);
+      }
+    }, 500);
+  }
+
+  function stopCallTimer() {
+    if (call.timer) { clearInterval(call.timer); call.timer = null; }
+  }
+
+  function showCallCard(show) {
+    const card = document.getElementById('alsCall');
+    if (card) card.hidden = !show;
+  }
+
+  function setCallNote(text) {
+    const el = document.getElementById('alsCallNote');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  }
+
+  function paintCall() {
+    const who = document.getElementById('alsCallWho');
+    const status = document.getElementById('alsCallStatus');
+    const timer = document.getElementById('alsCallTimer');
+    const answering = document.getElementById('alsCallAnswer');
+    const liveRow = document.getElementById('alsCallLive');
+    const muteBtn = document.getElementById('alsCallMute');
+    const viewBtn = document.getElementById('alsCallView');
+
+    const incoming = call.direction === 'customer_to_admin'
+      && (call.status === 'ringing' || call.status === 'calling');
+
+    if (who) who.textContent = call.customerName || 'Customer';
+    if (status) status.textContent = CALL_LABELS[call.status] || '';
+    if (timer) {
+      timer.hidden = call.status !== 'connected';
+      if (call.status !== 'connected') timer.textContent = '00:00';
+    }
+    if (answering) answering.hidden = !incoming;
+    if (liveRow) liveRow.hidden = incoming;
+    if (viewBtn) {
+      /* "View Customer" from the brief. Only useful while the popup is over a
+         thread the agent has not opened. */
+      viewBtn.hidden = !call.conversationId
+        || (state.current && state.current.conversation_id === call.conversationId);
+    }
+    if (muteBtn) {
+      const muted = JWCall.isMuted();
+      muteBtn.classList.toggle('is-on', muted);
+      muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      muteBtn.textContent = muted ? 'Unmute' : 'Mute';
+    }
+    const callBtn = document.querySelector('[data-als-call]');
+    if (callBtn) callBtn.disabled = Boolean(call.id);
+  }
+
+  async function loadCallLog(conversationId) {
+    const box = document.getElementById('alsCallLog');
+    if (!box) return;
+    try {
+      const body = await api('/conversations/' + conversationId + '/calls?limit=6');
+      const rows = (body && body.calls) || [];
+      box.textContent = '';
+      if (!rows.length) { box.hidden = true; return; }
+      const head = document.createElement('div');
+      head.className = 'als-calls-head';
+      head.textContent = 'Recent calls';
+      box.appendChild(head);
+      rows.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'als-call-row als-call-' + c.status;
+        const label = document.createElement('span');
+        label.textContent = CALL_LOG_LABELS[c.status] || c.status;
+        const when = document.createElement('span');
+        when.className = 'als-call-when';
+        const d = new Date(c.created_at);
+        when.textContent = d.toLocaleDateString([], { day: 'numeric', month: 'short' })
+          + ' \u00b7 ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          + (c.duration_seconds != null
+            ? ' \u00b7 ' + JWCall.formatDuration(c.duration_seconds) : '');
+        row.appendChild(label);
+        row.appendChild(when);
+        box.appendChild(row);
+      });
+      box.hidden = false;
+    } catch (e) { box.hidden = true; }
+  }
+
   function messageEl(message) {
     if (message.message_type === 'system') {
       const row = document.createElement('div');
@@ -369,9 +652,13 @@ const AdminLiveSupport = (function () {
         <dt>Status</dt><dd>${esc(c.status)}</dd>
         <dt>Assigned</dt><dd>${esc(c.assigned_admin_name || 'Nobody')}</dd>
       </dl>
-      <!-- Booking history lands here when CR-10 exposes it; the pane exists now
-           so the layout does not shift when it does. -->
-      <div class="als-soon">Booking history — coming with CR-10</div>`;
+      <div class="als-calls" id="alsCallLog" hidden></div>
+      <div class="als-soon">Booking history — not yet exposed here</div>`;
+    /* Rendered by THIS function rather than left as static markup in
+       index.html: renderContext replaces the whole pane's innerHTML on every
+       thread switch, so a container declared in the page is destroyed the
+       first time an agent opens a conversation. */
+    loadCallLog(c.conversation_id);
   }
 
   function paintActions() {
@@ -486,6 +773,15 @@ const AdminLiveSupport = (function () {
   }
 
   function handleFrame(event, data) {
+    if (CALL_FRAMES.indexOf(event) !== -1) {
+      /* onmessage cannot await; the handler settles on its own and nothing
+         after this line depends on the result. */
+      Promise.resolve(handleCallFrame(event, data)).catch(err => {
+        console.error('live support: call frame failed', event, err);
+        endCallUi('failed');
+      });
+      return;
+    }
     if (event === 'receive_message') {
       const open = state.current && data.conversation_id === state.current.conversation_id;
       if (open) {
@@ -559,6 +855,24 @@ const AdminLiveSupport = (function () {
     document.getElementById('alsQueueList')?.addEventListener('click', e => {
       const row = e.target.closest('[data-als-open]');
       if (row) openConversation(Number(row.dataset.alsOpen));
+    });
+
+    document.getElementById('alsCallAcceptBtn')?.addEventListener('click', () => acceptCall());
+    document.getElementById('alsCallRejectBtn')?.addEventListener('click', () => rejectCall());
+    document.getElementById('alsCallEndBtn')?.addEventListener('click', () => hangUp());
+    document.getElementById('alsCallMute')?.addEventListener('click', () => JWCall.toggleMute());
+    document.getElementById('alsCallView')?.addEventListener('click', () => {
+      if (call.conversationId) openConversation(call.conversationId);
+    });
+    document.querySelector('[data-als-call]')?.addEventListener('click', () => startCall());
+
+    /* A call must not outlive the tab: the customer would be left listening to
+       a connection nobody is on. */
+    window.addEventListener('beforeunload', () => {
+      if (call.id) {
+        try { socketSend('call_end', { call_id: call.id }); } catch (e) {}
+        JWCall.reset();
+      }
     });
 
     document.getElementById('alsSendBtn')?.addEventListener('click', () => send(false));

@@ -23,7 +23,7 @@
      jp-ds.css despite the note above — it declares only its own --brand-* vars
      and re-points none of the tokens jp-ds owns. -->
 <link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260815svc2">
-<link rel="stylesheet" href="../assets/css/live-support.css?v=20260907ls2">
+<link rel="stylesheet" href="../assets/css/live-support.css?v=20260908vc2">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -553,10 +553,37 @@
           <div class="als-main-head">
             <span class="als-status" id="alsStatus">Connecting…</span>
             <div class="als-actions" id="alsActions">
+              <button type="button" class="btn btn-sm" data-als-call
+                      title="Start a voice call with this customer">Call</button>
               <button type="button" class="btn btn-sm btn-primary" data-als-claim hidden>Accept chat</button>
               <button type="button" class="btn btn-sm" data-als-resolve hidden>Resolve</button>
               <button type="button" class="btn btn-sm" data-als-reopen hidden>Reopen</button>
               <button type="button" class="btn btn-sm btn-danger" data-als-close hidden>Close</button>
+            </div>
+          </div>
+          <!-- The incoming-call card. Sits above the thread rather than as a
+               floating modal: an agent mid-sentence should not have a dialog
+               steal their keyboard, and a card that pushes the thread down is
+               impossible to miss without being impossible to work around. -->
+          <div class="als-call" id="alsCall" hidden role="alertdialog"
+               aria-live="assertive" aria-label="Voice call">
+            <div class="als-call-main">
+              <span class="als-call-dot" aria-hidden="true"></span>
+              <div class="als-call-text">
+                <div class="als-call-who" id="alsCallWho">Customer</div>
+                <div class="als-call-status" id="alsCallStatus">Calling…</div>
+              </div>
+              <div class="als-call-timer" id="alsCallTimer" hidden>00:00</div>
+            </div>
+            <div class="als-call-note" id="alsCallNote" hidden></div>
+            <div class="als-call-actions" id="alsCallAnswer" hidden>
+              <button type="button" class="btn btn-sm" id="alsCallView" hidden>View customer</button>
+              <button type="button" class="btn btn-sm btn-danger" id="alsCallRejectBtn">Reject</button>
+              <button type="button" class="btn btn-sm btn-primary" id="alsCallAcceptBtn">Accept</button>
+            </div>
+            <div class="als-call-actions" id="alsCallLive">
+              <button type="button" class="btn btn-sm" id="alsCallMute" aria-pressed="false">Mute</button>
+              <button type="button" class="btn btn-sm btn-danger" id="alsCallEndBtn">End call</button>
             </div>
           </div>
           <div class="als-thread" id="alsThread">
@@ -1277,7 +1304,8 @@
       </div>
     </div>
 
-<script src="../assets/js/admin-live-support.js?v=20260907ls2"></script>
+<script src="../assets/js/webrtc-call.js?v=20260908vc2"></script>
+<script src="../assets/js/admin-live-support.js?v=20260908vc2"></script>
 <script src="../assets/js/admin.js?v=20260908ao1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->

@@ -102,6 +102,10 @@ const LiveChat = (function () {
     clip: '<path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.6l8.49-8.48"/>',
     smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
     doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+    phoneOff: '<path d="M10.7 13.3a16 16 0 0 0 4 3l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 5 15.5"/><path d="M2 2l20 20"/><path d="M8.6 3.7A2 2 0 0 0 7.1 2h-3a2 2 0 0 0-2 2.2 19.6 19.6 0 0 0 1 4.3"/>',
+    mic: '<path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 19v3"/>',
+    micOff: '<path d="M2 2l20 20"/><path d="M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M15 10.5V5a3 3 0 0 0-5.9-.7"/><path d="M19 10v1a7 7 0 0 1-10.8 5.9"/><path d="M5 10v1a7 7 0 0 0 2 4.9"/><path d="M12 19v3"/>',
   };
 
   /* A small, deliberately boring set. A full emoji keyboard is a library plus a
@@ -432,6 +436,335 @@ const LiveChat = (function () {
     input.setSelectionRange(caret, caret);
     input.focus();
     autoGrow();
+  }
+
+  /* =========================================================================
+     Voice calling (CR-10)
+     =========================================================================
+     Signalling rides the chat socket that is already open and already
+     authenticated. Media does not: audio goes peer-to-peer over WebRTC, or
+     through TURN, and never touches the server.
+
+     WHY THE PANEL IS AN OVERLAY AND NOT A SCREEN
+     A call happens *about* a conversation. Replacing the thread with a call
+     screen means the customer cannot read the booking reference the agent just
+     asked them for. The overlay covers the composer, leaves the messages
+     visible, and collapses to a strip once the call connects.
+     ========================================================================= */
+  const call = {
+    id: null,
+    status: null,        /* calling | ringing | accepted | connected | ... */
+    direction: null,
+    agentName: null,
+    connectedAt: null,
+    timer: null,
+    iceServers: null,
+    quality: null,
+  };
+
+  const CALL_LABELS = {
+    calling: 'Calling support\u2026',
+    ringing: 'Ringing\u2026',
+    accepted: 'Connecting\u2026',
+    connected: 'Connected',
+    ended: 'Call ended',
+    rejected: 'Call declined',
+    missed: 'No answer',
+    cancelled: 'Call cancelled',
+    busy: 'Support is on another call',
+    failed: 'Call failed',
+  };
+
+  /** ICE servers, fetched once per call and never cached across calls.
+   *  TURN credentials are short-lived by design; a browser holding a stale one
+   *  fails to connect in a way indistinguishable from a network fault. */
+  async function iceServers() {
+    const config = await api('/ice');
+    if (config && config.turn_configured === false) {
+      /* Not shown to the customer — they can do nothing about it. Logged so
+         that whoever is debugging "some calls never connect" finds the reason
+         in the console rather than in a packet capture. */
+      console.warn(
+        'JackpotsWorld: no TURN server is configured. Calls will fail between '
+        + 'peers with no direct network path (common on Indian mobile carriers).'
+      );
+    }
+    return (config && config.iceServers) || [];
+  }
+
+  function callHandlers() {
+    return {
+      onConnected: () => socketSend('call_connected', { call_id: call.id }),
+      onReconnecting: () => { setCallNote('Reconnecting\u2026'); },
+      onQuality: q => {
+        call.quality = q.quality;
+        setCallNote(q.quality === 'poor' ? 'Poor connection' : null);
+      },
+      onFailed: info => {
+        socketSend('call_failed', { call_id: call.id, reason: (info && info.code) || 'failed' });
+        endCallUi('failed');
+      },
+      onError: info => setCallNote(info && info.message),
+      onMute: () => paintCall(),
+    };
+  }
+
+  /** Press-to-call. Everything that can refuse happens BEFORE anyone is rung. */
+  async function startCall() {
+    if (call.id) return;
+    if (!socketOpen()) {
+      setCallNote('You are offline. Reconnect and try again.');
+      showCallPanel(true);
+      setTimeout(() => { if (!call.id) showCallPanel(false); }, 3500);
+      return;
+    }
+    call.status = 'preparing';
+    call.direction = 'customer_to_admin';
+    showCallPanel(true);
+    paintCall();
+    try {
+      /* The microphone is requested BEFORE the request goes out. Ringing an
+         agent and then discovering the customer has no microphone wastes the
+         agent's attention and shows the customer a failure after a delay that
+         made it look like a network problem. */
+      call.iceServers = await iceServers();
+      await JWCall.prepare({
+        callId: null, role: 'caller', send: socketSend,
+        handlers: callHandlers(), iceServers: call.iceServers,
+      });
+    } catch (err) {
+      call.status = null;
+      setCallNote(err.message || 'Your microphone could not be started.');
+      paintCall();
+      return;
+    }
+    socketSend('call_request', {});
+  }
+
+  /** Answering a call the agent placed. */
+  async function acceptCall() {
+    if (!call.id) return;
+    try {
+      call.iceServers = call.iceServers || await iceServers();
+      await JWCall.prepare({
+        callId: call.id, role: 'callee', send: socketSend,
+        handlers: callHandlers(), iceServers: call.iceServers,
+      });
+    } catch (err) {
+      socketSend('call_reject', { call_id: call.id });
+      setCallNote(err.message);
+      endCallUi('failed');
+      return;
+    }
+    socketSend('call_accept', { call_id: call.id });
+  }
+
+  function rejectCall() {
+    if (call.id) socketSend('call_reject', { call_id: call.id });
+    endCallUi('rejected');
+  }
+
+  /** Hang up. `call_cancel` before an answer, `call_end` after — the server
+   *  records them as different outcomes, and the customer's log shows the
+   *  difference between a call they abandoned and one they had. */
+  function hangUp() {
+    if (!call.id) { endCallUi(null); return; }
+    const connected = call.status === 'connected' || call.status === 'accepted';
+    socketSend(connected ? 'call_end' : 'call_cancel', { call_id: call.id });
+    endCallUi('ended');
+  }
+
+  function endCallUi(finalStatus) {
+    JWCall.reset();
+    stopCallTimer();
+    call.id = null;
+    call.connectedAt = null;
+    call.quality = null;
+    call.status = finalStatus;
+    paintCall();
+    /* The outcome stays on screen briefly. A panel that vanishes the instant a
+       call is declined leaves the customer unsure whether it was declined or
+       whether the button never worked. */
+    setTimeout(() => {
+      if (!call.id) { showCallPanel(false); call.status = null; loadCallLog(); }
+    }, finalStatus ? 2600 : 0);
+  }
+
+  /* -- frames ------------------------------------------------------------- */
+  async function handleCallFrame(event, data) {
+    if (event === 'incoming_call') {
+      /* An agent is calling this customer. */
+      call.id = data.call_id;
+      call.status = 'ringing';
+      call.direction = 'admin_to_customer';
+      call.agentName = data.admin_name;
+      showCallPanel(true);
+      paintCall();
+      chime();
+      return true;
+    }
+    if (event === 'call_status') {
+      call.id = data.status && !isTerminal(data.status) ? data.call_id : null;
+      call.status = data.status;
+      call.agentName = data.admin_name || call.agentName;
+      if (data.status === 'connected' && !call.connectedAt) {
+        call.connectedAt = data.connected_at ? new Date(data.connected_at) : new Date();
+        startCallTimer();
+        setCallNote(null);
+      }
+      if (isTerminal(data.status)) { endCallUi(data.status); return true; }
+      showCallPanel(true);
+      paintCall();
+      return true;
+    }
+    if (event === 'call_accepted') {
+      call.status = 'accepted';
+      call.agentName = data.admin_name || call.agentName;
+      paintCall();
+      /* THE OFFER IS CREATED HERE, not when the call was placed. The callee
+         must have a peer connection listening before the offer arrives, or the
+         first frame of the negotiation is dropped and the call fails silently
+         with both sides showing "connected". */
+      if (call.direction === 'customer_to_admin') {
+        try { await JWCall.createOffer(); }
+        catch (e) { socketSend('call_failed', { call_id: call.id, reason: 'offer_failed' }); }
+      }
+      return true;
+    }
+    if (event === 'call_busy') {
+      setCallNote('Support is on another call. Please try again shortly.');
+      endCallUi('busy');
+      return true;
+    }
+    if (event === 'call_cancelled') { endCallUi(data.status || 'ended'); return true; }
+    if (event === 'offer')  { await JWCall.handleOffer(data.payload); return true; }
+    if (event === 'answer') { await JWCall.handleAnswer(data.payload); return true; }
+    if (event === 'ice_candidate') { await JWCall.handleCandidate(data.payload); return true; }
+    return false;
+  }
+
+  const CALL_FRAMES = [
+    'incoming_call', 'call_status', 'call_accepted', 'call_busy',
+    'call_cancelled', 'offer', 'answer', 'ice_candidate',
+  ];
+
+  function isTerminal(status) {
+    return ['ended', 'rejected', 'missed', 'cancelled', 'busy', 'failed'].indexOf(status) !== -1;
+  }
+
+  /* -- the timer ---------------------------------------------------------- */
+  function startCallTimer() {
+    stopCallTimer();
+    call.timer = setInterval(() => {
+      const el = state.root && state.root.querySelector('[data-lc-call-timer]');
+      if (el && call.connectedAt) {
+        el.textContent = JWCall.formatDuration((Date.now() - call.connectedAt) / 1000);
+      }
+    }, 500);
+  }
+
+  function stopCallTimer() {
+    if (call.timer) { clearInterval(call.timer); call.timer = null; }
+  }
+
+  /* -- the panel ---------------------------------------------------------- */
+  function showCallPanel(show) {
+    const panel = state.root && state.root.querySelector('[data-lc-call]');
+    if (panel) panel.hidden = !show;
+  }
+
+  function setCallNote(text) {
+    const el = state.root && state.root.querySelector('[data-lc-call-note]');
+    if (!el) return;
+    el.textContent = text || '';
+    el.hidden = !text;
+  }
+
+  function paintCall() {
+    const root = state.root;
+    if (!root) return;
+    const title = root.querySelector('[data-lc-call-title]');
+    const sub = root.querySelector('[data-lc-call-status]');
+    const timer = root.querySelector('[data-lc-call-timer]');
+    const muteBtn = root.querySelector('[data-lc-call-mute]');
+    const answerRow = root.querySelector('[data-lc-call-answer]');
+    const liveRow = root.querySelector('[data-lc-call-live]');
+
+    const incoming = call.direction === 'admin_to_customer'
+      && (call.status === 'ringing' || call.status === 'calling');
+
+    if (title) {
+      title.textContent = incoming
+        ? (call.agentName || 'JackpotsWorld Support')
+        : (call.agentName || 'JackpotsWorld Support');
+    }
+    if (sub) {
+      sub.textContent = call.status === 'preparing'
+        ? 'Checking your microphone\u2026'
+        : (CALL_LABELS[call.status] || '');
+    }
+    if (timer) {
+      timer.hidden = call.status !== 'connected';
+      if (call.status !== 'connected') timer.textContent = '00:00';
+    }
+    if (muteBtn) {
+      const muted = JWCall.isMuted();
+      muteBtn.classList.toggle('is-on', muted);
+      muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      muteBtn.title = muted ? 'Unmute' : 'Mute';
+      muteBtn.innerHTML = svg(muted ? ICONS.micOff : ICONS.mic)
+        + '<span>' + (muted ? 'Unmute' : 'Mute') + '</span>';
+    }
+    if (answerRow) answerRow.hidden = !incoming;
+    if (liveRow) liveRow.hidden = incoming;
+    root.querySelector('[data-lc-panel]')
+      && root.querySelector('[data-lc-panel]').classList.toggle(
+        'lc-in-call', call.status === 'connected');
+  }
+
+  /* -- recent calls ------------------------------------------------------- */
+  async function loadCallLog() {
+    const list = state.root && state.root.querySelector('[data-lc-calls]');
+    if (!list) return;
+    try {
+      const body = await api('/calls?limit=8');
+      const rows = (body && body.calls) || [];
+      list.textContent = '';
+      if (!rows.length) { list.hidden = true; return; }
+      rows.forEach(c => list.appendChild(callLogRow(c)));
+      list.hidden = false;
+    } catch (e) {
+      list.hidden = true;   /* a log that will not load is not worth an error */
+    }
+  }
+
+  const CALL_LOG_LABELS = {
+    ended: 'Completed', missed: 'Missed', rejected: 'Declined',
+    cancelled: 'Cancelled', busy: 'Busy', failed: 'Failed',
+  };
+
+  function callLogRow(c) {
+    const row = document.createElement('div');
+    row.className = 'lc-call-row lc-call-' + c.status;
+    row.innerHTML = svg(
+      ['missed', 'rejected', 'failed', 'busy'].indexOf(c.status) !== -1
+        ? ICONS.phoneOff : ICONS.phone, 'lc-call-row-icon');
+    const meta = document.createElement('div');
+    meta.className = 'lc-call-row-meta';
+    const top = document.createElement('span');
+    top.className = 'lc-call-row-top';
+    top.textContent = 'Voice call \u00b7 ' + (CALL_LOG_LABELS[c.status] || c.status);
+    const when = document.createElement('span');
+    when.className = 'lc-call-row-when';
+    const d = new Date(c.created_at);
+    when.textContent = d.toLocaleDateString([], { day: 'numeric', month: 'short' })
+      + ' \u00b7 ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      + (c.duration_seconds != null
+        ? ' \u00b7 ' + JWCall.formatDuration(c.duration_seconds) : '');
+    meta.appendChild(top);
+    meta.appendChild(when);
+    row.appendChild(meta);
+    return row;
   }
 
   function renderThread() {
@@ -816,6 +1149,18 @@ const LiveChat = (function () {
   }
 
   function handleFrame(event, data) {
+    /* Call frames first, and awaited nowhere: handleFrame is called from the
+       socket's onmessage, which cannot await. The call handler returns a
+       promise that resolves on its own; nothing after it depends on the
+       result. */
+    if (CALL_FRAMES.indexOf(event) !== -1) {
+      Promise.resolve(handleCallFrame(event, data)).catch(err => {
+        console.error('JackpotsWorld: call frame failed', event, err);
+        socketSend('call_failed', { call_id: call.id, reason: 'client_error' });
+        endCallUi('failed');
+      });
+      return;
+    }
     if (event === 'receive_message') {
       mergeMessage(data);
       renderThread();
@@ -949,9 +1294,35 @@ const LiveChat = (function () {
       + '<div class="lc-head-title">Support Center</div>'
       + '<div class="lc-head-sub">Our travel experts are available 24/7.</div>'
       + '</div>'
+      + '<button type="button" class="lc-head-call" data-lc-call-start'
+      + ' aria-label="Start a voice call" title="Call support">'
+      + svg(ICONS.phone) + '</button>'
       + '<button type="button" class="lc-head-close" data-lc-close aria-label="Close chat">'
       + svg(ICONS.close) + '</button>'
       + '</div>'
+      /* The call overlay. Hidden until there is a call; covers the composer
+         and leaves the thread readable behind it. */
+      + '<div class="lc-call" data-lc-call hidden role="dialog"'
+      + ' aria-label="Voice call">'
+      + '<div class="lc-call-avatar" aria-hidden="true">JW</div>'
+      + '<div class="lc-call-title" data-lc-call-title>JackpotsWorld Support</div>'
+      + '<div class="lc-call-status" data-lc-call-status></div>'
+      + '<div class="lc-call-timer" data-lc-call-timer hidden>00:00</div>'
+      + '<div class="lc-call-note" data-lc-call-note hidden></div>'
+      + '<div class="lc-call-actions" data-lc-call-answer hidden>'
+      + '<button type="button" class="lc-call-btn lc-call-reject" data-lc-call-decline>'
+      + svg(ICONS.phoneOff) + '<span>Decline</span></button>'
+      + '<button type="button" class="lc-call-btn lc-call-accept" data-lc-call-answer-btn>'
+      + svg(ICONS.phone) + '<span>Accept</span></button>'
+      + '</div>'
+      + '<div class="lc-call-actions" data-lc-call-live>'
+      + '<button type="button" class="lc-call-btn lc-call-mute" data-lc-call-mute'
+      + ' aria-pressed="false">' + svg(ICONS.mic) + '<span>Mute</span></button>'
+      + '<button type="button" class="lc-call-btn lc-call-end" data-lc-call-hangup>'
+      + svg(ICONS.phoneOff) + '<span>End</span></button>'
+      + '</div>'
+      + '</div>'
+      + '<div class="lc-calls" data-lc-calls hidden></div>'
       + '<div class="lc-thread" data-lc-thread role="log" aria-live="polite" aria-label="Conversation"></div>'
       + '<div class="lc-emoji-tray" data-lc-emoji-tray hidden></div>'
       + '<form class="lc-composer" data-lc-form>'
@@ -984,6 +1355,17 @@ const LiveChat = (function () {
 
     const close = root.querySelector('[data-lc-close]');
     if (close) close.addEventListener('click', () => hide());
+
+    const callBtn = root.querySelector('[data-lc-call-start]');
+    if (callBtn) callBtn.addEventListener('click', () => startCall());
+    const hangupBtn = root.querySelector('[data-lc-call-hangup]');
+    if (hangupBtn) hangupBtn.addEventListener('click', () => hangUp());
+    const muteToggle = root.querySelector('[data-lc-call-mute]');
+    if (muteToggle) muteToggle.addEventListener('click', () => { JWCall.toggleMute(); });
+    const answerBtn = root.querySelector('[data-lc-call-answer-btn]');
+    if (answerBtn) answerBtn.addEventListener('click', () => acceptCall());
+    const declineBtn = root.querySelector('[data-lc-call-decline]');
+    if (declineBtn) declineBtn.addEventListener('click', () => rejectCall());
 
     const form = root.querySelector('[data-lc-form]');
     form.addEventListener('submit', e => { e.preventDefault(); send(); });
@@ -1047,6 +1429,15 @@ const LiveChat = (function () {
     /* Not a poll — a refresh when the reader comes back to the tab. Slice 3
        replaces this with the socket. */
     window.addEventListener('focus', () => { if (state.open) load(); });
+
+    /* A call in progress must not survive the tab closing: the other party
+       would sit listening to a connection nobody is on. */
+    window.addEventListener('beforeunload', () => {
+      if (call.id) {
+        try { socketSend('call_end', { call_id: call.id }); } catch (e) {}
+        JWCall.reset();
+      }
+    });
   }
 
   function autoGrow() {
@@ -1129,6 +1520,10 @@ const LiveChat = (function () {
     autoGrow();
     load();
     connect();
+    /* The call log is loaded alongside the thread, not lazily on a tab: the
+       brief puts "Recent Calls" inside Support Center, and a customer checking
+       whether they missed a callback should not have to find a control first. */
+    loadCallLog();
     if (state.input) state.input.focus();
   }
 

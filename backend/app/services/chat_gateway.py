@@ -35,9 +35,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.session import SessionLocal
 from app.schemas.customer_chat import ChatMessageResponse, MAX_BODY_CHARS
+from app.services import call_handlers
 from app.services import chat_assignment as assignment_service
 from app.services import customer_chat_service as chat
-from app.services.chat_broker import get_broker
+from app.services.chat_broker import agent_channel, get_broker
 
 logger = logging.getLogger("jackpots.chat")
 
@@ -79,6 +80,10 @@ class _RateLimiter:
 class ChatConnection:
     """One customer's socket, for the life of that socket."""
 
+    #: Set lazily by the `calls` property. Declared here so the attribute
+    #: exists before the first frame arrives.
+    _calls = None
+
     def __init__(self, websocket: WebSocket, customer_id: int):
         self.ws = websocket
         self.customer_id = customer_id
@@ -94,6 +99,20 @@ class ChatConnection:
 
     async def fail(self, code: str, message: str) -> None:
         await self.send("error", {"code": code, "message": message})
+
+    @property
+    def calls(self) -> "call_handlers.CallSession":
+        """Call handling for this socket, built on first use (CR-10).
+
+        Lazy because most sockets never place a call, and a CallSession holds a
+        ring-timer slot that would otherwise be created for every chat.
+        """
+        if self._calls is None:
+            self._calls = call_handlers.CallSession(
+                kind="customer", actor_id=self.customer_id, actor_name=None,
+                send=self.send, fail=self.fail,
+            )
+        return self._calls
 
     def _session(self) -> Session:
         return SessionLocal()
@@ -125,6 +144,11 @@ class ChatConnection:
                 await self._read_loop()
             finally:
                 pump.cancel()
+                # A dropped socket during a live call is a hangup, not a pause:
+                # cancel the ring timer so it cannot fire against a call this
+                # disconnect has effectively ended.
+                if self._calls is not None:
+                    self._calls.close()
                 await self.broker.mark_offline(f"customer:{self.customer_id}")
 
     async def _pump(self, stream) -> None:
@@ -155,6 +179,14 @@ class ChatConnection:
                 data = frame.get("data") or {}
             except (ValueError, AttributeError):
                 await self.fail("bad_frame", "Expected {\"event\": ..., \"data\": ...}")
+                continue
+
+            if event in call_handlers.CALL_EVENTS:
+                try:
+                    await self._dispatch_call(event, data)
+                except Exception:
+                    logger.exception("call: customer handler %s failed", event)
+                    await self.fail("call_failed", "The call could not be set up.")
                 continue
 
             handler = self._HANDLERS.get(event)
@@ -216,6 +248,38 @@ class ChatConnection:
             await publish_assignment(
                 self.conversation_id, assignment[0], assignment[1], assigned_status,
             )
+
+    async def _dispatch_call(self, event: str, data: dict) -> None:
+        """Call frames, all of them delegated to the shared handler (CR-10).
+
+        A flat if-chain rather than a dict, because three of the ten need an
+        argument the others do not and a table of partials reads worse than the
+        chain it replaces.
+        """
+        from app.services import customer_call_service as call_service  # noqa: PLC0415
+
+        session = self.calls
+        try:
+            if event == "call_request":
+                await session.request(data, conversation_id=self.conversation_id)
+            elif event == "call_accept":
+                await session.accept(data)
+            elif event == "call_reject":
+                await session.reject(data)
+            elif event == "call_cancel":
+                await session.cancel(data)
+            elif event == "call_end":
+                await session.end(data)
+            elif event == "call_connected":
+                await session.connected(data)
+            elif event == "call_failed":
+                await session.failed(data)
+            else:
+                await session.relay(event, data)
+        except call_service.CallNotFound:
+            await self.fail("no_such_call", "That call is no longer active.")
+        except call_service.CallError as exc:
+            await self.fail("call_rejected", str(exc))
 
     async def _on_typing(self, data: dict, *, typing: bool) -> None:
         """Typing is published but never stored.
@@ -390,6 +454,8 @@ class AgentConnection:
     It also SEES internal notes, which the customer's pump drops.
     """
 
+    _calls = None
+
     def __init__(self, websocket: WebSocket, admin_id: int, admin_name: str):
         self.ws = websocket
         self.admin_id = admin_id
@@ -406,14 +472,45 @@ class AgentConnection:
     async def fail(self, code: str, message: str) -> None:
         await self.send("error", {"code": code, "message": message})
 
+    @property
+    def calls(self) -> "call_handlers.CallSession":
+        if self._calls is None:
+            self._calls = call_handlers.CallSession(
+                kind="admin", actor_id=self.admin_id, actor_name=self.admin_name,
+                send=self.send, fail=self.fail,
+            )
+        return self._calls
+
     async def run(self) -> None:
         await self.broker.mark_online(f"admin:{self.admin_id}")
+        # THE AGENT'S OWN CHANNEL, held for the whole session (CR-10).
+        #
+        # The per-conversation pumps below are joined on demand, which is right
+        # for chat and useless for a call: an incoming call is by definition
+        # about a conversation the agent is NOT currently reading. Without this
+        # subscription a ring would reach an agent only by the coincidence of
+        # them already having the right thread open.
+        personal = self.broker.subscribe_to(agent_channel(self.admin_id))
+        async with personal as stream:
+            ring_pump = asyncio.create_task(self._pump_personal(stream))
+            try:
+                await self._read_loop()
+            finally:
+                ring_pump.cancel()
+                for task in self._pumps.values():
+                    task.cancel()
+                if self._calls is not None:
+                    self._calls.close()
+                await self.broker.mark_offline(f"admin:{self.admin_id}")
+
+    async def _pump_personal(self, stream) -> None:
         try:
-            await self._read_loop()
-        finally:
-            for task in self._pumps.values():
-                task.cancel()
-            await self.broker.mark_offline(f"admin:{self.admin_id}")
+            async for payload in stream:
+                await self.ws.send_text(json.dumps(payload, default=str))
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("call: personal pump failed for admin %s", self.admin_id)
 
     async def _read_loop(self) -> None:
         while True:
@@ -453,8 +550,40 @@ class AgentConnection:
         elif event == "ping":
             await self.broker.mark_online(f"admin:{self.admin_id}")
             await self.send("pong", {"t": int(time.time())})
+        elif event in call_handlers.CALL_EVENTS:
+            await self._dispatch_call(event, data)
         else:
             await self.fail("unknown_event", f"No such event: {event}")
+
+    async def _dispatch_call(self, event: str, data: dict) -> None:
+        """The agent half of the call vocabulary. Same handlers as the
+        customer half — see call_handlers.CallSession."""
+        from app.services import customer_call_service as call_service  # noqa: PLC0415
+
+        session = self.calls
+        try:
+            if event == "call_request":
+                await session.request(
+                    data, conversation_id=int(data.get("conversation_id", 0)),
+                )
+            elif event == "call_accept":
+                await session.accept(data)
+            elif event == "call_reject":
+                await session.reject(data)
+            elif event == "call_cancel":
+                await session.cancel(data)
+            elif event == "call_end":
+                await session.end(data)
+            elif event == "call_connected":
+                await session.connected(data)
+            elif event == "call_failed":
+                await session.failed(data)
+            else:
+                await session.relay(event, data)
+        except call_service.CallNotFound:
+            await self.fail("no_such_call", "That call is no longer active.")
+        except call_service.CallError as exc:
+            await self.fail("call_rejected", str(exc))
 
     async def _join(self, conversation_id: int) -> None:
         if conversation_id in self._pumps:

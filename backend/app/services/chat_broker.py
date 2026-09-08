@@ -45,9 +45,24 @@ CHANNEL_PREFIX = "chat:conv:"
 TICKET_PREFIX = "chat:ticket:"
 PRESENCE_PREFIX = "chat:presence:"
 
+#: One channel per AGENT, subscribed for the life of their socket (CR-10).
+#:
+#: The conversation channels above are joined on demand, which is right for
+#: chat: an agent who has four hundred conversations should not be woken by
+#: traffic on the three hundred and ninety-seven they are not reading. A voice
+#: call is the exact opposite — it exists to interrupt, and the customer ringing
+#: is almost never in the thread the agent happens to have open. Without a
+#: channel that is always subscribed, an incoming call reaches an agent only by
+#: the coincidence of them already looking at the right conversation.
+AGENT_PREFIX = "chat:agent:"
+
 
 def channel_for(conversation_id: int) -> str:
     return f"{CHANNEL_PREFIX}{conversation_id}"
+
+
+def agent_channel(admin_id: int) -> str:
+    return f"{AGENT_PREFIX}{admin_id}"
 
 
 class ChatBroker(Protocol):
@@ -56,6 +71,10 @@ class ChatBroker(Protocol):
     async def publish(self, conversation_id: int, payload: dict[str, Any]) -> None: ...
 
     def subscribe(self, conversation_id: int) -> "Subscription": ...
+
+    async def publish_to(self, channel: str, payload: dict[str, Any]) -> None: ...
+
+    def subscribe_to(self, channel: str) -> "Subscription": ...
 
     async def issue_ticket(self, actor: str) -> str: ...
 
@@ -93,7 +112,13 @@ class RedisBroker:
         await self._redis.publish(channel_for(conversation_id), json.dumps(payload))
 
     def subscribe(self, conversation_id: int) -> "RedisSubscription":
-        return RedisSubscription(self._redis, channel_for(conversation_id))
+        return self.subscribe_to(channel_for(conversation_id))
+
+    async def publish_to(self, channel: str, payload: dict[str, Any]) -> None:
+        await self._redis.publish(channel, json.dumps(payload))
+
+    def subscribe_to(self, channel: str) -> "RedisSubscription":
+        return RedisSubscription(self._redis, channel)
 
     async def issue_ticket(self, actor: str) -> str:
         """`actor` is "customer:43" or "admin:7".
@@ -191,7 +216,7 @@ class InProcessBroker:
     """
 
     def __init__(self) -> None:
-        self._queues: dict[int, set[asyncio.Queue]] = {}
+        self._queues: dict[str, set[asyncio.Queue]] = {}
         self._tickets: dict[str, str] = {}
         self._online: set[str] = set()
         logger.warning(
@@ -216,12 +241,18 @@ class InProcessBroker:
         not a stand-in; it is a way of not testing. The cost is one serialise
         per publish on a laptop.
         """
-        encoded = json.dumps(payload)
-        for queue in list(self._queues.get(conversation_id, ())):
-            queue.put_nowait(json.loads(encoded))
+        await self.publish_to(channel_for(conversation_id), payload)
 
     def subscribe(self, conversation_id: int) -> "InProcessSubscription":
-        return InProcessSubscription(self._queues, conversation_id)
+        return self.subscribe_to(channel_for(conversation_id))
+
+    async def publish_to(self, channel: str, payload: dict[str, Any]) -> None:
+        encoded = json.dumps(payload)
+        for queue in list(self._queues.get(channel, ())):
+            queue.put_nowait(json.loads(encoded))
+
+    def subscribe_to(self, channel: str) -> "InProcessSubscription":
+        return InProcessSubscription(self._queues, channel)
 
     async def issue_ticket(self, actor: str) -> str:
         ticket = secrets.token_urlsafe(32)
@@ -250,13 +281,13 @@ class InProcessBroker:
 
 
 class InProcessSubscription:
-    def __init__(self, registry: dict[int, set[asyncio.Queue]], conversation_id: int):
+    def __init__(self, registry: dict[str, set[asyncio.Queue]], channel: str):
         self._registry = registry
-        self._conversation_id = conversation_id
+        self._channel = channel
         self._queue: asyncio.Queue = asyncio.Queue()
 
     async def __aenter__(self) -> AsyncIterator[dict[str, Any]]:
-        self._registry.setdefault(self._conversation_id, set()).add(self._queue)
+        self._registry.setdefault(self._channel, set()).add(self._queue)
         return self._iterate()
 
     async def _iterate(self) -> AsyncIterator[dict[str, Any]]:
@@ -264,11 +295,11 @@ class InProcessSubscription:
             yield await self._queue.get()
 
     async def __aexit__(self, *exc: Any) -> None:
-        listeners = self._registry.get(self._conversation_id)
+        listeners = self._registry.get(self._channel)
         if listeners:
             listeners.discard(self._queue)
             if not listeners:
-                self._registry.pop(self._conversation_id, None)
+                self._registry.pop(self._channel, None)
 
 
 # ---------------------------------------------------------------------------
