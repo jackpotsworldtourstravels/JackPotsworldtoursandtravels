@@ -130,6 +130,28 @@ def rival_merchant(atok):
         # so `login` below would hand back a token the server has already
         # revoked. Calling this flow twice in one script is what exposes it.
         forget_login(candidate["email"], "merchant")
+
+        # THE RIVAL HAS TO BE ABLE TO BOOK, and which company this loop lands
+        # on is whatever the database happens to hold. Nearly every caller
+        # follows this with make_booking(), which posts an enquiry and is
+        # refused 403 "your company does not have access to Flights" unless the
+        # product is enabled for that merchant.
+        #
+        # It is not enabled by default here for a reason worth knowing: the
+        # suites that exercise the service-access toggle turn products OFF on a
+        # real merchant and leave them off, so a later script picking the same
+        # company inherits the previous run's state. That is how eight scripts
+        # came to fail at once on a database where nothing was actually broken.
+        #
+        # Enabled through the ordinary Admin endpoint rather than by writing
+        # rows: if that endpoint is broken, a cross-tenant suite failing loudly
+        # is the correct outcome.
+        requests.patch(
+            f"{BASE}/api/admin/merchants/{merchant['id']}/service-access",
+            headers=H(atok),
+            json={"flights": True, "hotels": True, "visa": True, "holidays": True},
+        )
+
         return {
             "token": login(candidate["email"], password, "merchant"),
             "merchant_id": merchant["id"],

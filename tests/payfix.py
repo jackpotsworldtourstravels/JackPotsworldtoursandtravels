@@ -87,6 +87,22 @@ def call(path, body=None, token=None, method=None, raw=None, headers=None):
             return e.code, None
 
 
+def _ensure_demo_customer(db) -> int:
+    """The demo customer this suite books as, created on first use."""
+    from app.models_customer import Customer                          # noqa: PLC0415
+    from app.services.customer_auth_service import next_customer_code  # noqa: PLC0415
+
+    customer = Customer(
+        customer_code=next_customer_code(db),
+        full_name="Demo Customer",
+        email=DEMO_CUSTOMER_EMAIL,
+        mobile="+919900000001",
+    )
+    db.add(customer)
+    db.commit()
+    return customer.customer_id
+
+
 class PaymentFixture:
     """Books through the real API; cleans up exactly what it made."""
 
@@ -98,9 +114,15 @@ class PaymentFixture:
                 "SELECT customer_id FROM customers WHERE lower(email) = :e"),
                 {"e": DEMO_CUSTOMER_EMAIL}).scalar()
             if customer_id is None:
-                raise RuntimeError(
-                    f"No seeded customer {DEMO_CUSTOMER_EMAIL!r}. Run the alembic "
-                    f"seed migrations before this suite.")
+                # CREATED, NOT DEMANDED. This used to raise, telling the reader
+                # to "run the alembic seed migrations" — but no migration has
+                # ever created this row, so that instruction could not be
+                # followed and the whole money suite was unrunnable on a fresh
+                # database. The fixture makes what it needs, exactly as the
+                # call and chat suites already do, and cleans up nothing:
+                # the account is stable across runs and every booking it makes
+                # is reclaimed by the teardown below.
+                customer_id = _ensure_demo_customer(self.db)
         self.customer_id = customer_id
         self.token = create_customer_access_token(customer_id)
 
