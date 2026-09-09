@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Components — Premium Travel Platform Template</title>
+<meta name="description" content="Component reference: every variant and every state — default, hover, focus visible, active, disabled, loading and error.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="assets/template.css">
+<style>
+  /* Page-local scaffolding for the reference itself. Nothing here styles a
+     component — it only arranges the specimens on the page. */
+  .ref-head{border-bottom:1px solid var(--border-default); padding-block:var(--space-8);}
+  .ref-block{padding-block:var(--space-9); border-bottom:1px solid var(--border-default);}
+  .ref-block h2{font-size:var(--fs-h2); margin-bottom:var(--space-2);}
+  .ref-block > .l-container > p.ref-lede{color:var(--text-secondary); max-width:68ch; margin-bottom:var(--space-6);}
+  .ref-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--space-6);}
+  .ref-cell{display:flex; flex-direction:column; gap:var(--space-3); align-items:flex-start;}
+  .ref-label{
+    font-size:var(--fs-caption); font-weight:var(--fw-bold); letter-spacing:.12em;
+    text-transform:uppercase; color:var(--text-tertiary);
+  }
+  .ref-note{font-size:var(--fs-body-sm); color:var(--text-tertiary); max-width:34ch;}
+  .ref-table{width:100%; border-collapse:collapse; font-size:var(--fs-body-md);}
+  .ref-table th,.ref-table td{text-align:left; padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--border-default); vertical-align:top;}
+  .ref-table thead th{font-size:var(--fs-caption); letter-spacing:.12em; text-transform:uppercase; color:var(--text-tertiary); background:var(--surface-secondary);}
+  .ref-table td:first-child{font-weight:var(--fw-bold); white-space:nowrap;}
+  .ref-scroll{overflow-x:auto; border:1px solid var(--border-default); border-radius:var(--radius-md);}
+  .ref-swatches{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:var(--space-4);}
+  .ref-sw{display:flex; flex-direction:column; gap:var(--space-2);}
+  .ref-sw i{height:56px; border-radius:var(--radius-sm); border:1px solid rgba(19,19,22,.12); display:block;}
+  .ref-sw code{font-family:var(--font-mono); font-size:var(--fs-body-sm);}
+  .ref-sw span{font-size:var(--fs-body-sm); color:var(--text-tertiary);}
+  .ref-check{margin:0; padding:0; list-style:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--space-3);}
+  .ref-check li{display:flex; gap:var(--space-3); font-size:var(--fs-body-md); color:var(--text-secondary);}
+  .ref-check li::before{content:"✓"; color:var(--success-default); font-weight:var(--fw-black); flex:none;}
+</style>
+</head>
+<body>
+
+<a class="u-skip" href="#main">Skip to main content</a>
+
+<header class="c-nav" data-sticky-nav>
+  <div class="l-container">
+    <a class="c-nav__logo" href="index.html">Jackpots<em>World</em></a>
+    <nav class="c-nav__links" aria-label="Primary">
+      <a class="c-nav__link" href="index.html">Home</a>
+      <a class="c-nav__link" href="flights.html">Flights</a>
+      <a class="c-nav__link" href="components.html" aria-current="page">Components</a>
+    </nav>
+    <div class="c-nav__actions">
+      <a class="c-btn c-btn--outline c-btn--sm" href="index.html">Back to Home</a>
+      <button class="c-btn c-btn--icon c-nav__burger" type="button" data-drawer-open aria-label="Open navigation menu">
+        <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="c-drawer" data-drawer data-open="false" role="dialog" aria-modal="true" aria-label="Navigation menu">
+  <div class="c-drawer__scrim" data-drawer-close></div>
+  <div class="c-drawer__panel">
+    <div class="c-drawer__head">
+      <span class="c-nav__logo">Jackpots<em>World</em></span>
+      <button class="c-drawer__close" type="button" data-drawer-close aria-label="Close navigation menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <a href="index.html">Home</a>
+    <a href="flights.html">Flights</a>
+    <a href="components.html">Components</a>
+  </div>
+</div>
+
+<main id="main">
+
+<div class="ref-head">
+  <div class="l-container">
+    <p class="c-sectionhead__eyebrow">Component reference</p>
+    <h1 style="font-size:var(--fs-display-l);max-width:20ch">Every variant, every state</h1>
+    <p class="ref-lede" style="margin-top:var(--space-4);color:var(--text-secondary);max-width:68ch">
+      Each specimen below is the real component from <code>assets/template.css</code>, not a picture of one.
+      Tab through the page to check focus order; every interactive element shows a 2px ring at a 2px offset,
+      which is a shape change rather than a colour change, so it survives greyscale and high-contrast modes.
+    </p>
+  </div>
+</div>
+
+<!-- ======================================================================
+     TOKENS
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="tokTitle">
+  <div class="l-container">
+    <h2 id="tokTitle">Colour tokens</h2>
+    <p class="ref-lede">Semantic names only. No component references a raw hex value.</p>
+
+    <div class="ref-swatches" style="margin-bottom:var(--space-7)">
+      <div class="ref-sw"><i style="background:#0C0C0E"></i><code>surface.inverse</code><span>#0C0C0E &middot; chrome</span></div>
+      <div class="ref-sw"><i style="background:#FFFFFF"></i><code>surface.primary</code><span>#FFFFFF &middot; booking surfaces</span></div>
+      <div class="ref-sw"><i style="background:#F5F4F1"></i><code>surface.secondary</code><span>#F5F4F1 &middot; alternating bands</span></div>
+      <div class="ref-sw"><i style="background:#D8B96A"></i><code>brand.primary</code><span>#D8B96A &middot; fill only</span></div>
+      <div class="ref-sw"><i style="background:#7A5F1E"></i><code>brand.ink</code><span>#7A5F1E &middot; gold text, 6.2:1</span></div>
+      <div class="ref-sw"><i style="background:#F6EFDC"></i><code>brand.tint</code><span>#F6EFDC &middot; chips</span></div>
+      <div class="ref-sw"><i style="background:#2E6B52"></i><code>success.default</code><span>#2E6B52 &middot; 5.6:1</span></div>
+      <div class="ref-sw"><i style="background:#8A5A12"></i><code>warning.default</code><span>#8A5A12 &middot; 5.8:1</span></div>
+      <div class="ref-sw"><i style="background:#8E2B26"></i><code>error.default</code><span>#8E2B26 &middot; 7.4:1</span></div>
+    </div>
+
+    <div class="c-promo c-promo--minimal">
+      <div class="c-promo__body">
+        <h3 style="font-size:var(--fs-h4)">The two golds are not interchangeable</h3>
+        <p><code>brand.primary</code> #D8B96A measures 1.9:1 against white and fails AA as text. It is a fill: button grounds and rules on black. Anything gold that carries a label on a light surface must use <code>brand.ink</code> #7A5F1E at 6.2:1.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     TYPE + SPACING
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="typeTitle">
+  <div class="l-container">
+    <h2 id="typeTitle">Type scale</h2>
+    <p class="ref-lede">Lato. The family ships no 500 weight on Google Fonts, so <code>--fw-medium</code> resolves to 700 — the nearest weight that exists. Swap the family if a true medium is required.</p>
+    <div class="ref-scroll">
+      <table class="ref-table">
+        <thead><tr><th>Token</th><th>Size</th><th>Specimen</th></tr></thead>
+        <tbody>
+          <tr><td>display.xl</td><td>48</td><td style="font-size:48px;font-weight:900;line-height:1.16">Explore Holidays</td></tr>
+          <tr><td>display.l</td><td>36</td><td style="font-size:36px;font-weight:900;line-height:1.16">Explore Holidays</td></tr>
+          <tr><td>h1</td><td>30</td><td style="font-size:30px;font-weight:900">Delhi to Goa</td></tr>
+          <tr><td>h2</td><td>24</td><td style="font-size:24px;font-weight:900">Popular destinations</td></tr>
+          <tr><td>h3</td><td>20</td><td style="font-size:20px;font-weight:900">Casa Anjuna Retreat</td></tr>
+          <tr><td>h4</td><td>18</td><td style="font-size:18px;font-weight:900">Free cancellation</td></tr>
+          <tr><td>body.large</td><td>16</td><td style="font-size:16px">Fares from 48 airline partners.</td></tr>
+          <tr><td>body.medium</td><td>14</td><td style="font-size:14px">Cancel up to 24 hours before check-in.</td></tr>
+          <tr><td>body.small</td><td>12</td><td style="font-size:12px">Taxes and fees included.</td></tr>
+          <tr><td>caption</td><td>11</td><td style="font-size:11px;letter-spacing:.12em;text-transform:uppercase">Departure</td></tr>
+          <tr><td>tiny</td><td>10</td><td style="font-size:10px;letter-spacing:.12em;text-transform:uppercase">Best seller</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     BUTTONS
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="btnTitle">
+  <div class="l-container">
+    <h2 id="btnTitle">Buttons</h2>
+    <p class="ref-lede">Seven variants. Every one is at least 44&times;44px, and the loading state keeps the label's width so the row never reflows mid-click.</p>
+
+    <div class="ref-grid">
+      <div class="ref-cell"><span class="ref-label">Primary</span><button class="c-btn c-btn--primary" type="button">Search Flights</button></div>
+      <div class="ref-cell"><span class="ref-label">Secondary</span><button class="c-btn c-btn--secondary" type="button">Explore Holidays</button></div>
+      <div class="ref-cell"><span class="ref-label">Outline</span><button class="c-btn c-btn--outline" type="button">View Deals</button></div>
+      <div class="ref-cell"><span class="ref-label">Ghost</span><button class="c-btn c-btn--ghost" type="button">Book Hotels</button></div>
+      <div class="ref-cell"><span class="ref-label">Danger</span><button class="c-btn c-btn--danger" type="button">Cancel Booking</button></div>
+      <div class="ref-cell"><span class="ref-label">Icon</span>
+        <button class="c-btn c-btn--icon" type="button" aria-label="Add to wishlist">
+          <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.3-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.7-7 9-7 9Z"/></svg>
+        </button>
+      </div>
+      <div class="ref-cell"><span class="ref-label">Loading</span>
+        <button class="c-btn c-btn--primary" type="button" data-loading="true" aria-busy="true" aria-live="polite">Search Flights</button>
+        <p class="ref-note">Label preserved, width unchanged.</p>
+      </div>
+      <div class="ref-cell"><span class="ref-label">Disabled</span>
+        <button class="c-btn c-btn--primary" type="button" disabled>Continue Booking</button>
+        <p class="ref-note">Reduced emphasis, not hidden.</p>
+      </div>
+      <div class="ref-cell"><span class="ref-label">Error</span>
+        <button class="c-btn c-btn--outline c-btn--error" type="button" aria-describedby="btnErr">Retry Payment</button>
+        <p class="ref-note" id="btnErr" style="color:var(--error-default)">Payment declined by your bank.</p>
+      </div>
+    </div>
+
+    <p class="ref-lede" style="margin-top:var(--space-7);margin-bottom:var(--space-4)">Hover and active are live — move a pointer over any button above. Focus visible is live too: press Tab.</p>
+    <div class="ref-scroll">
+      <table class="ref-table">
+        <thead><tr><th>State</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr><td>Default</td><td>Resting fill, 1px border, radius.sm</td></tr>
+          <tr><td>Hover</td><td>translateY(&minus;2px) and shadow.md, 120ms</td></tr>
+          <tr><td>Focus visible</td><td>2px ring at 2px offset, independent of fill colour</td></tr>
+          <tr><td>Active</td><td>Returns to translateY(0), darker fill, shadow removed</td></tr>
+          <tr><td>Disabled</td><td>surface.disabled ground, text.disabled label, cursor not-allowed</td></tr>
+          <tr><td>Loading</td><td>Label transparent, centred spinner, pointer events off, aria-busy</td></tr>
+          <tr><td>Error</td><td>error.default border with the message in an aria-describedby target</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     INPUTS
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="inpTitle">
+  <div class="l-container">
+    <h2 id="inpTitle">Inputs</h2>
+    <p class="ref-lede">Every control has a visible label. Validation is inline, sits next to the field it concerns, and clears as soon as the field is edited.</p>
+
+    <div class="ref-grid">
+      <div class="c-field">
+        <label class="c-field__label" for="s1">Default</label>
+        <div class="c-field__control"><input class="c-field__input" id="s1" type="text" placeholder="City or airport"></div>
+        <p class="c-field__hint">Type at least two letters</p>
+      </div>
+
+      <div class="c-field c-field--filled">
+        <label class="c-field__label" for="s2">Filled</label>
+        <div class="c-field__control"><input class="c-field__input" id="s2" type="text" value="Goa"></div>
+        <p class="c-field__hint">GOI &middot; Dabolim</p>
+      </div>
+
+      <div class="c-field c-field--error">
+        <label class="c-field__label" for="s3">Error</label>
+        <div class="c-field__control"><input class="c-field__input" id="s3" type="text" value="Delhi" aria-invalid="true" aria-describedby="s3err"></div>
+        <p class="c-field__error" id="s3err">Choose a destination different from your origin</p>
+      </div>
+
+      <div class="c-field c-field--success">
+        <label class="c-field__label" for="s4">Success</label>
+        <div class="c-field__control"><input class="c-field__input" id="s4" type="text" value="JWMONSOON"></div>
+        <p class="c-field__hint" style="color:var(--success-default)">Applied. &#8377;520 off this fare.</p>
+      </div>
+
+      <div class="c-field c-field--disabled">
+        <label class="c-field__label" for="s5">Disabled</label>
+        <div class="c-field__control"><input class="c-field__input" id="s5" type="text" value="Return date" disabled></div>
+        <p class="ref-note">One-way trips have no return leg.</p>
+      </div>
+
+      <div class="c-field c-field--loading">
+        <label class="c-field__label" for="s6">Loading</label>
+        <div class="c-field__control"><input class="c-field__input" id="s6" type="text" value="Checking seats…" readonly></div>
+      </div>
+
+      <div class="c-field">
+        <label class="c-field__label" for="s7">Date</label>
+        <div class="c-field__control"><input class="c-field__input" id="s7" type="date" value="2026-09-14" min="2026-09-09"></div>
+        <p class="ref-note">min blocks past dates at the control.</p>
+      </div>
+
+      <div class="c-field">
+        <label class="c-field__label" for="s8">Dropdown</label>
+        <div class="c-field__control"><select class="c-field__input" id="s8" style="appearance:none"><option>Economy</option><option>Premium Economy</option><option>Business</option></select></div>
+      </div>
+
+      <div class="c-field c-relative" data-combobox>
+        <label class="c-field__label" for="s9">Autocomplete</label>
+        <div class="c-field__control">
+          <input class="c-field__input" id="s9" type="text" placeholder="Start typing"
+                 role="combobox" aria-expanded="false" aria-controls="s9list" autocomplete="off" data-combobox-input>
+        </div>
+        <p class="ref-note">Arrow to move, Enter to take, Escape to close.</p>
+        <ul class="c-listbox" id="s9list" role="listbox" aria-label="Matching airports" data-combobox-list hidden>
+          <li class="c-listbox__item" role="option" id="c1" aria-selected="false" data-value="Delhi"><span><strong>Delhi</strong><span>Indira Gandhi International</span></span><code>DEL</code></li>
+          <li class="c-listbox__item" role="option" id="c2" aria-selected="false" data-value="Dehradun"><span><strong>Dehradun</strong><span>Jolly Grant</span></span><code>DED</code></li>
+          <li class="c-listbox__item" role="option" id="c3" aria-selected="false" data-value="Dibrugarh"><span><strong>Dibrugarh</strong><span>Mohanbari</span></span><code>DIB</code></li>
+          <li class="c-listbox__item" role="option" id="c4" aria-selected="false" data-value="Diu"><span><strong>Diu</strong><span>Diu Airport</span></span><code>DIU</code></li>
+          <li class="c-listbox__item" role="option" id="c5" aria-selected="false" data-value="Durgapur"><span><strong>Durgapur</strong><span>Kazi Nazrul Islam</span></span><code>RDP</code></li>
+          <li class="c-listbox__item" role="option" id="c6" aria-selected="false" data-value="Darbhanga"><span><strong>Darbhanga</strong><span>Darbhanga Airport</span></span><code>DBR</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="font-size:var(--fs-h3);margin-top:var(--space-8);margin-bottom:var(--space-3)">Edge cases handled</h3>
+    <div class="ref-scroll">
+      <table class="ref-table">
+        <thead><tr><th>Case</th><th>Behaviour</th></tr></thead>
+        <tbody>
+          <tr><td>Long airport name</td><td>Secondary line ellipses; the code stays pinned right and is never clipped</td></tr>
+          <tr><td>Unknown airport</td><td>Listbox shows an empty state, not a blank panel; the typed value is kept</td></tr>
+          <tr><td>Same origin and destination</td><td>Inline error on the destination field, submit blocked, focus moved to it</td></tr>
+          <tr><td>Past date</td><td>Blocked by <code>min</code> on the control, so the picker cannot offer it</td></tr>
+          <tr><td>Invalid range</td><td>Return before departure resets the return leg and announces the change</td></tr>
+          <tr><td>Offline</td><td>Submit button holds its loading state and a retry banner replaces the results</td></tr>
+          <tr><td>No flights</td><td>Empty state with the filter that caused it named, plus a clear action</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     CARDS
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="cardTitle">
+  <div class="l-container">
+    <h2 id="cardTitle">Cards</h2>
+    <p class="ref-lede">Image, badge, title, description, meta, price, action. Titles and descriptions clamp at two lines; prices never truncate.</p>
+
+    <ul class="c-cardgrid c-cardgrid--3">
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-goa"></div><span class="c-card__badge c-badge c-badge--inverse">Best seller</span><span class="c-card__overtitle">Goa</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Destination card</h3>
+          <p class="c-card__desc">Hover to see the lift and the image scale. Both respect prefers-reduced-motion.</p>
+          <p class="c-card__meta">Delhi &rarr; Goa &middot; <b>2h 40m</b></p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><span>from</span><b>&#8377;4,310</b></span>
+          <a class="c-btn c-btn--outline c-btn--sm" href="#x">View Fares</a>
+        </div>
+      </li>
+
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-jai"></div><span class="c-card__badge c-badge c-badge--inverse">5 nights</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Package card with a deliberately long title that must clamp at exactly two lines and then stop</h3>
+          <p class="c-card__desc">This description is also over-long on purpose, to prove that the clamp holds on the second line and the card height stays equal to its siblings.</p>
+          <p class="c-card__meta">Departs 12 Oct &middot; <b>4.7</b> (218 reviews)</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><s>&#8377;38,900</s><b>&#8377;32,400</b><span>per person</span></span>
+          <a class="c-btn c-btn--primary c-btn--sm" href="#x">Continue Booking</a>
+        </div>
+      </li>
+
+      <li class="c-card" aria-busy="true">
+        <div class="c-card__media"><div class="c-skel c-skel--media"></div></div>
+        <div class="c-card__body">
+          <div class="c-skel c-skel--title"></div>
+          <div class="c-skel c-skel--line" style="width:100%"></div>
+          <div class="c-skel c-skel--line" style="width:72%"></div>
+        </div>
+        <div class="c-card__foot"><div class="c-skel c-skel--pill" style="width:96px"></div><div class="c-skel c-skel--pill" style="margin-left:auto"></div></div>
+      </li>
+    </ul>
+
+    <h3 style="font-size:var(--fs-h3);margin-top:var(--space-8);margin-bottom:var(--space-4)">Badges</h3>
+    <div class="l-row" style="flex-wrap:wrap;gap:var(--space-3)">
+      <span class="c-badge c-badge--brand">Flat 12% off</span>
+      <span class="c-badge c-badge--success">Free cancellation</span>
+      <span class="c-badge c-badge--warning">3 seats left</span>
+      <span class="c-badge c-badge--error">Sold out</span>
+      <span class="c-badge c-badge--inverse">Best seller</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     LISTS + BANNERS
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="listTitle">
+  <div class="l-container">
+    <h2 id="listTitle">Lists and banners</h2>
+    <p class="ref-lede">Lists show five items and then scroll. Long labels ellipse; the trailing value is never clipped.</p>
+
+    <div class="ref-grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+      <div>
+        <span class="ref-label" style="display:block;margin-bottom:var(--space-3)">Scrolling list — 5 visible</span>
+        <ul class="c-list">
+          <li class="c-list__item"><span>Delhi to Goa</span><b>&#8377;4,310</b></li>
+          <li class="c-list__item"><span>Mumbai to Dubai</span><b>&#8377;13,780</b></li>
+          <li class="c-list__item"><span>Bengaluru to Port Blair via Chennai, with a long layover</span><b>&#8377;9,240</b></li>
+          <li class="c-list__item"><span>Delhi to Srinagar</span><b>&#8377;5,880</b></li>
+          <li class="c-list__item"><span>Kolkata to Bangkok</span><b>&#8377;15,400</b></li>
+          <li class="c-list__item"><span>Chennai to Colombo</span><b>&#8377;11,100</b></li>
+          <li class="c-list__item"><span>Hyderabad to Kochi</span><b>&#8377;3,990</b></li>
+        </ul>
+      </div>
+
+      <div class="l-stack l-stack--4">
+        <span class="ref-label">Banner variants</span>
+        <div class="c-promo c-promo--gradient" data-dismissible style="padding:var(--space-5)">
+          <div class="c-promo__body"><h3 style="font-size:var(--fs-h4)">Gradient</h3><p>Monsoon sale ends 30 September.</p></div>
+          <div class="c-promo__cta"><a class="c-btn c-btn--primary c-btn--sm" href="#x">View Deals</a></div>
+          <button class="c-promo__dismiss" type="button" data-dismiss aria-label="Dismiss gradient banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <div class="c-promo c-promo--festival" style="padding:var(--space-5)">
+          <div class="c-promo__body"><h3 style="font-size:var(--fs-h4)">Festival</h3><p>Diwali fixed departures now open.</p></div>
+          <div class="c-promo__cta"><a class="c-btn c-btn--primary c-btn--sm" href="#x">Explore Holidays</a></div>
+        </div>
+        <div class="c-promo c-promo--minimal" style="padding:var(--space-5)">
+          <div class="c-promo__body"><h3 style="font-size:var(--fs-h4)">Minimal</h3><p>Add travel insurance for &#8377;449 per person.</p></div>
+          <div class="c-promo__cta"><a class="c-btn c-btn--outline c-btn--sm" href="#x">View Plans</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     EMPTY STATES
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="emptyTitle">
+  <div class="l-container">
+    <h2 id="emptyTitle">Empty states</h2>
+    <p class="ref-lede">Each names the reason and offers the action that resolves it. None of them says "nothing found" and stops there.</p>
+
+    <div class="ref-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+      <div class="c-empty">
+        <div class="c-empty__art" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/></svg></div>
+        <h3>No flights</h3>
+        <p>Nothing departs before 06:00 for this route. Four non-stop options remain from &#8377;4,310.</p>
+        <button class="c-btn c-btn--primary" type="button">Clear Filters</button>
+      </div>
+
+      <div class="c-empty">
+        <div class="c-empty__art" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 13h6"/></svg></div>
+        <h3>No hotels</h3>
+        <p>Nothing in Old Manali is free on those dates. Solang and Vashisht have rooms 15 minutes away.</p>
+        <button class="c-btn c-btn--primary" type="button">Book Hotels</button>
+      </div>
+
+      <div class="c-empty">
+        <div class="c-empty__art" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7M21 12a9 9 0 0 1-15 6.7"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></div>
+        <h3>You are offline</h3>
+        <p>Fares could not be refreshed. The last prices loaded were from 14 minutes ago.</p>
+        <button class="c-btn c-btn--primary" type="button">Retry</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     ACCESSIBILITY
+     ====================================================================== -->
+<section class="ref-block" aria-labelledby="a11yTitle" style="border-bottom:0">
+  <div class="l-container">
+    <h2 id="a11yTitle">Accessibility acceptance criteria</h2>
+    <p class="ref-lede">Each line below is testable on this page as it stands.</p>
+    <ul class="ref-check">
+      <li>Tab reaches every interactive element in visual order</li>
+      <li>Arrow keys move between booking widget tabs; Home and End jump to the ends</li>
+      <li>Arrow keys move through autocomplete options, Enter takes one, Escape closes</li>
+      <li>Escape closes the mobile drawer and returns focus to the trigger</li>
+      <li>Focus is a 2px ring at 2px offset — a shape change, not colour alone</li>
+      <li>Every input has a visible <code>&lt;label&gt;</code>, never a placeholder standing in for one</li>
+      <li>Icon-only buttons carry an <code>aria-label</code> naming the action</li>
+      <li>Loading states set <code>aria-busy</code> and announce through a live region</li>
+      <li>Errors are tied to their field with <code>aria-describedby</code> and <code>aria-invalid</code></li>
+      <li>Every touch target is at least 44&times;44px</li>
+      <li>Body, secondary and tertiary text all meet WCAG 2.2 AA on their own surface</li>
+      <li>All motion is suppressed under <code>prefers-reduced-motion</code></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="c-footer" style="padding-block:var(--space-8) var(--space-6)">
+  <div class="l-container">
+    <div class="c-footer__legal" style="margin-top:0;border-top:0;padding-top:0">
+      <p>&copy; 2026 JackpotsWorld Tours &amp; Travels &middot; UI template</p>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="flights.html">Flight Results</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/template.js"></script>
+</body>
+</html>

@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JackPots World Tours &amp; Travels — Flights, Hotels, Holidays, Visa</title>
+<meta name="description" content="Book flights, hotels, holiday packages, buses and visas with JackPots World Tours & Travels.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Kaushan+Script&display=swap">
+
+<style>
+/* ===========================================================================
+   JACKPOTS WORLD — HOME
+   ===========================================================================
+   PHOTOGRAPHY. Every image on this page is a CSS gradient stand-in. Each one
+   is marked `.ph` and carries the exact aspect ratio of the real asset, so
+   dropping photography in is a one-line swap per slot:
+
+       <div class="ph ph-hero"></div>
+       ->  <img src="assets/img/hero.jpg" alt="" class="ph ph-hero">
+
+   The `.ph` class already sets object-fit:cover, so an <img> inherits the
+   right crop without any further CSS.
+   =========================================================================== */
+
+:root{
+  --navy:#0C1E3A;
+  --navy-2:#0A1730;
+  --navy-3:#13294B;
+  --ink:#12253F;
+  --ink-2:#3D4E66;
+  --muted:#6B7A90;
+  --line:#E4E9F0;
+  --line-2:#EFF3F8;
+  --bg:#FFFFFF;
+  --bg-soft:#F6F8FB;
+
+  --gold:#E9B949;
+  --gold-2:#F3CB66;
+  --gold-3:#D9A32C;
+  --gold-ink:#7C5B12;
+
+  --blue:#1668E3;
+  --blue-soft:#E8F1FE;
+  --green:#14A05C;
+  --green-soft:#E4F6ED;
+  --amber-soft:#FDF3E2;
+  --red:#E24B4A;
+  --red-soft:#FDEBEB;
+  --purple:#7A5AF8;
+  --purple-soft:#EFEBFE;
+
+  --r-sm:8px;
+  --r:12px;
+  --r-lg:16px;
+  --pill:999px;
+  --shadow-card:0 1px 2px rgba(12,30,58,.05), 0 8px 22px -10px rgba(12,30,58,.16);
+  --shadow-lift:0 4px 10px rgba(12,30,58,.07), 0 22px 44px -18px rgba(12,30,58,.3);
+  --shadow-search:0 2px 6px rgba(12,30,58,.08), 0 30px 60px -24px rgba(12,30,58,.45);
+  --wrap:1240px;
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Poppins', -apple-system, 'Segoe UI', sans-serif;
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; transition-duration:.01ms !important;}
+}
+img,svg{display:block; max-width:100%;}
+a{color:inherit; text-decoration:none;}
+ul{margin:0; padding:0; list-style:none;}
+h1,h2,h3,h4{margin:0; line-height:1.2;}
+p{margin:0;}
+button{font:inherit; color:inherit; border:0; background:none; cursor:pointer;}
+input,select{font:inherit; color:inherit;}
+:focus-visible{outline:2px solid var(--blue); outline-offset:2px; border-radius:4px;}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+.wrap{max-width:var(--wrap); margin:0 auto; padding:0 24px;}
+
+/* photo stand-ins ---------------------------------------------------------- */
+.ph{display:block; width:100%; height:100%; object-fit:cover; background-size:cover; background-position:center;}
+.ph-hero{background:
+  radial-gradient(70% 90% at 76% 6%, rgba(255,206,140,.85) 0%, rgba(255,206,140,0) 55%),
+  radial-gradient(50% 60% at 92% 30%, rgba(255,158,96,.5) 0%, rgba(255,158,96,0) 60%),
+  linear-gradient(180deg,#1B3A63 0%,#2E5F86 26%,#4E8AA6 44%,#2C6C77 62%,#14323F 100%);}
+.ph-plane{background:linear-gradient(150deg,#2E6BB8 0%,#54A0E0 55%,#BCD9F2 100%);}
+.ph-resort{background:linear-gradient(150deg,#8A4B2A 0%,#D08A4E 48%,#F0C489 100%);}
+.ph-boat{background:linear-gradient(150deg,#12525E 0%,#2C8E93 50%,#C9B98A 100%);}
+.ph-visa{background:linear-gradient(150deg,#123B6B 0%,#2A6AAE 52%,#A8C9E8 100%);}
+.ph-emi{background:linear-gradient(150deg,#0E4C46 0%,#1C7F73 52%,#8FC9BC 100%);}
+.ph-dubai{background:linear-gradient(160deg,#2A2438 0%,#7C5A3C 46%,#E4B577 100%);}
+.ph-thai{background:linear-gradient(160deg,#123F35 0%,#3E8A62 46%,#E0C078 100%);}
+.ph-sing{background:linear-gradient(160deg,#1D3550 0%,#4E7EA0 48%,#CFE0EC 100%);}
+.ph-bali{background:linear-gradient(160deg,#16341F 0%,#3C6E3C 48%,#B9C98A 100%);}
+.ph-mald{background:linear-gradient(160deg,#0D4A63 0%,#1F92A8 46%,#A9E0DC 100%);}
+.ph-euro{background:linear-gradient(160deg,#2B3550 0%,#6B7EA0 48%,#D9C9A8 100%);}
+.ph-japan{background:linear-gradient(160deg,#3A2434 0%,#8A5A6E 46%,#F0C8D4 100%);}
+.ph-usa{background:linear-gradient(160deg,#173248 0%,#3F7B8C 48%,#B6D6D0 100%);}
+.ph-story1{background:linear-gradient(160deg,#14331F 0%,#3E7048 50%,#B4C88C 100%);}
+.ph-story2{background:linear-gradient(160deg,#123C33 0%,#37836A 50%,#DCC583 100%);}
+.ph-story3{background:linear-gradient(160deg,#3A2A20 0%,#8A6144 50%,#E2C79A 100%);}
+.ph-story4{background:linear-gradient(160deg,#2A3244 0%,#6A7794 50%,#D2C4A6 100%);}
+
+/* ===========================================================================
+   HEADER
+   =========================================================================== */
+.hdr{background:linear-gradient(180deg,#0C1E3A 0%,#0A1730 100%); color:#fff; position:relative; z-index:30;}
+.hdr .wrap{display:flex; align-items:center; gap:26px; height:64px;}
+.brand{display:flex; align-items:center; gap:11px; flex:none;}
+.brand__emblem{
+  width:42px; height:42px; border-radius:50%; flex:none;
+  background:radial-gradient(circle at 34% 30%, #FBE08D 0%, #E9B949 42%, #A97C1C 100%);
+  display:grid; place-items:center; box-shadow:0 0 0 1px rgba(233,185,73,.5);
+}
+.brand__emblem svg{width:24px; height:24px; stroke:#3B2A06; fill:none; stroke-width:1.6;}
+.brand__name{font-size:16px; font-weight:700; letter-spacing:.06em; line-height:1.05;}
+.brand__name span{display:block; font-size:8px; font-weight:500; letter-spacing:.3em; color:var(--gold);}
+
+.mainnav{display:flex; align-items:center; gap:22px; margin-left:14px;}
+.mainnav a{
+  display:inline-flex; align-items:center; gap:5px; height:64px;
+  font-size:13.5px; font-weight:500; color:#D6DEEA;
+  border-bottom:3px solid transparent;
+}
+.mainnav a:hover{color:#fff;}
+.mainnav a[aria-current="page"]{color:#fff; font-weight:600; border-bottom-color:var(--gold);}
+.mainnav svg{width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2;}
+
+.hdrtools{margin-left:auto; display:flex; align-items:center; gap:18px; font-size:12.5px;}
+.hdrtools a,.hdrtools button{display:inline-flex; align-items:center; gap:6px; color:#D6DEEA; font-weight:500;}
+.hdrtools a:hover,.hdrtools button:hover{color:#fff;}
+.hdrtools svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7;}
+.btn-login{
+  border:1px solid rgba(255,255,255,.42); border-radius:var(--pill);
+  padding:7px 16px; color:#fff !important; font-weight:500;
+}
+.btn-login:hover{background:rgba(255,255,255,.1);}
+.hdr-sep{width:1px; height:20px; background:rgba(255,255,255,.18);}
+
+/* ===========================================================================
+   HERO
+   =========================================================================== */
+.hero{position:relative; padding-top:44px;}
+.hero__bg{position:absolute; inset:0; overflow:hidden;}
+.hero__bg::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(100deg, rgba(8,20,40,.86) 0%, rgba(8,20,40,.62) 34%, rgba(8,20,40,.18) 62%, rgba(8,20,40,.05) 100%);
+}
+.hero .wrap{position:relative; z-index:2;}
+.hero h1{font-size:38px; font-weight:700; color:#fff; letter-spacing:-.01em; line-height:1.14;}
+.hero h1 em{font-style:normal; display:block; color:var(--gold);}
+.hero__sub{margin-top:12px; font-size:14.5px; color:#DCE4EE; font-weight:400;}
+.hero__script{
+  position:absolute; right:34px; top:74px; z-index:2;
+  font-family:'Kaushan Script', cursive; font-size:34px; line-height:1.05;
+  color:var(--gold-2); text-shadow:0 2px 14px rgba(0,0,0,.4);
+  transform:rotate(-8deg); text-align:center; pointer-events:none;
+}
+.hero__script span{display:block;}
+.hero__script span:last-child{margin-left:26px;}
+
+/* ---- search widget ---- */
+.search{
+  margin-top:30px; background:#fff; border-radius:var(--r-lg);
+  box-shadow:var(--shadow-search); overflow:hidden; position:relative; z-index:5;
+}
+.search__tabs{display:flex; gap:4px; padding:8px 8px 0; background:#F1F4F8; overflow-x:auto; scrollbar-width:none;}
+.search__tabs::-webkit-scrollbar{display:none;}
+.stab{
+  display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  padding:11px 16px; border-radius:var(--r-sm) var(--r-sm) 0 0;
+  font-size:13px; font-weight:500; color:var(--ink-2); min-height:42px;
+}
+.stab svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7; flex:none;}
+.stab:hover{color:var(--ink); background:rgba(255,255,255,.6);}
+.stab[aria-selected="true"]{background:var(--navy); color:#fff; font-weight:600;}
+
+.search__opts{
+  display:flex; align-items:center; gap:26px; flex-wrap:wrap;
+  padding:14px 18px 0;
+}
+.rad,.chk{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-2); cursor:pointer;}
+.rad input{appearance:none; width:16px; height:16px; margin:0; border-radius:50%; border:1.5px solid #C3CDDB; flex:none;}
+.rad input:checked{border:5px solid var(--blue);}
+.chk input{appearance:none; width:15px; height:15px; margin:0; border-radius:3px; border:1.5px solid #C3CDDB; flex:none;}
+.chk input:checked{background:var(--blue); border-color:var(--blue);}
+.chk input:checked::after{content:"✓"; display:block; color:#fff; font-size:10px; line-height:12px; text-align:center;}
+.search__opts .spacer{margin-left:auto; display:flex; gap:22px;}
+
+.search__row{display:flex; align-items:stretch; gap:0; padding:14px 18px 18px; position:relative;}
+.fld{
+  flex:1; min-width:0; padding:10px 16px;
+  border:1px solid var(--line); border-right:0;
+  display:flex; gap:10px; align-items:flex-start;
+}
+.fld:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm);}
+.fld:hover{background:#FAFCFE;}
+.fld:focus-within{border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue);}
+.fld svg{width:17px; height:17px; stroke:var(--muted); fill:none; stroke-width:1.7; flex:none; margin-top:12px;}
+.fld__body{min-width:0; flex:1;}
+.fld__lab{font-size:11px; color:var(--muted); font-weight:400; display:block; margin-bottom:1px;}
+.fld__val{font-size:15px; font-weight:600; color:var(--ink); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.fld__sub{font-size:11px; color:var(--muted); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.fld--muted .fld__val{color:var(--muted); font-weight:500;}
+
+.swap{
+  position:absolute; left:calc(18px + (100% - 36px - 210px) * 0.2266); top:50%;
+  transform:translate(-50%,-8px); z-index:4;
+  width:30px; height:30px; border-radius:50%; background:#fff;
+  border:1px solid var(--line); box-shadow:0 2px 6px rgba(12,30,58,.12);
+  display:grid; place-items:center;
+}
+.swap svg{width:15px; height:15px; stroke:var(--ink-2); fill:none; stroke-width:1.8; margin:0;}
+.swap:hover{border-color:var(--blue);}
+.swap:hover svg{stroke:var(--blue);}
+
+.btn-search{
+  flex:none; width:210px; margin-left:14px;
+  background:linear-gradient(180deg,var(--gold-2) 0%,var(--gold-3) 100%);
+  color:#3B2A06; border-radius:var(--r-sm);
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  font-size:15px; font-weight:600; letter-spacing:.01em;
+  box-shadow:0 6px 16px -6px rgba(217,163,44,.7);
+  transition:filter .15s ease, transform .15s ease;
+}
+.btn-search svg{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:2.2;}
+.btn-search:hover{filter:brightness(1.05); transform:translateY(-1px);}
+.btn-search:active{transform:translateY(0);}
+
+/* ===========================================================================
+   QUICK SERVICES
+   =========================================================================== */
+.quick{border-bottom:1px solid var(--line-2); background:#fff;}
+.quick .wrap{display:grid; grid-template-columns:repeat(6,1fr); padding-block:18px;}
+.qs{display:flex; align-items:center; gap:12px; padding:6px 16px; border-right:1px solid var(--line-2); min-width:0;}
+.qs:last-child{border-right:0;}
+.qs__ic{width:36px; height:36px; border-radius:10px; display:grid; place-items:center; flex:none;}
+.qs__ic svg{width:19px; height:19px; fill:none; stroke-width:1.8;}
+.qs b{display:block; font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap;}
+.qs span{display:block; font-size:11px; color:var(--muted); white-space:nowrap;}
+.ic-blue{background:var(--blue-soft);} .ic-blue svg{stroke:var(--blue);}
+.ic-amber{background:var(--amber-soft);} .ic-amber svg{stroke:#D98A18;}
+.ic-green{background:var(--green-soft);} .ic-green svg{stroke:var(--green);}
+
+/* ===========================================================================
+   SECTION FURNITURE
+   =========================================================================== */
+.sec{padding-block:34px;}
+.sec--soft{background:var(--bg-soft);}
+.sechead{display:flex; align-items:flex-end; gap:16px; margin-bottom:18px;}
+.sechead h2{font-size:22px; font-weight:700; letter-spacing:-.01em;}
+.sechead p{font-size:12.5px; color:var(--muted); margin-top:3px;}
+.viewall{
+  margin-left:auto; display:inline-flex; align-items:center; gap:7px;
+  font-size:13px; font-weight:500; color:var(--blue); white-space:nowrap;
+}
+.viewall svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2;}
+.viewall:hover{text-decoration:underline;}
+
+/* ---- deals ---- */
+.deals{display:grid; grid-template-columns:repeat(5,1fr); gap:16px;}
+.deal{
+  position:relative; border-radius:var(--r); overflow:hidden; min-height:132px;
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:16px; color:#fff; isolation:isolate;
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.deal:hover{transform:translateY(-3px); box-shadow:var(--shadow-lift);}
+.deal .ph{position:absolute; inset:0; z-index:-2;}
+.deal::after{content:""; position:absolute; inset:0; z-index:-1;}
+.deal--1::after{background:linear-gradient(118deg, rgba(20,64,132,.95) 0%, rgba(24,88,168,.72) 52%, rgba(24,88,168,.3) 100%);}
+.deal--2::after{background:linear-gradient(118deg, rgba(150,66,26,.9) 0%, rgba(196,104,44,.6) 55%, rgba(196,104,44,.24) 100%);}
+.deal--3::after{background:linear-gradient(118deg, rgba(14,74,102,.93) 0%, rgba(22,116,140,.66) 55%, rgba(22,116,140,.26) 100%);}
+.deal--4::after{background:linear-gradient(118deg, rgba(18,60,120,.94) 0%, rgba(28,94,166,.7) 55%, rgba(28,94,166,.3) 100%);}
+.deal--5::after{background:linear-gradient(118deg, rgba(12,78,72,.93) 0%, rgba(20,120,110,.68) 55%, rgba(20,120,110,.28) 100%);}
+.deal h3{font-size:17px; font-weight:700; letter-spacing:-.01em;}
+.deal p{font-size:12px; color:rgba(255,255,255,.92); margin-top:2px;}
+.deal__foot{display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+.deal__btn{
+  background:#fff; color:var(--ink); border-radius:var(--r-sm);
+  padding:6px 14px; font-size:12px; font-weight:600; white-space:nowrap;
+}
+.deal__btn--gold{background:linear-gradient(180deg,var(--gold-2),var(--gold-3)); color:#3B2A06;}
+.deal__btn:hover{filter:brightness(.96);}
+.deal__code{font-size:11px; color:rgba(255,255,255,.9);}
+
+/* ---- destinations ---- */
+.dests{display:grid; grid-template-columns:repeat(8,1fr); gap:12px;}
+.dest{
+  border-radius:var(--r); overflow:hidden; background:#fff;
+  border:1px solid var(--line); box-shadow:var(--shadow-card);
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.dest:hover{transform:translateY(-3px); box-shadow:var(--shadow-lift);}
+.dest__img{aspect-ratio:1/.78; overflow:hidden;}
+.dest__body{padding:9px 10px 11px;}
+.dest b{display:block; font-size:13px; font-weight:600;}
+.dest span{display:block; font-size:10.5px; color:var(--muted); margin-top:1px; white-space:nowrap;}
+
+/* ---- three column band ---- */
+.trio{display:grid; grid-template-columns:repeat(3,1fr); gap:26px; align-items:start;}
+.trio__head{display:flex; align-items:flex-end; gap:12px; margin-bottom:12px;}
+.trio__head h2{font-size:18px; font-weight:700;}
+.trio__head p{font-size:11.5px; color:var(--muted); margin-top:2px;}
+.trio__head .viewall{font-size:12px;}
+
+.panel{background:#fff; border:1px solid var(--line); border-radius:var(--r); overflow:hidden;}
+
+/* cheapest flights */
+.route{
+  display:flex; align-items:center; gap:12px; padding:13px 14px;
+  border-bottom:1px solid var(--line-2);
+}
+.route:last-child{border-bottom:0;}
+.route:hover{background:#FAFCFE;}
+.route > svg:first-child{width:16px; height:16px; stroke:var(--blue); fill:none; stroke-width:1.7; flex:none;}
+.route__pair{display:flex; align-items:center; gap:9px; font-size:13px; font-weight:500; min-width:0;}
+.route__pair svg{width:13px; height:13px; stroke:var(--muted); fill:none; stroke-width:2; flex:none;}
+.route__fare{margin-left:auto; font-size:14px; font-weight:700; color:var(--green); white-space:nowrap;}
+.route__go{width:14px; height:14px; stroke:#B6C1D0; fill:none; stroke-width:2; flex:none;}
+
+/* fare calendar */
+.farecal{display:flex; align-items:stretch; gap:8px; padding:12px;}
+.farecal__arrow{
+  width:26px; flex:none; border:1px solid var(--line); border-radius:var(--r-sm);
+  display:grid; place-items:center; background:#fff;
+}
+.farecal__arrow svg{width:13px; height:13px; stroke:var(--ink-2); fill:none; stroke-width:2;}
+.farecal__arrow:hover{border-color:var(--blue);}
+.farecal__days{flex:1; display:grid; grid-template-columns:repeat(5,1fr); gap:6px; min-width:0;}
+.day{
+  border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 4px 6px;
+  text-align:center; background:#fff; position:relative;
+}
+.day b{display:block; font-size:11px; font-weight:500; color:var(--muted);}
+.day span{display:block; font-size:13px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums;}
+.day:hover{border-color:var(--blue);}
+.day--low{border-color:var(--green); background:var(--green-soft); padding-bottom:20px;}
+.day--low span{color:var(--green);}
+.day__tag{
+  position:absolute; left:50%; bottom:4px; transform:translateX(-50%);
+  background:var(--green); color:#fff; font-size:8.5px; font-weight:600;
+  padding:1px 7px; border-radius:3px; letter-spacing:.04em;
+}
+
+/* price trend chart */
+.trend{padding:0 12px 14px;}
+.trend h3{font-size:16px; font-weight:700; margin-bottom:2px;}
+.trend p{font-size:11.5px; color:var(--muted); margin-bottom:8px;}
+.chart{width:100%; height:auto; display:block; overflow:visible;}
+.chart .grid{stroke:var(--line-2); stroke-width:1;}
+.chart .axis{fill:var(--muted); font-size:9px; font-family:'Poppins',sans-serif;}
+.chart .line{fill:none; stroke:var(--blue); stroke-width:2; stroke-linejoin:round; stroke-linecap:round;}
+.chart .dot{fill:var(--blue);}
+.chart .dot-low{fill:var(--green); stroke:#fff; stroke-width:2;}
+.chart .callout{fill:var(--green-soft); stroke:var(--green); stroke-width:1;}
+.chart .callout-t{fill:var(--green); font-size:10px; font-weight:700; font-family:'Poppins',sans-serif;}
+.chart .callout-s{fill:#2C7A55; font-size:7.5px; font-family:'Poppins',sans-serif;}
+
+/* holiday packages */
+.pkg{display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--line-2);}
+.pkg:last-child{border-bottom:0;}
+.pkg:hover{background:#FAFCFE;}
+.pkg__img{width:74px; height:64px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
+.pkg__body{min-width:0; flex:1;}
+.pkg__body b{display:block; font-size:13.5px; font-weight:600;}
+.pkg__nights{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
+.pkg__price{display:block; font-size:15px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums;}
+.pkg__incl{display:block; font-size:10px; color:var(--muted); margin-top:1px;}
+.pkg__btn{
+  flex:none; background:linear-gradient(180deg,var(--gold-2),var(--gold-3)); color:#3B2A06;
+  border-radius:var(--r-sm); padding:7px 14px; font-size:12px; font-weight:600; white-space:nowrap;
+}
+.pkg__btn:hover{filter:brightness(1.05);}
+
+/* ---- why book with us ---- */
+.why{display:grid; grid-template-columns:repeat(6,1fr); gap:18px;}
+.why__it{display:flex; align-items:center; gap:12px; min-width:0;}
+.why__ic{width:42px; height:42px; border-radius:50%; display:grid; place-items:center; flex:none;}
+.why__ic svg{width:20px; height:20px; fill:none; stroke-width:1.8;}
+.why__it b{display:block; font-size:12.5px; font-weight:600;}
+.why__it span{display:block; font-size:11px; color:var(--muted);}
+.ic-c-amber{background:var(--amber-soft);} .ic-c-amber svg{stroke:#D98A18;}
+.ic-c-green{background:var(--green-soft);} .ic-c-green svg{stroke:var(--green);}
+.ic-c-blue{background:var(--blue-soft);} .ic-c-blue svg{stroke:var(--blue);}
+.ic-c-red{background:var(--red-soft);} .ic-c-red svg{stroke:var(--red);}
+.ic-c-purple{background:var(--purple-soft);} .ic-c-purple svg{stroke:var(--purple);}
+
+/* ---- airline partners ---- */
+.airlines{
+  display:grid; grid-template-columns:repeat(9,1fr);
+  border:1px solid var(--line); border-radius:var(--r); background:#fff; overflow:hidden;
+}
+.air{
+  display:grid; place-items:center; padding:16px 8px; min-height:58px;
+  border-right:1px solid var(--line-2); font-size:13px; font-weight:700;
+  letter-spacing:-.02em; white-space:nowrap; text-align:center;
+}
+.air:last-child{border-right:0;}
+.air:hover{background:#FAFCFE;}
+.air i{font-style:normal; display:inline-flex; align-items:center; gap:4px;}
+.air svg{width:14px; height:14px; flex:none;}
+
+/* ---- stories ---- */
+.stories{display:grid; grid-template-columns:repeat(4,1fr); gap:16px;}
+.story{
+  display:flex; gap:12px; align-items:center; background:#fff;
+  border:1px solid var(--line); border-radius:var(--r); padding:10px;
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.story:hover{transform:translateY(-2px); box-shadow:var(--shadow-lift);}
+.story__img{width:86px; height:68px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
+.story__body{min-width:0;}
+.story h3{font-size:13.5px; font-weight:600; line-height:1.3;}
+.story a{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--blue); font-weight:500; margin-top:7px;}
+.story a svg{width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2;}
+
+/* ===========================================================================
+   FOOTER
+   =========================================================================== */
+.ftr{background:linear-gradient(180deg,#0C1E3A 0%,#0A1730 100%); color:#B9C5D6; padding-top:34px;}
+.ftr__cols{display:flex; gap:34px; align-items:flex-start; padding-bottom:30px;}
+.ftr__brand{flex:none; width:120px;}
+.ftr__brand .brand__emblem{width:54px; height:54px;}
+.ftr__brand .brand__name{margin-top:8px; font-size:13px; color:#fff;}
+.ftr__col{min-width:104px;}
+.ftr__col h3{font-size:12.5px; font-weight:600; color:#fff; margin-bottom:11px;}
+.ftr__col li{margin-bottom:7px;}
+.ftr__col a{font-size:12.5px;}
+.ftr__col a:hover{color:#fff;}
+.ftr__apps{display:flex; flex-direction:column; gap:8px; margin-top:2px;}
+.appbadge{
+  display:inline-flex; align-items:center; gap:8px; width:132px;
+  border:1px solid rgba(255,255,255,.28); border-radius:7px; padding:6px 10px;
+}
+.appbadge svg{width:17px; height:17px; flex:none; fill:#fff;}
+.appbadge span{font-size:7.5px; line-height:1.15; color:#C9D4E2;}
+.appbadge b{display:block; font-size:11px; color:#fff; font-weight:600;}
+.appbadge:hover{border-color:rgba(255,255,255,.55);}
+.socials{display:flex; gap:9px;}
+.socials a{width:28px; height:28px; border-radius:6px; display:grid; place-items:center;}
+.socials svg{width:15px; height:15px; fill:#fff;}
+.s-fb{background:#1877F2;} .s-ig{background:linear-gradient(135deg,#F58529,#DD2A7B,#8134AF);}
+.s-yt{background:#FF0000;} .s-li{background:#0A66C2;}
+.socials a:hover{filter:brightness(1.12);}
+.ftr__script{
+  margin-left:auto; flex:none; font-family:'Kaushan Script', cursive;
+  font-size:27px; line-height:1.12; color:var(--gold-2); text-align:center;
+  transform:rotate(-6deg); padding-right:8px;
+}
+.ftr__script span{display:block;}
+.ftr__bar{
+  border-top:1px solid rgba(255,255,255,.12); padding-block:15px;
+  display:flex; align-items:center; gap:20px; font-size:11.5px;
+}
+.ftr__bar ul{margin-left:auto; display:flex; gap:22px;}
+.ftr__bar a:hover{color:#fff;}
+
+/* ===========================================================================
+   RESPONSIVE
+   =========================================================================== */
+@media (max-width:1180px){
+  .mainnav{gap:16px;} .mainnav a{font-size:12.5px;}
+  .hdrtools{gap:12px;}
+  .dests{grid-template-columns:repeat(4,1fr);}
+  .deals{grid-template-columns:repeat(3,1fr);}
+  .airlines{grid-template-columns:repeat(5,1fr);}
+  .air:nth-child(5){border-right:0;}
+  .stories{grid-template-columns:repeat(2,1fr);}
+  .why{grid-template-columns:repeat(3,1fr);}
+  .quick .wrap{grid-template-columns:repeat(3,1fr); row-gap:14px;}
+  .qs:nth-child(3n){border-right:0;}
+}
+@media (max-width:980px){
+  .mainnav,.hdrtools a:not(.btn-login){display:none;}
+  .hero__script{display:none;}
+  .search__row{flex-wrap:wrap; gap:10px;}
+  .fld{flex:1 1 46%; border:1px solid var(--line); border-radius:var(--r-sm);}
+  .swap{display:none;}
+  .btn-search{width:100%; margin-left:0; min-height:48px;}
+  .trio{grid-template-columns:1fr; gap:22px;}
+}
+@media (max-width:720px){
+  .hero h1{font-size:28px;}
+  .deals,.dests,.stories{grid-template-columns:repeat(2,1fr);}
+  .why{grid-template-columns:repeat(2,1fr);}
+  .airlines{grid-template-columns:repeat(3,1fr);}
+  .air{border-right:1px solid var(--line-2) !important;}
+  .quick .wrap{grid-template-columns:repeat(2,1fr);}
+  .qs{border-right:0;}
+  .fld{flex:1 1 100%;}
+  .ftr__cols{flex-wrap:wrap; gap:24px;}
+  .ftr__script{margin-left:0; width:100%; text-align:left; transform:none;}
+  .ftr__bar{flex-wrap:wrap; gap:12px;}
+  .ftr__bar ul{margin-left:0;}
+}
+</style>
+</head>
+<body>
+
+<a class="sr" href="#main">Skip to main content</a>
+
+<!-- ======================================================================
+     HEADER
+     ====================================================================== -->
+<header class="hdr">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="brand__emblem" aria-hidden="true">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>
+      </span>
+      <span class="brand__name">JACKPOTS WORLD<span>TOURS &amp; TRAVELS</span></span>
+    </a>
+
+    <nav class="mainnav" aria-label="Primary">
+      <a href="#flights" aria-current="page">Flights</a>
+      <a href="#hotels">Hotels</a>
+      <a href="#holidays">Holidays</a>
+      <a href="#bus">Bus</a>
+      <a href="#visa">Visa</a>
+      <a href="#more">More <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></a>
+    </nav>
+
+    <div class="hdrtools">
+      <a href="#offers"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Offers</a>
+      <a href="#support"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.5.2-.7.6-.7 1.1v.5M12 16.5h.01"/></svg>Support</a>
+      <a href="#trips"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>My Trips</a>
+      <a class="btn-login" href="#login"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>Login / Sign Up</a>
+      <span class="hdr-sep" aria-hidden="true"></span>
+      <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>INR <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ======================================================================
+     HERO + SEARCH
+     ====================================================================== -->
+<section class="hero">
+  <div class="hero__bg" aria-hidden="true">
+    <!-- <img src="assets/img/hero.jpg" alt="" class="ph ph-hero"> -->
+    <div class="ph ph-hero"></div>
+  </div>
+
+  <p class="hero__script" aria-hidden="true"><span>Explore</span><span>The World</span></p>
+
+  <div class="wrap">
+    <h1>Your next adventure <em>starts here.</em></h1>
+    <p class="hero__sub">Flights &middot; Hotels &middot; Holidays &middot; Visa &middot; All in one place</p>
+
+    <div class="search">
+      <div class="search__tabs" role="tablist" aria-label="Choose what to book">
+        <button class="stab" role="tab" aria-selected="true" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>Flights</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1M9 13h1m4 0h1M9 17h6"/></svg>Hotels</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M8 7h8l1 4H7ZM6 11v10h12V11M9 21v-5h6v5"/></svg>Holidays</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M4 10h16M7 20v-2m10 2v-2"/><circle cx="8" cy="16" r=".8"/><circle cx="16" cy="16" r=".8"/></svg>Bus</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5Z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>Visa</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>Travel Insurance</button>
+        <button class="stab" role="tab" aria-selected="false" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>More Services</button>
+      </div>
+
+      <form onsubmit="return false">
+        <div class="search__opts">
+          <label class="rad"><input type="radio" name="trip" checked> One Way</label>
+          <label class="rad"><input type="radio" name="trip"> Round Trip</label>
+          <label class="rad"><input type="radio" name="trip"> Multi City</label>
+          <span class="spacer">
+            <label class="chk"><input type="checkbox"> Student Fare</label>
+            <label class="chk"><input type="checkbox"> Show Direct Flights Only</label>
+          </span>
+        </div>
+
+        <div class="search__row">
+          <div class="fld">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="fld__body">
+              <label class="fld__lab" for="fFrom">From</label>
+              <span class="fld__val" id="fFrom">Hyderabad (HYD)</span>
+              <span class="fld__sub">Rajiv Gandhi Int. Airport</span>
+            </span>
+          </div>
+
+          <button class="swap" type="button" aria-label="Swap origin and destination">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>
+          </button>
+
+          <div class="fld">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="fld__body">
+              <label class="fld__lab" for="fTo">To</label>
+              <span class="fld__val" id="fTo">Delhi (DEL)</span>
+              <span class="fld__sub">Indira Gandhi Int. Airport</span>
+            </span>
+          </div>
+
+          <div class="fld">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>
+            <span class="fld__body">
+              <span class="fld__lab">Departure</span>
+              <span class="fld__val">Wed, 9 Sep 2026</span>
+            </span>
+          </div>
+
+          <div class="fld fld--muted">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>
+            <span class="fld__body">
+              <span class="fld__lab">Return</span>
+              <span class="fld__val">Add Return</span>
+            </span>
+          </div>
+
+          <div class="fld">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
+            <span class="fld__body">
+              <span class="fld__lab">Travellers &amp; Class</span>
+              <span class="fld__val">1 Adult</span>
+              <span class="fld__sub">Economy</span>
+            </span>
+          </div>
+
+          <button class="btn-search" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            Search Flights
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     QUICK SERVICES
+     ====================================================================== -->
+<section class="quick" aria-label="Quick services">
+  <div class="wrap">
+    <a class="qs" href="#manage">
+      <span class="qs__ic ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg></span>
+      <span><b>Manage Booking</b><span>Modify or Cancel</span></span>
+    </a>
+    <a class="qs" href="#checkin">
+      <span class="qs__ic ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 9h4M8 13h6"/><circle cx="17" cy="10" r="1.6"/></svg></span>
+      <span><b>Check-in</b><span>Web Check-in</span></span>
+    </a>
+    <a class="qs" href="#status">
+      <span class="qs__ic ic-amber" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+      <span><b>Flight Status</b><span>Live Updates</span></span>
+    </a>
+    <a class="qs" href="#visa">
+      <span class="qs__ic ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5Z"/><path d="M9 10h6M9 14h6"/></svg></span>
+      <span><b>Visa Assistance</b><span>Get Expert Help</span></span>
+    </a>
+    <a class="qs" href="#insurance">
+      <span class="qs__ic ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <span><b>Travel Insurance</b><span>Secure Your Trip</span></span>
+    </a>
+    <a class="qs" href="#currency">
+      <span class="qs__ic ic-green" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.5h-4a1.8 1.8 0 0 0 0 3.6h3a1.8 1.8 0 0 1 0 3.6h-4M12 7.5v1.8m0 5.6v1.8"/></svg></span>
+      <span><b>Currency Converter</b><span>Live Rates</span></span>
+    </a>
+  </div>
+</section>
+
+<!-- ======================================================================
+     EXCLUSIVE TRAVEL DEALS
+     ====================================================================== -->
+<section class="sec" aria-labelledby="dealsTitle">
+  <div class="wrap">
+    <div class="sechead">
+      <div>
+        <h2 id="dealsTitle">Exclusive Travel Deals</h2>
+        <p>Save more on your next trip</p>
+      </div>
+      <a class="viewall" href="#offers">View All Offers <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+    </div>
+
+    <div class="deals">
+      <article class="deal deal--1">
+        <div class="ph ph-plane" aria-hidden="true"></div>
+        <div><h3>FLAT 20% OFF</h3><p>on International Flights</p></div>
+        <div class="deal__foot">
+          <a class="deal__btn deal__btn--gold" href="#book">Book Now</a>
+          <span class="deal__code">Use Code: FLY20</span>
+        </div>
+      </article>
+
+      <article class="deal deal--2">
+        <div class="ph ph-resort" aria-hidden="true"></div>
+        <div><h3>Up to 40% OFF</h3><p>on Hotels Worldwide</p></div>
+        <div class="deal__foot"><a class="deal__btn" href="#book">Book Now</a></div>
+      </article>
+
+      <article class="deal deal--3">
+        <div class="ph ph-boat" aria-hidden="true"></div>
+        <div><h3>Thailand Packages</h3><p>Starting at &#8377;29,999</p></div>
+        <div class="deal__foot"><a class="deal__btn" href="#explore">Explore Now</a></div>
+      </article>
+
+      <article class="deal deal--4">
+        <div class="ph ph-visa" aria-hidden="true"></div>
+        <div><h3>Visa Assistance</h3><p>Hassle-Free Processing</p></div>
+        <div class="deal__foot"><a class="deal__btn" href="#visa">Get Visa</a></div>
+      </article>
+
+      <article class="deal deal--5">
+        <div class="ph ph-emi" aria-hidden="true"></div>
+        <div><h3>EMI Available</h3><p>on Flights &amp; Holidays</p></div>
+        <div class="deal__foot"><a class="deal__btn" href="#emi">Know More</a></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     POPULAR DESTINATIONS
+     ====================================================================== -->
+<section class="sec" aria-labelledby="destTitle">
+  <div class="wrap">
+    <div class="sechead">
+      <div>
+        <h2 id="destTitle">Popular Destinations</h2>
+        <p>Handpicked for your next holiday</p>
+      </div>
+      <a class="viewall" href="#dest">View All Destinations <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+    </div>
+
+    <div class="dests">
+      <a class="dest" href="#dubai"><span class="dest__img"><span class="ph ph-dubai"></span></span><span class="dest__body"><b>Dubai</b><span>Flights from &#8377;18,999</span></span></a>
+      <a class="dest" href="#thailand"><span class="dest__img"><span class="ph ph-thai"></span></span><span class="dest__body"><b>Thailand</b><span>Flights from &#8377;16,999</span></span></a>
+      <a class="dest" href="#singapore"><span class="dest__img"><span class="ph ph-sing"></span></span><span class="dest__body"><b>Singapore</b><span>Flights from &#8377;20,999</span></span></a>
+      <a class="dest" href="#bali"><span class="dest__img"><span class="ph ph-bali"></span></span><span class="dest__body"><b>Bali</b><span>Flights from &#8377;19,999</span></span></a>
+      <a class="dest" href="#maldives"><span class="dest__img"><span class="ph ph-mald"></span></span><span class="dest__body"><b>Maldives</b><span>Flights from &#8377;28,999</span></span></a>
+      <a class="dest" href="#europe"><span class="dest__img"><span class="ph ph-euro"></span></span><span class="dest__body"><b>Europe</b><span>Flights from &#8377;42,999</span></span></a>
+      <a class="dest" href="#japan"><span class="dest__img"><span class="ph ph-japan"></span></span><span class="dest__body"><b>Japan</b><span>Flights from &#8377;36,999</span></span></a>
+      <a class="dest" href="#usa"><span class="dest__img"><span class="ph ph-usa"></span></span><span class="dest__body"><b>USA</b><span>Flights from &#8377;54,999</span></span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     CHEAPEST FLIGHTS / FARE CALENDAR / PLAN YOUR HOLIDAY
+     ====================================================================== -->
+<section class="sec" aria-label="Fares and packages">
+  <div class="wrap">
+    <div class="trio">
+
+      <!-- Cheapest flights -->
+      <div>
+        <div class="trio__head">
+          <div>
+            <h2>Cheapest Flights</h2>
+            <p>Grab the best fares to top destinations</p>
+          </div>
+          <a class="viewall" href="#fares">View All <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </div>
+        <div class="panel">
+          <a class="route" href="#r1">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="route__pair">Hyderabad <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg> Delhi</span>
+            <span class="route__fare">&#8377;4,980</span>
+            <svg class="route__go" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </a>
+          <a class="route" href="#r2">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="route__pair">Delhi <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg> Mumbai</span>
+            <span class="route__fare">&#8377;4,750</span>
+            <svg class="route__go" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </a>
+          <a class="route" href="#r3">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="route__pair">Bangalore <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg> Goa</span>
+            <span class="route__fare">&#8377;3,999</span>
+            <svg class="route__go" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </a>
+          <a class="route" href="#r4">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="route__pair">Chennai <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg> Dubai</span>
+            <span class="route__fare">&#8377;12,499</span>
+            <svg class="route__go" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </a>
+          <a class="route" href="#r5">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            <span class="route__pair">Mumbai <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg> Singapore</span>
+            <span class="route__fare">&#8377;16,999</span>
+            <svg class="route__go" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Fare calendar + price trend -->
+      <div>
+        <div class="trio__head">
+          <div>
+            <h2>Fare Calendar</h2>
+            <p>Check lowest fares across dates</p>
+          </div>
+          <a class="viewall" href="#calendar">View All <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </div>
+        <div class="panel">
+          <div class="farecal">
+            <button class="farecal__arrow" type="button" aria-label="Earlier dates">
+              <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+            </button>
+            <div class="farecal__days">
+              <button class="day" type="button"><b>6 Sep</b><span>&#8377;4,250</span></button>
+              <button class="day day--low" type="button" aria-current="true"><b>7 Sep</b><span>&#8377;3,980</span><span class="day__tag">Lowest</span></button>
+              <button class="day" type="button"><b>8 Sep</b><span>&#8377;4,100</span></button>
+              <button class="day" type="button"><b>9 Sep</b><span>&#8377;4,320</span></button>
+              <button class="day" type="button"><b>10 Sep</b><span>&#8377;4,500</span></button>
+            </div>
+            <button class="farecal__arrow" type="button" aria-label="Later dates">
+              <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>
+            </button>
+          </div>
+
+          <div class="trend">
+            <h3>Price Trend</h3>
+            <p>Track fare trends and book at the right time</p>
+
+            <svg class="chart" viewBox="0 0 380 150" role="img" aria-label="Fares between 1 and 17 September range from ₹3,980 to ₹5,900, with the lowest on 9 September.">
+              <line class="grid" x1="34" y1="24" x2="374" y2="24"/>
+              <line class="grid" x1="34" y1="56" x2="374" y2="56"/>
+              <line class="grid" x1="34" y1="88" x2="374" y2="88"/>
+              <line class="grid" x1="34" y1="120" x2="374" y2="120"/>
+
+              <text class="axis" x="28" y="27" text-anchor="end">&#8377;8K</text>
+              <text class="axis" x="28" y="59" text-anchor="end">&#8377;6K</text>
+              <text class="axis" x="28" y="91" text-anchor="end">&#8377;4K</text>
+              <text class="axis" x="28" y="123" text-anchor="end">&#8377;2K</text>
+
+              <text class="axis" x="46" y="140">Sep 1</text>
+              <text class="axis" x="126" y="140">Sep 5</text>
+              <text class="axis" x="206" y="140">Sep 9</text>
+              <text class="axis" x="286" y="140">Sep 13</text>
+              <text class="axis" x="360" y="140" text-anchor="end">Sep 17</text>
+
+              <polyline class="line" points="46,80 66,74 86,68 106,64 126,66 146,72 166,76 186,82 206,86 226,80 246,76 266,72 286,74 306,70 326,64 346,60 366,58"/>
+
+              <circle class="dot" cx="46" cy="80" r="2.6"/>
+              <circle class="dot" cx="86" cy="68" r="2.6"/>
+              <circle class="dot" cx="126" cy="66" r="2.6"/>
+              <circle class="dot" cx="166" cy="76" r="2.6"/>
+              <circle class="dot" cx="246" cy="76" r="2.6"/>
+              <circle class="dot" cx="286" cy="74" r="2.6"/>
+              <circle class="dot" cx="326" cy="64" r="2.6"/>
+              <circle class="dot" cx="366" cy="58" r="2.6"/>
+
+              <rect class="callout" x="172" y="40" width="70" height="30" rx="5"/>
+              <text class="callout-t" x="207" y="53" text-anchor="middle">&#8377;3,980</text>
+              <text class="callout-s" x="207" y="63" text-anchor="middle">Lowest Fare</text>
+              <path class="callout" d="M203 70h8l-4 5Z"/>
+              <circle class="dot-low" cx="206" cy="86" r="5"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plan your holiday -->
+      <div>
+        <div class="trio__head">
+          <div>
+            <h2>Plan Your Holiday</h2>
+            <p>Customised packages for every traveller</p>
+          </div>
+          <a class="viewall" href="#packages">View All <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </div>
+        <div class="panel">
+          <div class="pkg">
+            <span class="pkg__img"><span class="ph ph-thai"></span></span>
+            <span class="pkg__body">
+              <b>Thailand</b>
+              <span class="pkg__nights">4 Nights / 5 Days</span>
+              <span class="pkg__price">&#8377;29,999</span>
+              <span class="pkg__incl">Flights + Hotels + Sightseeing</span>
+            </span>
+            <a class="pkg__btn" href="#book">Book Now</a>
+          </div>
+          <div class="pkg">
+            <span class="pkg__img"><span class="ph ph-sing"></span></span>
+            <span class="pkg__body">
+              <b>Singapore</b>
+              <span class="pkg__nights">3 Nights / 4 Days</span>
+              <span class="pkg__price">&#8377;39,999</span>
+              <span class="pkg__incl">Flights + Hotels + Sightseeing</span>
+            </span>
+            <a class="pkg__btn" href="#book">Book Now</a>
+          </div>
+          <div class="pkg">
+            <span class="pkg__img"><span class="ph ph-dubai"></span></span>
+            <span class="pkg__body">
+              <b>Dubai</b>
+              <span class="pkg__nights">4 Nights / 5 Days</span>
+              <span class="pkg__price">&#8377;49,999</span>
+              <span class="pkg__incl">Flights + Hotels + Sightseeing</span>
+            </span>
+            <a class="pkg__btn" href="#book">Book Now</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     WHY BOOK WITH US
+     ====================================================================== -->
+<section class="sec" aria-labelledby="whyTitle">
+  <div class="wrap">
+    <div class="sechead"><h2 id="whyTitle">Why Book With Us</h2></div>
+    <div class="why">
+      <div class="why__it">
+        <span class="why__ic ic-c-amber" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><path d="M12 8.5v5M9.5 11h5"/></svg></span>
+        <span><b>Best Price</b><span>Guarantee</span></span>
+      </div>
+      <div class="why__it">
+        <span class="why__ic ic-c-green" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span><b>Secure Payments</b><span>100% Safe</span></span>
+      </div>
+      <div class="why__it">
+        <span class="why__ic ic-c-blue" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="13" width="4" height="6" rx="2"/><rect x="17" y="13" width="4" height="6" rx="2"/></svg></span>
+        <span><b>24/7 Customer</b><span>Support</span></span>
+      </div>
+      <div class="why__it">
+        <span class="why__ic ic-c-red" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12h7"/></svg></span>
+        <span><b>Easy Cancellations</b><span>Hassle Free</span></span>
+      </div>
+      <div class="why__it">
+        <span class="why__ic ic-c-green" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 14h4"/></svg></span>
+        <span><b>EMI Available</b><span>on Flights &amp; Hotels</span></span>
+      </div>
+      <div class="why__it">
+        <span class="why__ic ic-c-purple" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><circle cx="12" cy="11" r="2"/><path d="M9 16c.6-1.5 1.7-2.2 3-2.2s2.4.7 3 2.2"/></svg></span>
+        <span><b>Trusted Travel</b><span>Partner</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     AIRLINE PARTNERS
+     ====================================================================== -->
+<section class="sec" aria-labelledby="airTitle">
+  <div class="wrap">
+    <div class="sechead">
+      <h2 id="airTitle">Our Airline Partners</h2>
+      <a class="viewall" href="#partners">View All <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+    </div>
+    <!-- Wordmarks stand in for the carriers' registered logos. Replace each
+         with the licensed asset supplied by the airline before publishing. -->
+    <div class="airlines">
+      <span class="air" style="color:#122E88">IndiGo</span>
+      <span class="air" style="color:#C8102E">AIR INDIA</span>
+      <span class="air" style="color:#4A2A6B">Vistara</span>
+      <span class="air" style="color:#E4791F">SpiceJet</span>
+      <span class="air" style="color:#C8102E">Emirates</span>
+      <span class="air" style="color:#5C0632">QATAR</span>
+      <span class="air" style="color:#B99A5F">ETIHAD</span>
+      <span class="air" style="color:#1B3B6F">SINGAPORE</span>
+      <span class="air" style="color:#05164D">Lufthansa</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     TRAVEL STORIES & GUIDES
+     ====================================================================== -->
+<section class="sec" aria-labelledby="storyTitle">
+  <div class="wrap">
+    <div class="sechead">
+      <div>
+        <h2 id="storyTitle">Travel Stories &amp; Guides</h2>
+        <p>Get inspired for your next adventure</p>
+      </div>
+      <a class="viewall" href="#blog">View All <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+    </div>
+
+    <div class="stories">
+      <article class="story">
+        <span class="story__img"><span class="ph ph-story1"></span></span>
+        <span class="story__body">
+          <h3>Top 10 Things to Do in Bali</h3>
+          <a href="#story1">Read More <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </span>
+      </article>
+      <article class="story">
+        <span class="story__img"><span class="ph ph-story2"></span></span>
+        <span class="story__body">
+          <h3>A Complete Thailand Travel Guide</h3>
+          <a href="#story2">Read More <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </span>
+      </article>
+      <article class="story">
+        <span class="story__img"><span class="ph ph-story3"></span></span>
+        <span class="story__body">
+          <h3>Visa-Free Destinations for Indians</h3>
+          <a href="#story3">Read More <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </span>
+      </article>
+      <article class="story">
+        <span class="story__img"><span class="ph ph-story4"></span></span>
+        <span class="story__body">
+          <h3>Best Time to Visit Europe</h3>
+          <a href="#story4">Read More <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-5-5 5 5-5 5"/></svg></a>
+        </span>
+      </article>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ======================================================================
+     FOOTER
+     ====================================================================== -->
+<footer class="ftr">
+  <div class="wrap">
+    <div class="ftr__cols">
+
+      <div class="ftr__brand">
+        <span class="brand__emblem" aria-hidden="true">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>
+        </span>
+        <span class="brand__name">JACKPOTS WORLD<span>TOURS &amp; TRAVELS</span></span>
+      </div>
+
+      <nav class="ftr__col" aria-label="Company">
+        <h3 class="sr">Company</h3>
+        <ul>
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#careers">Careers</a></li>
+          <li><a href="#press">Press</a></li>
+          <li><a href="#blog">Blog</a></li>
+        </ul>
+      </nav>
+
+      <nav class="ftr__col" aria-label="Help">
+        <h3 class="sr">Help</h3>
+        <ul>
+          <li><a href="#help">Help</a></li>
+          <li><a href="#contact">Contact Us</a></li>
+          <li><a href="#alerts">Travel Alerts</a></li>
+          <li><a href="#sitemap">Site Map</a></li>
+        </ul>
+      </nav>
+
+      <nav class="ftr__col" aria-label="Policies">
+        <h3>Policies</h3>
+        <ul>
+          <li><a href="#terms">Terms &amp; Conditions</a></li>
+          <li><a href="#privacy">Privacy Policy</a></li>
+          <li><a href="#cancellation">Cancellation Policy</a></li>
+        </ul>
+      </nav>
+
+      <div class="ftr__col" style="min-width:150px">
+        <h3>Download Our App</h3>
+        <div class="ftr__apps">
+          <a class="appbadge" href="#play">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.4a1 1 0 0 0-.6.9v17.4a1 1 0 0 0 .6.9l9.6-9.6ZM14.3 10.5 5.4 1.9l10.9 6.3ZM14.3 13.5l2-2 3.6 2.1a1 1 0 0 1 0 1.8l-3.6 2.1ZM5.4 22.1l8.9-8.6 2 2Z"/></svg>
+            <span>GET IT ON<b>Google Play</b></span>
+          </a>
+          <a class="appbadge" href="#appstore">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.6c0-2.2 1.8-3.3 1.9-3.4-1-1.5-2.6-1.7-3.2-1.7-1.4-.1-2.7.8-3.3.8-.7 0-1.7-.8-2.8-.8-1.4 0-2.7.8-3.5 2.1-1.5 2.6-.4 6.4 1 8.5.7 1 1.6 2.2 2.7 2.1 1.1 0 1.5-.7 2.8-.7s1.7.7 2.8.7 1.9-1 2.6-2a9 9 0 0 0 1.2-2.4c-.1 0-2.2-.9-2.2-3.2ZM14.2 5.8c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.7-1 2.6 1 .1 2-.5 2.7-1.2Z"/></svg>
+            <span>Download on the<b>App Store</b></span>
+          </a>
+        </div>
+      </div>
+
+      <div class="ftr__col" style="min-width:120px">
+        <h3>Follow Us On</h3>
+        <div class="socials">
+          <a class="s-fb" href="#fb" aria-label="Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-8h2.7l.4-3.1h-3.1V7.9c0-.9.25-1.5 1.55-1.5H16.7V3.6c-.3 0-1.3-.13-2.45-.13-2.4 0-4.05 1.47-4.05 4.18V9.9H7.5V13h2.7v8Z"/></svg></a>
+          <a class="s-ig" href="#ig" aria-label="Instagram"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.9c3 0 3.3 0 4.5.07 1.1.05 1.7.24 2.1.4.5.2.9.45 1.3.85s.65.8.85 1.3c.16.4.35 1 .4 2.1.07 1.2.07 1.5.07 4.5s0 3.3-.07 4.5c-.05 1.1-.24 1.7-.4 2.1-.2.5-.45.9-.85 1.3s-.8.65-1.3.85c-.4.16-1 .35-2.1.4-1.2.07-1.5.07-4.5.07s-3.3 0-4.5-.07c-1.1-.05-1.7-.24-2.1-.4-.5-.2-.9-.45-1.3-.85s-.65-.8-.85-1.3c-.16-.4-.35-1-.4-2.1C2.9 15.3 2.9 15 2.9 12s0-3.3.07-4.5c.05-1.1.24-1.7.4-2.1.2-.5.45-.9.85-1.3s.8-.65 1.3-.85c.4-.16 1-.35 2.1-.4C8.7 2.9 9 2.9 12 2.9Zm0 3.75A5.35 5.35 0 1 0 17.35 12 5.35 5.35 0 0 0 12 6.65Zm0 8.82A3.47 3.47 0 1 1 15.47 12 3.47 3.47 0 0 1 12 15.47Zm5.56-8.98a1.25 1.25 0 1 0-1.25-1.25 1.25 1.25 0 0 0 1.25 1.25Z"/></svg></a>
+          <a class="s-yt" href="#yt" aria-label="YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 7.2a2.5 2.5 0 0 0-1.76-1.77C18.25 5 12 5 12 5s-6.25 0-7.84.43A2.5 2.5 0 0 0 2.4 7.2 26 26 0 0 0 2 12a26 26 0 0 0 .4 4.8 2.5 2.5 0 0 0 1.76 1.77C5.75 19 12 19 12 19s6.25 0 7.84-.43a2.5 2.5 0 0 0 1.76-1.77A26 26 0 0 0 22 12a26 26 0 0 0-.4-4.8ZM10 15V9l5.2 3Z"/></svg></a>
+          <a class="s-li" href="#li" aria-label="LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.94 8.5H3.9V20h3.04ZM5.42 3.6a1.77 1.77 0 1 0 0 3.53 1.77 1.77 0 0 0 0-3.53ZM20.1 13.2c0-3.06-1.63-4.48-3.81-4.48a3.29 3.29 0 0 0-2.98 1.64V8.5H10.3V20h3.02v-6.09c0-1.6.31-3.16 2.3-3.16s1.98 1.83 1.98 3.26V20h3.02Z"/></svg></a>
+        </div>
+      </div>
+
+      <p class="ftr__script" aria-hidden="true"><span>Travel</span><span>More</span><span>Live Better</span></p>
+    </div>
+
+    <div class="ftr__bar">
+      <p>&copy; 2026 Jackpots World Tours. All rights reserved.</p>
+      <ul>
+        <li><a href="#explore">Explore</a></li>
+        <li><a href="#discover">Discover</a></li>
+        <li><a href="#experience">Experience</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Tabs, radios and the swap control — the minimum needed for the page to
+   behave as it looks. Arrow keys move between tabs; Enter and Space select. */
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll('.stab'));
+  function select(t) {
+    tabs.forEach(function (x) {
+      x.setAttribute('aria-selected', x === t ? 'true' : 'false');
+      x.tabIndex = x === t ? 0 : -1;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.tabIndex = t.getAttribute('aria-selected') === 'true' ? 0 : -1;
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      var n = null;
+      if (e.key === 'ArrowRight') { n = tabs[(i + 1) % tabs.length]; }
+      else if (e.key === 'ArrowLeft') { n = tabs[(i - 1 + tabs.length) % tabs.length]; }
+      else if (e.key === 'Home') { n = tabs[0]; }
+      else if (e.key === 'End') { n = tabs[tabs.length - 1]; }
+      else { return; }
+      e.preventDefault(); select(n); n.focus();
+    });
+  });
+
+  var swap = document.querySelector('.swap');
+  if (swap) {
+    swap.addEventListener('click', function () {
+      var f = document.querySelectorAll('.search__row .fld')[0];
+      var t = document.querySelectorAll('.search__row .fld')[1];
+      var fv = f.querySelector('.fld__val'), fs = f.querySelector('.fld__sub');
+      var tv = t.querySelector('.fld__val'), ts = t.querySelector('.fld__sub');
+      var v = fv.textContent, s = fs.textContent;
+      fv.textContent = tv.textContent; fs.textContent = ts.textContent;
+      tv.textContent = v; ts.textContent = s;
+    });
+  }
+
+  var days = [].slice.call(document.querySelectorAll('.day'));
+  days.forEach(function (d) {
+    d.addEventListener('click', function () {
+      days.forEach(function (x) { x.removeAttribute('aria-current'); });
+      d.setAttribute('aria-current', 'true');
+    });
+  });
+}());
+</script>
+</body>
+</html>

@@ -2,6 +2,20 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "//": "Serves design-templates/ — the standalone UI template pages.",
+      "//2": "Separate port so it never contends with the app's own servers.",
+      "name": "templates",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8430",
+        "--directory",
+        "design-templates"
+      ],
+      "port": 8430
+    },
+    {
       "name": "static",
       "runtimeExecutable": "python",
       "runtimeArgs": [

@@ -700,7 +700,12 @@ const LiveChat = (function () {
          with both sides showing "connected". */
       if (call.direction === 'customer_to_admin') {
         try { await JWCall.createOffer(); }
-        catch (e) { socketSend('call_failed', { call_id: call.id, reason: 'offer_failed' }); }
+        catch (e) {
+          /* NEVER SILENT. An offer that fails to build is the difference
+             between "no audio" and a reason, and the reason is in `e`. */
+          console.error('[JWCall] createOffer failed', e);
+          socketSend('call_failed', { call_id: call.id, reason: 'offer_failed' });
+        }
       }
       return true;
     }

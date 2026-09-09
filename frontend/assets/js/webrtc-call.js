@@ -53,7 +53,115 @@ const JWCall = (function () {
     outputLabel: null,
     notification: null,
     held: false,
+    startedAt: 0,
   };
+
+  /* -------------------------------------------------------------------------
+     Diagnostics
+     -------------------------------------------------------------------------
+     One prefix, so a whole call can be filtered in or out of a console that
+     also carries the page's own noise. Timestamped from the start of the call
+     rather than the clock, because what matters when reading a failure is how
+     long after the offer the thing happened, not what time it was.
+
+     Errors are logged as errors and never swallowed — a `catch` that hides the
+     reason a peer connection failed costs an entire round of testing. */
+  function log(...args) {
+    const t = state.startedAt ? ((Date.now() - state.startedAt) / 1000).toFixed(2) : '0.00';
+    console.log(`[JWCall +${t}s]`, ...args);
+  }
+
+  function logError(...args) {
+    const t = state.startedAt ? ((Date.now() - state.startedAt) / 1000).toFixed(2) : '0.00';
+    console.error(`[JWCall +${t}s]`, ...args);
+  }
+
+  /** Everything worth knowing about the current call, in one object.
+   *
+   *  Meant to be typed into a console during or just after a failure:
+   *  `await JWCall.diagnostics()`. Async because the candidate pair only comes
+   *  from getStats().
+   */
+  async function diagnostics() {
+    const pc = state.pc;
+    const out = {
+      callId: state.callId,
+      role: state.role,
+      muted: state.muted,
+      held: state.held,
+      hasPeerConnection: !!pc,
+      iceServers: (state.iceServers || []).map(srv => ({
+        urls: srv.urls,
+        hasCredential: !!srv.credential,
+      })),
+      turnConfigured: (state.iceServers || []).some(
+        srv => String(srv.urls).indexOf('turn:') !== -1),
+    };
+    if (pc) {
+      out.connectionState = pc.connectionState;
+      out.iceConnectionState = pc.iceConnectionState;
+      out.iceGatheringState = pc.iceGatheringState;
+      out.signalingState = pc.signalingState;
+      out.localDescription = pc.localDescription && pc.localDescription.type;
+      out.remoteDescription = pc.remoteDescription && pc.remoteDescription.type;
+      out.senders = pc.getSenders().map(sender => sender.track && {
+        kind: sender.track.kind, enabled: sender.track.enabled,
+        muted: sender.track.muted, readyState: sender.track.readyState,
+      }).filter(Boolean);
+      out.receivers = pc.getReceivers().map(r => r.track && {
+        kind: r.track.kind, enabled: r.track.enabled,
+        muted: r.track.muted, readyState: r.track.readyState,
+      }).filter(Boolean);
+      out.selectedCandidatePair = await selectedPair();
+    }
+    if (state.remoteAudio) {
+      out.remoteAudio = {
+        hasStream: !!state.remoteAudio.srcObject,
+        paused: state.remoteAudio.paused,
+        muted: state.remoteAudio.muted,
+        volume: state.remoteAudio.volume,
+        readyState: state.remoteAudio.readyState,
+      };
+    }
+    return out;
+  }
+
+  /** The pair ICE actually chose — host, reflexive, or relayed through TURN.
+   *
+   *  THE SINGLE MOST USEFUL LINE when a call connects for two laptops on one
+   *  wifi and fails between a phone and a desk. `relay` on both ends means
+   *  TURN is carrying it; no pair at all means ICE never completed.
+   */
+  async function selectedPair() {
+    if (!state.pc || !state.pc.getStats) return null;
+    try {
+      const stats = await state.pc.getStats();
+      let pair = null;
+      const candidates = {};
+      stats.forEach(report => {
+        if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+          candidates[report.id] = report;
+        }
+        if (report.type === 'candidate-pair'
+            && (report.selected || report.state === 'succeeded')) {
+          if (!pair || report.selected) pair = report;
+        }
+      });
+      if (!pair) return null;
+      const local = candidates[pair.localCandidateId];
+      const remote = candidates[pair.remoteCandidateId];
+      return {
+        state: pair.state,
+        local: local && { type: local.candidateType, protocol: local.protocol },
+        remote: remote && { type: remote.candidateType, protocol: remote.protocol },
+        bytesSent: pair.bytesSent,
+        bytesReceived: pair.bytesReceived,
+        currentRoundTripTime: pair.currentRoundTripTime,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
 
   function emit(name, detail) {
     const fn = state.handlers['on' + name];
@@ -162,8 +270,22 @@ const JWCall = (function () {
       bundlePolicy: 'max-bundle',
     });
 
+    pc.onicegatheringstatechange = () => log('iceGatheringState', pc.iceGatheringState);
+    pc.onsignalingstatechange = () => log('signalingState', pc.signalingState);
+    pc.onconnectionstatechange = () => {
+      log('connectionState', pc.connectionState);
+      if (pc.connectionState === 'failed') {
+        logError('the peer connection FAILED — no media path was established');
+      }
+    };
+
     pc.onicecandidate = e => {
-      if (!e.candidate) return;   /* null means gathering finished */
+      if (!e.candidate) { log('ICE gathering complete'); return; }
+      /* candidateType tells you which path was found: host (same network),
+         srflx (through NAT via STUN), relay (through TURN). No relay
+         candidates on a mobile network usually means TURN is unreachable. */
+      log('local ICE candidate', e.candidate.type || '(type unknown)',
+          e.candidate.protocol || '', e.candidate.address || '');
       state.send('ice_candidate', {
         call_id: state.callId,
         payload: e.candidate.toJSON ? e.candidate.toJSON() : e.candidate,
@@ -171,6 +293,19 @@ const JWCall = (function () {
     };
 
     pc.ontrack = e => {
+      const track = e.track;
+      log('REMOTE TRACK received', {
+        kind: track.kind, enabled: track.enabled,
+        muted: track.muted, readyState: track.readyState,
+        streams: e.streams.length,
+      });
+      /* `muted: true` here is normal for a moment — it clears when media
+         actually starts flowing. Still muted seconds later means the other
+         side is sending nothing. */
+      track.onunmute = () => log('remote track unmuted — audio is flowing');
+      track.onmute = () => log('remote track MUTED — audio stopped arriving');
+      track.onended = () => log('remote track ended');
+
       const el = remoteAudioElement();
       el.srcObject = e.streams[0];
       /* play() can still be refused despite autoplay, on a page the user has
@@ -188,6 +323,7 @@ const JWCall = (function () {
 
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
+      log('iceConnectionState', s);
       if (s === 'connected' || s === 'completed') {
         /* TWO DIFFERENT EVENTS FROM ONE ICE STATE. Arriving at `connected` for
            the first time is the call starting; arriving there again after a
@@ -197,6 +333,10 @@ const JWCall = (function () {
           state.wasDegraded = false;
           emit('Restored');
         }
+        /* WHICH PATH WON. Logged once per connect, because "it works on two
+           laptops and fails from a phone" is answered entirely by whether this
+           says host/srflx or relay. */
+        selectedPair().then(pair => log('CONNECTED via', pair || '(no pair yet)'));
         emit('Connected');
       } else if (s === 'disconnected') {
         /* NOT a failure yet. `disconnected` is routinely transient — a phone
@@ -291,25 +431,44 @@ const JWCall = (function () {
     state.send = opts.send;
     state.handlers = opts.handlers || {};
     state.iceServers = opts.iceServers || [];
+    state.startedAt = Date.now();
+    log('preparing', {
+      role: opts.role, callId: opts.callId,
+      iceServers: (state.iceServers || []).length,
+      turn: (state.iceServers || []).some(x => String(x.urls).indexOf('turn:') !== -1),
+    });
+
     state.localStream = await getMicrophone();
+    log('microphone granted', state.localStream.getAudioTracks().map(t => ({
+      label: t.label, enabled: t.enabled, muted: t.muted, readyState: t.readyState,
+    })));
+
     state.pc = buildPeer(state.iceServers);
-    state.localStream.getTracks().forEach(t => state.pc.addTrack(t, state.localStream));
+    state.localStream.getTracks().forEach(t => {
+      state.pc.addTrack(t, state.localStream);
+      log('local track added', t.kind, t.id);
+    });
     watchQuality();
   }
 
   /** The caller, once the other side has accepted. */
   async function createOffer() {
+    log('creating offer; signalingState was', state.pc.signalingState);
     const offer = await state.pc.createOffer({ offerToReceiveAudio: true });
     await state.pc.setLocalDescription(offer);
+    log('local description set (offer); signalingState now', state.pc.signalingState);
     state.send('offer', { call_id: state.callId, payload: { sdp: offer.sdp, type: offer.type } });
   }
 
   /** An offer arrived — the callee's side, or an ICE restart on the caller's. */
   async function handleOffer(payload) {
+    log('offer received; signalingState was', state.pc.signalingState);
     await state.pc.setRemoteDescription(new RTCSessionDescription(payload));
+    log('remote description set (offer); signalingState now', state.pc.signalingState);
     await drainCandidates();
     const answer = await state.pc.createAnswer();
     await state.pc.setLocalDescription(answer);
+    log('answer sent; signalingState now', state.pc.signalingState);
     state.send('answer', {
       call_id: state.callId, payload: { sdp: answer.sdp, type: answer.type },
     });
@@ -319,8 +478,15 @@ const JWCall = (function () {
     /* An answer for a connection that is not expecting one is a duplicate or a
        late frame from a previous negotiation. Applying it throws and takes the
        call down; ignoring it is correct. */
-    if (!state.pc || state.pc.signalingState !== 'have-local-offer') return;
+    if (!state.pc || state.pc.signalingState !== 'have-local-offer') {
+      log('answer IGNORED — signalingState is',
+          state.pc ? state.pc.signalingState : 'no peer connection',
+          '(a duplicate or a late frame from a previous negotiation)');
+      return;
+    }
+    log('answer received; signalingState was', state.pc.signalingState);
     await state.pc.setRemoteDescription(new RTCSessionDescription(payload));
+    log('remote description set (answer); signalingState now', state.pc.signalingState);
     await drainCandidates();
   }
 
@@ -655,6 +821,7 @@ const JWCall = (function () {
     setMuted, toggleMute, isMuted, isActive, currentCallId,
     speakerSupported, speakerAvailable, cycleOutput, currentOutputLabel,
     setHold, isHeld, releasePeer,
+    diagnostics, selectedPair,
     startRinging, stopRinging, notifyIncoming,
     reset, getMicrophone, micPermission, formatDuration,
   };

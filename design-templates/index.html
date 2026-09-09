@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home — Premium Travel Platform Template</title>
+<meta name="description" content="Home page template: utility bar, navigation, hero with booking widget, offers, destinations, packages, hotels, collections and footer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="assets/template.css">
+</head>
+<body>
+
+<a class="u-skip" href="#main">Skip to main content</a>
+
+<!-- ======================================================================
+     TOP UTILITY BAR
+     ====================================================================== -->
+<div class="c-utility">
+  <div class="l-container">
+    <p class="c-utility__note"><b>IATA accredited</b> &middot; No convenience fee on any booking</p>
+    <ul class="c-utility__list">
+      <li><a href="#language">English (IN)</a></li>
+      <li><a href="#currency">INR &#8377;</a></li>
+      <li><a href="#support">24&times;7 Support</a></li>
+      <li><a href="#partner">Partner Login</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ======================================================================
+     PRIMARY NAVIGATION — sticky
+     ====================================================================== -->
+<header class="c-nav" data-sticky-nav>
+  <div class="l-container">
+    <a class="c-nav__logo" href="index.html">Jackpots<em>World</em></a>
+
+    <div class="c-nav__search">
+      <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <label class="u-sr" for="navSearch">Search destinations, hotels and packages</label>
+      <input id="navSearch" type="search" placeholder="Search destinations or hotels">
+    </div>
+
+    <nav class="c-nav__links" aria-label="Primary">
+      <a class="c-nav__link" href="index.html" aria-current="page">Home</a>
+      <a class="c-nav__link" href="flights.html">Flights</a>
+      <a class="c-nav__link" href="#hotels">Hotels</a>
+      <a class="c-nav__link" href="#packages">Holidays</a>
+      <a class="c-nav__link" href="components.html">Components</a>
+    </nav>
+
+    <div class="c-nav__actions">
+      <a class="c-nav__ghost c-nav__ghost--hideable" href="#bookings">My Bookings</a>
+      <a class="c-btn c-btn--outline c-btn--sm" href="#login">Log In</a>
+      <a class="c-btn c-btn--primary c-btn--sm" href="#signup">Sign Up</a>
+      <button class="c-btn c-btn--icon c-nav__burger" type="button" data-drawer-open aria-label="Open navigation menu">
+        <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- mobile drawer -->
+<div class="c-drawer" data-drawer data-open="false" role="dialog" aria-modal="true" aria-label="Navigation menu">
+  <div class="c-drawer__scrim" data-drawer-close></div>
+  <div class="c-drawer__panel">
+    <div class="c-drawer__head">
+      <span class="c-nav__logo">Jackpots<em>World</em></span>
+      <button class="c-drawer__close" type="button" data-drawer-close aria-label="Close navigation menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <a href="index.html">Home</a>
+    <a href="flights.html">Flights</a>
+    <a href="#hotels">Hotels</a>
+    <a href="#packages">Holidays</a>
+    <a href="components.html">Components</a>
+    <a href="#bookings">My Bookings</a>
+    <a href="#support">24&times;7 Support</a>
+    <a class="c-btn c-btn--primary c-btn--block" href="#signup" style="margin-top:var(--space-4)">Sign Up</a>
+  </div>
+</div>
+
+<main id="main">
+
+<!-- ======================================================================
+     HERO BANNER + BOOKING WIDGET
+     ====================================================================== -->
+<section class="c-hero" aria-labelledby="heroTitle">
+  <div class="l-container">
+    <div class="c-hero__grid">
+
+      <div>
+        <p class="c-hero__eyebrow">Flights &middot; Hotels &middot; Holidays</p>
+        <h1 id="heroTitle">Travel that feels <em>considered.</em></h1>
+        <p class="c-hero__copy">Fares from 48 airline partners, 2,100 properties with free cancellation, and a team that answers on WhatsApp at three in the morning.</p>
+        <div class="c-hero__cta">
+          <a class="c-btn c-btn--primary c-btn--lg" href="#packages">Explore Holidays</a>
+          <a class="c-btn c-btn--outline c-btn--lg" href="#deals" style="background:transparent;color:var(--text-inverse);border-color:var(--border-inverse)">View Deals</a>
+        </div>
+      </div>
+
+      <!-- BOOKING WIDGET -->
+      <div class="c-widget" data-tabs>
+        <div class="c-widget__tabs" role="tablist" aria-label="Choose what to book">
+          <button class="c-widget__tab" id="tabFlights" role="tab" aria-selected="true" aria-controls="panelFlights" tabindex="0" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
+            Flights
+          </button>
+          <button class="c-widget__tab" id="tabHotels" role="tab" aria-selected="false" aria-controls="panelHotels" tabindex="-1" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1m4 0h1M9 13h1m4 0h1M9 17h6"/></svg>
+            Hotels
+          </button>
+          <button class="c-widget__tab" id="tabBus" role="tab" aria-selected="false" aria-controls="panelBus" tabindex="-1" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M4 10h16M7 20v-2m10 2v-2"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>
+            Bus
+          </button>
+          <button class="c-widget__tab" id="tabTrain" role="tab" aria-selected="false" aria-controls="panelTrain" tabindex="-1" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="13" rx="3"/><path d="M5 10h14M8 20l-2 2m10-2 2 2"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>
+            Train
+          </button>
+          <button class="c-widget__tab" id="tabHoliday" role="tab" aria-selected="false" aria-controls="panelHoliday" tabindex="-1" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m9 20-6-3V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 13V4m0 0L9 7"/></svg>
+            Holiday
+          </button>
+          <button class="c-widget__tab" id="tabInsurance" role="tab" aria-selected="false" aria-controls="panelInsurance" tabindex="-1" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 8.2 7 9 4-.8 7-4.6 7-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>
+            Insurance
+          </button>
+        </div>
+
+        <!-- FLIGHTS PANEL -->
+        <div class="c-widget__panel" id="panelFlights" role="tabpanel" aria-labelledby="tabFlights" tabindex="0">
+          <form data-search-form novalidate>
+            <fieldset style="border:0;padding:0;margin:0">
+              <legend class="u-sr">Trip type</legend>
+              <div class="c-widget__triptype">
+                <label class="c-radio"><input type="radio" name="trip" value="one" checked> One Way</label>
+                <label class="c-radio"><input type="radio" name="trip" value="round"> Round Trip</label>
+                <label class="c-radio"><input type="radio" name="trip" value="multi"> Multi City</label>
+              </div>
+            </fieldset>
+
+            <div class="c-widget__fields">
+
+              <div class="c-field c-relative" data-combobox>
+                <label class="c-field__label" for="origin">From</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                  <input class="c-field__input" id="origin" name="origin" type="text" value="Delhi"
+                         autocomplete="off" role="combobox" aria-expanded="false"
+                         aria-controls="originList" aria-describedby="originHint" data-combobox-input>
+                </div>
+                <p class="c-field__hint" id="originHint">DEL &middot; Indira Gandhi International</p>
+                <p class="c-field__error" data-error-slot hidden></p>
+                <ul class="c-listbox" id="originList" role="listbox" aria-label="Airports matching your search" data-combobox-list hidden>
+                  <li class="c-listbox__item" role="option" id="o1" aria-selected="false" data-value="Delhi"><span><strong>Delhi</strong><span>Indira Gandhi International</span></span><code>DEL</code></li>
+                  <li class="c-listbox__item" role="option" id="o2" aria-selected="false" data-value="Mumbai"><span><strong>Mumbai</strong><span>Chhatrapati Shivaji Maharaj International</span></span><code>BOM</code></li>
+                  <li class="c-listbox__item" role="option" id="o3" aria-selected="false" data-value="Bengaluru"><span><strong>Bengaluru</strong><span>Kempegowda International</span></span><code>BLR</code></li>
+                  <li class="c-listbox__item" role="option" id="o4" aria-selected="false" data-value="Hyderabad"><span><strong>Hyderabad</strong><span>Rajiv Gandhi International</span></span><code>HYD</code></li>
+                  <li class="c-listbox__item" role="option" id="o5" aria-selected="false" data-value="Kolkata"><span><strong>Kolkata</strong><span>Netaji Subhas Chandra Bose International</span></span><code>CCU</code></li>
+                  <li class="c-listbox__item" role="option" id="o6" aria-selected="false" data-value="Chennai"><span><strong>Chennai</strong><span>Chennai International</span></span><code>MAA</code></li>
+                </ul>
+              </div>
+
+              <div class="c-field c-relative" data-combobox>
+                <label class="c-field__label" for="destination">To</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+                  <input class="c-field__input" id="destination" name="destination" type="text" value="Goa"
+                         autocomplete="off" role="combobox" aria-expanded="false"
+                         aria-controls="destList" aria-describedby="destHint" data-combobox-input>
+                </div>
+                <p class="c-field__hint" id="destHint">GOI &middot; Dabolim</p>
+                <p class="c-field__error" data-error-slot hidden></p>
+                <ul class="c-listbox" id="destList" role="listbox" aria-label="Airports matching your search" data-combobox-list hidden>
+                  <li class="c-listbox__item" role="option" id="d1" aria-selected="false" data-value="Goa"><span><strong>Goa</strong><span>Dabolim</span></span><code>GOI</code></li>
+                  <li class="c-listbox__item" role="option" id="d2" aria-selected="false" data-value="Dubai"><span><strong>Dubai</strong><span>Dubai International</span></span><code>DXB</code></li>
+                  <li class="c-listbox__item" role="option" id="d3" aria-selected="false" data-value="Singapore"><span><strong>Singapore</strong><span>Changi</span></span><code>SIN</code></li>
+                  <li class="c-listbox__item" role="option" id="d4" aria-selected="false" data-value="Kochi"><span><strong>Kochi</strong><span>Cochin International</span></span><code>COK</code></li>
+                  <li class="c-listbox__item" role="option" id="d5" aria-selected="false" data-value="Srinagar"><span><strong>Srinagar</strong><span>Sheikh ul-Alam International</span></span><code>SXR</code></li>
+                  <li class="c-listbox__item" role="option" id="d6" aria-selected="false" data-value="Port Blair"><span><strong>Port Blair</strong><span>Veer Savarkar International</span></span><code>IXZ</code></li>
+                </ul>
+              </div>
+
+              <div class="c-field is-span-2">
+                <label class="c-field__label" for="depart">Departure</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>
+                  <input class="c-field__input" id="depart" name="depart" type="date" value="2026-09-14" min="2026-09-09">
+                </div>
+              </div>
+
+              <div class="c-field is-span-2">
+                <label class="c-field__label" for="return">Return</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>
+                  <input class="c-field__input" id="return" name="return" type="date" value="2026-09-21" min="2026-09-09">
+                </div>
+              </div>
+
+              <div class="c-field is-span-2">
+                <label class="c-field__label" for="travellers">Travellers</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+                  <select class="c-field__input" id="travellers" name="travellers" style="appearance:none">
+                    <option>1 Adult</option><option>2 Adults</option><option>2 Adults, 1 Child</option><option>4 Adults</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="c-field is-span-2">
+                <label class="c-field__label" for="cabin">Cabin</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><rect x="4" y="7" width="16" height="12" rx="2"/><path d="M9 7V5h6v2"/></svg>
+                  <select class="c-field__input" id="cabin" name="cabin" style="appearance:none">
+                    <option>Economy</option><option>Premium Economy</option><option>Business</option><option>First</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="c-field is-span-2">
+                <label class="c-field__label" for="promo">Promo Code</label>
+                <div class="c-field__control">
+                  <svg class="c-field__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><path d="M20 12a2 2 0 0 1 0-4V6H4v2a2 2 0 0 1 0 4 2 2 0 0 1 0 4v2h16v-2a2 2 0 0 1 0-4Z"/><path d="M14 8v8"/></svg>
+                  <input class="c-field__input" id="promo" name="promo" type="text" placeholder="Optional">
+                </div>
+              </div>
+            </div>
+
+            <div class="c-widget__foot">
+              <ul class="c-widget__trust">
+                <li>No convenience fee</li>
+                <li>Free cancellation on select fares</li>
+                <li>24&times;7 support</li>
+              </ul>
+              <button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="submit">
+                <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                Search Flights
+              </button>
+            </div>
+            <p class="u-sr" role="status" aria-live="polite" data-form-status></p>
+          </form>
+        </div>
+
+        <!-- The remaining panels share the same field anatomy; only the labels
+             change. They are rendered as short forms so the tab contract is
+             demonstrable without repeating eight identical field blocks. -->
+        <div class="c-widget__panel" id="panelHotels" role="tabpanel" aria-labelledby="tabHotels" tabindex="0" hidden>
+          <div class="c-widget__fields">
+            <div class="c-field is-span-4">
+              <label class="c-field__label" for="hCity">City, Property or Area</label>
+              <div class="c-field__control"><input class="c-field__input" id="hCity" type="text" value="Goa"></div>
+            </div>
+            <div class="c-field is-span-2"><label class="c-field__label" for="hIn">Check In</label><div class="c-field__control"><input class="c-field__input" id="hIn" type="date" value="2026-09-14"></div></div>
+            <div class="c-field is-span-2"><label class="c-field__label" for="hOut">Check Out</label><div class="c-field__control"><input class="c-field__input" id="hOut" type="date" value="2026-09-18"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="hGuests">Rooms &amp; Guests</label><div class="c-field__control"><input class="c-field__input" id="hGuests" type="text" value="1 Room, 2 Adults"></div></div>
+          </div>
+          <div class="c-widget__foot"><button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="button">Search Hotels</button></div>
+        </div>
+
+        <div class="c-widget__panel" id="panelBus" role="tabpanel" aria-labelledby="tabBus" tabindex="0" hidden>
+          <div class="c-widget__fields">
+            <div class="c-field is-span-4"><label class="c-field__label" for="bFrom">From</label><div class="c-field__control"><input class="c-field__input" id="bFrom" type="text" value="Pune"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="bTo">To</label><div class="c-field__control"><input class="c-field__input" id="bTo" type="text" value="Goa"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="bDate">Travel Date</label><div class="c-field__control"><input class="c-field__input" id="bDate" type="date" value="2026-09-14"></div></div>
+          </div>
+          <div class="c-widget__foot"><button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="button">Search Buses</button></div>
+        </div>
+
+        <div class="c-widget__panel" id="panelTrain" role="tabpanel" aria-labelledby="tabTrain" tabindex="0" hidden>
+          <div class="c-widget__fields">
+            <div class="c-field is-span-4"><label class="c-field__label" for="tFrom">From Station</label><div class="c-field__control"><input class="c-field__input" id="tFrom" type="text" value="New Delhi (NDLS)"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="tTo">To Station</label><div class="c-field__control"><input class="c-field__input" id="tTo" type="text" value="Madgaon (MAO)"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="tDate">Journey Date</label><div class="c-field__control"><input class="c-field__input" id="tDate" type="date" value="2026-09-14"></div></div>
+          </div>
+          <div class="c-widget__foot"><button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="button">Search Trains</button></div>
+        </div>
+
+        <div class="c-widget__panel" id="panelHoliday" role="tabpanel" aria-labelledby="tabHoliday" tabindex="0" hidden>
+          <div class="c-widget__fields">
+            <div class="c-field is-span-4"><label class="c-field__label" for="pDest">Destination</label><div class="c-field__control"><input class="c-field__input" id="pDest" type="text" value="Kerala"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="pFrom">Departure City</label><div class="c-field__control"><input class="c-field__input" id="pFrom" type="text" value="Delhi"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="pMonth">Travel Month</label><div class="c-field__control"><input class="c-field__input" id="pMonth" type="month" value="2026-10"></div></div>
+          </div>
+          <div class="c-widget__foot"><button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="button">Explore Holidays</button></div>
+        </div>
+
+        <div class="c-widget__panel" id="panelInsurance" role="tabpanel" aria-labelledby="tabInsurance" tabindex="0" hidden>
+          <div class="c-widget__fields">
+            <div class="c-field is-span-4"><label class="c-field__label" for="iRegion">Destination Region</label><div class="c-field__control"><input class="c-field__input" id="iRegion" type="text" value="Schengen"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="iDates">Travel Dates</label><div class="c-field__control"><input class="c-field__input" id="iDates" type="text" value="14 – 28 Sep 2026"></div></div>
+            <div class="c-field is-span-4"><label class="c-field__label" for="iAge">Eldest Traveller Age</label><div class="c-field__control"><input class="c-field__input" id="iAge" type="number" value="34" min="0" max="99"></div></div>
+          </div>
+          <div class="c-widget__foot"><button class="c-btn c-btn--primary c-btn--lg c-widget__submit" type="button">View Plans</button></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     OFFERS CAROUSEL
+     ====================================================================== -->
+<section class="l-section" aria-labelledby="offersTitle">
+  <div class="l-container">
+
+    <div class="c-promo c-promo--gradient" data-dismissible style="margin-bottom:var(--space-7)">
+      <div class="c-promo__art" aria-hidden="true"></div>
+      <div class="c-promo__body">
+        <h3>Monsoon sale ends 30 September</h3>
+        <p>Flat 12% off domestic one-way fares booked seven days ahead, on every airline partner.</p>
+      </div>
+      <div class="c-promo__cta">
+        <a class="c-btn c-btn--primary" href="#deals">View Deals</a>
+      </div>
+      <button class="c-promo__dismiss" type="button" data-dismiss aria-label="Dismiss monsoon sale banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="c-carousel" data-carousel>
+      <div class="c-sectionhead">
+        <div>
+          <p class="c-sectionhead__eyebrow">14 live offers</p>
+          <h2 id="offersTitle">Offers for you</h2>
+          <p class="c-sectionhead__sub">Applied automatically at checkout. No coupon hunting.</p>
+        </div>
+        <div class="c-sectionhead__aside c-carousel__nav">
+          <button class="c-btn c-btn--icon" type="button" data-carousel-go="prev" aria-label="Previous offers">
+            <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+          </button>
+          <button class="c-btn c-btn--icon" type="button" data-carousel-go="next" aria-label="Next offers">
+            <svg class="c-btn__icon" viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <ul class="c-carousel__track" data-carousel-track>
+        <li class="c-card">
+          <div class="c-card__body">
+            <span class="c-badge c-badge--brand">Flat 12% off</span>
+            <h3 class="c-card__title">Goa monsoon fares</h3>
+            <p class="c-card__desc">One-way domestic flights booked at least seven days before travel.</p>
+            <p class="c-card__meta"><b>JWMONSOON</b> &middot; ends 30 Sep</p>
+          </div>
+          <div class="c-card__foot"><a class="c-btn c-btn--outline c-btn--sm" href="#deals">View Deals</a></div>
+        </li>
+        <li class="c-card">
+          <div class="c-card__body">
+            <span class="c-badge c-badge--success">Save &#8377;2,400</span>
+            <h3 class="c-card__title">Dubai visa and four nights</h3>
+            <p class="c-card__desc">Tourist visa, airport transfers and a four-star stay, twin sharing.</p>
+            <p class="c-card__meta"><b>JW-DXB-04</b> &middot; from &#8377;58,900</p>
+          </div>
+          <div class="c-card__foot"><a class="c-btn c-btn--outline c-btn--sm" href="#deals">View Deals</a></div>
+        </li>
+        <li class="c-card">
+          <div class="c-card__body">
+            <span class="c-badge c-badge--warning">12 seats left</span>
+            <h3 class="c-card__title">Kerala backwaters, October</h3>
+            <p class="c-card__desc">Five nights across Alleppey and Munnar, departing Kochi on 6 October.</p>
+            <p class="c-card__meta"><b>JW-COK-05</b> &middot; group departure</p>
+          </div>
+          <div class="c-card__foot"><a class="c-btn c-btn--outline c-btn--sm" href="#deals">View Deals</a></div>
+        </li>
+        <li class="c-card">
+          <div class="c-card__body">
+            <span class="c-badge c-badge--brand">Zero fee</span>
+            <h3 class="c-card__title">Free cancellation stays</h3>
+            <p class="c-card__desc">Cancel any of 2,100 properties up to 24 hours before check-in.</p>
+            <p class="c-card__meta"><b>Always on</b> &middot; no code needed</p>
+          </div>
+          <div class="c-card__foot"><a class="c-btn c-btn--outline c-btn--sm" href="#hotels">Book Hotels</a></div>
+        </li>
+        <li class="c-card">
+          <div class="c-card__body">
+            <span class="c-badge c-badge--success">Save &#8377;1,100</span>
+            <h3 class="c-card__title">Andaman island hopper</h3>
+            <p class="c-card__desc">Six nights, ferries and Havelock stay included, departing Chennai.</p>
+            <p class="c-card__meta"><b>JW-IXZ-06</b> &middot; from &#8377;41,200</p>
+          </div>
+          <div class="c-card__foot"><a class="c-btn c-btn--outline c-btn--sm" href="#deals">View Deals</a></div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     POPULAR DESTINATIONS
+     ====================================================================== -->
+<section class="l-section l-section--muted" id="destinations" aria-labelledby="destTitle">
+  <div class="l-container">
+    <div class="c-sectionhead">
+      <div>
+        <p class="c-sectionhead__eyebrow">Updated every 90 seconds</p>
+        <h2 id="destTitle">Popular destinations</h2>
+        <p class="c-sectionhead__sub">Lowest one-way fare found in the last hour.</p>
+      </div>
+      <div class="c-sectionhead__aside"><a class="c-btn c-btn--ghost c-btn--sm" href="#all">See all destinations</a></div>
+    </div>
+
+    <ul class="c-cardgrid">
+      <li class="c-card">
+        <a href="flights.html" style="display:contents">
+          <div class="c-card__media"><div class="c-card__art art-goa"></div><span class="c-card__overtitle">Goa</span></div>
+          <div class="c-card__body">
+            <p class="c-card__meta">Delhi &rarr; Goa &middot; <b>2h 40m</b></p>
+            <p class="c-card__desc">Direct on 6 airlines. Beaches, Portuguese quarters and the monsoon green.</p>
+          </div>
+          <div class="c-card__foot">
+            <span class="c-card__price"><span>from</span><b>&#8377;4,310</b></span>
+            <span class="c-btn c-btn--outline c-btn--sm">View Fares</span>
+          </div>
+        </a>
+      </li>
+      <li class="c-card">
+        <a href="flights.html" style="display:contents">
+          <div class="c-card__media"><div class="c-card__art art-dxb"></div><span class="c-card__badge c-badge c-badge--inverse">Visa on arrival</span><span class="c-card__overtitle">Dubai</span></div>
+          <div class="c-card__body">
+            <p class="c-card__meta">Mumbai &rarr; Dubai &middot; <b>3h 20m</b></p>
+            <p class="c-card__desc">Direct on 9 airlines. Visa, transfers and stay available as one package.</p>
+          </div>
+          <div class="c-card__foot">
+            <span class="c-card__price"><span>from</span><b>&#8377;13,780</b></span>
+            <span class="c-btn c-btn--outline c-btn--sm">View Fares</span>
+          </div>
+        </a>
+      </li>
+      <li class="c-card">
+        <a href="flights.html" style="display:contents">
+          <div class="c-card__media"><div class="c-card__art art-mnl"></div><span class="c-card__overtitle">Manali</span></div>
+          <div class="c-card__body">
+            <p class="c-card__meta">Delhi &rarr; Bhuntar &middot; <b>1h 30m</b></p>
+            <p class="c-card__desc">Fly to Kullu then drive, or take the overnight Volvo. Four-night packages.</p>
+          </div>
+          <div class="c-card__foot">
+            <span class="c-card__price"><span>from</span><b>&#8377;18,499</b></span>
+            <span class="c-btn c-btn--outline c-btn--sm">View Fares</span>
+          </div>
+        </a>
+      </li>
+      <li class="c-card">
+        <a href="flights.html" style="display:contents">
+          <div class="c-card__media"><div class="c-card__art art-kel"></div><span class="c-card__badge c-badge c-badge--inverse">Best seller</span><span class="c-card__overtitle">Kerala</span></div>
+          <div class="c-card__body">
+            <p class="c-card__meta">Delhi &rarr; Kochi &middot; <b>3h 15m</b></p>
+            <p class="c-card__desc">Backwaters, tea country and Fort Kochi across five unhurried nights.</p>
+          </div>
+          <div class="c-card__foot">
+            <span class="c-card__price"><span>from</span><b>&#8377;24,900</b></span>
+            <span class="c-btn c-btn--outline c-btn--sm">View Fares</span>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================================================================
+     HOLIDAY PACKAGES
+     ====================================================================== -->
+<section class="l-section" id="packages" aria-labelledby="pkgTitle">
+  <div class="l-container">
+    <div class="c-sectionhead">
+      <div>
+        <p class="c-sectionhead__eyebrow">Fixed departures</p>
+        <h2 id="pkgTitle">Holiday packages</h2>
+        <p class="c-sectionhead__sub">Flights, stays, transfers and a local host, priced per person on twin sharing.</p>
+      </div>
+      <div class="c-sectionhead__aside"><a class="c-btn c-btn--ghost c-btn--sm" href="#all">See all packages</a></div>
+    </div>
+
+    <ul class="c-cardgrid c-cardgrid--3">
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-jai"></div><span class="c-card__badge c-badge c-badge--inverse">5 nights</span><span class="c-card__overtitle">Rajasthan</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Jaipur, Jodhpur and the Thar</h3>
+          <p class="c-card__desc">Two forts, a desert camp and the blue city, with a private car throughout.</p>
+          <p class="c-card__meta">Departs 12 Oct &middot; <b>4.7</b> (218 reviews)</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><s>&#8377;38,900</s><b>&#8377;32,400</b><span>per person</span></span>
+          <a class="c-btn c-btn--primary c-btn--sm" href="#book">Continue Booking</a>
+        </div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-and"></div><span class="c-card__badge c-badge c-badge--inverse">6 nights</span><span class="c-card__overtitle">Andaman</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Havelock and Neil island hopper</h3>
+          <p class="c-card__desc">Ferries, a beachfront stay on Havelock and an optional scuba morning.</p>
+          <p class="c-card__meta">Departs 3 Nov &middot; <b>4.8</b> (96 reviews)</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><s>&#8377;46,000</s><b>&#8377;41,200</b><span>per person</span></span>
+          <a class="c-btn c-btn--primary c-btn--sm" href="#book">Continue Booking</a>
+        </div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-bal"></div><span class="c-card__badge c-badge c-badge--inverse">7 nights</span><span class="c-card__overtitle">Bali</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Ubud, Seminyak and Nusa Penida</h3>
+          <p class="c-card__desc">Rice terraces, a cliff-edge pool and the crossing to Penida by speedboat.</p>
+          <p class="c-card__meta">Departs 21 Nov &middot; <b>4.6</b> (341 reviews)</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><s>&#8377;96,500</s><b>&#8377;84,900</b><span>per person</span></span>
+          <a class="c-btn c-btn--primary c-btn--sm" href="#book">Continue Booking</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================================================================
+     RECOMMENDED HOTELS
+     ====================================================================== -->
+<section class="l-section l-section--muted" id="hotels" aria-labelledby="hotelTitle">
+  <div class="l-container">
+    <div class="c-sectionhead">
+      <div>
+        <p class="c-sectionhead__eyebrow">Free cancellation until 24h before</p>
+        <h2 id="hotelTitle">Recommended hotels</h2>
+        <p class="c-sectionhead__sub">Nightly rate for two adults, taxes included.</p>
+      </div>
+      <div class="c-sectionhead__aside"><a class="c-btn c-btn--ghost c-btn--sm" href="#all">Book Hotels</a></div>
+    </div>
+
+    <ul class="c-cardgrid">
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-goa"></div><span class="c-card__badge c-badge c-badge--inverse">Beachfront</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Casa Anjuna Retreat</h3>
+          <p class="c-card__meta">North Goa &middot; <b>4.5</b> (1,204)</p>
+          <p class="c-card__desc">Nine rooms around a courtyard pool, four minutes from Anjuna beach.</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><b>&#8377;6,450</b><span>per night</span></span>
+          <a class="c-btn c-btn--outline c-btn--sm" href="#book">View Rooms</a>
+        </div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-dxb"></div><span class="c-card__badge c-badge c-badge--inverse">Metro nearby</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Marina Vista Suites</h3>
+          <p class="c-card__meta">Dubai Marina &middot; <b>4.6</b> (3,810)</p>
+          <p class="c-card__desc">Serviced suites with kitchenettes, eight minutes from JBR by tram.</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><b>&#8377;11,900</b><span>per night</span></span>
+          <a class="c-btn c-btn--outline c-btn--sm" href="#book">View Rooms</a>
+        </div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-kel"></div><span class="c-card__badge c-badge c-badge--inverse">Houseboat</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Vembanad Kettuvallam</h3>
+          <p class="c-card__meta">Alleppey &middot; <b>4.8</b> (642)</p>
+          <p class="c-card__desc">Two-bedroom houseboat with a crew of three and all meals aboard.</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><b>&#8377;14,200</b><span>per night</span></span>
+          <a class="c-btn c-btn--outline c-btn--sm" href="#book">View Rooms</a>
+        </div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-mnl"></div><span class="c-card__badge c-badge c-badge--inverse">Mountain view</span></div>
+        <div class="c-card__body">
+          <h3 class="c-card__title">Old Manali Pine Lodge</h3>
+          <p class="c-card__meta">Manali &middot; <b>4.4</b> (508)</p>
+          <p class="c-card__desc">Timber rooms above the orchard, with the Beas audible from the balcony.</p>
+        </div>
+        <div class="c-card__foot">
+          <span class="c-card__price"><b>&#8377;4,800</b><span>per night</span></span>
+          <a class="c-btn c-btn--outline c-btn--sm" href="#book">View Rooms</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================================================================
+     TRAVEL COLLECTIONS
+     ====================================================================== -->
+<section class="l-section" aria-labelledby="collTitle">
+  <div class="l-container">
+    <div class="c-sectionhead">
+      <div>
+        <p class="c-sectionhead__eyebrow">Curated by our trip planners</p>
+        <h2 id="collTitle">Travel collections</h2>
+      </div>
+    </div>
+    <ul class="c-cardgrid">
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-and"></div><span class="c-card__overtitle">Monsoon escapes</span></div>
+        <div class="c-card__body"><p class="c-card__desc">Eleven places that are better in the rain, and cheaper because of it.</p></div>
+        <div class="c-card__foot"><span class="c-card__meta">11 destinations</span><a class="c-btn c-btn--ghost c-btn--sm" href="#collection">Explore Holidays</a></div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-bal"></div><span class="c-card__overtitle">Visa-free for Indians</span></div>
+        <div class="c-card__body"><p class="c-card__desc">Countries you can enter on arrival or with an e-visa issued in 72 hours.</p></div>
+        <div class="c-card__foot"><span class="c-card__meta">26 countries</span><a class="c-btn c-btn--ghost c-btn--sm" href="#collection">Explore Holidays</a></div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-jai"></div><span class="c-card__overtitle">Weekends from Delhi</span></div>
+        <div class="c-card__body"><p class="c-card__desc">Friday night out, Sunday night back, nothing more than six hours away.</p></div>
+        <div class="c-card__foot"><span class="c-card__meta">14 trips</span><a class="c-btn c-btn--ghost c-btn--sm" href="#collection">Explore Holidays</a></div>
+      </li>
+      <li class="c-card">
+        <div class="c-card__media"><div class="c-card__art art-sin"></div><span class="c-card__overtitle">First trip abroad</span></div>
+        <div class="c-card__body"><p class="c-card__desc">Short hauls with easy visas, English signage and a local host on call.</p></div>
+        <div class="c-card__foot"><span class="c-card__meta">9 itineraries</span><a class="c-btn c-btn--ghost c-btn--sm" href="#collection">Explore Holidays</a></div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ======================================================================
+     WHY BOOK WITH US
+     ====================================================================== -->
+<section class="l-section l-section--inverse" aria-labelledby="whyTitle">
+  <div class="l-container">
+    <div class="c-sectionhead">
+      <div>
+        <p class="c-sectionhead__eyebrow">Since 2018</p>
+        <h2 id="whyTitle" style="color:var(--text-inverse)">Why book with us</h2>
+      </div>
+    </div>
+    <ul class="l-grid" style="row-gap:var(--space-8)">
+      <li style="grid-column:span 3">
+        <p style="font-size:var(--fs-display-l);font-weight:var(--fw-black);color:var(--brand-primary);font-variant-numeric:tabular-nums">&#8377;0</p>
+        <h3 style="font-size:var(--fs-h4);color:var(--text-inverse);margin-block:var(--space-2)">Convenience fee</h3>
+        <p style="color:var(--text-inverse-secondary)">The fare you see is the fare you pay. No booking fee is added at checkout, ever.</p>
+      </li>
+      <li style="grid-column:span 3">
+        <p style="font-size:var(--fs-display-l);font-weight:var(--fw-black);color:var(--brand-primary);font-variant-numeric:tabular-nums">2,100+</p>
+        <h3 style="font-size:var(--fs-h4);color:var(--text-inverse);margin-block:var(--space-2)">Free cancellation stays</h3>
+        <p style="color:var(--text-inverse-secondary)">Cancel up to 24 hours before check-in and the refund is automatic.</p>
+      </li>
+      <li style="grid-column:span 3">
+        <p style="font-size:var(--fs-display-l);font-weight:var(--fw-black);color:var(--brand-primary);font-variant-numeric:tabular-nums">48</p>
+        <h3 style="font-size:var(--fs-h4);color:var(--text-inverse);margin-block:var(--space-2)">Airline partners</h3>
+        <p style="color:var(--text-inverse-secondary)">Domestic and international inventory in one search, priced net of commission.</p>
+      </li>
+      <li style="grid-column:span 3">
+        <p style="font-size:var(--fs-display-l);font-weight:var(--fw-black);color:var(--brand-primary);font-variant-numeric:tabular-nums">24&times;7</p>
+        <h3 style="font-size:var(--fs-h4);color:var(--text-inverse);margin-block:var(--space-2)">Support on WhatsApp</h3>
+        <p style="color:var(--text-inverse-secondary)">A person, not a bot, with your booking already open in front of them.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<!-- ======================================================================
+     FOOTER — 6 columns / 3 tablet / accordion on mobile
+     ====================================================================== -->
+<footer class="c-footer">
+  <div class="l-container">
+    <div class="c-footer__cols">
+
+      <div class="c-footer__col">
+        <h3 id="fCompany">Company</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fCompanyList">Company</button>
+        <ul id="fCompanyList" aria-labelledby="fCompany">
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#careers">Careers</a></li>
+          <li><a href="#press">Press</a></li>
+          <li><a href="#partners">Partner With Us</a></li>
+        </ul>
+      </div>
+
+      <div class="c-footer__col">
+        <h3 id="fProducts">Products</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fProductsList">Products</button>
+        <ul id="fProductsList" aria-labelledby="fProducts">
+          <li><a href="flights.html">Flights</a></li>
+          <li><a href="#hotels">Hotels</a></li>
+          <li><a href="#packages">Holiday Packages</a></li>
+          <li><a href="#insurance">Travel Insurance</a></li>
+        </ul>
+      </div>
+
+      <div class="c-footer__col">
+        <h3 id="fSupport">Support</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fSupportList">Support</button>
+        <ul id="fSupportList" aria-labelledby="fSupport">
+          <li><a href="#help">Help Centre</a></li>
+          <li><a href="#manage">Manage Booking</a></li>
+          <li><a href="#refund">Refund Status</a></li>
+          <li><a href="#contact">Contact Us</a></li>
+        </ul>
+      </div>
+
+      <div class="c-footer__col">
+        <h3 id="fLegal">Legal</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fLegalList">Legal</button>
+        <ul id="fLegalList" aria-labelledby="fLegal">
+          <li><a href="#terms">Terms &amp; Conditions</a></li>
+          <li><a href="#privacy">Privacy Policy</a></li>
+          <li><a href="#cancellation">Cancellation &amp; Refund</a></li>
+          <li><a href="#cookies">Cookie Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="c-footer__col">
+        <h3 id="fSocial">Social</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fSocialList">Social</button>
+        <ul id="fSocialList" aria-labelledby="fSocial">
+          <li><a href="#instagram">Instagram</a></li>
+          <li><a href="#youtube">YouTube</a></li>
+          <li><a href="#linkedin">LinkedIn</a></li>
+          <li><a href="#whatsapp">WhatsApp</a></li>
+        </ul>
+      </div>
+
+      <div class="c-footer__col">
+        <h3 id="fApp">Get the App</h3>
+        <button class="c-footer__toggle" type="button" data-accordion-toggle aria-expanded="false" aria-controls="fAppList">Get the App</button>
+        <ul id="fAppList" aria-labelledby="fApp">
+          <li><a href="#ios">iOS &middot; App Store</a></li>
+          <li><a href="#android">Android &middot; Play Store</a></li>
+          <li><a href="#sms">Get a download link</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="c-footer__news">
+      <div>
+        <h3>Deals worth opening</h3>
+        <p>One email a fortnight with fare drops on the routes you actually fly. Unsubscribe in one click.</p>
+      </div>
+      <form class="c-footer__form" novalidate>
+        <div class="c-field">
+          <label class="c-field__label" for="newsEmail">Email address</label>
+          <div class="c-field__control">
+            <input class="c-field__input" id="newsEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+          </div>
+        </div>
+        <button class="c-btn c-btn--primary" type="submit">Subscribe</button>
+      </form>
+    </div>
+
+    <div class="c-footer__legal">
+      <p>&copy; 2026 JackpotsWorld Tours &amp; Travels. All fares inclusive of GST.</p>
+      <ul>
+        <li><a href="#terms">Terms</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#sitemap">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/template.js"></script>
+</body>
+</html>
