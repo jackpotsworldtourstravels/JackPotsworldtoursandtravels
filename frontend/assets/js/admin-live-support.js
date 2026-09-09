@@ -398,9 +398,13 @@ const AdminLiveSupport = (function () {
     ended: 'Completed', missed: 'Missed', rejected: 'Declined',
     cancelled: 'Cancelled', busy: 'Busy', failed: 'Failed',
   };
+  /* EVERY EVENT handleCallFrame() ANSWERS HAS TO BE LISTED HERE, or the
+     handler for it is dead code: handleFrame() only routes what this list
+     names. */
   const CALL_FRAMES = [
     'incoming_call', 'call_status', 'call_accepted', 'call_busy', 'call_taken',
     'call_claimed', 'call_cancelled', 'offer', 'answer', 'ice_candidate',
+    'call_hold', 'call_transfer_ringing', 'call_transferred',
   ];
 
   async function iceServers() {
@@ -583,6 +587,15 @@ const AdminLiveSupport = (function () {
       if (data.status === 'missed' && data.failure_reason === 'callee_offline') {
         setCallNote('This customer is not online. Reply in the chat instead.');
       }
+      /* THE CALLER LEARNS ITS OWN CALL ID HERE, and nowhere else. `startCall`
+         takes the microphone and builds the peer connection before the call
+         exists, so it has no id to hand over; this is the first frame that
+         carries one. Until JWCall is told, everything it sends — the offer and
+         every ICE candidate after it — goes out with `call_id: null`, the relay
+         refuses each one as "no such call", and the call connects nowhere while
+         both sides still look like a call in progress. */
+      if (!call.id && !isTerminal(data.status)) call.id = data.call_id;
+      if (call.id) JWCall.setCallId(call.id);
       if (data.call_id !== call.id && !isTerminal(data.status)) return true;
       call.status = data.status;
       call.customerName = data.customer_name || call.customerName;

@@ -272,10 +272,15 @@ const JWCall = (function () {
 
     pc.onicegatheringstatechange = () => log('iceGatheringState', pc.iceGatheringState);
     pc.onsignalingstatechange = () => log('signalingState', pc.signalingState);
+    /* ONE HANDLER, NOT TWO. A second `pc.onconnectionstatechange =` further
+       down silently replaced this one, so `connectionState` was never logged
+       and the line naming a failed peer connection never printed — which is
+       the one line worth having when a call is silent. */
     pc.onconnectionstatechange = () => {
       log('connectionState', pc.connectionState);
       if (pc.connectionState === 'failed') {
         logError('the peer connection FAILED — no media path was established');
+        emit('Failed', { code: 'peer_failed' });
       }
     };
 
@@ -355,10 +360,6 @@ const JWCall = (function () {
           emit('Failed', { code: 'ice_failed' });
         }
       }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed') emit('Failed', { code: 'peer_failed' });
     };
 
     return pc;
@@ -453,6 +454,12 @@ const JWCall = (function () {
 
   /** The caller, once the other side has accepted. */
   async function createOffer() {
+    /* NEVER SILENT. An offer sent with no call id is refused by the relay and
+       nothing downstream reports it, so the failure has to be named here. */
+    if (!state.callId) {
+      logError('creating an offer with NO CALL ID — the relay will refuse this '
+               + 'offer and every candidate after it. setCallId() was not called.');
+    }
     log('creating offer; signalingState was', state.pc.signalingState);
     const offer = await state.pc.createOffer({ offerToReceiveAudio: true });
     await state.pc.setLocalDescription(offer);
@@ -529,6 +536,29 @@ const JWCall = (function () {
   function isMuted() { return state.muted; }
   function isActive() { return Boolean(state.pc); }
   function currentCallId() { return state.callId; }
+
+  /** Tell a prepared call what id the server gave it.
+   *
+   *  THE CALLER CANNOT KNOW ITS CALL ID WHEN IT PREPARES. The microphone is
+   *  taken and the peer connection built BEFORE `call_request` goes out — on
+   *  purpose, so a customer with no microphone is told before an agent's phone
+   *  rings — and the id only exists once the server has written the row. So
+   *  `prepare()` is handed null, and the id arrives a moment later on the first
+   *  `call_status` frame.
+   *
+   *  Until it is handed over, every frame this side sends carries
+   *  `call_id: null`: the offer, and every ICE candidate after it. The relay
+   *  answers each one with "no such call" and drops it, so the other browser
+   *  never receives an offer, never answers, and ICE never leaves `new`. Both
+   *  UIs still look like a call — which is exactly the failure this whole file
+   *  was written to avoid.
+   */
+  function setCallId(id) {
+    if (!id || id === state.callId) return state.callId;
+    log('call id adopted', id);
+    state.callId = id;
+    return state.callId;
+  }
 
   /** Tear everything down. Safe to call twice, and called on every exit path.
    *
@@ -818,7 +848,7 @@ const JWCall = (function () {
 
   return {
     prepare, createOffer, handleOffer, handleAnswer, handleCandidate,
-    setMuted, toggleMute, isMuted, isActive, currentCallId,
+    setMuted, toggleMute, isMuted, isActive, currentCallId, setCallId,
     speakerSupported, speakerAvailable, cycleOutput, currentOutputLabel,
     setHold, isHeld, releasePeer,
     diagnostics, selectedPair,

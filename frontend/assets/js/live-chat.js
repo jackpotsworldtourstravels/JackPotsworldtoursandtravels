@@ -678,6 +678,14 @@ const LiveChat = (function () {
                     + 'we reply to every one.');
       }
       call.id = data.status && !isTerminal(data.status) ? data.call_id : null;
+      /* THE CALLER LEARNS ITS OWN CALL ID HERE, and nowhere else. `startCall`
+         takes the microphone and builds the peer connection before the call
+         exists, so it has no id to hand over; this is the first frame that
+         carries one. Until JWCall is told, everything it sends — the offer and
+         every ICE candidate after it — goes out with `call_id: null`, the relay
+         refuses each one as "no such call", and the call connects nowhere while
+         both sides still look like a call in progress. */
+      if (call.id) JWCall.setCallId(call.id);
       call.status = data.status;
       call.agentName = data.admin_name || call.agentName;
       if (data.status === 'connected' && !call.connectedAt) {
@@ -721,9 +729,15 @@ const LiveChat = (function () {
     return false;
   }
 
+  /* EVERY EVENT handleCallFrame() ANSWERS HAS TO BE LISTED HERE, or the
+     handler for it is dead code: handleFrame() only routes what this list
+     names. `call_renegotiate` was missing, which meant a transferred call left
+     the customer holding a peer connection that had already been released —
+     connected on screen, silent in both ears. */
   const CALL_FRAMES = [
     'incoming_call', 'call_status', 'call_accepted', 'call_busy',
     'call_cancelled', 'offer', 'answer', 'ice_candidate',
+    'call_hold', 'call_renegotiate',
   ];
 
   function isTerminal(status) {
