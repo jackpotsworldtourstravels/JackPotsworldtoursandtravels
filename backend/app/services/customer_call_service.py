@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Optional, Sequence
+from typing import Iterable, Optional, Sequence
 
 from sqlalchemy import desc, select, update
 from sqlalchemy.exc import IntegrityError
@@ -289,6 +289,15 @@ def finish(
     call.ended_by = ended_by
     if reason:
         call.failure_reason = reason[:60]
+    # A CALL CAN END WHILE STILL HELD — the agent's socket drops, the ring
+    # timer fires, the customer gives up waiting. Closing the open bracket here
+    # rather than only in `set_hold` means no hold is ever lost because nobody
+    # pressed Resume, which is exactly the call whose hold time someone will
+    # want to look at.
+    _close_hold(call, now)
+    # A transfer offer cannot outlive the call it was made against; leaving one
+    # set would make a finished row look transferable to the next reader.
+    call.transfer_to_admin_id = None
     if call.connected_at is not None:
         started = call.connected_at
         if started.tzinfo is None:
@@ -296,6 +305,43 @@ def finish(
         call.duration_seconds = max(0, int((now - started).total_seconds()))
     db.flush()
     return True
+
+
+def _close_hold(call: CustomerCall, now: dt.datetime) -> int:
+    """Bank the hold in progress, if there is one. Returns seconds added."""
+    if call.held_since is None:
+        return 0
+    started = call.held_since
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=dt.timezone.utc)
+    seconds = max(0, int((now - started).total_seconds()))
+    call.hold_seconds = (call.hold_seconds or 0) + seconds
+    call.held_since = None
+    return seconds
+
+
+def set_hold(db: Session, call: CustomerCall, *, on: bool) -> int:
+    """Open or close a hold, and keep the running total.
+
+    THE FLAG IS STILL NOT STORED, and that is not an oversight — see the note
+    in `call_handlers.hold()`. What is stored is the arithmetic: `held_since`
+    is the open bracket and `hold_seconds` the sum of the closed ones. A reader
+    of a finished call sees only the total, which is the part that is still
+    true once the sockets are gone.
+
+    Idempotent in both directions: holding a held call and resuming one that is
+    not held both do nothing, because both browsers echo the state and a double
+    hold that reset `held_since` would silently discard the first stretch.
+
+    Returns the call's total hold seconds so far.
+    """
+    if on:
+        if call.held_since is None:
+            call.held_since = _now()
+    else:
+        _close_hold(call, _now())
+    db.flush()
+    return call.hold_seconds or 0
 
 
 def expire_stale(db: Session) -> int:
@@ -362,6 +408,33 @@ def history(
     )
 
 
+def admins_on_a_call(db: Session, admin_ids: Iterable[int]) -> set[int]:
+    """Of these agents, the ones already on a live call.
+
+    THE RING IS THE PLACE TO FILTER, not the accept. `accept()` already refuses
+    a second call with `call_busy`, but by then the agent's console has been
+    ringing over the conversation they are in the middle of — the popup is the
+    interruption, and answering it with an error afterwards does not take that
+    back. An agent who is talking to somebody is not available, and the
+    invitation should never have been addressed to them.
+
+    A live call is `accepted` or `connected`: the same pair `active_for_admin`
+    uses, and deliberately NOT `ringing`, because an agent with an unanswered
+    invitation on screen is still free to take a different one.
+    """
+    ids = [a for a in admin_ids]
+    if not ids:
+        return set()
+    return set(
+        db.execute(
+            select(CustomerCall.admin_id).where(
+                CustomerCall.admin_id.in_(ids),
+                CustomerCall.status.in_(("accepted", "connected")),
+            )
+        ).scalars()
+    )
+
+
 def active_for_admin(db: Session, admin_id: int) -> Optional[CustomerCall]:
     """The call this agent is currently on, if any.
 
@@ -416,6 +489,19 @@ def complete_transfer(db: Session, call: CustomerCall, *, to_admin_id: int,
     that can decide which one actually got it. Losing is not an error — it
     means somebody else is already talking to the customer.
     """
+    from_admin_id, from_admin_name = call.admin_id, call.admin_name
+    # APPENDED IN PYTHON, NOT IN SQL, and safe to do so: the conditional UPDATE
+    # below is what decides the winner, and only the winner's version of this
+    # list is written. A loser's UPDATE matches no row and its list is thrown
+    # away with the transaction.
+    chain = list(call.transfer_chain or [])
+    chain.append({
+        "from_admin_id": from_admin_id,
+        "from_admin_name": from_admin_name,
+        "to_admin_id": to_admin_id,
+        "to_admin_name": to_admin_name,
+        "at": _now().isoformat(),
+    })
     result = db.execute(
         update(CustomerCall)
         .where(
@@ -426,8 +512,9 @@ def complete_transfer(db: Session, call: CustomerCall, *, to_admin_id: int,
         .values(
             admin_id=to_admin_id,
             admin_name=to_admin_name,
-            transferred_from_admin_id=call.admin_id,
+            transferred_from_admin_id=from_admin_id,
             transfer_to_admin_id=None,
+            transfer_chain=chain,
         )
     )
     db.flush()

@@ -159,6 +159,11 @@ SUITE = [
     # Skips with exit 0 when 0066 is not applied.
     ("verify_voice_calls.py",
      "CR-10: call state machine, SDP/ICE relay, agent-channel ring, stranger refused"),
+    # After the signalling script: this one is about what happens to a call once
+    # two people are on it - ownership, hold, transfer outcomes - so a failure
+    # here only means something once the relay underneath it is known good.
+    ("verify_call_management.py",
+     "CR-10: single owner, busy agents, hold accounting, transfer outcomes"),
     # LAST, always. Section 9 exhausts the auth rate-limit budget on purpose,
     # so any script running after it would fail on login rather than on its
     # own subject — the failure would look like a regression and would not be one.

@@ -1651,8 +1651,24 @@ class CustomerCall(Base):
     #: hangup, so a finished call can never look transferable.
     transfer_to_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     #: Kept after the handover: "this call changed hands" is the interesting
-    #: fact when someone later asks why it has two agents in its history.
+    #: fact when someone later asks why it has two agents in its history. Only
+    #: ever the PREVIOUS agent — see `transfer_chain` for the whole route.
     transferred_from_admin_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    #: Total seconds spent on hold, summed over every hold this call had.
+    hold_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0"),
+    )
+    #: The open bracket of a hold in progress, NULL otherwise. The one piece of
+    #: live hold state that is persisted, because `hold_seconds` cannot be
+    #: summed without it. See migration 0068.
+    held_since: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    #: Every completed handover, oldest first. `transferred_from_admin_id`
+    #: remembers one hop and A -> B -> C overwrites A; this keeps the route.
+    transfer_chain: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"),
+    )
 
     conversation: Mapped["CustomerConversation"] = relationship(back_populates="calls")
 

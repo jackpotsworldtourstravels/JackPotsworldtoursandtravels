@@ -480,6 +480,14 @@ const LiveChat = (function () {
     busy: 'Support is on another call',
     failed: 'Call failed',
   };
+  /* NOT ROW STATUSES. The call stays `connected` through a hold and through a
+     transfer — that is the point of both — so these are chosen from the last
+     frame rather than from `status`. */
+  const CALL_LIVE_LABELS = {
+    held: 'On Hold',
+    transferring: 'Transferring\u2026',
+    transferred: 'Transferred',
+  };
 
   /** ICE servers, fetched once per call and never cached across calls.
    *  TURN credentials are short-lived by design; a browser holding a stale one
@@ -615,6 +623,7 @@ const LiveChat = (function () {
     JWCall.reset();
     stopCallTimer();
     call.id = null;
+    call.live = null;
     call.connectedAt = null;
     call.quality = null;
     call.status = finalStatus;
@@ -644,14 +653,28 @@ const LiveChat = (function () {
       return true;
     }
     if (event === 'call_hold') {
+      call.live = data.on_hold ? 'held' : null;
       if (data.held_by !== 'customer') {
         setCallNote(data.on_hold
-          ? 'Support has put you on hold. Please stay on the line.'
-          : 'You are back with support.');
+          ? 'Your call has been placed on hold. Please stay on the line \u2014 '
+            + 'you will hear music until support returns.'
+          : 'Support has resumed the call.');
         if (!data.on_hold) setTimeout(() => {
           if (call.status === 'connected') setCallNote(null);
         }, 2600);
       }
+      paintCall();
+      return;
+    }
+    if (event === 'call_transfer_failed') {
+      /* The handover did not happen and the customer never needs to know why —
+         only that the person they were already speaking to is still there. */
+      call.live = null;
+      setCallNote('Still connected to support.');
+      setTimeout(() => {
+        if (call.status === 'connected') setCallNote(null);
+      }, 2600);
+      paintCall();
       return;
     }
     if (event === 'call_renegotiate') {
@@ -660,7 +683,8 @@ const LiveChat = (function () {
          prompt mid-conversation reads as the call having dropped. The peer
          connection is rebuilt in place and the new agent's offer arrives on
          the ordinary path. */
-      setCallNote('Transferring you to ' + (data.admin_name || 'another agent') + '\u2026');
+      call.live = 'transferring';
+      setCallNote('Connecting you to another support specialist\u2026');
       call.adminName = data.admin_name || call.adminName;
       JWCall.releasePeer();
       JWCall.prepare({
@@ -691,7 +715,16 @@ const LiveChat = (function () {
       if (data.status === 'connected' && !call.connectedAt) {
         call.connectedAt = data.connected_at ? new Date(data.connected_at) : new Date();
         startCallTimer();
-        setCallNote(null);
+        /* NAMED, NOT JUST "Connected". Somebody who has been listening to a
+           ring for twenty seconds wants to know a person arrived, and the
+           status line above them already says the connection is up. */
+        setCallNote((call.agentName ? call.agentName : 'A support agent')
+                    + ' has joined the call.');
+        setTimeout(() => {
+          if (call.status === 'connected' && !call.quality && !call.live) {
+            setCallNote(null);
+          }
+        }, 3000);
       }
       if (isTerminal(data.status)) { endCallUi(data.status); return true; }
       showCallPanel(true);
@@ -737,7 +770,7 @@ const LiveChat = (function () {
   const CALL_FRAMES = [
     'incoming_call', 'call_status', 'call_accepted', 'call_busy',
     'call_cancelled', 'offer', 'answer', 'ice_candidate',
-    'call_hold', 'call_renegotiate',
+    'call_hold', 'call_renegotiate', 'call_transfer_failed',
   ];
 
   function isTerminal(status) {
@@ -835,7 +868,8 @@ const LiveChat = (function () {
     if (sub) {
       sub.textContent = call.status === 'preparing'
         ? 'Checking your microphone\u2026'
-        : (CALL_LABELS[call.status] || '');
+        : ((call.live && CALL_LIVE_LABELS[call.live])
+           || CALL_LABELS[call.status] || '');
     }
     if (timer) {
       timer.hidden = call.status !== 'connected';

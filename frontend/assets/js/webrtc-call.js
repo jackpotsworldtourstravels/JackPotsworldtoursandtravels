@@ -583,6 +583,10 @@ const JWCall = (function () {
     if (state.remoteAudio) {
       try { state.remoteAudio.srcObject = null; } catch (e) {}
     }
+    /* The music outlives the call otherwise: it is scheduled on an interval
+       against its own AudioContext, neither of which the peer connection
+       closing knows anything about. */
+    stopHoldMusic();
     state.pc = null;
     state.localStream = null;
     state.callId = null;
@@ -714,45 +718,70 @@ const JWCall = (function () {
      phone call.
   */
   let ringCtx = null;
-  let ringTimer = null;
+  let ringSource = null;
 
-  function ringOnce() {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    ringCtx = ringCtx || new Ctx();
-    if (ringCtx.state === 'suspended') ringCtx.resume();
-    const now = ringCtx.currentTime;
-    /* Two bursts of a two-tone pair — the shape of a telephone ring, which is
-       recognisable as "answer me" in a way an arbitrary melody is not. */
+  /* One cycle of ring, rendered as samples: two bursts of the 440+480 Hz pair
+     that every telephone in the world uses, then silence to the end of the
+     cycle. Rendered rather than scheduled because of how it is played — see
+     startRinging(). */
+  const RING_CYCLE_SECONDS = 3;
+
+  function ringBuffer(ctx) {
+    const rate = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, Math.floor(rate * RING_CYCLE_SECONDS), rate);
+    const data = buffer.getChannelData(0);
     [0, 0.4].forEach(function (offset) {
-      [440, 480].forEach(function (freq) {
-        const osc = ringCtx.createOscillator();
-        const gain = ringCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, now + offset);
-        gain.gain.exponentialRampToValueAtTime(0.09, now + offset + 0.03);
-        gain.gain.setValueAtTime(0.09, now + offset + 0.28);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.33);
-        osc.connect(gain).connect(ringCtx.destination);
-        osc.start(now + offset);
-        osc.stop(now + offset + 0.35);
-      });
+      const start = Math.floor(offset * rate);
+      const length = Math.floor(0.35 * rate);
+      for (let i = 0; i < length; i++) {
+        const t = i / rate;
+        /* Attack and release shaped by hand: a burst that starts and stops on
+           a sample boundary clicks, and a click on every ring is the kind of
+           detail that makes a product feel cheap. */
+        let envelope = 1;
+        if (t < 0.03) envelope = t / 0.03;
+        else if (t > 0.28) envelope = Math.max(0, (0.35 - t) / 0.07);
+        const tone = (Math.sin(2 * Math.PI * 440 * t)
+                    + Math.sin(2 * Math.PI * 480 * t)) * 0.5;
+        data[start + i] += tone * envelope * 0.09;
+      }
     });
+    return buffer;
   }
 
-  /** Ring until stopRinging(). Safe to call twice. */
+  /** Ring until stopRinging(). Safe to call twice.
+   *
+   *  A LOOPING BUFFER, NOT A TIMER, and that is the whole point of this
+   *  rewrite. This used to schedule one burst and re-arm with
+   *  `setInterval(..., 3000)` — which browsers throttle to roughly once a
+   *  minute in a tab that is not focused. An agent watching another tab, which
+   *  is exactly the agent this feature exists for, heard one ring and then
+   *  near-silence.
+   *
+   *  `AudioBufferSourceNode` with `loop = true` is played by the audio thread.
+   *  Nothing re-arms it, so there is no timer to throttle and the ring
+   *  continues at full cadence in a background tab until somebody deals with
+   *  it. Every failure here is swallowed: a call that throws because it could
+   *  not make a noise is worse than a silent one.
+   */
   function startRinging() {
-    if (ringTimer) return;
+    if (ringSource) return;
     try {
-      ringOnce();
-      ringTimer = setInterval(() => {
-        try { ringOnce(); } catch (e) { stopRinging(); }
-      }, 3000);
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!ringCtx || ringCtx.state === 'closed') ringCtx = new Ctx();
+      if (ringCtx.state === 'suspended') ringCtx.resume();
+      const source = ringCtx.createBufferSource();
+      source.buffer = ringBuffer(ringCtx);
+      source.loop = true;
+      source.connect(ringCtx.destination);
+      source.start();
+      ringSource = source;
     } catch (e) {
-      /* No audio available. The popup is still on screen; silence is a
-         degraded ring, not a broken call. */
-      ringTimer = null;
+      /* No audio available. The popup is still on screen, and a browser
+         notification may still have fired; silence is a degraded ring, not a
+         broken call. */
+      ringSource = null;
     }
   }
 
@@ -760,7 +789,12 @@ const JWCall = (function () {
    *  cancelled, timed out, socket dropped. A ringtone that outlives its call is
    *  the most annoying bug this feature could ship. */
   function stopRinging() {
-    if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+    if (!ringSource) return;
+    try {
+      ringSource.stop();
+      ringSource.disconnect();
+    } catch (e) { /* already stopped */ }
+    ringSource = null;
   }
 
   /** A browser notification for a call arriving in a tab nobody is looking at.
@@ -783,6 +817,161 @@ const JWCall = (function () {
 
 
   /* -------------------------------------------------------------------------
+     Hold music
+     -------------------------------------------------------------------------
+     WHAT THE CUSTOMER HEARS WHILE THEY WAIT, and the reason hold is worth
+     having at all. Silence on a held line is indistinguishable from a call
+     that has dropped: the customer says "hello? hello?", waits a few seconds
+     and hangs up. Music is the only thing that says "you are still connected
+     and somebody is coming back".
+
+     TWO SOURCES, IN ORDER OF PREFERENCE
+     A licensed track at `assets/audio/hold-music.mp3` is used if it is there.
+     Nothing in this repository ships one — an audio file cannot be written by
+     the person who wrote this code, and shipping an unlicensed track would be
+     a licensing problem rather than an engineering one. Drop a file at that
+     path and it is picked up with no code change.
+
+     Otherwise this synthesises a progression. That is a deliberate second
+     choice and not a beep: four chords on a soft triangle pad with a slow
+     arpeggio over them, at a volume that sits under a voice. It loops
+     seamlessly because it is scheduled rather than sampled, there is no asset
+     to 404, and it cannot be blocked by an autoplay policy — the audio never
+     reaches a speaker on this machine, it goes down the peer connection.
+
+     BOTH END UP AS A MediaStreamTrack, because that is what `replaceTrack()`
+     takes. The music is never played out loud on the holder's own machine.
+  */
+  const HOLD_MP3 = 'assets/audio/hold-music.mp3';
+
+  /* Am - F - C - G. A resolved, unhurried loop; nothing in it draws attention
+     to itself, which is the entire brief for music somebody is made to listen
+     to against their will. Frequencies rather than note names so there is no
+     table to get wrong. */
+  const HOLD_CHORDS = [
+    [220.00, 261.63, 329.63],
+    [174.61, 220.00, 261.63],
+    [130.81, 164.81, 196.00],
+    [196.00, 246.94, 293.66],
+  ];
+  const HOLD_BAR_SECONDS = 3.2;
+
+  let holdCtx = null;
+  let holdDest = null;
+  let holdTimer = null;
+  let holdAudioEl = null;
+  let holdBar = 0;
+
+  function holdContext() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!holdCtx || holdCtx.state === 'closed') {
+      holdCtx = new Ctx();
+      holdDest = holdCtx.createMediaStreamDestination();
+    }
+    if (holdCtx.state === 'suspended') holdCtx.resume();
+    return holdCtx;
+  }
+
+  /** A track playing hold music, for as long as it stays in a sender. */
+  function holdMusicTrack() {
+    const ctx = holdContext();
+    if (!ctx) return null;
+    stopHoldMusic(true);          /* leave the destination in place */
+
+    /* THE FILE FIRST. `createMediaElementSource` routes the element into the
+       graph instead of the speakers, so a missing file is silent rather than
+       audible on the wrong machine — hence the `error` fallback below rather
+       than trusting it to work. */
+    try {
+      holdAudioEl = new Audio(HOLD_MP3);
+      holdAudioEl.loop = true;
+      holdAudioEl.crossOrigin = 'anonymous';
+      holdAudioEl.addEventListener('error', () => {
+        log('no hold-music.mp3 — using the synthesised progression');
+        holdAudioEl = null;
+        synthesiseHold(ctx);
+      }, { once: true });
+      const source = ctx.createMediaElementSource(holdAudioEl);
+      const gain = ctx.createGain();
+      gain.gain.value = 0.5;
+      source.connect(gain).connect(holdDest);
+      const played = holdAudioEl.play();
+      if (played && played.catch) {
+        played.catch(() => { holdAudioEl = null; synthesiseHold(ctx); });
+      }
+    } catch (e) {
+      holdAudioEl = null;
+      synthesiseHold(ctx);
+    }
+
+    return holdDest.stream.getAudioTracks()[0] || null;
+  }
+
+  /** Schedule the progression, one bar ahead, until stopped. */
+  function synthesiseHold(ctx) {
+    if (holdTimer) return;
+    holdBar = 0;
+    const bar = () => {
+      const chord = HOLD_CHORDS[holdBar % HOLD_CHORDS.length];
+      holdBar += 1;
+      const at = ctx.currentTime + 0.05;
+
+      /* The pad: the whole chord, faded in and out so bars run together
+         instead of clicking at the join. */
+      chord.forEach(freq => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(0.06, at + 0.6);
+        gain.gain.setValueAtTime(0.06, at + HOLD_BAR_SECONDS - 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + HOLD_BAR_SECONDS);
+        osc.connect(gain).connect(holdDest);
+        osc.start(at);
+        osc.stop(at + HOLD_BAR_SECONDS + 0.05);
+      });
+
+      /* The arpeggio: the same notes an octave up, one at a time, so the loop
+         has some movement in it and does not read as a held tone. */
+      chord.forEach((freq, i) => {
+        const when = at + 0.2 + i * 0.55;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq * 2;
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(0.05, when + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.5);
+        osc.connect(gain).connect(holdDest);
+        osc.start(when);
+        osc.stop(when + 0.55);
+      });
+    };
+    bar();
+    holdTimer = setInterval(bar, HOLD_BAR_SECONDS * 1000);
+  }
+
+  /** Silence the music. `keepDestination` is for swapping source mid-hold. */
+  function stopHoldMusic(keepDestination) {
+    if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
+    if (holdAudioEl) {
+      try { holdAudioEl.pause(); } catch (e) {}
+      holdAudioEl = null;
+    }
+    if (!keepDestination && holdCtx) {
+      /* Closed rather than left suspended: an AudioContext per call that is
+         never closed is a leak the browser eventually complains about, and
+         there is a hard limit on how many a page may open. */
+      try { holdCtx.close(); } catch (e) {}
+      holdCtx = null;
+      holdDest = null;
+    }
+  }
+
+
+  /* -------------------------------------------------------------------------
      Hold
      -------------------------------------------------------------------------
      BOTH DIRECTIONS, which is what makes it hold rather than mute. Muting
@@ -796,17 +985,55 @@ const JWCall = (function () {
      Holding is therefore cheap and instant, and the media path survives it. */
   function setHold(on) {
     state.held = !!on;
-    if (state.localStream) {
-      /* Outbound: the track stays in the sender, so no renegotiation. */
-      state.localStream.getAudioTracks().forEach(t => { t.enabled = !on; });
-    }
+    /* OUTBOUND: THE MICROPHONE IS REPLACED, NOT SILENCED.
+       `RTCRtpSender.replaceTrack()` swaps what an established sender transmits
+       without touching the SDP — no renegotiation, no ICE, no gap in the RTP
+       stream. The customer simply hears music where a voice was.
+
+       Disabling the track instead (what this did before) leaves them listening
+       to nothing at all, and a silent line is indistinguishable from a dropped
+       one. That is the moment people hang up. */
+    swapOutbound(on);
     if (state.remoteAudio) {
       /* Inbound: muted at the element rather than by stopping the track, which
-         would need renegotiation to undo. */
+         would need renegotiation to undo. The holder stops hearing the other
+         party, which is what makes this hold rather than mute. */
       state.remoteAudio.muted = !!on;
     }
     emit('Hold', { on: state.held });
     return state.held;
+  }
+
+  /** The sender carrying our audio, whatever track is in it right now. */
+  function audioSender() {
+    if (!state.pc || !state.pc.getSenders) return null;
+    const senders = state.pc.getSenders();
+    return senders.find(s => s.track && s.track.kind === 'audio')
+        || senders.find(s => !s.track)
+        || null;
+  }
+
+  /** Put music in the sender, or put the microphone back. */
+  function swapOutbound(toMusic) {
+    const sender = audioSender();
+    if (!sender || !sender.replaceTrack) return;
+    let track;
+    if (toMusic) {
+      track = holdMusicTrack();
+    } else {
+      track = state.localStream && state.localStream.getAudioTracks()[0];
+      /* The mute button was still pressed while the call was on hold, and the
+         track it applies to has been out of the sender the whole time. Its
+         state is re-applied on the way back in, or resuming would quietly
+         unmute somebody. */
+      if (track) track.enabled = !state.muted;
+      stopHoldMusic();
+    }
+    if (!track) return;
+    const done = sender.replaceTrack(track);
+    if (done && done.catch) {
+      done.catch(e => logError('could not swap the outbound track', e));
+    }
   }
 
   function isHeld() { return !!state.held; }

@@ -77,6 +77,15 @@ def call_payload(call, *, customer_name: Optional[str] = None) -> dict[str, Any]
         "duration_seconds": call.duration_seconds,
         "ended_by": call.ended_by,
         "failure_reason": call.failure_reason,
+        # LIVE STATE, so a console that joins late or reloads mid-call paints
+        # the right thing. `on_hold` is derived rather than stored — see
+        # migration 0068 on why the flag stays out of the row and the
+        # arithmetic goes in.
+        "on_hold": call.held_since is not None,
+        "hold_seconds": call.hold_seconds or 0,
+        "transfer_pending_to": call.transfer_to_admin_id,
+        "transferred_from_admin_id": call.transferred_from_admin_id,
+        "transfer_chain": list(call.transfer_chain or []),
     }
 
 

@@ -108,7 +108,14 @@ check("there is exactly one base", len(bases) == 1, str(bases))
 reachable = {r.revision for r in script.walk_revisions("base", "heads")}
 on_disk_revs = set()
 for path in VERSIONS.glob("*.py"):
-    rev = re.search(r'^revision:\s*str\s*=\s*["\']([^"\']+)', path.read_text(encoding="utf-8"), re.M)
+    # THE ANNOTATION IS OPTIONAL. Alembic's own template writes
+    # `revision: str = "..."`, but a hand-written migration may declare a bare
+    # `revision = "..."` and alembic resolves both identically. Insisting on the
+    # annotated form made 0065_chat_admin_identity — which is on disk, is in the
+    # chain, and has been applied everywhere — report as "not on disk", and the
+    # check has been failing on that ever since rather than on anything real.
+    rev = re.search(r'^revision(?::\s*str)?\s*=\s*["\']([^"\']+)',
+                    path.read_text(encoding="utf-8"), re.M)
     if rev:
         on_disk_revs.add(rev.group(1))
 

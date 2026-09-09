@@ -161,6 +161,13 @@ class CallSession:
             # succeeds — so without this the customer hears 45 seconds of
             # ringing whenever every agent happens to be signed out.
             live = await sig.online_agents(targets)
+            # AVAILABLE MEANS ONLINE *AND* NOT ALREADY TALKING TO SOMEBODY.
+            # Presence alone rings the agent who is mid-sentence with another
+            # customer; `accept()` then answers them with `call_busy`, which is
+            # an apology for an interruption that should never have happened.
+            with SessionLocal() as db2:
+                busy = calls.admins_on_a_call(db2, live)
+            live = [a for a in live if a not in busy]
             if not live:
                 await self._terminate(public_id, "missed", "system", "no_agent_online")
                 return
@@ -291,9 +298,41 @@ class CallSession:
             await sig.to_agent(call_admin, "call_accepted", payload)
 
     async def reject(self, data: dict[str, Any]) -> None:
+        # DECLINING A TRANSFER IS NOT DECLINING THE CALL, and until this check
+        # existed it was: agent B pressed Reject on a handover, `_terminate`
+        # marked the *live* call rejected, and the customer — who was mid-
+        # conversation with agent A and had nothing to do with the transfer —
+        # was hung up on. The call is A's throughout; B was only ever offered
+        # it, so all a decline can do is withdraw the offer.
+        if self.kind == "admin" and await self._decline_transfer(data):
+            return
         await self._terminate(
             str(data.get("call_id", "")), "rejected", self.kind, None,
         )
+
+    async def _decline_transfer(self, data: dict[str, Any]) -> bool:
+        """Withdraw a handover offered to this agent. True if that is what this was."""
+        with SessionLocal() as db:
+            try:
+                call = calls.get_by_public_id(db, str(data.get("call_id", "")))
+            except calls.CallNotFound:
+                return False
+            if call.transfer_to_admin_id != self.actor_id or call.status != "connected":
+                return False
+            holder = call.admin_id
+            conversation_id = call.conversation_id
+            calls.clear_transfer(db, call)
+            payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+            db.commit()
+        self.close()
+        payload["transfer_declined_by"] = self.actor_name
+        # The agent who is still on the call is the only one who needs to know.
+        # The customer was never told a transfer was being attempted unless it
+        # got as far as ringing, and `call_transfer_failed` restores that.
+        if holder:
+            await sig.to_agent(holder, "call_transfer_failed", payload)
+        await sig.to_customer(conversation_id, "call_transfer_failed", payload)
+        return True
 
     async def cancel(self, data: dict[str, Any]) -> None:
         await self._terminate(
@@ -350,11 +389,17 @@ class CallSession:
             if not call.is_live or not await self._party_check(db, call):
                 await self._fail("no_such_call", "That call is no longer active.")
                 return
+            # THE DURATION IS STORED EVEN THOUGH THE FLAG IS NOT. "Six minutes,
+            # four of them on hold" is a different call from six minutes of
+            # conversation, and the difference is only recoverable if somebody
+            # writes down when the hold opened. See migration 0068.
+            calls.set_hold(db, call, on=on)
             payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+            db.commit()
 
         payload["on_hold"] = on
         payload["held_by"] = self.kind
-        await self._notify_both({"event": "call_hold", "data": payload})
+        await self._notify_both(payload, event="call_hold")
 
     # -- transfer -----------------------------------------------------------
     async def transfer(self, data: dict[str, Any]) -> None:
@@ -394,6 +439,7 @@ class CallSession:
                 return
             db.commit()
             payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
+            call_public_id = call.public_id
 
         payload["is_transfer"] = True
         payload["from_admin_name"] = self.actor_name
@@ -402,6 +448,53 @@ class CallSession:
         # point of that channel existing.
         await sig.ring_agents([target_id], payload)
         await self._send("call_transfer_ringing", payload)
+        self._arm_transfer_timeout(call_public_id, target_id)
+
+    def _arm_transfer_timeout(self, public_id: str, target_id: int) -> None:
+        """Give the call back if the other agent never picks up.
+
+        WITHOUT THIS THE OFFER NEVER EXPIRES. `transfer_to_admin_id` stays set,
+        the transferring agent watches "Ringing ...' forever, and — because
+        `begin_transfer` refuses a call that already has an offer against it —
+        they cannot even try somebody else. The customer is fine throughout,
+        which is what makes it easy to miss.
+
+        Reuses this socket's one ring slot: the transferring agent is on a
+        connected call, so their own ring timer was cancelled when they
+        answered it. Holding it here also means it dies with the socket, which
+        is what stops a timer firing against a call the disconnect already
+        ended.
+        """
+        if self._ring_timer:
+            self._ring_timer.cancel()
+
+        async def ring_out():
+            try:
+                await asyncio.sleep(calls.RING_TIMEOUT_SECONDS)
+            except asyncio.CancelledError:
+                return
+            with SessionLocal() as db:
+                try:
+                    call = calls.get_by_public_id(db, public_id)
+                except calls.CallNotFound:
+                    return
+                # Re-read rather than trusting the state this task started
+                # with: the offer may have been accepted, declined, or the
+                # whole call ended, in the seconds since it was armed.
+                if call.transfer_to_admin_id != target_id:
+                    return
+                holder = call.admin_id
+                conversation_id = call.conversation_id
+                calls.clear_transfer(db, call)
+                payload = sig.call_payload(
+                    call, customer_name=self._customer_name(db, call))
+                db.commit()
+            payload["transfer_timed_out"] = True
+            if holder:
+                await sig.to_agent(holder, "call_transfer_failed", payload)
+            await sig.to_customer(conversation_id, "call_transfer_failed", payload)
+
+        self._ring_timer = asyncio.create_task(ring_out())
 
     async def _accept_transfer(self, db, call) -> bool:
         """The second half of a transfer, run inside accept().
@@ -431,10 +524,22 @@ class CallSession:
             await sig.to_agent(previous_admin, "call_transferred", payload)
         return True
 
-    async def _notify_both(self, payload: dict[str, Any]) -> None:
-        await sig.to_customer(payload["conversation_id"], "call_status", payload)
+    async def _notify_both(
+        self, payload: dict[str, Any], *, event: str = "call_status",
+    ) -> None:
+        """Send one frame to both parties.
+
+        THE EVENT NAME IS A PARAMETER because it was previously hardcoded to
+        `call_status` while `hold()` passed `{"event": ..., "data": ...}` as
+        the payload, expecting it to be honoured. It was not: the wrapper was
+        published verbatim under the wrong event name and
+        `payload["conversation_id"]` raised KeyError on it, so a hold reached
+        neither the customer nor the agent. Hold looked like it worked because
+        the browser that pressed the button applies it locally.
+        """
+        await sig.to_customer(payload["conversation_id"], event, payload)
         if payload.get("admin_id"):
-            await sig.to_agent(payload["admin_id"], "call_status", payload)
+            await sig.to_agent(payload["admin_id"], event, payload)
 
     async def _terminate(
         self, public_id: str, status: str, ended_by: str, reason: Optional[str],

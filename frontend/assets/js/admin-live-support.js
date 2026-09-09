@@ -180,7 +180,14 @@ const AdminLiveSupport = (function () {
       btn.textContent = on ? 'Resume' : 'Hold';
       btn.classList.toggle('is-on', on);
     }
-    setCallNote(on ? 'On hold — neither side can hear the other.' : null);
+    /* PAINTED IMMEDIATELY, not on the echo. The server sends `call_hold` back
+       to both parties and the handler below sets the same flag, but a button
+       whose label changes a round trip after it was pressed reads as broken. */
+    call.live = on ? 'held' : null;
+    paintCall();
+    setCallNote(on
+      ? 'On hold \u2014 the customer hears hold music, not you.'
+      : null);
   }
 
   /* -------------------------------------------------------------------------
@@ -394,6 +401,15 @@ const AdminLiveSupport = (function () {
     missed: 'No answer', cancelled: 'Cancelled by customer', busy: 'Busy',
     failed: 'Call failed',
   };
+  /* STATES THAT ARE NOT ROW STATUSES. Hold and a transfer in flight are both
+     properties of a live session rather than of the call's history — the row
+     stays `connected` throughout, deliberately — so the label for them is
+     chosen from what the last frame said rather than from `status`. */
+  const CALL_LIVE_LABELS = {
+    held: 'On Hold',
+    transferring: 'Transfer Pending',
+    transferred: 'Transferred',
+  };
   const CALL_LOG_LABELS = {
     ended: 'Completed', missed: 'Missed', rejected: 'Declined',
     cancelled: 'Cancelled', busy: 'Busy', failed: 'Failed',
@@ -405,6 +421,7 @@ const AdminLiveSupport = (function () {
     'incoming_call', 'call_status', 'call_accepted', 'call_busy', 'call_taken',
     'call_claimed', 'call_cancelled', 'offer', 'answer', 'ice_candidate',
     'call_hold', 'call_transfer_ringing', 'call_transferred',
+    'call_transfer_failed',
   ];
 
   async function iceServers() {
@@ -506,6 +523,7 @@ const AdminLiveSupport = (function () {
     JWCall.reset();
     stopCallTimer();
     call.id = null;
+    call.live = null;
     call.connectedAt = null;
     call.status = finalStatus;
     paintCall();
@@ -568,13 +586,31 @@ const AdminLiveSupport = (function () {
     if (event === 'call_hold') {
       /* The OTHER side held. This agent's own hold is applied locally the
          instant the button is pressed, so echoing it back would toggle it. */
+      call.live = data.on_hold ? 'held' : null;
       if (data.held_by !== 'admin') {
         setCallNote(data.on_hold ? 'The customer put you on hold.' : null);
       }
+      paintCall();
       return true;
     }
     if (event === 'call_transfer_ringing') {
+      call.live = 'transferring';
       setCallNote('Ringing ' + esc(data.admin_name || 'the other agent') + '\u2026');
+      paintCall();
+      return true;
+    }
+    if (event === 'call_transfer_failed') {
+      /* THE CALL IS STILL OURS. Declined, or nobody picked up — either way
+         this agent never stopped being on it, so the only thing to undo is
+         the "Ringing ..." note the transfer put on screen. Before this frame
+         existed a decline came back as `call_reject`, which ended the call
+         the customer was still happily having. */
+      call.live = null;
+      setCallNote(data.transfer_timed_out
+        ? 'That agent did not answer. You are still on the call.'
+        : ((data.transfer_declined_by || 'That agent') + ' declined the transfer.'));
+      setTimeout(() => { if (call.status === 'connected') setCallNote(null); }, 3200);
+      paintCall();
       return true;
     }
     if (event === 'call_transferred') {
@@ -672,7 +708,10 @@ const AdminLiveSupport = (function () {
       && (call.status === 'ringing' || call.status === 'calling');
 
     if (who) who.textContent = call.customerName || 'Customer';
-    if (status) status.textContent = CALL_LABELS[call.status] || '';
+    if (status) {
+      status.textContent = (call.live && CALL_LIVE_LABELS[call.live])
+        || CALL_LABELS[call.status] || '';
+    }
     if (timer) {
       timer.hidden = call.status !== 'connected';
       if (call.status !== 'connected') timer.textContent = '00:00';

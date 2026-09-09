@@ -172,6 +172,13 @@ class CallResponse(BaseModel):
     ended_at: dt.datetime | None = None
     ended_by: str | None = None
     duration_seconds: int | None = None
+    #: Of `duration_seconds`, how many were spent on hold. 0, never None: a
+    #: call that was never held has a real answer and a nullable integer would
+    #: make every reader handle None to say it.
+    hold_seconds: int = 0
+    #: Every handover, oldest first. Empty when the agent who answered is the
+    #: agent who hung up.
+    transfer_chain: list[dict] = Field(default_factory=list)
 
     @classmethod
     def for_customer(cls, call) -> "CallResponse":
@@ -183,6 +190,17 @@ class CallResponse(BaseModel):
         """
         model = cls.model_validate(call)
         model.admin_id = None
+        # THE CHAIN CARRIES STAFF IDS TOO, and it would have walked straight
+        # past the line above — which strips exactly one field and was written
+        # before there was anywhere else for an id to hide. The customer keeps
+        # the names, because "you spoke to Priya, then to Arjun" is their own
+        # call and theirs to see.
+        model.transfer_chain = [
+            {"from_admin_name": hop.get("from_admin_name"),
+             "to_admin_name": hop.get("to_admin_name"),
+             "at": hop.get("at")}
+            for hop in (model.transfer_chain or [])
+        ]
         return model
 
 
