@@ -83,17 +83,21 @@ class CallSession:
         return call.admin_id == self.actor_id
 
     def _candidates(self, db, conversation: CustomerConversation) -> list[int]:
-        """Which agents should be rung for this conversation.
+        """Every agent who should be rung: all of them.
 
-        An assigned conversation rings its owner alone — the brief's rule, and
-        the one that stops a customer's call being answered by an agent who has
-        not read a word of their chat. An unassigned one rings every available
-        agent, because otherwise a customer whose first contact is a call has
-        nobody to reach: auto-assignment runs on a *message*, and there is not
-        going to be one.
+        THIS USED TO RING THE ASSIGNED AGENT ALONE, on the reasoning that a
+        call should not be answered by somebody who has not read the chat. That
+        is a good instinct and a bad rule: it means one signed-out agent
+        silences a customer entirely, and it makes a support desk of five
+        behave like a desk of one.
+
+        A phone rings everywhere and the first person to reach it answers. The
+        race is settled in the database by a conditional UPDATE, so the only
+        thing widening this costs is that the losers need to be told why their
+        popup vanished — which is what `call_claimed` is for.
+
+        Presence filtering happens in `request()`; this is the full pool.
         """
-        if conversation.assigned_admin_id is not None:
-            return [conversation.assigned_admin_id]
         from app.services import chat_assignment  # noqa: PLC0415 - import cycle
 
         return [admin_id for admin_id, _ in chat_assignment.candidates(db)]
@@ -144,17 +148,6 @@ class CallSession:
 
             payload = sig.call_payload(call, customer_name=self._customer_name(db, call))
             targets = self._candidates(db, conversation) if self.kind == "customer" else []
-            # The fallback pool is read HERE, inside the session. `conversation`
-            # is detached once this block exits, and touching a lazy attribute
-            # on it afterwards would raise rather than answer.
-            fallback: list[int] = []
-            if self.kind == "customer" and conversation.assigned_admin_id is not None:
-                from app.services import chat_assignment  # noqa: PLC0415
-
-                fallback = [
-                    admin_id for admin_id, _ in chat_assignment.candidates(db)
-                    if admin_id not in targets
-                ]
             db.commit()
             public_id = call.public_id
 
@@ -168,14 +161,6 @@ class CallSession:
             # succeeds — so without this the customer hears 45 seconds of
             # ringing whenever every agent happens to be signed out.
             live = await sig.online_agents(targets)
-            if not live and fallback:
-                # THE ASSIGNED AGENT GETS FIRST REFUSAL, NOT THE ONLY ONE.
-                # Ringing only the owner is right while they are at their desk
-                # and indefensible the moment they are not: the call dies while
-                # every other agent sits idle, and the customer — who does not
-                # know or care which of us they were assigned to — is told
-                # nobody is available. First refusal is a priority, not a lock.
-                live = await sig.online_agents(fallback)
             if not live:
                 await self._terminate(public_id, "missed", "system", "no_agent_online")
                 return
@@ -273,7 +258,13 @@ class CallSession:
 
         self.close()   # our own ring timer, if we were also the caller
         await self._send("call_status", payload)
-        await sig.cancel_ring(others, payload)
+        # EVERY OTHER AGENT, NEVER THIS ONE. `others` comes from _candidates(),
+        # which — after the claim above — includes the agent who just answered.
+        # Sending them a ring-clearing event ends their own call, because that
+        # is what the event means to a console. See claim_broadcast().
+        await sig.claim_broadcast(
+            [a for a in others if a != self.actor_id], payload,
+        )
         # The CUSTOMER is told last and is the one who then sends the offer:
         # the answering side must be listening before the offer is created, or
         # the first frame of the negotiation races the socket that has to

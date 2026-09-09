@@ -150,13 +150,39 @@ async def ring_agents(admin_ids: Iterable[int], data: dict[str, Any]) -> int:
     return rung
 
 
-async def cancel_ring(admin_ids: Iterable[int], data: dict[str, Any]) -> None:
-    """Take the invitation off every agent's screen.
+async def claim_broadcast(admin_ids: Iterable[int], data: dict[str, Any]) -> None:
+    """Tell the OTHER agents that somebody else answered.
 
-    Sent when the call is answered, cancelled or times out. Every agent who was
-    rung must be told, including the one who answered — their own popup has to
-    close too, and a client that only closes the popup it acted on leaves the
-    others ringing an already-answered call.
+    A DISTINCT EVENT FROM `call_cancelled`, and the distinction is the whole
+    reason this function exists. `cancel_ring` used to be reused for this, sent
+    to every candidate INCLUDING the one who had just answered — and a console
+    ends a call on `call_cancelled`, because that is what the event means. The
+    answering agent therefore tore down their own call milliseconds after
+    pressing Accept, while the customer, told only `call_accepted`, went on
+    showing it live.
+
+    "Stop ringing, someone else has it" and "this call is over" are different
+    facts. They now have different names.
+
+    The caller must exclude the answerer from `admin_ids`; this function does
+    not know who that is.
+    """
+    broker = get_broker()
+    for admin_id in admin_ids:
+        try:
+            await broker.publish_to(
+                agent_channel(admin_id), {"event": "call_claimed", "data": data},
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("call: could not tell admin %s the call was claimed", admin_id)
+
+
+async def cancel_ring(admin_ids: Iterable[int], data: dict[str, Any]) -> None:
+    """Take the invitation off every agent's screen — the call is genuinely over.
+
+    Sent when the caller hung up, the ring timed out, or the call failed. NOT
+    when it was answered: for that, see `claim_broadcast` above and the bug it
+    is named after.
     """
     broker = get_broker()
     for admin_id in admin_ids:

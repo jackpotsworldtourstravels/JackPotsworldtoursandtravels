@@ -295,6 +295,16 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
             if accepted:
                 results["answer_names_the_agent"] = bool(accepted[1].get("admin_name"))
 
+            # THE AGENT WHO ANSWERED MUST NOT BE TOLD THE CALL IS OVER.
+            # `cancel_ring` was sent to every candidate INCLUDING the answerer,
+            # and the console treats `call_cancelled` as "this call ended" — so
+            # accepting tore down the agent's own call a few milliseconds later
+            # while the customer, who only ever got `call_accepted`, went on
+            # showing it as live. Exactly the reported symptom, and invisible
+            # here until something read the answerer's socket after the accept.
+            stray = await _recv_until(aws, {"call_cancelled"}, timeout=3)
+            results["answerer_not_told_it_was_cancelled"] = stray is None
+
             # SDP, both directions. The strings are nonsense on purpose: the
             # server must forward what it cannot read.
             await _send(cws, "offer", {"call_id": call_id, "payload": {"sdp": "OFFER-XYZ"}})
@@ -366,6 +376,11 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
     check("the caller sees its own call status", results.get("caller_sees_status"))
     check("the customer is told it was answered", results.get("customer_told_it_was_answered"))
     check("and by whom", results.get("answer_names_the_agent"))
+    check(
+        "THE AGENT WHO ANSWERED IS NOT ALSO TOLD THE CALL WAS CANCELLED",
+        results.get("answerer_not_told_it_was_cancelled"),
+        "cancel_ring reached the answerer, whose console ends the call on it",
+    )
     check("an SDP offer reaches the agent", results.get("offer_reached_the_agent"))
     check("the offer arrives byte-identical", results.get("offer_arrived_intact"))
     check("the relay stamps who sent it", results.get("offer_says_who_sent_it"))
@@ -478,6 +493,84 @@ def _run(caller_id, onlooker_id, caller_token, onlooker_token) -> int:
             "IT FAILS FAST — seconds, not the 45-second ring timeout",
             empty.get("elapsed", 99) < 10,
             f"took {empty.get('elapsed'):.1f}s",
+        )
+
+    # == 3a2. two agents online, one call ==
+    #
+    # THE BRIEF: every online admin rings, the first to Accept gets it, and the
+    # rest are told why their popup closed. Two REAL sockets, because the whole
+    # question is what arrives on the second one — and the first version of
+    # this feature sent the loser nothing at all while sending the WINNER a
+    # ring-cancelling event that hung up their own call.
+    print("\n== two agents ring, one wins ==")
+    from config import ADMIN2  # noqa: PLC0415
+
+    try:
+        admin2_token = portal_login(*ADMIN2)
+    except Exception as exc:  # noqa: BLE001
+        admin2_token = None
+        print(f"  SKIP  no second admin to ring: {exc!r}")
+
+    if admin2_token:
+        two: dict = {}
+
+        async def _two_agents():
+            c_ticket = requests.post(
+                f"{BASE}/api/customer/chat/ws-ticket", headers=auth, timeout=8,
+            ).json()["ticket"]
+            a1 = requests.post(
+                f"{BASE}/api/admin/chat/ws-ticket", headers=admin_auth, timeout=8,
+            ).json()["ticket"]
+            a2 = requests.post(
+                f"{BASE}/api/admin/chat/ws-ticket", headers=H(admin2_token), timeout=8,
+            ).json()["ticket"]
+
+            async with ws_connect(f"{WS_BASE}/api/customer/chat/ws?ticket={c_ticket}") as cws, \
+                       ws_connect(f"{WS_BASE}/api/admin/chat/ws?ticket={a1}") as ws1, \
+                       ws_connect(f"{WS_BASE}/api/admin/chat/ws?ticket={a2}") as ws2:
+                await _recv_until(cws, {"joined"})
+                # Both agents must be registered as online before the call goes
+                # out, or this tests a race rather than the routing.
+                await asyncio.sleep(0.6)
+
+                await _send(cws, "call_request", {})
+                r1 = await _recv_until(ws1, {"incoming_call"}, timeout=10)
+                r2 = await _recv_until(ws2, {"incoming_call"}, timeout=10)
+                two["both_rang"] = r1 is not None and r2 is not None
+                if not two["both_rang"]:
+                    return
+                call_id = r1[1].get("call_id")
+                two["same_call_on_both"] = call_id == r2[1].get("call_id")
+
+                # Agent ONE answers.
+                await _send(ws1, "call_accept", {"call_id": call_id})
+                two["customer_told"] = await _recv_until(
+                    cws, {"call_accepted"}, timeout=8) is not None
+
+                # Agent TWO must be told it was claimed...
+                claimed = await _recv_until(ws2, {"call_claimed"}, timeout=6)
+                two["loser_told_it_was_claimed"] = claimed is not None
+
+                # ...and agent ONE must NOT be told anything that ends the call.
+                stray = await _recv_until(ws1, {"call_claimed", "call_cancelled"}, timeout=3)
+                two["winner_left_alone"] = stray is None
+
+                await _send(ws1, "call_end", {"call_id": call_id})
+                await asyncio.sleep(0.4)
+
+        asyncio.run(_two_agents())
+        check("BOTH online agents ring for one call", two.get("both_rang"),
+              "only one agent was rung — the pool is being narrowed")
+        check("and it is the same call on both", two.get("same_call_on_both"))
+        check("the customer is told it was answered", two.get("customer_told"))
+        check(
+            "THE AGENT WHO LOST IS TOLD IT WAS CLAIMED",
+            two.get("loser_told_it_was_claimed"),
+            "their popup would otherwise ring on for a call somebody else has",
+        )
+        check(
+            "and the agent who WON is sent nothing that ends their call",
+            two.get("winner_left_alone"),
         )
 
     # == 3b2. the header that silently forbade the microphone ==

@@ -400,7 +400,7 @@ const AdminLiveSupport = (function () {
   };
   const CALL_FRAMES = [
     'incoming_call', 'call_status', 'call_accepted', 'call_busy', 'call_taken',
-    'call_cancelled', 'offer', 'answer', 'ice_candidate',
+    'call_claimed', 'call_cancelled', 'offer', 'answer', 'ice_candidate',
   ];
 
   async function iceServers() {
@@ -494,6 +494,11 @@ const AdminLiveSupport = (function () {
   }
 
   function endCallUi(finalStatus) {
+    /* Re-armed here rather than where it was disabled: every path out of a
+       call comes through this function, so the button cannot stay dead
+       because one exit forgot to restore it. */
+    const accept = document.getElementById('alsCallAcceptBtn');
+    if (accept) accept.disabled = false;
     JWCall.reset();
     stopCallTimer();
     call.id = null;
@@ -529,6 +534,25 @@ const AdminLiveSupport = (function () {
       JWCall.startRinging();
       call.notification = JWCall.notifyIncoming(
         'Incoming call', (data.customer_name || 'A customer') + ' is calling');
+      return true;
+    }
+    if (event === 'call_claimed') {
+      /* SOMEBODY ELSE ANSWERED. Never sent to the agent who answered — the
+         server excludes them — because this closes the popup, and a console
+         that received it for its own call would hang up on itself. That is
+         precisely what `call_cancelled` used to do here.
+
+         Guarded anyway: if this ever arrives for a call we are actually on,
+         ignore it rather than dropping a live conversation. */
+      if (JWCall.isActive() && call.status === 'connected') return true;
+      setCallNote('This call has already been answered by another support agent.');
+      /* The sentence needs a beat on screen before the card goes, or the
+         popup simply vanishes and the agent is left wondering what happened. */
+      setTimeout(() => { if (call.status !== 'connected') endCallUi(null); }, 2200);
+      call.id = null;
+      const accept = document.getElementById('alsCallAcceptBtn');
+      if (accept) accept.disabled = true;
+      JWCall.stopRinging();
       return true;
     }
     if (event === 'call_taken' || event === 'call_busy') {

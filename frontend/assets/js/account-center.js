@@ -978,8 +978,34 @@ function loadAcctSupportCenter() {
     return;
   }
   if (mount.dataset.mounted) return;
-  mount.dataset.mounted = '1';
-  LiveChat.mountInto(mount);
+
+  /* MARKED MOUNTED ONLY IF IT ACTUALLY MOUNTED.
+     This used to set the flag on the line BEFORE the call, so a mountInto()
+     that returned null — which it does whenever the customer's token is not
+     readable yet — left the container permanently flagged as done. Support
+     Center then showed a blank panel and nothing would retry it: only a page
+     reload, by which time the token is definitely there, ever fixed it. That
+     is precisely the "blank until refresh" this is named for. */
+  const mounted = LiveChat.mountInto(mount);
+  if (mounted) {
+    mount.dataset.mounted = '1';
+    delete mount.dataset.mountAttempts;
+    return;
+  }
+
+  /* A few short retries, because the only realistic cause is a race with the
+     session being written — not an unbounded loop, because if the customer
+     genuinely is not signed in it will never succeed and a spinner forever is
+     a worse answer than a sentence. */
+  const attempts = Number(mount.dataset.mountAttempts || 0) + 1;
+  mount.dataset.mountAttempts = String(attempts);
+  if (attempts <= 8) {
+    mount.innerHTML = '<div class="acct-empty">Loading your conversation…</div>';
+    setTimeout(loadAcctSupportCenter, 250);
+    return;
+  }
+  mount.innerHTML = '<div class="acct-empty">'
+    + 'Please sign in again to load your conversation.</div>';
 }
 
 loadUpcomingJourney();
