@@ -275,6 +275,93 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-strip b { display: block; font-size: 13px; font-weight: 700; margin-bottom: 2px; }
 
 /* ==========================================================================
+   4b. FARE SELECTION (step 1)
+   --------------------------------------------------------------------------
+   The chooser between the results list and Traveller Details. One card per
+   fare the itinerary carries — one today — so the grid is written for N and
+   told to centre itself at 1 rather than stretching a lone card across the
+   full content width, which reads as a layout that lost its siblings.
+
+   The card is the .bkf-opt radio-tile pattern from Add-ons, widened: same
+   hidden input, same .bkf-radio dot, same accent ring on the chosen one, so a
+   traveller meets one selection idiom in this flow instead of two.
+   ========================================================================== */
+.bkf-ff-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+/* One fare: a readable column, left-aligned with the card it sits in, not a
+   1100px-wide band with 40 characters in it. */
+.bkf-ff-grid.is-single { grid-template-columns: minmax(0, 420px); }
+
+.bkf-ff {
+  position: relative; display: flex; flex-direction: column; gap: 10px;
+  padding: 16px; cursor: pointer; background: #fff;
+  border: 1px solid var(--bkf-line); border-radius: 10px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.bkf-ff:hover { border-color: #C6CEDA; }
+.bkf-ff.is-on { border-color: var(--sp-accent); box-shadow: 0 0 0 2px var(--bkf-red-soft); }
+.bkf-ff input { position: absolute; opacity: 0; width: 0; height: 0; }
+.bkf-ff:has(input:focus-visible) { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+
+.bkf-ff-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.bkf-ff.is-on .bkf-radio { border-color: var(--sp-accent); }
+.bkf-ff.is-on .bkf-radio::after {
+  content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--sp-accent);
+}
+.bkf-ff-name { font-size: 15px; font-weight: 700; color: var(--bkf-ink); }
+.bkf-ff-tag {
+  padding: 2px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 700;
+  background: #F1F3F7; color: var(--bkf-muted); white-space: nowrap;
+}
+.bkf-ff-tag.is-good { background: var(--bkf-green-soft); color: var(--bkf-green-ink); }
+
+/* The figure is the server's booking total, so it is labelled as one — "per
+   adult" here would be a second, unsourced number beside the rail's. */
+.bkf-ff-price { display: block; padding-bottom: 2px; }
+.bkf-ff-price b { display: block; font-size: 22px; font-weight: 800; color: var(--bkf-ink); line-height: 1.15; }
+.bkf-ff-price > span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--bkf-muted); }
+
+.bkf-ff-grp {
+  display: block; margin-top: 2px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--bkf-muted);
+}
+.bkf-ff-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.bkf-ff-line {
+  position: relative; display: flex; align-items: baseline; gap: 8px;
+  padding-left: 21px; font-size: 13px; line-height: 1.45; color: var(--bkf-ink);
+}
+.bkf-ff-line > span { flex: 1; min-width: 0; }
+.bkf-ff-line b { font-weight: 700; white-space: nowrap; }
+.bkf-ff-line::before {
+  position: absolute; left: 0; top: -1px; font-size: 13px; font-weight: 700;
+}
+.bkf-ff-line.is-yes::before { content: '\2713'; color: var(--bkf-green); }
+.bkf-ff-line.is-no::before { content: '\00D7'; color: var(--bkf-red); }
+/* Not a tick and not a cross: the fare does not decide these, a later step
+   does, and marking them either way would be an answer this screen has not
+   got. */
+.bkf-ff-line.is-later::before { content: '\2022'; color: #9AA5B4; }
+.bkf-ff-line.is-later { color: var(--bkf-muted); }
+.bkf-ff-line.is-later b { font-weight: 600; color: var(--bkf-muted); }
+
+.bkf-ff-rules {
+  display: block; padding-top: 10px; border-top: 1px solid var(--bkf-line);
+  font-size: 12px; line-height: 1.5; color: var(--bkf-muted);
+}
+
+/* Reads as the button the reference puts on a fare card, but it is not one:
+   the whole tile is the control, and the flow's own Continue is what moves
+   forward. A real <button> inside the <label> would fight the radio. */
+.bkf-ff-cta {
+  display: block; margin-top: auto; padding: 10px 14px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 700; text-align: center;
+  border: 1px solid var(--sp-accent); color: var(--sp-accent); background: #fff;
+}
+.bkf-ff-cta.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
+
+/* ==========================================================================
    5. TRAVELLER DETAILS (step 2)
    ========================================================================== */
 .bkf-pax { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--bkf-line); }

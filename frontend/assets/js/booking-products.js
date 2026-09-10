@@ -98,6 +98,222 @@ const BookingProducts = (function () {
   }
 
   /* =====================================================================
+     FLIGHT STEP — fare selection
+     =====================================================================
+     The screen between "Select" on the results list and Traveller Details.
+
+     WHY IT EXISTS WITH ONE OPTION ON IT TODAY. A traveller who has just
+     clicked a fare should see what that fare actually buys before they start
+     typing passport numbers — the baggage, whether it can be refunded, what a
+     cancellation costs. That is worth a screen whether there is one fare or
+     five, and it is the screen an airline's fare families would land on.
+
+     NOTHING HERE INVENTS A FARE FAMILY. fareOptions() reads whatever the
+     itinerary carries: a supplier that returns several fares gets several
+     cards, and today's single published fare gets one, labelled as one. There
+     is no Saver / Regular / Flexi ladder written down anywhere in this file,
+     because no part of this application produces one.
+
+     NOTHING HERE DOES ARITHMETIC EITHER. The figure on the card is
+     ctx.pricing.total — the same server answer the Fare Summary rail beside it
+     is showing, already multiplied for the cabin and the party by
+     customer_pricing_service. Reading item.total instead would have been the
+     ECONOMY fare for one adult, which is the right number only when the search
+     was economy and the party was one.
+     ===================================================================== */
+
+  /** The sentence the results page's View Details panel prints under "Fare
+   *  rules", derived from the same field, so the two screens cannot disagree
+   *  about what cancelling costs. */
+  function fareRuleText(item) {
+    return (item && item.refundable)
+      ? 'Cancellation and date changes are allowed for a fee, up to 4 hours before departure.'
+      : 'Non-refundable: cancellation forfeits the fare. A date change is allowed for a fee.';
+  }
+
+  /** THE SEAM. When a supplier starts returning fare families they arrive on
+   *  the itinerary as an array and each becomes a card, with its own name,
+   *  price and inclusions. Until then a flight carries exactly one published
+   *  fare and this returns exactly one.
+   *
+   *  A supplied fare is read, never filled in: a family that does not say what
+   *  its baggage allowance is renders no baggage row rather than borrowing the
+   *  itinerary's. */
+  function fareOptions(ctx) {
+    const item = (ctx && ctx.item) || {};
+    const supplied = Array.isArray(item.fares) ? item.fares
+      : (Array.isArray(item.fareFamilies) ? item.fareFamilies : null);
+
+    if (supplied && supplied.length) {
+      return supplied.map((f, i) => ({
+        id: String(f.id || f.code || `fare${i}`),
+        name: f.name || f.label || `Fare ${i + 1}`,
+        refundable: f.refundable,
+        baggage: f.baggage || null,
+        rules: f.rules || f.fare_rules || null,
+        /* Only a supplier that prices its families can show a per-family
+           figure. Absent, the card shows the booking's own total. */
+        total: f.total != null ? Number(f.total) : null,
+      }));
+    }
+
+    const cabin = (typeof BookingData !== 'undefined'
+      && (BookingData.CABIN_CLASSES.find(c => c.id === (ctx.cabin || 'economy')) || {}).label)
+      || 'Economy';
+    return [{
+      id: 'published',
+      name: cabin,
+      refundable: item.refundable,
+      baggage: item.baggage || null,
+      rules: fareRuleText(item),
+      total: null,
+      only: true,
+    }];
+  }
+
+  /** One inclusion row. `tone` decides the mark: a tick for what the fare
+   *  carries, a cross for what it does not, a dot for something decided at a
+   *  later step rather than by the fare. */
+  function bkfFareLine(tone, label, value) {
+    return `<li class="bkf-ff-line is-${tone}">
+      <span>${esc(label)}</span>${value ? `<b>${esc(value)}</b>` : ''}
+    </li>`;
+  }
+
+  function bkfFareCard(opt, ctx) {
+    const on = ctx.fareOptionId === opt.id;
+    const bag = opt.baggage || {};
+
+    /* WHAT THE FARE INCLUDES. Every row is a field that was actually present;
+       an itinerary with no baggage figures renders no baggage rows rather than
+       a reassuring guess. */
+    const included = [
+      bag.cabin ? bkfFareLine('yes', 'Cabin baggage', bag.cabin) : '',
+      bag.checkIn ? bkfFareLine('yes', 'Check-in baggage', bag.checkIn) : '',
+      opt.refundable === true ? bkfFareLine('yes', 'Refundable') : '',
+      opt.refundable === false ? bkfFareLine('no', 'Non-refundable') : '',
+    ].filter(Boolean).join('');
+
+    /* NOT INCLUSIONS — STEPS. These two are certain because this booking has
+       those steps in it, which is a different kind of fact from "the airline
+       includes a meal". Nothing is claimed about what the catalogue holds or
+       what anything in it costs. */
+    const later = [
+      bkfFareLine('later', 'Seat selection', 'At the Seats step'),
+      bkfFareLine('later', 'Baggage, meals & extras', 'At the Add-ons step'),
+    ].join('');
+
+    const price = opt.total != null
+      ? `<b>${esc(money(opt.total))}</b>`
+      : `<b>${esc(money((ctx.pricing || {}).total || 0))}</b>`;
+    const paxCount = Math.max(1, (ctx.paxKinds || []).length || ctx.paxCount || 1);
+
+    return `
+      <label class="bkf-ff ${on ? 'is-on' : ''}" data-fare="${esc(opt.id)}">
+        <input type="radio" name="bkFare" value="${esc(opt.id)}" ${on ? 'checked' : ''}>
+        <span class="bkf-ff-top">
+          <span class="bkf-radio"></span>
+          <span class="bkf-ff-name">${esc(opt.name)}</span>
+          ${opt.refundable === true ? '<span class="bkf-ff-tag is-good">Refundable</span>' : ''}
+          ${opt.refundable === false ? '<span class="bkf-ff-tag">Non-refundable</span>' : ''}
+        </span>
+
+        <span class="bkf-ff-price">
+          ${price}
+          <span>Total for ${paxCount} traveller${paxCount > 1 ? 's' : ''} &middot; incl. taxes</span>
+        </span>
+
+        ${included ? `<span class="bkf-ff-grp">Included in this fare</span>
+        <ul class="bkf-ff-list">${included}</ul>` : ''}
+
+        <span class="bkf-ff-grp">Chosen later in this booking</span>
+        <ul class="bkf-ff-list">${later}</ul>
+
+        ${opt.rules ? `<span class="bkf-ff-rules">${esc(opt.rules)}</span>` : ''}
+
+        <span class="bkf-ff-cta ${on ? 'is-on' : ''}">${on ? 'Selected' : 'Select'}</span>
+      </label>`;
+  }
+
+  function bkfFareSelectHtml(ctx) {
+    const opts = fareOptions(ctx);
+    const single = opts.length === 1;
+    const item = ctx.item || {};
+
+    /* A one-option chooser has to say why it is a one-option chooser, or it
+       reads as a screen that failed to load the rest. */
+    const note = single
+      ? `<p class="bkf-sub">Only one fare is published for this flight.</p>`
+      : `<p class="bkf-sub">Compare what each fare includes, then continue.</p>`;
+
+    /* The same scarcity cue the results card carries, from the same field, and
+       only when that field says so. */
+    const seats = (item.seatsLow && item.seatsLeft)
+      ? `<div class="bkf-strip is-warn">${svg('warn')}
+           <span>${esc(item.seatsLeft)} seat${item.seatsLeft === 1 ? '' : 's'} left at this fare.</span>
+         </div>`
+      : '';
+
+    /* The same card shell as Traveller Details, Seats, Add-ons and Review, so
+       this reads as the first screen of that sequence rather than a different
+       product's step that happens to come before it. */
+    return `<div class="bk-step bkf-step">
+      <section class="bkf-card">
+        <div class="bkf-card-head has-rule">
+          <div>
+            <h2 class="bkf-h2">Choose your fare</h2>
+            ${note}
+          </div>
+        </div>
+        <div class="bkf-card-body">
+          ${seats}
+          <div class="bkf-ff-grid ${single ? 'is-single' : ''}">
+            ${opts.map(o => bkfFareCard(o, ctx)).join('')}
+          </div>
+        </div>
+      </section>
+    </div>`;
+  }
+
+  /** Selecting a fare repaints the step so the chosen card takes the ring and
+   *  the CTA flips to "Selected". It does NOT re-price: today's single fare is
+   *  the fare the rail is already quoting, and a supplier's family will carry
+   *  its own figure rather than one computed here. */
+  function bkfMountFareSelect(root, ctx) {
+    root.querySelectorAll('[data-fare]').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.fare;
+        if (id === ctx.fareOptionId) return;
+        ctx.fareOptionId = id;
+        BookingFlow.repaint();
+      });
+    });
+  }
+
+  function fareSelectStep() {
+    return {
+      id: 'fare',
+      label: 'Fare',
+      nextLabel: 'Continue to Traveller Details',
+      ctaNote: 'Next: who is travelling',
+      load(ctx) {
+        const opts = fareOptions(ctx);
+        /* Preselected, and kept across a Back: the traveller has already
+           chosen this flight, so landing on an unselected chooser would make
+           them pick the only thing on the screen before they may continue. */
+        if (!opts.some(o => o.id === ctx.fareOptionId)) {
+          ctx.fareOptionId = opts[0] && opts[0].id;
+        }
+      },
+      render(ctx) { return bkfFareSelectHtml(ctx); },
+      mount(root, ctx) { bkfMountFareSelect(root, ctx); },
+      validate(ctx) {
+        return ctx.fareOptionId ? true : 'Choose a fare to continue.';
+      },
+    };
+  }
+
+  /* =====================================================================
      SHARED STEP — travellers
 
      THE CARD IS SPLIT IN TWO ON PURPOSE. What an airline needs to sell a seat
@@ -2526,6 +2742,10 @@ const BookingProducts = (function () {
     // shared pieces, exported so product files stay short
     field, val, firstMissing, fmtDate, money, icon, esc,
     travellersStep, addonsStep, summaryStep, paymentStep, confirmationStep,
+    /* Flights only — the fare chooser, and the two readers behind it. Exported
+       so the flow can mount the step and so a test can assert that a flight
+       with no supplied fare families produces exactly one option. */
+    fareSelectStep, fareOptions, fareRuleText,
     readTravellersInto: readInto,
     addonTotal, nightsBetween,
     /* The flight reference screens, used by booking-flow.js (the itinerary

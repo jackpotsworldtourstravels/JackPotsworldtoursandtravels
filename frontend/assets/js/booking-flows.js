@@ -327,6 +327,11 @@ const BookingFlows = (function () {
       sideHtml: (ctx, h, step) => P.fareHtml(ctx, h, step),
       footHtml: ctx => P.footHtml(ctx),
       steps: [
+        /* WHAT THIS FARE BUYS, BEFORE ANY PASSPORT NUMBERS ARE TYPED. One card
+           per fare the itinerary carries — one today, several the day a
+           supplier returns fare families. It carries its own labels because
+           unlike the four steps below it, no other product has this screen. */
+        P.fareSelectStep(),
         Object.assign(
           P.travellersStep({ passport: true, frequentFlyer: true, noun: 'Traveller',
                              stepLabel: 'Traveller Details', reference: true }),
