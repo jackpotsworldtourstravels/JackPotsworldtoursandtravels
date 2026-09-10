@@ -58,6 +58,16 @@ def _drop_fixture():
         mid = db.scalar(select(Merchant.merchant_id).where(Merchant.merchant_code == CODE))
         if mid is not None:
             db.execute(delete(WalletTransaction).where(WalletTransaction.merchant_id == mid))
+            # THE PAYMENTS GO TOO, and leaving them behind is what made this
+            # suite poison its own next run. `payments.merchant_id` is
+            # ON DELETE SET NULL, so hard-deleting the merchant below strands
+            # every wallet payment it made: no owner, no ledger row (deleted on
+            # the line above to get past ON DELETE RESTRICT), but still carrying
+            # `discount_meta->>'wallet_direction'`. The backfill check further
+            # down counts exactly those and fails on them — two of them were
+            # sitting in this database from previous runs.
+            db.execute(text(
+                "DELETE FROM payments WHERE merchant_id = :m"), {"m": mid})
             db.execute(delete(Merchant).where(Merchant.merchant_id == mid))
             db.commit()
     finally:
@@ -157,18 +167,46 @@ print("\n== backfill ==")
 # Every wallet movement ever made went through finance_service.adjust_wallet,
 # which always wrote a payments row carrying discount_meta->>'wallet_direction'.
 # That set is the whole history, so it is exactly what the ledger must cover.
-legacy = db.scalar(text(
-    "SELECT count(*) FROM payments WHERE discount_meta->>'wallet_direction' IS NOT NULL"
-))
+# SCOPED TO PAYMENTS THAT STILL HAVE A MERCHANT, which this used not to be.
+# A hard-deleted merchant takes its ledger rows with it — they have to go
+# first, because ON DELETE RESTRICT refuses the delete otherwise — while its
+# payments survive with `merchant_id` set to NULL by ON DELETE SET NULL. The
+# unscoped count therefore demanded a ledger row for money whose ledger was
+# deliberately removed, which is asking for the impossible rather than
+# checking the backfill.
+legacy = db.scalar(text("""
+    SELECT count(*) FROM payments
+     WHERE discount_meta->>'wallet_direction' IS NOT NULL
+       AND merchant_id IS NOT NULL
+"""))
 linked = db.scalar(text("""
     SELECT count(*) FROM payments p
     WHERE p.discount_meta->>'wallet_direction' IS NOT NULL
+      AND p.merchant_id IS NOT NULL
       AND EXISTS (SELECT 1 FROM wallet_transactions w WHERE w.payment_id = p.payment_id)
 """))
 check(
     f"every legacy wallet payment has a ledger row ({linked}/{legacy})",
     legacy == linked, f"{legacy} legacy rows, {linked} linked",
 )
+
+# COUNTED RATHER THAN IGNORED. Orphans are a normal consequence of a hard
+# delete, but a number that climbs on its own means something is stranding
+# wallet history — and the scoped check above would never notice.
+orphans = db.scalar(text("""
+    SELECT count(*) FROM payments
+     WHERE discount_meta->>'wallet_direction' IS NOT NULL
+       AND merchant_id IS NULL
+"""))
+check(f"orphaned wallet payments are only ever left by a hard delete ({orphans})",
+      orphans == db.scalar(text("""
+          SELECT count(*) FROM payments p
+           WHERE p.discount_meta->>'wallet_direction' IS NOT NULL
+             AND p.merchant_id IS NULL
+             AND NOT EXISTS (
+                 SELECT 1 FROM wallet_transactions w WHERE w.payment_id = p.payment_id)
+      """)),
+      "an orphan still holding a ledger row means the delete was not the cause")
 
 mismatched = db.execute(text("""
     SELECT p.payment_id, p.amount, p.discount_meta->>'wallet_direction', w.debit, w.credit
@@ -290,12 +328,30 @@ print("\n== booking debits are idempotent ==")
 # ===========================================================================
 # CR-4b bills a booking when it reaches Ticket Issued. A replayed transition must
 # not bill twice, and that guarantee belongs in the schema.
+# A BOOKING THAT HAS NEVER BEEN BILLED, which "the lowest request_id" stopped
+# being. `uq_wallet_transactions_booking_debit` is partial on `request_id`
+# ALONE — deliberately, since a booking is billed once no matter who is paying
+# — so the row this test inserts collides with any existing booking_debit for
+# the same request, whoever owns it. Request 1 acquired a real one ("Ticket
+# issued for REQ-2026-000004", merchant TRUST) in August, and from that moment
+# the *first* insert here failed instead of the second: the test blew up in its
+# own setup rather than demonstrating the constraint it exists to demonstrate.
+#
+# The fixture's own debits are removed by _drop_fixture(), so this does not
+# walk further down the table on every run.
 db = SessionLocal()
-some_request = db.scalar(text("SELECT request_id FROM service_requests ORDER BY request_id LIMIT 1"))
+some_request = db.scalar(text("""
+    SELECT s.request_id FROM service_requests s
+     WHERE NOT EXISTS (
+         SELECT 1 FROM wallet_transactions w
+          WHERE w.request_id = s.request_id
+            AND w.txn_type = 'booking_debit')
+     ORDER BY s.request_id LIMIT 1
+"""))
 db.close()
 
 if some_request is None:
-    check("SKIP: no service_requests row to test the idempotency index against", True)
+    check("SKIP: no unbilled service_requests row to test the idempotency index against", True)
 else:
     first = _post(MID, D("-100.00"), txn_type=WalletTxnType.BOOKING_DEBIT,
                   request_id=some_request, reason="first billing")
