@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
@@ -50,15 +51,43 @@ def _js_round(value: float) -> int:
     return int(math.floor(value + 0.5))
 
 
+#: Whitespace inside a flight number, for :func:`fare_seed`.
+_SEED_WS = re.compile(r"\s+")
+
+
+def fare_seed(flight_number: str) -> str:
+    """The flight number as a SEED, not as a label.
+
+    THE SAME FLIGHT REACHES THE TWO SIDES SPELT TWO WAYS. ``travel-data.js``
+    holds the raw number ``6E815`` and derives the results card's fare from it;
+    ``prettyFlightNumber`` then renders ``6E 815`` for display, and that spaced
+    form is what ``booking-api.js`` sends here as ``flight_number``. Both are
+    correct spellings of one flight — but they are different strings, so they
+    hashed to different fares and the price on the results card was not the
+    price the booking quoted. QP1405 advertised ₹4,480 and quoted ₹4,190.
+
+    So the seed is canonicalised before hashing rather than the caller being
+    asked to remember which spelling to send. Display is untouched: this value
+    is never stored and never shown, and the booking still records the
+    ``flight_number`` it was given.
+
+    KEEP THIS IDENTICAL TO ``fareSeed`` IN ``travel-data.js``. The two hash the
+    same string or the bug comes back.
+    """
+    return _SEED_WS.sub("", str(flight_number or "")).upper()
+
+
 def flight_fare(flight_number: str, duration_minutes: int | None) -> tuple[Decimal, Decimal]:
     """Per-passenger base fare and taxes for one flight, in economy.
 
-    Ported line for line from ``travel-data.js``. ``flight_number`` is the seed,
-    which is why two different flights of the same length price differently and
-    why the same flight prices the same on every load.
+    Ported line for line from ``travel-data.js``. The seed is the flight number
+    — canonicalised by :func:`fare_seed` first — which is why two different
+    flights of the same length price differently and why the same flight prices
+    the same on every load, from either side.
     """
     minutes = duration_minutes or 120
-    base = _js_round((2200 + minutes * 9 + catalog._seeded(flight_number, "fare") * 1800) / 50) * 50
+    seed = fare_seed(flight_number)
+    base = _js_round((2200 + minutes * 9 + catalog._seeded(seed, "fare") * 1800) / 50) * 50
     taxes = _js_round(base * 0.18 / 10) * 10
     return _money(base), _money(taxes)
 

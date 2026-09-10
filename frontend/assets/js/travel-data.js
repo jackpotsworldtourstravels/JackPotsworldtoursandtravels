@@ -227,15 +227,40 @@ const TravelData = (function () {
     return ((h >>> 0) % 100000) / 100000;
   }
 
+  /** The flight number as a SEED, not as a label.
+   *
+   *  THE SAME FLIGHT REACHES THE TWO SIDES SPELT TWO WAYS. This file holds the
+   *  raw number `6E815` and prices the results card from it; prettyFlightNumber
+   *  below renders `6E 815` for display, and that spaced form is what
+   *  booking-api.js sends to the server as `flight_number`. Both are correct
+   *  spellings of one flight — but they are different strings, so they hashed
+   *  to different fares and the price on the card was not the price the booking
+   *  quoted. QP1405 advertised ₹4,480 and quoted ₹4,190.
+   *
+   *  So the seed is canonicalised before hashing rather than every caller being
+   *  asked to remember which spelling to pass. Nothing displayed changes: this
+   *  value is never rendered.
+   *
+   *  KEEP THIS IDENTICAL TO `fare_seed` IN customer_pricing_service.py. The two
+   *  hash the same string or the bug comes back. */
+  function fareSeed(no) {
+    return String(no == null ? '' : no).replace(/\s+/g, '').toUpperCase();
+  }
+
   function demoCommercials(no, mins) {
     /* Priced off block time, which is the honest proxy for distance when the
        sample has no distance in it. ~₹9/min plus a floor, then a per-flight
        wobble so a results page does not look generated. */
     const minutes = mins || 120;
-    const base = Math.round((2200 + minutes * 9 + seeded(no, 'fare') * 1800) / 50) * 50;
+    /* Every commercial below is seeded off the canonical number, not off `no`
+       as it arrived — the fare because the server has to agree with it, and the
+       other three so a live feed that sends spaced numbers does not silently
+       reshuffle seat counts and baggage on a page refresh. */
+    const seed = fareSeed(no);
+    const base = Math.round((2200 + minutes * 9 + seeded(seed, 'fare') * 1800) / 50) * 50;
     const taxes = Math.round(base * 0.18 / 10) * 10;
-    const seatsLeft = 1 + Math.floor(seeded(no, 'seats') * 9);
-    const refundable = seeded(no, 'refund') > 0.55;
+    const seatsLeft = 1 + Math.floor(seeded(seed, 'seats') * 9);
+    const refundable = seeded(seed, 'refund') > 0.55;
     return {
       fare: base,
       taxes,
@@ -249,7 +274,7 @@ const TravelData = (function () {
       fareType: refundable ? 'Refundable' : 'Non-refundable',
       baggage: {
         cabin: '7 kg',
-        checkIn: seeded(no, 'bag') > 0.5 ? '20 kg' : '15 kg',
+        checkIn: seeded(seed, 'bag') > 0.5 ? '20 kg' : '15 kg',
       },
     };
   }

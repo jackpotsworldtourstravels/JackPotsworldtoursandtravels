@@ -37,6 +37,12 @@ SUITE = [
     # and M8 sat green and unrun. It also asserts the schema guarantees the
     # money paths rest on, so a dropped index is caught before anything spends.
     ("verify_m9.py", "M9: suite completeness, migration chain, schema guarantees, no money drift"),
+    # Mostly serverless, and early for the same reason as CR-4a: if the fare on
+    # the results card is not the fare the quote returns, every price further
+    # down the booking flow is a symptom of it. Its last check wants an API and
+    # skips politely without one.
+    ("verify_fare_seed.py",
+     "Fares: the advertised fare and the quoted fare hash the same flight number"),
     # Also serverless - TrustBrick is replaced by a stub that verifies our
     # signature the way the real service does, so nothing here opens an order
     # or moves money. Before the HTTP scripts because a signing or callback
