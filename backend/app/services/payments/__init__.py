@@ -118,8 +118,27 @@ def _build() -> PaymentProvider:
             secret=settings.razorpay_webhook_secret or "mock_secret",
         )
 
+    if name == "trustbrick":
+        return _build_trustbrick()
+
     raise PaymentMisconfigured(
-        f"Unknown PAYMENT_PROVIDER {name!r}. Use 'razorpay', 'mock' or 'none'."
+        f"Unknown PAYMENT_PROVIDER {name!r}. "
+        "Use 'razorpay', 'trustbrick', 'mock' or 'none'."
+    )
+
+
+def _build_trustbrick() -> PaymentProvider:
+    """The TrustBrick adapter, from settings. Raises if it cannot run."""
+    settings = app.config.settings
+    from app.services.payments.trustbrick_provider import TrustBrickProvider
+
+    return TrustBrickProvider(
+        base_url=settings.trustbrick_base_url or "",
+        key_id=settings.trustbrick_key_id or "",
+        secret=settings.trustbrick_secret or "",
+        callback_secret=settings.trustbrick_callback_secret or "",
+        timeout_seconds=settings.trustbrick_timeout_seconds,
+        publishable_key=settings.trustbrick_publishable_key or "",
     )
 
 
@@ -134,6 +153,88 @@ def get_provider() -> PaymentProvider:
         return _cached
 
 
+# ---------------------------------------------------------------------------
+# TrustBrick, alongside the configured provider rather than instead of it
+# ---------------------------------------------------------------------------
+# WHY THERE IS A SECOND SLOT AT ALL
+# TrustBrick has to be reachable while PAYMENT_PROVIDER is still ``razorpay``,
+# for two reasons that have nothing to do with each other:
+#
+#   1. a pilot booking is routed to it explicitly (see get_provider_for_booking)
+#      while every other booking keeps the live Razorpay path;
+#   2. its callback arrives at /api/webhooks/payments/trustbrick, and that route
+#      resolves the adapter by NAME — so a delivery for a payment TrustBrick
+#      collected must find the TrustBrick adapter even though it is not the
+#      configured default.
+#
+# Making TrustBrick the global provider would satisfy (2) and break (1). This
+# slot satisfies both without either provider knowing about the other.
+_cached_trustbrick: PaymentProvider | None = None
+
+
+def get_trustbrick_provider() -> PaymentProvider:
+    """The TrustBrick adapter, whatever PAYMENT_PROVIDER says.
+
+    Raises :class:`PaymentNotConfigured` when TrustBrick has no settings, so a
+    deployment that has never configured it behaves exactly as it does today.
+    """
+    global _cached_trustbrick
+    settings = app.config.settings
+    if not (settings.trustbrick_base_url and settings.trustbrick_key_id
+            and settings.trustbrick_secret and settings.trustbrick_callback_secret):
+        raise PaymentNotConfigured(
+            "TrustBrick partner payments are not configured on this deployment."
+        )
+    if _cached_trustbrick is not None:
+        return _cached_trustbrick
+    with _lock:
+        if _cached_trustbrick is None:
+            _cached_trustbrick = _build_trustbrick()
+        return _cached_trustbrick
+
+
+def trustbrick_is_available() -> bool:
+    try:
+        get_trustbrick_provider()
+        return True
+    except PaymentProviderError:
+        return False
+
+
+def _pilot_refs() -> frozenset[str]:
+    raw = getattr(app.config.settings, "trustbrick_pilot_booking_refs", "") or ""
+    return frozenset(part.strip().upper() for part in raw.split(",") if part.strip())
+
+
+def get_provider_for_booking(booking_ref: str) -> PaymentProvider:
+    """Which adapter should collect for THIS booking.
+
+    FAILS CLOSED, AND SILENTLY CHANGES NOTHING.
+    With ``TRUSTBRICK_PILOT_BOOKING_REFS`` unset — the default — this is
+    ``get_provider()`` and the live Razorpay path is untouched for every
+    booking. A reference named in that setting, and only such a reference, is
+    routed to TrustBrick.
+
+    A pilot reference on a deployment where TrustBrick is NOT configured falls
+    back to the ordinary provider rather than failing: a half-configured pilot
+    must not stop a customer paying.
+    """
+    ref = (booking_ref or "").strip().upper()
+    if ref and ref in _pilot_refs():
+        try:
+            provider = get_trustbrick_provider()
+        except PaymentProviderError as exc:
+            logger.warning(
+                "%s is listed as a TrustBrick pilot booking but TrustBrick is "
+                "not usable (%s); falling back to the configured provider.",
+                ref, exc,
+            )
+        else:
+            logger.info("Routing %s through TrustBrick (pilot).", ref)
+            return provider
+    return get_provider()
+
+
 def get_provider_named(name: str) -> PaymentProvider:
     """The configured provider, but only if it is the one asked for.
 
@@ -142,8 +243,18 @@ def get_provider_named(name: str) -> PaymentProvider:
     provider being verified with another's secret — which would fail anyway,
     but would fail as "bad signature" rather than as the routing mistake it is.
     """
+    wanted = (name or "").strip().lower()
+
+    # TrustBrick is resolvable by name even when it is not the configured
+    # default, because its callback route addresses it by name and a payment it
+    # collected must be verifiable regardless of what PAYMENT_PROVIDER says.
+    # Checked before the default so a deployment that has switched over to
+    # TrustBrick globally still resolves it through one path.
+    if wanted == "trustbrick":
+        return get_trustbrick_provider()
+
     provider = get_provider()
-    if provider.name != (name or "").strip().lower():
+    if provider.name != wanted:
         raise PaymentNotConfigured(
             f"No provider named {name!r} is configured on this deployment."
         )
@@ -151,10 +262,11 @@ def get_provider_named(name: str) -> PaymentProvider:
 
 
 def reset_provider_cache() -> None:
-    """Drop the cached provider. For tests that change the configuration."""
-    global _cached
+    """Drop the cached providers. For tests that change the configuration."""
+    global _cached, _cached_trustbrick
     with _lock:
         _cached = None
+        _cached_trustbrick = None
 
 
 def is_available() -> bool:
@@ -239,6 +351,9 @@ def check_configuration_at_startup() -> None:
 __all__ = [
     "get_provider",
     "get_provider_named",
+    "get_provider_for_booking",
+    "get_trustbrick_provider",
+    "trustbrick_is_available",
     "reset_provider_cache",
     "is_available",
     "provider_name",

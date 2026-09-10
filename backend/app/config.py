@@ -194,6 +194,56 @@ class Settings(BaseSettings):
     #: hour-long transaction.
     payment_sweep_batch_size: int = 100
 
+    # -----------------------------------------------------------------------
+    # TrustBrick partner payments.
+    #
+    # TrustBrick holds the Razorpay merchant account; this platform does not.
+    # These settings let a booking be paid for by asking TrustBrick to open an
+    # order on its account. See services/payments/trustbrick_provider.py.
+    #
+    # NONE OF THESE IS A RAZORPAY CREDENTIAL. The key secret and the Razorpay
+    # webhook secret stay on TrustBrick. What is held here is a partner
+    # identity and two shared secrets that sign traffic BETWEEN the two
+    # platforms, in opposite directions.
+    # -----------------------------------------------------------------------
+    #: TrustBrick's origin, no trailing path. e.g. https://trustbrick-xvyg.onrender.com
+    trustbrick_base_url: str | None = None
+    #: The partner identity TrustBrick issued us. Not a secret: it travels in a
+    #: header so TrustBrick knows who is calling.
+    trustbrick_key_id: str | None = None
+    #: Signs OUR requests TO TrustBrick. Must equal TrustBrick's
+    #: PARTNER_<SLUG>_SECRET exactly.
+    trustbrick_secret: str | None = None
+    #: Verifies TrustBrick's callbacks TO US. Must equal TrustBrick's
+    #: PARTNER_<SLUG>_CALLBACK_SECRET exactly. A DIFFERENT value from the one
+    #: above, so a signature we produce is not verifiable by the key that
+    #: authorises us.
+    trustbrick_callback_secret: str | None = None
+    #: How long TrustBrick gets to answer. A timeout on order creation is
+    #: reported distinctly from a refusal, because after one we do not know
+    #: whether an order exists and the retry must reuse the idempotency key.
+    trustbrick_timeout_seconds: float = 20.0
+    #: Razorpay's PUBLISHABLE key, as TrustBrick reports it. Optional: the
+    #: adapter learns it from every create response. Setting it makes a
+    #: rebuilt checkout deterministic on a process that has not opened one yet
+    #: — a customer who reloads after a restart. Never a secret; the browser
+    #: needs this value.
+    trustbrick_publishable_key: str | None = None
+
+    #: WHICH BOOKINGS GO THROUGH TRUSTBRICK. Comma-separated booking references.
+    #:
+    #: THIS IS THE WHOLE PROVIDER-SELECTION MECHANISM, AND IT FAILS CLOSED.
+    #: Empty — the default — means nothing changes: every booking uses
+    #: PAYMENT_PROVIDER exactly as it does today. A reference listed here, and
+    #: only such a reference, is routed to TrustBrick instead. So TrustBrick can
+    #: be exercised against one real booking without moving the live Razorpay
+    #: package flow, and reverting is deleting a string.
+    #:
+    #: Deliberately not a boolean and not a percentage: an operator has to name
+    #: the booking they are testing, which makes the blast radius exactly one
+    #: booking and makes it obvious in the configuration which one it was.
+    trustbrick_pilot_booking_refs: str = ""
+
 
     # -----------------------------------------------------------------------
     # Which emails actually leave the building.

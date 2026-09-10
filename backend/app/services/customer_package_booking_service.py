@@ -525,12 +525,34 @@ def start_checkout(
             "A payment needs an idempotency key of at least 8 characters."
         )
 
-    provider = payment_providers.get_provider()
+    # WHICH ADAPTER COLLECTS FOR THIS BOOKING.
+    # Almost always the configured provider. A booking named in
+    # TRUSTBRICK_PILOT_BOOKING_REFS goes through TrustBrick instead, which is
+    # how that path is exercised against one real booking without moving the
+    # live Razorpay flow. Empty pilot list — the default — makes this exactly
+    # ``get_provider()``.
+    provider = payment_providers.get_provider_for_booking(booking.booking_ref)
 
     # (1) The attempt this key already produced.
     existing = find_payment_by_idempotency_key(db, booking, key)
     if existing is not None and existing.provider_order_id:
-        return existing, _session_for(existing, booking, customer, provider)
+        # Rebuilt with the adapter that ACTUALLY opened it, not with whatever
+        # is configured now: a pilot list edited between two attempts would
+        # otherwise hand the customer a session carrying the wrong provider's
+        # publishable key, and a checkout that cannot open.
+        opener = provider
+        if existing.provider and existing.provider != provider.name:
+            try:
+                opener = payment_providers.get_provider_named(existing.provider)
+            except payment_providers.PaymentProviderError:
+                # The adapter that opened it is no longer configured. Say so
+                # rather than silently rebuilding against a different one.
+                raise PackageBookingError(
+                    f"{booking.booking_ref} has an open payment with "
+                    f"{existing.provider}, which is not available on this "
+                    "deployment. Contact support rather than paying twice."
+                )
+        return existing, _session_for(existing, booking, customer, opener)
 
     amount = payable_amount(booking)
     if amount <= 0:
