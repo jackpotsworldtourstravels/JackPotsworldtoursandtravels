@@ -25,7 +25,30 @@ python tests/verify_m1.py
 
 Every script exits `0` on success and `1` if any check failed, so they compose in CI.
 
-## Configuration
+### Optional packages
+
+The suite deliberately has no third-party dependency of its own — `minihttp.py` is a stdlib
+HTTP client for exactly that reason. Four scripts do reach for a package anyway, because what
+they verify cannot be faked by hand:
+
+| Package | Needed by | Without it |
+| --- | --- | --- |
+| `websockets` | `verify_live_chat`, `verify_voice_calls`, `verify_call_management` | the socket sections skip |
+| `moto` | `verify_storage_s3` | the S3 backend section skips |
+| `httpx2` | `verify_trustbrick_payments` | **one test fails rather than skipping** |
+
+None is in `backend/requirements.txt`, and none should be: that file is what the production
+image installs, and a test client has no business shipping to a customer.
+
+`httpx2` is the odd one out and worth knowing about. It backs
+`starlette.testclient.TestClient`, which starlette 1.6 imports as `httpx2` first and only falls
+back to `httpx` with a deprecation warning. When it is absent the TestClient raises at
+construction, so that one test reports as a **failure** rather than skipping the way the other
+three do — which reads as a broken payment adapter and is nothing of the sort:
+
+```bash
+pip install httpx2
+```
 
 `config.py` holds the base URL and the four accounts the suite signs in as. Every value is
 overridable from the environment, so a run against another database needs no edit to a tracked

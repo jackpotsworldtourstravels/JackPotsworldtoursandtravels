@@ -37,6 +37,13 @@ SUITE = [
     # and M8 sat green and unrun. It also asserts the schema guarantees the
     # money paths rest on, so a dropped index is caught before anything spends.
     ("verify_m9.py", "M9: suite completeness, migration chain, schema guarantees, no money drift"),
+    # Also serverless - TrustBrick is replaced by a stub that verifies our
+    # signature the way the real service does, so nothing here opens an order
+    # or moves money. Before the HTTP scripts because a signing or callback
+    # bug is cheaper to read here than as an integration that mysteriously
+    # 401s halfway through a payment suite.
+    ("verify_trustbrick_payments.py",
+     "TrustBrick: canonical signing, nonce reuse, callback verification, provider selection"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
