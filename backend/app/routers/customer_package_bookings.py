@@ -333,15 +333,38 @@ def cancel_package_booking(
         "changed. UPI Collect is not offered by anyone: NPCI withdrew it for "
         "merchant payments on 28 February 2026.\n\n"
         "**The key secret and the webhook secret are never returned by this or "
-        "any other endpoint.**"
+        "any other endpoint.**\n\n"
+        "Pass `booking_ref` to ask about ONE booking rather than the "
+        "deployment. The two answers differ only for a booking routed to a "
+        "specific provider — a pilot — where the deployment as a whole offers "
+        "no payment but that booking can still be collected for. Without it "
+        "the answer is exactly what it has always been."
     ),
 )
-def payment_config():
+def payment_config(
+    booking_ref: str | None = Query(
+        None,
+        max_length=40,
+        description=(
+            "Ask about this booking specifically. A booking with no special "
+            "routing gives the same answer as omitting it, so this cannot be "
+            "used to discover whether a booking exists."
+        ),
+    ),
+):
+    # WHICH PROVIDER WOULD ACTUALLY COLLECT FOR THIS BOOKING.
+    # Asked of the same function start_checkout asks, so the button this
+    # answer draws and the order that opens when it is pressed can never
+    # disagree about which provider is involved.
+    provider = payment_providers.available_for_booking(booking_ref)
     return {
-        "configured": payment_providers.is_available(),
-        "provider": payment_providers.provider_name(),
-        # Publishable by design — the provider's browser script needs it.
-        "key_id": payment_providers.publishable_key(),
+        "configured": provider is not None,
+        "provider": provider.name if provider is not None else None,
+        # Publishable by design — the provider's browser script needs it. There
+        # is no field on this response that could carry a key secret, a webhook
+        # secret or a partner secret, and the objects consulted above expose
+        # none of them.
+        "key_id": (provider.publishable_key or None) if provider is not None else None,
         "currency": payment_providers.INR,
     }
 

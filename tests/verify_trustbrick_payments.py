@@ -677,6 +677,129 @@ def _raises(fn, *args) -> bool:
 
 
 # ===========================================================================
+# 6. The payment-config endpoint, asked about ONE booking
+# ===========================================================================
+def test_payment_config_is_booking_aware():
+    """GET /api/customer/payments/config, with and without a booking.
+
+    THE GAP THIS CLOSES. The endpoint answered "can any booking be paid?" and
+    the checkout screen was asking "can THIS booking be paid?". With
+    PAYMENT_PROVIDER unset those differ for exactly one case - a pilot booking -
+    and the screen was hiding a Pay Now that would have worked.
+
+    WHAT MUST NOT CHANGE. Without ``booking_ref`` the answer is what it has
+    always been, and a booking with no special routing gets that same answer.
+    TrustBrick never becomes globally available.
+    """
+    print("\nPayment config, booking-aware")
+    import app.config as app_config
+    from fastapi.testclient import TestClient
+
+    from app.main import app as fastapi_app
+    from app.services import payments as payment_providers
+
+    settings = app_config.settings
+    saved = {k: getattr(settings, k, None) for k in (
+        "payment_provider", "payment_environment", "trustbrick_pilot_booking_refs",
+        "trustbrick_base_url", "trustbrick_key_id", "trustbrick_secret",
+        "trustbrick_callback_secret", "trustbrick_publishable_key",
+    )}
+    # Not used as a context manager on purpose: that would run the application's
+    # lifespan, which starts the payment sweep and touches the database. This
+    # endpoint takes no db dependency, so the plain client exercises it alone.
+    client = TestClient(fastapi_app)
+    PATH = "/api/customer/payments/config"
+
+    def configure(*, provider, pilot="", trustbrick=True):
+        settings.payment_provider = provider
+        settings.payment_environment = "test"
+        settings.trustbrick_pilot_booking_refs = pilot
+        settings.trustbrick_base_url = BASE_URL if trustbrick else None
+        settings.trustbrick_key_id = KEY_ID if trustbrick else None
+        settings.trustbrick_secret = SECRET if trustbrick else None
+        settings.trustbrick_callback_secret = CALLBACK_SECRET if trustbrick else None
+        settings.trustbrick_publishable_key = "rzp_live_fromtrustbrick"
+        payment_providers.reset_provider_cache()
+
+    def ask(booking_ref=None):
+        params = {"booking_ref": booking_ref} if booking_ref else None
+        response = client.get(PATH, params=params)
+        return response.status_code, response.json(), response.text
+
+    try:
+        # ---- production's current shape: payments off, no pilot -----------
+        configure(provider="none", pilot="")
+        status, body, _ = ask()
+        ok("payments off: no booking_ref reports unconfigured",
+           status == 200 and body["configured"] is False, f"{status} {body}")
+        ok("payments off: provider is null", body["provider"] is None)
+        ok("payments off: key_id is null", body["key_id"] is None)
+        ok("payments off: currency still reported", body["currency"] == "INR")
+
+        status, body, _ = ask("JPP000123")
+        ok("payments off: a NON-pilot booking stays disabled",
+           body["configured"] is False, str(body))
+
+        # ---- one pilot booking, payments still off globally ---------------
+        configure(provider="none", pilot="JPP000123")
+
+        status, body, _ = ask()
+        ok("pilot set: the GLOBAL answer is still unconfigured",
+           body["configured"] is False, str(body))
+        ok("pilot set: trustbrick is NOT globally available",
+           body["provider"] is None, str(body["provider"]))
+
+        status, body, raw = ask("JPP000123")
+        ok("pilot booking reports configured", body["configured"] is True, str(body))
+        ok("pilot booking names trustbrick", body["provider"] == "trustbrick",
+           str(body["provider"]))
+        ok("pilot booking returns the publishable key",
+           body["key_id"] == "rzp_live_fromtrustbrick", str(body["key_id"]))
+
+        # THE SECURITY ASSERTION. Checked against the raw response text, not the
+        # parsed body, so a secret nested anywhere would still be caught.
+        leaked = [name for name, value in (
+            ("TRUSTBRICK_SECRET", SECRET),
+            ("TRUSTBRICK_CALLBACK_SECRET", CALLBACK_SECRET),
+        ) if value in raw]
+        ok("no secret in the pilot response", not leaked, f"leaked {leaked}")
+        ok("response carries only the four public fields",
+           set(body) == {"configured", "provider", "key_id", "currency"}, str(set(body)))
+
+        status, body, _ = ask("JPP999999")
+        ok("a different booking is unaffected by the pilot",
+           body["configured"] is False, str(body))
+        ok("pilot matching is case-insensitive here too",
+           ask("jpp000123")[1]["configured"] is True)
+
+        # ---- a pilot ref with TrustBrick unconfigured ---------------------
+        configure(provider="none", pilot="JPP000123", trustbrick=False)
+        status, body, _ = ask("JPP000123")
+        ok("pilot booking with trustbrick unconfigured stays disabled",
+           body["configured"] is False, str(body))
+
+        # ---- existing behaviour, unchanged --------------------------------
+        configure(provider="mock", pilot="")
+        status, body, raw = ask()
+        ok("provider configured: unchanged without booking_ref",
+           body["configured"] is True and body["provider"] == "mock", str(body))
+        status, body2, _ = ask("JPP000123")
+        ok("provider configured: a booking_ref changes nothing",
+           body2 == body, f"{body2} vs {body}")
+
+        # A pilot booking still overrides, even with another provider live.
+        configure(provider="mock", pilot="JPP000123")
+        ok("pilot overrides even when another provider is configured",
+           ask("JPP000123")[1]["provider"] == "trustbrick")
+        ok("...and every other booking keeps the configured provider",
+           ask("JPP000999")[1]["provider"] == "mock")
+    finally:
+        for key, value in saved.items():
+            setattr(settings, key, value)
+        payment_providers.reset_provider_cache()
+
+
+# ===========================================================================
 def main() -> int:
     print("=" * 72)
     print("TrustBrick partner payment adapter")
@@ -711,7 +834,8 @@ def main() -> int:
             import traceback
             traceback.print_exc()
 
-    for test in (test_provider_selection, test_razorpay_path_untouched):
+    for test in (test_provider_selection, test_razorpay_path_untouched,
+                 test_payment_config_is_booking_aware):
         try:
             test()
         except Exception as exc:                            # noqa: BLE001

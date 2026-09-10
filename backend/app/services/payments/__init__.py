@@ -201,6 +201,34 @@ def trustbrick_is_available() -> bool:
         return False
 
 
+def available_for_booking(booking_ref: str | None = None) -> PaymentProvider | None:
+    """The adapter that would collect for THIS booking, or None if none would.
+
+    The booking-aware counterpart of :func:`is_available`,
+    :func:`provider_name` and :func:`publishable_key`, which answer for the
+    deployment as a whole. That global answer is wrong for a pilot: with
+    PAYMENT_PROVIDER unset, the deployment offers no payment, and yet a booking
+    named in TRUSTBRICK_PILOT_BOOKING_REFS can still be collected for. A
+    checkout screen asking "can this booking be paid?" was getting the answer to
+    "can any booking be paid?" and hiding a Pay Now that would have worked.
+
+    Returns the provider rather than a response shape: what the API chooses to
+    publish is the router's business, and nothing below this line should know
+    the field names of an HTTP payload.
+
+    ``None`` for a booking that cannot be paid for, which is the same answer a
+    deployment with no provider gives for every booking. That symmetry is
+    deliberate - an unknown or non-pilot reference is indistinguishable from
+    "payments are off", so this cannot be used to test whether a booking exists.
+    """
+    try:
+        if booking_ref:
+            return get_provider_for_booking(booking_ref)
+        return get_provider()
+    except PaymentProviderError:
+        return None
+
+
 def _pilot_refs() -> frozenset[str]:
     raw = getattr(app.config.settings, "trustbrick_pilot_booking_refs", "") or ""
     return frozenset(part.strip().upper() for part in raw.split(",") if part.strip())
@@ -352,6 +380,7 @@ __all__ = [
     "get_provider",
     "get_provider_named",
     "get_provider_for_booking",
+    "available_for_booking",
     "get_trustbrick_provider",
     "trustbrick_is_available",
     "reset_provider_cache",
