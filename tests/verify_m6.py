@@ -514,12 +514,45 @@ check("totals.total_revenue equals the rows' own sum, to the paisa",
       f"totals={g['totals']['total_revenue']} rows={revenue}")
 check("revenue crosses the wire as a decimal string",
       isinstance(g["totals"]["total_revenue"], str))
+# SCOPED THE WAY THE ROLLUP IS SCOPED, which this used not to be. It summed
+# *every* successful payment and compared that to a PER-MERCHANT rollup, which
+# only holds while every payment still has a merchant attached to it — and
+# `payments.merchant_id` is `ON DELETE SET NULL`, so deleting a merchant leaves
+# its payments behind with no attribution. The delete-test suites delete
+# merchants on every run, so orphans accumulate and this check could never pass
+# again on a database that had been used. It was off by exactly the orphaned
+# total, and the endpoint was right.
+#
+# Still hand-written rather than a call into the service: the point is to
+# re-derive the number independently, not to prove the implementation agrees
+# with itself.
 sql_revenue = sql("""
-    SELECT COALESCE(SUM(amount), 0) AS v FROM payments WHERE payment_status = 'success'
+    SELECT COALESCE(SUM(p.amount), 0) AS v
+      FROM payments p
+      JOIN merchants m ON m.merchant_id = p.merchant_id
+     WHERE p.payment_status = 'success'
+       AND m.status <> 'deleted'
 """)
-check("...and equals SQL over successful payments",
+check("...and equals SQL over successful payments to live merchants",
       D(g["totals"]["total_revenue"]) == D(sql_revenue.v),
       f"api={g['totals']['total_revenue']} sql={sql_revenue.v}")
+
+# THE MONEY THE ROLLUP CANNOT SHOW, asserted rather than ignored. A payment
+# whose merchant was deleted is real revenue that appears in no row of this
+# screen; if that total ever starts growing on its own, somebody is losing
+# sight of money and should find out here rather than from a spreadsheet.
+orphaned = sql("""
+    SELECT COALESCE(SUM(p.amount), 0) AS v, COUNT(*) AS n
+      FROM payments p
+      LEFT JOIN merchants m ON m.merchant_id = p.merchant_id
+     WHERE p.payment_status = 'success'
+       AND (p.merchant_id IS NULL OR m.status = 'deleted')
+""")
+check("the rollup accounts for every payment that still has a merchant",
+      D(g["totals"]["total_revenue"]) + D(orphaned.v)
+      == D(sql("SELECT COALESCE(SUM(amount), 0) AS v FROM payments"
+               " WHERE payment_status = 'success'").v),
+      f"rollup={g['totals']['total_revenue']} orphaned={orphaned.v} ({orphaned.n} rows)")
 
 
 print("\n=== 10. Pagination and caps hold ===")
