@@ -108,7 +108,13 @@ def main():
     inv = text_of(requests.get(f"{BASE}/api/requests/{rid}/invoice", headers=H(mtok)).content)
     check("invoice prints its invoice number", detail["request"]["invoice_number"] in inv, inv[:200])
     check("invoice prints the PNR", (detail["request"]["pnr"] or "@@") in inv, inv[:200])
-    check("invoice names the merchant", "Demo Travel Co" in inv, inv[:200])
+    # ASKED FOR, NOT HARDCODED. This read "Demo Travel Co" — a company name the
+    # seed stopped using — so it failed against an invoice that was correct and
+    # said "Billed to Test Suite Merchant". The check is that the invoice names
+    # whichever merchant it was billed to, and only the server knows which.
+    company = requests.get(f"{BASE}/api/auth/me", headers=H(mtok)).json().get("merchant_name")
+    check("invoice names the merchant", bool(company) and company in inv,
+          f"expected {company!r} in: {inv[:160]}")
     check("invoice shows a balance line", "Balance due" in inv, inv[:200])
     check("invoice reconciles paid against total", "Booking total" in inv and "Paid" in inv, inv[:200])
     check("no literal markup leaks into the invoice", "<br/>" not in inv and "<b>" not in inv, inv[:300])

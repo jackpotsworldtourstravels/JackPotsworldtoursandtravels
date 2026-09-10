@@ -293,6 +293,114 @@ def make_booking(mtok, atok, *, upto="draft", international=False, pax=1, label=
     }
 
 
+#: Seats put back on a fare that has run dry, and on a freshly created one.
+#: Large enough that a full suite run never exhausts it twice, small enough to
+#: stay recognisably test data.
+RESTOCK_SEATS = 400
+
+
+def restock_flight_inventory() -> str:
+    """Guarantee there is a bookable flight in the catalog. Returns what it did.
+
+    WHY THIS IS NEEDED AT ALL, AND WHY IT IS NOT A MIGRATION
+    Catalog inventory is seeded once, by 0027_seed_catalog_inventory, and there
+    is no endpoint that creates any — the only writer is that migration and the
+    only consumer is every suite that needs a booking with money on it. So the
+    stock is finite and strictly decreasing: `catalog_service.hold_units()`
+    takes seats on each booking and a test that reclaims its booking does not
+    put them back. Run the suite enough times and the shelf is bare.
+
+    On this database it was worse than bare. There were no `catalog_item` rows
+    of any status at all — 0027 ran long ago and its rows have since been
+    deleted by something, which is not recoverable by re-running a migration
+    alembic already considers applied. Six scripts failed on it, none of them
+    for a reason in the code they were testing.
+
+    A second seed migration is the obvious fix and the wrong one: migrations
+    run against production on every container start, so it would put demo
+    flights into the live catalog that real merchants search. Inventory is a
+    prerequisite of these tests, and a test's prerequisites belong to the test.
+
+    Written straight to the table because there is no other way in: the catalog
+    is read-only over HTTP. Row shape is copied from 0027 deliberately — if the
+    two ever disagree, the suite is exercising something the migration would
+    never have produced.
+    """
+    import datetime as _dt                                    # noqa: PLC0415
+    import json as _json                                      # noqa: PLC0415
+    import sys as _sys                                        # noqa: PLC0415
+    import uuid as _uuid                                      # noqa: PLC0415
+    from pathlib import Path as _Path                         # noqa: PLC0415
+
+    # Imported HERE, not at module scope. `flows` is imported by suites that
+    # only ever speak HTTP, and making all of them depend on the backend being
+    # importable would trade one broken script for a dozen.
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent.parent / "backend"))
+    from sqlalchemy import text as _text                      # noqa: PLC0415
+    from app.database.session import SessionLocal             # noqa: PLC0415
+
+    with SessionLocal() as db:
+        topped = db.execute(_text(
+            """
+            UPDATE service_requests
+               SET available_units = :seats,
+                   travel_date = :travel_date
+             WHERE request_type = 'catalog_item'
+               AND travel_type = 'flight'
+               AND status = 'approved'
+            """
+        ), {"seats": RESTOCK_SEATS,
+            "travel_date": _dt.date.today() + _dt.timedelta(days=21)}).rowcount
+        if topped:
+            db.commit()
+            return f"restocked {topped} existing flight fare(s)"
+
+        # Nothing to top up: the shelf is not low, it is gone.
+        date = _dt.date.today() + _dt.timedelta(days=21)
+        departure = _dt.datetime.combine(date, _dt.time(9, 30))
+        db.execute(_text(
+            """
+            INSERT INTO service_requests (
+                request_number, request_type, travel_type, status, title,
+                travel_details, pricing, total_amount, available_units,
+                travel_date, return_date, status_history
+            ) VALUES (
+                :request_number, CAST(:request_type AS request_type_enum),
+                CAST(:travel_type AS travel_type_enum),
+                CAST(:status AS request_status_enum), :title,
+                CAST(:travel_details AS jsonb), CAST(:pricing AS jsonb),
+                :total_amount, :available_units, :travel_date, :return_date,
+                CAST(:status_history AS jsonb)
+            )
+            """
+        ), {
+            "request_number": f"CAT-FL-TEST-{_uuid.uuid4().hex[:8].upper()}",
+            "request_type": "catalog_item",
+            "travel_type": "flight",
+            "status": "approved",
+            "title": "IndiGo 6E-1423 \u00b7 DEL \u2192 BOM",
+            "travel_details": _json.dumps({
+                "airline": "IndiGo", "flight_number": "6E-1423",
+                "origin": "DEL", "origin_city": "New Delhi",
+                "destination": "BOM", "destination_city": "Mumbai",
+                "departure_time": departure.isoformat(),
+                "arrival_time": (departure + _dt.timedelta(minutes=135)).isoformat(),
+                "duration_minutes": 135, "cabin_class": "economy",
+                "trip_type": "one_way", "stops": 0, "baggage_kg": 30,
+            }),
+            "pricing": _json.dumps({
+                "base_fare": 5400, "taxes": 980, "currency": "INR", "total": 6380,
+            }),
+            "total_amount": 6380,
+            "available_units": RESTOCK_SEATS,
+            "travel_date": date,
+            "return_date": None,
+            "status_history": _json.dumps([]),
+        })
+        db.commit()
+    return "created a flight fare (the catalog was empty)"
+
+
 def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
                          label="verification"):
     """Create a **catalog-led** booking and walk it to ``upto``.
@@ -318,10 +426,20 @@ def make_catalog_booking(mtok, atok, *, upto="draft", pax=1, amount="24500.00",
     # correctly said "Guests" / "not the hotel voucher". Every caller here
     # wants the flight track (fares, PNRs, e-tickets), so ask for it rather
     # than depending on which fare happens to be cheapest today.
-    items = requests.get(
-        f"{BASE}/api/catalog/search?page_size=20&travel_type=flight", headers=H(mtok)
-    ).json().get("items", [])
+    def _flights():
+        return requests.get(
+            f"{BASE}/api/catalog/search?page_size=20&travel_type=flight", headers=H(mtok)
+        ).json().get("items", [])
+
+    items = _flights()
     item = next((i for i in items if (i.get("available_units") or 0) >= pax), None)
+    if item is None:
+        # NOTHING BOOKABLE. Restock and look again rather than failing, because
+        # the failure is never a bug in the code under test — see
+        # restock_flight_inventory() for what actually runs out and why.
+        restock_flight_inventory()
+        items = _flights()
+        item = next((i for i in items if (i.get("available_units") or 0) >= pax), None)
     assert item, "no FLIGHT catalog item with available units — cannot build a catalog booking"
 
     passengers = [
