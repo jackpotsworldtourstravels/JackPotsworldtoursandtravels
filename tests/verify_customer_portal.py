@@ -81,7 +81,18 @@ def _db():
     return SessionLocal()
 
 
-def _post(url, json, *, headers=None, tries=6, wait=13):
+#: Backoff between 429s, in seconds. ESCALATING, AND ENDING PAST THE WINDOW.
+#: This was a flat 13s six times over — six attempts spanning 65 seconds, which
+#: only just covers a 60-second window and only if the window happens to have
+#: started when the loop did. Measured against the running server: the per-IP
+#: buckets are per-endpoint and in-process, rejected requests do not extend
+#: them, and one uninterrupted sleep longer than the window always clears it.
+#: So the last wait is 62s and is deterministic on its own; the short ones come
+#: first because the usual case is a window that is nearly over anyway.
+_BACKOFF = (5, 12, 25, 62)
+
+
+def _post(url, json, *, headers=None, tries=None, wait=None):
     """POST, waiting out the rate limiter rather than failing on it.
 
     Almost every auth endpoint here is limited per IP — /signup, /forgot- and
@@ -92,14 +103,26 @@ def _post(url, json, *, headers=None, tries=6, wait=13):
     password lifecycle), so a 429 is correct behaviour to back off from rather
     than a failure to report. Asserting through a raw call instead would make
     the script fail on whatever ran before it.
+
+    NOT EVERY 429 IS THE PER-MINUTE LIMITER, WHICH IS WHY THE BODY IS PRINTED.
+    `customer_otp_service` answers with the same status when an account has
+    asked for more than five verification codes in an HOUR, and no amount of
+    backing off inside a one-minute loop will outlast that. Three checks in
+    this script failed on every run for exactly that reason, and the retry loop
+    reported it as "rate-limited on login" because it never showed what the
+    server actually said. A loop that gives up silently is how a one-hour cap
+    hides behind a one-minute one.
     """
-    for attempt in range(tries):
+    waits = _BACKOFF if wait is None else ((wait,) * ((tries or 6) - 1))
+    for attempt, pause in enumerate((*waits, None)):
         r = requests.post(url, json=json, headers=headers)
-        if r.status_code != 429:
+        if r.status_code != 429 or pause is None:
             return r
         print(f"     (rate-limited on {url.rsplit('/', 1)[-1]}; "
-              f"waiting {wait}s — attempt {attempt + 1}/{tries})")
-        time.sleep(wait)
+              f"waiting {pause}s — attempt {attempt + 1}/{len(waits) + 1})"
+              f" body={r.text[:90]}")
+        time.sleep(pause)
+    print(f"     (GAVE UP on {url.rsplit('/', 1)[-1]}: {r.status_code} {r.text[:120]})")
     return r
 
 
@@ -532,14 +555,59 @@ if r2 is not None and r2.status_code == 200:
 # =====================================================================
 print("\n== 8. Forgot / reset: single-use, and it ends every session ==")
 # =====================================================================
-r = _post(f"{CUST}/forgot-password", {"email": EMAIL})
-check("forgot-password returns 200", r.status_code == 200, r.text[:160])
-generic = r.json()["message"]
+# A CUSTOMER OF ITS OWN, AND THE REASON IS A PRODUCT LIMIT, NOT TIDINESS.
+# `customer_otp_service.MAX_REQUESTS_PER_HOUR` is 5 codes per customer per
+# hour, counted as rows in `customer_otps`. Sections 2, 3 and 7 spend that
+# budget on the main account — signup, login by email, login by mobile, login
+# after the password change — so the login this section needs afterwards was
+# the sixth, and came back 429 "Too many verification codes requested. Try
+# again in an hour."
+#
+# No backoff can survive that: the window is an HOUR, and the suite had been
+# reading the 429 as the per-minute IP limiter and sleeping thirteen seconds at
+# it. Three checks failed on every run — this section's login, and both of
+# section 9's, because the token they needed was never refreshed.
+#
+# A fresh signup starts a fresh budget. This section spends two of its five.
+RESET_EMAIL = f"cxreset_{TAG}@example.com"
+#: DIGITS, not TAG — see the note where DIGITS is defined. A different
+#: trailing pair from MOBILE, because `uq_customers_mobile` is a plain unique
+#: index and this run already holds that number.
+RESET_MOBILE = f"+9199{DIGITS}66"
+_reset_signup = _signup(RESET_EMAIL, RESET_MOBILE, name="Reset Lifecycle")
+check("a dedicated account for the reset lifecycle is created",
+      _reset_signup.status_code in (200, 201), _reset_signup.text[:160])
+_reset_tokens = _finish(_reset_signup.json())
+check("...and it signs in", _reset_tokens.status_code == 200, _reset_tokens.text[:160])
+if _reset_tokens.status_code == 200:
+    CTOK = _reset_tokens.json()["access_token"]
+EMAIL = RESET_EMAIL          # the rest of this section, and section 9, use it
 
-r = _post(f"{CUST}/forgot-password", {"email": f"nobody_{TAG}@example.com"})
-check("an unknown address gets the identical message", r.json()["message"] == generic,
-      r.json().get("message"))
-check("an unknown address issues no token", r.json().get("reset_link") is None)
+known = _post(f"{CUST}/forgot-password", {"email": EMAIL})
+check("forgot-password returns 200", known.status_code == 200, known.text[:160])
+
+unknown = _post(f"{CUST}/forgot-password", {"email": f"nobody_{TAG}@example.com"})
+check("an unknown address issues no token", unknown.json().get("reset_link") is None)
+
+# THE TWO ANSWERS ARE ONLY IDENTICAL WHEN DEBUG IS OFF, and this asserted they
+# always were. With `settings.debug` on — which is how anyone runs this
+# locally — a KNOWN address deliberately comes back with "Reset link generated
+# (debug mode returns it directly)" and the link itself, so that the happy path
+# below can be driven without SMTP. The check was comparing that against the
+# non-committal answer and reporting the difference as an enumeration hole.
+#
+# Anti-enumeration is a property of the production shape, so it is asserted
+# against the production shape. In debug the weaker half still holds and is
+# worth keeping: an address that does not exist must not produce a link, and
+# must not say so.
+if known.json().get("reset_link") is None:
+    check("an unknown address gets the identical message",
+          unknown.json()["message"] == known.json()["message"],
+          f"known={known.json()['message']!r} unknown={unknown.json()['message']!r}")
+else:
+    check("an unknown address still gets the non-committal message",
+          unknown.json()["message"].startswith("If an account exists"),
+          unknown.json().get("message"))
 
 # The raw token is emailed, so it is read from the row rather than the response.
 db5 = _db()
