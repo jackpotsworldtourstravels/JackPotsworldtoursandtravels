@@ -28,34 +28,17 @@ const MyBookings = (function () {
      the time it was made -- which is exactly the pilot case, where the
      deployment offers no payment but one named booking can still be collected
      for. All three B2C products are wired to a payment provider now; the
-     MB_GATEWAY_API table below is what decides, so a product without endpoints
-     cannot be given a button that could only fail.
+     BookingPay decides, so a product without endpoints cannot be given a
+     button that could only fail.
 
      Whether a provider will ACTUALLY take it is not decided here. That is asked
      of the server, per booking, when the button is pressed -- see startPayment.
      Drawing the button is cheap; guessing the answer is not. */
-  /* The endpoint set per product, mirroring GATEWAY_API in booking-products.js.
-     A product belongs here only once it has both endpoints on the server. */
-  const MB_GATEWAY_API = {
-    package: {
-      checkout: (ref, key) => BookingApi.startPackageCheckout(ref, key),
-      reconcile: (ref, handler) => BookingApi.reconcilePackageBooking(ref, handler),
-      read: (ref) => BookingApi.getPackageBooking(ref),
-    },
-    flight: {
-      checkout: (ref, key) => BookingApi.startFlightCheckout(ref, key),
-      reconcile: (ref, handler) => BookingApi.reconcileFlightBooking(ref, handler),
-      read: (ref) => BookingApi.getBooking(ref),
-    },
-    hotel: {
-      checkout: (ref, key) => BookingApi.startHotelCheckout(ref, key),
-      reconcile: (ref, handler) => BookingApi.reconcileHotelBooking(ref, handler),
-      read: (ref) => BookingApi.getHotelBooking(ref),
-    },
-  };
-
+  /* BookingPay owns the list of products with a checkout and a reconcile
+     endpoint. Asking it, rather than keeping a second table here, is what stops
+     the button and the thing behind the button disagreeing. */
   function payable(b) {
-    return !!MB_GATEWAY_API[b.kind] && b.status === 'Pending';
+    return BookingPay.supports(b.kind) && b.status === 'Pending';
   }
 
   /* Pay a booking that already exists.
@@ -70,65 +53,26 @@ const MyBookings = (function () {
      rather than opening another against the same booking. */
   async function startPayment(b) {
     const ref = b.ref || b.id;
-    let cfg;
-    try {
-      cfg = await BookingApi.paymentConfig(ref);
-    } catch {
-      showToast('We could not reach the payment service. Please try again.');
-      return;
-    }
-    if (!(cfg && cfg.configured && cfg.key_id)) {
-      /* Both halves are required: a provider with no publishable key cannot
-         open a checkout, and continuing would fail in front of the traveller. */
-      showToast('Online payment is not available for this booking yet.');
-      return;
-    }
 
-    const key = `mb-${ref}`;
+    /* The overlay is this page's own; BookingPay draws into it rather than
+       making one, so the detail modal's close and lock behaviour still apply. */
     const ov = document.getElementById('mbOverlay');
     ov.innerHTML = '';
     ov.classList.add('is-open');
     document.body.classList.add('bk-locked');
 
-    try {
-      const api = MB_GATEWAY_API[b.kind];
-      const checkout = await api.checkout(ref, key);
-      JPay.mount(ov, {
-        bookingRef: ref,
-        packageName: b.title || b.id,
-        /* The PROVIDER's figure, echoed by our server -- never b.total. */
-        amountMinor: checkout.amount,
-        checkout: checkout,
-        /* RECONCILE FIRST, then a plain read. Asking the server to re-check
-           with the provider is what lets this finish where no webhook can
-           arrive. Same verifier the webhook runs, so nothing is trusted here
-           that would not be trusted there. */
-        pollStatus: async (handler) => {
-          let st = '';
-          try {
-            const r = await api.reconcile(ref, handler);
-            st = String((r && r.booking_status) || '').toLowerCase();
-          } catch { st = ''; }
-          if (!st) {
-            const got = await api.read(ref);
-            st = String((got && got.status) || '').toLowerCase();
-          }
-          if (st === 'confirmed' || st === 'completed') return 'confirmed';
-          if (st === 'cancelled') return 'cancelled';
-          return 'pending';
-        },
-        onRetry: async () => api.checkout(ref, key),
-        onDone: async () => { closeDetail(); await refresh(); },
-      });
-    } catch (err) {
-      const msg = (typeof BookingApi !== 'undefined' && BookingApi.errorText)
-        ? BookingApi.errorText(err, 'We could not start the payment.')
-        : 'We could not start the payment.';
-      ov.innerHTML = `<div class="jpay"><div class="jpay-error" role="alert">${esc(msg)}</div>
-        <div class="jpay-actions">
-          <button type="button" class="jpay-cta" data-mb="close">Close</button>
-        </div></div>`;
-    }
+    await BookingPay.open({
+      ref: ref,
+      kind: b.kind,
+      title: b.title || b.id,
+      host: ov,
+      onUnavailable: (msg) => {
+        ov.classList.remove('is-open');
+        document.body.classList.remove('bk-locked');
+        showToast(msg);
+      },
+      onDone: async () => { closeDetail(); await refresh(); },
+    });
   }
 
   function card(b) {

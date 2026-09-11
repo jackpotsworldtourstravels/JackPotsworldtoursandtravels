@@ -615,12 +615,33 @@ async function cancelBookingById(bookingRef, onSuccess) {
   } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
 function wireBookingRowActions(container) {
-  /* The panel has no payment screen of its own, and should not grow a second
-     copy of one. my-bookings.html already has the screen that is collecting
-     real money, so the reference is carried there and that page opens payment
-     on arrival. */
+  /* PAY WHERE THE TRAVELLER ALREADY IS.
+
+     This used to navigate to my-bookings.html, which meant a traveller who
+     pressed Pay in a light modal landed on a dark full page mid-payment. The
+     jolt is not cosmetic: changing everything on screen at the moment somebody
+     is about to part with money is exactly when they stop trusting the page.
+
+     BookingPay draws its own overlay and runs the same sequence my-bookings.html
+     runs -- one implementation, two mount points -- so paying here costs a
+     second copy of nothing. */
   container.querySelectorAll('[data-pay-id]').forEach(btn => btn.addEventListener('click', () => {
-    window.location.href = 'my-bookings.html?pay=' + encodeURIComponent(btn.dataset.payId);
+    const ref = btn.dataset.payId;
+    const b = (allBookingsCache || []).find(x => x.booking_ref === ref) || {};
+    if (typeof BookingPay === 'undefined') {
+      window.location.href = 'my-bookings.html?pay=' + encodeURIComponent(ref);
+      return;
+    }
+    BookingPay.open({
+      ref: ref,
+      kind: b.product_type,
+      title: bookingTitle(b),
+      onUnavailable: (msg) => {
+        if (typeof showToast === 'function') showToast(msg, true);
+        else alert(msg);
+      },
+      onDone: async () => { await loadAcctBookings(); },
+    });
   }));
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
   container.querySelectorAll('[data-cancel-id]').forEach(btn => {
