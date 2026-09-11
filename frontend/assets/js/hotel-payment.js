@@ -55,6 +55,7 @@ const HotelPayment = (function () {
   let gatewayConfigured = false;
   let gatewayLive = false;      // a provider would actually collect
   let gatewayMounted = false;   // the JPay panel is up; do not build a second
+  let gatewayPaid = false;      // the provider path reached a settled booking
   let chosen = null;
   let busy = false;          // a submission is in flight
   let submitError = null;
@@ -118,6 +119,21 @@ const HotelPayment = (function () {
     const s = readSession();
     return (s && s.fp === fingerprint() && s.ref) ? s.ref : null;
   }
+
+
+  /* THE REFERENCE THIS SCREEN SHOULD TREAT AS FINISHED -- which is not the same
+     question as "does a booking exist".
+
+     On the demo path a booking is written when Pay is pressed, so a reference
+     means submitted. On the gateway path the booking is written BEFORE payment,
+     because the provider needs something to open an order against; a reference
+     there means an order is open, not that anyone has paid.
+
+     Reading the second case as the first is what sent JPH000007 to the
+     confirmation screen having paid nothing: the action bar saw a reference,
+     announced "already submitted", and offered View booking where the Pay
+     button belonged. Razorpay recorded zero attempts against that order. */
+  const submittedRef = () => (gatewayLive && !gatewayPaid) ? null : existingRef();
 
   function nights() {
     const a = shell && shell.checkIn ? new Date(shell.checkIn) : null;
@@ -232,11 +248,11 @@ const HotelPayment = (function () {
         <p class="hr-panel-note">Choose how you intend to pay for this stay.</p>
       </div>
 
-      ${alreadyHtml()}
-      ${existingRef() ? '' : signInHtml()}
-      ${existingRef() || gatewayLive ? '' : noticeHtml()}
+      ${submittedRef() ? alreadyHtml() : ''}
+      ${submittedRef() ? '' : signInHtml()}
+      ${submittedRef() || gatewayLive ? '' : noticeHtml()}
 
-      ${existingRef() ? '' : (gatewayLive ? `
+      ${submittedRef() ? '' : (gatewayLive ? `
       <section class="hr-rvsec" aria-labelledby="hrPayHead">
         <div class="hr-rvsec-head"><h2 id="hrPayHead">Payment</h2></div>
         <div class="hr-rvsec-body"><div id="hpGatewayHost"></div></div>
@@ -300,7 +316,7 @@ const HotelPayment = (function () {
   }
 
   function actionbarHtml() {
-    const done = existingRef();
+    const done = submittedRef();
     if (done) {
       return `
       <div class="hr-actionbar-inner">
@@ -454,6 +470,23 @@ const HotelPayment = (function () {
     const sess = session();
     try {
       let ref = existingRef();
+      if (ref) {
+        /* Back into this screen after a payment settled. Opening another order
+           against a booking that is already paid would be a second charge
+           waiting to happen, so hand straight over to the booking instead. */
+        try {
+          const b = await BookingApi.getHotelBooking(ref);
+          const st = String((b && b.status) || '').toLowerCase();
+          if (st === 'confirmed' || st === 'completed') {
+            gatewayPaid = true;
+            paintActionbar();
+            if (handlers.viewBooking) handlers.viewBooking(ref);
+            return;
+          }
+        } catch {
+          /* Unreadable: fall through and let the order path decide. */
+        }
+      }
       if (!ref) {
         const created = await createBooking(
           { method: null, methodLabel: 'UPI / Razorpay',
@@ -492,7 +525,10 @@ const HotelPayment = (function () {
             const b = await BookingApi.getHotelBooking(ref);
             st = String((b && b.status) || '').toLowerCase();
           }
-          if (st === 'confirmed' || st === 'completed') return 'confirmed';
+          if (st === 'confirmed' || st === 'completed') {
+            gatewayPaid = true;
+            return 'confirmed';
+          }
           if (st === 'cancelled') return 'cancelled';
           return 'pending';
         },
@@ -601,6 +637,7 @@ const HotelPayment = (function () {
     submitError = null;
     busy = false;
     gatewayMounted = false;
+    gatewayPaid = false;
 
     const root = $('hpRoot');
     if (root) root.hidden = false;
