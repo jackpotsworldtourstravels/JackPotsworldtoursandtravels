@@ -285,11 +285,9 @@ def apply_event(
         # editing the module that decides money arrived while packages were
         # going into production.
         #
-        # Hotels still have no verifier. They have the columns and could receive
-        # an event, but nothing opens orders for them, so there is no booking
-        # total to verify against. Such an event stays deferred -- visible,
-        # un-acted-on, and picked up by the sweep once hotels are wired --
-        # rather than being guessed at.
+        # All three B2C products now have one. The else branch below is not
+        # dead: a payment table added later reaches it, and deferring is the
+        # honest answer for a row nothing knows how to verify.
         if isinstance(row, CustomerPackageBookingPayment):
             result = verify.verify_and_capture(
                 db, row.customer_package_booking_payment_id, provider_name=provider,
@@ -301,6 +299,14 @@ def apply_event(
 
             result = verify_flight.verify_and_capture(
                 db, row.customer_booking_payment_id, provider_name=provider,
+            )
+        elif isinstance(row, CustomerHotelBookingPayment):
+            from app.services import (
+                payment_verification_hotel_service as verify_hotel,
+            )
+
+            result = verify_hotel.verify_and_capture(
+                db, row.customer_hotel_booking_payment_id, provider_name=provider,
             )
         else:
             return DEFERRED, (

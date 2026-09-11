@@ -345,6 +345,14 @@ const BookingApi = (function () {
     post(`/api/customer/bookings/${encodeURIComponent(ref)}/reconcile`,
          handler || {});
 
+  const startHotelCheckout = (ref, idempotencyKey) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/checkout`,
+         { idempotency_key: idempotencyKey });
+
+  const reconcileHotelBooking = (ref, handler) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/reconcile`,
+         handler || {});
+
   /* reconcilePackageBooking() asks OUR server to ask the PROVIDER where the
      payment actually stands, and returns the booking status that came back.
 
@@ -477,6 +485,7 @@ const BookingApi = (function () {
     payHotelBooking, cancelHotelBooking, hotelPayload, hotelAddonPayload,
     paymentConfig, startPackageCheckout, reconcilePackageBooking,
     startFlightCheckout, reconcileFlightBooking,
+    startHotelCheckout, reconcileHotelBooking,
     packageAddons, quotePackage, createPackageBooking, listPackageBookings,
     getPackageBooking, payPackageBooking, cancelPackageBooking,
     packagePayload, packageAddonPayload,

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import datetime as dt
 
+from decimal import Decimal
+
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -32,6 +34,7 @@ from app.models_customer import (
 )
 from app.services import customer_hotel_catalog_service as catalog
 from app.services import customer_hotel_pricing_service as pricing
+from app.services import payments as payment_providers
 from app.services.customer_booking_service import PAYMENT_METHODS
 
 REF_SEQ = "seq_customer_hotel_booking_ref"
@@ -355,3 +358,277 @@ def record_payment(
     db.add(payment)
     db.flush()
     return payment
+
+# ---------------------------------------------------------------------------
+# Taking a real payment. Opening a checkout only -- nothing here moves
+# money-state, and nothing here trusts a browser.
+#
+# This mirrors customer_package_booking_service function for function. Packages
+# were wired first and are the reference implementation; anything that differs
+# here is a bug in one of the two, not a deliberate variation.
+# ---------------------------------------------------------------------------
+def payable_amount(booking: CustomerHotelBooking) -> Decimal:
+    """What this booking costs, read from the row the server priced.
+
+    THE WHOLE POINT OF THIS FUNCTION IS THAT IT TAKES NO ARGUMENT FROM A
+    REQUEST. ``create_booking`` recomputed every rupee through
+    ``customer_hotel_pricing_service`` and wrote the total down; this reads that total
+    back. A client that sends ``{"amount": 1}`` alongside its booking reference
+    changes nothing, because no code path reads an amount out of a payment
+    request -- there is no field for one to arrive in.
+    """
+    return Decimal(str(booking.total_amount or 0))
+
+
+def captured_payment(
+    db: Session, booking: CustomerHotelBooking
+) -> CustomerHotelBookingPayment | None:
+    """The verified payment for this booking, if it has been paid.
+
+    Used to refuse a second checkout on a booking that is already paid for --
+    the failure mode a customer reaches by pressing Back from the confirmation
+    screen and paying again.
+    """
+    return db.execute(
+        select(CustomerHotelBookingPayment).where(
+            CustomerHotelBookingPayment.hotel_booking_id == booking.customer_hotel_booking_id,
+            CustomerHotelBookingPayment.status == CustomerPaymentStatus.CAPTURED.value,
+        )
+    ).scalars().first()
+
+
+def reconcilable_payment(
+    db: Session, booking: CustomerHotelBooking
+) -> CustomerHotelBookingPayment | None:
+    """The attempt worth asking the provider about, if there is one.
+
+    The most recent one that actually reached the provider. An attempt with no
+    ``provider_order_id`` was never opened there and there is nothing to ask
+    about, so it is skipped rather than reported as unpayable. A captured row is
+    returned rather than filtered out: the verifier answers ``already_captured``
+    for it in one cheap read, which is the honest answer to "did this get paid?".
+    """
+    return db.execute(
+        select(CustomerHotelBookingPayment)
+        .where(
+            CustomerHotelBookingPayment.hotel_booking_id == booking.customer_hotel_booking_id,
+            CustomerHotelBookingPayment.provider_order_id.isnot(None),
+        )
+        .order_by(CustomerHotelBookingPayment.created_at.desc())
+    ).scalars().first()
+
+
+def find_payment_by_idempotency_key(
+    db: Session, booking: CustomerHotelBooking, key: str
+) -> CustomerHotelBookingPayment | None:
+    """The attempt this booking already has under this key, if any.
+
+    Scoped to the booking as well as the key, matching the unique index from
+    migration 0062.
+    """
+    return db.execute(
+        select(CustomerHotelBookingPayment).where(
+            CustomerHotelBookingPayment.hotel_booking_id == booking.customer_hotel_booking_id,
+            CustomerHotelBookingPayment.idempotency_key == key,
+        )
+    ).scalar_one_or_none()
+
+
+def _checkout_options(booking: CustomerHotelBooking, customer: Customer) -> dict:
+    """Non-secret display detail for the provider's checkout widget.
+
+    Prefill is a convenience the customer can overwrite and is never used for
+    verification. No passport and no document detail -- a checkout widget has no
+    use for any of it, and this is the boundary where that is decided.
+    """
+    label = booking.hotel_name or "Hotel stay"
+    return {
+        "name": "JackPots World Tours & Travels",
+        "description": f"{label} - {booking.booking_ref}",
+        "prefill": {
+            "name": customer.full_name,
+            "email": customer.email,
+            "contact": customer.mobile,
+        },
+    }
+
+
+def _session_for(payment, booking, customer, provider):
+    """Rebuild the checkout session for an attempt that already has an order.
+
+    Rebuilt rather than stored: the amount comes back off the payment row, so a
+    session handed to a returning customer cannot drift from what was recorded.
+    """
+    return payment_providers.CheckoutSession(
+        order_id=payment.provider_order_id,
+        amount_minor=payment_providers.to_minor(
+            Decimal(str(payment.amount)), payment.currency
+        ),
+        currency=payment.currency,
+        publishable_key=provider.publishable_key,
+        provider=provider.name,
+        redirect_url=None,
+        options=_checkout_options(booking, customer),
+    )
+
+
+def start_checkout(
+    db: Session,
+    customer: Customer,
+    booking: CustomerHotelBooking,
+    *,
+    idempotency_key: str,
+):
+    """Open a provider checkout for this booking. Takes no money.
+
+    Returns ``(payment_row, CheckoutSession)``.
+
+    WHAT THIS RETURNS IS AN INVITATION TO PAY, NOT A PAYMENT.
+    The payment row is written ``pending`` and the booking is not touched at
+    all. Only the verified provider path may promote either, which is why the
+    words ``CAPTURED`` and ``CONFIRMED`` appear nowhere in this function.
+
+    PRESSING PAY NOW TWICE OPENS ONE ORDER. Three mechanisms, in order:
+
+    1. the attempt already recorded under this key is returned as-is, so a
+       double-click or a reload re-uses the order it already opened;
+    2. the unique index on ``(hotel_booking_id, idempotency_key)`` decides
+       the race the lookup above cannot -- two simultaneous requests can both
+       find nothing -- and the loser re-reads the winner's row;
+    3. when a row already claimed this key but carries no order id -- a previous
+       attempt that failed between claiming and recording -- ``may_exist`` makes
+       the adapter LOOK THE ORDER UP BEFORE CREATING ONE.
+
+    Any one would usually do. All three are here because what is being guarded
+    against is a customer paying twice.
+    """
+    if booking.customer_id != customer.customer_id:
+        # Belt and braces: the router already resolved this booking through
+        # get_owned(). Repeated because this function WRITES a payment, and a
+        # payment written against someone else's booking is the worst outcome
+        # available in this module.
+        raise HotelBookingError("This booking belongs to another customer.")
+    if booking.status == CustomerBookingStatus.CANCELLED.value:
+        raise HotelBookingError("This booking has been cancelled and cannot be paid for.")
+    if booking.status == CustomerBookingStatus.COMPLETED.value:
+        raise HotelBookingError("This booking is already completed.")
+
+    already = captured_payment(db, booking)
+    if already is not None:
+        raise HotelBookingError(
+            f"{booking.booking_ref} has already been paid for. "
+            "No further payment is needed."
+        )
+
+    key = (idempotency_key or "").strip()
+    if len(key) < 8:
+        raise HotelBookingError(
+            "A payment needs an idempotency key of at least 8 characters."
+        )
+
+    # WHICH ADAPTER COLLECTS FOR THIS BOOKING. Almost always the configured
+    # provider; a booking named in TRUSTBRICK_PILOT_BOOKING_REFS goes through
+    # TrustBrick instead. An empty pilot list makes this exactly get_provider().
+    provider = payment_providers.get_provider_for_booking(booking.booking_ref)
+
+    # (1) The attempt this key already produced.
+    existing = find_payment_by_idempotency_key(db, booking, key)
+    if existing is not None and existing.provider_order_id:
+        # Rebuilt with the adapter that ACTUALLY opened it, not with whatever is
+        # configured now: a pilot list edited between two attempts would
+        # otherwise hand the customer a session carrying the wrong provider's
+        # publishable key, and a checkout that cannot open.
+        opener = provider
+        if existing.provider and existing.provider != provider.name:
+            try:
+                opener = payment_providers.get_provider_named(existing.provider)
+            except payment_providers.PaymentProviderError:
+                raise HotelBookingError(
+                    f"{booking.booking_ref} has an open payment with "
+                    f"{existing.provider}, which is not available on this "
+                    "deployment. Contact support rather than paying twice."
+                )
+        return existing, _session_for(existing, booking, customer, opener)
+
+    amount = payable_amount(booking)
+    if amount <= 0:
+        raise HotelBookingError(
+            f"{booking.booking_ref} has no amount to pay. "
+            "Contact support rather than paying zero."
+        )
+    currency = (booking.currency or payment_providers.INR).upper()
+    amount_minor = payment_providers.to_minor(amount, currency)
+
+    payment = existing
+    if payment is None:
+        payment = CustomerHotelBookingPayment(
+            hotel_booking_id=booking.customer_hotel_booking_id,
+            # The provider decides between UPI Intent and UPI QR from the
+            # device, and offers cards/netbanking if the account has them. What
+            # the customer ACTUALLY used is written back by the webhook from the
+            # provider's own answer -- guessing it here would put a method on
+            # the row that nobody chose.
+            method="gateway",
+            status=CustomerPaymentStatus.PENDING.value,
+            amount=amount,
+            currency=currency,
+            provider=provider.name,
+            idempotency_key=key,
+        )
+        db.add(payment)
+        try:
+            # (2) Claim the key before calling out, so a race is decided by the
+            # index rather than by two requests both opening an order.
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            won = find_payment_by_idempotency_key(db, booking, key)
+            if won is not None and won.provider_order_id:
+                return won, _session_for(won, booking, customer, provider)
+            raise
+
+    # (3) The provider call. ``may_exist`` is true only when a row already
+    # claimed this key and has no provider_order_id -- which is exactly "an
+    # earlier attempt may have opened an order and failed before telling us".
+    # In that state the adapter must look before it creates.
+    session = provider.create_checkout(
+        amount_minor=amount_minor,
+        currency=currency,
+        reference=booking.booking_ref,
+        idempotency_key=key,
+        may_exist=existing is not None,
+        customer={
+            "name": customer.full_name,
+            "email": customer.email,
+            "contact": customer.mobile,
+        },
+        notes={
+            "booking_ref": booking.booking_ref,
+            "product_type": "hotel",
+            "customer_id": customer.customer_id,
+        },
+    )
+
+    # WHAT THE PROVIDER OPENED MUST BE WHAT WE ASKED FOR. Checked here as well
+    # as at capture, so a mismatch is caught before the customer is shown a
+    # figure rather than after they have paid it.
+    if session.amount_minor != amount_minor or (session.currency or "").upper() != currency:
+        raise HotelBookingError(
+            "The payment provider opened an order for a different amount than "
+            f"{booking.booking_ref} is for. Nothing has been charged."
+        )
+
+    payment.provider = session.provider
+    payment.provider_order_id = session.order_id
+    payment.provider_status = "created"
+    db.flush()
+
+    return payment, payment_providers.CheckoutSession(
+        order_id=session.order_id,
+        amount_minor=session.amount_minor,
+        currency=session.currency,
+        publishable_key=session.publishable_key,
+        provider=session.provider,
+        redirect_url=session.redirect_url,
+        options={**dict(session.options), **_checkout_options(booking, customer)},
+    )

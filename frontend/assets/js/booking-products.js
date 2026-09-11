@@ -2091,9 +2091,9 @@ const BookingProducts = (function () {
      give travellers a Pay button with nothing behind it -- which is what the
      list is for.
 
-     Hotels are absent deliberately: they have the payment columns and the
-     models, but no checkout endpoint and no verifier. */
-  const GATEWAY_PRODUCTS = ['package', 'flight'];
+     All three B2C products are here now. Cruises and visas are not: they
+     have no server-side booking at all, let alone a payment one. */
+  const GATEWAY_PRODUCTS = ['package', 'flight', 'hotel'];
 
   /* The endpoint set per product. The gateway screen used to name the package
      calls directly, which meant adding a product meant editing the screen. */
@@ -2107,6 +2107,11 @@ const BookingProducts = (function () {
       checkout: (ref, key) => BookingApi.startFlightCheckout(ref, key),
       reconcile: (ref, handler) => BookingApi.reconcileFlightBooking(ref, handler),
       read: (ref) => BookingApi.getBooking(ref),
+    },
+    hotel: {
+      checkout: (ref, key) => BookingApi.startHotelCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcileHotelBooking(ref, handler),
+      read: (ref) => BookingApi.getHotelBooking(ref),
     },
   };
 
