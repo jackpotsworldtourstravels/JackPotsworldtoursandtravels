@@ -53,6 +53,8 @@ const HotelPayment = (function () {
   let quote = null;
   let methods = [];
   let gatewayConfigured = false;
+  let gatewayLive = false;      // a provider would actually collect
+  let gatewayMounted = false;   // the JPay panel is up; do not build a second
   let chosen = null;
   let busy = false;          // a submission is in flight
   let submitError = null;
@@ -232,13 +234,17 @@ const HotelPayment = (function () {
 
       ${alreadyHtml()}
       ${existingRef() ? '' : signInHtml()}
-      ${existingRef() ? '' : noticeHtml()}
+      ${existingRef() || gatewayLive ? '' : noticeHtml()}
 
-      ${existingRef() ? '' : `
+      ${existingRef() ? '' : (gatewayLive ? `
+      <section class="hr-rvsec" aria-labelledby="hrPayHead">
+        <div class="hr-rvsec-head"><h2 id="hrPayHead">Payment</h2></div>
+        <div class="hr-rvsec-body"><div id="hpGatewayHost"></div></div>
+      </section>` : `
       <section class="hr-rvsec" aria-labelledby="hrPayHead">
         <div class="hr-rvsec-head"><h2 id="hrPayHead">Payment method</h2></div>
         <div class="hr-rvsec-body" id="hrPayBody">${methodsHtml()}</div>
-      </section>`}
+      </section>`)}
 
       ${submitError ? `
         <div class="hr-pricechange" role="alert">
@@ -314,6 +320,7 @@ const HotelPayment = (function () {
     const ready = !!chosen && !!quote && !busy && signedIn();
     let note;
     if (!signedIn()) note = 'Sign in to continue';
+    else if (gatewayLive) note = 'Pay securely in the panel above';
     else if (busy) note = 'Confirming your booking…';
     else if (!chosen) note = 'Choose a payment method';
     else note = 'Demo checkout — nothing is charged';
@@ -331,10 +338,11 @@ const HotelPayment = (function () {
           <span>Amount due</span>
         </div>
         <div class="hr-ab-cta">
+          ${gatewayLive ? '' : `
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hpPayNow"
                   ${ready ? '' : 'disabled'}>
             ${busy ? 'Confirming…' : 'Pay now'}
-          </button>
+          </button>`}
           <span>${esc(note)}</span>
         </div>
       </div>`;
@@ -360,6 +368,146 @@ const HotelPayment = (function () {
   /* ---------------------------------------------------------------------
      Submit — the only thing on this screen that writes anything.
      --------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     THE BOOKING, WRITTEN THE SAME WAY ON BOTH PATHS.
+     The demo path and the gateway path differ in exactly one thing: what they
+     say about payment. The stay, the guests, the addons, the coupon and above
+     all the idempotency key are identical, so a hotel booked with a provider
+     configured is the same row as one booked without. Sharing this function is
+     what keeps that true -- two copies would drift, and the drift would show
+     up as a booking that reconciles for one product and not the other.
+     --------------------------------------------------------------------- */
+  async function createBooking(payment, sess) {
+    /* Created through BookingStore, not BookingApi directly. The store makes
+       the booking, logs the payment attempt against it, and -- the part that
+       matters here -- normalises the API response into the shape every
+       downstream screen already reads. Handing the raw response on instead
+       left the confirmation screen with no reference and a zero total, and it
+       fell back to calling a real server booking a demo one. */
+    const created = await BookingStore.create({
+      kind: 'hotel',
+      payment,
+      apiPayload: {
+      /* Same key on every retry of this submission, so the server returns
+         the booking it already made instead of making another. */
+      idempotency_key: sess.key,
+      stay: {
+        hotel_id: Number(detail.id),
+        room_id: Number(picks[0].id),
+        room_ids: picks.map(p => Number(p.id)),
+        check_in: shell.checkIn,
+        check_out: shell.checkOut,
+        rooms_count: picks.length,
+        adults: (guestData.party || []).filter(g => g.kind === 'adult').length || 1,
+        children: (guestData.party || []).filter(g => g.kind === 'child').length,
+        child_ages: (guestData.party || []).filter(g => g.kind === 'child').map(g => g.age),
+      },
+      guests: guestData.guests || [],
+      addons: addons.map(code => ({ code })),
+      special_requests: guestData.special_requests || [],
+      notes: guestData.notes || null,
+      coupon_code: couponCode || null,
+      },
+    });
+    /* Remember what this submission produced BEFORE navigating, so a Back
+       into this screen finds it. */
+    writeSession({ fp: sess.fp, key: sess.key, ref: created.id || created.booking_ref || null });
+    return created;
+  }
+
+  /* ---------------------------------------------------------------------
+     THE GATEWAY PATH.
+     A deliberate mirror of mountGatewayScreen() in booking-products.js, which
+     is the sequence already collecting real money for packages and flights:
+     write the booking FIRST so a reference exists, open the provider order
+     against that reference, then hand the screen to JPay. Three details look
+     incidental and are not:
+
+       * `method: null`, NOT 'gateway'. /pay accepts card, debit, upi, netbank
+         and wallet only, so 'gateway' 400s on every booking -- and it did,
+         silently, until the packages path was fixed. The method a customer
+         really used is written later, from the provider's own answer.
+       * the SAME idempotency key the demo path uses, so a retry, a reload or
+         a second click resolves to one booking and one order.
+       * `amountMinor` comes from the PROVIDER's echo, never from `quote`. If
+         those two ever disagree, the figure shown must be the one the provider
+         will actually charge.
+     --------------------------------------------------------------------- */
+  async function mountGateway() {
+    if (gatewayMounted) return;
+    const host = $('hpGatewayHost');
+    if (!host) return;
+    gatewayMounted = true;
+
+    if (typeof JPay === 'undefined') {
+      host.innerHTML = '<div class="hr-pricechange" role="alert">'
+        + '<div><b>Payment is unavailable.</b><span>The payment screen could not '
+        + 'be loaded. Please refresh and try again.</span></div></div>';
+      return;
+    }
+
+    /* A placeholder while the booking is written, so the panel is never blank. */
+    host.innerHTML = '<div class="jpay"><div class="jpay-status">'
+      + '<div class="jpay-status-icon is-wait"><div class="jpay-spinner"></div></div>'
+      + '<h3>Preparing your payment</h3><p>Just a moment.</p></div></div>';
+
+    const sess = session();
+    try {
+      let ref = existingRef();
+      if (!ref) {
+        const created = await createBooking(
+          { method: null, methodLabel: 'UPI / Razorpay',
+            amount: quote && quote.total_amount, simulated: false }, sess);
+        ref = created.id || created.booking_ref;
+      }
+      if (!ref) throw new Error('The booking could not be created.');
+
+      const checkout = await BookingApi.startHotelCheckout(ref, sess.key);
+      paintActionbar();
+
+      JPay.mount(host, {
+        bookingRef: ref,
+        packageName: (detail && detail.name) || 'your stay',
+        amountMinor: checkout.amount,
+        checkout: checkout,
+
+        /* RECONCILE FIRST, then a plain read.
+
+           Asking the server to re-check with the provider is what lets this
+           finish where no webhook can arrive -- a laptop that sleeps, or a
+           delivery that is late or lost. It runs the SAME verifier the webhook
+           runs, so nothing is trusted here that would not be trusted there.
+           A reconcile failure is not fatal: it can 503 while the provider is
+           briefly unreachable, and a webhook may already have confirmed the
+           booking, so the plain read below still runs. */
+        pollStatus: async (handler) => {
+          let st = '';
+          try {
+            const r = await BookingApi.reconcileHotelBooking(ref, handler);
+            st = String((r && r.booking_status) || '').toLowerCase();
+          } catch {
+            st = '';
+          }
+          if (!st) {
+            const b = await BookingApi.getHotelBooking(ref);
+            st = String((b && b.status) || '').toLowerCase();
+          }
+          if (st === 'confirmed' || st === 'completed') return 'confirmed';
+          if (st === 'cancelled') return 'cancelled';
+          return 'pending';
+        },
+        onRetry: async () => BookingApi.startHotelCheckout(ref, sess.key),
+        onDone: () => { if (handlers.viewBooking) handlers.viewBooking(ref); },
+      });
+    } catch (err) {
+      const msg = (BookingApi.errorText && BookingApi.errorText(err))
+        || 'We could not start the payment.';
+      host.innerHTML = '<div class="hr-pricechange" role="alert">'
+        + '<div><b>We could not start the payment.</b><span>' + esc(msg)
+        + '</span></div></div>';
+    }
+  }
+
   async function payNow() {
     if (busy || !chosen || !quote) return;
     if (!signedIn()) { openSignIn(); return; }
@@ -375,42 +523,9 @@ const HotelPayment = (function () {
     paintMain(); paintActionbar();
 
     try {
-      /* Created through BookingStore, not BookingApi directly. The store makes
-         the booking, logs the payment attempt against it, and — the part that
-         matters here — normalises the API response into the shape every
-         downstream screen already reads. Handing the raw response on instead
-         left the confirmation screen with no reference and a ₹0 total, and it
-         fell back to calling a real server booking a demo one. */
-      const created = await BookingStore.create({
-        kind: 'hotel',
-        payment: { method: chosen, methodLabel: methodLabel(chosen) },
-        apiPayload: {
-        /* Same key on every retry of this submission, so the server returns
-           the booking it already made instead of making another. */
-        idempotency_key: sess.key,
-        stay: {
-          hotel_id: Number(detail.id),
-          room_id: Number(picks[0].id),
-          room_ids: picks.map(p => Number(p.id)),
-          check_in: shell.checkIn,
-          check_out: shell.checkOut,
-          rooms_count: picks.length,
-          adults: (guestData.party || []).filter(g => g.kind === 'adult').length || 1,
-          children: (guestData.party || []).filter(g => g.kind === 'child').length,
-          child_ages: (guestData.party || []).filter(g => g.kind === 'child').map(g => g.age),
-        },
-        guests: guestData.guests || [],
-        addons: addons.map(code => ({ code })),
-        special_requests: guestData.special_requests || [],
-        notes: guestData.notes || null,
-        coupon_code: couponCode || null,
-        },
-      });
-
+      const created = await createBooking(
+        { method: chosen, methodLabel: methodLabel(chosen) }, sess);
       busy = false;
-      /* Remember what this submission produced BEFORE navigating, so a Back
-         into this screen finds it. */
-      writeSession({ fp: sess.fp, key: sess.key, ref: created.id || created.booking_ref || null });
       if (handlers.done) handlers.done(created, { method: chosen });
     } catch (err) {
       busy = false;
@@ -485,6 +600,7 @@ const HotelPayment = (function () {
     handlers = hs || {};
     submitError = null;
     busy = false;
+    gatewayMounted = false;
 
     const root = $('hpRoot');
     if (root) root.hidden = false;
@@ -509,8 +625,26 @@ const HotelPayment = (function () {
       methods = [];
       gatewayConfigured = false;
     }
+
+    /* Whether a provider would ACTUALLY collect -- a different question from
+       `gateway_configured`, and the one that decides whether this screen shows
+       a real checkout or the demo picker.
+
+       Asked WITHOUT a booking reference, because the booking does not exist
+       yet: this screen is what creates it. A booking routed to a provider by
+       reference alone -- a pilot -- therefore still sees the demo screen here,
+       which is precisely why a per-reference pilot is a testing scaffold and
+       not a shipping configuration. */
+    try {
+      const cfg = await BookingApi.paymentConfig();
+      gatewayLive = !!(cfg && cfg.configured && cfg.key_id);
+    } catch {
+      gatewayLive = false;
+    }
+
     paintMain();
     paintActionbar();
+    if (gatewayLive) mountGateway();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
