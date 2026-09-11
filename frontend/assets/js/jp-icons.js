@@ -94,6 +94,21 @@ const JPIcon = (function () {
       <circle data-jpi="shift" cx="7.6" cy="17.2" r="1.6"/>
       <circle data-jpi="shift" cx="16.4" cy="17.2" r="1.6"/>`,
 
+    /* Gaming. A pair of dice, the near one settling after a roll.
+
+       Drawn rather than borrowed: `activities` (an admission ticket) was the
+       closest existing glyph and reads as an event, not a table. The pips are
+       filled circles, which every other icon here avoids — a 1px-stroked dot
+       at 20px disappears, and a die with no pips is a rounded square. */
+    gaming: `
+      <rect data-jpi="rock" x="3.1" y="9.4" width="11.5" height="11.5" rx="2.6"
+            style="transform-origin:8.85px 15.15px"/>
+      <circle cx="6.6" cy="12.9" r="1.05" fill="currentColor" stroke="none"/>
+      <circle cx="11.1" cy="17.4" r="1.05" fill="currentColor" stroke="none"/>
+      <rect x="11.3" y="3.1" width="9.6" height="9.6" rx="2.2" opacity=".55"/>
+      <circle data-jpi="pop" cx="16.1" cy="7.9" r="1.05" fill="currentColor" stroke="none"
+              style="transform-origin:16.1px 7.9px"/>`,
+
     /* Travel insurance. The tick draws itself in. */
     insurance: `
       <path d="M12 2.9 5.2 5.6v5.6c0 4.1 2.8 7.9 6.8 9.2 4-1.3 6.8-5.1 6.8-9.2V5.6z"/>
@@ -166,6 +181,7 @@ const JPIcon = (function () {
     flights: 'Flights', hotels: 'Hotels', cruises: 'Cruises',
     packages: 'Tour Packages', visa: 'Visa Services', activities: 'Activities',
     transfers: 'Airport Transfers', insurance: 'Travel Insurance',
+    gaming: 'Gaming Packages',
     star: 'Rating', bell: 'Notifications',
     swap: 'Swap', arrowUp: 'Back to top', chat: 'Chat', mic: 'Voice search',
     sparkle: 'Suggestions', more: 'More travel services',

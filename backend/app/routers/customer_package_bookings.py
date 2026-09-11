@@ -61,13 +61,29 @@ router = APIRouter(prefix="/api/customer", tags=["customer-package-bookings"])
     response_model=list[PackageSearchResult],
     summary="Tour Packages grid",
     description=(
-        "Public. Every active package. Destination/budget/duration/month filtering stays "
-        "client-side — the same arrangement flights and hotels use for their own "
-        "sample-sized catalogues."
+        "Public. Every active package, or one shelf of them. Destination/budget/"
+        "duration/month filtering stays client-side — the same arrangement flights "
+        "and hotels use for their own sample-sized catalogues — but CATEGORY is "
+        "server-side, because it decides which page a trip belongs to rather than "
+        "narrowing a page that is already showing it."
     ),
 )
-def list_packages(db: Session = Depends(get_db)):
-    return catalog.list_packages(db)
+def list_packages(
+    db: Session = Depends(get_db),
+    category: str | None = Query(
+        None,
+        description="'holiday' or 'gaming'. Omit for every shelf.",
+    ),
+):
+    # REJECTED, NOT IGNORED. A typo'd category that fell through to "everything"
+    # would put holiday trips on the gaming page, which is the one outcome this
+    # column exists to prevent.
+    if category is not None and category not in catalog.CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown package category {category!r}.",
+        )
+    return catalog.list_packages(db, category=category)
 
 
 @router.get(

@@ -170,8 +170,14 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    window with 500px going spare either side. The bar uses the window it is
    given; everything below the header still honours --max. */
 #siteHeader nav.wrap{max-width:none; padding-inline:clamp(16px, 2.5vw, 44px);}
-.logo{display:flex; align-items:center; margin-left:16px;}
-.logo-mark-img{height:104px; width:auto; object-fit:contain; flex-shrink:0;}
+/* THE LOGO IS THE BRAND MARK AND IT IS SIZED LIKE ONE. Both numbers went up
+   when six products left the nav: the bar was fitting ten cells plus a
+   six-item utility cluster, and every pixel the logo took came off the strip
+   (see the comments further down about Flights sitting behind it). Four cells
+   is not that bar. `margin-left` is ON TOP of nav.wrap's own padding-inline,
+   so the mark clears the window edge rather than hugging it. */
+.logo{display:flex; align-items:center; margin-left:34px;}
+.logo-mark-img{height:120px; width:auto; object-fit:contain; flex-shrink:0;}
 .navlinks{display:flex; gap:30px; font-size:14.5px; font-weight:600; align-items:center;}
 .navlinks a{position:relative; padding:8px 0; color:rgba(255,255,255,0.86); transition:color .3s ease;}
 .navlinks a:hover{color:#fff;}
@@ -1107,7 +1113,7 @@ header.is-solid{
   color:var(--navy);
 }
 header.is-solid nav.wrap{height:76px;}
-header.is-solid .logo-mark-img{max-height:52px;}
+header.is-solid .logo-mark-img{max-height:64px;}
 
 header.is-solid .navlinks a{color:var(--navy); font-weight:600;}
 header.is-solid .navlinks a:hover{color:var(--coral);}
@@ -1127,7 +1133,7 @@ header.is-solid .mobile-nav a{color:var(--navy);}
 
 @media (max-width:900px){
   header.is-solid nav.wrap{height:64px;}
-  header.is-solid .logo-mark-img{max-height:42px;}
+  header.is-solid .logo-mark-img{max-height:52px;}
 }
 
 /* ---------------------------------------------------------------------------
@@ -1162,7 +1168,7 @@ body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader{
   border-bottom:1px solid var(--line); color:var(--navy);
 }
 body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader nav.wrap{height:76px;}
-body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:52px;}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:64px;}
 body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .navlinks a{color:var(--navy); font-weight:600;}
 body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .navlinks a:hover{color:var(--coral);}
 body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .nav-partner-mark{color:var(--navy); border-color:var(--line);}
@@ -1172,7 +1178,7 @@ body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .nav-icon-btn{
 body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .hr-wish{color:var(--navy);}
 @media (max-width:900px){
   body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader nav.wrap{height:64px;}
-  body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:42px;}
+  body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:52px;}
 }
 
 /* ---------------------------------------------------------------------------
@@ -1190,7 +1196,7 @@ body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .hr-wish{color
 @media (max-width:600px){
   header .nav-actions > .nav-partner-mark{display:none;}
   header .logo{flex:0 0 auto;}
-  header .logo-mark-img{max-height:38px;}
+  header .logo-mark-img{max-height:46px;}
 }
 
 /* ---------------------------------------------------------------------------

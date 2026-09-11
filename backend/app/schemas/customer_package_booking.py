@@ -36,6 +36,9 @@ class PackageSearchResult(BaseModel):
     priceFrom: Decimal = Field(validation_alias="price_from")
     blurb: str
     is_international: bool
+    #: 'holiday' or 'gaming'. Sent even though each page asks for one shelf,
+    #: so a row is self-describing wherever it ends up.
+    category: str
 
     @field_validator("id", mode="before")
     @classmethod

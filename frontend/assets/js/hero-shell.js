@@ -49,16 +49,31 @@ const HeroShell = (function () {
      "holiday package" too, which is why Tour Packages keeps its name. Adding
      them is a commercial decision plus a one-line change to that guard, not
      something to slip in behind it. */
+  /* THE PRODUCTS THIS BUSINESS SELLS, AND ONLY THOSE.
+     -------------------------------------------------------------------------
+     Villas & Homestays, Trains, Buses and Cabs pointed at the contact form
+     because they had no booking backend; Visa and Cruise had pages but are not
+     being sold. Six of the ten cells were therefore advertising, on the first
+     screen of every page, products a traveller could not buy — which is the
+     exact failure verify_footer.py's NOT_OFFERED list exists to catch further
+     down the page, and the nav was the copy it could not see.
+
+     Gaming Packages is the one that arrives. It is a real shelf of
+     customer_packages (migration 0069) with its own page, not a filter on
+     Holiday Packages, so it is a nav item like the other three.
+
+     visa.html and cruises.html ARE LEFT ON DISK. Nothing links to them now;
+     deleting a URL that has been live is how inbound links and search results
+     turn into 404s, and that is a decision to take on its own rather than as
+     part of a nav change.
+
+     index.html carries the other copy of this list in static markup, and
+     booking-card.js's TABS is the third. CHANGE ONE, CHANGE THE OTHERS. */
   const LINKS = [
     { href: 'flights.html', label: 'Flights', icon: 'flights' },
     { href: 'hotels.html', label: 'Hotels', icon: 'hotels' },
-    { href: 'index.html#contact', label: 'Villas & Homestays', icon: 'hotels' },
     { href: 'packages.html', label: 'Holiday Packages', icon: 'packages' },
-    { href: 'index.html#contact', label: 'Trains', icon: 'transfers' },
-    { href: 'index.html#contact', label: 'Buses', icon: 'transfers' },
-    { href: 'index.html#contact', label: 'Cabs', icon: 'transfers' },
-    { href: 'visa.html', label: 'Visa', icon: 'visa' },
-    { href: 'cruises.html', label: 'Cruise', icon: 'cruises' },
+    { href: 'gaming-packages.html', label: 'Gaming Packages', icon: 'gaming' },
     { href: 'index.html#contact', label: 'More', icon: 'more' },
   ];
 
@@ -493,6 +508,7 @@ const HeroShell = (function () {
       'flights.html': 'flights',
       'hotels.html': 'hotels',
       'packages.html': 'packages',
+      'gaming-packages.html': 'gaming',
     };
     /* Declared here because BOTH delegated handlers below hang off it. */
     const header = document.getElementById('siteHeader');

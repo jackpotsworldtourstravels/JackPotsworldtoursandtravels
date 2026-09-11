@@ -66,8 +66,11 @@ body.bk-inpage #siteHeader {
   color: var(--navy, #0A2540);
 }
 body.bk-inpage #siteHeader nav.wrap { height: 72px; }
-body.bk-inpage #siteHeader .logo { margin-left: 0; }
-body.bk-inpage #siteHeader .logo-mark-img { height: 54px; }
+/* The booking bar keeps the mark a little tighter to the edge than the rest
+   of the site — it is a working screen, and the row carries a stepper. It
+   still grew with everything else. */
+body.bk-inpage #siteHeader .logo { margin-left: 12px; }
+body.bk-inpage #siteHeader .logo-mark-img { height: 64px; }
 body.bk-inpage #siteHeader .navlinks a,
 body.bk-inpage #siteHeader .nav-login { color: var(--navy, #0A2540); }
 body.bk-inpage #siteHeader .navlinks a:hover { color: var(--coral, #FF4D4D); }

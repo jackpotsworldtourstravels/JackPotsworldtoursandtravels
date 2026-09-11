@@ -1079,6 +1079,10 @@ class CustomerPackage(Base):
     days: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     price_from: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     is_international: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: Which shelf this trip sits on — 'holiday' or 'gaming' (migration 0069).
+    #: A plain string with a CHECK, not an enum: the vocabulary is a
+    #: merchandising decision and the next one should not be an ALTER TYPE.
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="holiday")
     inclusions: Mapped[list[str]] = mapped_column(ARRAY(String(120)), nullable=False, default=list)
     cancellation_policy: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)

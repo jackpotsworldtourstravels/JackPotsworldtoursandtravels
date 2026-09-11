@@ -411,9 +411,30 @@ const BookingCard = (function () {
     return panelOpen('packages')
       + '<div class="search-fields cols-3">'
       + '<div class="field"><label for="pType">Tour Package Type</label><select id="pType">'
-      + '<option>Casino Tour Package</option><option>Domestic Tour Package</option>'
+      /* CASINO IS NOT A TOUR PACKAGE TYPE ANY MORE. It was the only trace of a
+         gaming product anywhere in this codebase, sitting in a dropdown on the
+         holiday panel; gaming is its own shelf and its own tab now, so leaving
+         it here would be two doors to one product, one of which searches the
+         wrong category. */
+      + '<option>Domestic Tour Package</option>'
+      + '<option>International Tour Package</option>'
       + '<option>Pilgrimage Tour Package</option></select></div>'
       + '<div class="field"><label for="pMonth">Month</label><select id="pMonth">'
+      + monthOptions('July') + '</select></div>'
+      + '</div></div>';
+  }
+
+  /* Gaming trips. The same two questions the holiday panel asks, because they
+     are the same table (customer_packages, migration 0069) reached through the
+     same flow — only the shelf differs, and the tab is what says which. */
+  function gamingPanel() {
+    return panelOpen('gaming')
+      + '<div class="search-fields cols-3">'
+      + '<div class="field"><label for="gType">Gaming Package Type</label><select id="gType">'
+      + '<option>Casino Tour Package</option>'
+      + '<option>Poker Tour Package</option>'
+      + '<option>Gaming Event Package</option></select></div>'
+      + '<div class="field"><label for="gMonth">Month</label><select id="gMonth">'
       + monthOptions('July') + '</select></div>'
       + '</div></div>';
   }
@@ -461,26 +482,23 @@ const BookingCard = (function () {
       + '</div></div>';
   }
 
+  /* FOUR PANELS, ALL OF THEM SEARCHES.
+     -----------------------------------------------------------------------
+     Villas, Trains, Buses, Cabs and Visa opened an enquiryPanel() — a sentence
+     and a link, because none of them has a booking backend. Five of nine tabs
+     that could not be searched is a product strip advertising things the site
+     cannot sell, and the nav carried the same six (hero-shell.js's LINKS).
+     They are withdrawn together.
+
+     enquiryPanel() IS DELIBERATELY KEPT even though nothing calls it: it is
+     the honest shape for a product that is coming, and the next one will want
+     it. cruisesPanel() is kept on the same terms and has been unused since
+     Cruise left this list. */
   const PANELS = {
     flights: flightsPanel,
     hotels: hotelsPanel,
-    cruises: cruisesPanel,
     packages: packagesPanel,
-    villas: () => enquiryPanel('villas',
-      'Villas and homestays are arranged by our team for your dates and party size.',
-      'index.html#contact', 'Enquire about a villa'),
-    trains: () => enquiryPanel('trains',
-      'Rail bookings are handled by our travel desk while online booking is being connected.',
-      'index.html#contact', 'Enquire about trains'),
-    buses: () => enquiryPanel('buses',
-      'Bus bookings are handled by our travel desk while online booking is being connected.',
-      'index.html#contact', 'Enquire about buses'),
-    cabs: () => enquiryPanel('cabs',
-      'Airport transfers and cabs are arranged alongside your booking.',
-      'index.html#contact', 'Enquire about a cab'),
-    visa: () => enquiryPanel('visa',
-      'Visa assistance is handled case by case — tell us the country and your travel dates.',
-      'visa.html', 'Visa assistance'),
+    gaming: gamingPanel,
   };
 
   /* The products, in the order the landing page has always listed them. `icon`
@@ -490,24 +508,22 @@ const BookingCard = (function () {
      just above — it is what cruises.html would need if that product is ever
      put back — but it is not in this list, so the tab is not drawn and the
      panel is not built. Nothing is hidden; it simply is not rendered. */
-  /* NINE TABS, per the supplied reference. Five of them open a panel that
-     enquires rather than searches — see PANELS above for why that is the
-     honest shape while those products have no backend. */
+  /* THE FOUR PRODUCTS THIS BUSINESS SELLS, in the order the header nav lists
+     them. hero-shell.js's LINKS and index.html's static markup are the other
+     two copies of this list — CHANGE ONE, CHANGE THE OTHERS. */
   const TABS = [
-    { id: 'flights',  label: 'Flights',            icon: 'flights' },
-    { id: 'hotels',   label: 'Hotels',             icon: 'hotels' },
-    { id: 'villas',   label: 'Villas & Homestays', icon: 'hotels' },
-    { id: 'packages', label: 'Holiday Packages',   icon: 'packages' },
-    { id: 'trains',   label: 'Trains',             icon: 'transfers' },
-    { id: 'buses',    label: 'Buses',              icon: 'transfers' },
-    { id: 'cabs',     label: 'Cabs',               icon: 'transfers' },
-    { id: 'visa',     label: 'Visa',               icon: 'visa' },
-    { id: 'cruises',  label: 'Cruise',             icon: 'cruises' },
+    { id: 'flights',  label: 'Flights',          icon: 'flights' },
+    { id: 'hotels',   label: 'Hotels',           icon: 'hotels' },
+    { id: 'packages', label: 'Holiday Packages', icon: 'packages' },
+    { id: 'gaming',   label: 'Gaming Packages',  icon: 'gaming' },
   ];
 
   /* Which tabs can actually run a search. The Search button and the criteria
-     dispatch both read this, so an enquiry tab can never submit a form. */
-  const SEARCHABLE = ['flights', 'hotels', 'packages', 'cruises'];
+     dispatch both read this, so a tab with no handler can never submit a form.
+     All four can now, which is the point of withdrawing the five that could
+     not. 'cruises' left with the tab; cruisesPanel() is still defined and
+     still unreferenced. */
+  const SEARCHABLE = ['flights', 'hotels', 'packages', 'gaming'];
 
   const panelId = name => 'bcPanel-' + name;
   const tabId = name => 'bcTab-' + name;
@@ -852,6 +868,12 @@ const BookingCard = (function () {
       return [main, join([dates, party])];
     }
 
+    if (state.tab === 'gaming') {
+      return [val('gType') || 'Gaming packages', val('gMonth')];
+    }
+
+    /* cruises is unreachable from TABS now; the branch is kept with
+       cruisesPanel() for the same reason. */
     if (state.tab === 'cruises') {
       return [val('crType') || 'Search cruises', join([val('crMonth'), val('crDur'), textOf('crTrav')])];
     }
@@ -1398,6 +1420,7 @@ const BookingCard = (function () {
     if (kind === 'flights') return flightCriteria();
     if (kind === 'hotels') return hotelCriteria();
     if (kind === 'packages') return { type: val('pType'), month: val('pMonth') };
+    if (kind === 'gaming') return { type: val('gType'), month: val('gMonth') };
     /* An enquiry tab has no criteria to give — its panel carries its own link
        and the Search button is hidden on it. */
     return {};

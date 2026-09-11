@@ -7,8 +7,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tour Packages — JackPots World Tours &amp; Travels</title>
-<meta name="description" content="Curated holiday and tour packages with JackPots World Tours &amp; Travels.">
+<title>Gaming Packages — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="Casino and gaming tour packages with JackPots World Tours &amp; Travels.">
 <link rel="icon" href="assets/images/favicon.ico">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -59,16 +59,26 @@
 <script src="assets/js/site-footer.js?v=20260905ft6"></script>
 <script src="assets/js/hero-shell.js?v=20260911gm5"></script>
 </head>
-<!-- data-sp-category NAMES THE SHELF rather than leaving it implied.
-     customer_packages carries both holiday and gaming trips now (migration
-     0069) and gaming-packages.html is the other half of this page. The
-     default in travel-explore.js is 'holiday' precisely so this page kept
-     working before the attribute existed; stating it means a future third
-     category cannot quietly appear in this grid. -->
+<!-- THE SAME PAGE AS packages.html, ON A DIFFERENT SHELF.
+     data-sp-service stays "packages" on purpose: the search strip, the grid,
+     the filters and the whole booking flow behind them are the package
+     machinery, and this page wants every one of them. customer_packages is
+     one table (migration 0069 gave it a category), so a gaming trip books
+     through exactly the path a holiday does.
+
+     What the three attributes below change is the QUERY and the WORDS:
+       data-sp-category  which shelf to fetch — see pkgCategory() in
+                         travel-explore.js. Absent means 'holiday', so the
+                         other page did not have to change to keep working.
+       data-sp-heading   the grid heading while nothing is filtered.
+       data-sp-noun      what to call these in a filtered heading and in the
+                         empty state.
+     A second copy of travel-explore's package code under a "gaming" service
+     name would be the same thing twice, kept in step by hand. -->
 <body class="sp-continuation" data-sp-service="packages"
-      data-sp-category="holiday"
-      data-sp-heading="Curated tour packages"
-      data-sp-noun="tour packages"
+      data-sp-category="gaming"
+      data-sp-heading="Gaming packages"
+      data-sp-noun="gaming packages"
       data-live-chat>
 <a href="#spMain" class="skip-link">Skip to content</a>
 
@@ -86,7 +96,7 @@
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('packages.html');</script>
+<script>HeroShell.mountHeader('gaming-packages.html');</script>
 
 <!-- The results-page search strip (search-strip.js), in the same compact
      band Flights and Hotels use. It replaces the richer #txSearchPanel
@@ -102,10 +112,10 @@
   <section class="tx-section" aria-labelledby="txPkgHead">
     <div class="tx-head">
       <div>
-        <h2 id="txPkgHead">Popular tour packages</h2>
-        <p>Prices are per person on twin sharing and exclude visa fees.</p>
+        <h2 id="txPkgHead">Gaming packages</h2>
+        <p>Casino and gaming trips, arranged end to end. Prices are per person
+          on twin sharing and exclude visa fees.</p>
       </div>
-      <span class="tx-sample" title="Replaced automatically when the Packages API is connected">Sample fares</span>
     </div>
     <!-- THE PACKAGE SEARCH PANEL IS NOT BUILT HERE ANY MORE.
          search-strip.js's row at the top of the page is this page's search now,

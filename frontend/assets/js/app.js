@@ -585,6 +585,7 @@ const HERO_SEARCH = {
   flights:  { page: 'flights.html' },
   hotels:   { page: 'hotels.html' },
   packages: { page: 'packages.html' },
+  gaming:   { page: 'gaming-packages.html' },
 };
 
 /** Park a search so signing in can resume it.

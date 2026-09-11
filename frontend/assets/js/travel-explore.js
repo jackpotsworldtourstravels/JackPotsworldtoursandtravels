@@ -1250,6 +1250,26 @@ const TravelExplore = (function () {
     armIcons(el);
   }
 
+  /* ---------------------------------------------------------------------
+     WHICH SHELF THIS PAGE SELLS.
+
+     packages.html and gaming-packages.html are the SAME page with a different
+     category: same search strip, same grid, same booking flow, same table
+     behind it (customer_packages, migration 0069). What differs is one query
+     parameter and the words around it, so that is all the pages carry — a
+     second copy of this machinery under a different name is how the two would
+     drift, and the file header's whole argument is about not doing that.
+
+     The default is 'holiday' rather than "no filter". A page that forgot to
+     declare its shelf should show the catalogue it has always shown, not every
+     shelf at once — that is how gaming trips would appear on the holiday page
+     the moment the first one is added.
+     --------------------------------------------------------------------- */
+  const pkgCategory = () => document.body.dataset.spCategory || 'holiday';
+
+  /** What to call these in a heading, an empty state and a count. */
+  const pkgNoun = () => document.body.dataset.spNoun || 'packages';
+
   function renderPackages(all) {
     const el = $('txPackageGrid');
     if (!el) return;
@@ -1259,7 +1279,31 @@ const TravelExplore = (function () {
 
     const head = $('txPkgHead');
     if (head) {
-      head.textContent = state.pkgDest ? `Tour packages — ${state.pkgDest}` : 'Curated tour packages';
+      /* The unfiltered heading belongs to the PAGE — "Curated tour packages"
+         is wrong above a gaming shelf — and the filtered one is built from the
+         same noun so the two cannot describe different products. */
+      const noun = pkgNoun();
+      head.textContent = state.pkgDest
+        ? `${noun.charAt(0).toUpperCase()}${noun.slice(1)} — ${state.pkgDest}`
+        : (document.body.dataset.spHeading || 'Curated tour packages');
+    }
+
+    /* AN EMPTY SHELF IS NOT A TOO-NARROW SEARCH, and telling somebody to try
+       a different month when there is nothing on sale at all would send them
+       round a loop that cannot end. This is the state a new category is in
+       before its first trip is added (see migration 0069, which deliberately
+       seeds none): say so, and offer the one thing that does work. */
+    if (!all.length) {
+      catalogue.package = [];
+      el.innerHTML = `<div class="tx-empty">
+        <b>Our ${esc(pkgNoun())} are not bookable online yet</b>
+        Tell us where and when, and we will put an itinerary and a price
+        together for you.
+        <div class="tx-empty-acts">
+          <a class="tx-btn tx-btn-primary" href="index.html#contact">Enquire about a trip</a>
+        </div>
+      </div>`;
+      return;
     }
 
     if (!rows.length) {
@@ -1277,7 +1321,9 @@ const TravelExplore = (function () {
       el.innerHTML = `<div class="tx-empty">
         <b>No packages ${bits.length ? bits.join(', ') : 'match that'}</b>
         Try a different month, a wider budget or another destination.
-        <button type="button" class="tx-btn tx-btn-primary" id="txShowAllPkgs">Show all packages</button>
+        <div class="tx-empty-acts">
+          <button type="button" class="tx-btn tx-btn-primary" id="txShowAllPkgs">Show all packages</button>
+        </div>
       </div>`;
       const btn = $('txShowAllPkgs');
       if (btn) btn.addEventListener('click', () => {
@@ -2600,7 +2646,7 @@ const TravelExplore = (function () {
       } else if (service === 'cruises') {
         renderCruises(await TravelData.cruises());
       } else if (service === 'packages') {
-        const rows = await TravelData.packages();
+        const rows = await TravelData.packages({ category: pkgCategory() });
         await mountPackageSearch(rows);
         /* The hero card, after the panel: both register against the same
            state, and the card is the one a traveller sees first. */

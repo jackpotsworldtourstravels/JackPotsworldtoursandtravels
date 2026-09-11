@@ -36,14 +36,27 @@ _PACKAGE_ADDONS = {
 }
 
 
-def list_packages(db: Session) -> list[CustomerPackage]:
-    """Every active package — what the Tour Packages grid renders."""
+#: The shelves a package can sit on, mirroring migration 0069's CHECK. Kept
+#: here rather than imported from the migration because a migration is a
+#: historical record and this is today's vocabulary.
+CATEGORIES = ("holiday", "gaming")
+
+
+def list_packages(db: Session, category: str | None = None) -> list[CustomerPackage]:
+    """Every active package, optionally narrowed to one shelf.
+
+    ``category=None`` means EVERY shelf, and that is what the existing callers
+    pass — the Tour Packages grid asks for ``holiday`` explicitly, so nothing
+    depends on the unfiltered form meaning "holidays". An unknown category is
+    the caller's problem to reject (the router does); this returns nothing for
+    it rather than silently falling back to everything, because a page that
+    asks for a shelf that does not exist should look empty, not full.
+    """
+    stmt = select(CustomerPackage).where(CustomerPackage.is_active.is_(True))
+    if category is not None:
+        stmt = stmt.where(CustomerPackage.category == category)
     return list(
-        db.execute(
-            select(CustomerPackage)
-            .where(CustomerPackage.is_active.is_(True))
-            .order_by(CustomerPackage.customer_package_id)
-        ).scalars()
+        db.execute(stmt.order_by(CustomerPackage.customer_package_id)).scalars()
     )
 
 
