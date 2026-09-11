@@ -23,6 +23,92 @@ const MyBookings = (function () {
   let rows = [];
   let filter = 'all';
 
+  /* WHICH BOOKINGS CAN STILL BE PAID.
+     A booking only reaches this page unpaid when no gateway was available at
+     the time it was made -- which is exactly the pilot case, where the
+     deployment offers no payment but one named booking can still be collected
+     for. Packages only: they are the sole product wired to a payment provider,
+     so offering this on a flight would draw a button that could only fail.
+
+     Whether a provider will ACTUALLY take it is not decided here. That is asked
+     of the server, per booking, when the button is pressed -- see startPayment.
+     Drawing the button is cheap; guessing the answer is not. */
+  function payable(b) {
+    return b.kind === 'package' && b.status === 'Pending';
+  }
+
+  /* Pay a booking that already exists.
+
+     THE REFERENCE IS THE POINT. paymentConfig() asked without one answers for
+     the deployment, and a pilot booking looks unpayable. Asked with this
+     booking's reference it answers for this booking, which is the only question
+     worth asking here.
+
+     The idempotency key is derived from the reference and never varies, so a
+     second click, a reload or a return visit all resolve to the one order
+     rather than opening another against the same booking. */
+  async function startPayment(b) {
+    const ref = b.ref || b.id;
+    let cfg;
+    try {
+      cfg = await BookingApi.paymentConfig(ref);
+    } catch {
+      showToast('We could not reach the payment service. Please try again.');
+      return;
+    }
+    if (!(cfg && cfg.configured && cfg.key_id)) {
+      /* Both halves are required: a provider with no publishable key cannot
+         open a checkout, and continuing would fail in front of the traveller. */
+      showToast('Online payment is not available for this booking yet.');
+      return;
+    }
+
+    const key = `mb-${ref}`;
+    const ov = document.getElementById('mbOverlay');
+    ov.innerHTML = '';
+    ov.classList.add('is-open');
+    document.body.classList.add('bk-locked');
+
+    try {
+      const checkout = await BookingApi.startPackageCheckout(ref, key);
+      JPay.mount(ov, {
+        bookingRef: ref,
+        packageName: b.title || b.id,
+        /* The PROVIDER's figure, echoed by our server -- never b.total. */
+        amountMinor: checkout.amount,
+        checkout: checkout,
+        /* RECONCILE FIRST, then a plain read. Asking the server to re-check
+           with the provider is what lets this finish where no webhook can
+           arrive. Same verifier the webhook runs, so nothing is trusted here
+           that would not be trusted there. */
+        pollStatus: async (handler) => {
+          let st = '';
+          try {
+            const r = await BookingApi.reconcilePackageBooking(ref, handler);
+            st = String((r && r.booking_status) || '').toLowerCase();
+          } catch { st = ''; }
+          if (!st) {
+            const got = await BookingApi.getPackageBooking(ref);
+            st = String((got && got.status) || '').toLowerCase();
+          }
+          if (st === 'confirmed' || st === 'completed') return 'confirmed';
+          if (st === 'cancelled') return 'cancelled';
+          return 'pending';
+        },
+        onRetry: async () => BookingApi.startPackageCheckout(ref, key),
+        onDone: async () => { closeDetail(); await refresh(); },
+      });
+    } catch (err) {
+      const msg = (typeof BookingApi !== 'undefined' && BookingApi.errorText)
+        ? BookingApi.errorText(err, 'We could not start the payment.')
+        : 'We could not start the payment.';
+      ov.innerHTML = `<div class="jpay"><div class="jpay-error" role="alert">${esc(msg)}</div>
+        <div class="jpay-actions">
+          <button type="button" class="jpay-cta" data-mb="close">Close</button>
+        </div></div>`;
+    }
+  }
+
   function card(b) {
     const cancelled = b.status === 'Cancelled';
     return `<article class="mb-card ${cancelled ? 'is-cancelled' : ''}">
@@ -43,6 +129,8 @@ const MyBookings = (function () {
         <span class="mb-status is-${cancelled ? 'cancelled' : 'confirmed'}">${esc(b.status)}</span>
         <b class="mb-total">${esc(money(b.total))}</b>
         <div class="mb-actions">
+          ${payable(b) ?
+            `<button type="button" class="tx-btn tx-btn-primary" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>` : ''}
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="view" data-id="${esc(b.id)}">View</button>
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="ticket" data-id="${esc(b.id)}">Ticket</button>
           ${cancelled ? '' :
@@ -173,6 +261,7 @@ const MyBookings = (function () {
       const b = rows.find(x => x.id === btn.dataset.id);
       if (!b) return;
 
+      if (act === 'pay') return startPayment(b);
       if (act === 'view') return openDetail(b);
       if (act === 'ticket') return BookingTicket.handle('download', b);
       if (act === 'cancel') {

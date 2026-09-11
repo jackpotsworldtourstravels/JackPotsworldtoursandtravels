@@ -308,16 +308,27 @@ const BookingApi = (function () {
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/pay`, { method });
 
   /* --- real payments (Phase 3/4) ---------------------------------------
-     paymentConfig() says whether a provider is configured on this deployment
-     and hands back its PUBLISHABLE key. There is no endpoint anywhere that
-     returns the key secret or the webhook secret, so there is nothing here
-     that could accidentally fetch one.
+     paymentConfig() says whether a provider is configured and hands back its
+     PUBLISHABLE key. There is no endpoint anywhere that returns the key secret
+     or the webhook secret, so there is nothing here that could accidentally
+     fetch one.
+
+     PASS A BOOKING REFERENCE WHERE YOU HAVE ONE. Without it the server answers
+     for the deployment, which is the wrong question for a booking routed to a
+     specific provider — a pilot — where the deployment as a whole offers no
+     payment but that one booking can still be collected for. Asked without a
+     reference, such a booking looks unpayable and no Pay button is drawn.
+
+     A booking with no special routing gives the same answer either way, so
+     this cannot be used to discover whether a booking exists.
 
      startPackageCheckout() asks the server to open a provider order. The
      amount is NOT a parameter — the server reads it off the booking row it
      priced. The idempotency key is the caller's, so a double-click, a reload
      or a Try-again all resolve to the one order. */
-  const paymentConfig = () => get('/api/customer/payments/config');
+  const paymentConfig = (bookingRef) =>
+    get('/api/customer/payments/config'
+        + (bookingRef ? `?booking_ref=${encodeURIComponent(bookingRef)}` : ''));
 
   const startPackageCheckout = (ref, idempotencyKey) =>
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/checkout`,
