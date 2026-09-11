@@ -278,15 +278,35 @@ def apply_event(
         # them yet, so there is no booking total to verify against. Such an
         # event stays deferred — visible, un-acted-on, and picked up by the
         # sweep once those products are wired — rather than being guessed at.
-        if not isinstance(row, CustomerPackageBookingPayment):
+        # WHICH VERIFIER OWNS THIS ROW.
+        # Packages and flights each have one. They are separate modules on
+        # purpose: the package verifier was proved against a live provider
+        # before the flight one existed, and generalising it would have meant
+        # editing the module that decides money arrived while packages were
+        # going into production.
+        #
+        # Hotels still have no verifier. They have the columns and could receive
+        # an event, but nothing opens orders for them, so there is no booking
+        # total to verify against. Such an event stays deferred -- visible,
+        # un-acted-on, and picked up by the sweep once hotels are wired --
+        # rather than being guessed at.
+        if isinstance(row, CustomerPackageBookingPayment):
+            result = verify.verify_and_capture(
+                db, row.customer_package_booking_payment_id, provider_name=provider,
+            )
+        elif isinstance(row, CustomerBookingPayment):
+            from app.services import (
+                payment_verification_flight_service as verify_flight,
+            )
+
+            result = verify_flight.verify_and_capture(
+                db, row.customer_booking_payment_id, provider_name=provider,
+            )
+        else:
             return DEFERRED, (
                 f"{event.event_type}: recorded; no verification path for "
                 f"{type(row).__name__} yet."
             )
-
-        result = verify.verify_and_capture(
-            db, row.customer_package_booking_payment_id, provider_name=provider,
-        )
 
         if result.disposition == verify.RETRYABLE:
             # STAYS DEFERRED. A slow or unreachable provider, or a payment still

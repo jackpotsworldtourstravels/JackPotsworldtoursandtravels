@@ -17,10 +17,16 @@ touches a booking requires a session.
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.auth.customer_deps import get_current_customer
 from app.database.session import get_db
 from app.models_customer import Customer
 from app.schemas.customer_booking import (
+    FlightCheckoutRequest,
+    FlightCheckoutResponse,
+    FlightReconcileRequest,
+    FlightReconcileResponse,
     BookingCreate,
     CouponOffer,
     BookingResponse,
@@ -33,10 +39,14 @@ from app.schemas.customer_booking import (
 from app.services import activity_service, customer_audit_service
 from app.services import customer_account_service as acct
 from app.services import customer_booking_service as bookings
+from app.services import payment_verification_flight_service as verify_flight
+from app.services import payments as payment_providers
 from app.services import customer_catalog_service as catalog
 from app.services import customer_pricing_service as pricing
 
 router = APIRouter(prefix="/api/customer", tags=["customer-bookings"])
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -361,3 +371,190 @@ def cancel_booking(
     db.commit()
     db.refresh(booking)
     return booking
+
+
+# ---------------------------------------------------------------------------
+# Taking a real payment for a flight booking.
+#
+# These mirror the package endpoints in customer_package_bookings.py. The
+# CustomerPaymentStatus import is local to keep this block self-contained.
+# ---------------------------------------------------------------------------
+@router.post(
+    "/bookings/{booking_ref}/checkout",
+    response_model=FlightCheckoutResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Open a payment checkout for a flight booking",
+    description=(
+        "Requires a customer session, and the booking must belong to it.\n\n"
+        "**This takes no money.** It asks the provider to open an order for the "
+        "amount held on the booking row, records the order id against a "
+        "`pending` payment, and returns what the browser needs to display the "
+        "provider's own checkout. The booking is not touched.\n\n"
+        "**The amount is never read from the request.** There is no field for "
+        "one. Every rupee comes from the booking the server priced at creation."
+    ),
+    responses={
+        400: {"description": "Cancelled, already paid, or a bad idempotency key."},
+        404: {"description": "No such booking for this customer."},
+        503: {"description": "No payment provider is configured, or it is unreachable."},
+    },
+)
+def start_flight_checkout(
+    request: Request,
+    booking_ref: str,
+    payload: FlightCheckoutRequest,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    from app.models_customer import CustomerPaymentStatus
+
+    booking = bookings.get_owned(db, customer, booking_ref)
+    if booking is None:
+        # 404 not 403: booking references are sequential and therefore
+        # guessable, and a 403 would confirm that one exists.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    try:
+        payment, session = bookings.start_checkout(
+            db, customer, booking, idempotency_key=payload.idempotency_key,
+        )
+    except payment_providers.PaymentNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.customer_message,
+        ) from exc
+    except payment_providers.PaymentProviderError as exc:
+        logger.warning(
+            "Flight checkout could not be opened for %s: %s", booking.booking_ref, exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.customer_message,
+        ) from exc
+    except bookings.BookingError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    customer_audit_service.log(
+        db, customer, "Payment checkout opened", module="Bookings",
+        description=(
+            f"{booking.booking_ref} via {session.provider} order {session.order_id} "
+            f"for {payment.currency} {payment.amount}"
+        ),
+        meta=activity_service.request_context(request),
+    )
+    db.commit()
+
+    return FlightCheckoutResponse(
+        provider=session.provider,
+        order_id=session.order_id,
+        amount=session.amount_minor,
+        currency=session.currency,
+        key_id=session.publishable_key,
+        booking_ref=booking.booking_ref,
+        options=dict(session.options),
+        # Always pending here. Said explicitly rather than read off the row so
+        # that a future change to the row cannot make this endpoint start
+        # reporting a success it has no business reporting.
+        payment_status=CustomerPaymentStatus.PENDING.value,
+    )
+
+
+@router.post(
+    "/bookings/{booking_ref}/reconcile",
+    response_model=FlightReconcileResponse,
+    summary="Ask the provider where this flight booking's payment actually stands",
+    description=(
+        "Requires a customer session. **Asks the provider**, over an "
+        "authenticated server-side channel, and applies the answer through the "
+        "same verifier the webhook uses. Nothing the browser sends decides "
+        "anything.\n\n"
+        "This is what lets a payment finish where no webhook can arrive."
+    ),
+    responses={
+        404: {"description": "No such booking for this customer."},
+        503: {"description": "No payment provider is configured."},
+    },
+)
+def reconcile_flight_payment(
+    request: Request,
+    booking_ref: str,
+    payload: FlightReconcileRequest,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    booking = bookings.get_owned(db, customer, booking_ref)
+    if booking is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    payment = bookings.reconcilable_payment(db, booking)
+    if payment is None:
+        # No checkout was ever opened. Not an error: it is what a booking looks
+        # like before anyone has pressed Pay Now, and the honest answer is the
+        # booking's own status rather than a 4xx.
+        return FlightReconcileResponse(
+            booking_ref=booking.booking_ref,
+            booking_status=booking.status,
+            payment_status=None,
+            captured=False,
+            code="no_payment",
+            retryable=False,
+        )
+
+    # ---- the handler's signature, when the browser still has it -----------
+    # CORROBORATION, NOT AUTHORISATION. A valid signature does not capture
+    # anything and an absent one does not block anything; the provider read
+    # below is what settles the payment either way.
+    #
+    # The order id compared is OURS, off the payment row. Verifying against the
+    # order id returned by the checkout proves nothing, because an attacker
+    # supplies both halves.
+    if payload.signature and payload.provider_payment_id:
+        try:
+            adapter = payment_providers.get_provider_named(payment.provider or "")
+            verify_sig = getattr(adapter, "verify_checkout_signature", None)
+            if callable(verify_sig) and payment.provider_order_id:
+                if not verify_sig(
+                    order_id=payment.provider_order_id,
+                    payment_id=payload.provider_payment_id,
+                    signature=payload.signature,
+                ):
+                    logger.warning(
+                        "Checkout signature did not match for %s (order %s). "
+                        "Verifying against the provider anyway; the provider "
+                        "read is what decides.",
+                        booking.booking_ref, payment.provider_order_id,
+                    )
+        except payment_providers.PaymentProviderError:
+            # Not configured, or a different provider. The verifier below
+            # reports that properly; nothing to add here.
+            pass
+
+    # ---- the authoritative path -------------------------------------------
+    result = verify_flight.verify_and_capture(
+        db, payment.customer_booking_payment_id,
+    )
+
+    if result.captured_now or result.booking_confirmed_now:
+        # Audited only when something actually MOVED. A poller calling this
+        # every two seconds must not write an audit row every two seconds.
+        customer_audit_service.log(
+            db, customer, "Payment reconciled", module="Bookings",
+            description=(
+                f"{booking.booking_ref}: {result.code} "
+                f"(payment {payment.customer_booking_payment_id}, "
+                f"captured={result.captured_now}, "
+                f"confirmed={result.booking_confirmed_now})"
+            ),
+            meta=activity_service.request_context(request),
+        )
+
+    db.commit()
+    db.refresh(booking)
+    db.refresh(payment)
+
+    return FlightReconcileResponse(
+        booking_ref=booking.booking_ref,
+        booking_status=booking.status,
+        payment_status=payment.status,
+        captured=result.captured_now,
+        code=result.code,
+        retryable=result.disposition == verify_flight.RETRYABLE,
+    )

@@ -2085,7 +2085,30 @@ const BookingProducts = (function () {
      amount unforgeable: by the time a checkout is opened there is a priced row
      on the server to open it against, and the browser never supplies a figure.
      ===================================================================== */
-  const GATEWAY_PRODUCTS = ['package'];
+  /* WHICH PRODUCTS CAN OPEN A PROVIDER CHECKOUT.
+     A product belongs here only once it has BOTH endpoints on the server and an
+     entry in GATEWAY_API below. Widening this list without widening those would
+     give travellers a Pay button with nothing behind it -- which is what the
+     list is for.
+
+     Hotels are absent deliberately: they have the payment columns and the
+     models, but no checkout endpoint and no verifier. */
+  const GATEWAY_PRODUCTS = ['package', 'flight'];
+
+  /* The endpoint set per product. The gateway screen used to name the package
+     calls directly, which meant adding a product meant editing the screen. */
+  const GATEWAY_API = {
+    package: {
+      checkout: (ref, key) => BookingApi.startPackageCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcilePackageBooking(ref, handler),
+      read: (ref) => BookingApi.getPackageBooking(ref),
+    },
+    flight: {
+      checkout: (ref, key) => BookingApi.startFlightCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcileFlightBooking(ref, handler),
+      read: (ref) => BookingApi.getBooking(ref),
+    },
+  };
 
   function mountGatewayScreen(root, ctx) {
     const host = root.querySelector('[data-jpay-host]') || root;
@@ -2133,7 +2156,8 @@ const BookingProducts = (function () {
            was written under, so a retry, a reload or a second click resolves
            to the one order — see the idempotency notes above. */
         const key = submitKey(ctx);
-        const checkout = await BookingApi.startPackageCheckout(ref, key);
+        const api = GATEWAY_API[ctx.kind] || GATEWAY_API.package;
+        const checkout = await api.checkout(ref, key);
 
         JPay.mount(host, {
           bookingRef: ref,
@@ -2160,20 +2184,20 @@ const BookingProducts = (function () {
                still runs, and the loop keeps its original behaviour. */
             let st = '';
             try {
-              const r = await BookingApi.reconcilePackageBooking(ref, handler);
+              const r = await api.reconcile(ref, handler);
               st = String((r && r.booking_status) || '').toLowerCase();
             } catch {
               st = '';
             }
             if (!st) {
-              const b = await BookingApi.getPackageBooking(ref);
+              const b = await api.read(ref);
               st = String((b && b.status) || '').toLowerCase();
             }
             if (st === 'confirmed' || st === 'completed') return 'confirmed';
             if (st === 'cancelled') return 'cancelled';
             return 'pending';
           },
-          onRetry: async () => BookingApi.startPackageCheckout(ref, key),
+          onRetry: async () => api.checkout(ref, key),
           onDone: () => { window.location.href = 'my-bookings.html'; },
         });
       } catch (err) {

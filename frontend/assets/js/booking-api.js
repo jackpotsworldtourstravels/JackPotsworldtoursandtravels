@@ -334,6 +334,17 @@ const BookingApi = (function () {
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/checkout`,
          { idempotency_key: idempotencyKey });
 
+  /* The flight equivalents. Same contract, different path -- flights got their
+     own endpoints rather than a product parameter, so the server can keep the
+     booking model in the URL and out of the body. */
+  const startFlightCheckout = (ref, idempotencyKey) =>
+    post(`/api/customer/bookings/${encodeURIComponent(ref)}/checkout`,
+         { idempotency_key: idempotencyKey });
+
+  const reconcileFlightBooking = (ref, handler) =>
+    post(`/api/customer/bookings/${encodeURIComponent(ref)}/reconcile`,
+         handler || {});
+
   /* reconcilePackageBooking() asks OUR server to ask the PROVIDER where the
      payment actually stands, and returns the booking status that came back.
 
@@ -465,6 +476,7 @@ const BookingApi = (function () {
     createHotelBooking, listHotelBookings, getHotelBooking,
     payHotelBooking, cancelHotelBooking, hotelPayload, hotelAddonPayload,
     paymentConfig, startPackageCheckout, reconcilePackageBooking,
+    startFlightCheckout, reconcileFlightBooking,
     packageAddons, quotePackage, createPackageBooking, listPackageBookings,
     getPackageBooking, payPackageBooking, cancelPackageBooking,
     packagePayload, packageAddonPayload,
