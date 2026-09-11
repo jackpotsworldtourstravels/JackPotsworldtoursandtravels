@@ -331,7 +331,18 @@ const JPay = (function () {
     let lastHandler = null;
 
     function render() {
-      root.innerHTML = viewFor(s);
+      /* WHILE THE PROVIDER IS COMING UP, SHOW NOTHING.
+
+         With autoOpen there is no ready screen and nothing useful to draw
+         while Razorpay loads and opens -- it covers the page with its own
+         modal anyway. Drawing our panel underneath would replace the
+         traveller's page at precisely the moment they are deciding whether to
+         trust it. The host is revealed again for what the provider cannot
+         show: confirming, cancelled, failed, pending, success. */
+      const quiet = !!opts.autoOpen
+        && (s.state === STATE.READY || s.state === STATE.OPENING);
+      if (opts.onChrome) opts.onChrome(!quiet);
+      root.innerHTML = quiet ? '' : viewFor(s);
       bind();
     }
 
@@ -467,6 +478,11 @@ const JPay = (function () {
     }
 
     render();
+
+    /* Straight to the provider. Only ever set by a Pay button on a list, where
+       the traveller has already said what they want; the booking flow keeps the
+       ready screen, because there it is the step rather than a repeat of one. */
+    if (opts.autoOpen) openCheckout();
 
     return {
       destroy() { clearTimeout(pollTimer); },

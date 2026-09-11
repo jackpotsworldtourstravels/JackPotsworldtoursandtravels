@@ -128,16 +128,32 @@ const BookingPay = (function () {
 
     const managed = !o.host;
     const host = o.host || makeOverlay();
-    const finish = () => { if (managed) closeOverlay(host); };
 
-    host.innerHTML = '<div class="jpay"><div class="jpay-status">'
-      + '<div class="jpay-status-icon is-wait"><div class="jpay-spinner"></div></div>'
-      + '<h3>Preparing your payment</h3><p>Just a moment.</p></div></div>';
+    /* Hidden until there is something only we can say. Razorpay covers the page
+       with its own modal, so anything drawn here before that lands is a change
+       to the traveller's screen that buys nothing. */
+    const setChrome = (needed) => { host.style.display = needed ? 'block' : 'none'; };
+
+    /* A borrowed host is not ours to leave altered. my-bookings.html lends the
+       same overlay to its booking-detail modal, which shows itself with a CSS
+       class -- an inline display left behind here would outrank that class and
+       the detail modal would quietly stop opening, nowhere near this code. */
+    const prevDisplay = managed ? '' : host.style.display;
+    const finish = () => {
+      if (managed) closeOverlay(host);
+      else host.style.display = prevDisplay;
+    };
+
+    setChrome(false);
 
     const key = keyFor(ref);
     try {
       const checkout = await api.checkout(ref, key);
       JPay.mount(host, {
+        /* Open the provider directly: this is a Pay button, and the traveller
+           has already said they want to pay. */
+        autoOpen: true,
+        onChrome: setChrome,
         bookingRef: ref,
         packageName: o.title || ref,
         /* The PROVIDER's figure, echoed by our server -- never a local total. */
@@ -180,6 +196,7 @@ const BookingPay = (function () {
         ? BookingApi.errorText(err, 'We could not start the payment.')
         : 'We could not start the payment.';
       if (o.onError) { finish(); o.onError(msg); return; }
+      setChrome(true);
       host.innerHTML = '<div class="jpay"><div class="jpay-error" role="alert">'
         + esc(msg) + '</div><div class="jpay-actions">'
         + '<button type="button" class="jpay-cta" data-bkpay="close">Close</button>'
