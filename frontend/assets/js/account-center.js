@@ -574,6 +574,19 @@ async function showAcctConfirmation(bookingRef) {
   });
 }
 
+/* WHICH LISTED BOOKINGS CAN STILL BE PAID.
+   Kept in step with GATEWAY_API in booking-products.js and MB_GATEWAY_API in
+   my-bookings.js: a product belongs here only once it has both a checkout and
+   a reconcile endpoint on the server. Cruises have neither, which is why they
+   are absent rather than forgotten.
+
+   Status is compared lowercase because this panel renders the server's own
+   value; BookingStore's Title-Cased copy is a different shape on a different
+   screen, and assuming one here would silently offer nothing. */
+const ACCT_PAYABLE_TYPES = ['flight', 'hotel', 'package'];
+const acctPayable = b =>
+  ACCT_PAYABLE_TYPES.indexOf(b.product_type) !== -1 && b.status === 'pending';
+
 function bookingRowHtml(b) {
   const route = bookingRoute(b);
   return `
@@ -585,7 +598,8 @@ function bookingRowHtml(b) {
       </div>
       <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
       <div class="ar-amount">${money(b.total_amount)}</div>
-      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
+      ${acctPayable(b) ? `<button type="button" class="btn btn-coral btn-sm" data-pay-id="${b.booking_ref}">Pay now</button>` : ''}
+      <button type="button" class="btn btn-navy btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
       ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.booking_ref}">Cancel</button>` : ''}
     </div>`;
 }
@@ -601,6 +615,13 @@ async function cancelBookingById(bookingRef, onSuccess) {
   } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
 function wireBookingRowActions(container) {
+  /* The panel has no payment screen of its own, and should not grow a second
+     copy of one. my-bookings.html already has the screen that is collecting
+     real money, so the reference is carried there and that page opens payment
+     on arrival. */
+  container.querySelectorAll('[data-pay-id]').forEach(btn => btn.addEventListener('click', () => {
+    window.location.href = 'my-bookings.html?pay=' + encodeURIComponent(btn.dataset.payId);
+  }));
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
   container.querySelectorAll('[data-cancel-id]').forEach(btn => {
     btn.addEventListener('click', () => cancelBookingById(btn.dataset.cancelId, async () => {

@@ -308,6 +308,22 @@ const MyBookings = (function () {
     if (!document.getElementById('mbList')) return;
     bind();
     await refresh();
+
+    /* ?pay=REF -- open payment for one booking on arrival.
+
+       The account panel lists bookings but deliberately has no payment screen
+       of its own, so its Pay button sends the traveller here. Dropping them on
+       the list and leaving them to find the same booking again is a worse
+       answer than carrying the reference across.
+
+       Ignored in silence when the booking is missing or not payable: the list
+       is already on screen and is the honest fallback, and a reference in a URL
+       is not evidence of anything -- payable() and the server's own
+       paymentConfig(ref) still decide. */
+    const want = new URLSearchParams(window.location.search).get('pay');
+    if (!want) return;
+    const b = rows.find(r => String(r.ref || r.id) === want);
+    if (b && payable(b)) startPayment(b);
   }
 
   return { init, refresh };
