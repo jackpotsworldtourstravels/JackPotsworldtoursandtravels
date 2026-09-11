@@ -27,14 +27,35 @@ const MyBookings = (function () {
      A booking only reaches this page unpaid when no gateway was available at
      the time it was made -- which is exactly the pilot case, where the
      deployment offers no payment but one named booking can still be collected
-     for. Packages only: they are the sole product wired to a payment provider,
-     so offering this on a flight would draw a button that could only fail.
+     for. All three B2C products are wired to a payment provider now; the
+     MB_GATEWAY_API table below is what decides, so a product without endpoints
+     cannot be given a button that could only fail.
 
      Whether a provider will ACTUALLY take it is not decided here. That is asked
      of the server, per booking, when the button is pressed -- see startPayment.
      Drawing the button is cheap; guessing the answer is not. */
+  /* The endpoint set per product, mirroring GATEWAY_API in booking-products.js.
+     A product belongs here only once it has both endpoints on the server. */
+  const MB_GATEWAY_API = {
+    package: {
+      checkout: (ref, key) => BookingApi.startPackageCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcilePackageBooking(ref, handler),
+      read: (ref) => BookingApi.getPackageBooking(ref),
+    },
+    flight: {
+      checkout: (ref, key) => BookingApi.startFlightCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcileFlightBooking(ref, handler),
+      read: (ref) => BookingApi.getBooking(ref),
+    },
+    hotel: {
+      checkout: (ref, key) => BookingApi.startHotelCheckout(ref, key),
+      reconcile: (ref, handler) => BookingApi.reconcileHotelBooking(ref, handler),
+      read: (ref) => BookingApi.getHotelBooking(ref),
+    },
+  };
+
   function payable(b) {
-    return b.kind === 'package' && b.status === 'Pending';
+    return !!MB_GATEWAY_API[b.kind] && b.status === 'Pending';
   }
 
   /* Pay a booking that already exists.
@@ -70,7 +91,8 @@ const MyBookings = (function () {
     document.body.classList.add('bk-locked');
 
     try {
-      const checkout = await BookingApi.startPackageCheckout(ref, key);
+      const api = MB_GATEWAY_API[b.kind];
+      const checkout = await api.checkout(ref, key);
       JPay.mount(ov, {
         bookingRef: ref,
         packageName: b.title || b.id,
@@ -84,18 +106,18 @@ const MyBookings = (function () {
         pollStatus: async (handler) => {
           let st = '';
           try {
-            const r = await BookingApi.reconcilePackageBooking(ref, handler);
+            const r = await api.reconcile(ref, handler);
             st = String((r && r.booking_status) || '').toLowerCase();
           } catch { st = ''; }
           if (!st) {
-            const got = await BookingApi.getPackageBooking(ref);
+            const got = await api.read(ref);
             st = String((got && got.status) || '').toLowerCase();
           }
           if (st === 'confirmed' || st === 'completed') return 'confirmed';
           if (st === 'cancelled') return 'cancelled';
           return 'pending';
         },
-        onRetry: async () => BookingApi.startPackageCheckout(ref, key),
+        onRetry: async () => api.checkout(ref, key),
         onDone: async () => { closeDetail(); await refresh(); },
       });
     } catch (err) {
