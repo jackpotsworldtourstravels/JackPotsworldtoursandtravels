@@ -12,11 +12,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260905ft5">
+<link rel="stylesheet" href="assets/css/main.css?v=20260911b2d4">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260903all2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911b2d4">
 <!-- The company footer. Self-contained (its own --jwf-* tokens), so the same
      stylesheet dresses this page's hand-written footer and the one every other
      page mounts from site-footer.js. -->
@@ -26,6 +26,14 @@
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
+<!-- LAST OF THE STYLESHEETS, deliberately. This is the landing page's
+     override sheet — it repoints tokens and restyles components that
+     booking-card.css, site-footer.css and the rest declare, so it has to be
+     read after them. It sat directly under main.css at first and lost every
+     tie to booking-card.css on equal specificity: the search card's footer
+     kept its own row layout and the call to action stayed 450px right of
+     centre. Same arrangement flights-ref.css has on flights.html. -->
+<link rel="stylesheet" href="assets/css/home-ref.css?v=20260911b2d4">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -44,14 +52,14 @@
 <script src="assets/js/destinations.js?v=20260825h1"></script>
 <script src="assets/js/rooms-selector.js?v=20260825h1"></script>
 <script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260903all2"></script>
+<script src="assets/js/booking-card.js?v=20260911b2d4"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
 <script src="assets/js/site-footer.js?v=20260905ft6"></script>
-<script src="assets/js/hero-shell.js?v=20260905ft5"></script>
+<script src="assets/js/hero-shell.js?v=20260911b2d4"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -64,7 +72,7 @@
      bubble. The chat still exists here — Profile > Support Center docks the
      same panel — it simply is not advertised in the corner of the landing
      page. See LiveChat.autoMount(). -->
-<body data-jw-home-search>
+<body class="home-ref" data-jw-home-search>
 <a href="#main" class="skip-link">Skip to content</a>
 
 <!-- THIS NAV BAR EXISTS TWICE, AND THE OTHER COPY IS hero-shell.js.
@@ -86,19 +94,46 @@
          be an in-page #packages anchor; it is "Tour Packages" -> packages.html
          so there are not two nav items with near-identical names. The landing
          page's own packages section is untouched and still scrolls to. -->
+    <!-- ICON OVER LABEL, per the supplied reference. This is the hand-written
+         copy of the nav that hero-shell.js also builds (see its LINKS) — the
+         duplication is deliberate, so a crawler reads the links out of the
+         served document. CHANGE ONE, CHANGE THE OTHER.
+
+         The reference's Villas & Homestays, Trains, Buses, Cabs and Cruise are
+         absent on purpose: four of them have no page or backend, and
+         tests/verify_footer.py fails the build when index.html advertises a
+         service this business does not sell. -->
     <div class="navlinks">
-      <a href="#home">Home</a>
-      <a href="flights.html">Flights</a>
-      <a href="hotels.html">Hotels</a>
-      <a href="packages.html">Tour Packages</a>
-      <a href="#contact">Contact</a>
+      <a href="flights.html" title="Flights"><i data-jp-icon="flights" data-jp-size="sm"></i><span>Flights</span></a>
+      <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Hotels</span></a>
+      <a href="index.html#contact" title="Villas &amp; Homestays"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Villas &amp; Homestays</span></a>
+      <a href="packages.html" title="Holiday Packages"><i data-jp-icon="packages" data-jp-size="sm"></i><span>Holiday Packages</span></a>
+      <a href="index.html#contact" title="Trains"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Trains</span></a>
+      <a href="index.html#contact" title="Buses"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Buses</span></a>
+      <a href="index.html#contact" title="Cabs"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Cabs</span></a>
+      <a href="visa.html" title="Visa"><i data-jp-icon="visa" data-jp-size="sm"></i><span>Visa</span></a>
+      <a href="cruises.html" title="Cruise"><i data-jp-icon="cruises" data-jp-size="sm"></i><span>Cruise</span></a>
+      <a href="index.html#contact" title="More"><i data-jp-icon="more" data-jp-size="sm"></i><span>More</span></a>
     </div>
     <div class="nav-actions">
+      <button type="button" class="hr-wish" data-nav-acct="wishlist" title="Wishlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l8.8 8.8 8.8-8.8a5 5 0 0 0 0-7.1Z"/></svg>
+        <span>Wishlist</span>
+      </button>
       <!-- B2B door. It goes straight to the Merchant login and asks nothing:
            the role menu that used to sit behind this link named the Admin,
            Manager and Super Admin portals on a public page. Those are internal
            URLs now and are not advertised here. -->
-      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">
+      <!-- OFF ON THE LANDING PAGE, AND ONLY HERE. The B2B door is a live link
+           on every other page (hero-shell.js builds those headers); this one
+           copy is marked closed. `aria-disabled` + `tabindex="-1"` is what
+           actually takes it out of the tab order and tells a screen reader; the
+           grey and the dead pointer are home-ref.css, keyed on the attribute so
+           the markup and the styling cannot disagree about which state it is
+           in. `href` is left in place deliberately — removing it would turn the
+           element into a non-link and change how it is announced. -->
+      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink"
+         aria-disabled="true" tabindex="-1">
         <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
         <span>My Partner</span>
       </a>
@@ -124,19 +159,33 @@
       <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
     </div>
   </nav>
+  <!-- THE SAME TEN PRODUCTS AS THE BAR ABOVE, and hero-shell.js builds this
+       drawer from the same LINKS list for every other page — so this is the
+       third copy of that list and it is the one that drifted. It still read
+       Home / Flights / Hotels / Tour Packages / Contact from before the nav
+       grew, which nobody saw while the icon strip stayed visible on a phone
+       and covered for it. The strip is hidden below 860px now, so the drawer
+       IS the navigation there and has to carry everything.
+       CHANGE THIS, THE BAR ABOVE, AND hero-shell.js's LINKS. -->
   <div class="mobile-nav" id="mobileNav">
-    <a href="#home">Home</a>
-    <a href="flights.html">Flights</a>
-    <a href="hotels.html">Hotels</a>
-    <a href="packages.html">Tour Packages</a>
-    <a href="#contact">Contact</a>
+    <a href="flights.html" title="Flights"><i data-jp-icon="flights" data-jp-size="sm"></i><span>Flights</span></a>
+    <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Hotels</span></a>
+    <a href="index.html#contact" title="Villas &amp; Homestays"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Villas &amp; Homestays</span></a>
+    <a href="packages.html" title="Holiday Packages"><i data-jp-icon="packages" data-jp-size="sm"></i><span>Holiday Packages</span></a>
+    <a href="index.html#contact" title="Trains"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Trains</span></a>
+    <a href="index.html#contact" title="Buses"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Buses</span></a>
+    <a href="index.html#contact" title="Cabs"><i data-jp-icon="transfers" data-jp-size="sm"></i><span>Cabs</span></a>
+    <a href="visa.html" title="Visa"><i data-jp-icon="visa" data-jp-size="sm"></i><span>Visa</span></a>
+    <a href="cruises.html" title="Cruise"><i data-jp-icon="cruises" data-jp-size="sm"></i><span>Cruise</span></a>
+    <a href="index.html#contact" title="More"><i data-jp-icon="more" data-jp-size="sm"></i><span>More</span></a>
     <!-- The drawer's own Login/Sign Up pair and its nine account links are
          gone. They were a THIRD and FOURTH copy of the same controls, kept in
          step by hand in renderAuthNav(), and they are not needed: .nav-actions
          stays visible at every width, so the chip (avatar-only under 560px)
          and the signed-out buttons are already reachable in the header on a
          phone. The drawer is the page LINKS; the account is the header. -->
-    <a href="partner-login.html" class="mobile-partner-mark">
+    <!-- The drawer's copy of the same door, closed for the same reason. -->
+    <a href="partner-login.html" class="mobile-partner-mark" aria-disabled="true" tabindex="-1">
       <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
       My Partner
     </a>
@@ -168,10 +217,32 @@
          place the withdrawn ones survived.
          hero-shell.js's HERO_EYEBROW and HERO_SUB are the other copy of these
          two strings. CHANGE ONE, CHANGE THE OTHER. -->
-    <div class="eyebrow">Flights &middot; Hotels &middot; Tour Packages — one search</div>
-    <h1>Your next adventure<span class="accent"> starts here.</span></h1>
-    <p class="sub">Book flights, hotels and tour packages — all in one place, at prices that don’t need a coupon hunt.</p>
+    <div class="eyebrow">Explore &middot; Discover &middot; Travel &middot; Repeat</div>
+    <h1>Your next adventure<span class="accent">starts here</span></h1>
+    <p class="sub">Book flights, hotels and tour packages — all in one place.</p>
+
+    <!-- THE TRUST ROW. Four claims the business already makes elsewhere on
+         this page (the Why Choose Us tiles) and in the booking flow's fare
+         rail, brought up to the first screen where the reference puts them.
+         Nothing new is asserted here. -->
+    <div class="hr-trust">
+      <div class="hr-trust-item">
+        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 9.2 9 10 5.2-.8 9-5 9-10V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <div><b>Best Price Guarantee</b><span>Unbeatable deals</span></div>
+      </div>
+      <div class="hr-trust-item">
+        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="5" height="6" rx="1.5"/><rect x="17" y="14" width="5" height="6" rx="1.5"/></svg></span>
+        <div><b>24/7 Customer Support</b><span>We&rsquo;re always here for you</span></div>
+      </div>
+      <div class="hr-trust-item">
+        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span>
+        <div><b>Secure Payments</b><span>Your transactions are safe</span></div>
+      </div>
+
+    </div>
   </div>
+
+
 
   <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
        Flights page mounts the same module — the two pages share one control
@@ -208,92 +279,127 @@
   </div>
 </section>
 
-<section class="offers-section" aria-labelledby="offersHead">
-  <div class="wrap">
-    <div class="section-head reveal">
+<!-- THE OFFER STRIP, built to the supplied reference.
+
+     THE FIGURES ARE THE APPLICATION'S, NOT THE MOCK-UP'S. The reference reads
+     "FLAT 20% OFF" and "Starting from Rs 9,999"; the coupon table's only live
+     flight coupon is FLYHIGH30 at 30%, and the cheapest package in the
+     catalogue is Goa at Rs 21,900. A card promising Rs 9,999 sends a traveller
+     to a page whose cheapest holiday is more than twice that, so each card
+     carries what the product can actually honour. The hotels card names no
+     percentage at all because no hotel coupon exists.
+
+     When a real hotels coupon or a cheaper package lands, these are the two
+     numbers to revisit. -->
+<section class="hr-offers" aria-labelledby="hrOffersHead">
+  <h2 id="hrOffersHead" class="sr-only">Current offers</h2>
+  <div class="hr-offers-in">
+    <article class="hr-offer">
+      <b>FLAT <em>30% OFF</em></b>
+      <p>on Domestic Flights &middot; code FLYHIGH30</p>
+      <a class="hr-offer-cta" href="flights.html">Book Now &rarr;</a>
+      <span class="hr-offer-art" style="background-image: var(--hr-shot-o1, none);"></span>
+    </article>
+    <article class="hr-offer">
+      <b>Hotels <em>Worldwide</em></b>
+      <p>Handpicked stays, free cancellation on most</p>
+      <a class="hr-offer-cta" href="hotels.html">Book Hotels &rarr;</a>
+      <span class="hr-offer-art" style="background-image: var(--hr-shot-o2, none);"></span>
+    </article>
+    <article class="hr-offer">
+      <b>Exclusive Tour Packages</b>
+      <p>Starting from <em>&#8377;21,900</em></p>
+      <a class="hr-offer-cta" href="packages.html">Explore Packages &rarr;</a>
+      <span class="hr-offer-art" style="background-image: var(--hr-shot-o3, none);"></span>
+    </article>
+    <article class="hr-offer">
+      <b>Visa Assistance</b>
+      <p>Documentation and appointment support</p>
+      <a class="hr-offer-cta" href="visa.html">Know More &rarr;</a>
+      <span class="hr-offer-art" style="background-image: var(--hr-shot-o4, none);"></span>
+    </article>
+  </div>
+</section>
+
+<!-- POPULAR DESTINATIONS, built to the supplied reference.
+
+     Five of the six sell a real package today (Bangkok goes to the Thailand
+     one); London has none yet and goes to the packages index rather than a
+     filter that would come back empty. No price is printed on a tile: the
+     reference does not carry one and the catalogue's own "from" figures
+     already appear on the packages page.
+
+     Each tile names its own --hr-shot-<city>. Until a photograph is set the
+     tinted gradient shows, which is why the six tints differ - six identical
+     grey boxes read as a broken grid, six different ones read as a design. -->
+<section class="hr-dest" id="destinations" aria-labelledby="hrDestHead">
+  <div class="hr-dest-in">
+    <div class="hr-dest-head">
       <div>
-        <div class="eyebrow">Deals refreshed daily</div>
-        <h2 id="offersHead">Exclusive offers</h2>
+        <h2 id="hrDestHead">Popular Destinations</h2>
+        <p>Discover our most loved destinations around the world</p>
       </div>
-      <p>Hand-picked discounts across every mode of travel — stacked automatically at checkout.</p>
+      <div class="hr-dest-nav">
+        <a class="hr-dest-all" href="packages.html">View All Destinations &rarr;</a>
+        <button type="button" class="hr-dest-arrow" data-hr-dest="-1" aria-label="Previous destinations">&#8249;</button>
+        <button type="button" class="hr-dest-arrow" data-hr-dest="1" aria-label="Next destinations">&#8250;</button>
+      </div>
     </div>
-  </div>
-  <div class="offers-track-wrap wrap">
-    <div class="offers-track" id="offersTrack">
-      <!-- FOUR CARDS, ONE PER THING THAT CAN ACTUALLY BE BOOKED.
-           This carousel used to carry five, and three of them sold services
-           this business does not: a cruise cashback offer, a family holiday
-           package and a honeymoon package. The cruise card also published a
-           redeemable discount code for a product with nowhere to redeem it,
-           which is worse than an out-of-date headline — someone could have
-           tried to use it. The code itself is deliberately not repeated here:
-           HTML comments ship to the browser, and a dead promo code sitting in
-           view-source is still a dead promo code someone can find.
-
-           A CTA REPLACES THE PROMO-CODE CHIP. The codes were not real
-           campaigns, and a code with nothing behind it is a promise the
-           checkout cannot keep; a link to the search that fulfils the offer is
-           the same pill in the same place, and it works. `.offers-track` pauses
-           on hover AND on focus-within (main.css) so these are reachable by
-           mouse and by keyboard. -->
-      <div class="offer-card o1"><div><div class="tag">Flights</div><h3>Domestic Flight Deals</h3><p>Save up to 30% on selected domestic flight bookings.</p></div><a class="offer-cta" href="flights.html">Book Flights</a></div>
-      <div class="offer-card o2"><div><div class="tag">Flights</div><h3>International Flight Offers</h3><p>Discover affordable international fares with trusted airlines.</p></div><a class="offer-cta" href="flights.html">Explore Flights</a></div>
-      <div class="offer-card o3"><div><div class="tag">Hotels</div><h3>Hotel Stay Offers</h3><p>Save on hotel bookings across popular destinations.</p></div><a class="offer-cta" href="hotels.html">Book Hotels</a></div>
-      <div class="offer-card o4"><div><div class="tag">Tour Packages</div><h3>Tour Package Specials</h3><p>Explore exclusive tour packages with competitive pricing.</p></div><a class="offer-cta" href="packages.html">Explore Tour Packages</a></div>
-    </div>
-  </div>
-</section>
-
-<section class="destinations-section" id="destinations" aria-labelledby="destHead">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <div><div class="eyebrow">Where India is booking right now</div><h2 id="destHead">Popular destinations</h2></div>
-      <a href="#" class="view-all">View all destinations &rarr;</a>
-    </div>
-    <div class="dest-grid">
-      <div class="dest-card reveal-zoom">
-        <img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=600&q=80" alt="Goa beach with palm trees" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
-        <div class="dest-label"><div class="city">Goa</div><div class="price">Starting from <b>₹5,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-1">
-        <img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=600&q=80" alt="Kashmir valley mountains" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.9</div>
-        <div class="dest-label"><div class="city">Kashmir</div><div class="price">Starting from <b>₹14,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-2">
-        <img src="https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=600&q=80" alt="Kerala backwaters houseboat" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.7</div>
-        <div class="dest-label"><div class="city">Kerala</div><div class="price">Starting from <b>₹9,299</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-3">
-        <img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=600&q=80" alt="Manali snow mountains" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
-        <div class="dest-label"><div class="city">Manali</div><div class="price">Starting from <b>₹7,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom">
-        <img src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=600&q=80" alt="Bali temple and rice terrace" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.9</div>
-        <div class="dest-label"><div class="city">Bali</div><div class="price">Starting from <b>₹28,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-1">
-        <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80" alt="Dubai skyline at dusk" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.8</div>
-        <div class="dest-label"><div class="city">Dubai</div><div class="price">Starting from <b>₹32,499</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-2">
-        <img src="https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?auto=format&fit=crop&w=600&q=80" alt="Thailand island beach" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>4.7</div>
-        <div class="dest-label"><div class="city">Thailand</div><div class="price">Starting from <b>₹22,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
-      <div class="dest-card reveal-zoom delay-3">
-        <img src="https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=600&q=80" alt="Maldives overwater villas" loading="lazy">
-        <div class="dest-rating"><svg viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 7 1-5 4.9 1.2 6.9L12 17.8l-6.3 3.3L7 14.2l-5-4.9 7-1z"/></svg>5.0</div>
-        <div class="dest-label"><div class="city">Maldives</div><div class="price">Starting from <b>₹49,999</b></div><a class="dest-explore" href="#">Explore &rarr;</a></div>
-      </div>
+    <div class="hr-dest-grid" id="hrDestGrid">
+      <a class="hr-tile" href="packages.html?dest=Dubai" style="--hr-tint: linear-gradient(160deg,#C08A3E,#6B4415); --hr-shot: var(--hr-shot-dubai, none);">
+        <span class="hr-tile-txt"><b>Dubai</b><span>City of Dreams</span></span>
+      </a>
+      <a class="hr-tile" href="packages.html?dest=Bali" style="--hr-tint: linear-gradient(160deg,#2E7D5B,#13402F); --hr-shot: var(--hr-shot-bali, none);">
+        <span class="hr-tile-txt"><b>Bali</b><span>Island of Gods</span></span>
+      </a>
+      <a class="hr-tile" href="packages.html?dest=Singapore" style="--hr-tint: linear-gradient(160deg,#3A6EA5,#16304C); --hr-shot: var(--hr-shot-singapore, none);">
+        <span class="hr-tile-txt"><b>Singapore</b><span>A Modern Marvel</span></span>
+      </a>
+      <a class="hr-tile" href="packages.html?dest=Maldives" style="--hr-tint: linear-gradient(160deg,#2E9AA8,#0F4650); --hr-shot: var(--hr-shot-maldives, none);">
+        <span class="hr-tile-txt"><b>Maldives</b><span>Paradise on Earth</span></span>
+      </a>
+      <a class="hr-tile" href="packages.html?dest=Thailand" style="--hr-tint: linear-gradient(160deg,#B4703A,#5A2F14); --hr-shot: var(--hr-shot-bangkok, none);">
+        <span class="hr-tile-txt"><b>Bangkok</b><span>Vibrant &amp; Exciting</span></span>
+      </a>
+      <a class="hr-tile" href="packages.html" style="--hr-tint: linear-gradient(160deg,#4A5568,#1F2733); --hr-shot: var(--hr-shot-london, none);">
+        <span class="hr-tile-txt"><b>London</b><span>History Meets Modernity</span></span>
+      </a>
     </div>
   </div>
 </section>
+<script>
+/* THE PAGER ONLY EXISTS WHEN THERE IS SOMETHING TO PAGE.
+
+   Six tiles fit on a wide monitor, so the arrows would be two controls that
+   visibly do nothing - which is worse than not drawing them. The grid becomes
+   a horizontal scroller once it overflows its rail, the arrows move it by one
+   viewport, and they are hidden (and taken out of the tab order) whenever
+   everything already fits. Re-measured on resize, because the breakpoint is
+   the content's, not a number picked here. */
+(function () {
+  var grid = document.getElementById('hrDestGrid');
+  if (!grid) return;
+  var arrows = Array.prototype.slice.call(
+    document.querySelectorAll('.hr-dest-arrow[data-hr-dest]'));
+
+  function fits() { return grid.scrollWidth <= grid.clientWidth + 1; }
+
+  function sync() {
+    var hide = fits();
+    arrows.forEach(function (b) { b.hidden = hide; });
+  }
+
+  arrows.forEach(function (b) {
+    b.addEventListener('click', function () {
+      grid.scrollBy({ left: (Number(b.dataset.hrDest) || 1) * grid.clientWidth * 0.9,
+                      behavior: 'smooth' });
+    });
+  });
+
+  sync();
+  window.addEventListener('resize', sync);
+})();
+</script>
 
 <section class="packages-section" id="packages" aria-labelledby="pkgHead">
   <div class="wrap">
@@ -659,6 +765,19 @@
            endpoint, no column to hang a Google id on — and a button that fails
            when pressed is worse than one that was never offered. -->
       <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
+      <!-- THE THIRD DOOR, and it is not a sign-in at all — it closes the modal
+           and leaves the traveller where they were. Booking already works
+           signed out (the flight flow collects its own traveller details and
+           contact), so this offers in words what the product already allows and
+           the dialog was hiding behind a required email. Nothing is created,
+           nothing is stored, and there is no guest session: an account is still
+           the only thing that keeps a trip in My Bookings, which is what the
+           line under it says. -->
+      <div class="modal-switch modal-guest">Booking without an account?
+        <a href="#" id="authGuestLink" data-step="guest">Continue as guest</a>
+        <small>You can still book — we will email the ticket. Create an account
+          later to keep every trip in one place.</small>
+      </div>
     </div>
 
     <!-- STEP 2A — returning traveller ---------------------------------------->
@@ -708,7 +827,25 @@
         </div>
         <div class="modal-field">
           <label for="suMobile">Mobile Number</label>
-          <input id="suMobile" type="tel" inputmode="numeric" autocomplete="tel" required placeholder="9876543210" aria-describedby="suMobileErr">
+          <!-- THE COUNTRY IS ASKED FOR, not assumed. This was a bare tel box
+               with "9876543210" in it, which is an Indian number and nothing
+               else — a customer dialling in from the Gulf, where a good share
+               of this business's traffic comes from, had nowhere to say so and
+               no way to be called back. The list is every E.164 assignment
+               (country-codes.js), popular markets first, filled in by app.js;
+               the server has always accepted a leading + (_MOBILE_RE in
+               backend/app/schemas/customer.py), so nothing behind this had to
+               change.
+
+               The select's value is the ISO code, not the dial code — +1 is
+               nineteen countries and a <select> cannot keep two options with
+               the same value apart. app.js reads the dial code back through
+               CountryCodes.dialOf(). -->
+          <div class="field-dial">
+            <select id="suDial" aria-label="Country dialling code"></select>
+            <input id="suMobile" type="tel" inputmode="numeric" autocomplete="tel" required
+                   placeholder="98765 43210" aria-describedby="suMobileErr">
+          </div>
           <p class="field-error" id="suMobileErr" role="alert"></p>
         </div>
         <div class="modal-field">
@@ -951,6 +1088,9 @@
 <script src="components/spinner.js"></script>
 <script src="components/confirm-dialog.js"></script>
 <script src="assets/js/auth.js?v=20260909dg1"></script>
+<!-- The dialling-code table the sign-up form's country select is built from.
+     Before app.js, which fills the select during start-up. -->
+<script src="assets/js/country-codes.js?v=20260911b2d4"></script>
 <script src="assets/js/api.js?v=20260805ui34"></script>
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
@@ -960,14 +1100,14 @@
      so the module skips injecting a second copy. -->
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout it
      calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
-<script src="assets/js/profile-menu.js?v=20260827dup1"></script>
+<script src="assets/js/profile-menu.js?v=20260911b2d4"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
 <script src="assets/js/account-center.js?v=20260909dg1"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260909dg1"></script>
+<script src="assets/js/app.js?v=20260911b2d4"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

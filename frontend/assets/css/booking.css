@@ -122,7 +122,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
   border: 1.5px solid var(--sp-line, rgba(10,37,64,.1)); transition: all .25s ease;
 }
 .bk-rail-label { font-size: 13px; font-weight: 700; color: var(--sp-muted, #5B6B82); }
-.bk-rail-step.is-now .bk-rail-dot { background: var(--sp-accent, #FF4D4D); color: #fff; border-color: var(--sp-accent, #FF4D4D); }
+.bk-rail-step.is-now .bk-rail-dot { background: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F); border-color: var(--sp-accent, #FF4D4D); }
 .bk-rail-step.is-now .bk-rail-label { color: var(--sp-ink, #0A2540); }
 .bk-rail-step.is-done .bk-rail-dot { background: var(--sp-emerald, #12B76A); color: #fff; border-color: var(--sp-emerald, #12B76A); }
 
@@ -258,7 +258,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
 .bk-seat.is-window { background: color-mix(in srgb, var(--sp-sky, #2F80ED) 14%, transparent); }
 .bk-seat.is-aisle  { background: color-mix(in srgb, var(--sp-emerald, #12B76A) 13%, transparent); }
 .bk-seat.is-taken  { background: var(--sp-line); color: transparent; cursor: not-allowed; border-style: dashed; }
-.bk-seat.is-mine   { background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent); color: #fff; }
+.bk-seat.is-mine   { background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent); color: var(--on-accent, #12253F); }
 .bk-seat-count { text-align: center; margin: 16px 0 0; font-size: 13.5px; font-weight: 700; color: var(--sp-muted); }
 
 @media (max-width: 560px) {
@@ -417,7 +417,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
    styles between a step's own controls and its Continue button. */
 .bk-btn:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: 2px; }
 .bk-btn-sm { padding: 8px 15px; font-size: 12.5px; border-radius: 999px; }
-.bk-btn-primary { background: var(--sp-accent, #FF4D4D); color: #fff; }
+.bk-btn-primary { background: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F); }
 .bk-btn-primary:hover:not(:disabled) { background: var(--sp-accent-dk, #E63946); }
 .bk-btn-ghost { background: transparent; color: var(--sp-ink); border-color: var(--sp-line); }
 .bk-btn-ghost:hover { border-color: var(--sp-accent); color: var(--sp-accent); }
@@ -456,7 +456,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
   font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
   transition: border-color .18s ease, color .18s ease; }
 .mb-tab:hover { border-color: var(--sp-accent); }
-.mb-tab.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
+.mb-tab.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--on-accent, #12253F); }
 .mb-tab span { font-size: 11.5px; opacity: .75; font-variant-numeric: tabular-nums; }
 
 .mb-list { display: grid; gap: 12px; }
@@ -743,7 +743,7 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
   background: var(--sp-line); color: transparent; cursor: not-allowed; border-style: dashed;
 }
 .bk-seat.is-selected {
-  background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent, #FF4D4D); color: #fff;
+  background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F);
 }
 /* Selected must win whatever else the seat is. */
 .bk-seat.is-selected.is-paid { border-style: solid; }

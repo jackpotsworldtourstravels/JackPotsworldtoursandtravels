@@ -194,10 +194,17 @@ input,select{font:inherit; color:inherit;}
 
 .search__row{display:flex; align-items:stretch; gap:0; padding:14px 18px 18px; position:relative;}
 .fld{
-  flex:1; min-width:0; padding:10px 16px;
+  position:relative;
+  flex:1 1 0; min-width:0; padding:10px 13px;
   border:1px solid var(--line); border-right:0;
-  display:flex; gap:10px; align-items:flex-start;
+  display:flex; gap:9px; align-items:flex-start;
 }
+/* From and To carry a city, an IATA code and an airport name; the date and
+   traveller cells carry a short string. Equal flex ellipsed "Hyderabad (HYD)"
+   at 1340px, so the two place fields take a larger share of the row. */
+.fld--place{flex-grow:1.42;}
+.fld--date{flex-grow:1.18;}   /* "Wed, 9 Sep 2026" is the longest short value */
+.fld--pax{flex-grow:1.08;}
 .fld:first-child{border-radius:var(--r-sm) 0 0 var(--r-sm);}
 .fld:hover{background:#FAFCFE;}
 .fld:focus-within{border-color:var(--blue); box-shadow:inset 0 0 0 1px var(--blue);}
@@ -208,9 +215,11 @@ input,select{font:inherit; color:inherit;}
 .fld__sub{font-size:11px; color:var(--muted); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .fld--muted .fld__val{color:var(--muted); font-weight:500;}
 
+/* Anchored to the To field's left edge rather than computed from the row's
+   width — the calc version drifted the moment any field changed its share. */
 .swap{
-  position:absolute; left:calc(18px + (100% - 36px - 210px) * 0.2266); top:50%;
-  transform:translate(-50%,-8px); z-index:4;
+  position:absolute; left:-15px; top:50%;
+  transform:translateY(-50%); z-index:4;
   width:30px; height:30px; border-radius:50%; background:#fff;
   border:1px solid var(--line); box-shadow:0 2px 6px rgba(12,30,58,.12);
   display:grid; place-items:center;
@@ -220,7 +229,7 @@ input,select{font:inherit; color:inherit;}
 .swap:hover svg{stroke:var(--blue);}
 
 .btn-search{
-  flex:none; width:210px; margin-left:14px;
+  flex:none; width:196px; margin-left:12px;
   background:linear-gradient(180deg,var(--gold-2) 0%,var(--gold-3) 100%);
   color:#3B2A06; border-radius:var(--r-sm);
   display:inline-flex; align-items:center; justify-content:center; gap:9px;
@@ -289,7 +298,11 @@ input,select{font:inherit; color:inherit;}
 .deal__btn:hover{filter:brightness(.96);}
 .deal__code{font-size:11px; color:rgba(255,255,255,.9);}
 
-/* ---- destinations ---- */
+/* ---- destinations ----
+   Every wrapper below is a <span> so it can sit inside an <a>. A span is
+   inline by default, and aspect-ratio, width, height and overflow are all
+   inert on an inline box — which collapsed every image slot on the page to
+   zero height. Each one is explicitly display:block for that reason. */
 .dests{display:grid; grid-template-columns:repeat(8,1fr); gap:12px;}
 .dest{
   border-radius:var(--r); overflow:hidden; background:#fff;
@@ -297,8 +310,8 @@ input,select{font:inherit; color:inherit;}
   transition:transform .2s ease, box-shadow .2s ease;
 }
 .dest:hover{transform:translateY(-3px); box-shadow:var(--shadow-lift);}
-.dest__img{aspect-ratio:1/.78; overflow:hidden;}
-.dest__body{padding:9px 10px 11px;}
+.dest__img{display:block; aspect-ratio:1/.78; overflow:hidden;}
+.dest__body{display:block; padding:9px 10px 11px;}
 .dest b{display:block; font-size:13px; font-weight:600;}
 .dest span{display:block; font-size:10.5px; color:var(--muted); margin-top:1px; white-space:nowrap;}
 
@@ -366,8 +379,8 @@ input,select{font:inherit; color:inherit;}
 .pkg{display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--line-2);}
 .pkg:last-child{border-bottom:0;}
 .pkg:hover{background:#FAFCFE;}
-.pkg__img{width:74px; height:64px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
-.pkg__body{min-width:0; flex:1;}
+.pkg__img{display:block; width:74px; height:64px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
+.pkg__body{display:block; min-width:0; flex:1;}
 .pkg__body b{display:block; font-size:13.5px; font-weight:600;}
 .pkg__nights{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
 .pkg__price{display:block; font-size:15px; font-weight:700; margin-top:3px; font-variant-numeric:tabular-nums;}
@@ -414,8 +427,8 @@ input,select{font:inherit; color:inherit;}
   transition:transform .2s ease, box-shadow .2s ease;
 }
 .story:hover{transform:translateY(-2px); box-shadow:var(--shadow-lift);}
-.story__img{width:86px; height:68px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
-.story__body{min-width:0;}
+.story__img{display:block; width:86px; height:68px; border-radius:var(--r-sm); overflow:hidden; flex:none;}
+.story__body{display:block; min-width:0;}
 .story h3{font-size:13.5px; font-weight:600; line-height:1.3;}
 .story a{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--blue); font-weight:500; margin-top:7px;}
 .story a svg{width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2;}
@@ -584,29 +597,28 @@ input,select{font:inherit; color:inherit;}
         </div>
 
         <div class="search__row">
-          <div class="fld">
+          <div class="fld fld--place">
             <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
             <span class="fld__body">
-              <label class="fld__lab" for="fFrom">From</label>
+              <span class="fld__lab">From</span>
               <span class="fld__val" id="fFrom">Hyderabad (HYD)</span>
               <span class="fld__sub">Rajiv Gandhi Int. Airport</span>
             </span>
           </div>
 
-          <button class="swap" type="button" aria-label="Swap origin and destination">
-            <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>
-          </button>
-
-          <div class="fld">
+          <div class="fld fld--place">
+            <button class="swap" type="button" aria-label="Swap origin and destination">
+              <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>
+            </button>
             <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a1 1 0 0 0-1 1.6l5.4 4.2-2.6 2.6-2.3-.5-1.2 1.2 3 1.6 1.6 3 1.2-1.2-.5-2.3 2.6-2.6 4.2 5.4a1 1 0 0 0 1.6-1Z"/></svg>
             <span class="fld__body">
-              <label class="fld__lab" for="fTo">To</label>
+              <span class="fld__lab">To</span>
               <span class="fld__val" id="fTo">Delhi (DEL)</span>
               <span class="fld__sub">Indira Gandhi Int. Airport</span>
             </span>
           </div>
 
-          <div class="fld">
+          <div class="fld fld--date">
             <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4m8-4v4"/></svg>
             <span class="fld__body">
               <span class="fld__lab">Departure</span>
@@ -622,7 +634,7 @@ input,select{font:inherit; color:inherit;}
             </span>
           </div>
 
-          <div class="fld">
+          <div class="fld fld--pax">
             <svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
             <span class="fld__body">
               <span class="fld__lab">Travellers &amp; Class</span>

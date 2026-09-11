@@ -1,0 +1,488 @@
+/* ===========================================================================
+   flights-ref.css — the Flights results page, in the JackpotsWorld palette.
+   ===========================================================================
+   EVERY RULE HERE IS SCOPED TO `body[data-sp-service="flights"]`. Three pages
+   carry `body.sp-continuation` — flights, hotels and packages — and they share
+   travel-explore.css, search-strip.css, booking.css and the --sp-* bridge in
+   booking-card.css. An unscoped rule on .tx-flight or --tx-accent would
+   repalette the other two as a side effect of a change only asked for here.
+
+   IT NO LONGER OWNS THE PALETTE. It did when Flights was the only page in the
+   brand colours; main.css now carries navy and gold site-wide and this file
+   inherits them like every other page. What is left here is the part that is
+   genuinely only true of Flights: the navy search band, the two components
+   the reference asks for that no other product has (the date strip and the
+   offers strip), and the density the compact flight card needs.
+
+   IT REPOINTS TOKENS, IT DOES NOT RESTYLE COMPONENTS. travel-explore.css
+   funnels its colours through --tx-*, search-strip.css through --ss-* (which
+   falls back to --tx-*), and the booking screens through --sp-*. All three
+   already derive from main.css, so most of this page follows the brand with
+   no rule here at all.
+   =========================================================================== */
+
+/* ==========================================================================
+   1. PALETTE — nothing here any more, and that is the point
+   --------------------------------------------------------------------------
+   This file used to declare the whole gold palette itself, because Flights was
+   the only page wearing it. main.css now carries the brand tokens site-wide,
+   and every layer this page uses already derives from them: .tx-scope reads
+   --coral/--ink/--line for its --tx-*, and booking-card.css's sp-continuation
+   bridge reads the same for its --sp-*. Re-declaring them here would be a
+   second source of truth that drifts the first time one of them is edited.
+
+   The --jw-* names below are the few shades the components in sections 4-8
+   need and the brand tokens do not carry — a soft gold wash, a blue tint, a
+   green tint. They are aliases of main.css's values, not new colours.
+   ========================================================================== */
+body.sp-continuation[data-sp-service="flights"] {
+  --jw-navy:      var(--navy);
+  --jw-gold:      var(--coral);
+  --jw-gold-2:    var(--coral-light);
+  --jw-gold-3:    var(--coral-dark);
+  --jw-gold-ink:  var(--coral-dark);
+  --jw-gold-soft: var(--coral-hover);
+  --jw-blue:      var(--sky);
+  --jw-blue-soft: #E3F1F4;
+  --jw-green:     var(--emerald);
+  --jw-green-soft:#E2F1EA;
+  --jw-red:       var(--danger, #E24B4A);
+  --jw-red-soft:  var(--danger-soft, rgba(226,75,74,.12));
+  --sp-on-accent: var(--on-accent, #fff);
+}
+
+/* ==========================================================================
+   2. INK ON GOLD, where the shared sheets hardcode white
+   --------------------------------------------------------------------------
+   travel-explore.css goes through --tx-accent-ink and needs nothing. The
+   booking stylesheets predate that token and pair `background:
+   var(--sp-accent)` with a literal `color:#fff` — right for coral, about
+   1.7:1 on #E9B949. This is every such surface reachable from a Flights page;
+   the only thing changed is the text colour on it.
+   ========================================================================== */
+body[data-sp-service="flights"] .bk-btn-primary,
+body[data-sp-service="flights"] .bkf-ff-cta.is-on,
+body[data-sp-service="flights"] .bkf-sector.is-on,
+body[data-sp-service="flights"] .bk-seat.is-mine,
+body[data-sp-service="flights"] .mb-tab.is-on,
+body[data-sp-service="flights"] .bk-rail-step.is-now .bk-rail-dot {
+  color: var(--sp-on-accent);
+}
+body[data-sp-service="flights"] .bk-btn-primary:hover:not(:disabled) {
+  background: var(--jw-gold-3); color: var(--sp-on-accent);
+}
+/* Gold is a weak 1px border. These read as outlines, so they take bronze. */
+body[data-sp-service="flights"] .bkf-ff.is-on,
+body[data-sp-service="flights"] .bkf-opt.is-on {
+  border-color: var(--jw-gold-3);
+  box-shadow: 0 0 0 2px rgba(232,96,76,.22);
+}
+body[data-sp-service="flights"] .bkf-info-list a { color: var(--jw-blue); }
+
+/* ==========================================================================
+   3. THE PAGE SHELL
+   --------------------------------------------------------------------------
+   A results page is a working surface: the film, the headline and the pitch
+   go, and the criteria row sits directly under the navigation — what the
+   brief asks for, and what the home-page mockup's own search widget does.
+   ========================================================================== */
+/* THE HERO IS THE HERO AGAIN, AND THIS FILE NO LONGER PAINTS OVER IT.
+   -------------------------------------------------------------------------
+   Three rules used to live here: a flat navy background on `#siteHero`, and a
+   sticky navy `#siteHeader` to sit above it. Both existed because compact
+   mode rendered the hero as nothing but the search dock — no film to show
+   through, so the band had to supply its own colour.
+
+   heroHtml puts the film back on a compact hero now (see main.css
+   `.hero.is-compact`), so painting over it would hide the thing the band is
+   for. The hero takes main.css's height and clearance; the header goes back
+   to the landing shell's transparent bar, which bindScrollFade darkens on
+   scroll — it finds `#heroBg` on this page again.
+
+   THE LETTERING RULES BELOW STAY. They were written for white-on-navy and a
+   dark film asks for exactly the same thing, so the nav, the partner pill and
+   the burger are unchanged. */
+body[data-sp-service="flights"] #siteHeader a,
+body[data-sp-service="flights"] #siteHeader .nav-icon-btn { color: #E7EDF6; }
+body[data-sp-service="flights"] #siteHeader a:hover,
+body[data-sp-service="flights"] #siteHeader .nav-link.is-active { color: var(--jw-gold-2); }
+/* .pm-* , not .nav-* : the auth slot is rendered by profile-menu.js, which
+   replaces hero-shell's markup once it mounts. */
+body[data-sp-service="flights"] #siteHeader .pm-signup {
+  background: var(--jw-gold); color: var(--on-accent, #fff); border-color: var(--jw-gold);
+}
+body[data-sp-service="flights"] #siteHeader .pm-signup:hover { background: var(--jw-gold-3); }
+body[data-sp-service="flights"] #siteHeader .pm-login { color: #E7EDF6; }
+body[data-sp-service="flights"] #siteHeader .nav-partner-mark {
+  color: #E7EDF6; border-color: rgba(255, 255, 255, .22);
+}
+body[data-sp-service="flights"] #siteHeader .hamburger span { background: #E7EDF6; }
+
+/* THE HEADER STAYS NAVY THROUGH THE BOOKING TOO.
+   booking-ref.css turns it white while `body.bk-inpage` is set, because the
+   landing shell's header is a transparent overlay designed for a dark hero and
+   the booking screens are light. On THIS page it is already a solid navy bar
+   over a navy search band, so the white would be a colour change triggered by
+   clicking Select — the bar reading as a different site mid-booking. The
+   !important matches booking-ref's own, and for the same reason: hero-shell's
+   bindScrollFade writes these three as inline styles on every scroll. */
+body[data-sp-service="flights"].bk-inpage #siteHeader {
+  background-color: var(--jw-navy) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .08) !important;
+}
+body[data-sp-service="flights"].bk-inpage #siteHeader .navlinks a,
+body[data-sp-service="flights"].bk-inpage #siteHeader .pm-login,
+body[data-sp-service="flights"].bk-inpage #siteHeader .nav-partner-mark { color: #E7EDF6; }
+body[data-sp-service="flights"].bk-inpage #siteHeader .navlinks a:hover { color: var(--jw-gold-2); }
+body[data-sp-service="flights"].bk-inpage #siteHeader .nav-partner-mark {
+  border-color: rgba(255, 255, 255, .22);
+}
+body[data-sp-service="flights"].bk-inpage #siteHeader .hamburger span { background: #E7EDF6; }
+
+body[data-sp-service="flights"] #heroSearchDock { padding-top: 0; padding-bottom: 0; }
+body[data-sp-service="flights"] .ss-strip {
+  --ss-accent: var(--jw-gold);
+  box-shadow: 0 2px 6px rgba(12,30,58,.08), 0 18px 40px -22px rgba(12,30,58,.45);
+  border-radius: 10px;
+}
+body[data-sp-service="flights"] .ss-lab {
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700;
+}
+body[data-sp-service="flights"] .ss-val { font-weight: 700; }
+body[data-sp-service="flights"] .ss-go {
+  background: var(--jw-gold); color: var(--on-accent, #fff); font-weight: 800; letter-spacing: .04em;
+}
+body[data-sp-service="flights"] .ss-go:hover { background: var(--jw-gold-3); }
+
+/* ==========================================================================
+   4. DATE STRIP — real dates, real navigation, price only where known
+   --------------------------------------------------------------------------
+   THE DATES AND THE NAVIGATION ARE REAL: a cell writes state.depart and
+   re-runs the same search the strip's own Search button runs.
+
+   THE PRICES ARE NOT INVENTED. This application has no date-level fare feed —
+   the schedule is one day of departures — so a cell prints a fare only for a
+   date whose results are actually loaded, and every other cell shows its date
+   alone with an en-dash where the fare would go. The component is ready for a
+   fare-calendar endpoint; nothing here fills the gap in the meantime.
+   ========================================================================== */
+body[data-sp-service="flights"] .fx-dates {
+  display: flex; align-items: stretch; gap: 6px;
+  margin: 0 0 12px; padding: 6px;
+  background: var(--tx-surface);
+  border: 1px solid var(--tx-line); border-radius: 10px;
+}
+body[data-sp-service="flights"] .fx-dates-nav {
+  flex: none; width: 30px; border: 1px solid var(--tx-line); border-radius: 8px;
+  background: var(--tx-surface); color: var(--tx-muted); cursor: pointer;
+  font-size: 15px; line-height: 1; display: grid; place-items: center;
+}
+body[data-sp-service="flights"] .fx-dates-nav:hover {
+  border-color: var(--jw-gold-3); color: var(--tx-ink); background: var(--jw-gold-soft);
+}
+body[data-sp-service="flights"] .fx-dates-track {
+  flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none;
+}
+body[data-sp-service="flights"] .fx-dates-track::-webkit-scrollbar { display: none; }
+body[data-sp-service="flights"] .fx-date {
+  display: grid; gap: 1px; padding: 7px 6px; min-width: 82px;
+  background: var(--tx-surface); border: 1px solid transparent; border-radius: 8px;
+  cursor: pointer; text-align: center; font: inherit; color: var(--tx-ink);
+}
+body[data-sp-service="flights"] .fx-date:hover { background: var(--tx-surface-2); }
+body[data-sp-service="flights"] .fx-date-day {
+  font-size: 10.5px; color: var(--tx-muted); text-transform: uppercase; letter-spacing: .04em;
+}
+body[data-sp-service="flights"] .fx-date-num { font-size: 13px; font-weight: 700; }
+body[data-sp-service="flights"] .fx-date-fare {
+  font-size: 11.5px; font-weight: 700; color: var(--jw-green); min-height: 15px;
+}
+/* An en-dash keeps every cell the same height, so the strip does not jag
+   where a date has no fare to show. */
+body[data-sp-service="flights"] .fx-date-fare:empty::before {
+  content: '\2013'; color: #B7C2D2; font-weight: 500;
+}
+/* GOLD for the selected date, as the brief asks. */
+body[data-sp-service="flights"] .fx-date.is-on {
+  background: var(--jw-gold-soft); border-color: var(--jw-gold);
+  box-shadow: inset 0 -2px 0 var(--jw-gold);
+}
+body[data-sp-service="flights"] .fx-date.is-on .fx-date-num { color: var(--jw-gold-ink); }
+
+/* ==========================================================================
+   5. OFFERS STRIP
+   --------------------------------------------------------------------------
+   Rendered ONLY from GET /api/customer/coupons — real rows from the coupon
+   table, carrying the code and title the server returned. When the table has
+   nothing active for flights the strip is absent entirely rather than filled
+   with a plausible-looking discount.
+   ========================================================================== */
+body[data-sp-service="flights"] .fx-offers {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 9px 12px;
+  background: var(--jw-blue-soft);
+  border: 1px solid #D6E5FB; border-radius: 10px;
+}
+body[data-sp-service="flights"] .fx-offers-label {
+  flex: none; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--jw-blue);
+}
+body[data-sp-service="flights"] .fx-offers-track {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; min-width: 0;
+}
+body[data-sp-service="flights"] .fx-offers-track::-webkit-scrollbar { display: none; }
+body[data-sp-service="flights"] .fx-offer {
+  display: flex; align-items: baseline; gap: 8px; flex: none;
+  padding: 5px 10px; background: var(--tx-surface);
+  border: 1px dashed #B9D2F7; border-radius: 7px;
+}
+body[data-sp-service="flights"] .fx-offer b {
+  font-size: 12px; font-weight: 800; color: var(--jw-blue); letter-spacing: .03em;
+}
+body[data-sp-service="flights"] .fx-offer span {
+  font-size: 12px; color: var(--tx-muted); white-space: nowrap;
+}
+
+/* ==========================================================================
+   6. RESULTS HEAD, TOOLBAR, DIRECT-ONLY
+   ========================================================================== */
+body[data-sp-service="flights"] .tx-head h2 {
+  font-size: 21px; font-weight: 800; letter-spacing: -.01em;
+}
+body[data-sp-service="flights"] .tx-head p { font-size: 12.5px; }
+body[data-sp-service="flights"] .tx-sample {
+  background: var(--jw-gold-soft); color: var(--jw-gold-ink);
+  border: 1px solid #F0DCB4; font-size: 10.5px; font-weight: 700;
+}
+body[data-sp-service="flights"] .tx-toolbar { gap: 10px; margin-bottom: 12px; }
+body[data-sp-service="flights"] .tx-search input:focus,
+body[data-sp-service="flights"] .tx-sort select:focus {
+  border-color: var(--jw-gold-3); outline: none;
+  box-shadow: 0 0 0 3px rgba(232,96,76,.18);
+}
+
+/* A REAL control: it writes the same `stops` filter the sidebar owns, so
+   ticking this and ticking Non-stop under Stops are one act and stay in step. */
+body[data-sp-service="flights"] .fx-direct {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  padding: 7px 11px; background: var(--tx-surface);
+  border: 1px solid var(--tx-line); border-radius: 8px;
+  font-size: 12.5px; font-weight: 600; color: var(--tx-ink); cursor: pointer;
+  white-space: nowrap;
+}
+body[data-sp-service="flights"] .fx-direct input { accent-color: var(--jw-gold-3); margin: 0; }
+body[data-sp-service="flights"] .fx-direct:has(input:checked) {
+  border-color: var(--jw-gold); background: var(--jw-gold-soft); color: var(--jw-gold-ink);
+}
+
+/* ==========================================================================
+   7. THE FLIGHT CARD — compact and scannable
+   --------------------------------------------------------------------------
+   The card keeps its markup; this is density. The previous card ran ~150px
+   tall with 16px between, so a 1440x900 screen held four results. Times stay
+   large because they are what the eye scans for; everything around them
+   tightens.
+   ========================================================================== */
+body[data-sp-service="flights"] #txFlightList { display: grid; gap: 8px; }
+body[data-sp-service="flights"] .tx-flight {
+  padding: 12px 14px; border-radius: 10px; gap: 14px;
+  border: 1px solid var(--tx-line); background: var(--tx-surface);
+  box-shadow: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+body[data-sp-service="flights"] .tx-flight:hover {
+  border-color: #C9D5E4;
+  box-shadow: 0 1px 2px rgba(12,30,58,.05), 0 8px 20px -12px rgba(12,30,58,.22);
+}
+body[data-sp-service="flights"] .tx-carrier-name { font-size: 13px; font-weight: 700; }
+body[data-sp-service="flights"] .tx-carrier-no { font-size: 11px; }
+body[data-sp-service="flights"] .tx-time { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+body[data-sp-service="flights"] .tx-place { font-size: 11.5px; }
+body[data-sp-service="flights"] .tx-dur { font-size: 11.5px; font-weight: 600; }
+body[data-sp-service="flights"] .tx-stops {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--jw-green);
+}
+body[data-sp-service="flights"] .tx-line { color: #C9D5E4; }
+body[data-sp-service="flights"] .tx-tbd { font-size: 13px; font-weight: 600; }
+body[data-sp-service="flights"] .tx-fare b { font-size: 20px; font-weight: 800; }
+body[data-sp-service="flights"] .tx-fare span,
+body[data-sp-service="flights"] .tx-fare i { font-size: 10.5px; font-style: normal; }
+
+/* The commercial chips: one quiet row, not five competing badges. */
+body[data-sp-service="flights"] .tx-facts { gap: 6px; margin-top: 8px; }
+body[data-sp-service="flights"] .tx-fact {
+  padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 600;
+  background: var(--tx-surface-2); color: var(--tx-muted); border: none;
+}
+body[data-sp-service="flights"] .tx-fact.is-good { background: var(--jw-green-soft); color: #0E7A46; }
+body[data-sp-service="flights"] .tx-fact.is-warn { background: var(--jw-red-soft); color: var(--jw-red); }
+
+body[data-sp-service="flights"] .tx-status { font-size: 10.5px; color: var(--jw-green); font-weight: 600; }
+body[data-sp-service="flights"] .tx-btn {
+  border-radius: 7px; font-size: 12.5px; font-weight: 700; padding: 8px 14px;
+}
+body[data-sp-service="flights"] .tx-btn-primary { letter-spacing: .04em; text-transform: uppercase; }
+body[data-sp-service="flights"] .tx-btn-primary:hover {
+  background: var(--jw-gold-3); border-color: var(--jw-gold-3);
+}
+body[data-sp-service="flights"] .tx-btn-ghost {
+  background: transparent; border: 1px solid var(--tx-line); color: var(--jw-blue); font-weight: 600;
+}
+body[data-sp-service="flights"] .tx-btn-ghost:hover { border-color: var(--jw-blue); background: var(--jw-blue-soft); }
+
+/* ==========================================================================
+   7b. GOLD AS TEXT
+   --------------------------------------------------------------------------
+   --tx-accent is used for two different jobs in travel-explore.css: a fill to
+   put white on, and a text colour. Coral did both — #FF4D4D is 3.9:1 on white.
+   Gold cannot: #E9B949 on white is about 1.9:1, which fails even large-text
+   AA. So text keeps the gold FAMILY and drops to the dark end of it
+   (#7C5B12, ~6.5:1), while links take the blue the home page already uses for
+   links. Fills are untouched — those are handled by --tx-accent-ink.
+
+   THE BOOKING SUMMARY'S TOTAL IS NO LONGER ONE OF THESE. It used to be
+   repointed here from coral to gold-ink; it takes the panel's own ink now
+   (travel-explore.css), because an amount to read is not an accent.
+   ========================================================================== */
+body[data-sp-service="flights"] .tx-sum-arrow { color: var(--jw-gold-3); }
+body[data-sp-service="flights"] .tx-state-art { color: var(--jw-gold-3); }
+body[data-sp-service="flights"] .tx-leg .tx-line svg,
+body[data-sp-service="flights"] .tx-path svg { color: var(--jw-gold-3); }
+/* An error is not a decoration. */
+body[data-sp-service="flights"] .tx-sum-error { color: var(--jw-red); }
+/* The underlined text buttons — "edit", "clear" and the like — read as links,
+   so they are blue rather than a gold that would disappear at 12.5px. */
+body[data-sp-service="flights"] .tx-sum-edit,
+body[data-sp-service="flights"] .ff-clear-one,
+body[data-sp-service="flights"] .ff-clear-all { color: var(--jw-blue); }
+body[data-sp-service="flights"] .tx-more:hover {
+  border-color: var(--jw-gold-3); color: var(--jw-gold-ink);
+}
+
+/* ==========================================================================
+   8. FILTER RAIL + SUMMARY RAIL
+   ========================================================================== */
+body[data-sp-service="flights"] .tx-filters { border-radius: 10px; box-shadow: none; }
+body[data-sp-service="flights"] .ff-title,
+body[data-sp-service="flights"] .ff-heading {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--tx-muted);
+}
+body[data-sp-service="flights"] .ff-opt { font-size: 12.5px; }
+body[data-sp-service="flights"] .ff-opt input { accent-color: var(--jw-gold-3); }
+body[data-sp-service="flights"] .ff-count { font-size: 11px; }
+body[data-sp-service="flights"] .ff-clear-all,
+body[data-sp-service="flights"] .ff-clear-one { color: var(--jw-blue); font-weight: 600; }
+body[data-sp-service="flights"] .ff-range-fill { background: var(--jw-gold); }
+body[data-sp-service="flights"] .ff-range-track input { accent-color: var(--jw-gold-3); }
+
+/* ==========================================================================
+   9. RESPONSIVE
+   --------------------------------------------------------------------------
+   travel-explore.css already collapses the three columns and moves the
+   filters into a sheet. These are only what this file adds.
+   ========================================================================== */
+/* THE 700px THE FLIGHT CARD NEEDS, STATED AS A CONSTRAINT RATHER THAN GUESSED
+   AT WITH BREAKPOINTS.
+
+   .tx-flight restacks from a CONTAINER query, not a viewport one — @container
+   txlist (max-width: 700px), at the foot of travel-explore.css. Its column is
+   whatever the two rails leave behind, so on a 1280px screen it came to 697px
+   and every card collapsed into a vertical stack: the row went from ~140px to
+   331px on an ordinary laptop.
+
+   THE ARITHMETIC IS WHY THIS IS NOT A MEDIA QUERY. The card's width depends on
+   the scrollbar (media queries match innerWidth, layout gets clientWidth — 15px
+   apart here), on .tx-section's 64px of padding, and on its 1360px cap. A
+   viewport breakpoint can see none of those, so every threshold picked by hand
+   was wrong by a few pixels and would go wrong again the next time the padding
+   moved. minmax() states the requirement instead: the middle track may not go
+   below the card's own threshold, and the rails are free to give up their
+   width — down to 200 and 224 — until it is satisfied. Grid maximises them
+   back to 256/280 whenever the room exists, so a wide desktop is untouched.
+
+   701, NOT 700. `@container txlist (max-width: 700px)` is an INCLUSIVE bound,
+   so a column of exactly 700px still matches it and still stacks — which is
+   what a first pass at minmax(700px, ...) produced: the track measured 700.0px
+   and every card was still 330px tall. The card needs MORE than 700, so the
+   minimum is one pixel more than the query it has to clear.
+
+   THE 1270 IS DELIBERATELY LOOSE, and an earlier 1256 was not. The minimums
+   need about 1236px of document, so 1256 of viewport looked exact — and it
+   was, on a display at devicePixelRatio 1. At 1.25 the CSS media width and
+   window.innerWidth disagree by a pixel (measured: innerWidth 1255, media
+   width 1256), so a threshold sitting exactly on the arithmetic lands on
+   whichever side the rounding falls. 1270 clears the fractional wobble with
+   ~18px to spare and still covers every desktop width in the brief; the point
+   of minmax() above is that the exact number no longer has to be right.
+
+   Scoped to flights because the threshold is the FLIGHT card's. hotels and
+   packages share these stylesheets and are unaffected. */
+@media (min-width: 1270px) {
+  body[data-sp-service="flights"] .tx-layout-3 {
+    grid-template-columns: minmax(200px, 256px) minmax(701px, 1fr) minmax(224px, 280px);
+  }
+}
+
+/* BELOW THAT THE MINIMUMS NO LONGER FIT — 200 + 700 + 224 + 48 of gaps + 64 of
+   padding needs 1236px of document, about 1253 of viewport — and a grid whose
+   tracks cannot fit overflows its container. So the summary rail drops under
+   the list here rather than at travel-explore.css's 1180, which is the same
+   degradation that file already describes, just meeting the constraint above.
+
+   The 901px FLOOR is not decoration: travel-explore.css goes single-column at
+   900px, and this selector is the more specific of the two — left unbounded it
+   would win there too and put two columns on a phone. */
+@media (min-width: 901px) and (max-width: 1269px) {
+  body[data-sp-service="flights"] .tx-layout-3 {
+    grid-template-columns: 256px minmax(0, 1fr);
+  }
+  body[data-sp-service="flights"] .tx-summary-rail { grid-column: 1 / -1; }
+  body[data-sp-service="flights"] .tx-summary { position: static; }
+}
+
+/* THE DENSER CARD STACKS LATER THAN THE ONE IT REPLACES.
+
+   travel-explore.css stacks .tx-flight below a 700px COLUMN, which is right
+   for the card it was written for: 21px times, a 168px carrier block, 20px
+   gaps, 18/20 padding. Section 7 above shrinks all of those — 19px times, 14px
+   gaps, 12/14 padding — so the same content clears in noticeably less width.
+
+   Without this the band between the three-column layout and the filter sheet
+   (roughly 1001-1269px, where travel-explore keeps a 256px filter rail but has
+   not yet moved it into a sheet) left a 665px column, and every card on a
+   1024px tablet was 331px tall — half the density of the same page on a
+   laptop, for a card that fits.
+
+   620 is measured, not guessed: the three tracks need about 590px before the
+   times start colliding with the fare, and this leaves a margin for the longest
+   carrier name in the data. Below it the shared rule takes over unchanged, so
+   phones stack exactly as they did. */
+@container txlist (min-width: 620px) {
+  body[data-sp-service="flights"] .tx-flight { grid-template-columns: auto 1fr auto; }
+  body[data-sp-service="flights"] .tx-carrier { min-width: 140px; }
+  body[data-sp-service="flights"] .tx-act { min-width: 132px; grid-template-columns: 1fr; }
+  body[data-sp-service="flights"] .tx-fare { grid-column: auto; text-align: right; }
+}
+
+@media (max-width: 1024px) {
+  body[data-sp-service="flights"] .fx-date { min-width: 74px; }
+}
+@media (max-width: 768px) {
+  body[data-sp-service="flights"] #heroSearchDock { padding: 12px 14px 14px; }
+  body[data-sp-service="flights"] .fx-dates { padding: 5px; gap: 5px; }
+  body[data-sp-service="flights"] .fx-dates-track { grid-auto-columns: minmax(70px, 1fr); }
+  body[data-sp-service="flights"] .fx-date { min-width: 70px; padding: 6px 4px; }
+  body[data-sp-service="flights"] .fx-offers { padding: 8px 10px; }
+  body[data-sp-service="flights"] .fx-offers-label { display: none; }
+}
+@media (max-width: 480px) {
+  body[data-sp-service="flights"] .tx-flight { padding: 11px 12px; gap: 10px; }
+  body[data-sp-service="flights"] .tx-time { font-size: 17px; }
+  body[data-sp-service="flights"] .tx-fare b { font-size: 18px; }
+  /* The arrows are the only way to reach another week on a phone, so they
+     stay put and the track scrolls between them. */
+  body[data-sp-service="flights"] .fx-dates-track { grid-auto-columns: 68px; }
+}

@@ -31,13 +31,13 @@
   transition: background .18s ease, border-color .18s ease;
 }
 .pm-chip:hover { background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .38); }
-.pm-chip:focus-visible { outline: 2px solid #FF4D4D; outline-offset: 2px; }
+.pm-chip:focus-visible { outline: 2px solid var(--coral, #E9B949); outline-offset: 2px; }
 
 .pm-avatar {
   display: grid; place-items: center;
   width: 30px; height: 30px; flex: none;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FF4D4D, #FF7A59);
+  background: linear-gradient(135deg, var(--gold, #E9B949), var(--coral-dark, #D9A32C));
   color: #fff; font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
 }
 .pm-name {
@@ -75,9 +75,9 @@
   transition: background .14s ease, color .14s ease;
 }
 .pm-item:hover { background: #F4F7FB; }
-.pm-item:focus-visible { outline: 2px solid #FF4D4D; outline-offset: -2px; }
+.pm-item:focus-visible { outline: 2px solid var(--coral, #E9B949); outline-offset: -2px; }
 .pm-icon { width: 18px; height: 18px; flex: none; color: #5B6B82; }
-.pm-item:hover .pm-icon { color: #FF4D4D; }
+.pm-item:hover .pm-icon { color: var(--coral-dark, #D9A32C); }
 
 .pm-sep { margin: 6px 4px; border: 0; border-top: 1px solid rgba(10, 37, 64, .10); }
 .pm-logout { color: #D64545; }
@@ -93,10 +93,10 @@
 .pm-login:hover { opacity: 1; }
 .pm-signup {
   margin-left: 6px; padding: 9px 18px; border-radius: 999px;
-  background: #FF4D4D; color: #fff;
+  background: var(--coral, #E9B949); color: var(--on-accent, #12253F);
   transition: background .18s ease;
 }
-.pm-signup:hover { background: #E63946; }
+.pm-signup:hover { background: var(--coral-dark, #D9A32C); }
 
 /* -------------------------------------------------------------- responsive
    On a narrow screen the menu is pinned to the right edge of the viewport

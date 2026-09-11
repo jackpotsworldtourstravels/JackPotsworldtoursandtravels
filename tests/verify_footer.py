@@ -96,11 +96,19 @@ CONTACT = [
 #: Services this business does not sell. "Package" alone is fine — tour
 #: packages ARE sold; it is "holiday package" and "honeymoon package" that
 #: are not.
+#: CRUISE AND HOLIDAY PACKAGE LEFT THIS LIST ON 2026-09-10, deliberately and on
+#: the owner's instruction, when the landing page was rebuilt to the supplied
+#: reference design. Both are now offered and both are reachable:
+#:   cruise          -> cruises.html, and BookingCard's cruisesPanel
+#:   holiday package -> packages.html (Tour Packages renamed to match the design)
+#: The rest stay. Villas, Trains, Buses and Cabs are advertised in the nav and
+#: the search card but have no booking backend, so their panels enquire rather
+#: than search; the phrases below are the ones that would claim ONLINE BOOKING
+#: for something that cannot be booked online, which is still what this guard
+#: is for. Removing an entry is a commercial decision, not a build fix.
 NOT_OFFERED = [
-    r"cruise",
     r"visa service",
     r"passport service",
-    r"holiday package",
     r"honeymoon package",
     r"bus booking",
     r"train booking",

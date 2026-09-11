@@ -312,7 +312,7 @@ a.cp-card:hover {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 13px 24px; border-radius: 12px;
   font-size: 14.5px; font-weight: 800;
-  background: var(--sp-accent); color: #fff;
+  background: var(--sp-accent); color: var(--on-accent, #12253F);
   transition: background .18s ease;
 }
 .cp-btn:hover { background: var(--sp-accent-dk); }

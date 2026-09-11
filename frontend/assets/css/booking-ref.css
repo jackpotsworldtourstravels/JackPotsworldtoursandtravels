@@ -32,7 +32,7 @@
 
 /* The reference has no back-link / kicker / booking title above the stepper —
    the stepper is the first thing under the site header. Leaving the flow is
-   the itinerary card's "Change Flights" (and Escape), both still wired. */
+   the itinerary card's "Modify Flights" (and Escape), both still wired. */
 .bk-sheet.is-flight .bk-pagehead { display: none; }
 
 /* ==========================================================================
@@ -56,6 +56,14 @@ body.bk-inpage #siteHeader {
   background-color: #fff !important;
   backdrop-filter: none !important;
   box-shadow: 0 1px 0 rgba(10,37,64,.10) !important;
+  /* The bar's own ink, because `.pm-login` takes `color: inherit` from it
+     (profile-menu.css) and main.css's `header` declares #fff for the state
+     where the bar floats over the hero film. Painted white here, that would be
+     white on white — the Login link vanishing the moment a booking opened. The
+     three rules below name the elements that set their own colour; this is for
+     everything that does not. flights.html keeps a NAVY bar through the
+     booking and overrides this in flights-ref.css. */
+  color: var(--navy, #0A2540);
 }
 body.bk-inpage #siteHeader nav.wrap { height: 72px; }
 body.bk-inpage #siteHeader .logo { margin-left: 0; }
@@ -130,7 +138,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   box-shadow: 0 1px 2px rgba(10,37,64,.05);
 }
 .bk-sheet.is-flight .bk-rail-step.is-now .bk-rail-dot {
-  background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent, #FF4D4D); color: #fff;
+  background: var(--sp-accent, #FF4D4D); border-color: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F);
 }
 .bk-sheet.is-flight .bk-rail-step.is-now .bk-rail-label {
   color: var(--bkf-red); font-weight: 700; border-bottom-color: var(--bkf-red);
@@ -169,20 +177,71 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-itin-meta i { font-style: normal; padding: 0 6px; opacity: .55; }
 
 .bkf-itin-segs { display: flex; align-items: stretch; }
-.bkf-itin-segs .bkf-seg { flex: 1 1 0; min-width: 0; padding: 14px 18px; }
+.bkf-itin-segs .bkf-seg { flex: 1 1 0; min-width: 0; padding: 14px 18px 16px; }
 .bkf-itin-segs .bkf-seg + .bkf-seg { border-left: 1px solid var(--bkf-line); }
-.bkf-seg-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+
+/* ---- the leg -------------------------------------------------------------
+   Two ends and a path, because that is the shape of the thing being checked.
+   See itineraryHtml() in booking-products.js for why it stopped being three
+   stacked lines of grey.
+   ------------------------------------------------------------------------- */
+.bkf-seg-head {
+  display: flex; align-items: center; gap: 9px; min-width: 0;
+  padding-bottom: 12px; margin-bottom: 13px;
+  border-bottom: 1px dashed var(--bkf-line);
+}
 .bkf-n {
   display: grid; place-items: center; width: 20px; height: 20px; flex: none;
   border-radius: 999px; background: var(--bkf-red-soft); color: var(--bkf-red);
   font-size: 11px; font-weight: 700; font-style: normal; line-height: 1;
 }
-.bkf-seg-route { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--bkf-ink); }
-.bkf-seg-route .bkf-arrow { color: var(--bkf-muted); font-weight: 400; }
-.bkf-seg-when { font-size: 12.5px; color: var(--bkf-muted); margin-bottom: 9px; }
-.bkf-seg-air { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--bkf-muted); min-width: 0; flex-wrap: wrap; }
-.bkf-seg-air .bkf-airline { font-weight: 700; color: var(--bkf-ink); }
-.bkf-seg-air .bkf-dot { opacity: .5; }
+.bkf-seg-carrier { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.bkf-seg-carrier b {
+  font-size: 13.5px; font-weight: 700; color: var(--bkf-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bkf-seg-carrier > span { font-size: 12px; color: var(--bkf-muted); white-space: nowrap; }
+/* Pushed to the far end rather than floated: the header is a flex row and the
+   date is the only thing in it that belongs on the right. */
+.bkf-seg-date {
+  margin-left: auto; flex: none;
+  font-size: 12px; font-weight: 600; color: var(--bkf-muted); white-space: nowrap;
+}
+
+.bkf-seg-leg { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.bkf-leg-end { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: none; }
+.bkf-leg-end.is-to { text-align: right; }
+/* THE TIME IS THE BIGGEST THING IN THE CARD. It is what a traveller reads
+   first and checks hardest, and tabular numerals stop 06:15 and 07:15 from
+   sitting at different widths under each other. */
+.bkf-leg-time {
+  font-size: 19px; font-weight: 800; line-height: 1.15; color: var(--bkf-ink);
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+.bkf-leg-code { font-size: 12.5px; font-weight: 700; color: var(--bkf-ink); letter-spacing: .04em; }
+.bkf-leg-city {
+  font-size: 11.5px; color: var(--bkf-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The path. It eats the space between the two ends, so the ends stay put and
+   only the middle stretches when the card is wide. */
+.bkf-leg-path {
+  flex: 1 1 auto; min-width: 60px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.bkf-leg-dur { font-size: 11.5px; font-weight: 600; color: var(--bkf-muted); white-space: nowrap; }
+.bkf-leg-dur:empty { display: none; }
+/* The rule itself is the ::before/::after pair; the plane rides between them,
+   which is what keeps it centred at any width without a fixed size. */
+.bkf-leg-line { display: flex; align-items: center; gap: 5px; width: 100%; color: #A9B3C1; }
+.bkf-leg-line::before, .bkf-leg-line::after {
+  content: ''; flex: 1 1 auto; height: 1px; background: currentColor; opacity: .55;
+}
+.bkf-leg-line svg { width: 15px; height: 15px; flex: none; }
+.bkf-leg-stops { font-size: 11.5px; font-weight: 600; color: var(--bkf-muted); white-space: nowrap; }
+/* A direct flight is the good outcome, so it is the one that gets a colour. */
+.bkf-leg-stops.is-direct { color: var(--bkf-green-ink); }
 /* The little plane between two legs, exactly as the reference draws it: it
    straddles the divider rather than taking a column of its own. */
 .bkf-seg-link { position: relative; width: 0; flex: none; }
@@ -199,7 +258,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-logo img { width: 100%; height: 100%; object-fit: contain; }
 .bkf-logo-fb { font-size: 9.5px; font-weight: 800; color: var(--bkf-muted); }
 
-/* The outline button used by "Change Flights" / "Edit Search" / "Edit All". */
+/* The outline button used by "Modify Flights" / "Edit Search" / "Edit All". */
 .bkf-obtn {
   display: inline-flex; align-items: center; gap: 7px; flex: none;
   padding: 8px 14px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600;
@@ -359,7 +418,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   font-size: 13.5px; font-weight: 700; text-align: center;
   border: 1px solid var(--sp-accent); color: var(--sp-accent); background: #fff;
 }
-.bkf-ff-cta.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: #fff; }
+.bkf-ff-cta.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--on-accent, #12253F); }
 
 /* ==========================================================================
    5. TRAVELLER DETAILS (step 2)
@@ -589,7 +648,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 .bkf-sector b { display: block; font-size: 13.5px; font-weight: 700; }
 /* `> span` for the same reason as .bkf-foot-leg above — the arrow lives in <b>. */
 .bkf-sector > span { display: block; font-size: 11.5px; color: var(--bkf-muted); margin-top: 2px; }
-.bkf-sector.is-on { background: var(--sp-accent, #FF4D4D); color: #fff; }
+.bkf-sector.is-on { background: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F); }
 .bkf-sector.is-on > span { color: rgba(255,255,255,.9); }
 .bkf-sector:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: -3px; }
 
@@ -756,7 +815,13 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   margin-top: 12px; padding-top: 13px; border-top: 1px solid var(--bkf-line);
   font-size: 15px; font-weight: 700; color: var(--bkf-ink);
 }
-.bk-sheet.is-flight .bk-price-total > span:last-child { font-size: 20px; font-weight: 700; color: var(--bkf-red); }
+/* THE MONEY IS READ, NOT ACTED ON. Every amount in the booking phases now
+   carries the page's ink at full weight rather than the accent red: red is
+   this sheet's ALERT colour (--bkf-red is also the invalid-field ring, the
+   fare warning and the seat-taken cross), and spending it on the number a
+   traveller is meant to check made a correct total look like a problem.
+   Weight, not hue, is what makes it the biggest thing in the panel. */
+.bk-sheet.is-flight .bk-price-total > span:last-child { font-size: 20px; font-weight: 800; color: var(--bkf-ink); }
 .bkf-incl { margin: 3px 0 0; font-size: 11.5px; color: var(--bkf-muted); }
 
 /* the coupon control, restyled to sit inside the reference's card */
@@ -813,7 +878,7 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
   border-left: 1px solid var(--bkf-line); text-align: left;
 }
 .bkf-foot-total > span:first-child { font-size: 12px; color: var(--bkf-muted); }
-.bkf-foot-total b { font-size: 20px; font-weight: 700; line-height: 1.25; color: var(--bkf-red); }
+.bkf-foot-total b { font-size: 20px; font-weight: 800; line-height: 1.25; color: var(--bkf-ink); }
 .bkf-foot-incl { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--bkf-muted); }
 .bkf-foot-incl svg { width: 12px; height: 12px; }
 

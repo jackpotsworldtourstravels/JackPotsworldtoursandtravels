@@ -1222,22 +1222,49 @@ const BookingProducts = (function () {
           }).filter(Boolean).join(', ')
       : `${paxCount} Adult${paxCount > 1 ? 's' : ''}`;
 
+    /* THE LEG, DRAWN AS THE JOURNEY IT IS.
+       This used to be three stacked lines — "HYD → VGA", then the date and
+       times run together, then the airline — which is the same facts with no
+       shape: every one of them the same size, in the same grey, reading left
+       to right in one column. The traveller is checking ONE thing here, that
+       this is the flight they picked, and the two ends of the trip are what
+       they check it by.
+
+       So the two ends are the structure: time over code over city at each
+       end, and the path between them carrying what happens in between (the
+       duration, the stops). The carrier, its number and the date sit above as
+       a header, because they identify the leg rather than describe it.
+
+       THE PATH IS DECORATION AROUND REAL TEXT, not an image of it. Only the
+       rule and the glyph are aria-hidden; the duration and "Non Stop" are
+       read out in place, between the two ends, which is the order they are
+       meant to be understood in. */
+    const end = (place, time, cls) => `
+      <div class="bkf-leg-end ${cls}">
+        <b class="bkf-leg-time">${esc(time || '--:--')}</b>
+        <span class="bkf-leg-code">${esc(place.code || '')}</span>
+        <span class="bkf-leg-city">${esc(place.city || '')}</span>
+      </div>`;
+
     const cells = segs.map((s, i) => `
       <div class="bkf-seg">
-        <div class="bkf-seg-top">
+        <div class="bkf-seg-head">
           <i class="bkf-n">${i + 1}</i>
-          <span class="bkf-seg-route">${esc(s.origin.code)}
-            <span class="bkf-arrow" aria-hidden="true">&#8594;</span>
-            ${esc(s.destination.code)}</span>
-        </div>
-        <div class="bkf-seg-when">${esc(bkfDate(s.date))}${
-          s.departure ? ` &middot; ${esc(s.departure)}${s.arrival ? ` &ndash; ${esc(s.arrival)}` : ''}` : ''}</div>
-        <div class="bkf-seg-air">
           ${bkfLogo(s)}
-          <span class="bkf-airline">${esc(s.airline || '')}</span>
-          <span>${esc(s.flightNumber || '')}</span>
-          <span class="bkf-dot" aria-hidden="true">&bull;</span>
-          <span>${esc(rvStops(s.stops))}</span>
+          <span class="bkf-seg-carrier">
+            <b>${esc(s.airline || '')}</b>
+            <span>${esc(s.flightNumber || '')}</span>
+          </span>
+          <span class="bkf-seg-date">${esc(bkfDate(s.date))}</span>
+        </div>
+        <div class="bkf-seg-leg">
+          ${end(s.origin || {}, s.departure, 'is-from')}
+          <div class="bkf-leg-path">
+            <span class="bkf-leg-dur">${esc(s.durationLabel || '')}</span>
+            <span class="bkf-leg-line" aria-hidden="true">${svg('plane')}</span>
+            <span class="bkf-leg-stops${s.stops ? '' : ' is-direct'}">${esc(rvStops(s.stops))}</span>
+          </div>
+          ${end(s.destination || {}, s.arrival, 'is-to')}
         </div>
       </div>`).join('<div class="bkf-seg-link">' + svg('plane') + '</div>');
 
@@ -1250,7 +1277,7 @@ const BookingProducts = (function () {
             ${review ? `<span class="bkf-itin-meta">${esc(party)}<i>&middot;</i>${esc(cabin)}</span>` : ''}
           </div>
           <button type="button" class="bkf-obtn" data-bk-exit="1">
-            ${svg('edit')}<span>${review ? 'Edit Search' : 'Change Flights'}</span>
+            ${svg('edit')}<span>${review ? 'Edit Search' : 'Modify Flights'}</span>
           </button>
         </div>
         <div class="bkf-itin-segs">${cells}</div>

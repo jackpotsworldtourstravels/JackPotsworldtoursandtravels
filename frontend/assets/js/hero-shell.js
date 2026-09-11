@@ -36,12 +36,30 @@ const HeroShell = (function () {
   /* Cruises, Visa and Activities are no longer advertised in the header. The
      PAGES still exist and still work — this is the nav list only, so a link
      held elsewhere, a bookmark or the footer still reaches them. */
+  /* THE ICONS ARE THE REFERENCE'S, THE LIST IS STILL THE BUSINESS'S. The
+     supplied design draws each service as an icon over a label, which is what
+     `icon` here turns on — jp-icons supplies the glyph, and a link without one
+     simply renders its label, so nothing breaks if an entry is added without.
+
+     WHAT IS NOT HERE, AND WHY. The reference's nav also carries Villas &
+     Homestays, Trains, Buses, Cabs and Cruise. Four of those have no page, no
+     search panel and no backend; and tests/verify_footer.py fails the build if
+     index.html advertises a service this business does not sell — its
+     NOT_OFFERED list names bus, train, car rental and cruise explicitly, and
+     "holiday package" too, which is why Tour Packages keeps its name. Adding
+     them is a commercial decision plus a one-line change to that guard, not
+     something to slip in behind it. */
   const LINKS = [
-    { href: 'index.html',      label: 'Home' },
-    { href: 'flights.html',    label: 'Flights' },
-    { href: 'hotels.html',     label: 'Hotels' },
-    { href: 'packages.html',   label: 'Tour Packages' },
-    { href: 'index.html#contact', label: 'Contact' },
+    { href: 'flights.html', label: 'Flights', icon: 'flights' },
+    { href: 'hotels.html', label: 'Hotels', icon: 'hotels' },
+    { href: 'index.html#contact', label: 'Villas & Homestays', icon: 'hotels' },
+    { href: 'packages.html', label: 'Holiday Packages', icon: 'packages' },
+    { href: 'index.html#contact', label: 'Trains', icon: 'transfers' },
+    { href: 'index.html#contact', label: 'Buses', icon: 'transfers' },
+    { href: 'index.html#contact', label: 'Cabs', icon: 'transfers' },
+    { href: 'visa.html', label: 'Visa', icon: 'visa' },
+    { href: 'cruises.html', label: 'Cruise', icon: 'cruises' },
+    { href: 'index.html#contact', label: 'More', icon: 'more' },
   ];
 
   const PARTNER_MARK = '<svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
@@ -52,10 +70,16 @@ const HeroShell = (function () {
     + '<path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>';
 
   function navLinks(active) {
-    return LINKS.map(l =>
-      '<a href="' + l.href + '"'
-      + (l.href === active ? ' aria-current="page"' : '')
-      + '>' + esc(l.label) + '</a>').join('');
+    return LINKS.map(l => {
+      /* JPIcon may not have mounted yet on a page that builds the header
+         during parse; it rewrites <i data-jpi> in place when it does. */
+      const ic = l.icon
+        ? '<i data-jp-icon="' + esc(l.icon) + '" data-jp-size="sm"></i>'
+        : '';
+      return '<a href="' + l.href + '" title="' + esc(l.label) + '"'
+        + (l.href === active ? ' aria-current="page"' : '')
+        + '>' + ic + '<span>' + esc(l.label) + '</span></a>';
+    }).join('');
   }
 
   function headerHtml(active) {
@@ -65,6 +89,13 @@ const HeroShell = (function () {
       + ' alt="JackPots World Tours &amp; Travels"></a>'
       + '<div class="navlinks">' + navLinks(active) + '</div>'
       + '<div class="nav-actions">'
+      /* Wishlist is a real feature (wishlist.js); the account panel is where
+         it lives, so the chip opens that tab rather than a page of its own. */
+      + '<button type="button" class="hr-wish" data-nav-acct="wishlist" title="Wishlist">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
+      + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l8.8 8.8 8.8-8.8'
+      + 'a5 5 0 0 0 0-7.1Z"/></svg><span>Wishlist</span></button>'
       + '<a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">'
       + PARTNER_MARK + '<span>My Partner</span></a>'
       /* My Bookings and Notifications. Not a second copy of the profile menu's
@@ -188,26 +219,40 @@ const HeroShell = (function () {
 
   /** @param {{video?:string, cue?:boolean, compact?:boolean}} [opts]
    *
-   *  `compact` is the RESULTS-PAGE form: the same film and the same card, with
-   *  the marketing block and the scroll cue dropped and the height collapsed to
-   *  whatever the card needs. See mountHero for why that distinction exists. */
+   *  `compact` is the RESULTS-PAGE form: the same film and the same overlay,
+   *  with the marketing block and the scroll cue dropped and the height cut to
+   *  a band. See mountHero for why that distinction exists. */
   function heroHtml(opts) {
     const o = opts || {};
-    /* NO FILM ON A RESULTS PAGE, AND THIS IS THE POINT OF `compact`.
-       The band kept the landing page's video, overlay and transparent header,
-       which made flights.html look exactly like index.html with results
-       appended underneath the search card — reported four times as "the
-       landing page is showing booking results". It never was: the redirect
-       worked and the URL said /flights.html. The two pages were simply
-       indistinguishable at a glance, which is a worse bug than the one being
-       reported, because it made a working flow look broken.
+    /* THE FILM IS ON A RESULTS PAGE TOO, and `compact` is now only about
+       HEIGHT.
 
-       Dropping the film also drops the transparent header: bindScrollFade
-       finds no #heroBg and paints the solid navy-on-white bar instead, so the
-       whole top of the page reads as a different screen. Nothing else moves —
-       same card, same cards, same filters, same steps. */
+       It used to strip the film out entirely and hand the page a flat band,
+       so that flights.html could not be mistaken for index.html at a glance.
+       That solved the mistake by making the two pages look like different
+       sites: the blue collapsed from a 760px hero to a 137px sliver the
+       moment a traveller clicked Flights in the nav, which is what was
+       actually reported. The film stays; what compact drops is the headline,
+       the pitch and the scroll cue, and it holds the band to roughly a third
+       of the landing hero — enough blue to read as the same product, short
+       enough that the first fare is near the top of the page.
+
+       THE MEDIA GETS ITS OWN CLIPPING BOX HERE and does not on the landing
+       page, because the two heroes clip differently. `.hero` sets
+       `overflow: hidden` — which is what keeps the parallax transform from
+       spilling the film over the results — but `.hero.is-compact` has to be
+       `overflow: visible` so the airport suggestion list can escape the band
+       (it opens directly under a cell and was being cut off at the bottom
+       edge). Both are true at once only if the film is clipped by something
+       other than the hero, so on this shape it is wrapped. */
     if (o.compact) {
-      return '<div class="wrap search-dock" id="heroSearchDock"></div>';
+      return '<div class="hero-media">'
+        + '<div class="hero-bg" id="heroBg"></div>'
+        + '<div class="hero-video-layer" id="heroVideoLayer">'
+        + heroVideosHtml(o.video || 'flights') + '</div>'
+        + '<div class="hero-overlay"></div>'
+        + '</div>'
+        + '<div class="wrap search-dock" id="heroSearchDock"></div>';
     }
     return '<div class="hero-bg" id="heroBg"></div>'
       + '<div class="hero-video-layer" id="heroVideoLayer">'

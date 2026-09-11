@@ -1029,7 +1029,30 @@ function renderPasswordStrength() {
   box.textContent = PW_LABELS[score];
   box.className = `pw-strength is-s${score}`;
 }
-const isMobile = v => /^\d{10,15}$/.test(String(v).replace(/[\s-]/g, ''));
+/* THE NATIONAL NUMBER ONLY — the dial code is a separate control now.
+   The bound is 6 at the bottom because plenty of countries are shorter than
+   ten digits (Iceland is 7, the Faroes 6), and 14 at the top because E.164
+   caps the WHOLE number at 15 and the shortest dial code is one digit. The
+   combined length is checked separately, against the same 15. */
+const isMobile = v => /^\d{6,14}$/.test(String(v).replace(/[\s-]/g, ''));
+
+/** The sign-up form's country select, filled from the shared table.
+ *
+ *  Built here rather than written into index.html because it is 239 options:
+ *  that is 12KB of markup on a page that mostly never opens this dialog, and
+ *  three other forms want the same list (see country-codes.js). */
+(function fillDialCodes() {
+  const sel = document.getElementById('suDial');
+  if (!sel || typeof CountryCodes === 'undefined') return;
+  sel.innerHTML = CountryCodes.options(CountryCodes.DEFAULT_ISO);
+})();
+
+/** '+91', from whatever the select is showing. */
+function signupDial() {
+  const sel = document.getElementById('suDial');
+  return (typeof CountryCodes !== 'undefined')
+    ? CountryCodes.dialOf(sel ? sel.value : null) : '+91';
+}
 
 /* Clear a field's error the moment the traveller starts fixing it — leaving
    it there while they type reads as though the correction is not registering. */
@@ -1136,6 +1159,13 @@ authOverlay.addEventListener('click', e => {
   if (!target) return;
   e.preventDefault();
   const next = target.dataset.step;
+  /* GUEST IS NOT A STEP, it is the way out. There is no guest session and
+     nothing is created: booking already works signed out, so the honest
+     implementation of "continue as guest" is to stop asking and give the page
+     back. It rides on the same [data-step] dispatcher because it sits in the
+     same row of links; showStep() would throw on a name AUTH_STEPS has no
+     view for, so it is answered before that. */
+  if (next === 'guest') { closeAuth(); return; }
   /* Carry the address forward so it is never typed twice. */
   if (next === 'signup') document.getElementById('suEmail').value = currentAuthEmail();
   if (next === 'password') document.getElementById('liUser').value = currentAuthEmail();
@@ -1351,7 +1381,14 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   clearFieldErrors();
   if (name.length < 2) return setFieldError('suName', 'Enter your full name.');
   if (!isEmail(email)) return setFieldError('suEmail', 'That does not look like an email address.');
-  if (!isMobile(mobile)) return setFieldError('suMobile', 'Enter a valid mobile number, 10 to 15 digits.');
+  if (!isMobile(mobile)) return setFieldError('suMobile', 'Enter a valid mobile number, 6 to 14 digits.');
+  /* E.164 caps the dial code and the number together at 15 digits. Checked
+     here so the traveller is told which field to shorten, not handed the
+     server's generic rejection of the whole form. */
+  const dial = signupDial();
+  if ((dial + mobile).replace(/[^\d]/g, '').length > 15) {
+    return setFieldError('suMobile', 'That number is too long for the country code selected.');
+  }
   if (pass.length < 8) return setFieldError('suPass', 'Use at least 8 characters.');
   if (passwordScore(pass) < 2) {
     return setFieldError('suPass',
@@ -1362,7 +1399,11 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   setModalMsg(msg, 'Creating your account…', 'muted');
   try {
     const { data } = await axios.post(`${API_BASE}/api/customer/auth/signup`, {
-      full_name: name, email, mobile: mobile.replace(/[\s-]/g, ''),
+      /* The dial code travels WITH the number. The API stores one string and
+         validates `^\+?\d{8,15}$`, so a bare national number would be
+         indistinguishable from an Indian one the moment anybody tried to ring
+         it back. */
+      full_name: name, email, mobile: dial + mobile.replace(/[\s-]/g, ''),
       password: pass, confirm_password: pass2,
     });
     setModalMsg(msg, '', 'muted');

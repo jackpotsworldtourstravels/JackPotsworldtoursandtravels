@@ -68,6 +68,8 @@ const BookingCard = (function () {
   const state = {
     tab: 'flights',
     trip: 'oneway',
+    /* The special fare, carried into flightCriteria() as `fare`. */
+    fare: 'regular',
     hotelMode: 'rooms',
   };
 
@@ -131,12 +133,102 @@ const BookingCard = (function () {
     + ' aria-controls="' + id + 'List">'
     + '<div class="tx-ap-list" id="' + id + 'List" role="listbox"'
     + ' aria-label="' + esc(label) + ' suggestions" hidden></div>'
+    /* The airport line under the city, as the reference draws it. Filled by
+       paintSubLabels() from the airports table — never typed in, so it cannot
+       disagree with the code the field actually holds. */
+    + '<span class="fld-sub" data-sub-for="' + id + '" aria-hidden="true"></span>'
     + '</div>';
+
+  /* THE SECOND LINE IN EVERY CELL, from data the card already holds.
+
+     The reference prints the airport under the city ("DEL, Delhi Airport
+     India") and the weekday under the date ("Thursday"). The airports table
+     carries a code, a city and a country but NOT an airport's proper name, so
+     the line is built from what is actually known — "DEL, Delhi India" — and a
+     code the table does not have prints nothing rather than a guess. The
+     weekday is derived from the date input's own value.
+
+     Called after every repaint and on every change, because both lines follow
+     fields the traveller can edit. */
+  function paintSubLabels() {
+    if (!root) return;
+    const table = (typeof JPAirports !== 'undefined' && JPAirports.TABLE) || {};
+    root.querySelectorAll('.fld-sub[data-sub-for]').forEach(el => {
+      const src = root.querySelector('#' + el.dataset.subFor);
+      if (!src) { el.textContent = ''; return; }
+
+      if (src.type === 'date' || src.dataset.native === 'date' || /Dep|Ret|date/i.test(src.id)) {
+        const v = src.value || src.dataset.value || '';
+        const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : null;
+        el.textContent = d && !isNaN(d)
+          ? d.toLocaleDateString('en-IN', { weekday: 'long' }) : '';
+        return;
+      }
+
+      const code = (src.dataset.key || codeFrom(src.value) || '').toUpperCase();
+      const row = table[code];
+      el.textContent = (code && row)
+        ? code + ', ' + row.city + (row.country ? ' ' + row.country : '')
+        : '';
+    });
+  }
 
   const swapButton = area =>
     '<button class="swap-btn" type="button"' + (area ? ' data-fg="' + area + '"' : '')
     + ' aria-label="Swap origin and destination">'
     + '<span data-jp-icon="swap" data-jp-size="sm"></span></button>';
+
+  /* SELECT A SPECIAL FARE — the five categories the reference names.
+
+     THE AXIS IS REAL. flight-filters.js already models it as `fareCategory`
+     and renders a filter for it the day results carry the field; this control
+     is what sets it, and the value rides along in the search criteria as
+     `fare`, so nothing new has to be invented on the results side.
+
+     THE SUB-LINES ARE THE BUSINESS'S OWN COMMERCIAL COPY, supplied in the
+     reference and reproduced verbatim. Nothing in this application applies
+     them: there is no fare rule, coupon or supplier response that discounts a
+     student or an armed-forces fare, so choosing one changes what is SEARCHED
+     FOR and does not change a price at checkout. Wiring that up is a pricing
+     change, not a UI one. */
+  const SPECIAL_FARES = [
+    { id: 'regular', label: 'Regular',           note: 'Regular fares' },
+    { id: 'student', label: 'Student',           note: 'Extra discounts/baggage' },
+    { id: 'armed',   label: 'Armed Forces',      note: 'Up to ₹ 600 off' },
+    { id: 'senior',  label: 'Senior Citizen',    note: 'Up to ₹ 600 off' },
+    { id: 'marine',  label: 'Marine Fare',       note: 'Up to ₹ 600 off' },
+  ];
+
+  /* Quick Tools. Each opens the thing that already exists and can answer it —
+     the fare calendar is the date picker, price alerts and flight status have
+     no feature behind them yet and say so rather than doing nothing. */
+  const QUICK_TOOLS = [
+    { id: 'status',   label: 'Flight Status' },
+    { id: 'calendar', label: 'Fare Calendar' },
+    { id: 'alerts',   label: 'Price Alerts' },
+  ];
+
+  function specialFaresHtml() {
+    const tiles = SPECIAL_FARES.map(f =>
+      '<button type="button" class="hr-fare' + (f.id === state.fare ? ' is-on' : '') + '"'
+      + ' data-fare="' + f.id + '" aria-pressed="' + (f.id === state.fare) + '">'
+      + '<b>' + esc(f.label) + '</b><span>' + esc(f.note) + '</span></button>').join('');
+
+    const tools = QUICK_TOOLS.map(t =>
+      '<button type="button" class="hr-tool" data-tool="' + t.id + '">'
+      + (typeof JPIcon !== 'undefined' ? JPIcon.html('sparkle', { size: 'sm' }) : '')
+      + '<span>' + esc(t.label) + '</span></button>').join('');
+
+    return '<div class="hr-fares">'
+      + '<div class="hr-fares-group">'
+      + '<span class="hr-fares-lab">Select a special fare</span>'
+      + '<div class="hr-fare-row" role="group" aria-label="Special fare">' + tiles + '</div>'
+      + '</div>'
+      + '<div class="hr-tools">'
+      + '<span class="hr-tools-lab">Quick Tools</span>'
+      + '<div class="hr-tool-row">' + tools + '</div>'
+      + '</div></div>';
+  }
 
   function flightsPanel() {
     const trip = TRIPS.map(t =>
@@ -195,6 +287,11 @@ const BookingCard = (function () {
       + '<div class="field field-pax" data-fg="pax" id="fPaxField"></div>'
       + '<div class="field" data-fg="cabin" id="fCabinField"><label for="fCabin">Cabin</label>'
       + '<select id="fCabin">' + cabin + '</select></div>'
+
+      /* The special-fare row and the quick tools, under the fields — where the
+         reference puts them, and inside the flights panel because they are
+         about flights and nothing else. */
+      + specialFaresHtml()
       + '</div>';
   }
 
@@ -341,11 +438,49 @@ const BookingCard = (function () {
      `tab` at mount still decides which one OPENS — render(host,{tab:'hotels'})
      — so the Hotels page opens on Hotels. It no longer decides which ones
      EXIST. */
+  /* A PANEL FOR A PRODUCT THAT CANNOT BE SEARCHED YET.
+
+     The supplied reference draws nine product tabs. Four of them — Villas &
+     Homestays, Trains, Buses and Cabs — have no catalogue, no search endpoint
+     and no results page anywhere in this application, and Visa has a page but
+     no search panel.
+
+     They are drawn, because the reference draws them and the business asked
+     for them. What they must not do is imitate a search: a From/To/Date form
+     with a Search button that cannot answer is worse than no tab at all,
+     because the traveller only finds out after filling it in. So the panel
+     says plainly that the product is arranged by the team, and its button goes
+     to the enquiry route that already exists rather than to a search that does
+     not. When a real panel is built, it replaces the entry in PANELS below and
+     nothing else changes. */
+  function enquiryPanel(id, blurb, href, cta) {
+    return panelOpen(id)
+      + '<div class="bc-enquire">'
+      + '<p>' + esc(blurb) + '</p>'
+      + '<a class="bc-enquire-go" href="' + esc(href) + '">' + esc(cta) + '</a>'
+      + '</div></div>';
+  }
+
   const PANELS = {
     flights: flightsPanel,
     hotels: hotelsPanel,
     cruises: cruisesPanel,
     packages: packagesPanel,
+    villas: () => enquiryPanel('villas',
+      'Villas and homestays are arranged by our team for your dates and party size.',
+      'index.html#contact', 'Enquire about a villa'),
+    trains: () => enquiryPanel('trains',
+      'Rail bookings are handled by our travel desk while online booking is being connected.',
+      'index.html#contact', 'Enquire about trains'),
+    buses: () => enquiryPanel('buses',
+      'Bus bookings are handled by our travel desk while online booking is being connected.',
+      'index.html#contact', 'Enquire about buses'),
+    cabs: () => enquiryPanel('cabs',
+      'Airport transfers and cabs are arranged alongside your booking.',
+      'index.html#contact', 'Enquire about a cab'),
+    visa: () => enquiryPanel('visa',
+      'Visa assistance is handled case by case — tell us the country and your travel dates.',
+      'visa.html', 'Visa assistance'),
   };
 
   /* The products, in the order the landing page has always listed them. `icon`
@@ -355,11 +490,24 @@ const BookingCard = (function () {
      just above — it is what cruises.html would need if that product is ever
      put back — but it is not in this list, so the tab is not drawn and the
      panel is not built. Nothing is hidden; it simply is not rendered. */
+  /* NINE TABS, per the supplied reference. Five of them open a panel that
+     enquires rather than searches — see PANELS above for why that is the
+     honest shape while those products have no backend. */
   const TABS = [
-    { id: 'flights',  label: 'Flights',       icon: 'flights' },
-    { id: 'hotels',   label: 'Hotels',        icon: 'hotels' },
-    { id: 'packages', label: 'Tour Packages', icon: 'packages' },
+    { id: 'flights',  label: 'Flights',            icon: 'flights' },
+    { id: 'hotels',   label: 'Hotels',             icon: 'hotels' },
+    { id: 'villas',   label: 'Villas & Homestays', icon: 'hotels' },
+    { id: 'packages', label: 'Holiday Packages',   icon: 'packages' },
+    { id: 'trains',   label: 'Trains',             icon: 'transfers' },
+    { id: 'buses',    label: 'Buses',              icon: 'transfers' },
+    { id: 'cabs',     label: 'Cabs',               icon: 'transfers' },
+    { id: 'visa',     label: 'Visa',               icon: 'visa' },
+    { id: 'cruises',  label: 'Cruise',             icon: 'cruises' },
   ];
+
+  /* Which tabs can actually run a search. The Search button and the criteria
+     dispatch both read this, so an enquiry tab can never submit a form. */
+  const SEARCHABLE = ['flights', 'hotels', 'packages', 'cruises'];
 
   const panelId = name => 'bcPanel-' + name;
   const tabId = name => 'bcTab-' + name;
@@ -392,8 +540,10 @@ const BookingCard = (function () {
 
   function cardHtml() {
     const trust = [
-      'Trusted by 2 Million+ Travellers', '24/7 Support',
-      'Secure Payments', 'Instant Confirmation',
+      /* The traveller-count claim was removed on request. The three that
+         remain are statements about how the service works, not about how many
+         people have used it. */
+      '24/7 Support', 'Secure Payments', 'Instant Confirmation',
     ].map(t => '<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
       + '<path d="M20 6L9 17l-5-5"/></svg>' + esc(t) + '</span>').join('');
 
@@ -742,8 +892,23 @@ const BookingCard = (function () {
   function paintSearchButton() {
     const go = root && root.querySelector('.search-go');
     if (!go || busy) return;   // a repaint mid-send must not undo setBusy's label
+
+    /* AN ENQUIRY TAB HAS NO SEARCH. Villas, Trains, Buses, Cabs and Visa carry
+       their own link inside the panel; leaving the card's own Search button
+       under them would offer to run a search that has nothing to answer it.
+       Hidden rather than disabled — a greyed-out button still reads as "this
+       should work and does not". */
+    const searchable = SEARCHABLE.indexOf(state.tab) !== -1;
+    go.hidden = !searchable;
+    const row = go.closest('.hr-go-row, .search-actions, .search-go-row');
+    if (row) row.hidden = !searchable;
+    if (!searchable) return;
+
     const group = state.tab === 'hotels' && state.hotelMode === 'group';
-    go.textContent = group ? 'Request Group Quote' : 'Search';
+    /* The reference names the product on the button. */
+    const LABEL = { flights: 'Search Flights', hotels: 'Search Hotels',
+                    packages: 'Search Packages', cruises: 'Search Cruises' };
+    go.textContent = group ? 'Request Group Quote' : (LABEL[state.tab] || 'Search');
     go.classList.toggle('is-wide', group);
   }
 
@@ -861,6 +1026,7 @@ const BookingCard = (function () {
   };
 
   function paintTrip() {
+    setTimeout(paintSubLabels, 0);
     if (!root) return;
     const panel = root.querySelector('[data-panel="flights"]');
     if (!panel) return;
@@ -954,7 +1120,7 @@ const BookingCard = (function () {
        label is the one thing that has to be told which mode it is in. Group
        Deals does not search — it asks — and a button that still said "Search"
        would be describing the wrong action. */
-    if (state.tab === 'hotels') paintSearchButton();
+    paintSearchButton();
     paintNights();
   }
 
@@ -1128,6 +1294,10 @@ const BookingCard = (function () {
       children: party.children,
       infants: party.infants,
       cabin: cabin,
+      /* The special fare. `fareCategory` is the axis flight-filters.js already
+         models, so the results page can narrow on it the day rows carry the
+         field; until then it rides in the URL and changes nothing. */
+      fare: state.fare || 'regular',
     };
 
     if (state.trip === 'multi') {
@@ -1228,6 +1398,8 @@ const BookingCard = (function () {
     if (kind === 'flights') return flightCriteria();
     if (kind === 'hotels') return hotelCriteria();
     if (kind === 'packages') return { type: val('pType'), month: val('pMonth') };
+    /* An enquiry tab has no criteria to give — its panel carries its own link
+       and the Search button is hidden on it. */
     return {};
   }
 
@@ -1524,7 +1696,46 @@ const BookingCard = (function () {
   /* ---------------------------------------------------------------------
      Wiring
      --------------------------------------------------------------------- */
+  /* The two sub-lines follow fields the traveller edits, so they repaint on
+     any input inside the card as well as after every structural repaint.
+     Delegated on the card root: multi-city rows are added and removed at
+     runtime and a per-field listener would miss the new ones. */
+  function bindSubLabels() {
+    if (!root) return;
+    ['input', 'change'].forEach(ev =>
+      root.addEventListener(ev, () => paintSubLabels(), true));
+    paintSubLabels();
+  }
+
   function bind() {
+    bindSubLabels();
+
+    /* The special fare and the quick tools. Delegated on the card root because
+       the flights panel is re-rendered whenever the trip type changes. */
+    root.addEventListener('click', e => {
+      const fare = e.target.closest('[data-fare]');
+      if (fare) {
+        state.fare = fare.dataset.fare;
+        root.querySelectorAll('[data-fare]').forEach(b => {
+          const on = b.dataset.fare === state.fare;
+          b.classList.toggle('is-on', on);
+          b.setAttribute('aria-pressed', String(on));
+        });
+        return;
+      }
+      const tool = e.target.closest('[data-tool]');
+      if (tool) {
+        /* Only the fare calendar has something behind it — the departure date
+           picker. The other two have no feature yet, and a button that opens
+           nothing is worse than one that says so. */
+        if (tool.dataset.tool === 'calendar') {
+          const dep = root.querySelector('#fDep');
+          if (dep) { dep.focus(); dep.click(); }
+        } else if (typeof showToast === 'function') {
+          showToast(tool.textContent.trim() + ' is not available yet.', true);
+        }
+      }
+    });
     /* The collapsed summary. Delegated so it survives a re-render, and it
        repaints on any change inside the card so the strip is never describing
        a search the fields no longer hold. */

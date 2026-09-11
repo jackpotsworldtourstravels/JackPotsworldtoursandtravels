@@ -24,7 +24,7 @@
 .jw-footer {
   --jwf-navy:      #0A2540;
   --jwf-navy-deep: #071B2E;
-  --jwf-gold:      #FFB020;
+  --jwf-gold:      var(--gold, #E9B949);
   --jwf-ink:       #FFFFFF;
   --jwf-dim:       rgba(255,255,255,.72);
   --jwf-line:      rgba(255,255,255,.12);

@@ -186,8 +186,12 @@
   function initSearchForm(form) {
     var status = form.querySelector('[data-form-status]');
 
+    /* The trip-type radios live in a fieldset, not a .c-field, so `closest`
+       returns null for them — and the input listener below binds to every
+       input in the form. Both helpers bail rather than throw. */
     function fail(field, message) {
       var wrap = field.closest('.c-field');
+      if (!wrap) { return; }
       wrap.classList.add('c-field--error');
       var slot = wrap.querySelector('[data-error-slot]');
       if (slot) { slot.textContent = message; slot.hidden = false; }
@@ -195,6 +199,7 @@
     }
     function clear(field) {
       var wrap = field.closest('.c-field');
+      if (!wrap) { return; }
       wrap.classList.remove('c-field--error');
       var slot = wrap.querySelector('[data-error-slot]');
       if (slot) { slot.hidden = true; slot.textContent = ''; }

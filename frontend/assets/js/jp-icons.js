@@ -145,6 +145,20 @@ const JPIcon = (function () {
       <path d="M4.4 15.6v2.8a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.8"/>
       <path data-jpi="lift" d="M12 14.6V3.4"/>
       <path data-jpi="lift" d="M7.8 7.4 12 3.2l4.2 4.2"/>`,
+
+    /* THE "MORE" CATCH-ALL IN THE PRODUCT NAV.
+       Filled circles rather than the zero-length `h.01` trick the chat icon
+       uses for its ellipsis: at 1.6 stroke those come out as 1.6px specks,
+       which is fine as detail inside a speech bubble and too faint when the
+       three dots ARE the whole glyph. The nav is icon-only below 1460px, so
+       this is all a traveller has to go on.
+
+       fill/stroke are set per shape because wrap() hands every icon
+       `fill="none" stroke="currentColor"`, which would draw three rings. */
+    more: `
+      <circle cx="5.6" cy="12" r="1.15" fill="currentColor" stroke="none"/>
+      <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none"/>
+      <circle cx="18.4" cy="12" r="1.15" fill="currentColor" stroke="none"/>`,
   };
 
   /** Human labels, used for the title/aria when an icon is asked to stand alone. */
@@ -154,7 +168,7 @@ const JPIcon = (function () {
     transfers: 'Airport Transfers', insurance: 'Travel Insurance',
     star: 'Rating', bell: 'Notifications',
     swap: 'Swap', arrowUp: 'Back to top', chat: 'Chat', mic: 'Voice search',
-    sparkle: 'Suggestions',
+    sparkle: 'Suggestions', more: 'More travel services',
   };
 
   function wrap(name, inner, opts) {

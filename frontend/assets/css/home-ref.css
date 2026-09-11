@@ -1,0 +1,645 @@
+/* ===========================================================================
+   home-ref.css — the landing page, built to the supplied reference.
+   ===========================================================================
+   Loaded ONLY by index.html, and every rule is scoped to `body.home-ref`, so
+   the seven other pages that share main.css are untouched by it.
+
+   WHAT THE REFERENCE CHANGES, top to bottom:
+     - a two-line icon nav of ten products. It was a WHITE bar at first, which
+       is what the reference draws; the business asked for the shared
+       header's behaviour back instead, so the bar is clear over the hero and
+       fades to black on scroll (section 1) and only the nav layout is the
+       reference's.
+     - a taller hero with an eyebrow, a two-tone headline and a four-item
+       trust row carrying icons and sub-lines
+     - the "Travel More / Worry Less" script mark at the top right
+     - a wider, flatter search card: bigger tabs, a special-fare row, a
+       quick-tools cluster and one large centred call to action
+     - a four-card offer strip on cream
+     - a six-tile destination grid with its own pager
+
+   IMAGERY IS THE ONE THING IT CANNOT SUPPLY. The reference is carried by
+   photographs — a sunset coastline behind the hero, six destination tiles,
+   four offer illustrations — and none of them are in this repository
+   (design-templates/assets/img is empty; the only photographs on disk are the
+   eleven hotel shots under assets/hotels). Every slot that wants one is built
+   to take a real file and falls back to a warm gradient in the meantime,
+   rather than sitting empty or stretching a placeholder. See the
+   `--hr-shot-*` custom properties: dropping a file in and setting one is the
+   whole change.
+   =========================================================================== */
+
+body.home-ref {
+  --hr-cream:     #F5EFE9;
+  /* Named -gold from when the accent was gold; they are the ACCENT family and
+     follow whatever main.css says the accent is. Renaming them would touch
+     every rule below for no behavioural gain. */
+  --hr-gold:      var(--coral);
+  --hr-gold-dk:   var(--coral-dark);
+  --hr-gold-ink:  var(--coral-dark);
+  --hr-ink:       var(--ink, #12253F);
+  --hr-muted:     var(--muted, #6B7A90);
+  --hr-line:      var(--line, #E4E9F0);
+  --hr-navy:      var(--navy, #0C1E3A);
+  /* Header ink. The bar is clear over the dark hero and near-black once
+     scrolled (section 1), so nothing in it can use --hr-ink. One pair of
+     tokens for both states, because both states are dark. */
+  --hr-onhero:     rgba(255,255,255,.92);
+  --hr-onhero-dim: rgba(255,255,255,.70);
+  background: #fff;
+}
+
+/* THE CARD IS NO LONGER ONLY THE LANDING PAGE'S.
+   -------------------------------------------------------------------------
+   search-strip.js's Modify button opens this same BookingCard underneath the
+   results-page search row, because the row cannot edit a multi-city
+   itinerary, a special fare or Group Deals and the card can. Mounted there it
+   arrived UNSTYLED: every rule that dresses it — the tab row, the fare tiles,
+   the quick tools, the enquiry panel — was scoped to `body.home-ref`, which
+   only index.html sets, so the fare tiles came out as a run-on line of text.
+
+   So the CARD sections (3, 4, 8, 10 and the card lines of 7) match either
+   scope, and this class carries the tokens they read. The PAGE sections (1,
+   2, 5, 6, 9 — header, hero, offers, destinations, nav fitting) are still
+   `body.home-ref` alone, which is what lets flights/hotels/packages load this
+   stylesheet without taking the landing page's chrome with it. */
+.hr-card-scope {
+  --hr-cream:     #F5EFE9;
+  --hr-gold:      var(--coral);
+  --hr-gold-dk:   var(--coral-dark);
+  --hr-gold-ink:  var(--coral-dark);
+  --hr-ink:       var(--ink, #12253F);
+  --hr-muted:     var(--muted, #6B7A90);
+  --hr-line:      var(--line, #E4E9F0);
+  --hr-navy:      var(--navy, #0C1E3A);
+  --hr-onhero:     rgba(255,255,255,.92);
+  --hr-onhero-dim: rgba(255,255,255,.70);
+}
+
+/* ==========================================================================
+   1. HEADER — clear over the hero, dark once you scroll
+   --------------------------------------------------------------------------
+   THE BAR IS NOT PAINTED IN THIS FILE, deliberately. main.css starts it at
+   rgba(0,0,0,0) and hero-shell's bindScrollFade() writes background-color,
+   backdrop-filter and box-shadow as INLINE styles on every scroll event,
+   taking the bar from fully clear over the hero photograph to near-black by
+   600px down. This block used to override all three with `!important` — which
+   is exactly why the landing page wore a white bar from the first frame and
+   never darkened, while every other page kept the fade.
+
+   Two things follow from letting the fade run again, and both are handled
+   here:
+
+   POSITION IS `fixed`, NOT `sticky`. A sticky bar occupies flow space, so the
+   hero began 128px BELOW it. A transparent bar has to overlay the thing it is
+   transparent to, so it leaves the flow and .hero takes the padding instead
+   (section 2). z-index matches main.css's 100 rather than the 70 a
+   flow-occupying bar could afford.
+
+   EVERY LABEL IN IT IS LIGHT. Its backdrop is the dark hero and then the dark
+   bar — never white — so the ink, the icons, the partner pill and the login
+   link all invert below. That is the whole reason the white bar existed: get
+   the colours wrong and the nav vanishes into the sky.
+   ========================================================================== */
+body.home-ref header#siteHeader,
+body.home-ref header.site-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+}
+body.home-ref header#siteHeader nav.wrap { min-height: 64px; gap: 18px; }
+/* THE LOGO IS NEVER THE THING THAT GIVES WAY.
+   .navlinks carries flex:1 and there are ten of them; the logo's default
+   `flex: 0 1 auto` let it be squeezed toward nothing as the bar filled up, and
+   at a narrow window it collapsed out of sight entirely. It is the brand mark
+   — the nav scrolls instead (section 7). */
+body.home-ref header#siteHeader .logo { flex: none; }
+body.home-ref header#siteHeader .logo-mark-img { height: 52px; width: auto; }
+
+/* The nav is a row of ICON-OVER-LABEL cells in the reference, not a row of
+   words. The icon comes from jp-icons (one family for the whole site); a link
+   with no icon simply renders its label, so nothing breaks if one is added
+   without one. */
+/* `safe center`, not `center`. Centred flex content that does not fit
+   overflows at BOTH ends, and the end that overflows first is the one the
+   header clips against the logo — which is how Flights, the first cell,
+   stopped being visible on a full-screen window. `safe` abandons the centring
+   the moment the row runs out of room, so the row starts flush and scrolls
+   instead of hiding its own first link. */
+body.home-ref .navlinks {
+  display: flex; align-items: stretch; gap: 2px; flex: 1;
+  justify-content: safe center; overflow-x: auto; scrollbar-width: none;
+}
+body.home-ref .navlinks::-webkit-scrollbar { display: none; }
+body.home-ref .navlinks a {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 9px 12px 7px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.2; color: var(--hr-onhero);
+  text-align: center; white-space: nowrap; position: relative;
+}
+body.home-ref .navlinks a .jpi,
+body.home-ref .navlinks a svg { width: 20px; height: 20px; color: var(--hr-onhero-dim); }
+/* Hover is a wash of light, not the cream tile — cream on a clear bar is a
+   pale block floating on the photograph. */
+body.home-ref .navlinks a:hover { background: rgba(255,255,255,.12); color: #fff; }
+body.home-ref .navlinks a:hover .jpi,
+body.home-ref .navlinks a:hover svg { color: #fff; }
+/* The current page: accent label, accent icon, accent underline. --coral-light
+   rather than --coral-dark: the deepened shade is for white backgrounds and
+   goes muddy against the hero. */
+body.home-ref .navlinks a[aria-current="page"] { color: var(--coral-light); }
+body.home-ref .navlinks a[aria-current="page"] .jpi,
+body.home-ref .navlinks a[aria-current="page"] svg { color: var(--coral-light); }
+body.home-ref .navlinks a[aria-current="page"]::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: 0;
+  height: 2px; background: var(--hr-gold); border-radius: 2px;
+}
+/* main.css draws a sliding underline on hover; the current-page rule above is
+   the reference's treatment, so the sliding one is switched off. */
+body.home-ref .navlinks a::before { display: none; }
+
+body.home-ref .nav-actions { gap: 12px; }
+body.home-ref .nav-actions .nav-icon-btn,
+body.home-ref .nav-actions .hr-wish { color: var(--hr-onhero); }
+
+/* MY BOOKINGS AND NOTIFICATIONS ARE ACCOUNT CONTROLS, so they are not offered
+   to somebody who has not signed in. Both open the Account Center, which needs
+   a session — to a first-time visitor they were two buttons whose only
+   possible answer was "sign in first", sitting next to the Login button that
+   would have been the answer.
+
+   HIDDEN BY DEFAULT AND REVEALED BY THE CLASS, not the other way round: the
+   class is set by profile-menu.js's markSession() once the session has been
+   read, and the reverse rule would show both icons on every first paint and
+   then snatch them away. `jp-signed-in` covers an admin on the shared session
+   too, which is the other case where the Account Center opens.
+
+   The landing page only. Every other page's header is hero-shell's, and this
+   stylesheet's page rules do not reach it. */
+body.home-ref .nav-actions .nav-icon-btn { display: none; }
+html.jp-signed-in body.home-ref .nav-actions .nav-icon-btn { display: inline-grid; }
+
+/* THE B2B DOOR IS CLOSED ON THIS PAGE. index.html marks its two copies
+   `aria-disabled` (the header pill and the drawer link); every other page's
+   header comes from hero-shell.js and is untouched. Keyed on the attribute
+   rather than a class so the thing a screen reader is told and the thing the
+   pointer does cannot disagree — `tabindex="-1"` in the markup is what takes
+   it out of the tab order, and `pointer-events` is what stops the click. */
+body.home-ref .nav-partner-mark[aria-disabled="true"],
+body.home-ref .mobile-partner-mark[aria-disabled="true"] {
+  pointer-events: none; cursor: default; opacity: .45;
+}
+body.home-ref .nav-partner-mark[aria-disabled="true"]:hover {
+  border-color: rgba(255,255,255,.32); background: none; transform: none;
+}
+/* The partner pill is an OUTLINE on the hero, not a white lozenge. A white
+   fill here reads as a button pasted over the photograph, and it is the one
+   control in the bar that is a link to somewhere else rather than an action. */
+body.home-ref .nav-partner-mark {
+  color: var(--hr-onhero); border: 1px solid rgba(255,255,255,.34);
+  background: transparent;
+  border-radius: 999px; padding: 7px 14px;
+}
+body.home-ref .nav-partner-mark:hover {
+  border-color: var(--hr-gold); background: rgba(255,255,255,.12);
+}
+
+/* Wishlist and the currency chip — both in the reference's utility row. */
+body.home-ref .hr-wish {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 600; color: var(--hr-onhero);
+}
+/* The heart keeps its red — it is the one deliberate spot of colour in the
+   utility row, and #E24B4A still clears the hero and the dark bar. */
+body.home-ref .hr-wish svg { width: 18px; height: 18px; color: #E24B4A; }
+body.home-ref .hr-cur {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 11px; border: 1px solid rgba(255,255,255,.34); border-radius: 8px;
+  font-size: 13px; font-weight: 700; color: var(--hr-onhero); background: transparent;
+}
+body.home-ref .hr-cur .hr-flag { font-size: 14px; line-height: 1; }
+
+body.home-ref .pm-login { color: var(--hr-onhero); font-weight: 600; }
+body.home-ref .pm-signup {
+  background: linear-gradient(135deg, var(--hr-gold), var(--hr-gold-dk));
+  color: var(--on-accent, #fff); border: none;
+  padding: 10px 22px; border-radius: 999px; font-weight: 800; font-size: 14px;
+}
+
+/* ==========================================================================
+   2. HERO
+   --------------------------------------------------------------------------
+   `--hr-shot-hero` is the photograph slot. Set it to a real file and the
+   gradient underneath stops showing:
+       body.home-ref { --hr-shot-hero: url('../images/hero-sunset.webp'); }
+   Until then the band is a warm dusk gradient in the reference's own colours,
+   which reads as a deliberate treatment rather than a missing asset.
+   ========================================================================== */
+/* THE TOP PADDING REPLACES THE SPACE THE HEADER USED TO OCCUPY.
+   The bar was `sticky`, so it took 128px of flow and the hero began beneath
+   it. It is `fixed` now (section 1) and overlays instead, so the hero reserves
+   that height itself and the sky shows through the clear bar. 128px is
+   main.css's `nav.wrap { height: 128px }` — the two have to agree, and this
+   page never gets `.is-solid`, which is the only thing that shortens it. */
+body.home-ref .hero { min-height: 0; padding: 128px 0 48px; }
+body.home-ref .hero-overlay {
+  background: linear-gradient(90deg, rgba(8,16,32,.86) 0%, rgba(8,16,32,.55) 46%, rgba(8,16,32,.30) 100%);
+}
+body.home-ref .hero-bg {
+  background-image: var(--hr-shot-hero, linear-gradient(120deg, #08303C 0%, #14515F 34%, #9C4632 72%, #E8604C 100%));
+  background-size: cover; background-position: center;
+}
+/* The reference's hero is a still photograph. The video layer stays in the
+   DOM — booking-card.js switches it per product tab and removing it would
+   break that — but it is not what this page shows. */
+body.home-ref .hero-video-layer { display: none; }
+
+body.home-ref .hero-inner { padding-top: 46px; max-width: var(--max, 1280px); }
+body.home-ref .hero .eyebrow {
+  font-size: 12.5px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+  color: rgba(255,255,255,.82); margin-bottom: 14px;
+}
+body.home-ref .hero .eyebrow::before { display: none; }
+body.home-ref .hero h1 {
+  font-size: clamp(38px, 5.4vw, 62px); line-height: 1.06; font-weight: 800;
+  color: #fff; letter-spacing: -.02em; margin: 0;
+}
+/* THE BRIGHT CORAL, not the fill shade. --coral is deepened so white text
+   clears AA on top of it; nothing sits on top of a headline, and against the
+   dark hero the bright shade is the one that actually sings. */
+body.home-ref .hero h1 .accent { color: var(--coral-light); display: block; }
+body.home-ref .hero .sub {
+  margin-top: 16px; font-size: 17px; color: rgba(255,255,255,.88); max-width: 46ch;
+}
+
+/* The four-item trust row. Icon in an outlined lozenge, a bold line and a
+   quiet one — the reference's own shape. */
+body.home-ref .hr-trust {
+  display: flex; flex-wrap: wrap; gap: 34px; margin-top: 30px;
+}
+body.home-ref .hr-trust-item { display: flex; align-items: center; gap: 11px; }
+body.home-ref .hr-trust-ic {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  border: 1.5px solid rgba(255,255,255,.42); border-radius: 9px; color: #fff;
+}
+body.home-ref .hr-trust-ic svg { width: 17px; height: 17px; }
+body.home-ref .hr-trust b {
+  display: block; font-size: 14px; font-weight: 700; color: #fff; line-height: 1.25;
+}
+body.home-ref .hr-trust span {
+  display: block; font-size: 12.5px; color: rgba(255,255,255,.72); margin-top: 1px;
+}
+
+/* "Travel More / Worry Less" — the script mark at the top right. Drawn as
+   text with a gold underline swoosh rather than shipped as an image, so it
+   stays crisp at any zoom and can be translated. */
+body.home-ref .hr-script {
+  position: absolute; right: clamp(16px, 4vw, 74px); top: 84px;
+  text-align: center; pointer-events: none; z-index: 2;
+}
+body.home-ref .hr-script b {
+  display: block; font-family: 'Segoe Script', 'Bradley Hand', 'Brush Script MT', cursive;
+  font-size: clamp(24px, 3vw, 38px); font-weight: 400; color: #fff;
+  line-height: 1.16; text-shadow: 0 2px 14px rgba(0,0,0,.35);
+}
+body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(130px, 15vw, 190px); }
+@media (max-width: 1100px) { body.home-ref .hr-script { display: none; } }
+
+/* ==========================================================================
+   3. SEARCH CARD
+   ========================================================================== */
+:is(body.home-ref, .hr-card-scope) .search-dock { max-width: var(--max, 1280px); margin-top: 26px; }
+:is(body.home-ref, .hr-card-scope) .search-card {
+  border-radius: 14px; box-shadow: 0 2px 8px rgba(12,30,58,.08), 0 34px 70px -30px rgba(12,30,58,.5);
+  padding: 0; overflow: visible;
+}
+
+/* the product tab row */
+:is(body.home-ref, .hr-card-scope) .bc-tabs {
+  display: flex; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--hr-line);
+  overflow-x: auto; scrollbar-width: none;
+}
+:is(body.home-ref, .hr-card-scope) .bc-tabs::-webkit-scrollbar { display: none; }
+:is(body.home-ref, .hr-card-scope) .bc-tab {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding: 12px 18px; border-radius: 8px 8px 0 0; border: none; background: none;
+  font-size: 13.5px; font-weight: 600; color: var(--hr-ink); cursor: pointer;
+  white-space: nowrap;
+}
+:is(body.home-ref, .hr-card-scope) .bc-tab .jpi, :is(body.home-ref, .hr-card-scope) .bc-tab svg { width: 18px; height: 18px; color: var(--hr-muted); }
+:is(body.home-ref, .hr-card-scope) .bc-tab:hover { background: var(--hr-cream); }
+:is(body.home-ref, .hr-card-scope) .bc-tab.is-on {
+  background: linear-gradient(135deg, var(--hr-gold), var(--hr-gold-dk));
+  color: var(--on-accent, #fff); font-weight: 800;
+}
+:is(body.home-ref, .hr-card-scope) .bc-tab.is-on .jpi, :is(body.home-ref, .hr-card-scope) .bc-tab.is-on svg { color: var(--on-accent, #fff); }
+
+/* the One Way / Round Trip / Multi City row */
+:is(body.home-ref, .hr-card-scope) .bc-trip {
+  display: flex; align-items: center; gap: 26px; padding: 14px 20px 0; flex-wrap: wrap;
+}
+:is(body.home-ref, .hr-card-scope) .bc-trip label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--hr-ink); cursor: pointer;
+}
+:is(body.home-ref, .hr-card-scope) .bc-trip input { accent-color: var(--hr-gold-dk); width: 17px; height: 17px; }
+:is(body.home-ref, .hr-card-scope) .bc-trip-note {
+  margin-left: auto; font-size: 13px; color: var(--hr-muted); font-weight: 500;
+}
+
+/* ==========================================================================
+   4. SPECIAL FARES + QUICK TOOLS
+   --------------------------------------------------------------------------
+   THE FIVE FARE NAMES ARE REAL; THE DISCOUNTS IN THE REFERENCE ARE NOT.
+   flight-filters.js already models this axis — a `fareCategory` filter, with
+   Regular / Student / Senior Citizen / Armed Forces / Corporate named in its
+   own header — and renders it the day rows carry the field. So the control is
+   the one the application is already built for.
+
+   What the reference prints under each name ("Up to Rs 600 off", "Extra
+   discounts/baggage") is a commercial claim, and no fare rule, coupon or
+   supplier response in this application produces those figures. The tiles
+   carry the name alone until something does; the sub-line slot is styled and
+   waiting, so a real entitlement drops straight in.
+   ========================================================================== */
+:is(body.home-ref, .hr-card-scope) .hr-fares {
+  display: flex; align-items: flex-start; gap: 26px;
+  padding: 16px 20px 0; flex-wrap: wrap;
+}
+:is(body.home-ref, .hr-card-scope) .hr-fares-group { flex: 1; min-width: 0; }
+:is(body.home-ref, .hr-card-scope) .hr-fares-lab,
+:is(body.home-ref, .hr-card-scope) .hr-tools-lab {
+  display: block; font-size: 13px; font-weight: 700; color: var(--hr-ink); margin-bottom: 9px;
+}
+:is(body.home-ref, .hr-card-scope) .hr-fare-row { display: flex; gap: 9px; flex-wrap: wrap; }
+:is(body.home-ref, .hr-card-scope) .hr-fare {
+  display: grid; gap: 1px; padding: 9px 15px; min-width: 104px;
+  border: 1px solid var(--hr-line); border-radius: 8px; background: #fff;
+  cursor: pointer; font: inherit; text-align: left;
+}
+:is(body.home-ref, .hr-card-scope) .hr-fare b { font-size: 13.5px; font-weight: 700; color: var(--hr-ink); }
+:is(body.home-ref, .hr-card-scope) .hr-fare span { font-size: 11.5px; color: var(--hr-muted); }
+:is(body.home-ref, .hr-card-scope) .hr-fare:hover { border-color: var(--hr-gold-dk); background: var(--coral-hover, #FDF3E2); }
+:is(body.home-ref, .hr-card-scope) .hr-fare.is-on {
+  border-color: var(--hr-gold); background: var(--coral-hover, #FDF3E2);
+  box-shadow: inset 0 0 0 1px var(--hr-gold);
+}
+:is(body.home-ref, .hr-card-scope) .hr-fare.is-on b { color: var(--hr-gold-ink); }
+
+:is(body.home-ref, .hr-card-scope) .hr-tools { flex: none; }
+:is(body.home-ref, .hr-card-scope) .hr-tool-row { display: flex; gap: 0; border: 1px solid var(--hr-line); border-radius: 8px; overflow: hidden; }
+:is(body.home-ref, .hr-card-scope) .hr-tool {
+  display: grid; justify-items: center; gap: 5px; padding: 10px 18px;
+  background: #fff; border: none; border-right: 1px solid var(--hr-line);
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--hr-ink); cursor: pointer;
+  white-space: nowrap;
+}
+:is(body.home-ref, .hr-card-scope) .hr-tool:last-child { border-right: none; }
+:is(body.home-ref, .hr-card-scope) .hr-tool svg { width: 18px; height: 18px; color: var(--hr-gold-dk); }
+:is(body.home-ref, .hr-card-scope) .hr-tool:hover { background: var(--hr-cream); }
+
+/* the single large call to action */
+:is(body.home-ref, .hr-card-scope) .hr-go-row { display: grid; place-items: center; padding: 20px 20px 24px; }
+:is(body.home-ref, .hr-card-scope) .search-go, :is(body.home-ref, .hr-card-scope) .hr-go {
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+  min-width: 336px; padding: 17px 40px; border: none; border-radius: 999px;
+  background: linear-gradient(135deg, var(--hr-gold), var(--hr-gold-dk));
+  color: var(--on-accent, #fff); font-size: 15.5px; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 12px 26px -10px rgba(217,163,44,.62);
+}
+:is(body.home-ref, .hr-card-scope) .search-go:hover, :is(body.home-ref, .hr-card-scope) .hr-go:hover { filter: brightness(1.04); }
+
+/* ==========================================================================
+   5. OFFER STRIP
+   --------------------------------------------------------------------------
+   Four cards on cream, each with room for artwork on its right. The art slot
+   takes --hr-shot-o1..o4 and shows nothing at all when unset — an empty half
+   reads as a wide card, where a grey box reads as a broken image.
+   ========================================================================== */
+body.home-ref .hr-offers { background: var(--hr-cream); padding: 22px 0; }
+body.home-ref .hr-offers-in {
+  max-width: var(--max, 1280px); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px);
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 16px;
+}
+body.home-ref .hr-offer {
+  position: relative; overflow: hidden; min-height: 108px;
+  padding: 18px 20px; border-radius: 12px; background: #fff;
+  box-shadow: 0 1px 2px rgba(12,30,58,.05), 0 10px 26px -16px rgba(12,30,58,.3);
+}
+body.home-ref .hr-offer b {
+  display: block; font-size: 19px; font-weight: 800; color: var(--hr-ink); line-height: 1.2;
+}
+body.home-ref .hr-offer b em { font-style: normal; color: var(--hr-gold-ink); }
+body.home-ref .hr-offer p { margin: 3px 0 12px; font-size: 13.5px; color: var(--hr-muted); }
+body.home-ref .hr-offer .hr-offer-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 15px; border-radius: 6px; font-size: 12.5px; font-weight: 700;
+  background: var(--hr-gold); color: var(--on-accent, #fff);
+}
+body.home-ref .hr-offer .hr-offer-cta:hover { background: var(--hr-gold-dk); }
+body.home-ref .hr-offer-art {
+  position: absolute; right: 0; bottom: 0; width: 42%; height: 100%;
+  background-position: right bottom; background-repeat: no-repeat; background-size: contain;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   6. POPULAR DESTINATIONS
+   ========================================================================== */
+body.home-ref .hr-dest { padding: 42px 0 10px; }
+body.home-ref .hr-dest-in { max-width: var(--max, 1280px); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px); }
+body.home-ref .hr-dest-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 20px;
+}
+body.home-ref .hr-dest-head h2 {
+  font-size: clamp(24px, 3vw, 31px); font-weight: 800; color: var(--hr-ink); margin: 0;
+}
+body.home-ref .hr-dest-head p { margin: 5px 0 0; font-size: 14px; color: var(--hr-muted); }
+body.home-ref .hr-dest-nav { display: flex; align-items: center; gap: 10px; flex: none; }
+body.home-ref .hr-dest-all {
+  font-size: 13.5px; font-weight: 700; color: var(--hr-ink); text-decoration: underline;
+  text-underline-offset: 4px;
+}
+body.home-ref .hr-dest-arrow {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hr-line);
+  background: #fff; color: var(--hr-ink); cursor: pointer; display: grid; place-items: center;
+}
+body.home-ref .hr-dest-arrow:hover { border-color: var(--hr-gold); background: var(--coral-hover, #FDF3E2); }
+
+body.home-ref .hr-dest-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 14px;
+}
+body.home-ref .hr-tile {
+  position: relative; display: block; min-height: 152px; border-radius: 12px; overflow: hidden;
+  /* Each tile names its own --hr-shot; the gradient is what shows until one
+     is set, tinted per tile so six of them do not read as one flat block. */
+  background-image: var(--hr-shot, none), var(--hr-tint, linear-gradient(160deg, #24405F, #12253F));
+  background-size: cover; background-position: center;
+  color: #fff;
+}
+body.home-ref .hr-tile::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(8,16,32,0) 38%, rgba(8,16,32,.78) 100%);
+}
+body.home-ref .hr-tile-txt { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 1; }
+body.home-ref .hr-tile b { display: block; font-size: 17px; font-weight: 800; line-height: 1.2; }
+body.home-ref .hr-tile span { display: block; font-size: 12.5px; color: rgba(255,255,255,.86); margin-top: 2px; }
+body.home-ref .hr-tile:hover { transform: translateY(-3px); }
+body.home-ref .hr-tile { transition: transform .2s ease; }
+
+/* ==========================================================================
+   7. RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1180px) {
+  body.home-ref .navlinks { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  body.home-ref .navlinks::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 900px) {
+  :is(body.home-ref, .hr-card-scope) .hr-trust { gap: 18px 26px; }
+  :is(body.home-ref, .hr-card-scope) .hr-fares { flex-direction: column; }
+  :is(body.home-ref, .hr-card-scope) .hr-tools { width: 100%; }
+  :is(body.home-ref, .hr-card-scope) .hr-tool-row { width: 100%; }
+  :is(body.home-ref, .hr-card-scope) .hr-tool { flex: 1; }
+}
+/* THE DRAWER IS THE NAV ON A PHONE, AND ONLY THE DRAWER.
+   main.css hides `header .navlinks` at this width, but `body.home-ref
+   .navlinks` above carries two classes to its one and won — so the landing
+   page was the one page that showed the icon strip AND the hamburger together
+   all the way down to 320px. Same rule, same breakpoint, enough specificity
+   to actually apply. */
+@media (max-width: 860px) {
+  body.home-ref .navlinks { display: none; }
+}
+@media (max-width: 640px) {
+  body.home-ref .hero-inner { padding-top: 30px; }
+  body.home-ref .hr-trust-item { width: calc(50% - 13px); }
+  :is(body.home-ref, .hr-card-scope) .search-go, :is(body.home-ref, .hr-card-scope) .hr-go { min-width: 0; width: 100%; }
+  body.home-ref .hr-dest-head { flex-direction: column; align-items: flex-start; }
+}
+
+/* ==========================================================================
+   8. THE ENQUIRY PANEL
+   --------------------------------------------------------------------------
+   What Villas & Homestays, Trains, Buses, Cabs and Visa show instead of a
+   search form. Deliberately plain: it is a sentence and a link, sized to the
+   same height as the search panels so the card does not jump when a tab is
+   clicked, and carrying nothing that looks like a field.
+   ========================================================================== */
+:is(body.home-ref, .hr-card-scope) .bc-enquire {
+  display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: center; gap: 14px; min-height: 108px; padding: 22px 20px 4px;
+}
+:is(body.home-ref, .hr-card-scope) .bc-enquire p {
+  margin: 0; font-size: 15px; line-height: 1.5; color: var(--hr-ink); max-width: 62ch;
+}
+:is(body.home-ref, .hr-card-scope) .bc-enquire-go {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px; border-radius: 999px;
+  background: linear-gradient(135deg, var(--hr-gold), var(--hr-gold-dk));
+  color: var(--on-accent, #fff); font-size: 14px; font-weight: 800;
+}
+:is(body.home-ref, .hr-card-scope) .bc-enquire-go:hover { filter: brightness(1.04); }
+
+/* ==========================================================================
+   9. FITTING TEN PRODUCTS AND SIX UTILITIES ON ONE BAR
+   --------------------------------------------------------------------------
+   The reference's header carries ten nav cells AND a six-item utility cluster.
+   At the shared header's original spacing that overflowed and wrapped Login /
+   Sign Up onto two lines. The nav cells tighten and the utility cluster is
+   told not to wrap; below 1180px the nav scrolls sideways instead (section 7),
+   which is the same thing the reference does on a narrow window.
+   ========================================================================== */
+body.home-ref header#siteHeader nav.wrap { gap: 10px; padding-inline: clamp(10px, 2vw, 24px); }
+body.home-ref .navlinks { gap: 0; }
+body.home-ref .navlinks a { padding: 8px 9px 6px; font-size: 11.5px; gap: 3px; }
+body.home-ref .navlinks a .jpi { width: 18px; height: 18px; }
+body.home-ref .nav-actions { gap: 9px; flex: none; flex-wrap: nowrap; white-space: nowrap; }
+body.home-ref .hr-wish span { display: none; }         /* icon only, as the bar tightens */
+body.home-ref .nav-partner-mark { padding: 6px 11px; font-size: 12.5px; }
+body.home-ref .pm-signup { padding: 9px 17px; font-size: 13px; }
+body.home-ref .pm-login { font-size: 13px; }
+
+@media (min-width: 1500px) {
+  /* Room again on a wide monitor: the word comes back and the cells breathe. */
+  body.home-ref .hr-wish span { display: inline; }
+  body.home-ref .navlinks a { padding: 9px 12px 7px; font-size: 12.5px; }
+}
+
+/* The destination grid becomes a scroller when it cannot fit its rail; the
+   arrows above drive it and hide themselves when everything already fits. */
+body.home-ref .hr-dest-grid {
+  overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity;
+  scrollbar-width: none; grid-auto-flow: column; grid-auto-columns: minmax(178px, 1fr);
+}
+body.home-ref .hr-dest-grid::-webkit-scrollbar { display: none; }
+body.home-ref .hr-tile { scroll-snap-align: start; }
+
+/* ==========================================================================
+   10. A SMALLER SEARCH CARD
+   --------------------------------------------------------------------------
+   The card was reading as oversized against the hero. Everything below is one
+   step down — tabs, fields, fare tiles, the action row — for roughly a 12%
+   reduction in height. The FIELD VALUES are deliberately untouched at 15px:
+   they are what the traveller reads back to check the trip is right, and they
+   were already the smallest thing worth shrinking.
+   ========================================================================== */
+:is(body.home-ref, .hr-card-scope) .search-card { border-radius: 12px; }
+:is(body.home-ref, .hr-card-scope) .bc-tabs { padding: 7px 9px 0; }
+:is(body.home-ref, .hr-card-scope) .bc-tab { padding: 9px 14px; font-size: 12.5px; }
+:is(body.home-ref, .hr-card-scope) .bc-tab .jpi { width: 16px; height: 16px; }
+:is(body.home-ref, .hr-card-scope) .bc-trip { padding: 11px 16px 0; gap: 20px; }
+:is(body.home-ref, .hr-card-scope) .bc-trip label { font-size: 13px; }
+:is(body.home-ref, .hr-card-scope) .search-panel .search-fields { gap: 8px; padding: 10px 16px 0; }
+:is(body.home-ref, .hr-card-scope) .search-panel .field { padding: 9px 12px; }
+:is(body.home-ref, .hr-card-scope) .search-panel .field label { font-size: 9.5px; letter-spacing: .05em; }
+:is(body.home-ref, .hr-card-scope) .search-panel .field input,
+:is(body.home-ref, .hr-card-scope) .search-panel .field select { font-size: 15px; }
+:is(body.home-ref, .hr-card-scope) .fld-sub { font-size: 11px; }
+
+:is(body.home-ref, .hr-card-scope) .hr-fares { padding: 12px 16px 0; gap: 20px; }
+:is(body.home-ref, .hr-card-scope) .hr-fares-lab, :is(body.home-ref, .hr-card-scope) .hr-tools-lab { font-size: 12px; margin-bottom: 7px; }
+:is(body.home-ref, .hr-card-scope) .hr-fare { padding: 7px 12px; min-width: 94px; }
+:is(body.home-ref, .hr-card-scope) .hr-fare b { font-size: 12.5px; }
+:is(body.home-ref, .hr-card-scope) .hr-fare span { font-size: 10.5px; }
+:is(body.home-ref, .hr-card-scope) .hr-tool { padding: 8px 14px; font-size: 10.5px; }
+:is(body.home-ref, .hr-card-scope) .hr-tool svg { width: 16px; height: 16px; }
+
+:is(body.home-ref, .hr-card-scope) .hr-go-row { padding: 15px 16px 18px; }
+:is(body.home-ref, .hr-card-scope) .search-go, :is(body.home-ref, .hr-card-scope) .hr-go {
+  min-width: 288px; padding: 14px 32px; font-size: 14.5px;
+}
+:is(body.home-ref, .hr-card-scope) .bc-enquire { min-height: 92px; padding: 18px 16px 2px; }
+
+/* THE CALL TO ACTION IS CENTRED, AND THE TRUST STRIP SITS UNDER IT.
+   .search-foot is a flex ROW — trust marks on the left, button on the right —
+   which put SEARCH FLIGHTS 450px right of the card's centre. The reference
+   centres it under the whole card and treats the trust marks as a quiet
+   footnote, so the row becomes a column and the button is ordered first. */
+:is(body.home-ref, .hr-card-scope) .search-foot {
+  flex-direction: column; align-items: center; gap: 10px;
+  padding: 14px 16px 16px;
+}
+:is(body.home-ref, .hr-card-scope) .search-foot .search-go { order: -1; }
+:is(body.home-ref, .hr-card-scope) .search-foot > *:not(.search-go) {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
+  font-size: 11.5px; opacity: .8;
+}
+
+/* margin-left:auto is what pushed SEARCH FLIGHTS to the right in the original
+   .search-foot ROW. Turning the row into a column left that margin in place,
+   and in a column it resolves against the full width — 879px of it — so the
+   button ignored align-items:center and sat hard right. Reset explicitly. */
+:is(body.home-ref, .hr-card-scope) .search-foot .search-go { margin: 0 auto; }
+
+
+/* ==========================================================================
+   11. THE GUEST LINE ON THE SIGN-IN DIALOG
+   --------------------------------------------------------------------------
+   `.modal-switch` is a one-line row; this one carries a second line under it
+   saying what continuing as a guest does and does not get you. Scoped to the
+   landing page because that is the only page carrying the dialog.
+   ========================================================================== */
+body.home-ref .modal-guest { margin-top: 10px; }
+body.home-ref .modal-guest small {
+  display: block; margin-top: 5px; max-width: 42ch; margin-inline: auto;
+  font-size: 12px; line-height: 1.5; color: var(--hr-muted);
+}

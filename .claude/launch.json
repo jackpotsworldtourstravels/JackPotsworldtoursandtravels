@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "//": "Serves design-templates/ — the standalone UI template pages.",
+      "//": "Serves design-templates/ \u00e2\u20ac\u201d the standalone UI template pages.",
       "//2": "Separate port so it never contends with the app's own servers.",
       "name": "templates",
       "runtimeExecutable": "python",
@@ -82,6 +82,19 @@
         "8020"
       ],
       "port": 8020
+    },
+    {
+      "//": "A throwaway static server for verification when 8420 is held by another session.",
+      "name": "static-verify",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8425",
+        "--directory",
+        "frontend"
+      ],
+      "port": 8425
     }
   ]
 }

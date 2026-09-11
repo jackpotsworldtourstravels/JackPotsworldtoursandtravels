@@ -396,7 +396,7 @@
   border: none; border-radius: 10px; background: none; color: var(--muted);
   cursor: pointer; transition: background .18s ease, color .18s ease;
 }
-.mc-remove:hover { background: rgba(255, 77, 77, .1); color: var(--coral); }
+.mc-remove:hover { background: rgba(233,185,73,.16); color: var(--coral); }
 .mc-remove:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
 .mc-remove svg { width: 17px; height: 17px; }
 /* The first leg IS the itinerary and has nothing to be removed back to. Hidden
@@ -589,7 +589,7 @@
   font-family: inherit; font-size: 12px; font-weight: 700; color: var(--muted);
   cursor: pointer; transition: color .18s ease, background .18s ease;
 }
-.rooms-remove:hover { color: var(--coral); background: rgba(255, 77, 77, .1); }
+.rooms-remove:hover { color: var(--coral); background: rgba(233,185,73,.16); }
 .rooms-remove:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
 
 /* SearchWidgets.stepperRow's markup, in the card's clothes. The panels on the
@@ -797,7 +797,7 @@ body.sp-continuation {
   --sp-accent:      var(--coral);
   --sp-accent-dk:   var(--coral-dark);
   --sp-coral-dark:  #C0392B;
-  --sp-accent-soft: rgba(255, 77, 77, .12);
+  --sp-accent-soft: rgba(233,185,73,.18);
   --sp-gold:        var(--gold);
   --sp-emerald:     var(--emerald);
   --sp-header:      var(--navy);

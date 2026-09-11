@@ -288,7 +288,7 @@ const TravelExplore = (function () {
         ${fare}
         <span class="tx-status">${esc(f.status)}</span>
         <button type="button" class="tx-btn tx-btn-ghost" data-tx-details="${esc(f.id)}">View Details</button>
-        <button type="button" class="tx-btn tx-btn-primary" data-tx-book="${esc(f.id)}">Book Now</button>
+        <button type="button" class="tx-btn tx-btn-primary" data-tx-book="${esc(f.id)}">Select</button>
       </div>
     </article>`;
   }
@@ -327,6 +327,202 @@ const TravelExplore = (function () {
      rather than the whole set, so that job moved into flight-filters.js with
      the definitions it belongs to. */
 
+  /* =====================================================================
+     THE DATE STRIP
+     =====================================================================
+     Seven days centred on the searched date. Picking one writes state.depart
+     and re-runs the search through runFlightSearch(), which is the same path
+     the search strip's own Search button takes — so a date change here and a
+     date change up there cannot behave differently.
+
+     WHAT IT DOES NOT DO IS PRICE THE OTHER DAYS. There is no date-level fare
+     endpoint in this application; TravelData.flights() answers with one day of
+     departures and takes no date. So a cell shows a fare only for the day whose
+     results are on screen, and that fare is the cheapest of those results —
+     read off the same rows the list is rendering, not fetched or guessed. Every
+     other cell shows its date with an en-dash where the fare would be.
+
+     When a fare calendar does land, fareFor() is the only function that
+     changes: give it the day's price and every cell fills in.
+     ===================================================================== */
+
+  const DATE_WINDOW = 7;
+
+  /** N days from an ISO day, as an ISO day. Local midnight throughout — see
+   *  booking-card.js's isoDay for why toISOString() is wrong here. */
+  function addDays(iso, n) {
+    const base = /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso : fxToday();
+    const d = new Date(base + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  }
+
+  function fxToday() {
+    const d = new Date();
+    return d.getFullYear() + '-'
+      + String(d.getMonth() + 1).padStart(2, '0') + '-'
+      + String(d.getDate()).padStart(2, '0');
+  }
+
+  /** The lowest total among the rows currently loaded, or null.
+   *
+   *  Only ever answers for the day being shown. Returning a number for any
+   *  other date would be inventing one. */
+  function fareFor(iso) {
+    if (iso !== (state.depart || '')) return null;
+    const fares = searchable().map(f => f.total).filter(v => v != null);
+    return fares.length ? Math.min(...fares) : null;
+  }
+
+  function renderDateStrip() {
+    const host = $('fxDates');
+    if (!host) return;
+    /* Multi-city has a date per leg; one strip cannot speak for four of them,
+       so it stays out of the way rather than editing leg 1 behind the
+       traveller's back. */
+    if (state.trip === 'multi') { host.innerHTML = ''; return; }
+
+    const centre = state.depart || fxToday();
+    const half = Math.floor(DATE_WINDOW / 2);
+    const cells = Array.from({ length: DATE_WINDOW }, (_, i) => {
+      const iso = addDays(centre, i - half);
+      const d = new Date(iso + 'T00:00:00');
+      const day = d.toLocaleDateString('en-IN', { weekday: 'short' });
+      const num = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      const fare = fareFor(iso);
+      const on = iso === centre;
+      return `<button type="button" class="fx-date${on ? ' is-on' : ''}"
+                data-fx-date="${esc(iso)}"${on ? ' aria-current="date"' : ''}>
+          <span class="fx-date-day">${esc(day)}</span>
+          <span class="fx-date-num">${esc(num)}</span>
+          <span class="fx-date-fare">${fare == null ? '' : esc(money(fare))}</span>
+        </button>`;
+    }).join('');
+
+    host.innerHTML = `<div class="fx-dates" role="group" aria-label="Departure date">
+        <button type="button" class="fx-dates-nav" data-fx-date-shift="-1"
+                aria-label="Earlier dates">&#8249;</button>
+        <div class="fx-dates-track">${cells}</div>
+        <button type="button" class="fx-dates-nav" data-fx-date-shift="1"
+                aria-label="Later dates">&#8250;</button>
+      </div>`;
+    centreSelectedDate(host);
+  }
+
+  /** Put the searched day in the middle of the track.
+   *
+   *  THE TRACK IS A SCROLLER AND IT OPENS AT ZERO. Seven cells with a 70px
+   *  floor need 514px; on a 375px phone the track gets 254 of that, so four of
+   *  the seven are off to the right — and the selected day is the FOURTH,
+   *  because the window is built three days either side of it (DATE_WINDOW /
+   *  2). The strip therefore opened showing three days BEFORE the search with
+   *  the searched day itself half cut off at the edge: the one cell that is
+   *  highlighted, carries the only real fare and explains what the list
+   *  underneath is showing.
+   *
+   *  Centred rather than merely scrolled into view, so the days either side of
+   *  the search are reachable in both directions — which is the whole point of
+   *  a date strip. scrollLeft is clamped by the browser, so the first and last
+   *  days of the window need no special case.
+   *
+   *  Measured off getBoundingClientRect rather than offsetLeft: the track sets
+   *  no `position`, so its offsetParent is somewhere up the page and offsetLeft
+   *  would not be relative to it. Nothing here scrolls the PAGE — scrollIntoView
+   *  would have, dragging the viewport to the strip on every date change. */
+  function centreSelectedDate(host) {
+    const track = host.querySelector('.fx-dates-track');
+    const on = track && track.querySelector('.fx-date.is-on');
+    if (!track || !on) return;
+    if (track.scrollWidth <= track.clientWidth) return;   // it all fits
+    const cell = on.getBoundingClientRect();
+    const view = track.getBoundingClientRect();
+    track.scrollLeft += (cell.left - view.left) - (track.clientWidth - cell.width) / 2;
+  }
+
+  /** Move to a day and search it. Same two calls the strip's Search runs, in
+   *  the same order, so nothing about a date change is special-cased. */
+  function goToDate(iso) {
+    if (!iso || iso === state.depart) return;
+    pushNext();
+    state.depart = iso;
+    /* A return date that now precedes the outbound is not a trip. Clearing it
+       is what the search strip's own date pair does. */
+    if (state.ret && state.ret < iso) state.ret = '';
+    writeUrl(false);
+    renderDateStrip();
+    runFlightSearch({ scroll: false });
+  }
+
+  /* =====================================================================
+     THE OFFERS STRIP
+     =====================================================================
+     Real coupons or nothing. GET /api/customer/coupons is the coupon table,
+     date-filtered server-side, and what it returns is what this renders — the
+     code and the title, verbatim. An empty table, a failed call or a
+     deployment with no backend all leave the strip absent rather than showing
+     a discount nobody can claim.
+
+     Fetched once per page load: the coupon table does not change while
+     somebody reads a page of flights.
+     ===================================================================== */
+  let offersLoaded = false;
+
+  async function renderOffers() {
+    const host = $('fxOffers');
+    if (!host || offersLoaded) return;
+    offersLoaded = true;
+    if (typeof BookingApi === 'undefined' || !BookingApi.isLive('flight')) return;
+
+    let rows;
+    try {
+      rows = await BookingApi.coupons('flight');
+    } catch {
+      return;                       // no strip, rather than a broken one
+    }
+    if (!Array.isArray(rows) || !rows.length) return;
+
+    host.innerHTML = `<div class="fx-offers">
+        <span class="fx-offers-label">Offers</span>
+        <div class="fx-offers-track">
+          ${rows.map(c => `<article class="fx-offer">
+              <b>${esc(c.code)}</b><span>${esc(c.title || '')}</span>
+            </article>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  /* =====================================================================
+     DIRECT FLIGHTS ONLY
+     =====================================================================
+     NOT A SECOND FILTER. It drives the sidebar's own "Non-stop" checkbox —
+     finds it and clicks it — so the engine's handler runs, the sidebar shows
+     the tick, the URL gains f_stops, and "clear all" clears this too. A
+     parallel piece of state here would be a second answer to the same
+     question, and the two would disagree the first time somebody used the
+     sidebar instead.
+
+     Absent when the current results cannot answer it: an all-non-stop list has
+     no Stops filter rendered, and a toggle with nothing to toggle is a control
+     that does nothing.
+     ===================================================================== */
+  function stopsBox(value) {
+    const panel = $('txFilters');
+    return panel ? panel.querySelector(`[data-ff-opt="stops"][value="${value}"]`) : null;
+  }
+
+  function renderDirectToggle() {
+    const host = $('fxDirect');
+    if (!host) return;
+    const box = stopsBox('0');
+    if (!box) { host.innerHTML = ''; return; }
+    host.innerHTML = `<label class="fx-direct">
+        <input type="checkbox" id="fxDirectBox" ${box.checked ? 'checked' : ''}>
+        <span>Non-stop only</span>
+      </label>`;
+  }
+
   /** Hand the panel the current searchable set and repaint the sort menu.
    *
    *  Both are derived from the SAME rows, which is what keeps a sort mode from
@@ -336,6 +532,11 @@ const TravelExplore = (function () {
     if (typeof FlightFilters === 'undefined') return;
     FlightFilters.setRows(searchable());
     renderSortOptions();
+    /* setRows repaints the sidebar synchronously, so the Non-stop checkbox the
+       toggle mirrors exists by the time this runs. Here rather than at the call
+       sites because every path that redraws the sidebar has to redraw the
+       toggle with it, or the two start disagreeing. */
+    renderDirectToggle();
   }
 
   function renderSortOptions() {
@@ -1123,6 +1324,10 @@ const TravelExplore = (function () {
     state.shown = PAGE_SIZE;
     renderFilters();
     renderFlights();
+    /* After renderFilters: the strip's fare is the cheapest of the rows the
+       panel has just been given. The non-stop toggle repaints inside
+       renderFilters itself, which is every path that redraws the sidebar. */
+    renderDateStrip();
   }
 
   /** The Packages panel.
@@ -1575,6 +1780,45 @@ const TravelExplore = (function () {
     if (n) t.setAttribute('data-count', String(n)); else t.removeAttribute('data-count');
   }
 
+  /** The floating Filters button waits until there is a list to filter.
+   *
+   *  IT IS FIXED TO THE BOTTOM OF THE VIEWPORT, so it covers whatever happens
+   *  to be there — and on a phone, on first paint, that is the DATE STRIP. The
+   *  hero band is most of the first screen (the search row stacks into seven
+   *  cells), which puts the strip's centre exactly under a 44px pill: the
+   *  selected day, the one cell carrying a real fare and the only one that
+   *  says what the list below is showing.
+   *
+   *  The button's own reason for floating is that "the filters are wanted most
+   *  while deep in the list" (travel-explore.css). The corollary is this: above
+   *  the list it has nothing to act on, so it does not need to be there. It
+   *  fades in once the results have actually come into view and stays for the
+   *  rest of the visit — it is not a thing that should flicker in and out while
+   *  a traveller scrolls back up to change the date.
+   *
+   *  Guarded on IntersectionObserver, and the fallback is to SHOW the button:
+   *  a filter control that never appears is a worse failure than one that
+   *  overlaps. Above 1000px the CSS hides it regardless, so this costs those
+   *  widths nothing but a disconnected observer. */
+  let filterRevealBound = false;
+
+  function armFilterToggleReveal() {
+    const toggle = $('txFilterToggle');
+    const list = $('txFlightList') || $('txResults');
+    if (!toggle || filterRevealBound) return;
+    filterRevealBound = true;
+    if (!list || typeof IntersectionObserver === 'undefined') {
+      toggle.classList.add('is-ready');
+      return;
+    }
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      toggle.classList.add('is-ready');
+      io.disconnect();
+    }, { rootMargin: '-10% 0px 0px 0px' });
+    io.observe(list);
+  }
+
   function openFilterSheet(open) {
     const parts = sheetParts();
     if (!parts) return;
@@ -1793,10 +2037,34 @@ const TravelExplore = (function () {
 
     const toggle = $('txFilterToggle');
     if (toggle) toggle.addEventListener('click', () => openFilterSheet(true));
+    armFilterToggleReveal();
 
     /* Delegated: the filter panel and the result list are both re-rendered, so
        per-element listeners would be lost on every repaint. */
     document.addEventListener('click', e => {
+      /* --- the date strip ------------------------------------------------ */
+      const dateCell = e.target.closest('[data-fx-date]');
+      if (dateCell) { goToDate(dateCell.dataset.fxDate); return; }
+
+      /* The arrows move the WINDOW, not the selection: a week either side is
+         browsable without committing to a search you did not ask for. */
+      const shift = e.target.closest('[data-fx-date-shift]');
+      if (shift) {
+        const dir = Number(shift.dataset.fxDateShift) || 1;
+        goToDate(addDays(state.depart || fxToday(), dir * DATE_WINDOW));
+        return;
+      }
+
+      /* --- non-stop only -------------------------------------------------
+         Forwarded to the sidebar's own checkbox rather than handled here, so
+         there is one piece of state and the sidebar, the URL and this control
+         cannot drift. The engine's change handler repaints both. */
+      if (e.target.id === 'fxDirectBox') {
+        const box = stopsBox('0');
+        if (box) box.click();
+        return;
+      }
+
       /* Both buttons on the empty state, and the sidebar's own "clear all"
          routes here too — one way to reset, wherever it is asked for. */
       if (e.target.closest('[data-tx-clear]')) {
@@ -2278,6 +2546,11 @@ const TravelExplore = (function () {
        real endpoint will sit behind, and an empty grid reads as "nothing
        here" rather than "not yet". */
     showSkeleton();
+    /* The date strip is drawn from the criteria alone, so it can be up before
+       the schedule is — one less thing that arrives late. The offers strip is
+       deliberately NOT awaited: it is a network call for a decoration, and a
+       slow coupon table must not hold up the flights. */
+    if (service === 'flights') { renderDateStrip(); renderOffers(); }
     await loadCatalogue(service);
   }
 

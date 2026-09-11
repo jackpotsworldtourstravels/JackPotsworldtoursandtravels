@@ -134,6 +134,29 @@ const ProfileMenu = (function () {
     (scope || document).querySelectorAll('[data-profile-menu]').forEach(slot => {
       slot.innerHTML = html();
     });
+    markSession();
+  }
+
+  /** Stamp the session on <html> so CSS can reach it.
+   *
+   *  THIS IS THE ONE PLACE THAT KNOWS. Every shell calls render() after it
+   *  injects a header, and app.js calls it again on every session change
+   *  (sign-in, sign-out, a token the server rejected), so a class set here
+   *  cannot fall out of step with the chip beside it. The alternative — each
+   *  page reading getCustomerSession() for itself — is the same question
+   *  answered in five places.
+   *
+   *  What it is for: the landing page's My Bookings and Notifications icons.
+   *  Both open the Account Center, which needs a signed-in traveller, so
+   *  showing them to a visitor who has never logged in is two controls that
+   *  can only answer "sign in first". home-ref.css hides them by DEFAULT and
+   *  reveals them on `.jp-signed-in`, which is the way round that cannot
+   *  flash them on screen before this runs. */
+  function markSession() {
+    const on = !!(session() || adminSession());
+    const root = document.documentElement;
+    root.classList.toggle('jp-signed-in', on);
+    root.classList.toggle('jp-signed-out', !on);
   }
 
   /* ------------------------------------------------------------------ open */

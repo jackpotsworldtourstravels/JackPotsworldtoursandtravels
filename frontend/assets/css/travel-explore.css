@@ -27,7 +27,9 @@
   --tx-muted:     var(--muted, #5B6B82);
   --tx-line:      var(--line, rgba(10,37,64,.10));
   --tx-accent:    var(--coral, #FF4D4D);
-  --tx-accent-ink:#fff;
+  /* Ink ON an accent fill. It was #fff for a coral accent; the brand accent
+     is gold now (~1.9:1 under white), so this follows --on-accent. */
+  --tx-accent-ink:var(--on-accent, #12253F);
   --tx-gold:      var(--gold, #FFB020);
   --tx-emerald:   var(--emerald, #12B76A);
   --tx-shadow:    0 1px 2px rgba(10,37,64,.04), 0 8px 24px rgba(10,37,64,.06);
@@ -272,7 +274,10 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
   margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--tx-line);
   font-size: 14px; font-weight: 800; color: var(--tx-ink);
 }
-.tx-sum-total span:last-child { font-size: 19px; color: var(--tx-accent); font-variant-numeric: tabular-nums; }
+/* The total is READ, not clicked, so it takes the panel's own ink and says
+   so with weight instead of hue — the accent is this page's colour for
+   things that need attention, and the running total is not one of them. */
+.tx-sum-total span:last-child { font-size: 19px; font-weight: 800; color: var(--tx-ink); font-variant-numeric: tabular-nums; }
 .tx-sum-note { margin: 9px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--tx-ink-3); }
 .tx-sum-empty {
   margin-top: 14px; padding: 13px 14px; border-radius: 10px;
@@ -846,6 +851,19 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
     border: none; background: var(--tx-ink); color: var(--tx-surface);
     font-weight: 800; font-size: 14.5px; font-family: inherit; cursor: pointer;
     box-shadow: 0 6px 22px rgba(10, 37, 64, .34);
+    /* NOT THERE UNTIL THERE IS A LIST TO FILTER. Fixed to the bottom of the
+       viewport, it covers whatever is there — and on first paint that is the
+       date strip, dead centre, hiding the selected day. armFilterToggleReveal()
+       in travel-explore.js adds `is-ready` once the results come into view and
+       never takes it away. `visibility` rather than `display` so the button
+       keeps its size and the fade has something to animate; pointer-events
+       because a hidden-but-present control must not be clickable. */
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .22s ease, visibility .22s;
+  }
+  .tx-filter-toggle.is-ready { opacity: 1; visibility: visible; pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) {
+    .tx-filter-toggle { transition: none; }
   }
   .tx-filter-toggle:hover { background: var(--tx-accent); color: var(--tx-accent-ink); }
   .tx-filter-toggle:focus-visible { outline: 2px solid var(--tx-accent); outline-offset: 3px; }
@@ -1072,7 +1090,7 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
    differently — the cue is the point, not decoration. */
 .tx-cal-cell.is-weekend:not(:disabled) { color: var(--sp-accent, #FF4D4D); font-weight: 700; }
 .tx-cal-cell.is-selected {
-  background: var(--sp-accent, #FF4D4D) !important; color: #fff; font-weight: 800;
+  background: var(--sp-accent, #FF4D4D) !important; color: var(--on-accent, #12253F); font-weight: 800;
 }
 .tx-cal-cell:focus-visible { outline: 2px solid var(--sp-accent, #FF4D4D); outline-offset: -2px; }
 /* Reserved for real fares. search-widgets.js's calendar draws this whenever a
@@ -1197,7 +1215,7 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
   background: var(--sp-accent-soft, rgba(255, 77, 77, .12)); border-radius: 0;
 }
 .tx-cal-cell.is-rangeend:not(:disabled) {
-  background: var(--sp-accent, #FF4D4D); color: #fff; font-weight: 800;
+  background: var(--sp-accent, #FF4D4D); color: var(--on-accent, #12253F); font-weight: 800;
 }
 .tx-cal-foot {
   margin-top: 8px; padding-top: 8px; font-size: 12px; text-align: center;

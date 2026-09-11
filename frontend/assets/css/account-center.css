@@ -40,7 +40,7 @@
 /* ---------- ACCOUNT CENTER MODAL ---------- */
 #accountModalOverlay .modal-card {max-width:960px; padding:0; max-height:88vh; display:flex; flex-direction:column;}
 .acct-header {display:flex; align-items:center; gap:16px; padding:24px 30px; border-bottom:1px solid var(--line); flex-shrink:0;}
-.acct-header-avatar {width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.acct-header-avatar {width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:var(--on-accent, #12253F); display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; flex-shrink:0; object-fit:cover;}
 .acct-header-info {min-width:0; flex:1;}
 .acct-header-name {font-size:18px; font-weight:800; color:var(--navy);}
 .acct-header-email {font-size:13px; color:var(--muted); margin-top:2px;}

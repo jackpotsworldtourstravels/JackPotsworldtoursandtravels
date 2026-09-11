@@ -163,7 +163,7 @@
   transition: border-color .15s ease, background .15s ease;
 }
 
-.jpay-method:hover { border-color: rgba(255, 77, 77, .45); }
+.jpay-method:hover { border-color: rgba(233,185,73,.55); }
 
 .jpay-method.is-on {
   border-color: var(--sp-accent, #FF4D4D);

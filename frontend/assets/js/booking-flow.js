@@ -453,7 +453,7 @@ const BookingFlow = (function () {
     const footNote = document.getElementById('bkFootNote');
     if (footNote) footNote.textContent = step.ctaNote || '';
     if (step.mount) step.mount(main, ctx);
-    /* #bkItin sits outside the step's own root, so its Change Flights / Edit
+    /* #bkItin sits outside the step's own root, so its Modify Flights / Edit
        Search button has to be wired from here. */
     root.querySelectorAll('#bkItin [data-bk-exit]').forEach(b => {
       b.addEventListener('click', confirmClose);

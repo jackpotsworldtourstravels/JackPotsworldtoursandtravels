@@ -85,7 +85,7 @@ const BookingTicket = (function () {
   ul li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(10,37,64,.07)}
   .tk-fare{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
   .tk-total{margin-top:16px;padding-top:14px;border-top:2px solid #0A2540;display:flex;justify-content:space-between;font-size:17px;font-weight:800}
-  .tk-demo{margin:22px 0 0;padding:12px 14px;border:1px dashed #FF4D4D;border-radius:10px;color:#B3252F;font-size:12px;font-weight:700}
+  .tk-demo{margin:22px 0 0;padding:12px 14px;border:1px dashed #D9A32C;border-radius:10px;color:#B3252F;font-size:12px;font-weight:700}
   @media print{ body{padding:0} .tk{border:none} }
 </style>
 <div class="tk">

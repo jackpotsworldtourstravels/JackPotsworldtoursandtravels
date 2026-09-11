@@ -1,20 +1,64 @@
+/* ===========================================================================
+   THE JACKPOTSWORLD BRAND PALETTE — navy and gold.
+   ===========================================================================
+   Values copied from design-templates/jackpots-home.html, which is the
+   approved design, rather than re-picked by eye: navy #0C1E3A, ink #12253F,
+   muted #6B7A90, line #E4E9F0, page #F6F8FB, gold var(--coral-light), blue #1668E3,
+   green #14A05C, red #E24B4A.
+
+   WHY `--coral` STILL SAYS CORAL WHILE HOLDING GOLD. It is the ACCENT ROLE,
+   read in 154 places across fourteen files. Renaming it would touch every one
+   of them for no behavioural gain — and `admin.css` declares its OWN --coral
+   (#FF6B35) for the staff portals, so a global find-and-replace would either
+   miss that or wrongly repaint it. The name is historical; the role is
+   "primary accent", and this is the one place its value is decided.
+
+   THE STAFF PORTALS ARE NOT AFFECTED. admin, partner and super-admin do not
+   load this file and resolve --coral against admin.css instead.
+
+   GOLD TAKES DARK INK. Coral is 3.9:1 on white and carried white text
+   everywhere; var(--coral-light) is about 1.9:1 and cannot. --on-accent is what goes on
+   an accent FILL, and --gold-ink is gold as TEXT on a light surface. Every
+   `color:#fff` that sat on a coral background has been moved to one of them.
+
+   DANGER IS NO LONGER THE ACCENT. Cancelled and failed states used to borrow
+   --coral-dark, which read as red because the accent was red. With a gold
+   accent they would have gone gold and stopped meaning anything, so they have
+   their own --danger now.
+   =========================================================================== */
 :root{
-  --navy:#0A2540;
-  --navy-2:#123157;
-  --navy-3:#1B4577;
-  --coral:#FF4D4D;
-  --coral-dark:#E63946;
-  --coral-hover:#FFF0F0;
-  --bg:#F8FAFC;
+  /* TEAL + CORAL. Anchor and accent are complements, which is why a button
+     reads as an action here rather than sinking into the page.
+
+     THE ACCENT IS TWO SHADES, AND THAT IS DELIBERATE. Coral sits at a mid
+     luminance where neither white nor dark ink clears AA on the bright version
+     (#E8604C is 3.4:1 under white and 4.0:1 under this ink — both short). So
+     --coral is the deeper shade that FILLS things and carries white text at
+     4.7:1, and --coral-light is the bright one, used where nothing has to be
+     read on top of it: borders, icons, hover washes, a focus ring. */
+  --navy:#0B3C4A;
+  --navy-2:#12546A;
+  --navy-3:#1A6B85;
+  --coral:#C9482F;
+  --coral-light:#E8604C;
+  --coral-dark:#A63A24;
+  --coral-hover:#FCEDE9;
+  --on-accent:#FFFFFF;
+  --gold:var(--coral-light);
+  --gold-ink:#6B5411;
+  /* Danger is NOT a shade of the accent now that the accent is itself red —
+     a cancelled badge in coral would read as a call to action. */
+  --danger:#9B2C2C;
+  --danger-soft:rgba(155,44,44,0.12);
+  --bg:#FBF9F6;
   --white:#FFFFFF;
-  --sky:#2F80ED;
-  --emerald:#12B76A;
-  --gold:#FFB020;
-  --ink:#0A2540;
-  --muted:#5B6B82;
-  --line:rgba(10,37,64,0.10);
-  --shadow-sm:0 8px 24px -12px rgba(10,37,64,0.18);
-  --shadow-lg:0 30px 70px -20px rgba(10,37,64,0.35);
+  --sky:#0E7490;
+  --emerald:#12855F;
+  --ink:#17323C;
+  --muted:#6B7A80;
+  --line:#E7E2DA;
+  --shadow-sm:0 8px 24px -12px rgba(23,50,60,0.16);
+  --shadow-lg:0 30px 70px -20px rgba(23,50,60,0.30);
   --radius:20px;
   --radius-sm:14px;
   --max:1280px;
@@ -48,7 +92,7 @@ body{
   background:var(--bg); color:var(--ink); font-family:var(--ff-body);
   -webkit-font-smoothing:antialiased; overflow-x:clip; line-height:1.5;
 }
-::selection{background:var(--coral); color:#fff;}
+::selection{background:var(--coral); color:var(--on-accent);}
 img,svg{display:block; max-width:100%;}
 a{color:inherit; text-decoration:none;}
 ul{list-style:none;}
@@ -71,8 +115,8 @@ h1,h2,h3,h4{font-family:var(--ff-head); line-height:1.12; letter-spacing:-0.01em
   position:relative; overflow:hidden; transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
 }
 .btn:active{transform:scale(.97);}
-.btn-coral{background:linear-gradient(135deg, var(--coral) 0%, var(--coral-dark) 100%); color:#fff; box-shadow:0 14px 30px -10px rgba(255,77,77,0.55);}
-.btn-coral:hover{filter:brightness(1.06); box-shadow:0 18px 36px -8px rgba(255,77,77,0.6);}
+.btn-coral{background:linear-gradient(135deg, var(--coral) 0%, var(--coral-dark) 100%); color:var(--on-accent); box-shadow:0 14px 30px -10px rgba(232,96,76,0.55);}
+.btn-coral:hover{filter:brightness(1.06); box-shadow:0 18px 36px -8px rgba(232,96,76,0.6);}
 .btn-navy{background:var(--navy); color:#fff;}
 .btn-navy:hover{background:var(--navy-3);}
 .btn-sm{padding:10px 16px; font-size:13px;}
@@ -102,11 +146,30 @@ section{padding:110px 0;}
 .delay-1{transition-delay:.08s;} .delay-2{transition-delay:.16s;} .delay-3{transition-delay:.24s;} .delay-4{transition-delay:.32s;}
 
 /* ---------- NAV ---------- */
+/* THE BAR DECLARES ITS OWN INK, and that is not decoration.
+   profile-menu.js renders the signed-out Login link as `.pm-login`, which
+   takes `color: inherit` (profile-menu.css) — so whatever the header says is
+   what it gets. The header said nothing, so it inherited the BODY's dark ink
+   and came out navy-on-navy over the hero film. index.html and flights.html
+   both happened to patch it in their own stylesheets; hotels.html and
+   packages.html have no such file, and once the film came back to their heroes
+   their Login link disappeared into it. Declared once, here, where the
+   transparent-over-film state is defined. `header.is-solid` sets the dark
+   counterpart, so a painted bar is unaffected. */
 header{
   position:fixed; top:0; left:0; right:0; z-index:100;
   background:rgba(0,0,0,0); backdrop-filter:blur(0px);
+  color:#fff;
 }
 nav.wrap{display:flex; align-items:center; justify-content:space-between; height:128px; gap:20px;}
+/* THE HEADER BAR IS NOT PAGE CONTENT, so it does not stop at --max.
+   The reference nav is ten cells; with the logo and the utility cluster the row
+   wants about 1320px, and .wrap capped it at 1280. .navlinks centres itself, so
+   the 40px it was short got split across BOTH ends: the first link (Flights)
+   sat behind the logo and the last (More) fell off the right — on a full-screen
+   window with 500px going spare either side. The bar uses the window it is
+   given; everything below the header still honours --max. */
+#siteHeader nav.wrap{max-width:none; padding-inline:clamp(16px, 2.5vw, 44px);}
 .logo{display:flex; align-items:center; margin-left:16px;}
 .logo-mark-img{height:104px; width:auto; object-fit:contain; flex-shrink:0;}
 .navlinks{display:flex; gap:30px; font-size:14.5px; font-weight:600; align-items:center;}
@@ -117,7 +180,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .nav-actions{display:flex; align-items:center; gap:14px;}
 .nav-login{font-size:14.5px; font-weight:700; color:#fff;}
 .nav-partner-mark{display:inline-flex; align-items:center; gap:8px; padding:7px 16px 7px 9px; border-radius:100px; border:1.5px solid rgba(255,255,255,0.32); color:#fff; font-weight:700; font-size:13.5px; transition:border-color .25s ease, background-color .25s ease, transform .2s ease;}
-.nav-partner-mark:hover{border-color:var(--coral); background:rgba(255,77,77,0.14); transform:translateY(-1px);}
+.nav-partner-mark:hover{border-color:var(--coral); background:rgba(232,96,76,0.14); transform:translateY(-1px);}
 .npm-mark{width:21px; height:21px; flex-shrink:0;}
 .mobile-partner-mark{display:flex; align-items:center; gap:10px;}
 .mobile-partner-mark .npm-mark{width:20px; height:20px; color:var(--navy);}
@@ -125,14 +188,50 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .hamburger{display:none; flex-direction:column; gap:5px; width:26px;}
 .hamburger span{height:2px; background:#fff; border-radius:2px;}
 .mobile-nav{display:none; flex-direction:column; gap:2px; background:#0a0a0a; padding:12px 32px 24px; box-shadow:var(--shadow-sm);}
-.mobile-nav a{padding:12px 0; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.1); color:#fff;}
+/* ICON THEN LABEL, ALIGNED. Every drawer row carries the same
+   `<i data-jp-icon>` + `<span>` the bar does — index.html's static copy and
+   hero-shell's navLinks() both emit it — and as inline content the glyph ran
+   straight into the word with no space at all. A flex row with a real gap
+   fixes that; a fixed icon width lines the labels up down the list instead of
+   letting each row indent by whatever its own glyph measures. */
+.mobile-nav a{display:flex; align-items:center; gap:12px; padding:12px 0; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.1); color:#fff;}
+.mobile-nav a .jpi,
+.mobile-nav a .npm-mark{width:18px; height:18px; flex:none;}
+/* "More" is the one entry with no glyph, so its label was starting 30px left
+   of the other nine. :not(.jpi) is load-bearing for the same reason it is on
+   the strip below — JPIcon.mount swaps the <i> for a <span class="jpi">, so
+   without it the ICON would take this indent on every other row. */
+.mobile-nav a > span:not(.jpi):first-child{margin-left:30px;}
 .mobile-nav.open{display:flex;}
+/* ONE BREAKPOINT FOR THE NAV, NOT THREE.
+   The strip hid at 860 (see the ten-product block near the foot of this file),
+   the hamburger appeared at 960 and the drawer was gated at 961 — so between
+   861px and 960px the header showed the icon strip AND the hamburger: two
+   navigations offering the same ten products, one of them redundant at every
+   width it appeared.
+
+   860 is the line, kept from the rule near the foot of this file rather than
+   invented here, and the hamburger and the drawer now swap in at exactly the
+   width the strip drops out — so only ever one of them is the navigation.
+
+   The strip is icon-only from 1460 down, and between roughly 861 and 1000 it
+   is still a few pixels short and scrolls sideways: at 902px the nav has 331
+   to spend on 342 of icons, because .nav-actions is taking 415 for the
+   utility cluster. That is the documented fallback and not the double nav —
+   nothing is hidden, `safe center` keeps the row flush left and it swipes.
+   Buying those pixels back means shortening Login / Sign Up on a tablet,
+   which is a change to the utility cluster, not to this breakpoint.
+
+   .nav-login keeps its own 960 deliberately — it is an auth control, not a
+   product link, and .nav-actions has its own crowding to answer for. */
 @media (max-width:960px){
-  .navlinks{display:none;}
-  .hamburger{display:flex;}
   .nav-login{display:none;}
 }
-@media (min-width:961px){
+@media (max-width:860px){
+  .navlinks{display:none;}
+  .hamburger{display:flex;}
+}
+@media (min-width:861px){
   .mobile-nav{display:none !important;}
 }
 
@@ -143,42 +242,45 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 }
 @media (max-width:900px){.hero{min-height:700px;}}
 
-/* THE RESULTS-PAGE HEADER — the same hero, doing a different job.
-   No min-height and no vertical centring: it is exactly as tall as the search
-   card inside it, so the first result sits just under the fold line instead of
-   877px down the page. The film and the overlay stay, which is what keeps this
-   recognisably the same product rather than a bare grey toolbar.
-   padding-top clears the fixed header (128px at rest) with a little air. */
-/* A plain band, not a hero. There is no film behind it any more (see
-   heroHtml), so it carries the page background and a hairline instead — which
-   is what tells a traveller at a glance that they have left the landing page
-   and are on a results page.
+/* THE RESULTS-PAGE HERO — the same hero, doing a different job.
+   ---------------------------------------------------------------------------
+   THE FILM AND THE OVERLAY STAY. They were taken out once, and the band that
+   replaced them read as a different site: a traveller clicking Flights in the
+   nav watched the blue collapse from a 760px hero to a 137px sliver of
+   painted header. It is the same product either side of that click, and the
+   backdrop is most of what says so.
 
-   THE 104px OF TOP PADDING WAS CLEARANCE FOR A FIXED HEADER THAT IS NOT
-   THERE. On the landing page the header floats over the film, so the hero has
-   to start below it. A results page has no film, so hero-shell paints the
-   solid header instead — and `header.is-solid` is `position:static`, in the
-   flow, 77px tall. The padding was clearing a header that had already taken
-   its own space, which put exactly 104px of blank white between the header
-   and the search strip. 18px is the gap the band actually wants.
+   WHAT COMPACT ACTUALLY DROPS IS HEIGHT AND COPY. No headline, no pitch, no
+   scroll cue (heroHtml), and roughly a third of the landing hero's height —
+   enough blue to carry the film, short enough that the first fare is near the
+   top of the page rather than a screen and a half down it.
 
-   OVERFLOW IS VISIBLE HERE, and that is the other half of it: `.hero` clips
-   its contents so the film and the parallax cannot spill, and this band has
-   neither. Inherited, that `overflow:hidden` cut the airport suggestion list
-   off at the bottom edge of the band. */
+   THE TOP PADDING IS CLEARANCE FOR THE FIXED HEADER, which is back here for
+   the same reason the film is: bindScrollFade looks for `#heroBg`, finds one
+   now, and gives these pages the landing page's transparent bar that darkens
+   on scroll instead of `header.is-solid`. 128px is `nav.wrap`'s height at
+   rest, plus air.
+
+   OVERFLOW IS VISIBLE, and it is why heroHtml wraps the film in `.hero-media`
+   on this shape only. `.hero`'s own `overflow:hidden` is what stops the
+   parallax spilling the film over the results — but it also cut the airport
+   suggestion list off at the bottom edge of the band, and that list has to
+   escape. The wrapper clips the film; the band does not clip anything. */
 .hero.is-compact{
-  min-height:0; justify-content:flex-start;
-  padding-top:18px; padding-bottom:22px;
-  background:var(--bg);
-  border-bottom:1px solid var(--line);
+  min-height:320px; justify-content:flex-end;
+  padding-top:148px; padding-bottom:34px;
+  border-bottom:none;
   overflow:visible;
 }
 @media (max-width:900px){
-  .hero.is-compact{min-height:0; padding-top:14px; padding-bottom:16px;}
+  .hero.is-compact{min-height:260px; padding-top:96px; padding-bottom:24px;}
 }
-/* The card is the whole content here, so it does not need the 34px of air that
-   separates it from the landing page's pitch. */
+/* The strip is the whole content here, so it does not need the 34px of air
+   that separates the card from the landing page's pitch. */
 .hero.is-compact .search-dock{margin-top:0;}
+/* The film's clipping box on a compact hero — see heroHtml. It is only ever
+   rendered on that shape; the landing page's hero clips the film itself. */
+.hero-media{position:absolute; inset:0; z-index:0; overflow:hidden;}
 .hero-bg{
   position:absolute; inset:0; z-index:0;
   background-image:url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1920&q=80');
@@ -201,7 +303,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   position:absolute; inset:0; z-index:1; pointer-events:none;
   background-image:
     linear-gradient(180deg, rgba(10,37,64,0.55) 0%, rgba(10,37,64,0.72) 55%, rgba(10,37,64,0.94) 100%),
-    radial-gradient(ellipse 900px 500px at 12% 0%, rgba(255,77,77,0.35), transparent 60%);
+    radial-gradient(ellipse 900px 500px at 12% 0%, rgba(232,96,76,0.35), transparent 60%);
 }
 .hero-inner{position:relative; z-index:2; color:#fff;}
 .hero .eyebrow{color:var(--gold);}
@@ -210,7 +312,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   color:#fff; font-weight:800; font-size:clamp(40px,6.4vw,78px); max-width:16ch; letter-spacing:-0.02em;
 }
 .hero h1 .accent{
-  background:linear-gradient(90deg, #FFB020, #FF4D4D); -webkit-background-clip:text; background-clip:text; color:transparent;
+  background:linear-gradient(90deg, var(--coral-light), var(--coral-dark)); -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 .hero p.sub{
   color:rgba(255,255,255,0.82); font-size:18.5px; max-width:560px; margin-top:22px; line-height:1.6;
@@ -391,10 +493,15 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   box-shadow:var(--shadow-sm); transition:transform .3s ease, box-shadow .3s ease;
 }
 .offer-card:hover{transform:translateY(-6px); box-shadow:var(--shadow-lg);}
-.offer-card.o1{background:linear-gradient(135deg,#FF4D4D,#FF8552);}
+/* WHITE TEXT NEEDS A DARK FILL. The sweep to the brand palette turned this
+   gradient and o4 below light gold, and white on var(--coral-light) is ~1.9:1. Both
+   now start from the bronze end of the brand instead, which keeps them warm
+   and keeps the text readable. The gold itself moved to the CTA chip, which
+   is where the reference design puts it. */
+.offer-card.o1{background:linear-gradient(135deg,var(--coral-dark),#E4791F);}
 .offer-card.o2{background:linear-gradient(135deg,#0A2540,#2F80ED);}
 .offer-card.o3{background:linear-gradient(135deg,#12B76A,#0A2540);}
-.offer-card.o4{background:linear-gradient(135deg,#FFB020,#FF4D4D);}
+.offer-card.o4{background:linear-gradient(135deg,var(--coral-dark),var(--navy));}
 .offer-card.o5{background:linear-gradient(135deg,#2F80ED,#12B76A);}
 .offer-card .tag{font-size:11.5px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; opacity:.85;}
 .offer-card h3{color:#fff; font-size:25px; font-weight:700; margin:14px 0 6px; max-width:22ch;}
@@ -412,10 +519,10 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    five different card gradients — hence white, not the coral :focus-visible
    default, which disappears on the o1 card. */
 .offer-card .offer-cta{
-  color:#fff; display:inline-block; white-space:nowrap;
+  background:var(--coral); color:var(--on-accent); display:inline-block; white-space:nowrap;
   transition:background .2s ease, transform .2s ease;
 }
-.offer-card .offer-cta:hover{background:rgba(255,255,255,0.34); transform:translateX(2px);}
+.offer-card .offer-cta:hover{background:var(--coral-dark); transform:translateX(2px);}
 .offer-card .offer-cta:focus-visible{outline:3px solid #fff; outline-offset:3px;}
 @keyframes offersScroll{0%{transform:translateX(0);} 100%{transform:translateX(-50%);}}
 
@@ -475,7 +582,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 
 /* ---------- WHY CHOOSE US ---------- */
 .why-section{background:var(--navy); color:#fff; position:relative; overflow:hidden;}
-.why-section::before{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 700px 500px at 90% 0%, rgba(255,77,77,0.25), transparent 60%);}
+.why-section::before{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 700px 500px at 90% 0%, rgba(232,96,76,0.25), transparent 60%);}
 .why-section .eyebrow{color:var(--gold);} .why-section .eyebrow::before{background:var(--gold);}
 .why-section h2, .why-section .section-head p{color:#fff;}
 .why-section .section-head p{opacity:.7;}
@@ -484,7 +591,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px 24px;
   transition:transform .3s ease, background .3s ease, box-shadow .3s ease;
 }
-.why-card:hover{transform:translateY(-6px); background:rgba(255,255,255,0.11); box-shadow:0 20px 50px -20px rgba(255,77,77,0.4);}
+.why-card:hover{transform:translateY(-6px); background:rgba(255,255,255,0.11); box-shadow:0 20px 50px -20px rgba(232,96,76,0.4);}
 .why-icon{width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,var(--coral),var(--gold)); display:flex; align-items:center; justify-content:center; margin-bottom:18px; transition:transform .3s ease;}
 .why-card:hover .why-icon{transform:scale(1.1) rotate(-6deg);}
 .why-icon svg{width:22px; height:22px; color:#fff;}
@@ -536,13 +643,17 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 @keyframes partnersScroll{0%{transform:translateX(0);} 100%{transform:translateX(-50%);}}
 
 /* ---------- NEWSLETTER ---------- */
+/* THE BAND KEPT ITS BRIGHTNESS AND LOST ITS WHITE TEXT. The gradient used to
+   run coral -> gold, so white sat on it at ~3.3:1 and got away with it at
+   44px. Both stops are gold now and white is ~1.9:1, so the band takes the
+   ink an accent fill takes everywhere else on the site. */
 .newsletter-section{
-  background:linear-gradient(135deg, var(--coral) 0%, var(--gold) 100%); background-size:200% 200%;
+  background:linear-gradient(135deg, var(--gold) 0%, var(--coral-dark) 100%); background-size:200% 200%;
   animation:gradientShift 8s ease infinite; text-align:center; position:relative; overflow:hidden;
 }
 @keyframes gradientShift{0%{background-position:0% 50%;} 50%{background-position:100% 50%;} 100%{background-position:0% 50%;}}
-.newsletter-section h2{color:#fff; font-size:clamp(28px,4vw,44px); font-weight:800; max-width:16ch; margin:0 auto;}
-.newsletter-section p{color:rgba(255,255,255,0.85); margin-top:14px; font-size:15.5px;}
+.newsletter-section h2{color:var(--on-accent); font-size:clamp(28px,4vw,44px); font-weight:800; max-width:16ch; margin:0 auto;}
+.newsletter-section p{color:rgba(18,37,63,0.78); margin-top:14px; font-size:15.5px;}
 .newsletter-form{display:flex; max-width:480px; margin:32px auto 0; background:#fff; border-radius:100px; padding:6px; box-shadow:var(--shadow-lg); gap:6px;}
 .newsletter-form input{flex:1; border:none; background:none; padding:14px 20px; font-size:15px; outline:none; color:var(--navy);}
 .newsletter-form button{border-radius:100px; padding:14px 26px; font-size:14.5px; white-space:nowrap;}
@@ -575,8 +686,8 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .fab-item.is-hidden{display:none;}
 .fab-item:hover, .fab-item:focus-visible{transform:translateY(0) scale(1.1); background:var(--coral-hover);}
 .fab-item:focus-visible{outline:2px solid var(--coral); outline-offset:3px;}
-.fab-item.listening{background:var(--coral); color:#fff; animation:fabPulse 1.1s ease-in-out infinite;}
-@keyframes fabPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,77,.5);} 50%{box-shadow:0 0 0 10px rgba(255,77,77,0);}}
+.fab-item.listening{background:var(--coral); color:var(--on-accent); animation:fabPulse 1.1s ease-in-out infinite;}
+@keyframes fabPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,96,76,.5);} 50%{box-shadow:0 0 0 10px rgba(232,96,76,0);}}
 .fab-menu.open .fab-items .fab-item{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
 /* Expand: item nearest the main FAB (last child) animates in first, cascading upward */
 .fab-menu.open .fab-item:nth-child(4){transition-delay:0s;}
@@ -595,7 +706,10 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 }
 .fab-item:hover[data-tooltip]::before, .fab-item:focus-visible[data-tooltip]::before{opacity:1; transform:translateY(-50%) translateX(0);}
 .fab-main{
-  width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, var(--coral), var(--navy)); color:#fff;
+  /* Was accent -> navy with white text, which was legible at the navy end and
+     not at the accent end once the accent became gold. Now the same gold ->
+     bronze fill .btn-coral uses, with the ink that fill takes. */
+  width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, var(--coral), var(--coral-dark)); color:var(--on-accent);
   box-shadow:var(--shadow-lg); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
   transition:transform .3s cubic-bezier(.34,1.56,.64,1);
 }
@@ -623,7 +737,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .chatbot-body{padding:16px 18px; max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;}
 .chat-msg{font-size:13.5px; padding:11px 14px; border-radius:14px; max-width:85%; line-height:1.5;}
 .chat-msg.bot{background:var(--bg); color:var(--navy); border-bottom-left-radius:4px;}
-.chat-msg.user{background:var(--coral); color:#fff; align-self:flex-end; border-bottom-right-radius:4px;}
+.chat-msg.user{background:var(--coral); color:var(--on-accent); align-self:flex-end; border-bottom-right-radius:4px;}
 .chat-suggestions{display:flex; flex-direction:column; gap:8px; padding:4px 18px 18px;}
 .chat-chip{text-align:left; font-size:13px; font-weight:600; padding:10px 14px; border-radius:12px; background:var(--coral-hover); color:var(--coral-dark); transition:background .2s ease;}
 .chat-chip:hover{background:#ffe1e1;}
@@ -653,6 +767,22 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   font-size:15px; font-family:var(--ff-body); color:var(--navy); outline:none; transition:border-color .2s ease;
 }
 .modal-field input:focus{border-color:var(--coral);}
+/* THE COUNTRY CODE AND THE NUMBER ARE ONE FIELD, two controls. The select is
+   sized to its content rather than shared evenly: the dial code is four
+   characters and the number is the thing being typed, so an even split would
+   give half the row to a value that never changes after the first visit.
+   `min-width:0` on the input is what lets it shrink inside the grid — without
+   it the 15px text sets a floor and the pair overflows the dialog at 340px.
+   The select is capped because the option LABELS carry the country name, and
+   a closed select sized to "United Arab Emirates (+971)" is most of the row. */
+.field-dial{display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; align-items:center;}
+.field-dial select{
+  max-width:126px; padding:13px 8px; border-radius:12px; border:1.5px solid var(--line);
+  font-size:15px; font-family:var(--ff-body); color:var(--navy); background:#fff;
+  outline:none; cursor:pointer; transition:border-color .2s ease;
+}
+.field-dial select:focus{border-color:var(--coral);}
+.field-dial input{min-width:0;}
 .modal-forgot{display:inline-block; margin:-6px 0 18px; font-size:13px; font-weight:700; color:var(--coral);}
 /* Remember Me sits on the same line as Forgot Password. The checkbox is
    deliberately OUTSIDE .modal-field: that rule sets width:100% on its inputs,
@@ -678,7 +808,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .profile-chip-wrap{position:relative;}
 .profile-chip{display:flex; align-items:center; gap:9px; padding:6px 14px 6px 6px; border-radius:100px; background:rgba(10,37,64,0.05); transition:background .2s ease;}
 .profile-chip:hover{background:rgba(10,37,64,0.1);}
-.profile-chip-avatar{width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.profile-chip-avatar{width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral-dark)); color:var(--on-accent); display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:800; flex-shrink:0; object-fit:cover;}
 .profile-chip-name{font-size:13.5px; font-weight:700; color:var(--navy); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .profile-chip-chevron{width:14px; height:14px; color:var(--muted); transition:transform .2s ease; flex-shrink:0;}
 .profile-chip.open .profile-chip-chevron{transform:rotate(180deg);}
@@ -704,7 +834,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 /* ---------- ACCOUNT CENTER MODAL ---------- */
 #accountModalOverlay .modal-card{max-width:960px; padding:0; max-height:88vh; display:flex; flex-direction:column;}
 .acct-header{display:flex; align-items:center; gap:16px; padding:24px 30px; border-bottom:1px solid var(--line); flex-shrink:0;}
-.acct-header-avatar{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; flex-shrink:0; object-fit:cover;}
+.acct-header-avatar{width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--gold), var(--coral-dark)); color:var(--on-accent); display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800; flex-shrink:0; object-fit:cover;}
 .acct-header-info{min-width:0; flex:1;}
 .acct-header-name{font-size:18px; font-weight:800; color:var(--navy);}
 .acct-header-email{font-size:13px; color:var(--muted); margin-top:2px;}
@@ -730,7 +860,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .badge{display:inline-block; padding:5px 12px; border-radius:100px; font-size:11px; font-weight:700; white-space:nowrap;}
 .badge.confirmed, .badge.success, .badge.resolved, .badge.closed, .badge.completed{background:rgba(18,183,106,0.12); color:var(--emerald);}
 .badge.pending, .badge.in_progress, .badge.open{background:rgba(255,176,32,0.18); color:#a06600;}
-.badge.cancelled, .badge.failed{background:rgba(230,57,70,0.12); color:var(--coral-dark);}
+.badge.cancelled, .badge.failed{background:var(--danger-soft); color:var(--danger);}
 .badge.refunded{background:rgba(47,128,237,0.12); color:var(--sky, #2F80ED);}
 .badge.unread{background:rgba(255,176,32,0.18); color:#a06600;}
 .badge.read{background:rgba(10,37,64,0.06); color:var(--muted);}
@@ -780,7 +910,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .tl-step{display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; width:74px;}
 .tl-dot{width:16px; height:16px; border-radius:50%; background:var(--line); border:2px solid var(--line); box-sizing:border-box;}
 .tl-step.done .tl-dot{background:var(--emerald); border-color:var(--emerald);}
-.tl-step.cancelled-step .tl-dot{background:var(--coral-dark); border-color:var(--coral-dark);}
+.tl-step.cancelled-step .tl-dot{background:var(--danger); border-color:var(--danger);}
 .tl-label{font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; text-align:center;}
 .tl-step.done .tl-label{color:var(--navy);}
 .tl-step.cancelled-step .tl-label{color:var(--coral-dark);}
@@ -913,7 +1043,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
   font-size:12px; font-weight:700; color:var(--coral);
   background:transparent; border:1px solid transparent; cursor:pointer;
 }
-.field-change:hover{ background:rgba(255,77,77,.1); }
+.field-change:hover{ background:rgba(232,96,76,.1); }
 .field-change:focus-visible{ outline:2px solid var(--coral); outline-offset:2px; }
 
 /* .modal-forgot is now a <button> rather than an <a> — it changes a step
@@ -972,6 +1102,9 @@ button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offse
 header.is-solid{
   position:static; background:#fff; backdrop-filter:none;
   border-bottom:1px solid var(--line);
+  /* The dark half of the pair declared on `header` above — anything in the bar
+     that inherits its colour (`.pm-login`) has to flip with the background. */
+  color:var(--navy);
 }
 header.is-solid nav.wrap{height:76px;}
 header.is-solid .logo-mark-img{max-height:52px;}
@@ -984,7 +1117,7 @@ header.is-solid .navlinks a[aria-current="page"]{color:var(--coral);}
 header.is-solid .navlinks a[aria-current="page"]::after{width:100%;}
 
 header.is-solid .nav-partner-mark{color:var(--navy); border-color:var(--line);}
-header.is-solid .nav-partner-mark:hover{border-color:var(--coral); background:rgba(255,77,77,0.08);}
+header.is-solid .nav-partner-mark:hover{border-color:var(--coral); background:rgba(232,96,76,0.08);}
 header.is-solid .nav-login{color:var(--navy);}
 header.is-solid .hamburger span{background:var(--navy);}
 
@@ -995,6 +1128,51 @@ header.is-solid .mobile-nav a{color:var(--navy);}
 @media (max-width:900px){
   header.is-solid nav.wrap{height:64px;}
   header.is-solid .logo-mark-img{max-height:42px;}
+}
+
+/* ---------------------------------------------------------------------------
+   A BOOKING HIDES THE HERO, AND THE BAR HAS TO NOTICE.
+   ---------------------------------------------------------------------------
+   booking.css hides everything under <main> while `body.bk-inpage` is set, so
+   the film the transparent bar was designed to sit on is no longer there. That
+   did not matter while the results pages had no film — bindScrollFade found no
+   `#heroBg`, painted the solid bar, and it stayed painted through the booking.
+   Now that the film is back (see `.hero.is-compact`) the bar starts
+   transparent, and on a page that ships no booking-screen header of its own it
+   stayed that way: white lettering on the white booking sheet, over content
+   that reserved no room for a fixed bar.
+
+   So `header.is-solid`'s treatment is applied for the duration. It is spelled
+   out rather than sharing that block's selector because widening
+   `header.is-solid` to carry an id would have raised its specificity above the
+   per-page overrides that are supposed to beat it.
+
+   NOT ON flights.html, which is the exception this `:not()` names. That page
+   loads booking-ref.css and flights-ref.css, which between them keep a NAVY,
+   FIXED bar through the booking — and `#bkRoot`'s top padding over there is
+   clearance for exactly that fixed bar. Turning it static here would put the
+   gap back between the header and the itinerary card.
+   --------------------------------------------------------------------------- */
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader{
+  position:static;
+  /* !important because bindScrollFade writes these two as INLINE styles on
+     every scroll event (hero-shell.js) — the same reason booking-ref.css
+     needs it. */
+  background:#fff !important; backdrop-filter:none !important;
+  border-bottom:1px solid var(--line); color:var(--navy);
+}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader nav.wrap{height:76px;}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:52px;}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .navlinks a{color:var(--navy); font-weight:600;}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .navlinks a:hover{color:var(--coral);}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .nav-partner-mark{color:var(--navy); border-color:var(--line);}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .nav-login{color:var(--navy);}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .hamburger span{background:var(--navy);}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .nav-icon-btn{border-color:var(--line); color:var(--navy);}
+body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .hr-wish{color:var(--navy);}
+@media (max-width:900px){
+  body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader nav.wrap{height:64px;}
+  body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .logo-mark-img{max-height:42px;}
 }
 
 /* ---------------------------------------------------------------------------
@@ -1036,8 +1214,26 @@ header.is-solid .mobile-nav a{color:var(--navy);}
 /* Over a light bar the white outline is invisible — same swap the rest of the
    solid-header rules make. */
 header.is-solid .nav-icon-btn{border-color:var(--line); color:var(--navy);}
-header.is-solid .nav-icon-btn:hover{background:rgba(255,77,77,.08); border-color:var(--coral);}
-@media (max-width:900px){.nav-icon-btn{display:none;}}
+header.is-solid .nav-icon-btn:hover{background:rgba(232,96,76,.08); border-color:var(--coral);}
+/* 1000, NOT 900 — THIS PAIR IS WHAT BROKE THE TABLET BAND.
+   These two buttons cost 94px (2x38 plus two 9px gaps) and they came back at
+   901px, in a band that did not have 94px to give. Above 901 the bar was
+   short and the product strip scrolled sideways: 11px short at 902 on the
+   landing page, 104px short on a hero-shell page, whose cells are wider
+   because home-ref.css's tighter nav padding is not there. The strip fits
+   again from about 936 on the landing page and 976 elsewhere, so 900 landed
+   the swap right in the middle of the gap.
+
+   1000px clears both with room to spare, measured: the widest case is a
+   hero-shell page needing 389 of strip + 432 of utilities + 53 of logo + 50
+   of gutter + 20 of gaps = 944, against 1001 available the moment the buttons
+   return.
+
+   NOTHING IS LOST BELOW 1000. My Bookings and Notifications both open the
+   Account Center on a tab, and the profile menu names both destinations in
+   full — the same argument the block above makes for dropping their labels at
+   1280. Two glyphs are not worth making the ten products swipe. */
+@media (max-width:1000px){.nav-icon-btn{display:none;}}
 
 /* ---------------------------------------------------------------------------
    The booking footer — results and booking pages only
@@ -1059,7 +1255,7 @@ header.is-solid .nav-icon-btn:hover{background:rgba(255,77,77,.08); border-color
   transition:border-color .18s ease, color .18s ease, background .18s ease;
 }
 .bf-back svg{width:15px; height:15px;}
-.bf-back:hover{border-color:var(--coral); color:var(--coral); background:rgba(255,77,77,.06);}
+.bf-back:hover{border-color:var(--coral); color:var(--coral); background:rgba(232,96,76,.06);}
 .bf-back:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
 /* The copyright takes the slack so the links sit at the far right. */
 .bf-copy{flex:1 1 auto; min-width:0;}
@@ -1069,4 +1265,127 @@ header.is-solid .nav-icon-btn:hover{background:rgba(255,77,77,.08); border-color
 @media (max-width:700px){
   .bf-row{padding:14px 20px; gap:12px;}
   .bf-copy{flex:1 1 100%; order:3;}
+  /* THREE LINKS DO NOT FIT ON ONE PHONE LINE, and `flex:none` meant they were
+     never given the chance to try: the row is 381px wide against 335px of
+     usable width at 375px, and `body{overflow-x:hidden}` clipped the last 26 —
+     so "Cancellation & Refund" was cut in half with no way to scroll to it.
+     A refund policy that cannot be reached on a phone is the one place this
+     matters most. Allowed to take the full row and wrap within it. */
+  .bf-links{flex:1 1 100%; flex-wrap:wrap; gap:10px 16px;}
+}
+
+/* ===========================================================================
+   THE ICON NAV — ten products on one bar, on every page that mounts the shell
+   ===========================================================================
+   The header carries an icon over each label now (hero-shell.js LINKS, and
+   index.html's hand-written copy of it). These rules used to live in
+   home-ref.css, which only the landing page loads — so Flights, Hotels and the
+   rest got the ten-item nav with the old one-line spacing and wrapped it onto
+   two rows. The markup is shared, so the layout has to be too.
+
+   The logo never gives way: .navlinks takes the slack and scrolls sideways
+   when there is not enough of it.
+   =========================================================================== */
+/* `safe center`, not `center`. A centred flex row that does not fit overflows
+   at BOTH ends, and overflow-x:auto only ever gives back the right-hand half —
+   the left half sits behind the logo where nothing can scroll to it. That is
+   why Flights, the FIRST item, was missing on a full-screen window while More,
+   the last, was merely cut. `safe` drops the centring the moment the row runs
+   short, so it starts flush left and scrolls, and the first product is never
+   the one that disappears. */
+header .navlinks { display:flex; align-items:stretch; gap:0; flex:1; justify-content:safe center; min-width:0; overflow-x:auto; scrollbar-width:none; }
+header .navlinks::-webkit-scrollbar { display:none; }
+header .navlinks a {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; padding:8px 9px 6px; border-radius:8px; font-size:11.5px; font-weight:600;
+  line-height:1.2; text-align:center; white-space:nowrap; position:relative; flex:none;
+}
+header .navlinks a .jpi { width:18px; height:18px; }
+header .navlinks a[aria-current="page"]::after {
+  content:''; position:absolute; left:9px; right:9px; bottom:0; height:2px;
+  background:var(--coral); border-radius:2px;
+}
+header .logo { flex:none; }
+/* A REAL GUTTER BETWEEN THE MARK AND THE FIRST PRODUCT.
+   The two boxes never actually intersected, but once the nav grew to ten items
+   it filled the row and closed to about 10px of the logo — close enough to
+   read as overlapping. The gutter is non-negotiable space: the nav gives up
+   width for it, which it can, because its labels already drop below 1460. */
+header .navlinks { margin-left: 26px; }
+/* THE SHARED HEADER TAPERS THE WAY THE LANDING PAGE ALREADY DOES.
+   home-ref.css's section 9 pulls nav.wrap's gap to 10px and its gutter to
+   clamp(10px, 2vw, 24px) for exactly this reason — and because that taper
+   lived on one page only, the landing page came up 11px short in the tablet
+   band while a hero-shell page came up 104px short. Same numbers, applied to
+   every header that mounts the shell.
+
+   Measured at 902px, where the shortfall was worst relative to the room
+   available: the gap gives back 20px and the gutter 9px, against the 10px the
+   strip was missing. The gutter is a floor, not a fixed value, so a 1099px
+   window still gets its full 24px and only a genuinely narrow one tightens. */
+@media (max-width: 1100px) {
+  #siteHeader nav.wrap { gap: 10px; padding-inline: clamp(10px, 2vw, 24px); }
+  /* 16, so the logo gutter never drops below the 26px the block below calls
+     non-negotiable: nav.wrap's gap is 10 here, and 16 + 10 is that same 26.
+     Measured 26px on the landing page and 29 to 36 on a hero-shell page,
+     which has slack to spread. The savings come from the gap on the OTHER
+     side of the nav and from the gutter — never from the brand mark. */
+  header .navlinks { margin-left: 16px; }
+}
+header .nav-actions { flex:none; flex-wrap:nowrap; white-space:nowrap; gap:9px; }
+header .hr-wish { display:inline-flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer; font:inherit; font-size:13px; font-weight:600; color:inherit; }
+header .hr-wish svg { width:18px; height:18px; color:var(--danger); }
+@media (max-width: 1500px) { header .hr-wish span { display:none; } }
+
+/* WHEN TEN PRODUCTS AND A SIGNED-IN PROFILE WILL NOT SHARE ONE ROW.
+
+   Two earlier attempts are worth naming so they are not tried again. Scrolling
+   .navlinks clips wherever the edge falls, so the last item read as "M"
+   instead of "More" — a row that looks broken rather than scrollable. Wrapping
+   it onto a second line does not work either: nav.wrap is laid out elsewhere
+   in this file with nowrap, and forcing it here only reordered the items
+   without ever breaking the line.
+
+   So the labels go and the icons stay. Ten icons at ~34px fit beside the logo
+   and the utility cluster with room to spare at 1280, nothing overlaps,
+   nothing is cut mid-word, and every item keeps an accessible name through
+   `title` (set from the label in hero-shell.js and index.html). Above 1460 the
+   labels come back. */
+@media (max-width: 1460px) {
+  header .navlinks a { padding: 8px 10px; gap: 0; }
+  /* :not(.jpi) is load-bearing. JPIcon.mount replaces the <i> with a
+     <span class="jpi">, so the icon is a direct-child span too — hiding every
+     one of them hid the icons and left ten empty boxes. */
+  header .navlinks a > span:not(.jpi) { display: none; }
+  /* EXCEPT WHEN THE LABEL IS ALL THERE IS — a guard, not a live rule.
+     "More" used to be the one entry with no glyph, and hiding its label left
+     an 18px empty box: a nav item that was invisible and had nothing to click
+     anywhere from 1460 down to the drawer. Giving it an icon (jp-icons
+     `more`) is the real fix, because keeping the WORD cost 32px and put the
+     strip back into overflow at 861. This stays so the next icon-less entry
+     someone adds degrades to a visible word rather than to nothing. */
+  header .navlinks a > span:not(.jpi):only-child { display: inline; }
+  header .navlinks a .jpi { width: 21px; height: 21px; }
+  header .navlinks a[aria-current="page"]::after { left: 6px; right: 6px; }
+}
+/* AFTER the 1460 block, not inside the 1100 one further up — deliberately.
+   `header .navlinks a` there and `header .navlinks a` here are the same
+   specificity, so source order decides, and the 1460 block is further down
+   the file: setting this padding earlier had no effect at all.
+
+   8 rather than 10. Ten cells x 4px is 40px, which is what pays for giving
+   "More" a real glyph — the icon costs 23px more than the empty box it
+   replaced, and at 861px the bar had nothing like that to spare. The cell is
+   still 37px across a 21px icon, and only a genuinely tight bar tightens:
+   above 1100 the cells keep their full padding. */
+@media (max-width: 1100px) {
+  header .navlinks a { padding: 8px 8px; }
+}
+/* A phone gets the drawer, so the inline strip goes away entirely. Paired
+   with the hamburger's own 860 near the top of this file — the two have to
+   agree or the header carries both navigations at once. home-ref.css repeats
+   this rule; its `body.home-ref .navlinks` outranks the selector here and was
+   silently keeping the strip alive on the landing page at every width. */
+@media (max-width: 860px) {
+  header .navlinks { display: none; }
 }

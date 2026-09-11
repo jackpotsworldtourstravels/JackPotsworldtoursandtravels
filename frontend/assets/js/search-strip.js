@@ -128,7 +128,21 @@ const SearchStrip = (function () {
     + '<path d="M7 16H3l4-4"/><path d="M3 16h14a4 4 0 0 0 0-8"/>'
     + '</svg></button>';
 
-  const SEARCH_BTN = '<button type="button" class="ss-go" id="ssGo">Search</button>';
+  /* TWO BUTTONS, TWO DIFFERENT JOBS, AND THE SECOND IS NOT A DUPLICATE.
+
+     Search runs whatever the row is currently showing. Modify opens the
+     LANDING PAGE'S CARD directly underneath the row — the only editor on the
+     site that can reach the criteria this row has no cells for: a five-leg
+     multi-city itinerary, the special-fare categories, and Hotels' Group
+     Deals. flightsHtml below deliberately withholds the Multi City option
+     unless the search that arrived already was one, because the row cannot
+     edit an itinerary; this button is where that editor now lives, so the
+     option no longer has to be hidden to avoid promising something. */
+  const ACTIONS = '<div class="ss-actions">'
+    + '<button type="button" class="ss-modify" id="ssModify"'
+    + ' aria-expanded="false" aria-controls="ssFull">Modify</button>'
+    + '<button type="button" class="ss-go" id="ssGo">Search</button>'
+    + '</div>';
 
   /* ---------------------------------------------------------------------
      The three layouts
@@ -151,7 +165,7 @@ const SearchStrip = (function () {
       + popCell('ssPax', 'Travellers')
       + selectCell('ssCabin', 'Cabin class',
           opts(CABINS, CABIN_LABEL[v.cabin] || 'Economy'))
-      + SEARCH_BTN;
+      + ACTIONS;
   }
 
   function hotelsHtml() {
@@ -159,7 +173,7 @@ const SearchStrip = (function () {
       + dateCell('ssIn', 'Check-in')
       + dateCell('ssOut', 'Check-out')
       + popCell('ssRooms', 'Rooms & guests')
-      + SEARCH_BTN;
+      + ACTIONS;
   }
 
   function packagesHtml(v) {
@@ -169,7 +183,7 @@ const SearchStrip = (function () {
             MONTHS.map(m => ({ v: m, label: m }))), v.month || 'any'))
       + popCell('ssPkgPax', 'Travellers')
       + selectCell('ssPkgBudget', 'Budget', opts(BUDGETS, v.budget || 'any'))
-      + SEARCH_BTN;
+      + ACTIONS;
   }
 
   const LAYOUTS = { flights: flightsHtml, hotels: hotelsHtml, packages: packagesHtml };
@@ -279,19 +293,224 @@ const SearchStrip = (function () {
     };
   }
 
-  /** Round trip shows the return date; one way greys it. Called on mount and
-   *  on every trip-type change, so the first paint and the tenth cannot
-   *  disagree about it. */
+  /** Round trip shows the return date; one way TAKES IT OFF THE ROW. Called
+   *  on mount and on every trip-type change, so the first paint and the tenth
+   *  cannot disagree about it.
+   *
+   *  IT USED TO BE GREYED AND THAT WAS THE BUG. `.ss-cell.is-off` dimmed the
+   *  text and killed pointer events on the invisible native input, but the
+   *  readonly display sitting on top of it kept its own click handler — so a
+   *  one-way search still opened a calendar, still accepted a date, and still
+   *  showed it. criteria() dropped the value on the way out, which made it
+   *  worse rather than better: the row said a return was booked and the search
+   *  that ran was one-way.
+   *
+   *  Hidden, not disabled, because the cell is not a criterion of a one-way
+   *  trip at all. `hidden` needs the author rule in search-strip.css —
+   *  `.ss-cell` sets `display:flex`, which outranks the UA sheet's
+   *  `[hidden] { display:none }` and left the cell fully visible. The native
+   *  input is disabled as well so a hidden cell cannot be tabbed into. */
   function paintTrip() {
     if (product !== 'flights' || !root) return;
     const trip = ($('ssTrip') || {}).value || 'oneway';
-    const retCell = root.querySelector('.ss-cell.ss-date:nth-of-type(1)');
     const ret = $('ssRet');
     if (!ret) return;
     const off = trip !== 'round';
-    ret.closest('.ss-cell').classList.toggle('is-off', off);
+    const cell = ret.closest('.ss-cell');
+    if (cell) cell.hidden = off;
     ret.readOnly = true;
+    ret.tabIndex = off ? -1 : 0;
+    const nat = $('ssRetNative');
+    if (nat) nat.disabled = off;
     if (off) setDate('ssRet', '');
+  }
+
+  /* ---------------------------------------------------------------------
+     Modify — the landing page's card, opened underneath the row
+
+     WHY THIS IS NOT A SECOND SEARCH FORM. The row and the card are already
+     two editors for one search (see the file header); what the row cannot do
+     is reach the criteria it has no cells for — a five-leg itinerary, the
+     special-fare categories, Hotels' Group Deals. Rather than grow the row
+     into the card, Modify OPENS the card, and whatever comes back out of it
+     is reshaped into exactly what criteria() returns, so the host page's
+     onSearch cannot tell which of the two produced the search it is handed.
+
+     ONE CARD PER PAGE. BookingCard is a module singleton, so mounting it here
+     is safe only because the results pages mount it nowhere else — hero-shell
+     builds the strip into the hero dock, not the card. index.html never loads
+     this file.
+     --------------------------------------------------------------------- */
+  let fullHost = null;    /* the <div class="ss-full"> under the row */
+  let fullBuilt = false;  /* has BookingCard been mounted into it yet?   */
+  let escBound = false;   /* render() may run again; the listener must not */
+
+  /** BookingCard speaks hyphenated cabin labels ('premium-economy'); this
+   *  strip and the results pages speak CABIN_KEY ('premium'). */
+  function cabinKeyOf(c) {
+    const want = String(c || '').replace(/-/g, ' ').trim().toLowerCase();
+    if (want === 'premium' || want === 'premium economy') return 'premium';
+    if (want === 'business') return 'business';
+    if (want === 'first') return 'first';
+    return 'economy';
+  }
+
+  /** What the card handed back, in the shape criteria() returns. */
+  function fromCard(kind, p) {
+    if (kind === 'flights') {
+      return {
+        trip: p.trip || 'oneway',
+        from: p.from || '',
+        to: p.to || '',
+        depart: p.depart || '',
+        /* Same rule criteria() applies: only a round trip carries one, so a
+           stale return from a previous selection cannot ride along. */
+        ret: p.trip === 'round' ? (p.ret || '') : '',
+        adults: p.adults, children: p.children, infants: p.infants,
+        cabin: cabinKeyOf(p.cabin),
+        /* Already a string — BookingCard encodes the itinerary itself so it
+           can survive a URL. Passed through for a page that reads it. */
+        legs: p.legs || '',
+        fare: p.fare || 'regular',
+      };
+    }
+    if (kind === 'hotels') {
+      return {
+        dest: p.dest || '',
+        checkIn: p.checkIn || '',
+        checkOut: p.checkOut || '',
+        rooms: p.rooms || 1,
+        adults: p.adults, children: p.children,
+        guests: p.guests,
+        roomsDetail: p.roomsDetail || [],
+      };
+    }
+    /* Packages: the card asks for a type and a month and nothing else, so the
+       budget and the party stay whatever the ROW is showing rather than being
+       silently reset to a default nobody chose. */
+    const now = criteria();
+    return {
+      dest: p.type || now.dest,
+      month: p.month || 'any',
+      travellers: now.travellers,
+      budget: now.budget,
+    };
+  }
+
+  /** Put a criteria object back into the ROW's own cells.
+   *
+   *  WITHOUT THIS THE ROW LIES. A search run from the Modify panel re-renders
+   *  the results and rewrites the URL, but the row above them is a separate
+   *  set of controls and kept whatever it was showing — change the destination
+   *  in the card, press Search, and the list said "Hyderabad to Bengaluru"
+   *  over a row whose To box was empty. The row is the page's description of
+   *  the search; it has to be the one that ran.
+   *
+   *  Shapes are criteria()'s, so this is the inverse of fromCard() above. */
+  function seedRow(v) {
+    if (product === 'flights') {
+      const trip = $('ssTrip');
+      if (trip) {
+        /* flightsHtml only offers Multi City when the search that arrived was
+           one. The card can now MAKE it one, so the option has to appear. */
+        if (v.trip === 'multi'
+            && !Array.prototype.some.call(trip.options, o => o.value === 'multi')) {
+          trip.insertAdjacentHTML('beforeend', '<option value="multi">Multi City</option>');
+        }
+        trip.value = v.trip || 'oneway';
+      }
+      setAirport('ssFrom', v.from);
+      setAirport('ssTo', v.to);
+      setDate('ssDep', v.depart || '');
+      setDate('ssRet', v.ret || '');
+      if (pax && pax.set) {
+        pax.set({ adults: v.adults, children: v.children, infants: v.infants }, true);
+      }
+      const cabin = $('ssCabin');
+      if (cabin) cabin.value = CABIN_LABEL[v.cabin] || 'Economy';
+      /* LAST, because it is what hides the Return cell — and it reads the trip
+         type this function has just written. */
+      paintTrip();
+      return;
+    }
+    if (product === 'hotels') {
+      const dest = $('ssDest');
+      if (dest) dest.value = v.dest || '';
+      setDate('ssIn', v.checkIn || '');
+      setDate('ssOut', v.checkOut || '');
+      if (rooms && rooms.set && v.roomsDetail && v.roomsDetail.length) {
+        rooms.set(v.roomsDetail, true);
+      }
+      return;
+    }
+    const pdest = $('ssPkgDest');
+    if (pdest) pdest.value = v.dest || '';
+    const month = $('ssPkgMonth');
+    if (month) month.value = v.month || 'any';
+    const budget = $('ssPkgBudget');
+    if (budget) budget.value = v.budget || 'any';
+  }
+
+  function closeModify() {
+    if (!fullHost) return;
+    fullHost.hidden = true;
+    const btn = $('ssModify');
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.classList.remove('is-on');
+    }
+  }
+
+  function openFull() {
+    if (!fullHost || typeof BookingCard === 'undefined') return;
+    if (!fullBuilt) {
+      /* SEEDED FROM THE ROW, not from the card's own defaults — the card is
+         opening on top of a page of results, and it has to describe the
+         search that produced them. */
+      const now = criteria();
+      const seed = product === 'flights' ? { flights: now }
+        : product === 'hotels' ? { hotels: now }
+        : { packages: { type: now.dest, month: now.month } };
+      BookingCard.render(fullHost, Object.assign({ tab: product }, seed));
+      BookingCard.setSearchHandler((kind, params) => {
+        /* A GROUP DEALS SUBMISSION IS AN ENQUIRY, NOT A SEARCH. Same check
+           the landing page makes, through the same module, so the enquirer's
+           name, email and phone cannot fall through into a search. */
+        if (typeof GroupEnquiry !== 'undefined' && GroupEnquiry.isGroup(kind, params)) {
+          GroupEnquiry.handle(params);
+          return;
+        }
+        closeModify();
+        const next = fromCard(kind, params);
+        seedRow(next);
+        if (onSearch) onSearch(next);
+      });
+      fullBuilt = true;
+    }
+    fullHost.hidden = false;
+    const btn = $('ssModify');
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.classList.add('is-on');
+    }
+  }
+
+  function bindModify(el) {
+    fullHost = el.querySelector('.ss-full');
+    fullBuilt = false;
+    const btn = $('ssModify');
+    if (!btn || !fullHost) return;
+    /* No card on the page means no editor to open, so the button is not
+       offered at all — better than one that does nothing when pressed. */
+    if (typeof BookingCard === 'undefined') { btn.remove(); return; }
+    btn.addEventListener('click', () => {
+      if (fullHost.hidden) openFull(); else closeModify();
+    });
+    if (escBound) return;
+    escBound = true;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && fullHost && !fullHost.hidden) closeModify();
+    });
   }
 
   /**
@@ -312,7 +531,16 @@ const SearchStrip = (function () {
     const v = o.value || {};
 
     el.innerHTML = '<div class="ss-strip ss-' + product + '" role="search"'
-      + ' aria-label="Edit your search">' + LAYOUTS[product](v) + '</div>';
+      + ' aria-label="Edit your search">' + LAYOUTS[product](v) + '</div>'
+      /* Empty until Modify is pressed. BookingCard is a heavy control — four
+         panels, three pickers and a video switcher — and building it on every
+         results page for a button most visitors never press is a cost for
+         nothing. See openFull(). */
+      /* `hr-card-scope` is what dresses the card once it is mounted — the
+         reference styling for the tabs, the fare tiles and the quick tools
+         lives in home-ref.css and used to be scoped to the landing page's
+         body alone. See the note at the top of that file. */
+      + '<div class="ss-full hr-card-scope" id="ssFull" hidden></div>';
     root = el.querySelector('.ss-strip');
 
     if (product === 'flights') {
@@ -424,6 +652,7 @@ const SearchStrip = (function () {
 
     const go = $('ssGo');
     if (go) go.addEventListener('click', submit);
+    bindModify(el, v);
     /* Enter anywhere in the strip runs the search, which is what a row of
        inputs with one button leads everybody to expect. */
     root.addEventListener('keydown', e => {
@@ -436,7 +665,7 @@ const SearchStrip = (function () {
     return root;
   }
 
-  return { render, criteria, prettyDay };
+  return { render, criteria, prettyDay, closeModify };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SearchStrip;

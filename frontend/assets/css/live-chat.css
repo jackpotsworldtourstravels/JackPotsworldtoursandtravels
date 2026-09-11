@@ -20,9 +20,9 @@
 
 .lc-root {
   --lc-navy:      #0A2540;
-  --lc-accent:    #FF4D4D;
-  --lc-accent-dk: #E63946;
-  --lc-gold:      #FFB020;
+  --lc-accent:    var(--coral, #E9B949);
+  --lc-accent-dk: var(--coral-dark, #D9A32C);
+  --lc-gold:      var(--gold, #E9B949);
   --lc-surface:   #FFFFFF;
   --lc-surface-2: #F1F5F9;
   --lc-ink:       #0A2540;
@@ -80,7 +80,7 @@
   display: grid; place-items: center;
   background: var(--lc-accent); color: #fff;
   border: none; cursor: pointer;
-  box-shadow: 0 14px 30px -10px rgba(255,77,77,.6);
+  box-shadow: 0 14px 30px -10px rgba(233,185,73,.6);
   transition: transform .2s ease, background .2s ease;
 }
 .lc-launcher:hover { background: var(--lc-accent-dk); transform: translateY(-2px); }
