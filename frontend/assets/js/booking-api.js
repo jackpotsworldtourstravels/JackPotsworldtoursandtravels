@@ -81,7 +81,7 @@ const BookingApi = (function () {
     }
   }
 
-  async function request(method, path, { params, body } = {}) {
+  async function request(method, path, { params, body, retried } = {}) {
     let url = `${base()}${path}`;
     if (params) {
       const qs = new URLSearchParams(
@@ -102,6 +102,24 @@ const BookingApi = (function () {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+
+    /* A 401 ON A REQUEST WE SENT A TOKEN WITH MEANS THE TOKEN AGED OUT.
+       Exchange the refresh token and send the request again, once.
+
+       `retried` stops a loop: if the renewed token is refused too, the second
+       401 is reported rather than starting another exchange. The refresh call
+       itself is excluded for the same reason -- a 401 from it is the answer,
+       not something to retry.
+
+       Only attempted when a token was actually sent. A 401 without one is the
+       server saying this endpoint needs a session, which no refresh can fix. */
+    if (res.status === 401 && !retried
+        && path.indexOf('/auth/refresh') === -1
+        && Object.keys(authHeaders()).length
+        && typeof refreshCustomerSession === 'function') {
+      const renewed = await refreshCustomerSession();
+      if (renewed) return request(method, path, { params, body, retried: true });
+    }
 
     if (!res.ok) throw new ApiError(res.status, data);
     return data;

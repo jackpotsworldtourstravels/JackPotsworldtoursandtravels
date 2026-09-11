@@ -128,6 +128,77 @@ function clearCustomerAuth() {
   [CUSTOMER_KEYS.access, CUSTOMER_KEYS.refresh, CUSTOMER_KEYS.name,
    CUSTOMER_KEYS.role, CUSTOMER_KEYS.userId].forEach(k => localStorage.removeItem(k));
 }
+
+/* ---------------------------------------------------------------------------
+   SPENDING THE REFRESH TOKEN.
+
+   The traveller has held one since they logged in; setCustomerAuth stores it
+   and, until now, nothing ever used it. An access token would age out and the
+   session simply died, in the middle of whatever was being done.
+
+   ONE EXCHANGE AT A TIME, AND WHY THAT MATTERS.
+   The server rotates: a successful refresh invalidates the token it was given.
+   A booking screen fires several requests together, so when a session expires
+   they all 401 at once -- and without this guard each would present the same
+   refresh token, the first would win and the rest would be refused with a token
+   that no longer exists. Everyone waits on one exchange instead.
+
+   Returns true when the session was renewed. On a definitive refusal the stored
+   session is CLEARED: a refresh token the server rejects is not coming back,
+   and leaving it in place is what kept the header showing a signed-in traveller
+   who could not make a single authenticated request.
+
+   A network failure is treated differently -- the session is left alone, because
+   an unreachable server says nothing about whether the token is still good.
+   --------------------------------------------------------------------------- */
+let customerRefreshInFlight = null;
+
+function refreshCustomerSession() {
+  if (customerRefreshInFlight) return customerRefreshInFlight;
+
+  const current = getCustomerAuth();
+  if (!current || !current.refresh) return Promise.resolve(false);
+
+  customerRefreshInFlight = (async () => {
+    let res;
+    try {
+      res = await fetch(`${authApiBase()}/api/customer/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        /* The refresh token IS the credential here; the dead access token is
+           deliberately not sent. */
+        body: JSON.stringify({ refresh_token: current.refresh }),
+      });
+    } catch {
+      return false;               // unreachable: keep the session, surface the error
+    }
+
+    if (!res.ok) {
+      clearCustomerAuth();        // refused: the session is genuinely over
+      return false;
+    }
+
+    let data = null;
+    try { data = await res.json(); } catch { data = null; }
+    if (!data || !data.access_token) {
+      clearCustomerAuth();
+      return false;
+    }
+
+    setCustomerAuth(
+      data.access_token,
+      /* Keep the old one only if the server did not rotate. */
+      data.refresh_token || current.refresh,
+      current.name, current.role, current.userId
+    );
+    return true;
+  })();
+
+  /* Cleared however it settles, so a later expiry can exchange again. */
+  customerRefreshInFlight.finally(() => { customerRefreshInFlight = null; });
+  return customerRefreshInFlight;
+}
+
 function customerAuthHeaders() {
   return { Authorization: `Bearer ${localStorage.getItem(CUSTOMER_KEYS.access)}` };
 }
