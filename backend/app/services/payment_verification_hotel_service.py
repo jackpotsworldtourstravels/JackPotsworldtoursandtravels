@@ -36,7 +36,7 @@ from app.models_customer import (
     CustomerBookingStatus,
     CustomerPaymentStatus,
 )
-from app.services import account_service
+from app.services import customer_account_service as account_service
 from app.services import payments as payment_providers
 
 # The model-agnostic half. Imported, not copied -- importing changes nothing in
