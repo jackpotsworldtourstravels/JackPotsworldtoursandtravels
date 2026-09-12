@@ -2148,7 +2148,7 @@ const BookingProducts = (function () {
                swallowed by the catch below it — a wasted round trip, and an
                ignored error sitting exactly where a real one would appear. */
             method: null,
-            methodLabel: 'UPI / Razorpay',
+            methodLabel: 'UPI',
             amount: ctx.pricing.total,
             simulated: false,
           };

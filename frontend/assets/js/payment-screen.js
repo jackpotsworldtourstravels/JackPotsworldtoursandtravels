@@ -36,6 +36,15 @@
    same rule Razorpay implements. The actual list of apps is drawn by Razorpay,
    inside Razorpay, from what the device actually has.
 
+   THE CUSTOMER COPY BELOW NAMES NO PROVIDER, ON PURPOSE.
+
+   Every sentence a payer reads says "the secure checkout", never a vendor.
+   Who clears the money is our arrangement, not theirs, and it has already
+   changed once beneath this file without a word of this copy needing to move.
+   The comments here still name Razorpay, because a developer needs to know
+   whose API this is; the strings must not. If you are about to put the name
+   back into a customer-visible string, that is the line you are crossing.
+
    UPI COLLECT IS NOT IMPLEMENTED AND CANNOT BE.
    NPCI withdrew it for merchant payments on 28 February 2026. There is no
    "enter your UPI ID" field anywhere in this file, and adding one would be
@@ -46,6 +55,26 @@ const JPay = (function () {
   'use strict';
 
   const CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
+
+  /* OUR BRAND, INSIDE THE PROVIDER'S MODAL.
+
+     The checkout draws itself over this page, so without these two values the
+     last thing a customer sees before authorising a payment is an unbranded
+     window — at the one moment a payment screen can least afford to look like
+     it belongs to somebody else.
+
+     THE LOGO is the same file every page's header already serves, so the mark
+     in the modal is the mark they have been looking at all session.
+
+     THE COLOUR is --jpay-cta from payment.css, not the brighter --sp-accent.
+     The provider paints this value behind white type in its own header, and
+     that is the same problem payment.css already solved and measured: white on
+     #FF4D4D is 3.27:1 and fails AA, white on #D62839 is 4.97:1 and passes. So
+     the modal opens in the exact red of the button that opened it, at the
+     weight that stays readable. Neither value is a new brand — both are
+     already on the screen behind the modal. */
+  const BRAND_LOGO_PATH = 'assets/images/jackpots-logo-full.png';
+  const BRAND_COLOR = '#D62839';
 
   /* The seven states the screen can be in. Named rather than boolean-flagged so
      an impossible combination (processing AND failed) cannot be represented. */
@@ -101,6 +130,21 @@ const JPay = (function () {
       }
     } catch { /* fall through */ }
     return /android|iphone|ipad|ipod|windows phone/i.test(navigator.userAgent || '');
+  }
+
+  /** The logo as the provider needs it: absolute, or not at all.
+   *
+   *  The modal is drawn from the provider's origin, so a page-relative path
+   *  would not resolve there. Resolved against this document rather than
+   *  assembled from a guessed origin, and returning null rather than a guess
+   *  if that fails — a broken image in a payment modal reads worse than no
+   *  image, and branding is never worth failing a checkout over. */
+  function brandLogoUrl() {
+    try {
+      return new URL(BRAND_LOGO_PATH, document.baseURI).href;
+    } catch {
+      return null;
+    }
   }
 
   /** Load Razorpay's checkout script once, on demand.
@@ -179,9 +223,9 @@ const JPay = (function () {
         <div>
           <b>${mobile ? 'You will choose your UPI app' : 'You will scan a QR code'}</b>
           <p>${mobile
-            ? 'Razorpay opens your installed UPI apps so you can approve the payment there. '
+            ? 'The secure checkout opens your installed UPI apps so you can approve the payment there. '
               + 'We never see your UPI PIN.'
-            : 'Razorpay shows a QR code to scan with any UPI app on your phone. '
+            : 'The secure checkout shows a QR code to scan with any UPI app on your phone. '
               + 'Approve it in the app — we never see your UPI PIN.'}</p>
         </div>
       </div>`;
@@ -200,7 +244,7 @@ const JPay = (function () {
             <input type="radio" name="jpayMethod" value="upi" checked>
             <span class="jpay-method-body">
               <b>UPI</b>
-              <span>Pay from any UPI app — Razorpay shows the ones available on your device.</span>
+              <span>Pay from any UPI app — the secure checkout shows the ones available on your device.</span>
             </span>
             <span class="jpay-method-tag">Recommended</span>
           </label>
@@ -209,7 +253,7 @@ const JPay = (function () {
             <span class="jpay-method-body">
               <b>Other payment methods</b>
               <span>Cards, net banking and wallets, if enabled on this account.
-                    Razorpay shows exactly what is available.</span>
+                    The secure checkout shows exactly what is available.</span>
             </span>
           </label>
         </div>
@@ -219,7 +263,7 @@ const JPay = (function () {
             Pay ${esc(rupees(s.amountMinor))}
           </button>
         </div>
-        <div class="jpay-secure">${iconLock()} Payments are processed securely by Razorpay</div>
+        <div class="jpay-secure">${iconLock()} Payments are processed securely</div>
       </div>`;
   }
 
@@ -395,7 +439,16 @@ const JPay = (function () {
       }
 
       const c = s.checkout || {};
-      const options = Object.assign({}, c.options || {}, {
+
+      /* BRANDING ONLY, AND DELIBERATELY FIRST — these are DEFAULTS, so a
+         session that ever carries its own image or theme still wins. Nothing
+         here is authority: these values change what the modal looks like,
+         never what it charges. */
+      const branded = { theme: { color: BRAND_COLOR } };
+      const logo = brandLogoUrl();
+      if (logo) branded.image = logo;
+
+      const options = Object.assign(branded, c.options || {}, {
         /* PUBLISHABLE KEY ONLY. The key secret and the webhook secret live on
            the server and are never sent to a browser — there is no field in
            the checkout response that could carry one. */
