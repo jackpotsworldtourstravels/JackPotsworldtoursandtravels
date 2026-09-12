@@ -178,9 +178,45 @@ SUITE = [
 ]
 
 
+#: Scripts that build B2C bookings and open provider checkouts. They guard
+#: themselves at import, so this list is not what makes them safe -- it is what
+#: lets the runner say so ONCE, up front, instead of printing the same refusal
+#: per script and burying it among real results.
+PAYMENT_FIXTURE_SCRIPTS = frozenset({"verify_payments.py"})
+
+
+def _payment_env_problems():
+    """Why the payment fixtures must not run here, or an empty list."""
+    sys.path.insert(0, HERE)
+    try:
+        from payment_safety import problems
+        from config import BASE
+        sys.path.insert(0, os.path.join(os.path.dirname(HERE), "backend"))
+        import app.config as C
+        return problems(BASE, getattr(C.settings, "payment_provider", None))
+    except Exception as exc:                                   # noqa: BLE001
+        # Could not establish that this environment is safe, so it is not
+        # treated as safe. Refusing on an unreadable configuration is the only
+        # answer that cannot open an order by accident.
+        return [f"could not read the payment configuration ({exc})"]
+
+
 def main() -> int:
     results = []
+    skip_payments = _payment_env_problems()
+    if skip_payments:
+        print("\n!! SKIPPING the B2C payment fixtures - this environment can take real money:")
+        for line in skip_payments:
+            print(f"     - {line}")
+        print("   Run them against a local server with PAYMENT_PROVIDER=mock.\n")
+
     for script, description in SUITE:
+        if script in PAYMENT_FIXTURE_SCRIPTS and skip_payments:
+            # SKIPPED, NOT FAILED. The suite is being run correctly; it is the
+            # environment that is wrong for these two, and marking it a failure
+            # would train people to ignore a red run.
+            results.append((script, None))
+            continue
         path = os.path.join(HERE, script)
         if not os.path.exists(path):
             print(f"\n!! {script} is listed in SUITE but does not exist — skipping")

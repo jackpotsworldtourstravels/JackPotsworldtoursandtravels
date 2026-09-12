@@ -53,6 +53,17 @@ import app.config as C                                                 # noqa: E
 
 from config import BASE                                                # noqa: E402
 
+# ---------------------------------------------------------------------------
+# THE GUARD. Runs at import, before any request, query, booking or checkout.
+# Placed here rather than inside a function because a module-level statement
+# cannot be forgotten by a caller, and everything below this line is capable of
+# creating something. There is no way to switch it off -- see payment_safety.py.
+# ---------------------------------------------------------------------------
+from payment_safety import guard_or_exit                               # noqa: E402
+
+guard_or_exit()
+
+
 #: The seeded demo customer. Looked up by address rather than by a magic id so
 #: a reseeded database that renumbers the row still finds the right account.
 DEMO_CUSTOMER_EMAIL = "demo.customer@example.com"

@@ -75,6 +75,17 @@ from app.services.payments.base import ProviderPayment                 # noqa: E
 import app.config as C                                                 # noqa: E402
 
 from config import BASE, Checker                                             # noqa: E402
+
+# ---------------------------------------------------------------------------
+# THE GUARD. Runs at import, before any request, query, booking or checkout.
+# Placed here rather than inside a function because a module-level statement
+# cannot be forgotten by a caller, and everything below this line is capable of
+# creating something. There is no way to switch it off -- see payment_safety.py.
+# ---------------------------------------------------------------------------
+from payment_safety import guard_or_exit                               # noqa: E402
+
+guard_or_exit()
+
 from payfix import PaymentFixture, call                                # noqa: E402
 
 try:
