@@ -38,7 +38,22 @@ const MyBookings = (function () {
      endpoint. Asking it, rather than keeping a second table here, is what stops
      the button and the thing behind the button disagreeing. */
   function payable(b) {
-    return BookingPay.supports(b.kind) && b.status === 'Pending';
+    if (!BookingPay.supports(b.kind)) return false;
+    if (b.status !== 'Pending') return false;
+    // Money taken and returned: the booking is finished, whatever its status.
+    if (BookingPay.isRefunded(b.payments)) return false;
+    // Held, not paid for, and the hold has run out.
+    if (BookingPay.windowClosed(b.bookedAt)) return false;
+    return true;
+  }
+
+  /** Why a pending booking cannot be paid, for the traveller. Null when it can. */
+  function unpayableReason(b) {
+    if (!BookingPay.supports(b.kind)) return null;
+    if (b.status !== 'Pending') return null;
+    if (BookingPay.isRefunded(b.payments)) return 'Refunded';
+    if (BookingPay.windowClosed(b.bookedAt)) return 'Payment window closed';
+    return null;
   }
 
   /* Pay a booking that already exists.
@@ -95,8 +110,10 @@ const MyBookings = (function () {
         <span class="mb-status is-${cancelled ? 'cancelled' : 'confirmed'}">${esc(b.status)}</span>
         <b class="mb-total">${esc(money(b.total))}</b>
         <div class="mb-actions">
-          ${payable(b) ?
-            `<button type="button" class="tx-btn tx-btn-primary" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>` : ''}
+          ${payable(b)
+            ? `<button type="button" class="tx-btn tx-btn-primary" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>`
+            : (unpayableReason(b)
+                ? `<span class="mb-unpayable">${esc(unpayableReason(b))}</span>` : '')}
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="view" data-id="${esc(b.id)}">View</button>
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="ticket" data-id="${esc(b.id)}">Ticket</button>
           ${cancelled ? '' :

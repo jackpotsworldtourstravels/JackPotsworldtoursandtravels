@@ -39,6 +39,7 @@ from app.models_customer import (
 from app.services import customer_pricing_service as pricing
 from app.services import customer_traveller_service as travellers
 from app.services import payments as payment_providers
+from app.services import customer_payment_window as payment_window
 
 REF_SEQ = "seq_customer_booking_ref"
 
@@ -378,6 +379,22 @@ def payable_amount(booking: CustomerBooking) -> Decimal:
     return Decimal(str(booking.total_amount or 0))
 
 
+def refunded_payment(db: Session, booking):
+    """A refunded payment against this booking, if there is one.
+
+    Used to refuse a SECOND checkout on a booking whose money has already been
+    taken and given back. Without this the traveller is offered a Pay button on
+    a booking that is, commercially, finished -- and paying it would collect
+    money against a reference nobody is going to honour.
+    """
+    return db.execute(
+        select(CustomerBookingPayment).where(
+            CustomerBookingPayment.customer_booking_id == booking.customer_booking_id,
+            CustomerBookingPayment.status == CustomerPaymentStatus.REFUNDED.value,
+        )
+    ).scalars().first()
+
+
 def captured_payment(
     db: Session, booking: CustomerBooking
 ) -> CustomerBookingPayment | None:
@@ -521,6 +538,12 @@ def start_checkout(
             f"{booking.booking_ref} has already been paid for. "
             "No further payment is needed."
         )
+
+    refunded = refunded_payment(db, booking)
+    if refunded is not None:
+        raise BookingError(payment_window.refunded_message(booking.booking_ref))
+    if payment_window.window_closed(booking.created_at):
+        raise BookingError(payment_window.expired_message(booking.booking_ref))
 
     key = (idempotency_key or "").strip()
     if len(key) < 8:

@@ -584,8 +584,24 @@ async function showAcctConfirmation(bookingRef) {
    value; BookingStore's Title-Cased copy is a different shape on a different
    screen, and assuming one here would silently offer nothing. */
 const ACCT_PAYABLE_TYPES = ['flight', 'hotel', 'package'];
-const acctPayable = b =>
-  ACCT_PAYABLE_TYPES.indexOf(b.product_type) !== -1 && b.status === 'pending';
+const acctPayable = b => {
+  if (ACCT_PAYABLE_TYPES.indexOf(b.product_type) === -1) return false;
+  if (b.status !== 'pending') return false;
+  if (typeof BookingPay === 'undefined') return true;
+  // Refunded money is not re-payable, and a hold that has run out is over.
+  if (BookingPay.isRefunded(b.payments)) return false;
+  if (BookingPay.windowClosed(b.created_at)) return false;
+  return true;
+};
+
+/** What to show instead of a Pay button, when there is a reason. */
+const acctUnpayableNote = b => {
+  if (ACCT_PAYABLE_TYPES.indexOf(b.product_type) === -1) return '';
+  if (b.status !== 'pending' || typeof BookingPay === 'undefined') return '';
+  if (BookingPay.isRefunded(b.payments)) return 'Refunded';
+  if (BookingPay.windowClosed(b.created_at)) return 'Payment window closed';
+  return '';
+};
 
 function bookingRowHtml(b) {
   const route = bookingRoute(b);
@@ -598,7 +614,9 @@ function bookingRowHtml(b) {
       </div>
       <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
       <div class="ar-amount">${money(b.total_amount)}</div>
-      ${acctPayable(b) ? `<button type="button" class="btn btn-coral btn-sm" data-pay-id="${b.booking_ref}">Pay now</button>` : ''}
+      ${acctPayable(b)
+        ? `<button type="button" class="btn btn-coral btn-sm" data-pay-id="${b.booking_ref}">Pay now</button>`
+        : (acctUnpayableNote(b) ? `<span class="badge">${escapeHtml(acctUnpayableNote(b))}</span>` : '')}
       <button type="button" class="btn btn-navy btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
       ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.booking_ref}">Cancel</button>` : ''}
     </div>`;

@@ -47,6 +47,40 @@ const BookingPay = (function () {
 
   const supports = (kind) => !!API[kind];
 
+  /* ---------------------------------------------------------------------
+     WHEN A BOOKING STOPS BEING PAYABLE.
+
+     Mirrors customer_payment_window.py on the server, which is what actually
+     refuses the checkout. These exist so the traveller is not shown a button
+     that is going to be refused -- and, for a refund, not shown a Pay button on
+     a booking whose money has already been taken and given back.
+
+     Keep PAY_WINDOW_MINUTES in step with PAYMENT_WINDOW_MINUTES on the server.
+     If the two ever disagree the server wins, which is the right way round: the
+     worst case is a button that turns out to be refused, not a payment taken
+     after the window.
+     --------------------------------------------------------------------- */
+  const PAY_WINDOW_MINUTES = 30;
+
+  /** Has the gap between booking and paying run out?
+
+      An unreadable or missing timestamp returns false: when we cannot tell how
+      old a booking is, showing the button and letting the server decide is
+      better than hiding a payment the traveller is entitled to make. */
+  function windowClosed(createdAt) {
+    if (!createdAt) return false;
+    const then = new Date(createdAt).getTime();
+    if (!isFinite(then)) return false;
+    return (Date.now() - then) > PAY_WINDOW_MINUTES * 60 * 1000;
+  }
+
+  /** Was money taken for this booking and given back? */
+  function isRefunded(payments) {
+    return (payments || []).some(
+      p => String((p && p.status) || '').toLowerCase() === 'refunded'
+    );
+  }
+
   /* Derived from the reference and never varying, so a second click, a reload
      or a return visit all resolve to the one order rather than opening another
      against the same booking. The `mb-` prefix is kept because orders already
@@ -209,7 +243,7 @@ const BookingPay = (function () {
     }
   }
 
-  return { open, supports, API, keyFor };
+  return { open, supports, API, keyFor, windowClosed, isRefunded, PAY_WINDOW_MINUTES };
 })();
 
 if (typeof window !== 'undefined') window.BookingPay = BookingPay;

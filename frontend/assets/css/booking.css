@@ -481,6 +481,14 @@ body.bk-inpage > *:not(#spHeader):not(#siteHeader):not(.skip-link):not(#bkRoot):
   padding: 4px 11px; border-radius: 999px; }
 .mb-status.is-confirmed { color: var(--sp-emerald); background: color-mix(in srgb, var(--sp-emerald) 14%, transparent); }
 .mb-status.is-cancelled { color: var(--sp-accent); background: color-mix(in srgb, var(--sp-accent) 13%, transparent); }
+
+/* Shown where the Pay button would be, when a pending booking cannot be paid:
+   its money was refunded, or the hold ran out. Quiet on purpose -- it explains
+   an absence, and should not compete with the actions beside it. */
+.mb-unpayable { font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--sp-muted, #6b7280); align-self: center;
+  padding: 4px 8px; border: 1px dashed currentColor; border-radius: 4px;
+  white-space: nowrap; opacity: .85; }
 .mb-total { font-size: 19px; }
 .mb-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
 .mb-actions .tx-btn { padding: 8px 13px; font-size: 12.5px; }
