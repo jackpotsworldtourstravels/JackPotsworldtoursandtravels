@@ -249,6 +249,17 @@ def apply_event(
     # useless.
     if payment.provider_payment_id and not row.provider_payment_id:
         row.provider_payment_id = payment.provider_payment_id
+    elif (
+        payment.provider_payment_id
+        and payment.provider_payment_id != row.provider_payment_id
+        and row.provider_order_id
+        and payment.provider_order_id == row.provider_order_id
+    ):
+        # A LATER ATTEMPT ON THE SAME ORDER supersedes the one we hold. Keeping
+        # the first id meant a row that could no longer be looked up at all once
+        # the provider moved on. Only with the order agreeing -- that is what
+        # makes this the same booking's money and not somebody else's.
+        row.provider_payment_id = payment.provider_payment_id
     if payment.provider_order_id and not row.provider_order_id:
         row.provider_order_id = payment.provider_order_id
     if payment.provider_status:
