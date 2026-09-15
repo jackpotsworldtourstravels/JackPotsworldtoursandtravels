@@ -317,3 +317,73 @@ class HotelBookingResponse(BaseModel):
 
 class HotelPaymentRequest(BaseModel):
     method: str = Field(min_length=1, max_length=30)
+
+
+class HotelCheckoutRequest(BaseModel):
+    """What the browser sends to start a payment.
+
+    NOTE WHAT IS NOT HERE: no amount, no currency, no customer id, no room rate, no
+    payment status. There is deliberately no field for any of them, so a client
+    cannot send one and no handler can accidentally read one. The booking
+    reference in the URL plus the session identify everything else, and every
+    rupee comes off the booking row the server priced.
+
+    THE KEY IS THE CLIENT'S, ON PURPOSE. It identifies one submission, so a
+    double-click, a reload or a retried request after a timeout all carry the
+    same value and resolve to the same order.
+    """
+
+    idempotency_key: str = Field(min_length=8, max_length=64)
+
+
+class HotelCheckoutResponse(BaseModel):
+    """Everything the browser needs to open the checkout, and nothing else.
+
+    THERE IS NO FIELD HERE THAT COULD CARRY A SECRET. ``key_id`` is the
+    publishable key the provider's own script requires and is meant to be
+    public. The API key secret and the webhook secret are never serialised into
+    this model, and the model is the only shape this endpoint can return.
+    """
+
+    provider: str
+    order_id: str
+    #: Minor units, as the PROVIDER reported them. Compared against our own
+    #: figure server-side before this is returned, so a mismatch is an error
+    #: rather than something the browser gets a chance to see.
+    amount: int
+    currency: str
+    #: Publishable only. Never the secret.
+    key_id: str
+    booking_ref: str
+    options: dict = Field(default_factory=dict)
+    #: Always "pending" from this endpoint: opening a checkout takes no money,
+    #: and only the verified provider path may report anything else.
+    payment_status: str
+
+
+class HotelReconcileRequest(BaseModel):
+    """What the browser may offer when its checkout handler fires.
+
+    EVERY FIELD IS OPTIONAL, AND NONE OF THEM DECIDES ANYTHING. The endpoint
+    re-reads the payment from the provider over an authenticated channel and
+    compares it against the booking row; that read is what settles the payment.
+    A request with none of them reconciles exactly the same way -- which is what
+    makes the endpoint useful to a customer who reloaded and no longer has them.
+    """
+
+    provider_payment_id: str | None = Field(default=None, max_length=120)
+    provider_order_id: str | None = Field(default=None, max_length=120)
+    signature: str | None = Field(default=None, max_length=256)
+
+
+class HotelReconcileResponse(BaseModel):
+    """Where the payment and the booking actually stand, after asking."""
+
+    booking_ref: str
+    #: pending | confirmed | cancelled | completed -- the booking row's status.
+    booking_status: str
+    payment_status: str | None = None
+    #: True only when THIS call moved the payment to captured.
+    captured: bool = False
+    code: str
+    retryable: bool = False

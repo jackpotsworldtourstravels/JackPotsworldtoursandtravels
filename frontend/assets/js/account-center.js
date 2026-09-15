@@ -575,6 +575,35 @@ async function showAcctConfirmation(bookingRef) {
   });
 }
 
+/* WHICH LISTED BOOKINGS CAN STILL BE PAID.
+   Kept in step with GATEWAY_API in booking-products.js and MB_GATEWAY_API in
+   my-bookings.js: a product belongs here only once it has both a checkout and
+   a reconcile endpoint on the server. Cruises have neither, which is why they
+   are absent rather than forgotten.
+
+   Status is compared lowercase because this panel renders the server's own
+   value; BookingStore's Title-Cased copy is a different shape on a different
+   screen, and assuming one here would silently offer nothing. */
+const ACCT_PAYABLE_TYPES = ['flight', 'hotel', 'package'];
+const acctPayable = b => {
+  if (ACCT_PAYABLE_TYPES.indexOf(b.product_type) === -1) return false;
+  if (b.status !== 'pending') return false;
+  if (typeof BookingPay === 'undefined') return true;
+  // Refunded money is not re-payable, and a hold that has run out is over.
+  if (BookingPay.isRefunded(b.payments)) return false;
+  if (BookingPay.windowClosed(b.created_at)) return false;
+  return true;
+};
+
+/** What to show instead of a Pay button, when there is a reason. */
+const acctUnpayableNote = b => {
+  if (ACCT_PAYABLE_TYPES.indexOf(b.product_type) === -1) return '';
+  if (b.status !== 'pending' || typeof BookingPay === 'undefined') return '';
+  if (BookingPay.isRefunded(b.payments)) return 'Refunded';
+  if (BookingPay.windowClosed(b.created_at)) return 'Payment window closed';
+  return '';
+};
+
 function bookingRowHtml(b) {
   const route = bookingRoute(b);
   return `
@@ -586,7 +615,10 @@ function bookingRowHtml(b) {
       </div>
       <span class="badge ${b.status}">${escapeHtml(b.status)}</span>
       <div class="ar-amount">${money(b.total_amount)}</div>
-      <button type="button" class="btn btn-coral btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
+      ${acctPayable(b)
+        ? `<button type="button" class="btn btn-coral btn-sm" data-pay-id="${b.booking_ref}">Pay now</button>`
+        : (acctUnpayableNote(b) ? `<span class="badge">${escapeHtml(acctUnpayableNote(b))}</span>` : '')}
+      <button type="button" class="btn btn-navy btn-sm" data-confirm-id="${b.booking_ref}">View Ticket</button>
       ${b.status !== 'cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-id="${b.booking_ref}">Cancel</button>` : ''}
     </div>`;
 }
@@ -602,6 +634,34 @@ async function cancelBookingById(bookingRef, onSuccess) {
   } catch (err) { alert(apiErrorText(err, 'Failed to cancel booking.')); }
 }
 function wireBookingRowActions(container) {
+  /* PAY WHERE THE TRAVELLER ALREADY IS.
+
+     This used to navigate to my-bookings.html, which meant a traveller who
+     pressed Pay in a light modal landed on a dark full page mid-payment. The
+     jolt is not cosmetic: changing everything on screen at the moment somebody
+     is about to part with money is exactly when they stop trusting the page.
+
+     BookingPay draws its own overlay and runs the same sequence my-bookings.html
+     runs -- one implementation, two mount points -- so paying here costs a
+     second copy of nothing. */
+  container.querySelectorAll('[data-pay-id]').forEach(btn => btn.addEventListener('click', () => {
+    const ref = btn.dataset.payId;
+    const b = (allBookingsCache || []).find(x => x.booking_ref === ref) || {};
+    if (typeof BookingPay === 'undefined') {
+      window.location.href = 'my-bookings.html?pay=' + encodeURIComponent(ref);
+      return;
+    }
+    BookingPay.open({
+      ref: ref,
+      kind: b.product_type,
+      title: bookingTitle(b),
+      onUnavailable: (msg) => {
+        if (typeof showToast === 'function') showToast(msg, true);
+        else alert(msg);
+      },
+      onDone: async () => { await loadAcctBookings(); },
+    });
+  }));
   container.querySelectorAll('[data-confirm-id]').forEach(btn => btn.addEventListener('click', () => showAcctConfirmation(btn.dataset.confirmId)));
   container.querySelectorAll('[data-cancel-id]').forEach(btn => {
     btn.addEventListener('click', () => cancelBookingById(btn.dataset.cancelId, async () => {

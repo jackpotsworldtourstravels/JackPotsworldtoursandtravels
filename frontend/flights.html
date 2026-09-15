@@ -29,7 +29,8 @@
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/main.css?v=20260912im1">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
+<link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
@@ -63,7 +64,7 @@
      during parse — the same trick index.html uses, so nothing on this page
      renders a frame later than it does over there. -->
 <script src="shared/formatters.js"></script>
-<script src="assets/js/auth.js?v=20260909dg1"></script>
+<script src="assets/js/auth.js?v=20260911rt1"></script>
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <!-- The airport picker: the table and the shared listbox. airports.js also has
      to precede travel-data.js further down, which reads the same table. -->
@@ -87,7 +88,7 @@
 <script src="assets/js/profile-menu.js?v=20260911ic7"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260911ic7"></script>
+<script src="assets/js/account-center.js?v=20260915mg1"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -198,11 +199,12 @@
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=20260902rz1"></script>
+<script src="assets/js/booking-api.js?v=20260911rt1"></script>
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260902p5"></script>
 <script src="assets/js/booking-flow.js?v=20260911ic7"></script>
-<script src="assets/js/booking-products.js?v=20260911ic7"></script>
+<script src="assets/js/payment-screen.js?v=20260915mg1"></script>
+<script src="assets/js/booking-products.js?v=20260915mg1"></script>
 <script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
 <script src="assets/js/booking-flows.js?v=20260911ic7"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search
@@ -226,5 +228,6 @@
      landing page's contact footer is not rendered on these pages. -->
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
+<script src="assets/js/booking-pay.js?v=20260912pw1"></script>
 </body>
 </html>

@@ -124,6 +124,38 @@ def _v(disposition, code, detail, *, status=None, captured_now=False,
 # ---------------------------------------------------------------------------
 # The verification
 # ---------------------------------------------------------------------------
+def _remote_for(provider, payment):
+    """The provider's current view of this payment.
+
+    Asked by payment id first: it is the most specific handle we hold, and for
+    the ordinary single-attempt payment it is exactly right.
+
+    But a payment id is not stable. One order accepts several attempts, and when
+    a declined card is followed by a successful one the provider points at the
+    newer payment -- at which point the id we recorded stops resolving and the
+    lookup 404s. That is not "the provider is unreachable", which is how it used
+    to read; it is "ask about the order instead". The order id is the stable
+    identity and every caller checks it before believing anything.
+
+    A timeout is re-raised untouched. Slow is not missing, and retrying it
+    against a different endpoint would turn a transient delay into a second
+    round trip on every poll.
+    """
+    if payment.provider_payment_id:
+        try:
+            return provider.fetch_payment(payment.provider_payment_id)
+        except payment_providers.PaymentTimeout:
+            raise
+        except payment_providers.PaymentProviderError:
+            if not payment.provider_order_id:
+                raise
+            logger.info(
+                "Provider no longer resolves payment %s; asking about order %s.",
+                payment.provider_payment_id, payment.provider_order_id,
+            )
+    return provider.fetch_order(payment.provider_order_id)
+
+
 def verify_and_capture(
     db: Session,
     payment_id: int,
@@ -226,10 +258,7 @@ def verify_and_capture(
         )
 
     try:
-        if payment.provider_payment_id:
-            remote = provider.fetch_payment(payment.provider_payment_id)
-        else:
-            remote = provider.fetch_order(payment.provider_order_id)
+        remote = _remote_for(provider, payment)
     except payment_providers.PaymentTimeout as exc:
         # THE MOST IMPORTANT BRANCH IN THIS FILE.
         # Slow is not failed. Nothing is written; the event stays deferred.
@@ -262,10 +291,25 @@ def verify_and_capture(
 
     if payment.provider_payment_id and remote.provider_payment_id \
             and remote.provider_payment_id != payment.provider_payment_id:
-        return _reject(
-            db, payment, booking, "payment_id_mismatch",
-            f"Provider reports payment {remote.provider_payment_id!r}; "
-            f"we recorded {payment.provider_payment_id!r}.",
+        # A DIFFERENT ATTEMPT ON THE SAME ORDER IS NOT A MISMATCH.
+        # It is what a declined card followed by a successful retry looks like.
+        # The order check immediately above has already established that this is
+        # our order; without that corroboration a differing payment id is still
+        # somebody else's payment and is still refused.
+        if not (
+            payment.provider_order_id
+            and remote.provider_order_id
+            and remote.provider_order_id == payment.provider_order_id
+        ):
+            return _reject(
+                db, payment, booking, "payment_id_mismatch",
+                f"Provider reports payment {remote.provider_payment_id!r}; "
+                f"we recorded {payment.provider_payment_id!r}.",
+            )
+        logger.info(
+            "Provider reports a later attempt for %s: %s supersedes %s on order %s.",
+            payment_id, remote.provider_payment_id,
+            payment.provider_payment_id, payment.provider_order_id,
         )
 
     remote_currency = (remote.currency or "").upper()
@@ -294,6 +338,31 @@ def verify_and_capture(
         return _v(
             RETRYABLE, "not_yet_paid",
             f"Provider reports {remote.provider_status!r}; still in progress.",
+            status=payment.status,
+        )
+
+    if remote.status == payment_providers.REFUNDED:
+        # MONEY THAT MOVED AND CAME BACK. Terminal, and not a capture.
+        # Checked against the booking's own figures first: a refund we describe
+        # on the row is a claim about this booking's money, and a claim about
+        # the wrong amount or currency is worth no more here than it would be on
+        # the way in.
+        if remote.amount_minor is not None and int(remote.amount_minor) != expected_minor:
+            return _reject(
+                db, payment, booking, "amount_mismatch",
+                f"Provider reports a refund of {remote.amount_minor} minor units; "
+                f"{booking.booking_ref} is {expected_minor}.",
+            )
+        _record_remote(payment, remote)
+        # Forward-only, like every other status move here. is_forward already
+        # allows failed -> refunded, which is the case this exists for.
+        if payment_providers.is_forward(payment.status, payment_providers.REFUNDED):
+            payment.status = payment_providers.REFUNDED
+        db.flush()
+        return _v(
+            DONE, "refunded_at_provider",
+            f"Provider reports this payment was refunded; "
+            f"{booking.booking_ref} was not paid for.",
             status=payment.status,
         )
 
@@ -391,7 +460,24 @@ def _record_remote(payment: CustomerPackageBookingPayment, remote) -> None:
     the provider's figure would quietly make the two agree on a later read and
     destroy the evidence of a mismatch.
     """
+    # A PROVIDER PAYMENT ID IS NOT A STABLE IDENTITY.
+    # One order accepts several attempts. A declined card followed by a
+    # successful retry leaves the provider pointing at a different payment for
+    # the same order, and the id we recorded first stops resolving. Adopting the
+    # newer one is what keeps this row able to ask about itself at all.
+    #
+    # Only ever when the ORDER agrees. The order is the stable link between a
+    # provider payment and one of our bookings, it is checked first and hardest
+    # by every caller, and without that corroboration this would be a way to
+    # point a row at somebody else's payment.
     if remote.provider_payment_id and not payment.provider_payment_id:
+        payment.provider_payment_id = remote.provider_payment_id
+    elif (
+        remote.provider_payment_id
+        and remote.provider_payment_id != payment.provider_payment_id
+        and payment.provider_order_id
+        and remote.provider_order_id == payment.provider_order_id
+    ):
         payment.provider_payment_id = remote.provider_payment_id
     if remote.provider_order_id and not payment.provider_order_id:
         payment.provider_order_id = remote.provider_order_id

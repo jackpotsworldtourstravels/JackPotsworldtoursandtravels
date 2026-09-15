@@ -69,7 +69,21 @@ const HotelConfirm = (function () {
      about money that has not moved. Flip it to false and every headline,
      pill and status line on this screen goes back to reporting the booking
      exactly as the server holds it — no other change is needed. */
-  const PAYMENT_RECEIVED_UI = true;
+  /* FLIPPED TO false ON 2026-09-11, and the reason is worth keeping.
+
+     This was the requested treatment while no gateway existed: every hotel was
+     settled with the traveller directly, so "Payment Received" described what
+     was about to happen and no screen could contradict it.
+
+     A provider collects now, and the switch started describing money that had
+     not moved. JPH000007 was shown "Payment Received" and "Hotel Booking
+     Confirmed" while Razorpay held zero payment attempts against its order and
+     the booking sat pending -- the screen and the ledger disagreed, and the
+     screen was the one the customer believed.
+
+     Set it back to true and every headline, pill and status line returns to the
+     old treatment; nothing else needs changing. */
+  const PAYMENT_RECEIVED_UI = false;
 
   /** Did this booking reach the payment step at all? A booking created but
    *  never paid still shows the honest "received" treatment either way. */

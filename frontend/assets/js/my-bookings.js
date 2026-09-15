@@ -23,6 +23,73 @@ const MyBookings = (function () {
   let rows = [];
   let filter = 'all';
 
+  /* WHICH BOOKINGS CAN STILL BE PAID.
+     A booking only reaches this page unpaid when no gateway was available at
+     the time it was made -- which is exactly the pilot case, where the
+     deployment offers no payment but one named booking can still be collected
+     for. All three B2C products are wired to a payment provider now; the
+     BookingPay decides, so a product without endpoints cannot be given a
+     button that could only fail.
+
+     Whether a provider will ACTUALLY take it is not decided here. That is asked
+     of the server, per booking, when the button is pressed -- see startPayment.
+     Drawing the button is cheap; guessing the answer is not. */
+  /* BookingPay owns the list of products with a checkout and a reconcile
+     endpoint. Asking it, rather than keeping a second table here, is what stops
+     the button and the thing behind the button disagreeing. */
+  function payable(b) {
+    if (!BookingPay.supports(b.kind)) return false;
+    if (b.status !== 'Pending') return false;
+    // Money taken and returned: the booking is finished, whatever its status.
+    if (BookingPay.isRefunded(b.payments)) return false;
+    // Held, not paid for, and the hold has run out.
+    if (BookingPay.windowClosed(b.bookedAt)) return false;
+    return true;
+  }
+
+  /** Why a pending booking cannot be paid, for the traveller. Null when it can. */
+  function unpayableReason(b) {
+    if (!BookingPay.supports(b.kind)) return null;
+    if (b.status !== 'Pending') return null;
+    if (BookingPay.isRefunded(b.payments)) return 'Refunded';
+    if (BookingPay.windowClosed(b.bookedAt)) return 'Payment window closed';
+    return null;
+  }
+
+  /* Pay a booking that already exists.
+
+     THE REFERENCE IS THE POINT. paymentConfig() asked without one answers for
+     the deployment, and a pilot booking looks unpayable. Asked with this
+     booking's reference it answers for this booking, which is the only question
+     worth asking here.
+
+     The idempotency key is derived from the reference and never varies, so a
+     second click, a reload or a return visit all resolve to the one order
+     rather than opening another against the same booking. */
+  async function startPayment(b) {
+    const ref = b.ref || b.id;
+
+    /* The overlay is this page's own; BookingPay draws into it rather than
+       making one, so the detail modal's close and lock behaviour still apply. */
+    const ov = document.getElementById('mbOverlay');
+    ov.innerHTML = '';
+    ov.classList.add('is-open');
+    document.body.classList.add('bk-locked');
+
+    await BookingPay.open({
+      ref: ref,
+      kind: b.kind,
+      title: b.title || b.id,
+      host: ov,
+      onUnavailable: (msg) => {
+        ov.classList.remove('is-open');
+        document.body.classList.remove('bk-locked');
+        showToast(msg);
+      },
+      onDone: async () => { closeDetail(); await refresh(); },
+    });
+  }
+
   function card(b) {
     const cancelled = b.status === 'Cancelled';
     return `<article class="mb-card ${cancelled ? 'is-cancelled' : ''}">
@@ -43,6 +110,10 @@ const MyBookings = (function () {
         <span class="mb-status is-${cancelled ? 'cancelled' : 'confirmed'}">${esc(b.status)}</span>
         <b class="mb-total">${esc(money(b.total))}</b>
         <div class="mb-actions">
+          ${payable(b)
+            ? `<button type="button" class="tx-btn tx-btn-primary" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>`
+            : (unpayableReason(b)
+                ? `<span class="mb-unpayable">${esc(unpayableReason(b))}</span>` : '')}
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="view" data-id="${esc(b.id)}">View</button>
           <button type="button" class="tx-btn tx-btn-ghost" data-mb="ticket" data-id="${esc(b.id)}">Ticket</button>
           ${cancelled ? '' :
@@ -173,6 +244,7 @@ const MyBookings = (function () {
       const b = rows.find(x => x.id === btn.dataset.id);
       if (!b) return;
 
+      if (act === 'pay') return startPayment(b);
       if (act === 'view') return openDetail(b);
       if (act === 'ticket') return BookingTicket.handle('download', b);
       if (act === 'cancel') {
@@ -197,6 +269,22 @@ const MyBookings = (function () {
     if (!document.getElementById('mbList')) return;
     bind();
     await refresh();
+
+    /* ?pay=REF -- open payment for one booking on arrival.
+
+       The account panel lists bookings but deliberately has no payment screen
+       of its own, so its Pay button sends the traveller here. Dropping them on
+       the list and leaving them to find the same booking again is a worse
+       answer than carrying the reference across.
+
+       Ignored in silence when the booking is missing or not payable: the list
+       is already on screen and is the honest fallback, and a reference in a URL
+       is not evidence of anything -- payable() and the server's own
+       paymentConfig(ref) still decide. */
+    const want = new URLSearchParams(window.location.search).get('pay');
+    if (!want) return;
+    const b = rows.find(r => String(r.ref || r.id) === want);
+    if (b && payable(b)) startPayment(b);
   }
 
   return { init, refresh };

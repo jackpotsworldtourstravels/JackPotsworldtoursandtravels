@@ -249,6 +249,17 @@ def apply_event(
     # useless.
     if payment.provider_payment_id and not row.provider_payment_id:
         row.provider_payment_id = payment.provider_payment_id
+    elif (
+        payment.provider_payment_id
+        and payment.provider_payment_id != row.provider_payment_id
+        and row.provider_order_id
+        and payment.provider_order_id == row.provider_order_id
+    ):
+        # A LATER ATTEMPT ON THE SAME ORDER supersedes the one we hold. Keeping
+        # the first id meant a row that could no longer be looked up at all once
+        # the provider moved on. Only with the order agreeing -- that is what
+        # makes this the same booking's money and not somebody else's.
+        row.provider_payment_id = payment.provider_payment_id
     if payment.provider_order_id and not row.provider_order_id:
         row.provider_order_id = payment.provider_order_id
     if payment.provider_status:
@@ -278,15 +289,41 @@ def apply_event(
         # them yet, so there is no booking total to verify against. Such an
         # event stays deferred — visible, un-acted-on, and picked up by the
         # sweep once those products are wired — rather than being guessed at.
-        if not isinstance(row, CustomerPackageBookingPayment):
+        # WHICH VERIFIER OWNS THIS ROW.
+        # Packages and flights each have one. They are separate modules on
+        # purpose: the package verifier was proved against a live provider
+        # before the flight one existed, and generalising it would have meant
+        # editing the module that decides money arrived while packages were
+        # going into production.
+        #
+        # All three B2C products now have one. The else branch below is not
+        # dead: a payment table added later reaches it, and deferring is the
+        # honest answer for a row nothing knows how to verify.
+        if isinstance(row, CustomerPackageBookingPayment):
+            result = verify.verify_and_capture(
+                db, row.customer_package_booking_payment_id, provider_name=provider,
+            )
+        elif isinstance(row, CustomerBookingPayment):
+            from app.services import (
+                payment_verification_flight_service as verify_flight,
+            )
+
+            result = verify_flight.verify_and_capture(
+                db, row.customer_booking_payment_id, provider_name=provider,
+            )
+        elif isinstance(row, CustomerHotelBookingPayment):
+            from app.services import (
+                payment_verification_hotel_service as verify_hotel,
+            )
+
+            result = verify_hotel.verify_and_capture(
+                db, row.customer_hotel_booking_payment_id, provider_name=provider,
+            )
+        else:
             return DEFERRED, (
                 f"{event.event_type}: recorded; no verification path for "
                 f"{type(row).__name__} yet."
             )
-
-        result = verify.verify_and_capture(
-            db, row.customer_package_booking_payment_id, provider_name=provider,
-        )
 
         if result.disposition == verify.RETRYABLE:
             # STAYS DEFERRED. A slow or unreachable provider, or a payment still

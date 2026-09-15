@@ -81,7 +81,7 @@ const BookingApi = (function () {
     }
   }
 
-  async function request(method, path, { params, body } = {}) {
+  async function request(method, path, { params, body, retried } = {}) {
     let url = `${base()}${path}`;
     if (params) {
       const qs = new URLSearchParams(
@@ -102,6 +102,24 @@ const BookingApi = (function () {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+
+    /* A 401 ON A REQUEST WE SENT A TOKEN WITH MEANS THE TOKEN AGED OUT.
+       Exchange the refresh token and send the request again, once.
+
+       `retried` stops a loop: if the renewed token is refused too, the second
+       401 is reported rather than starting another exchange. The refresh call
+       itself is excluded for the same reason -- a 401 from it is the answer,
+       not something to retry.
+
+       Only attempted when a token was actually sent. A 401 without one is the
+       server saying this endpoint needs a session, which no refresh can fix. */
+    if (res.status === 401 && !retried
+        && path.indexOf('/auth/refresh') === -1
+        && Object.keys(authHeaders()).length
+        && typeof refreshCustomerSession === 'function') {
+      const renewed = await refreshCustomerSession();
+      if (renewed) return request(method, path, { params, body, retried: true });
+    }
 
     if (!res.ok) throw new ApiError(res.status, data);
     return data;
@@ -308,20 +326,50 @@ const BookingApi = (function () {
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/pay`, { method });
 
   /* --- real payments (Phase 3/4) ---------------------------------------
-     paymentConfig() says whether a provider is configured on this deployment
-     and hands back its PUBLISHABLE key. There is no endpoint anywhere that
-     returns the key secret or the webhook secret, so there is nothing here
-     that could accidentally fetch one.
+     paymentConfig() says whether a provider is configured and hands back its
+     PUBLISHABLE key. There is no endpoint anywhere that returns the key secret
+     or the webhook secret, so there is nothing here that could accidentally
+     fetch one.
+
+     PASS A BOOKING REFERENCE WHERE YOU HAVE ONE. Without it the server answers
+     for the deployment, which is the wrong question for a booking routed to a
+     specific provider — a pilot — where the deployment as a whole offers no
+     payment but that one booking can still be collected for. Asked without a
+     reference, such a booking looks unpayable and no Pay button is drawn.
+
+     A booking with no special routing gives the same answer either way, so
+     this cannot be used to discover whether a booking exists.
 
      startPackageCheckout() asks the server to open a provider order. The
      amount is NOT a parameter — the server reads it off the booking row it
      priced. The idempotency key is the caller's, so a double-click, a reload
      or a Try-again all resolve to the one order. */
-  const paymentConfig = () => get('/api/customer/payments/config');
+  const paymentConfig = (bookingRef) =>
+    get('/api/customer/payments/config'
+        + (bookingRef ? `?booking_ref=${encodeURIComponent(bookingRef)}` : ''));
 
   const startPackageCheckout = (ref, idempotencyKey) =>
     post(`/api/customer/package-bookings/${encodeURIComponent(ref)}/checkout`,
          { idempotency_key: idempotencyKey });
+
+  /* The flight equivalents. Same contract, different path -- flights got their
+     own endpoints rather than a product parameter, so the server can keep the
+     booking model in the URL and out of the body. */
+  const startFlightCheckout = (ref, idempotencyKey) =>
+    post(`/api/customer/bookings/${encodeURIComponent(ref)}/checkout`,
+         { idempotency_key: idempotencyKey });
+
+  const reconcileFlightBooking = (ref, handler) =>
+    post(`/api/customer/bookings/${encodeURIComponent(ref)}/reconcile`,
+         handler || {});
+
+  const startHotelCheckout = (ref, idempotencyKey) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/checkout`,
+         { idempotency_key: idempotencyKey });
+
+  const reconcileHotelBooking = (ref, handler) =>
+    post(`/api/customer/hotel-bookings/${encodeURIComponent(ref)}/reconcile`,
+         handler || {});
 
   /* reconcilePackageBooking() asks OUR server to ask the PROVIDER where the
      payment actually stands, and returns the booking status that came back.
@@ -454,6 +502,8 @@ const BookingApi = (function () {
     createHotelBooking, listHotelBookings, getHotelBooking,
     payHotelBooking, cancelHotelBooking, hotelPayload, hotelAddonPayload,
     paymentConfig, startPackageCheckout, reconcilePackageBooking,
+    startFlightCheckout, reconcileFlightBooking,
+    startHotelCheckout, reconcileHotelBooking,
     packageAddons, quotePackage, createPackageBooking, listPackageBookings,
     getPackageBooking, payPackageBooking, cancelPackageBooking,
     packagePayload, packageAddonPayload,
