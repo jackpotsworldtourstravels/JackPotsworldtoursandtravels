@@ -28,17 +28,19 @@
       "port": 8420
     },
     {
+      "//": "autoPort, because two chats open on this repo fought over 8000",
+      "//2": "and the second simply failed to start. The harness picks a free",
+      "//3": "port and publishes it as PORT; devserver.py reads it, because",
+      "//4": "uvicorn's own CLI only reads UVICORN_PORT and would otherwise",
+      "//5": "fall back to its default of 8000 and collide again.",
+      "//6": "Any port is safe - see backend-alt below: the page calls /api on",
+      "//7": "whatever origin served it, so nothing is pinned to 8000.",
       "name": "backend",
       "runtimeExecutable": "backend/venv/Scripts/python.exe",
       "runtimeArgs": [
-        "-m",
-        "uvicorn",
-        "app.main:app",
-        "--app-dir",
-        "backend",
-        "--port",
-        "8000"
+        "backend/scripts/devserver.py"
       ],
+      "autoPort": true,
       "port": 8000
     },
     {

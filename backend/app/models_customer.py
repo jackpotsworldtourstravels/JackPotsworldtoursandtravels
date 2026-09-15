@@ -759,17 +759,51 @@ class CustomerHotel(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     star_rating: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=3)
     guest_rating: Mapped[Optional[float]] = mapped_column(Numeric(2, 1), nullable=True)
+    #: Free-text display line — 'Banjara Hills, Hyderabad'. Kept because it is
+    #: what the results card prints. It is NOT how location is determined:
+    #: ``destination_id``/``location_id`` below are, and 0072 explains why.
     location: Mapped[str] = mapped_column(String(200), nullable=False)
     distance_km: Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)
     price_per_night: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
-    amenities: Mapped[list[str]] = mapped_column(ARRAY(String(60)), nullable=False, default=list)
+    amenities: Mapped[list[str]] = mapped_column(ARRAY(String(120)), nullable=False, default=list)
     image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
-    images: Mapped[list[str]] = mapped_column(ARRAY(String(60)), nullable=False, default=list)
+    images: Mapped[list[str]] = mapped_column(ARRAY(String(160)), nullable=False, default=list)
     cancellation_policy: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
+
+    # -- Geography (0072) ----------------------------------------------------
+    # Nullable on purpose: a hotel whose location is unknown must stay
+    # sellable. ``destination_id`` is held directly as well as being reachable
+    # through the location, because a hotel can be known to be in Goa before
+    # anyone has decided which part of Goa.
+    destination_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("customer_destinations.customer_destination_id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    location_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("customer_locations.customer_location_id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+
+    # -- Provenance (0072) ---------------------------------------------------
+    #: 'seed' for hand-written rows, 'hotelbeds' for synced ones. A sync
+    #: refreshes only what it owns, so a curated row is never overwritten.
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="seed")
+    #: The supplier's own hotel code. UNIQUE — this is what makes the sync
+    #: idempotent: a second run updates the row instead of adding a twin.
+    hotelbeds_code: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True)
+    last_synced_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # -- Supplier content (0072) ---------------------------------------------
+    address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    country_code: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Numeric(9, 6), nullable=True)
 
     rooms: Mapped[list["CustomerHotelRoom"]] = relationship(
         back_populates="hotel", order_by="CustomerHotelRoom.base_price_per_night",
@@ -1059,6 +1093,98 @@ class CustomerHotelBookingPayment(Base):
     )
 
     booking: Mapped["CustomerHotelBooking"] = relationship(back_populates="payments")
+
+
+# =====================================================================
+# Geography (0070). Destinations and the locations inside them.
+#
+# THESE ARE MASTER DATA, NOT INVENTORY, and that distinction is the whole
+# reason the tables exist. The first version of the Destinations shelf
+# derived a destination from ``customer_hotels.location`` and
+# ``customer_packages.name`` — so a place existed only while something was
+# for sale there, and Goa, which this company sells a tour package to,
+# reported "no locations available" because no Goa hotel had been loaded
+# yet. A destination is a fact about the world; whether we happen to have a
+# room in it today is a fact about our catalogue. Conflating the two makes
+# the geography disappear whenever the inventory does.
+#
+# NOTHING POINTS AT THESE TABLES YET, deliberately. Hotels and packages keep
+# their free-text ``location``/``name`` and are untouched by 0070 — adding a
+# destination_id to them is a data-migration with a matching problem
+# attached ("Banjara Hills, Hyderabad" -> which row?) and belongs in its own
+# change. The hierarchy is established here so that work has something to
+# point at:
+#
+#     Destination -> Location -> (later) Hotels, Tour Packages
+# =====================================================================
+
+class CustomerDestination(Base):
+    """A place we sell travel to. Independent of whether we have stock there."""
+
+    __tablename__ = "customer_destinations"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_customer_destination_slug"),
+    )
+
+    customer_destination_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: The public identifier. The API hands this out as `id` and takes it back on
+    #: the locations route, so it is what the frontend keys off — never the name.
+    #: Unique, because two destinations resolving to one slug would make the
+    #: locations lookup ambiguous.
+    slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    country: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    #: An image KEY, matching the convention customer_hotels/customer_packages
+    #: already use — not a URL. Null until real artwork exists; the frontend has
+    #: its own fallback and must not be sent a stock photograph.
+    image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: Display order for the homepage shelf. Lower first, then name.
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: The supplier's own code for this destination (0072). Our slug is NEVER
+    #: assumed to equal it — 'goa' is ours, the supplier's is its own string —
+    #: so the correspondence is stored rather than derived.
+    hotelbeds_destination_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    locations: Mapped[list["CustomerLocation"]] = relationship(
+        back_populates="destination",
+        order_by="CustomerLocation.sort_order, CustomerLocation.name",
+        cascade="all, delete-orphan",
+    )
+
+
+class CustomerLocation(Base):
+    """Somewhere inside a destination — an area, a resort town, an island."""
+
+    __tablename__ = "customer_locations"
+    __table_args__ = (
+        #: Slugs are unique WITHIN a destination, not globally: two different
+        #: destinations may both have a "city-centre", and forcing those apart
+        #: would mean namespacing the name itself.
+        UniqueConstraint("destination_id", "slug", name="uq_customer_location_slug"),
+    )
+
+    customer_location_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    destination_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_destinations.customer_destination_id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: The supplier's zone code for this area (0072). Same rule as the
+    #: destination code above: stored, never inferred from the name.
+    hotelbeds_zone_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    destination: Mapped["CustomerDestination"] = relationship(back_populates="locations")
 
 
 # =====================================================================

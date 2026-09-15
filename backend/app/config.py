@@ -356,6 +356,44 @@ class Settings(BaseSettings):
     #: over that; 30 keeps two clear bursts and is still nowhere near a script.
     assistant_rate_per_minute: int = 30
 
+    # ------------------------------------------------------- HOTELBEDS ------
+    # The hotel CONTENT provider. This is the static catalogue — properties,
+    # addresses, images, facilities, room types — and it is a different thing
+    # from live availability, which this block does not configure.
+    #
+    # NEITHER OF THESE MAY EVER REACH A BROWSER. Unlike Razorpay there is no
+    # publishable half: the key identifies the account and the secret signs
+    # every call, so both are strictly server-side. The signature is derived
+    # per request (see integrations/hotelbeds/client.py) and is itself a
+    # credential — never log it, never put it in an error the customer sees.
+    #
+    # Absent credentials are NOT an error. The sync simply refuses to run and
+    # says why; the site keeps serving whatever catalogue is already in the
+    # database. That is what makes it safe to ship this integration before the
+    # account exists.
+    hotelbeds_api_key: str | None = None
+    hotelbeds_secret: str | None = None
+    #: Sandbox by default, on purpose. Production costs money per call and is
+    #: gated behind a signed contract; pointing at it should be a deliberate
+    #: edit to .env, never something a fresh checkout does by accident.
+    hotelbeds_content_base_url: str = "https://api.test.hotelbeds.com/hotel-content-api/1.0"
+    hotelbeds_booking_base_url: str = "https://api.test.hotelbeds.com/hotel-api/1.0"
+    #: Content responses are large and gzipped; the API requires Accept-Encoding
+    #: and a whole page of hotels with fields=all is measured in megabytes.
+    hotelbeds_timeout_seconds: float = 60.0
+    #: Rows per page for the catalogue sync. The API's own default is 100 and
+    #: its parameters are `from`/`to` (inclusive). 1000 keeps the request count
+    #: — and therefore the daily quota — low, which matters enormously: a fresh
+    #: sandbox key allows only 50 requests PER DAY before it answers 403.
+    hotelbeds_page_size: int = 1000
+    #: ISO country for the catalogue sync. India, because that is the market
+    #: this integration was built for; it is a setting rather than a constant
+    #: so a second market never requires a code change.
+    hotelbeds_country_code: str = "IN"
+    #: Language for descriptions. ENG is the API's default; named here so the
+    #: sync is explicit about what it stored rather than inheriting a default.
+    hotelbeds_language: str = "ENG"
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---------------------------------------------------------------- CR-9 --

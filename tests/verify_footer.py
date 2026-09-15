@@ -107,6 +107,10 @@ CONTACT = [
 #: for something that cannot be booked online, which is still what this guard
 #: is for. Removing an entry is a commercial decision, not a build fix.
 NOT_OFFERED = [
+    #: Back on 2026-09-11. It left this list when the nav briefly read "Holiday
+    #: Packages"; the owner has since asked for "Tour Packages" everywhere, so
+    #: the phrase is once again one this business does not use.
+    r"holiday package",
     r"visa service",
     r"passport service",
     r"honeymoon package",

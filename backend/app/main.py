@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -26,6 +28,7 @@ from app.routers import (
     customer_auth,
     customer_bookings,
     customer_chat,
+    customer_destinations,
     customer_hotel_bookings,
     customer_package_bookings,
     customer_profile,
@@ -342,6 +345,11 @@ app.include_router(admin_chat.router)
 # reference series (JPH######) — see migration 0055. Same customer scope as
 # the flight booking flow; the catalogue routes (`/hotels`, `/hotels/{id}`,
 # `/hotels/addons`) are public for the same reason a flight's seat map is.
+# Destination discovery for the homepage shelf. Public, and READ-ONLY over the
+# hotel and package catalogues — there is no destinations table and this adds
+# none; see customer_destination_service for why deriving beats storing here.
+# A new prefix on a new router: no existing route changed to make room for it.
+app.include_router(customer_destinations.router)
 app.include_router(customer_hotel_bookings.router)
 # The real B2C tour-package system (Phase 5): its own tables, its own booking
 # reference series (JPP######) — see migration 0056. Same customer scope;
@@ -580,6 +588,29 @@ def port_status():
 # stands: passport and visa scans are never mounted, at any path.
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
+# ---------------------------------------------------------------------------
+# WebP needs registering by hand, and that is a stdlib gap, not a local quirk.
+#
+# StaticFiles serves a file through FileResponse, which types it as
+# `mimetypes.guess_type(path)[0] or "application/octet-stream"`. CPython did not
+# carry image/webp in its mimetypes table until 3.13; this runs on 3.12, and
+# Windows adds nothing for .webp from the registry either. So guess_type returns
+# None and every .webp on the site — the destination photographs AND the hotel
+# photographs, which share this one mount — goes out as a binary download.
+#
+# Browsers sniff the RIFF/WEBP magic and render them anyway, which is why this
+# was invisible. It stops being invisible behind anything that trusts the header
+# instead of the bytes: a CDN deciding what to compress, a proxy with a media
+# allowlist, an <img> under a restrictive CSP, or a Save As dialog offering the
+# file as `goa.webp` of unknown type.
+#
+# add_type is the fix at the right level: it corrects the table the whole
+# process reads, so it covers every current and future .webp under the mount
+# without naming a file or special-casing a directory. It is safe at import
+# time — add_type calls mimetypes.init() itself when the db is empty, so the
+# entry cannot be overwritten by a later implicit init.
+mimetypes.add_type("image/webp", ".webp")
+
 
 class CleanUrlStaticFiles(StaticFiles):
     """StaticFiles plus nginx's `try_files $uri $uri.html $uri/` behaviour,
@@ -651,6 +682,36 @@ class CleanUrlStaticFiles(StaticFiles):
 
 
 if FRONTEND_DIR.is_dir():
+    # -----------------------------------------------------------------------
+    # /destination/{slug} — one page, every destination.
+    # -----------------------------------------------------------------------
+    # The static mount resolves `/login` to `login.html`, but it has no concept
+    # of a dynamic segment: `/destination/goa` would look for a file at
+    # `destination/goa`, not find one, and 404. The alternatives were a file per
+    # destination — which is hardcoding the very thing that must stay
+    # data-driven — or a query string, which was not what was asked for.
+    #
+    # So this route serves ONE html file for any slug. It deliberately does not
+    # check whether the destination exists: that check belongs to the API the
+    # page then calls, and doing it here would mean a database round trip
+    # before a single byte of HTML, on a page whose first job is to render a
+    # loading state. An unknown slug therefore loads the page and the page
+    # reports "destination not found" — which is also what a direct link to a
+    # since-deleted destination should do.
+    #
+    # Registered BEFORE the mount below, because the mount matches everything.
+    _DESTINATION_PAGE = FRONTEND_DIR / "destination-hotels.html"
+
+    @app.get("/destination/{slug}", include_in_schema=False)
+    def destination_page(slug: str):                      # noqa: ARG001 — read by the page, not here
+        return FileResponse(
+            _DESTINATION_PAGE,
+            media_type="text/html",
+            # Same rule the static mount applies to HTML: always revalidate, so
+            # a deploy actually reaches a browser that has been here before.
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
+
     # Mounted last so every API route above wins the match first.
     app.mount("/", CleanUrlStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     logger.info("Serving static frontend from %s", FRONTEND_DIR)
