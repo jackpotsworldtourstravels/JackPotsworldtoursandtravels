@@ -256,8 +256,7 @@ const FilterEngine = (function () {
                   aria-expanded="${open}" aria-controls="ff-body-${esc(def.id)}">
             <span class="ff-title">${esc(def.label)}</span>
             ${n ? `<span class="ff-badge">${n}</span>` : ''}
-            <svg class="ff-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            ${typeof JPIcon !== 'undefined' ? JPIcon.html('chevronDown', { className: 'ff-caret' }) : ''}
           </button>
         </h4>
         <div class="ff-body" id="ff-body-${esc(def.id)}"${open ? '' : ' hidden'}>${body}</div>

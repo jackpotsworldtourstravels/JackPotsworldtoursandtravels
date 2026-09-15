@@ -1820,3 +1820,143 @@ body.hr-booking .sp-hero { display: none; }
   align-self: flex-start;
   margin-top: 20px;
 }
+
+/* ===========================================================================
+   DESTINATION HOTELS  (/destination/{slug})  — `dh-` scope
+   ===========================================================================
+   Built on the hr- tokens above, not beside them: the surface, line, radius
+   and shadow are the ones the Hotel Results cards already use, and the inner
+   elements (.hr-name, .hr-stars, .hr-loc, .hr-rating, .hr-amenities) are the
+   same classes rendering the same way. What differs is the LAYOUT — results is
+   a vertical list of wide rows, this is a grid of portrait cards — so only the
+   grid and the card's own axis are redefined.
+   ======================================================================== */
+
+.dh-main { padding: 26px 0 64px; }
+
+.dh-back {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--hr-muted, #5b6b82);
+  text-decoration: none; margin-bottom: 18px;
+}
+.dh-back:hover { color: var(--coral, #C9482F); }
+.dh-back svg, .dh-back .jpi { width: 16px; height: 16px; }
+
+.dh-head { margin-bottom: 18px; }
+.dh-eyebrow {
+  margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--coral, #C9482F);
+}
+.dh-title {
+  margin: 0; font-family: var(--ff-head, Georgia, serif);
+  font-size: clamp(28px, 3.4vw, 44px); line-height: 1.1; color: var(--navy, #0A2540);
+}
+.dh-lead { margin: 8px 0 0; font-size: 15px; color: var(--hr-muted, #5b6b82); }
+
+/* The location chips. A horizontal scroller on narrow screens rather than a
+   wrapping block that pushes the grid down the page — and `scrollbar-width`
+   keeps it from showing a bar on desktop where it never overflows. */
+.dh-locs {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 18px; padding: 0;
+}
+.dh-chip {
+  appearance: none; cursor: pointer;
+  padding: 8px 15px; border-radius: 999px;
+  border: 1px solid var(--hr-line, #e1e7f0);
+  background: var(--hr-surface, #fff);
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  color: var(--navy, #0A2540);
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+.dh-chip:hover { border-color: var(--coral, #C9482F); }
+.dh-chip.is-on {
+  background: var(--coral, #C9482F); border-color: var(--coral, #C9482F); color: #fff;
+}
+.dh-chip:focus-visible { outline: 3px solid var(--coral, #C9482F); outline-offset: 2px; }
+
+.dh-status { margin: 0 0 14px; font-size: 14px; color: var(--hr-muted, #5b6b82); }
+
+.dh-retry {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 700;
+  padding: 10px 20px; border-radius: 999px; border: 0;
+  background: var(--coral, #C9482F); color: #fff; margin-bottom: 18px;
+}
+
+/* THE GRID. auto-fill + minmax, so the column count follows the viewport and
+   never a breakpoint list — a destination returning 3 hotels and one returning
+   300 lay out identically, and nothing needs editing when a size is added. */
+.dh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+/* The card turns vertical: image on top, body beneath. Overrides .hr-card's
+   two-column results layout without touching it. */
+.hr-card.dh-card {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+.dh-card .hr-card-media { width: 100%; }
+.dh-card .hr-card-media .mh-hotel-media,
+.dh-card .hr-card-media figure { width: 100%; aspect-ratio: 4 / 3; }
+.dh-card .hr-card-media img { width: 100%; height: 100%; object-fit: cover; }
+
+.dh-card .hr-card-body {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+}
+.dh-card .hr-card-main { display: flex; flex-direction: column; gap: 7px; }
+.dh-card .hr-name { font-size: 17px; line-height: 1.25; }
+
+/* Description clamped to three lines. Supplier descriptions run to several
+   hundred words and an unclamped one makes every card in the row as tall as
+   the wordiest hotel in it. */
+.dh-desc {
+  margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--hr-muted, #5b6b82);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dh-free { margin: 0; font-size: 13px; font-weight: 600; color: #1c7c4a; }
+.dh-free svg, .dh-free .jpi { width: 14px; height: 14px; vertical-align: -2px; }
+
+/* Foot pinned to the bottom, so View Hotel lines up across a row whatever the
+   cards above it contain. */
+.dh-card-foot {
+  margin-top: auto; padding-top: 12px;
+  border-top: 1px solid var(--hr-line, #e1e7f0);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap;
+}
+.dh-price { display: flex; align-items: baseline; gap: 5px; }
+.dh-price-from, .dh-price-unit { font-size: 11.5px; color: var(--hr-muted, #5b6b82); }
+.dh-price-amt { font-size: 18px; font-weight: 800; color: var(--navy, #0A2540); }
+.dh-view { padding: 9px 18px; font-size: 13.5px; margin-left: auto; }
+
+.dh-more-wrap { display: flex; justify-content: center; margin-top: 26px; }
+.dh-more {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 14px;
+  padding: 12px 28px; border-radius: 999px;
+  border: 1px solid var(--hr-line, #e1e7f0);
+  background: var(--hr-surface, #fff); color: var(--navy, #0A2540);
+}
+.dh-more:hover { border-color: var(--coral, #C9482F); color: var(--coral, #C9482F); }
+.dh-more[disabled] { opacity: .6; cursor: default; }
+
+/* A 240px floor on phones, which resolves to two columns on a tablet and ONE
+   on a handset. Measured, not guessed: at 430 a 150px floor produced two
+   177px cards, and 177px cannot carry a photograph, a name, a star row, a
+   location, three lines of description, four amenities and a button without
+   all of it turning to confetti. It also made 430 a two-column layout while
+   375 was one, which is a worse inconsistency than either choice alone. */
+@media (max-width: 720px) {
+  .dh-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .dh-card .hr-card-body { padding: 11px 12px 13px; }
+  .dh-card .hr-name { font-size: 15px; }
+  .dh-desc { -webkit-line-clamp: 2; font-size: 12.5px; }
+  .dh-card-foot { flex-direction: column; align-items: stretch; }
+  .dh-view { margin-left: 0; text-align: center; }
+}

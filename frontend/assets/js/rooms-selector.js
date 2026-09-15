@@ -150,9 +150,12 @@ const RoomsSelector = (function () {
       + '<button type="button" class="pax-trigger" id="' + id + 'Btn"'
       + ' aria-haspopup="dialog" aria-expanded="false">'
       + '<span class="pax-trigger-text"></span>'
-      + '<svg class="pax-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
+      + '<i data-jp-icon="chevronDown" class="pax-caret"></i>'
       + '</button>';
+
+    /* This control builds its markup long after jp-icons.js made its
+       document-wide pass, so its own placeholders need arming here. */
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(host);
 
     const trigger = host.querySelector('#' + id + 'Btn');
     const triggerText = host.querySelector('.pax-trigger-text');
@@ -229,8 +232,7 @@ const RoomsSelector = (function () {
       pop.innerHTML =
         '<div class="rooms-list">' + rooms + '</div>'
         + '<button type="button" class="mc-add rooms-add" data-add-room' + (atCap ? ' disabled' : '') + '>'
-        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
-        + ' aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another room</button>'
+        + '<i data-jp-icon="plus"></i>Add another room</button>'
         + '<div class="pax-pop-foot">'
         + '<p class="pax-hint" role="status">' + hint(atCap) + '</p>'
         + '<button type="button" class="pax-done" data-rooms-done>Done</button>'

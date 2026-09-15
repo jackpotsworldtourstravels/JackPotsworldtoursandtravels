@@ -319,7 +319,7 @@ const HotelRooms = (function () {
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"
-                aria-label="${esc(detail.stars)} star hotel">${'★'.repeat(detail.stars)}</span>` : ''}
+                aria-label="${esc(detail.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(detail.stars, detail.stars) : ''}</span>` : ''}
               <p class="hr-sum-hotel-loc">${esc(detail.location)}</p>
             </div>
           </div>

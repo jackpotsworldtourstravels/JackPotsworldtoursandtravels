@@ -192,7 +192,7 @@ const HotelConfirm = (function () {
           <div class="hr-name-row">
             <h3 class="hr-rv-name">${esc(booking.hotel_name)}</h3>
             ${hotel && hotel.stars ? `<span class="hr-stars" role="img"
-              aria-label="${esc(hotel.stars)} star hotel">${'★'.repeat(hotel.stars)}</span>` : ''}
+              aria-label="${esc(hotel.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(hotel.stars, hotel.stars) : ''}</span>` : ''}
           </div>
           ${booking.hotel_location
             ? `<p class="hr-loc">${icon('pin')} ${esc(booking.hotel_location)}</p>` : ''}
@@ -380,7 +380,7 @@ const HotelConfirm = (function () {
             <div>
               <p class="hr-sum-hotel-name">${esc(booking.hotel_name)}</p>
               ${hotel && hotel.stars ? `<span class="hr-stars" role="img"
-                aria-label="${esc(hotel.stars)} star hotel">${'★'.repeat(hotel.stars)}</span>` : ''}
+                aria-label="${esc(hotel.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(hotel.stars, hotel.stars) : ''}</span>` : ''}
               <p class="hr-sum-hotel-loc">${esc(booking.hotel_location || '')}</p>
             </div>
           </div>

@@ -33,26 +33,21 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------- icons --- */
+/* THE LOGIN PAGE'S PRIVATE ICON SET IS GONE. Seventeen marks, drawn here on
+   their own half-pixel grid -- a fifth plane, a fourth hotel, a third padlock.
+   Names now; the drawings come from jp-icons like everywhere else, so signing
+   in looks like the site you are signing in to. */
 const JPL_ICONS = {
-  user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5v-.8a7.2 7.2 0 0 1 14.4 0v.8"/>',
-  mail: '<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6 9 7 9-7"/>',
-  lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
-  key: '<circle cx="8" cy="14" r="4.5"/><path d="m11.2 10.8 8-8"/><path d="m16.5 5.5 2.5 2.5"/><path d="m14 8 2.5 2.5"/>',
-  check: '<circle cx="12" cy="12" r="9.2"/><path d="m8 12.3 2.8 2.8L16.2 9.7"/>',
-  eye: '<path d="M1.5 12s4-7.5 10.5-7.5S22.5 12 22.5 12s-4 7.5-10.5 7.5S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/>',
-  eyeOff: '<path d="M10.6 6.2A9.7 9.7 0 0 1 12 6c6.5 0 10.5 6 10.5 6a17 17 0 0 1-3.3 3.8M6.4 8.1A17 17 0 0 0 1.5 12S5.5 18 12 18a9.6 9.6 0 0 0 3.8-.8"/><path d="m2 2 20 20"/>',
-  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
-  chevron: '<path d="m9 5 7 7-7 7"/>',
-  headset: '<path d="M4 13v-1a8 8 0 0 1 16 0v1"/><rect x="2.5" y="13" width="4.5" height="6.5" rx="2"/><rect x="17" y="13" width="4.5" height="6.5" rx="2"/><path d="M19.2 19.5A3.5 3.5 0 0 1 15.8 22H13"/>',
-  plane: '<path d="M10.2 3.2a1.6 1.6 0 0 1 3.1 0L14.6 9l6.6 3a1 1 0 0 1 0 1.8L14.6 16l-1.3 5.2a1 1 0 0 1-1.9 0L10.1 16l-6.6-2.2a1 1 0 0 1 0-1.8L10.1 9Z"/>',
-  hotel: '<path d="M4 21V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16"/><path d="M2 21h20"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/>',
-  ship: '<path d="M3 17.5 5 11h14l2 6.5"/><path d="M3.5 17.5c1.8 0 1.8 1.5 3.6 1.5s1.8-1.5 3.6-1.5 1.8 1.5 3.6 1.5 1.8-1.5 3.6-1.5"/><path d="M8 11V6.5h8V11M12 3v3.5"/>',
-  bag: '<rect x="2.5" y="7" width="19" height="13" rx="2.5"/><path d="M8.5 7V5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2"/>',
-  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18Z"/>',
-  shield: '<path d="M12 3l7.5 3v5.5c0 4.4-3.1 8.2-7.5 9.5-4.4-1.3-7.5-5.1-7.5-9.5V6Z"/>',
-  users: '<path d="M15.5 20v-1.5a4 4 0 0 0-4-4h-4a4 4 0 0 0-4 4V20"/><circle cx="9.5" cy="7.5" r="3.5"/><path d="M21 20v-1.5a4 4 0 0 0-3-3.85"/><path d="M15.5 4.15a4 4 0 0 1 0 7.7"/>',
+  user: 'userRound',  mail: 'mail',        lock: 'lock',      key: 'key',
+  check: 'circleCheck', eye: 'eye',        eyeOff: 'eyeOff',
+  arrow: 'arrowRight', chevron: 'chevronRight', headset: 'headset',
+  plane: 'plane',     hotel: 'bedDouble',  ship: 'ship',
+  bag: 'briefcaseBusiness', globe: 'globe', shield: 'shieldCheck',
+  users: 'usersRound',
 };
-const jplIco = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${JPL_ICONS[name] || ''}</svg>`;
+const jplIco = name => (typeof JPIcon !== 'undefined')
+  ? JPIcon.html(JPL_ICONS[name] || 'circle', { className: 'jpl-ico' })
+  : '';
 
 /* Five services, evenly distributed. "Buses" is deliberately absent and the row
    is flex with `flex:1 1 0` items, so there is no gap where it used to be. */
@@ -192,7 +187,7 @@ function jplLoginCard({
         <button type="button" class="jpl-btn" id="${ids.verify}">Verify OTP ${jplIco('arrow')}</button>
         <div class="msg" id="${ids.otpMsg}"></div>
         <button type="button" class="jpl-btn jpl-btn-ghost" id="${ids.resend}">Resend OTP</button>
-        <button type="button" class="jpl-btn jpl-btn-ghost" id="${ids.back}">← Back to Login</button>
+        <button type="button" class="jpl-btn jpl-btn-ghost" id="${ids.back}">${jplIco('chevron')} Back to Login</button>
       </div>`;
 }
 
@@ -218,7 +213,7 @@ function jplForgotCard(ids) {
           </div>
           <button type="submit" class="jpl-btn">Send Reset Link ${jplIco('arrow')}</button>
           <div class="msg" id="${ids.msg}"></div>
-          <a class="jpl-btn jpl-btn-ghost" href="${ids.loginHref}">← Back to Login</a>
+          <a class="jpl-btn jpl-btn-ghost" href="${ids.loginHref}">${jplIco('chevron')} Back to Login</a>
         </form>
       </div>
 
@@ -259,7 +254,7 @@ function jplResetCard(ids) {
           </div>
           <button type="submit" class="jpl-btn" id="${ids.submit}">Update Password ${jplIco('arrow')}</button>
           <div class="msg" id="${ids.msg}"></div>
-          <a class="jpl-btn jpl-btn-ghost" href="${ids.loginHref}">← Back to Login</a>
+          <a class="jpl-btn jpl-btn-ghost" href="${ids.loginHref}">${jplIco('chevron')} Back to Login</a>
         </form>
       </div>
 

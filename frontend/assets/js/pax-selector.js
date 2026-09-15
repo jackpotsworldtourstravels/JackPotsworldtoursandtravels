@@ -165,9 +165,12 @@ const PaxSelector = (function () {
          one paintTrigger() writes with the full party in it. */
       ' aria-haspopup="dialog" aria-expanded="false">' +
       '<span class="pax-trigger-text">' + esc(summary(value)) + '</span>' +
-      '<svg class="pax-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
-      ' stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' +
+      '<i data-jp-icon="chevronDown" class="pax-caret"></i>' +
       '</button>';
+
+    /* This control builds its markup long after jp-icons.js made its
+       document-wide pass, so its own placeholders need arming here. */
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(host);
 
     const trigger = host.querySelector('#' + id + 'Btn');
     const triggerText = host.querySelector('.pax-trigger-text');

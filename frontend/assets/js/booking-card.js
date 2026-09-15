@@ -81,9 +81,9 @@ const BookingCard = (function () {
   /* ---------------------------------------------------------------------
      Markup
      --------------------------------------------------------------------- */
-  const calIcon = '<svg class="cal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-    + ' stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/>'
-    + '<path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+  /* CalendarDays, from jp-icons. It was drawn here with a bare rectangle and
+     three strokes, which is a calendar with no dates on it. */
+  const calIcon = '<i data-jp-icon="calendarDays" class="cal-icon"></i>';
 
   /** `area` is the named grid area the flights row places this field in
    *  (booking-card.css). The hotels panel uses main.css's plain column
@@ -176,7 +176,7 @@ const BookingCard = (function () {
   const swapButton = area =>
     '<button class="swap-btn" type="button"' + (area ? ' data-fg="' + area + '"' : '')
     + ' aria-label="Swap origin and destination">'
-    + '<span data-jp-icon="swap" data-jp-size="sm"></span></button>';
+    + '<span data-jp-icon="swap" class="jpi-field"></span></button>';
 
   /* SELECT A SPECIAL FARE — the five categories the reference names.
 
@@ -192,41 +192,30 @@ const BookingCard = (function () {
      FOR and does not change a price at checkout. Wiring that up is a pricing
      change, not a UI one. */
   const SPECIAL_FARES = [
-    { id: 'regular', label: 'Regular',           note: 'Regular fares' },
-    { id: 'student', label: 'Student',           note: 'Extra discounts/baggage' },
-    { id: 'armed',   label: 'Armed Forces',      note: 'Up to ₹ 600 off' },
-    { id: 'senior',  label: 'Senior Citizen',    note: 'Up to ₹ 600 off' },
-    { id: 'marine',  label: 'Marine Fare',       note: 'Up to ₹ 600 off' },
-  ];
-
-  /* Quick Tools. Each opens the thing that already exists and can answer it —
-     the fare calendar is the date picker, price alerts and flight status have
-     no feature behind them yet and say so rather than doing nothing. */
-  const QUICK_TOOLS = [
-    { id: 'status',   label: 'Flight Status' },
-    { id: 'calendar', label: 'Fare Calendar' },
-    { id: 'alerts',   label: 'Price Alerts' },
+    { id: 'regular', label: 'Regular',        note: 'Regular fares',           icon: 'circleDot' },
+    { id: 'student', label: 'Student',        note: 'Extra discounts/baggage', icon: 'graduationCap' },
+    { id: 'armed',   label: 'Armed Forces',   note: 'Up to ₹ 600 off',         icon: 'shieldCheck' },
+    { id: 'senior',  label: 'Senior Citizen', note: 'Up to ₹ 600 off',         icon: 'userRound' },
+    { id: 'marine',  label: 'Marine Fare',    note: 'Up to ₹ 600 off',         icon: 'ship' },
   ];
 
   function specialFaresHtml() {
     const tiles = SPECIAL_FARES.map(f =>
       '<button type="button" class="hr-fare' + (f.id === state.fare ? ' is-on' : '') + '"'
       + ' data-fare="' + f.id + '" aria-pressed="' + (f.id === state.fare) + '">'
-      + '<b>' + esc(f.label) + '</b><span>' + esc(f.note) + '</span></button>').join('');
+      + '<i data-jp-icon="' + f.icon + '" class="jpi-filter"></i>'
+      + '<span class="hr-fare-txt"><b>' + esc(f.label) + '</b>'
+      + '<span>' + esc(f.note) + '</span></span></button>').join('');
 
-    const tools = QUICK_TOOLS.map(t =>
-      '<button type="button" class="hr-tool" data-tool="' + t.id + '">'
-      + (typeof JPIcon !== 'undefined' ? JPIcon.html('sparkle', { size: 'sm' }) : '')
-      + '<span>' + esc(t.label) + '</span></button>').join('');
-
+    /* QUICK TOOLS WERE REMOVED HERE. Two of the three (Price Alerts, Flight
+       Status) had no feature behind them and answered a click with "not
+       available yet"; the third only re-opened the departure date picker that
+       is already one field above. The row cost a third of the card's height to
+       offer nothing the card could not already do. */
     return '<div class="hr-fares">'
       + '<div class="hr-fares-group">'
       + '<span class="hr-fares-lab">Select a special fare</span>'
       + '<div class="hr-fare-row" role="group" aria-label="Special fare">' + tiles + '</div>'
-      + '</div>'
-      + '<div class="hr-tools">'
-      + '<span class="hr-tools-lab">Quick Tools</span>'
-      + '<div class="hr-tool-row">' + tools + '</div>'
       + '</div></div>';
   }
 
@@ -259,9 +248,7 @@ const BookingCard = (function () {
          airports rather than collapsing the column. */
       + mirrorField('fRetFrom', 'Return From', 'rfrom')
       + '<div class="mirror-mark" data-fg="mirror" aria-hidden="true">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-      + '<path d="M17 2l4 4-4 4"/><path d="M3 6h18"/><path d="M7 22l-4-4 4-4"/><path d="M21 18H3"/>'
-      + '</svg></div>'
+      + '<i data-jp-icon="arrowLeftRight"></i></div>'
       + mirrorField('fRetTo', 'Return To', 'rto')
       + dateField('fRet', 'Return', 'ret')
       + '</div>'
@@ -275,8 +262,7 @@ const BookingCard = (function () {
       + '<div class="mc-routes" id="mcRoutes"></div>'
       + '<div class="mc-actions">'
       + '<button type="button" class="mc-add" id="mcAdd">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
-      + ' aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Another City</button>'
+      + '<i data-jp-icon="plus"></i>Add Another City</button>'
       + '<p class="mc-limit" id="mcLimit" role="status"></p>'
       + '</div>'
       + '<div class="mc-party" id="mcParty"></div>'
@@ -288,9 +274,9 @@ const BookingCard = (function () {
       + '<div class="field" data-fg="cabin" id="fCabinField"><label for="fCabin">Cabin</label>'
       + '<select id="fCabin">' + cabin + '</select></div>'
 
-      /* The special-fare row and the quick tools, under the fields — where the
-         reference puts them, and inside the flights panel because they are
-         about flights and nothing else. */
+      /* The special-fare row, under the fields — where the reference puts it,
+         and inside the flights panel because it is about flights and nothing
+         else. */
       + specialFaresHtml()
       + '</div>';
   }
@@ -514,7 +500,7 @@ const BookingCard = (function () {
   const TABS = [
     { id: 'flights',  label: 'Flights',          icon: 'flights' },
     { id: 'hotels',   label: 'Hotels',           icon: 'hotels' },
-    { id: 'packages', label: 'Holiday Packages', icon: 'packages' },
+    { id: 'packages', label: 'Tour Packages', icon: 'packages' },
     { id: 'gaming',   label: 'Gaming Packages',  icon: 'gaming' },
   ];
 
@@ -548,7 +534,7 @@ const BookingCard = (function () {
           + ' aria-selected="' + on + '" aria-controls="' + panelId(t.id) + '"'
           + ' tabindex="' + (on ? '0' : '-1') + '"'
           + ' data-tab="' + t.id + '">'
-          + (typeof JPIcon !== 'undefined' ? JPIcon.html(t.icon, { size: 'sm' }) : '')
+          + '<i data-jp-icon="' + t.icon + '" class="jpi-btn"></i>'
           + '<span>' + esc(t.label) + '</span></button>';
       }).join('')
       + '</div>';
@@ -560,8 +546,8 @@ const BookingCard = (function () {
          remain are statements about how the service works, not about how many
          people have used it. */
       '24/7 Support', 'Secure Payments', 'Instant Confirmation',
-    ].map(t => '<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-      + '<path d="M20 6L9 17l-5-5"/></svg>' + esc(t) + '</span>').join('');
+    ].map(t => '<span class="jpi-row jpi-row--tight">'
+      + '<i data-jp-icon="check" class="jpi-meta"></i>' + esc(t) + '</span>').join('');
 
     /* THE RESULTS-PAGE FORM IS A BAR, NOT THE LANDING PAGE'S CARD.
        Same fields, same handlers, same validation — what it drops is the
@@ -583,8 +569,7 @@ const BookingCard = (function () {
       + '<span class="search-strip-sub"></span>'
       + '</span>'
       + '<span class="search-strip-edit">Edit'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"'
-      + ' stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+      + '<i data-jp-icon="chevronDown"></i>'
       + '</span></button>'
       /* THE PRODUCT TABS ARE THE FIRST THING IN THE CARD PROPER, above every
          field. What you are booking is the question that decides what the rest
@@ -636,8 +621,7 @@ const BookingCard = (function () {
       + airportField('mcTo' + uid, 'To Airport', 'to', seg.to || '', 'Where to?')
       + dateField('mcDate' + uid, 'Departure')
       + '<button type="button" class="mc-remove" data-mc-remove="' + uid + '">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
-      + ' aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+      + '<i data-jp-icon="x"></i>'
       + '<span class="sr-only">Remove this flight</span></button>'
       + '</div>';
   }
@@ -911,6 +895,8 @@ const BookingCard = (function () {
     if (on) paintSummary();
   }
 
+  const GO_ARROW = '<i data-jp-icon="search" class="search-go-arrow jpi-btn"></i>';
+
   function paintSearchButton() {
     const go = root && root.querySelector('.search-go');
     if (!go || busy) return;   // a repaint mid-send must not undo setBusy's label
@@ -929,8 +915,17 @@ const BookingCard = (function () {
     const group = state.tab === 'hotels' && state.hotelMode === 'group';
     /* The reference names the product on the button. */
     const LABEL = { flights: 'Search Flights', hotels: 'Search Hotels',
-                    packages: 'Search Packages', cruises: 'Search Cruises' };
-    go.textContent = group ? 'Request Group Quote' : (LABEL[state.tab] || 'Search');
+                    packages: 'Search Packages', gaming: 'Search Gaming Packages',
+                    cruises: 'Search Cruises' };
+    const label = group ? 'Request Group Quote' : (LABEL[state.tab] || 'Search');
+    /* THE ARROW IS THE DESIGN'S, and it is only on a SEARCH. "Request Group
+       Quote" opens an enquiry and goes nowhere, so an arrow promising forward
+       motion would be describing the wrong thing. The button is already
+       inline-flex with a 12px gap (home-ref.css), so the glyph needs no
+       layout of its own. innerHTML, not textContent — setBusy() still writes
+       textContent for "Sending…", which drops the arrow for the duration and
+       paintSearchButton() puts it back. */
+    go.innerHTML = esc(label) + (group ? '' : GO_ARROW);
     go.classList.toggle('is-wide', group);
   }
 
@@ -958,8 +953,7 @@ const BookingCard = (function () {
     done.className = 'hotel-sent';
     done.setAttribute('role', 'status');
     done.innerHTML =
-      '<svg class="hotel-sent-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>'
+      '<i data-jp-icon="circleCheckBig" class="hotel-sent-tick"></i>'
       + '<h3>' + (who ? 'Thanks, ' + esc(who) + '.' : 'Thanks — that\'s with us.') + '</h3>'
       + '<p>Your enquiry for ' + esc(where) + ' has reached the group desk. '
       + 'We reply to group enquiries within one working day.</p>'
@@ -1733,8 +1727,8 @@ const BookingCard = (function () {
   function bind() {
     bindSubLabels();
 
-    /* The special fare and the quick tools. Delegated on the card root because
-       the flights panel is re-rendered whenever the trip type changes. */
+    /* The special fare. Delegated on the card root because the flights panel
+       is re-rendered whenever the trip type changes. */
     root.addEventListener('click', e => {
       const fare = e.target.closest('[data-fare]');
       if (fare) {
@@ -1745,18 +1739,6 @@ const BookingCard = (function () {
           b.setAttribute('aria-pressed', String(on));
         });
         return;
-      }
-      const tool = e.target.closest('[data-tool]');
-      if (tool) {
-        /* Only the fare calendar has something behind it — the departure date
-           picker. The other two have no feature yet, and a button that opens
-           nothing is worse than one that says so. */
-        if (tool.dataset.tool === 'calendar') {
-          const dep = root.querySelector('#fDep');
-          if (dep) { dep.focus(); dep.click(); }
-        } else if (typeof showToast === 'function') {
-          showToast(tool.textContent.trim() + ' is not available yet.', true);
-        }
       }
     });
     /* The collapsed summary. Delegated so it survives a re-render, and it

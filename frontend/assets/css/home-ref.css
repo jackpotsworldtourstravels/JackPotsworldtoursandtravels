@@ -13,8 +13,8 @@
      - a taller hero with an eyebrow, a two-tone headline and a four-item
        trust row carrying icons and sub-lines
      - the "Travel More / Worry Less" script mark at the top right
-     - a wider, flatter search card: bigger tabs, a special-fare row, a
-       quick-tools cluster and one large centred call to action
+     - a wider, flatter search card: bigger tabs, a special-fare row and one
+       large centred call to action
      - a four-card offer strip on cream
      - a six-tile destination grid with its own pager
 
@@ -46,6 +46,14 @@ body.home-ref {
      tokens for both states, because both states are dark. */
   --hr-onhero:     rgba(255,255,255,.92);
   --hr-onhero-dim: rgba(255,255,255,.70);
+  /* THE HERO PHOTOGRAPH. The slot below (.hero-bg) falls back to a dusk
+     gradient when this is unset, which is what the page shipped with while
+     there was no asset. Supplied 2026-09-11 as a 1983x793 PNG and converted
+     to WebP at q86: 1704 KB -> 117 KB, which is the difference between a
+     hero that paints on a phone connection and one that does not. The
+     original PNG is not in the repo; re-export from it if a wider crop is
+     ever needed. */
+  --hr-shot-hero: url('../images/hero-sunset.webp');
   background: #fff;
 }
 
@@ -55,7 +63,7 @@ body.home-ref {
    results-page search row, because the row cannot edit a multi-city
    itinerary, a special fare or Group Deals and the card can. Mounted there it
    arrived UNSTYLED: every rule that dresses it — the tab row, the fare tiles,
-   the quick tools, the enquiry panel — was scoped to `body.home-ref`, which
+   the enquiry panel — was scoped to `body.home-ref`, which
    only index.html sets, so the fare tiles came out as a run-on line of text.
 
    So the CARD sections (3, 4, 8, 10 and the card lines of 7) match either
@@ -118,15 +126,26 @@ body.home-ref header#siteHeader .logo-mark-img { height: 70px; width: auto; }
    words. The icon comes from jp-icons (one family for the whole site); a link
    with no icon simply renders its label, so nothing breaks if one is added
    without one. */
-/* `safe center`, not `center`. Centred flex content that does not fit
-   overflows at BOTH ends, and the end that overflows first is the one the
-   header clips against the logo — which is how Flights, the first cell,
-   stopped being visible on a full-screen window. `safe` abandons the centring
-   the moment the row runs out of room, so the row starts flush and scrolls
-   instead of hiding its own first link. */
+/* THE ROW STARTS AT THE LOGO, it does not centre in what is left.
+
+   It was `safe center` — chosen because plain `center` overflows at BOTH ends
+   when the row does not fit, and the end that overflows first is the one the
+   header clips against the logo, which is how Flights stopped being visible on
+   a full-screen window. `safe` fixed the clipping but kept the centring, and
+   with only five cells left in the nav that put 288px of empty bar between the
+   mark and the first link on a 1600px window.
+
+   `flex-start` solves both: the row begins a fixed gutter after the logo at
+   every width (main.css sets that gutter), and when it does not fit it scrolls
+   from the left rather than hiding its own first link. */
+/* A grid item takes neither `flex` nor `justify-content` — nav.wrap is a
+   three-column grid now (main.css) and the centre track is what positions
+   this. Both were dropped rather than left to read as if the row still
+   stretched; `flex: 1` here was also what out-specified main.css and kept the
+   nav filling the bar. */
 body.home-ref .navlinks {
-  display: flex; align-items: stretch; gap: 2px; flex: 1;
-  justify-content: safe center; overflow-x: auto; scrollbar-width: none;
+  display: flex; align-items: stretch; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
 }
 body.home-ref .navlinks::-webkit-scrollbar { display: none; }
 body.home-ref .navlinks a {
@@ -135,13 +154,22 @@ body.home-ref .navlinks a {
   font-size: 12.5px; font-weight: 600; line-height: 1.2; color: var(--hr-onhero);
   text-align: center; white-space: nowrap; position: relative;
 }
-body.home-ref .navlinks a .jpi,
-body.home-ref .navlinks a svg { width: 20px; height: 20px; color: var(--hr-onhero-dim); }
+/* `:not(.nav-caret)` is load-bearing. This rule paints the PRODUCT GLYPH — the
+   icon that sits above each label — and "any icon inside a nav link" used to be
+   a safe way to say that, because the glyph was the only one in there. The
+   "More" chevron is an icon too, and it was being inflated to a 20x20 square
+   and repainted in the glyph's dim colour, so it read as a second icon rather
+   than as a caret.
+
+   IT MATCHES ON .jpi, NOT ON svg. Every nav icon is a jp-icons drawing now, so
+   the class that says "this is the caret" sits on the hydrated <span> — a
+   selector reaching through to the inner <svg> would no longer see it, and the
+   caret would be back to 20px. Size comes from .jpi-nav; this sets colour. */
+body.home-ref .navlinks a .jpi:not(.nav-caret) { color: var(--hr-onhero-dim); }
 /* Hover is a wash of light, not the cream tile — cream on a clear bar is a
    pale block floating on the photograph. */
 body.home-ref .navlinks a:hover { background: rgba(255,255,255,.12); color: #fff; }
-body.home-ref .navlinks a:hover .jpi,
-body.home-ref .navlinks a:hover svg { color: #fff; }
+body.home-ref .navlinks a:hover .jpi { color: #fff; }
 /* The current page: accent label, accent icon, accent underline. --coral-light
    rather than --coral-dark: the deepened shade is for white backgrounds and
    goes muddy against the hero. */
@@ -177,19 +205,14 @@ body.home-ref .nav-actions .hr-wish { color: var(--hr-onhero); }
 body.home-ref .nav-actions .nav-icon-btn { display: none; }
 html.jp-signed-in body.home-ref .nav-actions .nav-icon-btn { display: inline-grid; }
 
-/* THE B2B DOOR IS CLOSED ON THIS PAGE. index.html marks its two copies
-   `aria-disabled` (the header pill and the drawer link); every other page's
-   header comes from hero-shell.js and is untouched. Keyed on the attribute
-   rather than a class so the thing a screen reader is told and the thing the
-   pointer does cannot disagree — `tabindex="-1"` in the markup is what takes
-   it out of the tab order, and `pointer-events` is what stops the click. */
-body.home-ref .nav-partner-mark[aria-disabled="true"],
-body.home-ref .mobile-partner-mark[aria-disabled="true"] {
-  pointer-events: none; cursor: default; opacity: .45;
-}
-body.home-ref .nav-partner-mark[aria-disabled="true"]:hover {
-  border-color: rgba(255,255,255,.32); background: none; transform: none;
-}
+/* THE B2B DOOR IS OPEN ON EVERY PAGE, including this one.
+
+   It used to be disabled here — `pointer-events: none`, `aria-disabled` and
+   `tabindex="-1"` on the two copies in index.html — so that the front page
+   advertised the partner portal without letting a B2C visitor walk into a B2B
+   login. The owner has since asked for it to be clickable everywhere, so the
+   disabling is gone from both the markup and this file, and the pill is an
+   ordinary link to partner-login.html wherever it appears. */
 /* The partner pill is an OUTLINE on the hero, not a white lozenge. A white
    fill here reads as a button pasted over the photograph, and it is the one
    control in the bar that is a link to somewhere else rather than an action. */
@@ -209,7 +232,10 @@ body.home-ref .hr-wish {
 }
 /* The heart keeps its red — it is the one deliberate spot of colour in the
    utility row, and #E24B4A still clears the hero and the dark bar. */
-body.home-ref .hr-wish svg { width: 18px; height: 18px; color: #E24B4A; }
+/* Sized by .jpi-btn; this sets the one colour that is not inherited — the
+   heart is red on a bar where everything else is white. Matching on .jpi
+   rather than svg keeps the host box and the drawing the same size. */
+body.home-ref .hr-wish .jpi { color: #E24B4A; }
 body.home-ref .hr-cur {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 6px 11px; border: 1px solid rgba(255,255,255,.34); border-radius: 8px;
@@ -239,9 +265,33 @@ body.home-ref .pm-signup {
    that height itself and the sky shows through the clear bar. 128px is
    main.css's `nav.wrap { height: 128px }` — the two have to agree, and this
    page never gets `.is-solid`, which is the only thing that shortens it. */
-body.home-ref .hero { min-height: 0; padding: 128px 0 48px; }
+/* The bottom padding came down with the trust row: 48px was air under a
+   four-row block, and under a headline, one line of copy and the card it was
+   a gap for its own sake. */
+/* 104px, down from 128. The header is 128px tall and this used to clear it
+   exactly; it does not have to, because .hero-inner adds its own padding and
+   the eyebrow's cap height leaves air above it anyway. Every pixel taken here
+   lifts the search card by the same amount. */
+body.home-ref .hero { min-height: 0; padding: 104px 0 34px; }
+/* THE SCRIM FOLLOWS THE TEXT, NOT THE OLD PLACEHOLDER.
+   This was a 90deg wash, .86 opaque at the left edge — right when the hero was
+   a flat gradient and the headline was set hard left. Both of those changed:
+   the headline is centred now, and behind it is a photograph whose own left
+   side is the darkest thing in the frame (a night coastline) and whose right
+   is the sun. Kept as it was, it buried the coastline and the city lights
+   under near-black while adding nothing where the text actually sits.
+
+   Top-down instead, and much lighter. Heaviest across the top, where the
+   clear header and the headline sit; almost open through the middle, where
+   the photograph is worth seeing; and lifting again at the foot so the card's
+   top edge has something to sit against rather than floating on bright cloud. */
 body.home-ref .hero-overlay {
-  background: linear-gradient(90deg, rgba(8,16,32,.86) 0%, rgba(8,16,32,.55) 46%, rgba(8,16,32,.30) 100%);
+  background:
+    linear-gradient(180deg,
+      rgba(6,14,28,.62) 0%,
+      rgba(6,14,28,.42) 26%,
+      rgba(6,14,28,.16) 52%,
+      rgba(6,14,28,.38) 100%);
 }
 body.home-ref .hero-bg {
   background-image: var(--hr-shot-hero, linear-gradient(120deg, #08303C 0%, #14515F 34%, #9C4632 72%, #E8604C 100%));
@@ -252,45 +302,263 @@ body.home-ref .hero-bg {
    break that — but it is not what this page shows. */
 body.home-ref .hero-video-layer { display: none; }
 
-body.home-ref .hero-inner { padding-top: 46px; max-width: var(--max, 1280px); }
+/* 46px of it was clearance for a headline that ran to two rows, then 26 for a
+   one-row headline with a sub-line under it. Neither is the shape any more:
+   the sub-line is gone and the headline is smaller, so 14 is the whole of what
+   is needed between the header and the eyebrow. Every pixel taken here lifts
+   the search card by the same amount — the card is what this page is for and
+   it should not start below the fold. */
+body.home-ref .hero-inner { padding-top: 14px; max-width: var(--max, 1280px); }
+/* THE HERO HEADLINE IS THE ONLY PLACE TWO EXTRA FACES ARE USED.
+
+   "Travel More" is Playfair Display — a high-contrast serif that reads as
+   premium print rather than as UI. "Worry Less" is Yellowtail, a slanted brush
+   script, in the warm coral. The pair is the whole point: an elegant statement
+   and a handwritten aside, belonging to one sentence.
+
+   YELLOWTAIL, NOT PACIFICO, AND THE DIFFERENCE IS THE SLANT. Pacifico is a
+   round, near-upright brush face; the supplied design is a strongly slanted
+   calligraphic one whose letters connect and whose 'y' carries its descender
+   into the next word. Set beside them, Great Vibes / Alex Brush / Allura are
+   too light to hold up at this size against the sky, Kaushan Script is close
+   but sits too upright, and Yellowtail is the one that matches the weight and
+   the lean.
+
+   NEITHER FACE LEAVES THIS HEADLINE. Navigation, buttons, field labels, field
+   values and body copy all stay on Montserrat — a script face on a control is
+   what makes an interface look costume rather than considered, and main.css's
+   --ff-head is deliberately NOT touched so every other heading on every other
+   page is unchanged.
+
+   THE TWO ARE OPTICALLY MATCHED, NOT NOMINALLY. A script's lowercase is small
+   for its em and it carries a long descender, so set at the serif's nominal
+   size it reads as the smaller of the two and sits high. Yellowtail needs more
+   of a correction than Pacifico did — it is the more slanted face and its
+   x-height is smaller still — hence 1.18em rather than 1.06, and a deeper
+   baseline nudge. Re-measure these two numbers if the face changes again;
+   they belong to it, not to the layout. `font-display: swap`
+   (in the Google URL) means the headline paints in Montserrat first and
+   re-flows — acceptable for two words, and the alternative is invisible text.
+
+   FALLBACKS ARE REAL FACES, not just `serif`/`cursive`: a headline that falls
+   back to the browser's default cursive is unreadable on some machines, so
+   Georgia and Segoe Script are named ahead of the generics. */
 body.home-ref .hero .eyebrow {
-  font-size: 12.5px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
-  color: rgba(255,255,255,.82); margin-bottom: 14px;
+  /* Smaller, and the tracking with it. At 14px on .34em this ran 580px wide —
+     a line of spaced capitals as long as the headline underneath, which made
+     two headlines competing rather than a label over a statement. At 12px/.3em
+     it reads as the kicker it is. */
+  font-size: clamp(10.5px, .82vw, 12px); font-weight: 600;
+  letter-spacing: .3em; text-transform: uppercase;
+  color: rgba(255,255,255,.78); margin-bottom: 13px;
+  /* `.eyebrow` is `display:flex` in main.css (it carries a rule before the
+     text). A flex container does not read `text-align`, so the centring the
+     hero block sets travelled to the headline and the sub-line and stopped
+     dead here — the eyebrow alone stayed flush left. `justify-content` is the
+     flex spelling of the same instruction. */
+  justify-content: center;
 }
 body.home-ref .hero .eyebrow::before { display: none; }
+
 body.home-ref .hero h1 {
-  font-size: clamp(38px, 5.4vw, 62px); line-height: 1.06; font-weight: 800;
-  color: #fff; letter-spacing: -.02em; margin: 0;
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  /* 62px at the top, down from 76. The headline is the loudest thing on the
+     page and it was pushing the search card towards the fold; this keeps it
+     the largest type on screen by a wide margin and gives ~15px back to the
+     card. The floor moves 40 -> 34 in step, which also lets the line hold one
+     row down to a narrower window than before. */
+  font-size: clamp(34px, 4.6vw, 62px); line-height: 1.04; font-weight: 700;
+  color: #fff; letter-spacing: -.015em; margin: 0;
+  /* main.css caps `.hero h1` at 16ch, which is right for a headline meant to
+     break across two rows and wrong for one meant to read as a single line:
+     "Travel More Worry Less" is 22 characters, so it wrapped after "Worry" and
+     left "Less" stranded on a row of its own. */
+  max-width: none;
 }
-/* THE BRIGHT CORAL, not the fill shade. --coral is deepened so white text
-   clears AA on top of it; nothing sits on top of a headline, and against the
-   dark hero the bright shade is the one that actually sings. */
-body.home-ref .hero h1 .accent { color: var(--coral-light); display: block; }
+body.home-ref .hero h1 .accent {
+  font-family: 'Yellowtail', 'Segoe Script', 'Brush Script MT', cursive;
+  font-weight: 400; font-size: 1.18em; letter-spacing: 0;
+  color: var(--coral-light); display: inline;
+  position: relative; top: .1em;
+  /* A slanted script's strokes thin out against a dark sky at this size; the
+     shadow is contrast, not decoration, and is too tight to read as a glow. */
+  text-shadow: 0 2px 18px rgba(0,0,0,.28);
+  /* The face leans right, so its last glyph overhangs its own advance width
+     and the flourish that follows would otherwise start inside the 's'. */
+  padding-right: .06em;
+}
+/* ==========================================================================
+   THE HERO FLIGHT PATH
+   --------------------------------------------------------------------------
+   A decorative route drawn out of the end of "Worry Less": a smooth run right,
+   one loop, then a climb to an aeroplane at the top right. It replaced a much
+   smaller swoosh that sat inline in the headline.
+
+   SIZED IN em SO IT TRACKS THE HEADLINE, capped in vw so it cannot reach the
+   window edge on a 1366 screen, where the centred headline already ends about
+   330px from it. `.hero` clips its own overflow (main.css, for the film and
+   the parallax), so an over-long path would be cut rather than scroll — the
+   cap is what keeps it whole.
+
+   THE COLOUR IS THE HEADLINE'S. --coral-light is what `.accent` uses for
+   "Worry Less"; the line, the loop and the aircraft all inherit it through
+   `currentColor`, so the route reads as part of that phrase rather than as a
+   second decoration that happens to sit nearby.
+   ========================================================================== */
+body.home-ref .hero h1 .hr-accent-wrap { position: relative; display: inline-block; }
+
+body.home-ref .hr-flightpath {
+  position: absolute; left: 100%; bottom: -.06em;
+  /* 4.4em IS 3.6em's LENGTH, HELD THROUGH A SMALLER HEADLINE. The route is
+     sized in em so it tracks the type, which is right — but the headline just
+     dropped from 76px to 62px, and at 3.6em that would have quietly taken the
+     route from 274px back down to 223px, undoing the restore that was asked
+     for one change earlier. 4.4 x 62 = 273px: the same route, beside smaller
+     words. Re-derive this multiplier if the headline size changes again; it
+     belongs to that size, not to the drawing.
+
+     18vw IS NOT DECORATION HERE, unlike at the smaller sizes. At 3.6em the
+     route is wider than the gutter beside the headline on everything below
+     about 1520px, so the vw term is what actually decides the width from there
+     down — 246px at 1366, 198px at 1100, 138px at 768. It is the reason the
+     route fits at all on a laptop, and it is why the breakpoints below could be
+     re-derived rather than reverted along with the size.
+
+     THE 6px IS MEASURED SLACK, NOT A FUDGE. 18vw tracks that gutter closely —
+     too closely once the route is shown below 1100, where it ships now: the
+     aeroplane cleared the window edge by 6px at 768 and 9px at 900, which is
+     three stroke widths and one font-metric difference away from being clipped.
+     Taking 6px off the vw term buys that margin back at every width the vw term
+     governs, and costs NOTHING at the size this change was about: above 1520 the
+     em term wins and the route is 274px either way. */
+  width: min(4.4em, calc(18vw - 6px)); height: auto;
+  overflow: visible; pointer-events: none;
+  color: var(--coral-light);
+}
+
+body.home-ref .hr-fp-line {
+  fill: none; stroke: currentColor;
+  /* THE PEN IS THE SAME WIDTH AT EVERY SIZE. A plain stroke-width is in viewBox
+     units and shrinks with the box: 2.6 over a 412-unit box came out at 1.7px
+     on a 1920 screen but 0.7px once the route was down to tablet size, which
+     is a hairline losing a fight with a sunset photograph — the line was there
+     and could not be seen. `non-scaling-stroke` takes the stroke out of that
+     scaling, so 1.9px is 1.9px from 700px up. 1.9 because it matches what the
+     old 3.6em route measured on a full screen: the weight is unchanged where
+     it was already right, and only the small end gains. */
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
+  /* pathLength NORMALISES THE DASH MATHS TO 100 UNITS, so the draw works
+     without measuring the real length in script and stays correct at every
+     size the svg scales to. */
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: hr-fp-draw 3.2s cubic-bezier(.45,.05,.35,1) .35s forwards;
+}
+@keyframes hr-fp-draw { to { stroke-dashoffset: 0; } }
+
+/* THE AIRCRAFT RIDES THE PATH, it does not fly to a guessed end point.
+   Same duration, delay and easing as the draw above, and both are parametrised
+   by distance along the same curve — so the aeroplane sits exactly on the
+   growing tip of the line for the whole animation instead of drifting off it.
+   `offset-rotate: auto` is what turns it into the corners and leaves it
+   pointing up-right at the end, because that is where the route ends. */
+body.home-ref .hr-fp-plane {
+  fill: currentColor;
+  offset-path: path("M 6 198 C 60 214, 120 214, 176 196 C 216 190, 229.5 171.2, 264.8 157.2 C 285.3 149, 295.3 125.7, 287.2 105.2 C 279 84.7, 255.7 74.7, 235.2 82.8 C 214.7 91, 204.7 114.3, 212.8 134.8 C 221 155.3, 244.3 165.3, 264.8 157.2 C 318.7 135.7, 328.8 90.4, 388 46");
+  offset-rotate: auto;
+  offset-distance: 0%;
+  opacity: 0;
+  animation: hr-fp-fly 3.2s cubic-bezier(.45,.05,.35,1) .35s forwards;
+}
+@keyframes hr-fp-fly {
+  0%   { offset-distance: 0%;   opacity: 0; }
+  7%   { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 1; }
+}
+
+/* Without motion paths the aeroplane would sit at the viewBox origin, which is
+   the top left corner and nowhere near the route. Parked at the end instead,
+   turned to the path's closing bearing (0.80, -0.60 => -36.87deg). */
+@supports not (offset-path: path("M 0 0")) {
+  body.home-ref .hr-fp-plane {
+    animation: none; opacity: 1;
+    transform: translate(388px, 46px) rotate(-36.87deg);
+  }
+}
+
+/* REDUCED MOTION GETS THE DESTINATION, NOT THE JOURNEY: the finished route and
+   the aeroplane parked at the end of it, drawn in full with nothing moving. */
+@media (prefers-reduced-motion: reduce) {
+  body.home-ref .hr-fp-line { animation: none; stroke-dashoffset: 0; }
+  body.home-ref .hr-fp-plane { animation: none; offset-distance: 100%; opacity: 1; }
+}
+
+/* WHERE THE ROUTE RUNS OUT OF WINDOW — one band, measured, not a guess.
+
+   RE-MEASURED FOR THE SMALLER HEADLINE, and it moved a long way. Dropping the
+   headline to 62/34px narrowed the line itself, which WIDENS the gutter beside
+   it at every width — so the band where the route cannot fit shrank from
+   481-699 to 441-599, and the bottom cutoff went away almost entirely. These
+   numbers belong to that headline size: change it again and re-measure, the
+   way this had to be. Clearance is between the last of the INK — the
+   aeroplane, not the box, which carries 24 empty units on its right — and the
+   clipping edge, scrollbar already out of it:
+
+       900px  one row   156px route   clears by 63px
+       700px  one row   120px route   clears by 47px
+       640px  one row   109px route   clears by 27px
+       600px  one row   102px route   clears by 14px
+       580px  one row    98px route   clears by 8px
+       560px  one row    95px route   clears by 2px    <- the edge
+       460px  one row    77px route   OVERFLOWS by 31px
+
+   THE SQUEEZE IS NOT THE WRAP, IT IS THE ROW BEFORE IT. Between roughly 440 and
+   570 the headline is still ONE row, held at the 34px floor of its clamp, and
+   it very nearly fills the screen — 46px of gutter at 460, 39px at 446 — while
+   the route is still 74-95px wide.
+
+   BELOW THE WRAP THE ROOM COMES BACK, and now it does not run out again: the
+   route clears by 56px at 430, 43px at 390, 27px at 340 and 21px at 320, the
+   narrowest viewport anything still ships. The lower rule is a backstop at 279,
+   past which the headline's 34px floor stops the line shrinking while the
+   window keeps going and the gutter collapses under the route. No real device
+   reaches it.
+
+   BOTH BOUNDS ARE BIASED TOWARDS HIDING. The wrap is a cliff — 39px of gutter
+   one pixel wide of it, 127px the other side — and exactly where it falls
+   depends on font metrics this stylesheet does not control, as does every
+   number above. So the band starts at 599 rather than the 560 that still
+   fitted by 2px, and ends at 441 rather than the ~435 where the wrap was
+   measured. The margin is spent hiding a few widths that would have been fine,
+   which costs nothing, rather than showing one that is not, which clips the
+   aeroplane. */
+@media (max-width: 599px) and (min-width: 441px) {
+  body.home-ref .hr-flightpath { display: none; }
+}
+@media (max-width: 279px) {
+  body.home-ref .hr-flightpath { display: none; }
+}
+
 body.home-ref .hero .sub {
-  margin-top: 16px; font-size: 17px; color: rgba(255,255,255,.88); max-width: 46ch;
+  margin-top: 18px; font-size: clamp(16px, 1.3vw, 20px);
+  color: rgba(255,255,255,.86); max-width: 46ch; line-height: 1.6;
 }
 
-/* The four-item trust row. Icon in an outlined lozenge, a bold line and a
-   quiet one — the reference's own shape. */
-body.home-ref .hr-trust {
-  display: flex; flex-wrap: wrap; gap: 34px; margin-top: 30px;
-}
-body.home-ref .hr-trust-item { display: flex; align-items: center; gap: 11px; }
-body.home-ref .hr-trust-ic {
-  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
-  border: 1.5px solid rgba(255,255,255,.42); border-radius: 9px; color: #fff;
-}
-body.home-ref .hr-trust-ic svg { width: 17px; height: 17px; }
-body.home-ref .hr-trust b {
-  display: block; font-size: 14px; font-weight: 700; color: #fff; line-height: 1.25;
-}
-body.home-ref .hr-trust span {
-  display: block; font-size: 12.5px; color: rgba(255,255,255,.72); margin-top: 1px;
-}
+/* A headline that changes face mid-word is exactly what a reduced-motion or
+   low-bandwidth reader does not need re-flowing twice; nothing here animates,
+   so there is no motion to reduce. Left as a note so it is not "fixed". */
 
-/* "Travel More / Worry Less" — the script mark at the top right. Drawn as
-   text with a gold underline swoosh rather than shipped as an image, so it
-   stays crisp at any zoom and can be translated. */
+/* The hero's trust row is gone with its markup — see index.html. `.hr-trust`
+   is NOT free to reuse: hotel.css styles a different component of the same
+   name (`.hr-trust-row` inside it) for the hotel booking screens, and only
+   these `body.home-ref` rules were the landing page's. */
+
+/* THE SCRIPT MARK IS NOW THE HEADLINE. These rules styled a "Travel More /
+   Worry Less" flourish for the top right corner that no markup ever rendered —
+   the phrase is the <h1> instead. Kept rather than deleted only as long as it
+   takes to say so: if the corner mark is wanted BESIDE the headline one day it
+   wants writing against the headline, not resurrecting against nothing.
+   DEAD — no element carries `hr-script`. */
 body.home-ref .hr-script {
   position: absolute; right: clamp(16px, 4vw, 74px); top: 84px;
   text-align: center; pointer-events: none; z-index: 2;
@@ -306,7 +574,70 @@ body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(
 /* ==========================================================================
    3. SEARCH CARD
    ========================================================================== */
-:is(body.home-ref, .hr-card-scope) .search-dock { max-width: var(--max, 1280px); margin-top: 26px; }
+:is(body.home-ref, .hr-card-scope) .search-dock { max-width: var(--max, 1280px); margin-top: 20px; }
+
+/* THE CARD NARROWS ONLY WHERE THERE IS ROOM TO SPARE.
+   The design puts the card at about 70% of the window with a gutter either
+   side, and a label in the right one. Taken literally at every width that is
+   a six-field search row squeezed into 700px, so the trade is made once, at
+   1400px: above it the card gives up 420px of the window, and below it nothing
+   changes and the label is not rendered at all.
+
+   1500 RATHER THAN 1300, and there is no floor. Both earlier attempts were
+   worse: a 1020px floor at 1300 left a 172px gutter for a label that needs
+   about 190 and they overlapped, and taking 420px at 1400 left the card at
+   916px, which wrapped the five special-fare chips onto a second row. 1500 is
+   where 400px can come off and still leave a card (~1036px) that holds the
+   six-field row and the fare chips on one line each. `min()` with --max stops
+   the card growing past the page's own content width, so past about 1700 the
+   cap is doing the narrowing on its own and the gutter only gets wider. */
+@media (min-width: 1500px) {
+  body.home-ref .search-dock {
+    max-width: min(var(--max, 1280px), calc(100vw - 400px));
+  }
+}
+
+/* The label itself. Absolutely placed against `.hero`, which is the nearest
+   positioned ancestor (main.css sets `position: relative` on it for the film
+   and the overlay). Hidden by default and switched on with the gutter, so the
+   two can never disagree about whether there is space for it. */
+body.home-ref .hr-discover { display: none; }
+/* 1500 HERE TOO. This breakpoint and the one narrowing .search-dock above are
+   one decision, not two: the label only has a gutter to sit in because the
+   card gave the width up. Left at 1400 while the card moved to 1500, the label
+   appeared over a card that was still full width. */
+@media (min-width: 1500px) {
+  body.home-ref .hr-discover {
+    display: block;
+    position: absolute; z-index: 4;
+    /* 210px is half of the 420 the card gives up, so this sits in the middle
+       of the gutter the rule above creates. Anything derived from vw instead
+       drifts out of that gutter as the window grows, because the card stops
+       growing at --max and the gutter does not. */
+    right: max(28px, calc((100vw - min(var(--max, 1280px), calc(100vw - 400px))) / 2 - 176px));
+    /* CLEAR OF THE FLOATING MENU, which is the reason this is not lower. The
+       quick-actions control is `position: fixed` and is a 60x252 STRIP down
+       the right edge, not the small round button it looks like — its top lands
+       around 65% of the first screen. Sitting the label at the card's
+       lower-middle, where the design has it, put it inside that strip. 44%
+       keeps it above, and the two only share a screen at all near scroll 0:
+       the label scrolls with the hero and the strip does not. */
+    bottom: 44%;
+    color: #fff; text-align: left; pointer-events: none;
+    text-shadow: 0 1px 14px rgba(6,14,28,.55);
+  }
+  body.home-ref .hr-discover b,
+  body.home-ref .hr-discover span {
+    display: block; font-weight: 500; font-size: 17px;
+    line-height: 1.35; letter-spacing: .01em; white-space: nowrap;
+  }
+  /* The rule under it, as in the design — short, and the same white at a
+     fraction of the strength so it reads as a flourish and not a divider. */
+  body.home-ref .hr-discover::after {
+    content: ''; display: block; margin-top: 12px;
+    width: 62px; height: 1px; background: rgba(255,255,255,.55);
+  }
+}
 :is(body.home-ref, .hr-card-scope) .search-card {
   border-radius: 14px; box-shadow: 0 2px 8px rgba(12,30,58,.08), 0 34px 70px -30px rgba(12,30,58,.5);
   padding: 0; overflow: visible;
@@ -346,7 +677,7 @@ body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(
 }
 
 /* ==========================================================================
-   4. SPECIAL FARES + QUICK TOOLS
+   4. SPECIAL FARES
    --------------------------------------------------------------------------
    THE FIVE FARE NAMES ARE REAL; THE DISCOUNTS IN THE REFERENCE ARE NOT.
    flight-filters.js already models this axis — a `fareCategory` filter, with
@@ -365,16 +696,18 @@ body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(
   padding: 16px 20px 0; flex-wrap: wrap;
 }
 :is(body.home-ref, .hr-card-scope) .hr-fares-group { flex: 1; min-width: 0; }
-:is(body.home-ref, .hr-card-scope) .hr-fares-lab,
-:is(body.home-ref, .hr-card-scope) .hr-tools-lab {
+:is(body.home-ref, .hr-card-scope) .hr-fares-lab {
   display: block; font-size: 13px; font-weight: 700; color: var(--hr-ink); margin-bottom: 9px;
 }
 :is(body.home-ref, .hr-card-scope) .hr-fare-row { display: flex; gap: 9px; flex-wrap: wrap; }
 :is(body.home-ref, .hr-card-scope) .hr-fare {
-  display: grid; gap: 1px; padding: 9px 15px; min-width: 104px;
+  display: flex; align-items: center; gap: 9px; padding: 9px 14px; min-width: 104px;
   border: 1px solid var(--hr-line); border-radius: 8px; background: #fff;
   cursor: pointer; font: inherit; text-align: left;
 }
+:is(body.home-ref, .hr-card-scope) .hr-fare-txt { display: grid; gap: 1px; min-width: 0; }
+:is(body.home-ref, .hr-card-scope) .hr-fare > .jpi { color: var(--hr-muted); }
+:is(body.home-ref, .hr-card-scope) .hr-fare.is-on > .jpi { color: var(--hr-gold-ink); }
 :is(body.home-ref, .hr-card-scope) .hr-fare b { font-size: 13.5px; font-weight: 700; color: var(--hr-ink); }
 :is(body.home-ref, .hr-card-scope) .hr-fare span { font-size: 11.5px; color: var(--hr-muted); }
 :is(body.home-ref, .hr-card-scope) .hr-fare:hover { border-color: var(--hr-gold-dk); background: var(--coral-hover, #FDF3E2); }
@@ -383,18 +716,6 @@ body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(
   box-shadow: inset 0 0 0 1px var(--hr-gold);
 }
 :is(body.home-ref, .hr-card-scope) .hr-fare.is-on b { color: var(--hr-gold-ink); }
-
-:is(body.home-ref, .hr-card-scope) .hr-tools { flex: none; }
-:is(body.home-ref, .hr-card-scope) .hr-tool-row { display: flex; gap: 0; border: 1px solid var(--hr-line); border-radius: 8px; overflow: hidden; }
-:is(body.home-ref, .hr-card-scope) .hr-tool {
-  display: grid; justify-items: center; gap: 5px; padding: 10px 18px;
-  background: #fff; border: none; border-right: 1px solid var(--hr-line);
-  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--hr-ink); cursor: pointer;
-  white-space: nowrap;
-}
-:is(body.home-ref, .hr-card-scope) .hr-tool:last-child { border-right: none; }
-:is(body.home-ref, .hr-card-scope) .hr-tool svg { width: 18px; height: 18px; color: var(--hr-gold-dk); }
-:is(body.home-ref, .hr-card-scope) .hr-tool:hover { background: var(--hr-cream); }
 
 /* the single large call to action */
 :is(body.home-ref, .hr-card-scope) .hr-go-row { display: grid; place-items: center; padding: 20px 20px 24px; }
@@ -407,84 +728,29 @@ body.home-ref .hr-script svg { display: block; margin: 2px auto 0; width: clamp(
   box-shadow: 0 12px 26px -10px rgba(217,163,44,.62);
 }
 :is(body.home-ref, .hr-card-scope) .search-go:hover, :is(body.home-ref, .hr-card-scope) .hr-go:hover { filter: brightness(1.04); }
+/* Sized off the label rather than fixed, so it holds its proportion when the
+   button shrinks to full width on a phone. */
+:is(body.home-ref, .hr-card-scope) .search-go .search-go-arrow {
+  width: 18px; height: 18px; flex: none;
+}
+/* The arrow's hover nudge went with the arrow. A magnifier that slides to the
+   right on hover reads as a drag handle, not as search. */
 
-/* ==========================================================================
-   5. OFFER STRIP
-   --------------------------------------------------------------------------
-   Four cards on cream, each with room for artwork on its right. The art slot
-   takes --hr-shot-o1..o4 and shows nothing at all when unset — an empty half
-   reads as a wide card, where a grey box reads as a broken image.
-   ========================================================================== */
-body.home-ref .hr-offers { background: var(--hr-cream); padding: 22px 0; }
-body.home-ref .hr-offers-in {
-  max-width: var(--max, 1280px); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px);
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 16px;
-}
-body.home-ref .hr-offer {
-  position: relative; overflow: hidden; min-height: 108px;
-  padding: 18px 20px; border-radius: 12px; background: #fff;
-  box-shadow: 0 1px 2px rgba(12,30,58,.05), 0 10px 26px -16px rgba(12,30,58,.3);
-}
-body.home-ref .hr-offer b {
-  display: block; font-size: 19px; font-weight: 800; color: var(--hr-ink); line-height: 1.2;
-}
-body.home-ref .hr-offer b em { font-style: normal; color: var(--hr-gold-ink); }
-body.home-ref .hr-offer p { margin: 3px 0 12px; font-size: 13.5px; color: var(--hr-muted); }
-body.home-ref .hr-offer .hr-offer-cta {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 15px; border-radius: 6px; font-size: 12.5px; font-weight: 700;
-  background: var(--hr-gold); color: var(--on-accent, #fff);
-}
-body.home-ref .hr-offer .hr-offer-cta:hover { background: var(--hr-gold-dk); }
-body.home-ref .hr-offer-art {
-  position: absolute; right: 0; bottom: 0; width: 42%; height: 100%;
-  background-position: right bottom; background-repeat: no-repeat; background-size: contain;
-  pointer-events: none;
-}
+/* ===========================================================================
+   5 AND 6 ARE GONE — OFFER STRIP and POPULAR DESTINATIONS
+   ---------------------------------------------------------------------------
+   The four-card promo strip and the six-tile destination band were removed
+   from the landing page, and every rule that dressed them went with them:
+   .hr-offers, .hr-offer, .hr-offer-cta, .hr-offer-art, .hr-dest, .hr-dest-in,
+   .hr-dest-head, .hr-dest-nav, .hr-dest-all, .hr-dest-arrow, .hr-dest-grid and
+   .hr-tile. None of them is referenced by any other page — checked across every
+   .html and .js in frontend/ before deleting.
 
-/* ==========================================================================
-   6. POPULAR DESTINATIONS
-   ========================================================================== */
-body.home-ref .hr-dest { padding: 42px 0 10px; }
-body.home-ref .hr-dest-in { max-width: var(--max, 1280px); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px); }
-body.home-ref .hr-dest-head {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 20px;
-}
-body.home-ref .hr-dest-head h2 {
-  font-size: clamp(24px, 3vw, 31px); font-weight: 800; color: var(--hr-ink); margin: 0;
-}
-body.home-ref .hr-dest-head p { margin: 5px 0 0; font-size: 14px; color: var(--hr-muted); }
-body.home-ref .hr-dest-nav { display: flex; align-items: center; gap: 10px; flex: none; }
-body.home-ref .hr-dest-all {
-  font-size: 13.5px; font-weight: 700; color: var(--hr-ink); text-decoration: underline;
-  text-underline-offset: 4px;
-}
-body.home-ref .hr-dest-arrow {
-  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hr-line);
-  background: #fff; color: var(--hr-ink); cursor: pointer; display: grid; place-items: center;
-}
-body.home-ref .hr-dest-arrow:hover { border-color: var(--hr-gold); background: var(--coral-hover, #FDF3E2); }
-
-body.home-ref .hr-dest-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 14px;
-}
-body.home-ref .hr-tile {
-  position: relative; display: block; min-height: 152px; border-radius: 12px; overflow: hidden;
-  /* Each tile names its own --hr-shot; the gradient is what shows until one
-     is set, tinted per tile so six of them do not read as one flat block. */
-  background-image: var(--hr-shot, none), var(--hr-tint, linear-gradient(160deg, #24405F, #12253F));
-  background-size: cover; background-position: center;
-  color: #fff;
-}
-body.home-ref .hr-tile::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(8,16,32,0) 38%, rgba(8,16,32,.78) 100%);
-}
-body.home-ref .hr-tile-txt { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 1; }
-body.home-ref .hr-tile b { display: block; font-size: 17px; font-weight: 800; line-height: 1.2; }
-body.home-ref .hr-tile span { display: block; font-size: 12.5px; color: rgba(255,255,255,.86); margin-top: 2px; }
-body.home-ref .hr-tile:hover { transform: translateY(-3px); }
-body.home-ref .hr-tile { transition: transform .2s ease; }
+   What replaced both is one API-driven section, and its styles live in
+   main.css beside the rest of the page-level furniture rather than here: this
+   file is the landing page reference skin, and the Destinations shelf is not
+   part of that reference. See .jw-dest there.
+   =========================================================================== */
 
 /* ==========================================================================
    7. RESPONSIVE
@@ -494,11 +760,7 @@ body.home-ref .hr-tile { transition: transform .2s ease; }
   body.home-ref .navlinks::-webkit-scrollbar { display: none; }
 }
 @media (max-width: 900px) {
-  :is(body.home-ref, .hr-card-scope) .hr-trust { gap: 18px 26px; }
   :is(body.home-ref, .hr-card-scope) .hr-fares { flex-direction: column; }
-  :is(body.home-ref, .hr-card-scope) .hr-tools { width: 100%; }
-  :is(body.home-ref, .hr-card-scope) .hr-tool-row { width: 100%; }
-  :is(body.home-ref, .hr-card-scope) .hr-tool { flex: 1; }
 }
 /* THE DRAWER IS THE NAV ON A PHONE, AND ONLY THE DRAWER.
    main.css hides `header .navlinks` at this width, but `body.home-ref
@@ -510,10 +772,8 @@ body.home-ref .hr-tile { transition: transform .2s ease; }
   body.home-ref .navlinks { display: none; }
 }
 @media (max-width: 640px) {
-  body.home-ref .hero-inner { padding-top: 30px; }
-  body.home-ref .hr-trust-item { width: calc(50% - 13px); }
+  body.home-ref .hero-inner { padding-top: 18px; }
   :is(body.home-ref, .hr-card-scope) .search-go, :is(body.home-ref, .hr-card-scope) .hr-go { min-width: 0; width: 100%; }
-  body.home-ref .hr-dest-head { flex-direction: column; align-items: flex-start; }
 }
 
 /* ==========================================================================
@@ -540,38 +800,46 @@ body.home-ref .hr-tile { transition: transform .2s ease; }
 :is(body.home-ref, .hr-card-scope) .bc-enquire-go:hover { filter: brightness(1.04); }
 
 /* ==========================================================================
-   9. FITTING TEN PRODUCTS AND SIX UTILITIES ON ONE BAR
+   9. FITTING FIVE PRODUCTS AND THE UTILITY CLUSTER ON ONE BAR
    --------------------------------------------------------------------------
-   The reference's header carries ten nav cells AND a six-item utility cluster.
-   At the shared header's original spacing that overflowed and wrapped Login /
-   Sign Up onto two lines. The nav cells tighten and the utility cluster is
-   told not to wrap; below 1180px the nav scrolls sideways instead (section 7),
-   which is the same thing the reference does on a narrow window.
-   ========================================================================== */
-body.home-ref header#siteHeader nav.wrap { gap: 10px; padding-inline: clamp(10px, 2vw, 24px); }
+   This section was written when the bar carried TEN nav cells beside a
+   six-item utility cluster, which genuinely overflowed and wrapped Login /
+   Sign Up onto two rows. The nav is now five cells — Flights, Hotels, Tour
+   Packages, Gaming Packages, More — so most of the emergency tightening it
+   used to do is not only unnecessary, it is what kept the bar looking cramped
+   next to the reference.
+
+   WHAT WAS REMOVED AND WHY:
+
+   * `nav.wrap { gap: 10px; padding-inline: clamp(10px,2vw,24px) }` was
+     UNCONDITIONAL here. main.css applies exactly those numbers, but only
+     below 1100px, where they are a taper. Repeating them without a query
+     pinned every desktop width to the narrow-window spacing and fought the
+     shared header's own gutter.
+   * `.hr-wish span { display:none }` was unconditional too, with a
+     `min-width: 1500px` rule putting the word back. main.css hides that label
+     below 1150 and shows it above, and an unconditional rule out-specifies a
+     media-query rule at the same weight regardless of width — so "Wishlist"
+     was missing at 1150-1499 on the landing page alone. The reference draws
+     the word at ~1450. main.css governs it now; there is no copy here.
+   * The `.navlinks a` cell metrics were a duplicate of main.css's defaults
+     with a wide-screen bump bolted on at 1500. Five cells can afford the
+     roomier metrics from the width the labels appear at, so the bump moves to
+     1151 — the same boundary main.css uses to bring the labels back.
+
+   What stays is what is still true: the utility cluster must not wrap, and
+   the nav gap collapses to zero because each cell carries its own padding. */
 body.home-ref .navlinks { gap: 0; }
-body.home-ref .navlinks a { padding: 8px 9px 6px; font-size: 11.5px; gap: 3px; }
-body.home-ref .navlinks a .jpi { width: 18px; height: 18px; }
 body.home-ref .nav-actions { gap: 9px; flex: none; flex-wrap: nowrap; white-space: nowrap; }
-body.home-ref .hr-wish span { display: none; }         /* icon only, as the bar tightens */
 body.home-ref .nav-partner-mark { padding: 6px 11px; font-size: 12.5px; }
 body.home-ref .pm-signup { padding: 9px 17px; font-size: 13px; }
 body.home-ref .pm-login { font-size: 13px; }
 
-@media (min-width: 1500px) {
-  /* Room again on a wide monitor: the word comes back and the cells breathe. */
-  body.home-ref .hr-wish span { display: inline; }
+@media (min-width: 1151px) {
+  /* From the width the labels come back, the cells breathe. 1151 pairs with
+     main.css's `max-width: 1150` icon-only block: one boundary, not two. */
   body.home-ref .navlinks a { padding: 9px 12px 7px; font-size: 12.5px; }
 }
-
-/* The destination grid becomes a scroller when it cannot fit its rail; the
-   arrows above drive it and hide themselves when everything already fits. */
-body.home-ref .hr-dest-grid {
-  overflow-x: auto; scroll-behavior: smooth; scroll-snap-type: x proximity;
-  scrollbar-width: none; grid-auto-flow: column; grid-auto-columns: minmax(178px, 1fr);
-}
-body.home-ref .hr-dest-grid::-webkit-scrollbar { display: none; }
-body.home-ref .hr-tile { scroll-snap-align: start; }
 
 /* ==========================================================================
    10. A SMALLER SEARCH CARD
@@ -596,12 +864,10 @@ body.home-ref .hr-tile { scroll-snap-align: start; }
 :is(body.home-ref, .hr-card-scope) .fld-sub { font-size: 11px; }
 
 :is(body.home-ref, .hr-card-scope) .hr-fares { padding: 12px 16px 0; gap: 20px; }
-:is(body.home-ref, .hr-card-scope) .hr-fares-lab, :is(body.home-ref, .hr-card-scope) .hr-tools-lab { font-size: 12px; margin-bottom: 7px; }
+:is(body.home-ref, .hr-card-scope) .hr-fares-lab { font-size: 12px; margin-bottom: 7px; }
 :is(body.home-ref, .hr-card-scope) .hr-fare { padding: 7px 12px; min-width: 94px; }
 :is(body.home-ref, .hr-card-scope) .hr-fare b { font-size: 12.5px; }
 :is(body.home-ref, .hr-card-scope) .hr-fare span { font-size: 10.5px; }
-:is(body.home-ref, .hr-card-scope) .hr-tool { padding: 8px 14px; font-size: 10.5px; }
-:is(body.home-ref, .hr-card-scope) .hr-tool svg { width: 16px; height: 16px; }
 
 :is(body.home-ref, .hr-card-scope) .hr-go-row { padding: 15px 16px 18px; }
 :is(body.home-ref, .hr-card-scope) .search-go, :is(body.home-ref, .hr-card-scope) .hr-go {
@@ -643,3 +909,43 @@ body.home-ref .modal-guest small {
   display: block; margin-top: 5px; max-width: 42ch; margin-inline: auto;
   font-size: 12px; line-height: 1.5; color: var(--hr-muted);
 }
+
+
+
+/* ==========================================================================
+   11. THE HERO COPY, ABOVE THE CARD AND FLUSH WITH ITS LEFT EDGE
+   --------------------------------------------------------------------------
+   The copy sits ABOVE the search card, which is the DOM order in index.html,
+   so there is no `order` here — an earlier pass moved it below with one and
+   that has been taken out rather than left overriding itself.
+
+   WHY THE TEXT DID NOT LINE UP WITH THE CARD. .hero is a column flex
+   container, and .wrap — which both the copy block and the search dock wear —
+   carries `margin: 0 auto`. Auto margins on the CROSS axis absorb the free
+   space, so a flex item that has them stops stretching and centres at its
+   content width instead. .search-dock escapes that with `width: 100%`
+   (main.css); .hero-inner had nothing, so it shrank to the width of its
+   headline and centred: measured at 1500px, the card's left edge sat at 134
+   and the text began at 371.
+
+   `width: 100%` is the same escape the dock already uses. Both blocks are then
+   1280 wide with the same 32px padding, so the eyebrow, the headline and the
+   sub-line all start exactly where the card starts. The text was never
+   centre-ALIGNED — `text-align` computes to `start` — it was a centred box
+   with left-aligned text in it, which is why only the box needed fixing. */
+/* THE HERO COPY IS CENTRED, AND FULL WIDTH.
+
+   `width: 100%` is still needed: .hero is a column flex container and .wrap
+   carries `margin: 0 auto`, so auto margins on the CROSS axis stop the block
+   stretching and size it to its content instead. Without it the block is only
+   as wide as its headline, and centring text inside a box that is itself
+   floating mid-hero centres it against the wrong thing.
+
+   `text-align: center` is the change the reference asks for. An earlier pass
+   had this block flush-LEFT with the search card's edge, on request; the
+   supplied image centres all three lines over the card instead, so that is
+   what they do now. The sub-line keeps a max-width and takes auto margins so
+   it wraps to a readable measure and stays centred rather than running the
+   full 1280. */
+body.home-ref .hero .hero-inner { width: 100%; text-align: center; }
+body.home-ref .hero .sub { margin-left: auto; margin-right: auto; }

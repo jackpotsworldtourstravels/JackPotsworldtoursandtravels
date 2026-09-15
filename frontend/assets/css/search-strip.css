@@ -103,7 +103,7 @@
   border: 1px solid var(--ss-line);
   transition: color .18s ease, border-color .18s ease, transform .18s ease;
 }
-.ss-swap svg { width: 14px; height: 14px; }
+.ss-swap .jpi { width: 16px; height: 16px; }
 .ss-swap:hover { color: var(--ss-accent); border-color: var(--ss-accent); transform: rotate(180deg); }
 .ss-swap:focus-visible { outline: 3px solid var(--ss-accent); outline-offset: 2px; }
 

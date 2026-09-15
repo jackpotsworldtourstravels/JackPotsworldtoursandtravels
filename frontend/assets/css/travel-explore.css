@@ -586,10 +586,12 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
    on some. It is the jp-icons drawing now, so it matches the nav. */
 .tx-line .jpi {
   position: absolute; right: -6px; top: 50%;
-  /* The aeroplane is drawn nose-up (the conventional orientation for the nav);
-     here it has to fly along the route line, so it is turned to point right. */
-  transform: translateY(-50%) rotate(90deg);
-  width: 14px; height: 14px; color: var(--tx-accent);
+  /* 45deg, NOT 90. The mark used to be a hand-drawn aeroplane pointing straight
+     up, and a quarter turn laid it along the route line. Lucide's Plane is
+     already banked: its nose points up and to the RIGHT, about 45 degrees off
+     vertical. Left at 90 it flew nose-down into the arrival airport. */
+  transform: translateY(-50%) rotate(45deg);
+  width: 16px; height: 16px; color: var(--tx-accent);
   background: var(--tx-surface); padding-left: 3px;
 }
 /* The card is the hover target — a 14px mark is not one. */

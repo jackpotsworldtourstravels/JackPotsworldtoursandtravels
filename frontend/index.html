@@ -4,25 +4,39 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="JackPots World Tours &amp; Travels — book flights, hotels and tour packages in one premium search. Trusted by 2 million+ travellers.">
-<title>JackPots World Tours &amp; Travels — Your Next Adventure Starts Here</title>
+<!-- The tab and the search result say what the first screen says. This read
+     "Your Next Adventure Starts Here" — the old headline — so the page that
+     came back from a search promised a line the page no longer carries. -->
+<title>JackPots World Tours &amp; Travels — Travel More, Worry Less</title>
 <link rel="icon" type="image/png" href="assets/images/favicon-180.png">
 <link rel="icon" href="assets/images/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="assets/images/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260911gm5">
+<!-- THE HERO PHOTOGRAPH IS THIS PAGE'S LARGEST PAINT, and it is reached from a
+     CSS custom property inside home-ref.css — so the browser cannot see it
+     until the stylesheet has been fetched AND parsed. Preloading it here starts
+     the download with the stylesheet rather than after it. The `type` is what
+     stops a browser with no WebP support from fetching a file it cannot use. -->
+<link rel="preload" as="image" type="image/webp" href="assets/images/hero-sunset.webp">
+<!-- Montserrat is the UI face for the whole site. The landing page adds two
+     more, and ONLY for the hero headline: Playfair Display for "Travel More"
+     and Yellowtail for "Worry Less". Four weights between them, not the full
+     families - Playfair at 600/700 because the headline is the only thing
+     that uses it, Yellowtail at its single 400. One request, same as before. -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260912dh1">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
 <!-- The company footer. Self-contained (its own --jwf-* tokens), so the same
      stylesheet dresses this page's hand-written footer and the one every other
      page mounts from site-footer.js. -->
-<link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft6">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260911ic7">
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -33,7 +47,7 @@
      tie to booking-card.css on equal specificity: the search card's footer
      kept its own row layout and the call to action stayed 450px right of
      centre. Same arrangement flights-ref.css has on flights.html. -->
-<link rel="stylesheet" href="assets/css/home-ref.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -46,20 +60,20 @@
      product-tab glyphs while it renders, and this file used to load at the
      foot of the page - so JPIcon did not exist yet and the tabs came out as
      bare words. Every other page already loads it ahead of the card. -->
-<script src="assets/js/jp-icons.js?v=20260911gm5"></script>
+<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <script src="assets/js/airports.js?v=20260825t3"></script>
 <script src="assets/js/search-widgets.js?v=20260825t3"></script>
-<script src="assets/js/destinations.js?v=20260825h1"></script>
-<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
-<script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260911gm5"></script>
+<script src="assets/js/destinations.js?v=20260912ds4"></script>
+<script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
+<script src="assets/js/pax-selector.js?v=20260911ic7"></script>
+<script src="assets/js/booking-card.js?v=20260912qt1"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
-<script src="assets/js/site-footer.js?v=20260905ft6"></script>
-<script src="assets/js/hero-shell.js?v=20260911gm5"></script>
+<script src="assets/js/site-footer.js?v=20260911ic7"></script>
+<script src="assets/js/hero-shell.js?v=20260912ct2"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 </head>
@@ -108,15 +122,15 @@
          and could never see up here. Gaming Packages is a real shelf of
          customer_packages (migration 0069) with a page of its own. -->
     <div class="navlinks">
-      <a href="flights.html" title="Flights"><i data-jp-icon="flights" data-jp-size="sm"></i><span>Flights</span></a>
-      <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Hotels</span></a>
-      <a href="packages.html" title="Holiday Packages"><i data-jp-icon="packages" data-jp-size="sm"></i><span>Holiday Packages</span></a>
-      <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" data-jp-size="sm"></i><span>Gaming Packages</span></a>
-      <a href="index.html#contact" title="More"><span>More</span></a>
+      <a href="flights.html" title="Flights"><i data-jp-icon="flights" class="jpi-nav"></i><span>Flights</span></a>
+      <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" class="jpi-nav"></i><span>Hotels</span></a>
+      <a href="packages.html" title="Tour Packages"><i data-jp-icon="packages" class="jpi-nav"></i><span>Tour Packages</span></a>
+      <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" class="jpi-nav"></i><span>Gaming Packages</span></a>
+      <a href="index.html#jwFContact" title="Contact"><i data-jp-icon="phone" class="jpi-nav"></i><span>Contact</span></a>
     </div>
     <div class="nav-actions">
-      <button type="button" class="hr-wish" data-nav-acct="wishlist" title="Wishlist">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l8.8 8.8 8.8-8.8a5 5 0 0 0 0-7.1Z"/></svg>
+      <button type="button" class="hr-wish jpi-row" data-nav-acct="wishlist" title="Wishlist">
+        <i data-jp-icon="heart" class="jpi-btn"></i>
         <span>Wishlist</span>
       </button>
       <!-- B2B door. It goes straight to the Merchant login and asks nothing:
@@ -131,9 +145,8 @@
            the markup and the styling cannot disagree about which state it is
            in. `href` is left in place deliberately — removing it would turn the
            element into a non-link and change how it is announced. -->
-      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink"
-         aria-disabled="true" tabindex="-1">
-        <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">
+        <i data-jp-icon="handshake" class="npm-mark"></i>
         <span>My Partner</span>
       </a>
       <!-- My Bookings and Notifications. NOT a second copy of the profile menu's
@@ -141,8 +154,8 @@
          traveller checks mid-journey without wanting the whole account panel.
          Both open the Account Center on that tab, so there is one
          implementation of each screen. -->
-      <button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>
-      <button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+      <button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><i data-jp-icon="receipt" class="jpi-btn"></i></button>
+      <button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><i data-jp-icon="bell" class="jpi-btn"></i></button>
       <!-- THE ONLY AUTHENTICATION CONTROLS ON THIS PAGE.
            profile-menu.js renders Login + Sign Up when signed out and the chip
            + dropdown when signed in, so exactly one set exists at a time and
@@ -167,11 +180,11 @@
        drawer IS the navigation there and has to carry everything.
        CHANGE THIS, THE BAR ABOVE, AND hero-shell.js's LINKS. -->
   <div class="mobile-nav" id="mobileNav">
-    <a href="flights.html" title="Flights"><i data-jp-icon="flights" data-jp-size="sm"></i><span>Flights</span></a>
-    <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" data-jp-size="sm"></i><span>Hotels</span></a>
-    <a href="packages.html" title="Holiday Packages"><i data-jp-icon="packages" data-jp-size="sm"></i><span>Holiday Packages</span></a>
-    <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" data-jp-size="sm"></i><span>Gaming Packages</span></a>
-    <a href="index.html#contact" title="More"><span>More</span></a>
+    <a href="flights.html" title="Flights"><i data-jp-icon="flights" class="jpi-nav"></i><span>Flights</span></a>
+    <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" class="jpi-nav"></i><span>Hotels</span></a>
+    <a href="packages.html" title="Tour Packages"><i data-jp-icon="packages" class="jpi-nav"></i><span>Tour Packages</span></a>
+    <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" class="jpi-nav"></i><span>Gaming Packages</span></a>
+    <a href="index.html#jwFContact" title="Contact"><i data-jp-icon="phone" class="jpi-nav"></i><span>Contact</span></a>
     <!-- The drawer's own Login/Sign Up pair and its nine account links are
          gone. They were a THIRD and FOURTH copy of the same controls, kept in
          step by hand in renderAuthNav(), and they are not needed: .nav-actions
@@ -179,8 +192,8 @@
          and the signed-out buttons are already reachable in the header on a
          phone. The drawer is the page LINKS; the account is the header. -->
     <!-- The drawer's copy of the same door, closed for the same reason. -->
-    <a href="partner-login.html" class="mobile-partner-mark" aria-disabled="true" tabindex="-1">
-      <svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+    <a href="partner-login.html" class="mobile-partner-mark">
+      <i data-jp-icon="handshake" class="npm-mark"></i>
       My Partner
     </a>
   </div>
@@ -209,31 +222,54 @@
          site. The nav, the search card's TABS and the footer had all been
          reduced to flights/hotels/packages already; this copy was the last
          place the withdrawn ones survived.
-         hero-shell.js's HERO_EYEBROW and HERO_SUB are the other copy of these
-         two strings. CHANGE ONE, CHANGE THE OTHER. -->
+         hero-shell.js's HERO_EYEBROW is the other copy of this string.
+         CHANGE ONE, CHANGE THE OTHER. (HERO_SUB was the third of this pair and
+         is gone — the sub-line below was removed with it.) -->
     <div class="eyebrow">Explore &middot; Discover &middot; Travel &middot; Repeat</div>
-    <h1>Your next adventure<span class="accent">starts here</span></h1>
-    <p class="sub">Book flights, hotels and tour packages — all in one place.</p>
+    <!-- THE HOUSE LINE, ON ONE LINE. "Your next adventure / starts here" was
+         the reference's headline and set the accent half on its own row
+         (`.accent { display: block }`). This is the business's own phrase, it
+         is meant to read as one breath, so the accent is inline and only the
+         colour separates the halves — no comma, no slash, nothing between them
+         that would make it two statements.
 
-    <!-- THE TRUST ROW. Four claims the business already makes elsewhere on
-         this page (the Why Choose Us tiles) and in the booking flow's fare
-         rail, brought up to the first screen where the reference puts them.
-         Nothing new is asserted here. -->
-    <div class="hr-trust">
-      <div class="hr-trust-item">
-        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 9.2 9 10 5.2-.8 9-5 9-10V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-        <div><b>Best Price Guarantee</b><span>Unbeatable deals</span></div>
-      </div>
-      <div class="hr-trust-item">
-        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="14" width="5" height="6" rx="1.5"/><rect x="17" y="14" width="5" height="6" rx="1.5"/></svg></span>
-        <div><b>24/7 Customer Support</b><span>We&rsquo;re always here for you</span></div>
-      </div>
-      <div class="hr-trust-item">
-        <span class="hr-trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span>
-        <div><b>Secure Payments</b><span>Your transactions are safe</span></div>
-      </div>
+         The words were already in this stylesheet: `.hr-script` styles a
+         "Travel More / Worry Less" script mark for the top right corner that
+         no markup has ever rendered. Those rules are gone now; the phrase is
+         the headline instead of a decoration beside one.
 
-    </div>
+         hero-shell.js's HERO_TITLE is the other copy of this string.
+         CHANGE ONE, CHANGE THE OTHER. -->
+    <h1>Travel More <span class="hr-accent-wrap"><span class="accent">Worry Less</span><!--
+      THE FLIGHT PATH. Decoration, so aria-hidden: the heading still reads
+      "Travel More Worry Less" to a screen reader and to a crawler.
+
+      IT IS ANCHORED TO THE END OF "LESS" AND COSTS NO LAYOUT. The wrapper is
+      the positioning context and the svg is absolute inside it, so the path
+      begins where the script ends at any width without the headline shifting
+      left to make room for it — which is what an inline svg of this size did.
+
+      ONE PATH, ONE LOOP. The `d` below is generated, not hand-tuned: the loop
+      is a real circle traced as four cubic quarter-arcs, entered and left at
+      the same point with the same tangent, which is what stops a 360 reading
+      as a kink. The plane rides that same path via offset-path, so the curve
+      and the aircraft cannot disagree about where the route goes.
+   --><svg class="hr-flightpath" viewBox="0 0 412 226" aria-hidden="true" focusable="false">
+        <path class="hr-fp-line" pathLength="100" d="M 6 198 C 60 214, 120 214, 176 196 C 216 190, 229.5 171.2, 264.8 157.2 C 285.3 149, 295.3 125.7, 287.2 105.2 C 279 84.7, 255.7 74.7, 235.2 82.8 C 214.7 91, 204.7 114.3, 212.8 134.8 C 221 155.3, 244.3 165.3, 264.8 157.2 C 318.7 135.7, 328.8 90.4, 388 46"/>
+        <g class="hr-fp-plane"><path d="M16 0c0-1.6-1.4-3-3.2-3H6.4L-2-12.6c-.4-.4-1-.6-1.6-.6H-6c-.8 0-1.2.8-.9 1.5L-3-3h-6.4l-3-4c-.3-.4-.7-.6-1.2-.6h-1.6c-.8 0-1.3.8-1 1.5L-14.4 0l-1.8 6.1c-.3.7.2 1.5 1 1.5h1.6c.5 0 .9-.2 1.2-.6l3-4H-3l-3.9 8.7c-.3.7.1 1.5.9 1.5h2.4c.6 0 1.2-.2 1.6-.6L6.4 3h6.4c1.8 0 3.2-1.4 3.2-3z"/></g>
+      </svg></span></h1>
+    <!-- THE SUB-LINE IS GONE. "Book flights, hotels and tour packages — all in
+         one place" restated the four product tabs sitting directly beneath it,
+         in a sentence, and cost the search card 50px of the first screen to do
+         it. The card is what this page is for; the tabs already say what can be
+         booked. hero-shell.js's HERO_SUB went with it — see the note there. -->
+
+    <!-- THE TRUST ROW IS GONE. Best Price Guarantee, 24/7 Customer Support and
+         Secure Payments each cost a line of the first screen to repeat a claim
+         this page already makes twice below the fold (the Why Choose Us tiles)
+         and once more inside every booking (the fare rail's benefits list).
+         Nothing was lost with it, and the search card came up by what it
+         occupied — which is the point: the card is what the page is for. -->
   </div>
 
 
@@ -247,7 +283,23 @@
   <div class="wrap search-dock" id="heroSearchDock"></div>
   <script>BookingCard.render('heroSearchDock');</script>
 
-  <div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+  <!-- "Discover / New Horizons", in the gutter beside the card.
+
+       POSITIONED, NOT A FLEX SIBLING OF THE CARD, because the card stays
+       CENTRED. In the supplied design the card is centred on the page and this
+       sits outside it on the right; a flex row would have pushed the card left
+       by the width of this label and broken that symmetry.
+
+       It is real text, not decoration, so it is not aria-hidden — but it is
+       only shown once the viewport is wide enough to have a gutter at all
+       (see home-ref.css). Below that the card takes the full width and this
+       would have nowhere to go. -->
+  <aside class="hr-discover">
+    <b>Discover</b>
+    <span>New Horizons</span>
+  </aside>
+
+  <div class="hero-scroll-cue">Scroll<i data-jp-icon="chevronDown" class="jpi-meta"></i></div>
 </section>
 
 <!-- The search-results panel lived here. Nothing could ever open it: it was filled only
@@ -273,168 +325,50 @@
   </div>
 </section>
 
-<!-- THE OFFER STRIP, built to the supplied reference.
 
-     THE FIGURES ARE THE APPLICATION'S, NOT THE MOCK-UP'S. The reference reads
-     "FLAT 20% OFF" and "Starting from Rs 9,999"; the coupon table's only live
-     flight coupon is FLYHIGH30 at 30%, and the cheapest package in the
-     catalogue is Goa at Rs 21,900. A card promising Rs 9,999 sends a traveller
-     to a page whose cheapest holiday is more than twice that, so each card
-     carries what the product can actually honour. The hotels card names no
-     percentage at all because no hotel coupon exists.
 
-     When a real hotels coupon or a cheaper package lands, these are the two
-     numbers to revisit. -->
-<section class="hr-offers" aria-labelledby="hrOffersHead">
-  <h2 id="hrOffersHead" class="sr-only">Current offers</h2>
-  <div class="hr-offers-in">
-    <article class="hr-offer">
-      <b>FLAT <em>30% OFF</em></b>
-      <p>on Domestic Flights &middot; code FLYHIGH30</p>
-      <a class="hr-offer-cta" href="flights.html">Book Now &rarr;</a>
-      <span class="hr-offer-art" style="background-image: var(--hr-shot-o1, none);"></span>
-    </article>
-    <article class="hr-offer">
-      <b>Hotels <em>Worldwide</em></b>
-      <p>Handpicked stays, free cancellation on most</p>
-      <a class="hr-offer-cta" href="hotels.html">Book Hotels &rarr;</a>
-      <span class="hr-offer-art" style="background-image: var(--hr-shot-o2, none);"></span>
-    </article>
-    <article class="hr-offer">
-      <b>Exclusive Tour Packages</b>
-      <p>Starting from <em>&#8377;21,900</em></p>
-      <a class="hr-offer-cta" href="packages.html">Explore Packages &rarr;</a>
-      <span class="hr-offer-art" style="background-image: var(--hr-shot-o3, none);"></span>
-    </article>
-    <article class="hr-offer">
-      <b>Visa Assistance</b>
-      <p>Documentation and appointment support</p>
-      <a class="hr-offer-cta" href="visa.html">Know More &rarr;</a>
-      <span class="hr-offer-art" style="background-image: var(--hr-shot-o4, none);"></span>
-    </article>
-  </div>
-</section>
 
-<!-- POPULAR DESTINATIONS, built to the supplied reference.
 
-     Five of the six sell a real package today (Bangkok goes to the Thailand
-     one); London has none yet and goes to the packages index rather than a
-     filter that would come back empty. No price is printed on a tile: the
-     reference does not carry one and the catalogue's own "from" figures
-     already appear on the packages page.
 
-     Each tile names its own --hr-shot-<city>. Until a photograph is set the
-     tinted gradient shows, which is why the six tints differ - six identical
-     grey boxes read as a broken grid, six different ones read as a design. -->
-<section class="hr-dest" id="destinations" aria-labelledby="hrDestHead">
-  <div class="hr-dest-in">
-    <div class="hr-dest-head">
-      <div>
-        <h2 id="hrDestHead">Popular Destinations</h2>
-        <p>Discover our most loved destinations around the world</p>
-      </div>
-      <div class="hr-dest-nav">
-        <a class="hr-dest-all" href="packages.html">View All Destinations &rarr;</a>
-        <button type="button" class="hr-dest-arrow" data-hr-dest="-1" aria-label="Previous destinations">&#8249;</button>
-        <button type="button" class="hr-dest-arrow" data-hr-dest="1" aria-label="Next destinations">&#8250;</button>
-      </div>
-    </div>
-    <div class="hr-dest-grid" id="hrDestGrid">
-      <a class="hr-tile" href="packages.html?dest=Dubai" style="--hr-tint: linear-gradient(160deg,#C08A3E,#6B4415); --hr-shot: var(--hr-shot-dubai, none);">
-        <span class="hr-tile-txt"><b>Dubai</b><span>City of Dreams</span></span>
-      </a>
-      <a class="hr-tile" href="packages.html?dest=Bali" style="--hr-tint: linear-gradient(160deg,#2E7D5B,#13402F); --hr-shot: var(--hr-shot-bali, none);">
-        <span class="hr-tile-txt"><b>Bali</b><span>Island of Gods</span></span>
-      </a>
-      <a class="hr-tile" href="packages.html?dest=Singapore" style="--hr-tint: linear-gradient(160deg,#3A6EA5,#16304C); --hr-shot: var(--hr-shot-singapore, none);">
-        <span class="hr-tile-txt"><b>Singapore</b><span>A Modern Marvel</span></span>
-      </a>
-      <a class="hr-tile" href="packages.html?dest=Maldives" style="--hr-tint: linear-gradient(160deg,#2E9AA8,#0F4650); --hr-shot: var(--hr-shot-maldives, none);">
-        <span class="hr-tile-txt"><b>Maldives</b><span>Paradise on Earth</span></span>
-      </a>
-      <a class="hr-tile" href="packages.html?dest=Thailand" style="--hr-tint: linear-gradient(160deg,#B4703A,#5A2F14); --hr-shot: var(--hr-shot-bangkok, none);">
-        <span class="hr-tile-txt"><b>Bangkok</b><span>Vibrant &amp; Exciting</span></span>
-      </a>
-      <a class="hr-tile" href="packages.html" style="--hr-tint: linear-gradient(160deg,#4A5568,#1F2733); --hr-shot: var(--hr-shot-london, none);">
-        <span class="hr-tile-txt"><b>London</b><span>History Meets Modernity</span></span>
-      </a>
-    </div>
-  </div>
-</section>
-<script>
-/* THE PAGER ONLY EXISTS WHEN THERE IS SOMETHING TO PAGE.
 
-   Six tiles fit on a wide monitor, so the arrows would be two controls that
-   visibly do nothing - which is worse than not drawing them. The grid becomes
-   a horizontal scroller once it overflows its rail, the arrows move it by one
-   viewport, and they are hidden (and taken out of the tab order) whenever
-   everything already fits. Re-measured on resize, because the breakpoint is
-   the content's, not a number picked here. */
-(function () {
-  var grid = document.getElementById('hrDestGrid');
-  if (!grid) return;
-  var arrows = Array.prototype.slice.call(
-    document.querySelectorAll('.hr-dest-arrow[data-hr-dest]'));
+<!-- ===================================================================
+     DESTINATIONS — the one section that replaced six.
 
-  function fits() { return grid.scrollWidth <= grid.clientWidth + 1; }
+     WHAT STOOD HERE: a four-card promo strip, Popular Destinations, Featured
+     tour packages, Popular fares, four counting statistics and a partner logo
+     marquee. Between them they filled most of the page below the card with
+     things that were either duplicated elsewhere in the nav or not backed by
+     anything. This is the whole of what replaces them.
 
-  function sync() {
-    var hide = fits();
-    arrows.forEach(function (b) { b.hidden = hide; });
-  }
+     EVERY CARD COMES FROM /api/customer/destinations. There is no destination
+     list in this file, in the stylesheet or in the module that renders it —
+     grep for a city name and you will not find one. home-destinations.js
+     fetches, renders, and handles its own loading, empty and error states; the
+     rows come from customer_destinations / customer_locations (migration 0070),
+     so a destination is listed whether or not a hotel or package exists there.
 
-  arrows.forEach(function (b) {
-    b.addEventListener('click', function () {
-      grid.scrollBy({ left: (Number(b.dataset.hrDest) || 1) * grid.clientWidth * 0.9,
-                      behavior: 'smooth' });
-    });
-  });
-
-  sync();
-  window.addEventListener('resize', sync);
-})();
-</script>
-
-<section class="packages-section" id="packages" aria-labelledby="pkgHead">
+     The heading and the strapline are the only words here that are ours; the
+     rest of the section is empty until the API answers. -->
+<section class="jw-dest" id="destinations" aria-labelledby="jwDestHead">
   <div class="wrap">
     <div class="section-head reveal">
-      <div><div class="eyebrow">Ready-made itineraries</div><h2 id="pkgHead">Featured tour packages</h2></div>
-      <a href="#" class="view-all">Browse all packages &rarr;</a>
+      <div>
+        <div class="eyebrow">Where we can take you</div>
+        <h2 id="jwDestHead">Destinations</h2>
+      </div>
+      <p>Explore destinations and discover new places.</p>
     </div>
-    <div class="pkg-grid">
-      <article class="pkg-card reveal">
-        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=500&q=80" alt="Goa Escape package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
-        <div class="pkg-body">
-          <h3>Goa Escape</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.8 (2,140 reviews)</div>
-          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹5,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="1" data-book-price="5999" data-book-label="Goa Escape">Book Now</a></div>
-        </div>
-      </article>
-      <article class="pkg-card reveal delay-1">
-        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=500&q=80" alt="Kashmir Valley Retreat package" loading="lazy"><span class="pkg-duration">6 Days</span></div>
-        <div class="pkg-body">
-          <h3>Kashmir Valley Retreat</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.9 (1,865 reviews)</div>
-          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹16,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="2" data-book-price="16999" data-book-label="Kashmir Valley Retreat">Book Now</a></div>
-        </div>
-      </article>
-      <article class="pkg-card reveal delay-2">
-        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=500&q=80" alt="Bali Honeymoon Special package" loading="lazy"><span class="pkg-duration">5 Days</span></div>
-        <div class="pkg-body">
-          <h3>Bali Honeymoon Special</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 4.9 (3,210 reviews)</div>
-          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹31,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="3" data-book-price="31999" data-book-label="Bali Honeymoon Special">Book Now</a></div>
-        </div>
-      </article>
-      <article class="pkg-card reveal delay-3">
-        <div class="pkg-img"><img src="https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=500&q=80" alt="Maldives Overwater Villa package" loading="lazy"><span class="pkg-duration">4 Days</span></div>
-        <div class="pkg-body">
-          <h3>Maldives Overwater Villa</h3>
-          <div class="pkg-stars"><span class="stars" data-jp-stars="5"></span> 5.0 (980 reviews)</div>
-          <div class="pkg-foot"><div class="pkg-price">Starting from<b>₹52,999</b></div><a class="btn btn-coral pkg-book" href="#" data-book-type="package" data-book-id="4" data-book-price="52999" data-book-label="Maldives Overwater Villa">Book Now</a></div>
-        </div>
-      </article>
-    </div>
+
+    <!-- Filled by home-destinations.js. `aria-busy` is set while the first fetch
+         is in flight and the status line below carries the announcement, so a
+         screen reader is told the shelf is loading rather than told nothing. -->
+    <div class="jw-dest-grid" id="jwDestGrid" role="list" aria-busy="true"></div>
+    <p class="jw-dest-status" id="jwDestStatus" role="status"></p>
+
+    <!-- The locations panel that used to sit here is gone. A card now links to
+         /destination/{slug}, which shows that destination's locations as filter
+         chips above its actual hotels — the panel was a list of place names
+         that led nowhere. -->
   </div>
 </section>
 
@@ -445,95 +379,26 @@
       <p>Eight reasons two million travellers stopped comparing tabs and just booked here.</p>
     </div>
     <div class="why-grid">
-      <div class="why-card reveal"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div><h4>Instant Booking</h4><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div>
-      <div class="why-card reveal delay-1"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></div><h4>Best Price Guarantee</h4><p>Find it cheaper elsewhere and we refund the difference.</p></div>
-      <div class="why-card reveal delay-2"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div><h4>Secure Payments</h4><p>Bank-grade encryption on every transaction, every time.</p></div>
-      <div class="why-card reveal delay-3"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h4>Verified Hotels</h4><p>Every property physically inspected before it's listed.</p></div>
-      <div class="why-card reveal"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h4>24×7 Customer Support</h4><p>Real humans on chat and call, any hour, any day.</p></div>
-      <div class="why-card reveal delay-1"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg></div><h4>Free Cancellation</h4><p>Plans change — cancel most bookings at zero cost.</p></div>
-      <div class="why-card reveal delay-2"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1015-6.7M3 5v6h6"/></svg></div><h4>Easy Refunds</h4><p>Refunds processed to source within 24 hours.</p></div>
-      <div class="why-card reveal delay-3"><div class="why-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M11 3a4 4 0 110 8 4 4 0 010-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div><h4>Trusted by Millions</h4><p>2 million+ travellers and counting, every single month.</p></div>
-    </div>
-  </div>
-</section>
-
-
-<section class="routes-section" aria-labelledby="routesHead">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <!-- "Trending routes" first, because a route strip invites route-shaped
-           products and the one it carried was a cruise route. Then briefly
-           "Popular Destinations", which collided with the destinations grid
-           higher up this same page — two identical <h2>s, which is a bad
-           heading outline for a screen reader walking the page and two
-           competing targets for the same search query.
-
-           "Popular fares" is what the strip actually shows: live prices, with a
-           ticker that jitters them every few seconds. The grid above shows
-           places; this shows what they cost. Different name, different section.
-
-           The class stays `routes-section` and the heading keeps id
-           `routesHead` — both are internal names, `routesHead` is the target of
-           this section's aria-labelledby, and renaming either would touch
-           main.css for nothing a visitor could see. -->
-      <div><div class="eyebrow">Updated every 90 seconds</div><h2 id="routesHead">Popular fares</h2></div>
-      <!-- Not "the fares everyone's booking": one of the four cards is a hotel
-           at a nightly rate and another is a tour package, and neither is a
-           fare. The heading can generalise; a sentence naming them cannot. -->
-      <p>What everyone's booking right now, live from our reservation engine.</p>
-    </div>
-    <div class="routes-grid">
-      <div class="route-card reveal">
-        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16l20-6-7 12-2-6-6-2z"/><path d="M22 10L2 16"/></svg>Flight</span><span class="live-dot"><i></i>Live</span></div>
-        <div class="route-cities">Hyderabad <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Delhi</div>
-        <div class="route-price"><span class="amt" data-price="2499">₹2,499</span><span class="unit">onwards</span></div>
-      </div>
-      <div class="route-card reveal delay-1">
-        <!-- Was the cruise row, Mumbai to Goa at ₹4,999. It is now the
-             international flight the "International Flight Offers" card above
-             points at, so the two sections advertise the same three services.
-             Same icon as the first card, because it is the same product. -->
-        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 16l20-6-7 12-2-6-6-2z"/><path d="M22 10L2 16"/></svg>Flight</span><span class="live-dot"><i></i>Live</span></div>
-        <div class="route-cities">Mumbai <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg> Dubai</div>
-        <div class="route-price"><span class="amt" data-price="12999">₹12,999</span><span class="unit">onwards</span></div>
-      </div>
-      <div class="route-card reveal delay-2">
-        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/><path d="M9 9h1M14 9h1M9 13h1M14 13h1"/></svg>Tour Package</span><span class="live-dot"><i></i>Live</span></div>
-        <div class="route-cities">Rajasthan <span style="font-size:13px; font-weight:500; color:var(--muted);">— pilgrimage circuit</span></div>
-        <div class="route-price"><span class="amt" data-price="14999">₹14,999</span><span class="unit">onwards</span></div>
-      </div>
-      <div class="route-card reveal delay-3">
-        <div class="route-top"><span class="route-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg>Hotel</span><span class="live-dot"><i></i>Live</span></div>
-        <div class="route-cities">Goa <span style="font-size:13px; font-weight:500; color:var(--muted);">— beachfront stays</span></div>
-        <div class="route-price"><span class="amt" data-price="1999">₹1,999</span><span class="unit">/ night</span></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="stats-section" aria-label="JackPots World Tours &amp; Travels in numbers">
-  <div class="wrap">
-    <div class="stats-grid">
-      <div class="reveal"><div class="stat-num" data-count="2000000" data-suffix="+">0</div><div class="stat-label">Happy Travellers</div></div>
-      <div class="reveal delay-1"><div class="stat-num" data-count="500" data-suffix="+">0</div><div class="stat-label">Destinations</div></div>
-      <div class="reveal delay-2"><div class="stat-num" data-count="10000" data-suffix="+">0</div><div class="stat-label">Hotels</div></div>
-      <div class="reveal delay-3"><div class="stat-num" data-count="5000" data-suffix="+">0</div><div class="stat-label">Daily Bookings</div></div>
+      <div class="why-card reveal"><div class="why-icon"><i data-jp-icon="zap"></i></div><h4>Instant Booking</h4><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div>
+      <div class="why-card reveal delay-1"><div class="why-icon"><i data-jp-icon="circleCheck"></i></div><h4>Best Price Guarantee</h4><p>Find it cheaper elsewhere and we refund the difference.</p></div>
+      <div class="why-card reveal delay-2"><div class="why-icon"><i data-jp-icon="lock"></i></div><h4>Secure Payments</h4><p>Bank-grade encryption on every transaction, every time.</p></div>
+      <div class="why-card reveal delay-3"><div class="why-icon"><i data-jp-icon="bedDouble"></i></div><h4>Verified Hotels</h4><p>Every property physically inspected before it's listed.</p></div>
+      <div class="why-card reveal"><div class="why-icon"><i data-jp-icon="clock3"></i></div><h4>24×7 Customer Support</h4><p>Real humans on chat and call, any hour, any day.</p></div>
+      <div class="why-card reveal delay-1"><div class="why-icon"><i data-jp-icon="circleX"></i></div><h4>Free Cancellation</h4><p>Plans change — cancel most bookings at zero cost.</p></div>
+      <div class="why-card reveal delay-2"><div class="why-icon"><i data-jp-icon="rotateCcw"></i></div><h4>Easy Refunds</h4><p>Refunds processed to source within 24 hours.</p></div>
+      <div class="why-card reveal delay-3"><div class="why-icon"><i data-jp-icon="usersRound"></i></div><h4>Trusted by Millions</h4><p>2 million+ travellers and counting, every single month.</p></div>
     </div>
   </div>
 </section>
 
 
 
-<section class="partners-section" aria-label="Our airline and hotel partners">
-  <div class="wrap"><div class="eyebrow reveal" style="justify-content:center;">Trusted travel partners</div></div>
-  <div class="partners-track-wrap">
-    <div class="partners-track" id="partnersTrack">
-      <span class="partner-logo">Air India</span><span class="partner-logo">IndiGo</span><span class="partner-logo">Vistara</span>
-      <span class="partner-logo">IRCTC</span><span class="partner-logo">OYO</span><span class="partner-logo">Taj Hotels</span>
-      <span class="partner-logo">Uber</span><span class="partner-logo">SpiceJet</span><span class="partner-logo">Marriott</span>
-    </div>
-  </div>
-</section>
+
+
+
+
+
+
 
 <section class="newsletter-section" id="newsletter" aria-labelledby="newsHead">
   <div class="wrap reveal">
@@ -638,19 +503,19 @@
         <h3 id="jwFContact">Contact</h3>
         <ul class="jw-f-contact" aria-labelledby="jwFContact">
           <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.81.35 1.6.68 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.74-1.25a2 2 0 0 1 2.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0 1 22 16.92z"/></svg>
+            <i data-jp-icon="phone" class="jpi-meta"></i>
             <span><span class="jw-f-ct-label">Phone</span><a class="jw-f-link jw-f-ct-value" href="tel:+919177847799">+91 9177847799</a></span>
           </li>
           <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+            <i data-jp-icon="mail" class="jpi-meta"></i>
             <span><span class="jw-f-ct-label">Email</span><a class="jw-f-link jw-f-ct-value" href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></span>
           </li>
           <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <i data-jp-icon="mapPin" class="jpi-meta"></i>
             <span><span class="jw-f-ct-label">Address</span><address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span>
           </li>
           <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <i data-jp-icon="clock3" class="jpi-meta"></i>
             <!-- Same clock icon, same label, same classes — one line of value
                  instead of two. The staffed hours (Mon–Sat, 9:00 AM – 8:00 PM
                  IST) still appear on Contact Us, Customer Support, the FAQs and
@@ -668,9 +533,9 @@
       <span>&copy; 2026 JackpotsWorld Tours &amp; Travels. All Rights Reserved.</span>
       <span class="jw-f-tagline">Designed for every journey.</span>
       <span class="jw-f-badges">
-        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>SSL Secured</span>
-        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4.5 5.6v5.7c0 4.6 3.2 8.9 7.5 10.2 4.3-1.3 7.5-5.6 7.5-10.2V5.6L12 2.5z"/></svg>Privacy Protected</span>
-        <span class="jw-f-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>Secure Payments</span>
+        <span class="jw-f-badge"><i data-jp-icon="lock" class="jpi-meta"></i>SSL Secured</span>
+        <span class="jw-f-badge"><i data-jp-icon="shieldCheck" class="jpi-meta"></i>Privacy Protected</span>
+        <span class="jw-f-badge"><i data-jp-icon="creditCard" class="jpi-meta"></i>Secure Payments</span>
       </span>
     </div>
   </div>
@@ -965,14 +830,14 @@
     </div>
     <div class="acct-body">
       <nav class="acct-tabs" id="acctTabs">
-        <div class="acct-tab" data-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</div>
-        <div class="acct-tab" data-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</div>
-        <div class="acct-tab" data-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</div>
-        <div class="acct-tab" data-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</div>
-        <div class="acct-tab" data-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</div>
-        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Center</div>
-        <div class="acct-tab" data-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</div>
-        <div class="acct-tab" data-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"/></svg>Settings</div>
+        <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
+        <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
+        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
+        <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
+        <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
+        <div class="acct-tab" data-tab="reviews"><i data-jp-icon="star" class="dd-icon"></i>Reviews</div>
+        <div class="acct-tab" data-tab="settings"><i data-jp-icon="settings" class="dd-icon"></i>Settings</div>
       </nav>
       <div class="acct-panels">
         <div class="acct-panel" id="acctPanel-profile">
@@ -1084,7 +949,7 @@
 <script src="assets/js/auth.js?v=20260909dg1"></script>
 <!-- The dialling-code table the sign-up form's country select is built from.
      Before app.js, which fills the select during start-up. -->
-<script src="assets/js/country-codes.js?v=20260911gm5"></script>
+<script src="assets/js/country-codes.js?v=20260911fp2"></script>
 <script src="assets/js/api.js?v=20260805ui34"></script>
 <!-- The icon family. Loaded before app.js so JPIcon exists when the
      Account Center renders its empty states. -->
@@ -1094,14 +959,26 @@
      so the module skips injecting a second copy. -->
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout it
      calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
-<script src="assets/js/profile-menu.js?v=20260911gm5"></script>
+<script src="assets/js/profile-menu.js?v=20260911ic7"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260909dg1"></script>
+<script src="assets/js/account-center.js?v=20260911ic7"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
-<script src="assets/js/app.js?v=20260911gm5"></script>
+<!-- The Destinations shelf. Two public endpoints, no hardcoded place names;
+     see the note at the top of the file. NOT destinations.js, which is the
+     hotel search box's autocomplete and is loaded near the top of this page.
+     travel-data.js used to be loaded here for the Popular fares and Featured
+     packages shelves and went with them; the pages that still need it load
+     it themselves. -->
+<!-- The generated image manifest, before the module that reads it. It maps a
+     destination image_key to the art that shipped for it; the files live in
+     assets/destinations/ and both are written by
+     scripts/fetch_destination_images.py. -->
+<script src="assets/js/destination-images.js?v=20260912im1"></script>
+<script src="assets/js/home-destinations.js?v=20260912dh1"></script>
+<script src="assets/js/app.js?v=20260912ds4"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

@@ -39,7 +39,7 @@ const BookingFlow = (function () {
 
   const esc = s => (typeof escapeHtml === 'function' ? escapeHtml(String(s ?? '')) : String(s ?? ''));
   const money = n => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-  const backArrow = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const backArrow = '<i data-jp-icon="chevronLeft" class="jpi-meta"></i>';
 
   /* ---------------------------------------------------------------------
      Shell

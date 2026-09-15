@@ -309,7 +309,7 @@ const HotelDetails = (function () {
         <div class="hr-name-row">
           <h1 class="hr-hd-name">${esc(detail.name)}</h1>
           ${detail.stars ? `<span class="hr-stars" role="img"
-            aria-label="${esc(detail.stars)} star hotel">${'★'.repeat(detail.stars)}</span>` : ''}
+            aria-label="${esc(detail.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(detail.stars, detail.stars) : ''}</span>` : ''}
         </div>
         <p class="hr-loc">${icon('pin')} ${esc(detail.location)}
           ${detail.distanceKm != null
@@ -365,7 +365,7 @@ const HotelDetails = (function () {
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"
-                aria-label="${esc(detail.stars)} star hotel">${'★'.repeat(detail.stars)}</span>` : ''}
+                aria-label="${esc(detail.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(detail.stars, detail.stars) : ''}</span>` : ''}
               <p class="hr-sum-hotel-loc">${esc(detail.location)}</p>
             </div>
           </div>

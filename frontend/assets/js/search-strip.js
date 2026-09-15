@@ -123,10 +123,7 @@ const SearchStrip = (function () {
   }).join('');
 
   const SWAP = '<button type="button" class="ss-swap" id="ssSwap" aria-label="Swap origin and destination">'
-    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
-    + ' stroke-linecap="round" stroke-linejoin="round">'
-    + '<path d="M7 16H3l4-4"/><path d="M3 16h14a4 4 0 0 0 0-8"/>'
-    + '</svg></button>';
+    + '<i data-jp-icon="swap" class="jpi-field"></i></button>';
 
   /* TWO BUTTONS, TWO DIFFERENT JOBS, AND THE SECOND IS NOT A DUPLICATE.
 
@@ -537,10 +534,14 @@ const SearchStrip = (function () {
          results page for a button most visitors never press is a cost for
          nothing. See openFull(). */
       /* `hr-card-scope` is what dresses the card once it is mounted — the
-         reference styling for the tabs, the fare tiles and the quick tools
+         reference styling for the tabs and the fare tiles
          lives in home-ref.css and used to be scoped to the landing page's
          body alone. See the note at the top of that file. */
       + '<div class="ss-full hr-card-scope" id="ssFull" hidden></div>';
+    /* This control builds its markup long after jp-icons.js made its
+       document-wide pass, so its own placeholders need arming here. */
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(el);
+
     root = el.querySelector('.ss-strip');
 
     if (product === 'flights') {

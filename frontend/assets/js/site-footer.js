@@ -69,15 +69,11 @@ const SiteFooter = (function () {
   /* Stroke icons for the contact column and the trust badges. Kept as path
      data rather than <img> so they inherit the gold via `stroke:currentColor`
      rules in the stylesheet and cost no extra request. */
-  const ICONS = {
-    phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.81.35 1.6.68 2.34a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.74-1.25a2 2 0 0 1 2.11-.45c.74.33 1.53.56 2.34.68A2 2 0 0 1 22 16.92z"/>',
-    mail:  '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
-    pin:   '<path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
-    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    lock:  '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
-    shield:'<path d="M12 2.5 4.5 5.6v5.7c0 4.6 3.2 8.9 7.5 10.2 4.3-1.3 7.5-5.6 7.5-10.2V5.6L12 2.5z"/>',
-    card:  '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
-  };
+  /* THE FOOTER'S OWN ICON SET IS GONE. Seven marks lived here as raw path
+     data with a private svg() helper — a second icon abstraction, drawing a
+     padlock and a clock that jp-icons already draws, at a stroke weight only
+     this file used. They are jp-icons names now, so the footer's padlock and
+     the Payment Security page's padlock are the same padlock. */
 
   /* This file is loaded on pages that have escapeHtml() (formatters.js) and on
      pages that do not, so it cannot assume it. Every string below is authored
@@ -90,8 +86,8 @@ const SiteFooter = (function () {
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  const svg = (paths, extra) =>
-    '<svg viewBox="0 0 24 24" aria-hidden="true"' + (extra || '') + '>' + paths + '</svg>';
+  const icon = (name, cls) =>
+    '<i data-jp-icon="' + name + '" class="' + (cls || 'jpi-meta') + '"></i>';
 
   const linkList = items => items
     .map(([label, href]) =>
@@ -124,12 +120,12 @@ const SiteFooter = (function () {
     return '<div class="jw-f-col">'
       + '<h3 id="jwFContact">Contact</h3>'
       + '<ul class="jw-f-contact" aria-labelledby="jwFContact">'
-      + '<li>' + svg(ICONS.phone) + '<span><span class="jw-f-ct-label">Phone</span>'
+      + '<li>' + icon('phone') + '<span><span class="jw-f-ct-label">Phone</span>'
       + '<a class="jw-f-link jw-f-ct-value" href="tel:+919177847799">+91 9177847799</a></span></li>'
-      + '<li>' + svg(ICONS.mail) + '<span><span class="jw-f-ct-label">Email</span>'
+      + '<li>' + icon('mail') + '<span><span class="jw-f-ct-label">Email</span>'
       + '<a class="jw-f-link jw-f-ct-value" href="mailto:support@jackpotsworldtours.com">'
       + 'support@jackpotsworldtours.com</a></span></li>'
-      + '<li>' + svg(ICONS.pin) + '<span><span class="jw-f-ct-label">Address</span>'
+      + '<li>' + icon('mapPin') + '<span><span class="jw-f-ct-label">Address</span>'
       + '<address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span></li>'
       /* Same clock icon, same label, same two classes — one line of value text
          instead of two.
@@ -141,7 +137,7 @@ const SiteFooter = (function () {
          said Mon–Sat, 9:00 AM – 8:00 PM IST until this line changed and then
          contradicted it; they now say 24/7 too. Change one, change the set —
          `grep -ril "hours a day"` over frontend/ finds them. */
-      + '<li>' + svg(ICONS.clock) + '<span><span class="jw-f-ct-label">Business hours</span>'
+      + '<li>' + icon('clock3') + '<span><span class="jw-f-ct-label">Business hours</span>'
       + '<span class="jw-f-ct-value">24/7 Support</span></span></li>'
       + '</ul></div>';
   }
@@ -156,9 +152,9 @@ const SiteFooter = (function () {
       + '<span>&copy; 2026 JackpotsWorld Tours &amp; Travels. All Rights Reserved.</span>'
       + '<span class="jw-f-tagline">Designed for every journey.</span>'
       + '<span class="jw-f-badges">'
-      + '<span class="jw-f-badge">' + svg(ICONS.lock) + 'SSL Secured</span>'
-      + '<span class="jw-f-badge">' + svg(ICONS.shield) + 'Privacy Protected</span>'
-      + '<span class="jw-f-badge">' + svg(ICONS.card) + 'Secure Payments</span>'
+      + '<span class="jw-f-badge">' + icon('lock') + 'SSL Secured</span>'
+      + '<span class="jw-f-badge">' + icon('shieldCheck') + 'Privacy Protected</span>'
+      + '<span class="jw-f-badge">' + icon('creditCard') + 'Secure Payments</span>'
       + '</span></div></div>';
   }
 
@@ -185,6 +181,8 @@ const SiteFooter = (function () {
     foot.className = 'jw-footer';
     if (!foot.hasAttribute('role')) foot.setAttribute('role', 'contentinfo');
     foot.innerHTML = html();
+    /* The footer renders after jp-icons.js made its document-wide pass. */
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(foot);
     return foot;
   }
 

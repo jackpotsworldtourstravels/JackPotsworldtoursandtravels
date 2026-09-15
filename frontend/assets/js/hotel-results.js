@@ -70,20 +70,24 @@ const HotelResults = (function () {
      Small inline icons. The site's jp-icons set covers products, not
      amenities, so these are drawn here — as SVG, never emoji.
      --------------------------------------------------------------------- */
-  const ICONS = {
-    pin: '<path d="M8 1.6a4.6 4.6 0 0 0-4.6 4.6c0 3.4 4.6 8.2 4.6 8.2s4.6-4.8 4.6-8.2A4.6 4.6 0 0 0 8 1.6Zm0 6.3a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z"/>',
-    wifi: '<path d="M8 12.4a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3Zm0-3.2c-1.1 0-2.1.4-2.9 1.1l1 1.1A2.9 2.9 0 0 1 8 10.6c.7 0 1.4.3 1.9.8l1-1.1A4.3 4.3 0 0 0 8 9.2Zm0-3.2c-2 0-3.8.8-5.1 2l1 1.1A5.9 5.9 0 0 1 8 7.4c1.6 0 3 .6 4.1 1.7l1-1.1A7.4 7.4 0 0 0 8 6Z"/>',
-    check: '<path d="M6.4 11.3 3.2 8.1l1.1-1.1 2.1 2.1 5.3-5.3 1.1 1.1Z"/>',
-    calendar: '<path d="M5 1.5v1.2H3.6c-.7 0-1.3.6-1.3 1.3v9c0 .7.6 1.3 1.3 1.3h8.8c.7 0 1.3-.6 1.3-1.3v-9c0-.7-.6-1.3-1.3-1.3H11V1.5H9.6v1.2H6.4V1.5Zm-1.4 4h8.8v7.5H3.6Z"/>',
-    bed: '<path d="M2 4.5v7h1.4V9.8h9.2v1.7H14V7.6c0-1-.8-1.8-1.8-1.8H7.6v3.2H3.4V4.5Zm2.8 1.1a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6Z"/>',
-    person: '<path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 1.4c-2.4 0-5 1.2-5 2.9v1.3h10v-1.3c0-1.7-2.6-2.9-5-2.9Z"/>',
-    shield: '<path d="M8 1.4 2.8 3.6v3.6c0 3.3 2.2 6.3 5.2 7.2 3-.9 5.2-3.9 5.2-7.2V3.6Zm-.8 9.6L4.6 8.4l1.1-1.1 1.5 1.5 3.4-3.4 1.1 1.1Z"/>',
-    tag: '<path d="m14 8.3-5.7-5.7a1.2 1.2 0 0 0-.9-.4H3.2c-.7 0-1.2.5-1.2 1.2v4.2c0 .3.1.6.4.9L8 14.2c.5.5 1.3.5 1.8 0l4.2-4.2c.5-.5.5-1.2 0-1.7ZM4.9 5.8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/>',
-    headset: '<path d="M8 1.6a5.6 5.6 0 0 0-5.6 5.6v4a2 2 0 0 0 2 2h1.2V8H3.8v-.8a4.2 4.2 0 0 1 8.4 0V8h-1.8v5.2h1.8a2 2 0 0 0 2-2v-4A5.6 5.6 0 0 0 8 1.6Z"/>',
-    chevron: '<path d="m8 10.2-4-4 1-1.1L8 8.1l3-3 1 1.1Z"/>',
+  /* THE HOTEL FLOW'S PRIVATE ICON SET IS GONE. Ten marks lived here as filled
+     path data on a 16-unit grid, at 14px, while every other icon in the
+     product was a 24-grid outline at 2px -- so a padlock in the hotel results
+     and a padlock in the footer were not merely different sizes, they were
+     different DRAWINGS, one solid and one outlined. hotel-details.js and
+     hotel-rooms.js both borrow this helper through HotelResults.icon, so they
+     changed with it and no call site moved. */
+  const ICON_NAME = {
+    pin: 'mapPin',       wifi: 'wifi',       check: 'check',
+    calendar: 'calendarDays', bed: 'bedDouble', person: 'userRound',
+    shield: 'shieldCheck', tag: 'tag',        headset: 'headset',
+    chevron: 'chevronDown',
   };
-  const icon = (name, cls) =>
-    `<svg class="${cls || ''}" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+  const icon = (name, cls) => {
+    const n = ICON_NAME[name];
+    if (!n || typeof JPIcon === 'undefined') return '';
+    return JPIcon.html(n, { className: ((cls || '') + ' jpi-meta').trim() });
+  };
 
   /* ---------------------------------------------------------------------
      Stay maths. Nights come from the searched dates; when none were given
@@ -419,8 +423,9 @@ const HotelResults = (function () {
             <div class="hr-card-main">
               <div class="hr-name-row">
                 <h3 class="hr-name">${esc(h.name)}</h3>
-                ${h.stars ? `<span class="hr-stars" role="img"
-                   aria-label="${esc(h.stars)} star hotel">${'★'.repeat(h.stars)}</span>` : ''}
+                ${h.stars ? `<span class="hr-stars">${typeof JPIcon !== 'undefined'
+                   ? JPIcon.stars(h.stars, h.stars)
+                   : ''}</span>` : ''}
               </div>
               <p class="hr-loc">${icon('pin')} ${esc(h.location)}</p>
               ${h.guestRating != null ? `
@@ -537,8 +542,9 @@ const HotelResults = (function () {
             <img class="hr-sum-thumb" src="${esc(imageSrc(picked))}" alt="" loading="lazy">
             <div>
               <p class="hr-sum-hotel-name">${esc(picked.name)}</p>
-              ${picked.stars ? `<span class="hr-stars" role="img"
-                aria-label="${esc(picked.stars)} star hotel">${'★'.repeat(picked.stars)}</span>` : ''}
+              ${picked.stars ? `<span class="hr-stars">${typeof JPIcon !== 'undefined'
+                ? JPIcon.stars(picked.stars, picked.stars)
+                : ''}</span>` : ''}
               <p class="hr-sum-hotel-loc">${esc(picked.location)}</p>
             </div>
           </div>

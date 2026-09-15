@@ -26,23 +26,23 @@
      would put a second header design and a second palette on the page. The
      handful of --sp-* tokens booking.css still asks for are bridged onto
      main.css's palette in booking-card.css. -->
-<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260824bk9">
-<link rel="stylesheet" href="assets/css/main.css?v=20260911gm5">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911gm5">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260826rf1">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260912im1">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260911ic7">
 <!-- The flight booking screens, built to the supplied reference. Every rule
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
-<link rel="stylesheet" href="assets/css/booking-ref.css?v=20260911gm5">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/booking-ref.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260911ic7">
 <!-- The results-page search strip. A separate component from the landing
      page's booking card; index.html loads neither of these two files. -->
-<link rel="stylesheet" href="assets/css/search-strip.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/search-strip.css?v=20260911ic7">
 <!-- The landing page's search card, for the strip's Modify button: it opens
      BookingCard underneath the row, and the reference styling for that card
-     (tabs, fare tiles, quick tools) lives here. Only the CARD sections apply
+     (tabs, fare tiles) lives here. Only the CARD sections apply
      off the landing page - see the note at the top of the file. -->
-<link rel="stylesheet" href="assets/css/home-ref.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
 <!-- The JackpotsWorld palette for this page, and the two components the
      reference asks for that no other product has: the date strip and the
      offers strip. LAST of the stylesheets on purpose - it repoints the
@@ -50,11 +50,11 @@
      them. Every rule inside is scoped to body[data-sp-service="flights"], so
      hotels.html and packages.html (which share these same stylesheets) are
      untouched. -->
-<link rel="stylesheet" href="assets/css/flights-ref.css?v=20260911gm5">
+<link rel="stylesheet" href="assets/css/flights-ref.css?v=20260911ic7">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260827pm1">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260911ic7">
 <!-- The company footer, one stylesheet for every page that renders it. -->
-<link rel="stylesheet" href="assets/css/site-footer.css?v=20260905ft6">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -64,17 +64,17 @@
      renders a frame later than it does over there. -->
 <script src="shared/formatters.js"></script>
 <script src="assets/js/auth.js?v=20260909dg1"></script>
-<script src="assets/js/jp-icons.js?v=20260911gm5"></script>
+<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <!-- The airport picker: the table and the shared listbox. airports.js also has
      to precede travel-data.js further down, which reads the same table. -->
 <script src="assets/js/airports.js?v=20260825t3"></script>
 <script src="assets/js/search-widgets.js?v=20260825t3"></script>
-<script src="assets/js/destinations.js?v=20260825h1"></script>
-<script src="assets/js/rooms-selector.js?v=20260825h1"></script>
-<script src="assets/js/pax-selector.js?v=20260825t2"></script>
-<script src="assets/js/booking-card.js?v=20260911gm5"></script>
-<script src="assets/js/site-footer.js?v=20260905ft6"></script>
-<script src="assets/js/hero-shell.js?v=20260911gm5"></script>
+<script src="assets/js/destinations.js?v=20260912ds4"></script>
+<script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
+<script src="assets/js/pax-selector.js?v=20260911ic7"></script>
+<script src="assets/js/booking-card.js?v=20260912qt1"></script>
+<script src="assets/js/site-footer.js?v=20260911ic7"></script>
+<script src="assets/js/hero-shell.js?v=20260912ct2"></script>
 </head>
 <body class="sp-continuation" data-sp-service="flights" data-live-chat>
 <a href="#txResults" class="skip-link">Skip to results</a>
@@ -84,10 +84,10 @@
      <body> (it injects its own markup) and BEFORE mountHeader below, which asks
      whether AccountCenter exists to decide if the chip is a button or a link. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/profile-menu.js?v=20260911gm5"></script>
+<script src="assets/js/profile-menu.js?v=20260911ic7"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260909dg1"></script>
+<script src="assets/js/account-center.js?v=20260911ic7"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->
@@ -133,7 +133,7 @@
 
     <div class="tx-toolbar" id="txResults">
       <div class="tx-search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <i data-jp-icon="search" class="jpi-field"></i>
         <label for="txSearch" class="sr-only">Search flights</label>
         <input id="txSearch" type="search" placeholder="Search flight number, airline or city…" autocomplete="off">
       </div>
@@ -141,7 +141,7 @@
            filter to drive. It is that sidebar checkbox, not a second one. -->
       <span id="fxDirect"></span>
       <button type="button" class="tx-filter-toggle" id="txFilterToggle" aria-controls="txFilters">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+        <i data-jp-icon="slidersHorizontal" class="jpi-filter"></i>
         Filters
       </button>
       <div class="tx-sort">
@@ -194,17 +194,17 @@
 
 <script src="components/toast.js"></script>
 <script src="assets/js/airline-logos.js?v=20260824ic9"></script>
-<script src="assets/js/travel-data.js?v=20260910sd1"></script>
+<script src="assets/js/travel-data.js?v=20260912hm1"></script>
 <!-- Booking layer. travel-data/booking-data are the read seams, booking-store
      the write seam; booking-flow is the engine and booking-flows the five
      product configurations. travel-explore only says WHICH item was chosen. -->
 <script src="assets/js/booking-api.js?v=20260902rz1"></script>
 <script src="assets/js/booking-data.js?v=20260824ph5a"></script>
 <script src="assets/js/booking-store.js?v=20260902p5"></script>
-<script src="assets/js/booking-flow.js?v=20260911gm5"></script>
-<script src="assets/js/booking-products.js?v=20260911gm5"></script>
-<script src="assets/js/booking-ticket.js?v=20260824bk9"></script>
-<script src="assets/js/booking-flows.js?v=20260910fs1"></script>
+<script src="assets/js/booking-flow.js?v=20260911ic7"></script>
+<script src="assets/js/booking-products.js?v=20260911ic7"></script>
+<script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
+<script src="assets/js/booking-flows.js?v=20260911ic7"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search
      panel, so a second set of criteria controls below the fold would be two
      places to type the same trip into. search-widgets.js is loaded in <head>,
@@ -218,10 +218,10 @@
      current results can actually answer. -->
 <!-- The generic panel: options, counts, collapsing, the slider, focus, URL.
      Knows nothing about flights; flight-filters.js supplies the definitions. -->
-<script src="assets/js/filter-engine.js?v=20260827fe3"></script>
-<script src="assets/js/flight-filters.js?v=20260827fe3"></script>
-<script src="assets/js/search-strip.js?v=20260911gm5"></script>
-<script src="assets/js/travel-explore.js?v=20260911gm5"></script>
+<script src="assets/js/filter-engine.js?v=20260911ic7"></script>
+<script src="assets/js/flight-filters.js?v=20260911ic7"></script>
+<script src="assets/js/search-strip.js?v=20260912qt1"></script>
+<script src="assets/js/travel-explore.js?v=20260911ic7"></script>
 <!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
      landing page's contact footer is not rendered on these pages. -->
 <footer id="bookingFooter"></footer>

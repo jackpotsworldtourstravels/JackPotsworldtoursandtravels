@@ -81,8 +81,8 @@
     display: inline-flex; align-items: center; gap: 3px; flex: none;
     font-size: 12.5px; font-weight: 700; color: var(--coral);
   }
-  .search-strip-edit svg { width: 15px; height: 15px; transition: transform .22s ease; }
-  .search-card:not(.is-collapsed) .search-strip-edit svg { transform: rotate(180deg); }
+  .search-strip-edit .jpi { width: 15px; height: 15px; transition: transform .22s ease; }
+  .search-card:not(.is-collapsed) .search-strip-edit .jpi { transform: rotate(180deg); }
   .search-strip:focus-visible { outline: 3px solid var(--coral); outline-offset: -3px; }
 
   /* The band exists only to hold the card now, so it stops being a hero. */
@@ -119,7 +119,10 @@
   color: var(--navy); opacity: .55; cursor: pointer; white-space: nowrap;
   transition: opacity .2s ease, color .2s ease, border-color .2s ease;
 }
-.search-tab svg { width: 16px; height: 16px; flex: none; }
+/* Matches on .jpi, not svg. Every icon here is a jp-icons drawing now, so what
+   needs sizing is the hydrated host; the <svg> inside already fills it. */
+/* Sized by .jpi-btn at 18px; this only has to keep it out of the flex sizing. */
+.search-tab .jpi { flex: none; }
 .search-tab:hover:not(.is-on) { opacity: .85; }
 .search-tab.is-on { opacity: 1; color: var(--coral); border-bottom-color: var(--coral); }
 /* Inset, because the outline of a tab flush against the card's rounded top
@@ -129,7 +132,7 @@
 @media (max-width: 700px) {
   .search-tabs { padding: 4px 6px 0; }
   .search-tab { padding: 10px 11px 9px; font-size: 12.5px; gap: 5px; }
-  .search-tab svg { width: 15px; height: 15px; }
+  .search-tab .jpi { width: 16px; height: 16px; }
 }
 
 /* --------------------------------------------------------------------------
@@ -290,7 +293,7 @@
   align-self: center; justify-content: center; align-items: center;
   width: 42px; height: 42px; color: var(--muted); opacity: .55;
 }
-.mirror-mark svg { width: 19px; height: 19px; }
+.mirror-mark .jpi { width: 19px; height: 19px; }
 
 /* --------------------------------------------------------------------------
    Card footer — the one Search button, bottom right
@@ -398,7 +401,7 @@
 }
 .mc-remove:hover { background: rgba(233,185,73,.16); color: var(--coral); }
 .mc-remove:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-.mc-remove svg { width: 17px; height: 17px; }
+.mc-remove .jpi { width: 17px; height: 17px; }
 /* The first leg IS the itinerary and has nothing to be removed back to. Hidden
    rather than absent so every row keeps the same six columns — and
    visibility:hidden also takes it out of the tab order. */
@@ -417,7 +420,7 @@
 }
 .mc-add:disabled { opacity: .45; cursor: not-allowed; }
 .mc-add:focus-visible { outline: 3px solid var(--coral); outline-offset: 2px; }
-.mc-add svg { width: 15px; height: 15px; }
+.mc-add .jpi { width: 16px; height: 16px; }
 .mc-limit { margin: 0; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .mc-limit:empty { display: none; }
 
@@ -551,8 +554,8 @@
   to   { opacity: 1; transform: none; }
 }
 .hotel-sent-tick {
-  width: 42px; height: 42px; padding: 9px; border-radius: 50%;
-  color: #fff; background: var(--emerald, #1E9E6A); margin-bottom: 4px;
+  width: 42px; height: 42px; border-radius: 50%;
+  color: var(--emerald, #1E9E6A); margin-bottom: 4px;
 }
 .hotel-sent h3 { margin: 0; font-size: 18px; font-weight: 800; color: var(--navy); }
 .hotel-sent p {

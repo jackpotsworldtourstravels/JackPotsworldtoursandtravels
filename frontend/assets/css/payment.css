@@ -254,7 +254,7 @@
   color: var(--sp-muted, #5B6B82);
 }
 
-.jpay-secure svg { flex: none; }
+.jpay-secure .jpi { flex: none; }
 
 /* --- the button ---------------------------------------------------------- */
 .jpay-cta {

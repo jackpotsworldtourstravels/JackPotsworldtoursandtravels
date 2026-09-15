@@ -69,9 +69,13 @@ const ServiceShell = (function () {
     if (!btn) return;
     const dark = effectiveTheme() === 'dark';
     btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
-    btn.innerHTML = dark
-      ? `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`
-      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;
+    /* Rendered, not a placeholder. This runs again on every theme toggle, long
+       after the one JPIcon.mount() below — a placeholder written here would sit
+       unhydrated until the next full repaint, which is how the theme button
+       came out empty on the policy pages. */
+    btn.innerHTML = (typeof JPIcon !== 'undefined')
+      ? JPIcon.html(dark ? 'sun' : 'moon', { className: 'jpi-btn' })
+      : '';
   }
   /* Applied before first paint by an inline snippet in each page; this repeats
      it for safety if the snippet is ever dropped. */
@@ -111,12 +115,12 @@ const ServiceShell = (function () {
         </a>
         <button type="button" class="sp-icon-btn" id="spTheme"></button>
         <a class="sp-partner" href="partner-login.html">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>
+          <i data-jp-icon="handshake" class="npm-mark"></i>
           <span>My Partner</span>
         </a>
         <span id="spAuth"></span>
         <button type="button" class="sp-icon-btn sp-burger" id="spBurger" aria-label="Menu" aria-expanded="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          <i data-jp-icon="menu" class="jpi-nav"></i>
         </button>
       </div>
     </div>`;

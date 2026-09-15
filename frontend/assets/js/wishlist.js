@@ -80,9 +80,7 @@ const Wishlist = (function () {
       data-wl-type="${esc(type)}" data-wl-id="${esc(id)}"
       aria-pressed="${on}" title="${on ? 'Saved' : 'Save for later'}"
       aria-label="${on ? 'Remove' : 'Save'} ${esc(label || 'this')} ${on ? 'from' : 'to'} your wishlist">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z"/>
-      </svg>
+      ${typeof JPIcon !== 'undefined' ? JPIcon.html('heart', { className: 'jpi-btn' }) : ''}
     </button>`;
   }
 

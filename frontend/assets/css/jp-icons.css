@@ -40,10 +40,64 @@
 }
 .jpi svg [fill="none"] { fill: none; }
 
-/* Sizes. Set on the host so the icon scales with its context. */
+/* Sizes, relative. Set on the host so the icon scales with its context. */
 .jpi-sm { width: 1em;    height: 1em; }
 .jpi-lg { width: 1.75em; height: 1.75em; }
 .jpi-xl { width: 2.5em;  height: 2.5em; }
+
+/* --------------------------------------------------------------------------
+   THE SIZE SCALE — six steps, named for the job rather than the number.
+
+   The em sizes above scale an icon with whatever font-size it inherited, which
+   is right inside a paragraph and wrong everywhere else: an icon in a 13px
+   filter chip and an icon in a 15px field came out 2px apart for no reason
+   anyone chose. These are absolute, and they are named for where they are used
+   so a call site cannot pick "18px" without saying which 18px it means.
+
+   Optical size, not box size. A chevron at 18px reads smaller than a bell at
+   18px because it inks less of its 24-grid; the steps are close enough
+   together that the difference never crosses a step.
+   -------------------------------------------------------------------------- */
+.jpi-nav    { width: 22px; height: 22px; }  /* primary product navigation      */
+.jpi-field  { width: 19px; height: 19px; }  /* inside a search or form control */
+.jpi-btn    { width: 18px; height: 18px; }  /* inside a button, beside a label */
+.jpi-card   { width: 19px; height: 19px; }  /* flight and hotel result cards   */
+.jpi-filter { width: 18px; height: 18px; }  /* filter and sort controls        */
+.jpi-meta   { width: 16px; height: 16px; }  /* small metadata, inline with 12-13px text */
+
+/* --------------------------------------------------------------------------
+   SPACING — the gap between an icon and the word it belongs to.
+
+   Put `jpi-row` on the element that holds both. It is a flex row with the 7px
+   from the spec (the 6-8px band, middle of it) and a baseline that lines the
+   drawing up with lowercase text rather than with the line box, which is what
+   stops an icon sitting a pixel high next to its own label.
+
+   `jpi-in-field` is the other case: an icon sitting INSIDE an input rather
+   than beside it, where the spec asks for 10-14px of clearance from the edge.
+   -------------------------------------------------------------------------- */
+.jpi-row { display: inline-flex; align-items: center; gap: 7px; }
+.jpi-row--tight { gap: 6px; }
+.jpi-row--loose { gap: 8px; }
+
+.jpi-in-field { position: relative; }
+.jpi-in-field > .jpi {
+  position: absolute; top: 50%; left: 12px; transform: translateY(-50%);
+  pointer-events: none;
+}
+/* The control has to be told to get out of the icon's way; 12px of inset plus
+   a 19px icon plus 9px of air is the 40px this reserves. */
+.jpi-in-field > input,
+.jpi-in-field > select { padding-left: 40px; }
+
+/* An icon-only control still needs a hit area. 24px of drawing inside a 40px
+   target is the smallest the WCAG 2.2 target-size rule accepts without
+   spacing exemptions, and it costs nothing here because these sit in a row
+   that is already that tall. */
+.jpi-tap {
+  display: inline-grid; place-items: center;
+  min-width: 40px; min-height: 40px;
+}
 
 /* --------------------------------------------------------------------------
    Keyframes — the shared grammar
@@ -102,6 +156,16 @@
    -------------------------------------------------------------------------- */
 /* 42px round button — an em-sized icon landed at 13px and looked lost in it. */
 .swap-btn .jpi { width: 18px; height: 18px; }
+
+/* The payment screen. Two sizes: a mark inline with "secure payment" text, and
+   the outcome mark on the success and failure screens, which is a statement
+   rather than a label and is sized like one. */
+.jpay-ic-sm { width: 16px; height: 16px; }
+.jpay-ic-lg { width: 30px; height: 30px; }
+
+/* The results empty/failure state. Big, because it IS the screen at that
+   moment -- there is nothing else on it. */
+.tx-state-art { width: 38px; height: 38px; }
 /* The rating rows inherit their gold from .pkg-stars .stars / .tx-stars, and
    letter-spacing meant for text glyphs would push the SVGs apart. */
 .pkg-stars .stars { letter-spacing: normal; display: inline-flex; }

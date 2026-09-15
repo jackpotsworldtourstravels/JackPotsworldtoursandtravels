@@ -162,21 +162,52 @@ header{
   color:#fff;
 }
 nav.wrap{display:flex; align-items:center; justify-content:space-between; height:128px; gap:20px;}
-/* THE HEADER BAR IS NOT PAGE CONTENT, so it does not stop at --max.
-   The reference nav is ten cells; with the logo and the utility cluster the row
-   wants about 1320px, and .wrap capped it at 1280. .navlinks centres itself, so
-   the 40px it was short got split across BOTH ends: the first link (Flights)
-   sat behind the logo and the last (More) fell off the right — on a full-screen
-   window with 500px going spare either side. The bar uses the window it is
-   given; everything below the header still honours --max. */
-#siteHeader nav.wrap{max-width:none; padding-inline:clamp(16px, 2.5vw, 44px);}
+/* THE HEADER BAR IS A CENTRED CONTAINER, AND A THREE-COLUMN GRID.
+
+   `max-width: none` used to live here. It was right for the nav it was written
+   for — ten cells plus the logo and the utility cluster wanted ~1320px and
+   .wrap caps at 1280, so the row was 40px short and split the shortfall across
+   both ends, putting the first link behind the logo and the last off the right.
+   The nav is five cells now; what the rule left behind was a bar that spread
+   to the window edges on a large monitor while every other band on the page
+   stopped at --max.
+
+   IT USES --max, THE SAME 1280 AS THE PAGE. Not a wider header-only figure:
+   at --max the logo lands on the same vertical as the hero eyebrow, the
+   headline and the search card's left edge, so the whole page reads off one
+   margin. A header container of its own width would put the mark 60px outside
+   that line for no gain.
+
+   `auto auto 1fr`, NOT `1fr auto 1fr`. The middle track held the nav in the
+   dead centre of the bar for a while, which left ~400px of empty bar between
+   the mark and the first link — the brief calls that out directly ("the logo
+   should NOT be extremely far away from Flights"). Sizing the first two tracks
+   to their content puts the logo and the nav together on the left as one
+   group, and the third track takes the remaining space so the utility cluster
+   is held against the right edge. Everything is still in flow: no absolute
+   positioning, and the row cannot overlap itself. */
+#siteHeader nav.wrap{
+  display:grid; grid-template-columns:auto auto 1fr; align-items:center;
+  gap:0; max-width:var(--max); margin-inline:auto;
+  padding-inline:clamp(16px, 2.5vw, 32px);
+}
+#siteHeader nav.wrap > .logo        { justify-self:start; }
+/* The breathing room the brief asks for between the mark and Flights — close
+   enough to read as one group, far enough not to crowd the logo. */
+#siteHeader nav.wrap > .navlinks    { justify-self:start; margin-left:clamp(18px, 2.2vw, 40px); }
+#siteHeader nav.wrap > .nav-actions { justify-self:end; }
 /* THE LOGO IS THE BRAND MARK AND IT IS SIZED LIKE ONE. Both numbers went up
    when six products left the nav: the bar was fitting ten cells plus a
    six-item utility cluster, and every pixel the logo took came off the strip
    (see the comments further down about Flights sitting behind it). Four cells
    is not that bar. `margin-left` is ON TOP of nav.wrap's own padding-inline,
    so the mark clears the window edge rather than hugging it. */
-.logo{display:flex; align-items:center; margin-left:34px;}
+/* IT TRACKS THE WINDOW rather than sitting at a fixed inset. The bar is
+   logo | links | account, and on a wide monitor a fixed 34px left the mark
+   stranded against the edge with a gulf before the first product. 4vw closes
+   that gulf as the window grows, and collapses to 16px on a phone where the
+   burger and the account chip need every pixel of the row. */
+.logo{display:flex; align-items:center; margin-left:clamp(16px, 4vw, 76px);}
 .logo-mark-img{height:120px; width:auto; object-fit:contain; flex-shrink:0;}
 .navlinks{display:flex; gap:30px; font-size:14.5px; font-weight:600; align-items:center;}
 .navlinks a{position:relative; padding:8px 0; color:rgba(255,255,255,0.86); transition:color .3s ease;}
@@ -189,7 +220,13 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .nav-partner-mark:hover{border-color:var(--coral); background:rgba(232,96,76,0.14); transform:translateY(-1px);}
 .npm-mark{width:21px; height:21px; flex-shrink:0;}
 .mobile-partner-mark{display:flex; align-items:center; gap:10px;}
-.mobile-partner-mark .npm-mark{width:20px; height:20px; color:var(--navy);}
+/* INHERIT, NOT NAVY. The drawer is white on a service page
+   (`header.is-solid .mobile-nav`) and near-black on the landing page, and this
+   hard-coded navy was written for the first one: #0B3C4A on #0A0A0A is about
+   1.5:1, so the mark beside "My Partner" was the one icon in the drawer nobody
+   could see. The link already carries the right colour for whichever drawer it
+   is in — take it from there and both are correct. */
+.mobile-partner-mark .npm-mark{width:20px; height:20px; color:inherit;}
 .nav-signup{padding:11px 22px; font-size:14px;}
 .hamburger{display:none; flex-direction:column; gap:5px; width:26px;}
 .hamburger span{height:2px; background:#fff; border-radius:2px;}
@@ -386,7 +423,10 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .field-date{cursor:pointer;}
 .field-date .date-display{cursor:pointer; padding-right:24px;}
 .field-date .date-native{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
-.field-date .cal-icon{position:absolute; right:16px; bottom:14px; width:17px; height:17px; color:var(--muted);}
+/* 19px, the scale's field size. The icon spec puts an icon inside a control
+   at 18-20px and 10-14px from its edge; 16px of inset was already inside
+   that band, so only the drawing changed size. */
+.field-date .cal-icon{position:absolute; right:16px; bottom:13px; width:19px; height:19px; color:var(--muted);}
 .swap-btn{
   display:flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:50%; align-self:center;
   background:#fff; border:1px solid var(--line); color:var(--coral); transition:transform .3s ease, background .2s ease;
@@ -462,7 +502,6 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .wl-btn.saved{color:var(--coral); background:var(--coral-hover);}
 .review-link{font-size:12.5px; font-weight:700; color:var(--sky); white-space:nowrap;}
 .review-link:hover{text-decoration:underline;}
-.pkg-actions{display:flex; align-items:center; gap:10px; margin-top:12px;}
 .review-item{border-bottom:1px solid var(--line); padding:14px 0;}
 .review-item:last-child{border-bottom:none;}
 .review-item .stars{color:var(--gold); letter-spacing:1px; font-size:14px;}
@@ -563,28 +602,21 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 @media (max-width:760px){.dest-grid{grid-template-columns:repeat(2,1fr);}}
 @media (max-width:480px){.dest-grid{grid-template-columns:1fr;}}
 
-/* ---------- PACKAGES ---------- */
-.packages-section{background:var(--white);}
-.pkg-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:24px;}
-.pkg-card{
-  background:var(--bg); border:1px solid var(--line); border-radius:22px; overflow:hidden;
-  transition:transform .3s ease, box-shadow .3s ease;
-}
-.pkg-card:hover{transform:translateY(-8px); box-shadow:var(--shadow-lg);}
-.pkg-img{position:relative; aspect-ratio:4/3; overflow:hidden;}
-.pkg-img img{width:100%; height:100%; object-fit:cover; transition:transform .5s ease; background:var(--navy-2);}
-.pkg-card:hover .pkg-img img{transform:scale(1.08);}
-.pkg-duration{position:absolute; top:14px; left:14px; background:rgba(10,37,64,0.85); color:#fff; font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:100px; backdrop-filter:blur(6px);}
-.pkg-body{padding:22px;}
-.pkg-body h3{font-size:19px; font-weight:700;}
-.pkg-stars{display:flex; align-items:center; gap:6px; margin:10px 0 14px; font-size:13px; color:var(--muted);}
-.pkg-stars .stars{color:var(--gold); letter-spacing:1px;}
-.pkg-foot{display:flex; align-items:center; justify-content:space-between;}
-.pkg-price{font-size:12px; color:var(--muted);}
-.pkg-price b{display:block; font-size:19px; color:var(--navy); font-family:var(--ff-head);}
-.pkg-book{font-size:13px; padding:11px 18px;}
-@media (max-width:1100px){.pkg-grid{grid-template-columns:repeat(2,1fr);}}
-@media (max-width:560px){.pkg-grid{grid-template-columns:1fr;}}
+/* PACKAGES, TRENDING ROUTES, STATS and PARTNERS all used to have a block here.
+   Featured tour packages, Popular fares, the four statistics counters and the
+   Trusted travel partners marquee were removed from the landing page, and
+   every rule that dressed them went too: .packages-section, .pkg-grid/-card/
+   -img/-body/-foot/-price/-book/-blurb/-duration/-stars, .routes-section,
+   .routes-grid, .route-card/-top/-mode/-cities/-price/-note, .live-dot,
+   .stats-section/-grid, .stat-num/-label, .partners-section, .partners-track,
+   .partner-logo, and the liveBlink/priceFlip/partnersScroll keyframes.
+
+   NONE OF IT IS USED BY ANOTHER PAGE — every .html and .js under frontend/ was
+   checked for each class name before deleting, with the jw-dest-* prefix of the
+   new section excluded so a substring match could not vouch for a dead rule.
+
+   Tour packages and flight search are untouched. They were never styled from
+   here: packages.html and flights.html render through travel-explore.css. */
 
 /* ---------- WHY CHOOSE US ---------- */
 .why-section{background:var(--navy); color:#fff; position:relative; overflow:hidden;}
@@ -600,53 +632,17 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .why-card:hover{transform:translateY(-6px); background:rgba(255,255,255,0.11); box-shadow:0 20px 50px -20px rgba(232,96,76,0.4);}
 .why-icon{width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,var(--coral),var(--gold)); display:flex; align-items:center; justify-content:center; margin-bottom:18px; transition:transform .3s ease;}
 .why-card:hover .why-icon{transform:scale(1.1) rotate(-6deg);}
-.why-icon svg{width:22px; height:22px; color:#fff;}
+/* Matches on .jpi, not svg: every icon here is a jp-icons drawing now, so the
+   box that needs sizing is the hydrated host and the <svg> inside it already
+   fills that box. A selector reaching through to the <svg> would size the
+   drawing and leave the host at its default, which is how an icon ends up
+   sitting in a box a few pixels wider than itself. */
+.why-icon .jpi{width:22px; height:22px; color:#fff;}
 .why-card h4{color:#fff; font-size:16.5px; font-weight:700; margin-bottom:8px;}
 .why-card p{font-size:13.5px; opacity:.65; line-height:1.6;}
 @media (max-width:1100px){.why-grid{grid-template-columns:repeat(2,1fr);}}
 @media (max-width:560px){.why-grid{grid-template-columns:1fr;}}
 
-
-/* ---------- TRENDING ROUTES ---------- */
-.routes-section{background:var(--white);}
-.routes-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:20px;}
-.route-card{
-  background:var(--bg); border:1px solid var(--line); border-radius:20px; padding:26px;
-  transition:transform .3s ease, box-shadow .3s ease;
-}
-.route-card:hover{transform:translateY(-6px); box-shadow:var(--shadow-lg);}
-.route-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
-.route-mode{display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--sky);}
-.route-mode svg{width:16px; height:16px;}
-.live-dot{display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--emerald);}
-.live-dot i{width:7px; height:7px; border-radius:50%; background:var(--emerald); animation:liveBlink 1.4s ease-in-out infinite;}
-@keyframes liveBlink{0%,100%{opacity:1;} 50%{opacity:.25;}}
-.route-cities{font-family:var(--ff-head); font-size:19px; font-weight:700; display:flex; align-items:center; gap:8px;}
-.route-cities svg{width:16px; height:16px; color:var(--muted);}
-.route-price{margin-top:16px; display:flex; align-items:baseline; gap:8px;}
-.route-price .amt{font-family:var(--ff-head); font-size:26px; font-weight:800; color:var(--navy); transition:transform .25s ease;}
-.route-price .amt.flip{animation:priceFlip .5s ease;}
-@keyframes priceFlip{0%{transform:rotateX(90deg); opacity:0;} 100%{transform:rotateX(0); opacity:1;}}
-.route-price .unit{font-size:12.5px; color:var(--muted);}
-@media (max-width:1100px){.routes-grid{grid-template-columns:repeat(2,1fr);}}
-@media (max-width:560px){.routes-grid{grid-template-columns:1fr;}}
-
-/* ---------- STATS ---------- */
-.stats-section{background:linear-gradient(135deg, var(--navy) 0%, var(--navy-3) 100%); position:relative; overflow:hidden;}
-.stats-section::before{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 800px 400px at 50% 120%, rgba(255,176,32,0.25), transparent 60%);}
-.stats-grid{position:relative; z-index:1; display:grid; grid-template-columns:repeat(4,1fr); gap:20px; text-align:center;}
-.stat-num{font-family:var(--ff-head); font-size:clamp(34px,4.5vw,52px); font-weight:800; color:#fff;}
-.stat-label{font-size:14px; color:rgba(255,255,255,0.65); margin-top:8px; font-weight:600;}
-@media (max-width:760px){.stats-grid{grid-template-columns:repeat(2,1fr); gap:36px;}}
-
-/* ---------- PARTNERS ---------- */
-.partners-section{background:var(--white); padding:70px 0;}
-.partners-track-wrap{overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image:linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);}
-.partners-track{display:flex; gap:60px; width:max-content; animation:partnersScroll 26s linear infinite; align-items:center;}
-.partners-track:hover{animation-play-state:paused;}
-.partner-logo{font-family:var(--ff-head); font-weight:800; font-size:20px; color:var(--muted); opacity:.6; white-space:nowrap; transition:opacity .2s ease, color .2s ease;}
-.partner-logo:hover{opacity:1; color:var(--navy);}
-@keyframes partnersScroll{0%{transform:translateX(0);} 100%{transform:translateX(-50%);}}
 
 /* ---------- NEWSLETTER ---------- */
 /* THE BAND KEPT ITS BRIGHTNESS AND LOST ITS WHITE TEXT. The gradient used to
@@ -1105,8 +1101,17 @@ button.modal-forgot:focus-visible{ outline:2px solid var(--coral); outline-offse
    Scoped entirely to this class, so index.html and flights.html — which do
    have a hero — are untouched.
    =========================================================================== */
+/* THE BAR FOLLOWS THE PALETTE ITS OWN TEXT FOLLOWS.
+   `background:#fff` was hard-coded while every label in it is `var(--navy)` —
+   and service-page.css bridges `--navy` onto `--sp-ink`, which is #E8EEF7 on a
+   dark scheme. So on visa.html / cruises.html / activities.html with the OS in
+   dark mode the bar was white with near-white lettering: Flights, Hotels,
+   Holiday Packages, Gaming Packages, More, My Partner and Login all ghosted
+   out at once, and the same for the drawer below. `--white` is the token
+   service-page.css already remaps (to --sp-surface) for exactly this, and it
+   is plain #fff on every page that does not load it. */
 header.is-solid{
-  position:static; background:#fff; backdrop-filter:none;
+  position:static; background:var(--white, #fff); backdrop-filter:none;
   border-bottom:1px solid var(--line);
   /* The dark half of the pair declared on `header` above — anything in the bar
      that inherits its colour (`.pm-login`) has to flip with the background. */
@@ -1128,7 +1133,7 @@ header.is-solid .nav-login{color:var(--navy);}
 header.is-solid .hamburger span{background:var(--navy);}
 
 /* The mobile drawer hangs off the bar, so it needs the painted treatment too. */
-header.is-solid .mobile-nav{background:#fff; border-top:1px solid var(--line);}
+header.is-solid .mobile-nav{background:var(--white, #fff); border-top:1px solid var(--line);}
 header.is-solid .mobile-nav a{color:var(--navy);}
 
 @media (max-width:900px){
@@ -1182,19 +1187,36 @@ body.bk-inpage:not([data-sp-service="flights"]) header#siteHeader .hr-wish{color
 }
 
 /* ---------------------------------------------------------------------------
-   Narrow screens: the top bar cannot carry the partner button as well.
-   With a signed-in account chip present, "My Partner" (114px) + the chip
-   (179px) + the burger overflowed a 390px bar — the header scrolled to 410px,
-   which squeezed the LOGO to zero width and pushed the burger off-screen.
-   Neither is reachable, and the burger is the only way into the menu.
+   Narrow screens: the partner button loses its LABEL, not its place.
 
-   The button is not lost: the mobile drawer already carries its own
-   `.mobile-partner-mark` copy, which is where it belongs at this width.
-   Applies to the hero header too — flights.html and index.html had exactly
-   the same overflow before this.
+   It used to be `display:none` here. The reason was real — "My Partner"
+   (114px) plus a signed-in account chip (179px) plus the burger overflowed a
+   390px bar, which squeezed the logo to zero width and pushed the burger, the
+   only way into the menu, off the screen — and the drawer carries its own
+   copy, so nothing was strictly unreachable.
+
+   But the B2B door is meant to be visible on the front page (it is greyed
+   there, not removed — see home-ref.css), and "visible unless your window is
+   narrow" is not that. Icon-only is what actually fixes the overflow: the mark
+   is 21px, so the pill costs ~35px instead of 125 and the row fits with the
+   chip present. The width that was the problem is the width being paid back.
+
+   THE LABEL IS HIDDEN FROM THE EYE, NOT FROM THE ACCESSIBILITY TREE.
+   `display:none` on the span would leave an icon-only link with no accessible
+   name at all; clipped, it is still read out. Same technique
+   `.ss-popmount > label` uses in search-strip.css, for the same reason.
    --------------------------------------------------------------------------- */
 @media (max-width:600px){
-  header .nav-actions > .nav-partner-mark{display:none;}
+  header .nav-actions > .nav-partner-mark{padding:7px; gap:0;}
+  /* `:not(.jpi)` IS LOAD-BEARING. The handshake used to be a bare <svg> and the
+     label was the only <span> in here, so "> span" meant "the label". The mark
+     is a jp-icons drawing now and its host IS a span — without this the rule
+     clipped the ICON to 1x1 as well, and My Partner became an empty pill on
+     every phone. It is a link that stays legible; see home-ref.css. */
+  header .nav-actions > .nav-partner-mark > span:not(.jpi){
+    position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
+    clip-path:inset(50%); overflow:hidden; white-space:nowrap;
+  }
   header .logo{flex:0 0 auto;}
   header .logo-mark-img{max-height:46px;}
 }
@@ -1299,25 +1321,45 @@ header.is-solid .nav-icon-btn:hover{background:rgba(232,96,76,.08); border-color
    the last, was merely cut. `safe` drops the centring the moment the row runs
    short, so it starts flush left and scrolls, and the first product is never
    the one that disappears. */
-header .navlinks { display:flex; align-items:stretch; gap:0; flex:1; justify-content:safe center; min-width:0; overflow-x:auto; scrollbar-width:none; }
+/* .navlinks is still a flex ROW for its own links; it is the grid's middle
+   track that positions it. `flex:1` and `justify-content` are gone because a
+   grid item takes neither — keeping them read as if the row still stretched. */
+header .navlinks { display:flex; align-items:stretch; gap:0; min-width:0; overflow-x:auto; scrollbar-width:none; }
 header .navlinks::-webkit-scrollbar { display:none; }
 header .navlinks a {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:3px; padding:8px 9px 6px; border-radius:8px; font-size:11.5px; font-weight:600;
   line-height:1.2; text-align:center; white-space:nowrap; position:relative; flex:none;
 }
-header .navlinks a .jpi { width:18px; height:18px; }
+/* The product glyph. Sized by .jpi-nav (jp-icons.css) at the 22px the icon
+   spec asks of primary navigation — this rule only has to stay out of its way
+   and off the caret, which is a different job at a different size. */
+header .navlinks a .jpi.nav-caret { width:12px; height:12px; }
+/* The "More" chevron. It sits INSIDE the label span, so it is text-adjacent
+   and needs no layout of its own — the cell is a column (icon over label) and
+   a sibling element would land on a third row. */
+header .navlinks .nav-caret {
+  /* `display:inline-block` is the whole fix. The base reset near the top of
+     this file sets `img,svg{display:block}`, which is right for every other
+     icon on the site and wrong here: a block box inside the label span opens
+     its own line, so the chevron rendered UNDER the word "More" instead of
+     after it. `vertical-align` only ever applied to an inline-level box, so
+     it was inert until now too. */
+  display:inline-block;
+  /* Square, not 10x7. The chevron is drawn on the same 24-grid as every other
+     icon now, so a 10x7 box does not crop it — it SQUASHES it, and a chevron
+     with a flattened angle reads as a different mark. */
+  width:12px; height:12px; margin-left:5px; vertical-align:middle; opacity:.72;
+}
 header .navlinks a[aria-current="page"]::after {
   content:''; position:absolute; left:9px; right:9px; bottom:0; height:2px;
   background:var(--coral); border-radius:2px;
 }
-header .logo { flex:none; }
-/* A REAL GUTTER BETWEEN THE MARK AND THE FIRST PRODUCT.
-   The two boxes never actually intersected, but once the nav grew to ten items
-   it filled the row and closed to about 10px of the logo — close enough to
-   read as overlapping. The gutter is non-negotiable space: the nav gives up
-   width for it, which it can, because its labels already drop below 1460. */
-header .navlinks { margin-left: 26px; }
+/* The gutter between the mark and the first product is no longer a margin:
+   the nav sits in the centre track, so the space either side of it is whatever
+   the outer tracks leave. On a full-screen window that is several hundred
+   pixels, which is the "comfortable gap" the layout is after. */
+
 /* THE SHARED HEADER TAPERS THE WAY THE LANDING PAGE ALREADY DOES.
    home-ref.css's section 9 pulls nav.wrap's gap to 10px and its gutter to
    clamp(10px, 2vw, 24px) for exactly this reason — and because that taper
@@ -1331,17 +1373,21 @@ header .navlinks { margin-left: 26px; }
    window still gets its full 24px and only a genuinely narrow one tightens. */
 @media (max-width: 1100px) {
   #siteHeader nav.wrap { gap: 10px; padding-inline: clamp(10px, 2vw, 24px); }
-  /* 16, so the logo gutter never drops below the 26px the block below calls
-     non-negotiable: nav.wrap's gap is 10 here, and 16 + 10 is that same 26.
-     Measured 26px on the landing page and 29 to 36 on a hero-shell page,
-     which has slack to spread. The savings come from the gap on the OTHER
-     side of the nav and from the gutter — never from the brand mark. */
-  header .navlinks { margin-left: 16px; }
+
 }
-header .nav-actions { flex:none; flex-wrap:nowrap; white-space:nowrap; gap:9px; }
+/* .nav-actions is its own flex row (the cluster); the grid's third track is
+   what holds it against the right edge, so it needs no flex sizing of its own. */
+header .nav-actions { display:flex; align-items:center; flex-wrap:nowrap; white-space:nowrap; gap:9px; }
 header .hr-wish { display:inline-flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer; font:inherit; font-size:13px; font-weight:600; color:inherit; }
-header .hr-wish svg { width:18px; height:18px; color:var(--danger); }
-@media (max-width: 1500px) { header .hr-wish span { display:none; } }
+header .hr-wish .jpi { color:var(--danger); }
+/* 1150, not 1500. That figure was set when the bar carried ten products and a
+   six-item cluster; with five cells the word fits at every desktop width in
+   the brief, and the reference shows it at ~1450. */
+/* `:not(.jpi)` for the same reason as the partner mark above: the heart is a
+   jp-icons drawing now and its host is a <span>, so an unqualified
+   "header .hr-wish span" hid the ICON along with the word below 1150px --
+   which is most laptops. The LABEL is what collapses here; the control stays. */
+@media (max-width: 1150px) { header .hr-wish span:not(.jpi) { display:none; } }
 
 /* WHEN TEN PRODUCTS AND A SIGNED-IN PROFILE WILL NOT SHARE ONE ROW.
 
@@ -1357,7 +1403,9 @@ header .hr-wish svg { width:18px; height:18px; color:var(--danger); }
    nothing is cut mid-word, and every item keeps an accessible name through
    `title` (set from the label in hero-shell.js and index.html). Above 1460 the
    labels come back. */
-@media (max-width: 1460px) {
+/* 1150, not 1460 — same reason. The reference draws the nav labels at ~1450,
+   and ten cells' worth of caution was hiding them on every laptop. */
+@media (max-width: 1150px) {
   header .navlinks a { padding: 8px 10px; gap: 0; }
   /* :not(.jpi) is load-bearing. JPIcon.mount replaces the <i> with a
      <span class="jpi">, so the icon is a direct-child span too — hiding every
@@ -1394,4 +1442,189 @@ header .hr-wish svg { width:18px; height:18px; color:var(--danger); }
    silently keeping the strip alive on the landing page at every width. */
 @media (max-width: 860px) {
   header .navlinks { display: none; }
+}
+
+
+/* ===========================================================================
+   DESTINATIONS
+   ---------------------------------------------------------------------------
+   The one section that replaced six. It borrows the page's existing language
+   rather than inventing a second one: .section-head and .eyebrow above it are
+   main.css's, the card radius and lift are the destination tiles' and the
+   package cards' from before them, and the accent is --coral like every other
+   selected thing on the site.
+
+   THE GRID IS auto-fill, NOT A FIXED COLUMN COUNT. The API decides how many
+   destinations there are and nothing here may assume four or six: columns are
+   as many tracks as fit. Measured, at the real content widths: five at 1440,
+   four at 1024, two at 768, two at 430 and two at 375 — and no horizontal page
+   scroll at any of them.
+   =========================================================================== */
+.jw-dest{padding:58px 0 46px;}
+.jw-dest .section-head{margin-bottom:26px;}
+
+.jw-dest-grid{
+  display:grid; gap:18px;
+  grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+}
+@media (max-width:520px){
+  /* 140px, NOT 150. Two per row rather than one — a destination card is a name
+     over a tint, and one per row turns a short list into a long scroll. At 375
+     the content box is 311px, so two tracks plus the 12px gap need each to be
+     at most 149.5px: 150 missed it by half a pixel and collapsed to a single
+     column on the commonest phone width there is. */
+  .jw-dest-grid{grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px;}
+}
+
+/* A BUTTON, BECAUSE IT ACTS ON THIS PAGE. It opens a panel below rather than
+   navigating, so it is a button with aria-pressed and aria-controls, not a
+   link (spec §33). That also means keyboard support and the focus ring come
+   from the element rather than from anything added here. */
+/* THE PHOTOGRAPH IS THE CARD. Name and country sit ON the image rather than in
+   a strip beneath it, which is what the shelf needed to stop reading as a grid
+   of coloured rectangles with captions. The card is one 4:3 frame, cropped to
+   that ratio by the fetch script, so no image can make its row taller. */
+.jw-dest-card{
+  position:relative; display:block; padding:0; overflow:hidden;
+  aspect-ratio:4/3; border:1px solid var(--line); border-radius:20px;
+  background:var(--navy); font:inherit; text-align:left; cursor:pointer;
+  /* It is an <a> now, not a <button> — these three undo what a browser gives
+     a link for free and a button never had. */
+  text-decoration:none; color:inherit; -webkit-tap-highlight-color:transparent;
+  box-shadow:0 1px 2px rgba(12,30,58,.06), 0 12px 28px -20px rgba(12,30,58,.45);
+  transition:transform .3s ease, box-shadow .3s ease, border-color .2s ease;
+}
+.jw-dest-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 2px 6px rgba(12,30,58,.09), 0 22px 40px -22px rgba(12,30,58,.55);
+}
+.jw-dest-card:focus-visible{outline:3px solid var(--coral); outline-offset:3px;}
+
+/* THE TINT IS NOW THE FALLBACK, not the design. It sits under the photograph
+   and shows through only when there is none — either the API sent no image_key,
+   or it sent one the generated manifest does not list, or the file 404'd and
+   home-destinations.js removed the <img>. In all three the card degrades to
+   what it looked like before the photographs existed, rather than to a broken
+   image glyph. */
+.jw-dest-art{
+  position:absolute; inset:0; display:block; overflow:hidden;
+  background:linear-gradient(160deg, var(--navy-2, #16304C), var(--navy, #0A2540));
+}
+.jw-dest-img{
+  width:100%; height:100%; object-fit:cover; display:block;
+  transition:transform .55s cubic-bezier(.22,1,.36,1);
+}
+.jw-dest-card:hover .jw-dest-img{transform:scale(1.06);}
+
+/* THE SCRIM IS A GRADIENT, NOT A WASH. Darkening the whole frame would buy
+   legibility by throwing away the photograph, which is the thing the card is
+   for. This is transparent across the top two-thirds and only gathers behind
+   the two lines of text; on hover it deepens slightly, enough to hold the name
+   steady while the image moves under it. */
+.jw-dest-scrim{
+  position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(to top,
+    rgba(6,20,38,.88) 0%, rgba(6,20,38,.62) 22%,
+    rgba(6,20,38,.18) 46%, rgba(6,20,38,0) 68%);
+  transition:opacity .3s ease;
+}
+.jw-dest-card:hover .jw-dest-scrim{opacity:.92; background:linear-gradient(to top,
+    rgba(6,20,38,.94) 0%, rgba(6,20,38,.7) 24%,
+    rgba(6,20,38,.24) 48%, rgba(6,20,38,0) 70%);}
+.jw-dest-card:nth-child(6n+2) .jw-dest-art{background:linear-gradient(160deg,#2E7D5B,#13402F);}
+.jw-dest-card:nth-child(6n+3) .jw-dest-art{background:linear-gradient(160deg,#C08A3E,#6B4415);}
+.jw-dest-card:nth-child(6n+4) .jw-dest-art{background:linear-gradient(160deg,#2E9AA8,#0F4650);}
+.jw-dest-card:nth-child(6n+5) .jw-dest-art{background:linear-gradient(160deg,#B4703A,#5A2F14);}
+.jw-dest-card:nth-child(6n)   .jw-dest-art{background:linear-gradient(160deg,#4A5568,#1F2733);}
+
+/* The two lines, bottom-left over the scrim. Playfair for the place, matching
+   the hero headline and the section's own h2; the country in the body face
+   underneath, quieter. */
+.jw-dest-body{
+  position:absolute; left:0; right:0; bottom:0; z-index:1;
+  display:block; padding:16px 18px 15px;
+}
+.jw-dest-name{
+  display:block; font-family:var(--ff-head); font-size:19px; font-weight:700;
+  line-height:1.15; color:#fff; letter-spacing:-.01em;
+  text-shadow:0 1px 12px rgba(0,0,0,.35);
+}
+.jw-dest-meta{
+  display:block; margin-top:2px; font-size:12.5px; font-weight:600;
+  color:rgba(255,255,255,.8); text-shadow:0 1px 10px rgba(0,0,0,.35);
+}
+
+/* SELECTED. A ring in the brand colour and nothing else — no scale, no glow.
+   The panel opening below is the loud half of the feedback; this only has to
+   say which card opened it. The ring is drawn INSIDE the radius as a second
+   inset shadow so it follows the rounded corner instead of boxing it. */
+.jw-dest-card.is-on{
+  border-color:var(--coral);
+  box-shadow:inset 0 0 0 3px var(--coral),
+             0 2px 6px rgba(12,30,58,.09), 0 18px 36px -20px rgba(201,72,47,.5);
+}
+/* The name stays white — it is on a photograph, and coral on a dark image is
+   less legible than white, not more. */
+
+@media (prefers-reduced-motion: reduce){
+  .jw-dest-card,
+  .jw-dest-img,
+  .jw-dest-scrim{transition:none;}
+  .jw-dest-card:hover{transform:none;}
+  .jw-dest-card:hover .jw-dest-img{transform:none;}
+}
+
+/* Status line and the two buttons that can appear beside it. The status is
+   role="status" in the markup, so its text is announced when it changes. */
+.jw-dest-status{margin:16px 0 0; font-size:14px; color:var(--muted); text-align:center;}
+.jw-dest-status:empty{display:none;}
+.jw-dest-more,
+.jw-dest-retry{
+  display:block; margin:16px auto 0; padding:11px 22px; border-radius:100px;
+  border:1.5px solid var(--line); background:var(--bg); cursor:pointer;
+  font:inherit; font-size:14px; font-weight:700; color:var(--navy);
+  transition:border-color .2s ease, color .2s ease;
+}
+.jw-dest-more:hover,
+.jw-dest-retry:hover{border-color:var(--coral); color:var(--coral-dark);}
+.jw-dest-more:focus-visible,
+.jw-dest-retry:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
+
+/* ---------------------------------------------------------------------------
+   The locations panel, under the shelf.
+   -------------------------------------------------------------------------- */
+.jw-loc{
+  margin-top:22px; padding:20px 22px;
+  border:1px solid var(--line); border-radius:18px; background:var(--bg-2, #F7F9FC);
+}
+.jw-loc-head{display:flex; align-items:center; justify-content:space-between; gap:14px;}
+.jw-loc-title{margin:0; font-family:var(--ff-head); font-size:20px; font-weight:800; color:var(--navy);}
+.jw-loc-close{
+  padding:7px 14px; border-radius:100px; border:1.5px solid var(--line);
+  background:transparent; cursor:pointer; font:inherit; font-size:13px;
+  font-weight:700; color:var(--muted);
+}
+.jw-loc-close:hover{border-color:var(--coral); color:var(--coral-dark);}
+.jw-loc-close:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
+
+.jw-loc-lead{margin:14px 0 12px; font-size:13.5px; color:var(--muted);}
+.jw-loc-list{display:flex; flex-wrap:wrap; gap:10px; list-style:none; margin:0; padding:0;}
+.jw-loc-chip{
+  display:flex; flex-direction:column; gap:2px;
+  padding:11px 16px; border-radius:12px; border:1px solid var(--line);
+  background:var(--bg); text-decoration:none; color:inherit;
+  transition:border-color .2s ease, transform .2s ease;
+}
+.jw-loc-chip:hover{border-color:var(--coral); transform:translateY(-2px);}
+.jw-loc-chip:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
+.jw-loc-chip b{font-size:14px; font-weight:700; color:var(--navy);}
+.jw-loc-chip span{font-size:12px; color:var(--muted);}
+
+.jw-loc-loading,
+.jw-loc-empty,
+.jw-loc-error{margin:14px 0 0; font-size:14px; color:var(--muted);}
+.jw-loc-error .jw-dest-retry{margin:12px 0 0;}
+
+@media (prefers-reduced-motion: reduce){
+  .jw-loc-chip:hover{transform:none;}
 }

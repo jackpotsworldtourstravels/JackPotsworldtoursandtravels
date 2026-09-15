@@ -46,7 +46,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="assets/js/auth.js?v=20260909dg1"></script>
-<script src="assets/js/jp-login.js?v=20260803ui8"></script>
+<!-- jp-icons, because jp-login.js draws its field and benefit marks from it now.
+     It used to carry its own seventeen-icon set; the login page looked like a
+     different product to the one it signs you in to. -->
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
+<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
+<script src="assets/js/jp-login.js?v=20260911ic7"></script>
 <script>
 'use strict';
 

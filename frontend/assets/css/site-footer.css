@@ -161,10 +161,20 @@
   margin-bottom: 18px;
 }
 .jw-f-contact li:last-child { margin-bottom: 0; }
-.jw-f-contact svg {
+/* Matches on .jpi, not svg: every icon here is a jp-icons drawing now, so the
+   box that needs sizing is the hydrated host and the <svg> inside it already
+   fills that box. A selector reaching through to the <svg> would size the
+   drawing and leave the host at its default, which is how an icon ends up
+   sitting in a box a few pixels wider than itself. */
+/* THE HEADER IS position:fixed, so an anchor jump puts its target underneath
+   it. 96px is the solid header's 76px plus air — the same figure .search-dock
+   uses in main.css for the same reason. Without it the nav's Contact link
+   lands with the word "Contact" hidden behind the bar. */
+#jwFContact { scroll-margin-top: 96px; }
+
+.jw-f-contact .jpi {
   width: 17px; height: 17px; flex: none; margin-top: 3px;
-  fill: none; stroke: var(--jwf-gold);
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  color: var(--jwf-gold);
 }
 .jw-f-ct-label {
   display: block;
@@ -200,10 +210,9 @@
 .jw-f-tagline { font-style: italic; color: rgba(255,255,255,.55); }
 .jw-f-badges { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .jw-f-badge { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.jw-f-badge svg {
+.jw-f-badge .jpi {
   width: 14px; height: 14px; flex: none;
-  fill: none; stroke: var(--jwf-gold);
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  color: var(--jwf-gold);
 }
 
 /* ---------------------------------------------------------------------------

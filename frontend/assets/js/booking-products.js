@@ -1144,38 +1144,29 @@ const BookingProducts = (function () {
      are decorative and inherit currentColor.
      ===================================================================== */
 
-  const SVG_PATHS = {
-    edit: '<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M13.5 6.5l4 4"/>',
-    user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/>',
-    users: '<circle cx="9" cy="8" r="3.2"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.9"/><path d="M17.6 14.4a6.2 6.2 0 0 1 3.6 5.1"/>',
-    child: '<circle cx="12" cy="7" r="3"/><path d="M9 20v-4.5L7 13l1.6-2.6h6.8L17 13l-2 2.5V20"/>',
-    infant: '<circle cx="12" cy="7.5" r="3.2"/><path d="M8 20c0-3 1.8-5.2 4-5.2S16 17 16 20"/>',
-    seat: '<path d="M6.5 4h2.2a2 2 0 0 1 2 1.8l.7 6.2H8.4a2 2 0 0 1-2-1.8L6.5 4Z"/><path d="M11.4 12h4.4a2.4 2.4 0 0 1 0 4.8h-6a3 3 0 0 1-3-2.7"/><path d="M5 10v9"/>',
-    bag: '<rect x="3.5" y="7" width="17" height="13" rx="2.2"/><path d="M9 7V5.2A1.7 1.7 0 0 1 10.7 3.5h2.6A1.7 1.7 0 0 1 15 5.2V7"/><path d="M9 11v5M15 11v5"/>',
-    meal: '<path d="M6 3v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3"/><path d="M8 12v9"/><path d="M17.5 3c-1.4 1-2.2 2.6-2.2 4.6 0 1.6.7 2.7 2.2 3.1V21"/>',
-    shield: '<path d="M12 3l7.2 3v5.3c0 4.3-3 8-7.2 9.4-4.2-1.4-7.2-5.1-7.2-9.4V6L12 3Z"/>',
-    shieldCheck: '<path d="M12 3l7.2 3v5.3c0 4.3-3 8-7.2 9.4-4.2-1.4-7.2-5.1-7.2-9.4V6L12 3Z"/><path d="m9.2 11.8 2 2 3.6-3.8"/>',
-    phone: '<path d="M21 16.9v2.6a2 2 0 0 1-2.2 2 19.4 19.4 0 0 1-8.5-3A19.1 19.1 0 0 1 4.4 12 19.4 19.4 0 0 1 1.5 3.4 2 2 0 0 1 3.5 1.2h2.6a2 2 0 0 1 2 1.7c.12.8.34 1.6.66 2.3a2 2 0 0 1-.45 2.1L7.2 8.5a15.6 15.6 0 0 0 6 6l1.2-1.1a2 2 0 0 1 2.1-.45c.74.32 1.52.54 2.32.66a2 2 0 0 1 1.7 2Z"/>',
-    mail: '<rect x="2.8" y="5" width="18.4" height="14" rx="2.2"/><path d="m3.4 6.6 8.6 6 8.6-6"/>',
-    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.2"/><path d="M12 7.7h.01"/>',
-    warn: '<path d="M12 3.6 21 19.4H3L12 3.6Z"/><path d="M12 9.6v4.2"/><path d="M12 16.7h.01"/>',
-    chevDown: '<path d="m5 8.5 7 7 7-7"/>',
-    arrowRight: '<path d="M4.5 12h14.4"/><path d="m13 6 6 6-6 6"/>',
-    plane: '<path d="M12 2.4c.88 0 1.6 1.06 1.6 2.37v3.6l7.4 4.32v2.1l-7.4-2.2v3.94l2.4 1.78v1.6L12 18.9l-4 1.2v-1.6l2.4-1.78V12.8l-7.4 2.2v-2.1l7.4-4.32v-3.6C10.4 3.46 11.12 2.4 12 2.4Z"/>',
-    refresh: '<path d="M20.4 12a8.4 8.4 0 1 1-2.6-6.1"/><path d="M20.6 4v5h-5"/><path d="M9.4 13.2a3.6 3.6 0 0 0 5.2 0"/><path d="M9 10h.01M15 10h.01"/>',
-    support: '<path d="M4.4 15v-3a7.6 7.6 0 0 1 15.2 0v3"/><rect x="2.6" y="13.4" width="3.6" height="5.6" rx="1.6"/><rect x="17.8" y="13.4" width="3.6" height="5.6" rx="1.6"/><path d="M19.6 19a3.6 3.6 0 0 1-3.6 2.6h-1.8"/>',
-    tag: '<path d="M3.6 11.4V4.4a.8.8 0 0 1 .8-.8h7l9 9-7.8 7.8-9-9Z"/><circle cx="7.8" cy="7.8" r="1.3"/>',
-    upload: '<path d="M12 15.5V4"/><path d="m7.5 8.2 4.5-4.4 4.5 4.4"/><path d="M4.5 15.4v3.1a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3.1"/>',
-    check: '<path d="m5 12.6 4.6 4.6L19 7.6"/>',
+  /* THE FLIGHT FLOW'S PRIVATE ICON SET IS GONE. Twenty-two marks lived here as
+     raw path data behind a local svg() helper, drawn at stroke 1.7 while the
+     header above them drew at 1.8, the search card at 2 and the footer at 2 --
+     four icon systems on one screen. This table is all that is left of it: the
+     names every call site in this file already uses, pointed at the jp-icons
+     drawing that means the same thing. Call sites did not change. */
+  const ICON_NAME = {
+    edit: 'pencil',        user: 'userRound',     users: 'usersRound',
+    child: 'userRound',    infant: 'baby',        seat: 'armchair',
+    bag: 'luggage',        meal: 'utensils',      shield: 'shieldCheck',
+    shieldCheck: 'shieldCheck', phone: 'phone',   mail: 'mail',
+    info: 'info',          warn: 'triangleAlert', chevDown: 'chevronDown',
+    arrowRight: 'arrowRight', plane: 'plane',     refresh: 'rotateCcw',
+    support: 'headset',    tag: 'tag',            upload: 'upload',
+    check: 'check',
   };
 
   /** One decorative inline glyph. Unknown names render nothing rather than a
    *  broken box, matching JPIcon.html's contract. */
   function svg(name, cls) {
-    const d = SVG_PATHS[name];
-    if (!d) return '';
-    return `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const n = ICON_NAME[name];
+    if (!n || typeof JPIcon === 'undefined') return '';
+    return JPIcon.html(n, { className: cls || '' });
   }
 
   /* The reference prints "04 Jul, 2026" — no weekday. fmtDate() above is the
@@ -1652,10 +1643,14 @@ const BookingProducts = (function () {
         <rect x="32" y="27" width="12" height="5" rx="2.5" fill="#D8DEE7"/>
       </svg>`;
     }
+    /* JPIcon.inner(), not JPIcon.html(): this is a 24-grid drawing embedded in
+       a 44-grid illustration, and a nested <svg> would inherit neither the
+       scene's palette nor its scale. That is the case inner() exists for. */
+    const mark = (typeof JPIcon !== 'undefined') ? JPIcon.inner('shieldCheck') : '';
     return `<svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
       <circle cx="22" cy="22" r="16" fill="#EEF1F5"/>
-      <g transform="translate(11,11)" stroke="#7E8CA0" stroke-width="1.7"
-         stroke-linecap="round" stroke-linejoin="round" fill="none">${SVG_PATHS.shieldCheck}</g>
+      <g transform="translate(11,11)" stroke="#7E8CA0" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" fill="none">${mark}</g>
     </svg>`;
   }
 

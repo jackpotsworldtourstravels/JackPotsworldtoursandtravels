@@ -60,7 +60,7 @@ const HeroShell = (function () {
 
      Gaming Packages is the one that arrives. It is a real shelf of
      customer_packages (migration 0069) with its own page, not a filter on
-     Holiday Packages, so it is a nav item like the other three.
+     Tour Packages, so it is a nav item like the other three.
 
      visa.html and cruises.html ARE LEFT ON DISK. Nothing links to them now;
      deleting a URL that has been live is how inbound links and search results
@@ -72,28 +72,53 @@ const HeroShell = (function () {
   const LINKS = [
     { href: 'flights.html', label: 'Flights', icon: 'flights' },
     { href: 'hotels.html', label: 'Hotels', icon: 'hotels' },
-    { href: 'packages.html', label: 'Holiday Packages', icon: 'packages' },
+    { href: 'packages.html', label: 'Tour Packages', icon: 'packages' },
     { href: 'gaming-packages.html', label: 'Gaming Packages', icon: 'gaming' },
-    { href: 'index.html#contact', label: 'More', icon: 'more' },
+    /* CONTACT, AND IT GOES TO THE FOOTER. It was "More", pointing at
+       index.html#contact — the "Get in touch" FORM halfway down the landing
+       page. Two things were wrong with that: "More" promised a menu of
+       something and delivered a form, and the link left whatever page you were
+       on to do it. #jwFContact is the footer's Contact column — phone, email,
+       address, hours — and site-footer.js puts that same id on every page, so
+       this now scrolls to the details in place instead of navigating home.
+
+       THE HREF IS CROSS-PAGE, THE BEHAVIOUR IS NOT. Four pages — flights,
+       hotels, packages and gaming-packages — end in the slim BOOKING footer
+       (hero-shell's own bookingFooterHtml: a Back button and a copyright line),
+       not the site footer, so #jwFContact does not exist on them and a
+       same-page anchor would have been a dead link on exactly the screens
+       where someone is most likely to want a phone number. Written as a link
+       to the landing page it is correct with no scripting at all; bindHeader
+       below upgrades it to an in-place scroll wherever the footer IS present.
+
+       NO CARET. The chevron said "this opens a menu"; it does not. */
+    { href: 'index.html#jwFContact', label: 'Contact', icon: 'phone' },
   ];
 
-  const PARTNER_MARK = '<svg class="npm-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-    + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-    + '<path d="M11 17l2 2a1 1 0 1 0 3-3"/>'
-    + '<path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81'
-    + 'a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/>'
-    + '<path d="M21 3l1 11h-2"/><path d="M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>';
+  /* The handshake was hand-written here at stroke 1.8 while the nav beside it
+     drew at 1.6 and the wishlist at 1.9. It is jp-icons' `handshake` now — the
+     same Lucide drawing, at the one stroke weight — and .npm-mark rides along
+     to keep the 21px sizing main.css gives it. */
+  const PARTNER_MARK = '<i data-jp-icon="handshake" class="npm-mark"></i>';
 
   function navLinks(active) {
     return LINKS.map(l => {
       /* JPIcon may not have mounted yet on a page that builds the header
          during parse; it rewrites <i data-jpi> in place when it does. */
       const ic = l.icon
-        ? '<i data-jp-icon="' + esc(l.icon) + '" data-jp-size="sm"></i>'
+        ? '<i data-jp-icon="' + esc(l.icon) + '" class="jpi-nav"></i>'
+        : '';
+      /* A caret, for any entry that really does open something. Nothing sets it
+         today — the last one that did was "More", now Contact, which scrolls
+         rather than opening a menu. It lives INSIDE the label span so it flows
+         with the word: the cell is a column (icon over label), so a sibling
+         would drop onto a third row. */
+      const caret = l.caret
+        ? '<i data-jp-icon="chevronDown" class="nav-caret"></i>'
         : '';
       return '<a href="' + l.href + '" title="' + esc(l.label) + '"'
         + (l.href === active ? ' aria-current="page"' : '')
-        + '>' + ic + '<span>' + esc(l.label) + '</span></a>';
+        + '>' + ic + '<span>' + esc(l.label) + caret + '</span></a>';
     }).join('');
   }
 
@@ -106,19 +131,19 @@ const HeroShell = (function () {
       + '<div class="nav-actions">'
       /* Wishlist is a real feature (wishlist.js); the account panel is where
          it lives, so the chip opens that tab rather than a page of its own. */
-      + '<button type="button" class="hr-wish" data-nav-acct="wishlist" title="Wishlist">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"'
-      + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l8.8 8.8 8.8-8.8'
-      + 'a5 5 0 0 0 0-7.1Z"/></svg><span>Wishlist</span></button>'
+      + '<button type="button" class="hr-wish jpi-row" data-nav-acct="wishlist" title="Wishlist">'
+      + '<i data-jp-icon="heart" class="jpi-btn"></i><span>Wishlist</span></button>'
       + '<a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">'
       + PARTNER_MARK + '<span>My Partner</span></a>'
       /* My Bookings and Notifications. Not a second copy of the profile menu's
          entries — the same two destinations, reached as icons for the two
          things a traveller checks mid-journey without wanting the whole
          account panel. Both open the Account Center on that tab. */
-      + '<button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg></button>'
-      + '<button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>'
+      /* Receipt and Bell, per the icon spec. The bookmark that was here read
+         as "save this page", which is what a bookmark means everywhere else
+         on the web — it is a list of trips, and a receipt says so. */
+      + '<button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><i data-jp-icon="receipt" class="jpi-btn"></i></button>'
+      + '<button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><i data-jp-icon="bell" class="jpi-btn"></i></button>'
       /* THE SAME ELEMENT index.html USES, not a wrapper around it.
          This was a <span id="shellAuth"> that booking-card.css then had to
          flatten with display:contents so the two Login/Sign Up controls would
@@ -215,9 +240,11 @@ const HeroShell = (function () {
      index.html carries the other copy of these two strings in static markup.
      CHANGE ONE, CHANGE THE OTHER. */
   const HERO_EYEBROW = 'Flights &middot; Hotels &middot; Tour Packages — one search';
-  const HERO_TITLE = 'Your next adventure<span class="accent"> starts here.</span>';
-  const HERO_SUB = 'Book flights, hotels and tour packages — all in one place,'
-    + ' at prices that don’t need a coupon hunt.';
+  const HERO_TITLE = 'Travel More <span class="accent">Worry Less</span>';
+  /* HERO_SUB IS GONE, with the landing page's copy of it. Every page that
+     mounts a hero today passes `compact: true`, which renders no eyebrow, no
+     headline and no sub-line at all — so this block is the landing page's
+     alone, and it should not carry a line the landing page no longer shows. */
 
   function heroVideosHtml(active) {
     return HERO_VIDEOS.map(v => {
@@ -280,7 +307,6 @@ const HeroShell = (function () {
       + (o.compact ? '' : '<div class="wrap hero-inner">'
         + '<div class="eyebrow">' + HERO_EYEBROW + '</div>'
         + '<h1>' + HERO_TITLE + '</h1>'
-        + '<p class="sub">' + HERO_SUB + '</p>'
         + '</div>')
       /* The card is BookingCard's, mounted by mountHero below — never markup
          here, so every page shares one control instead of four copies of a
@@ -289,9 +315,8 @@ const HeroShell = (function () {
       /* Nothing to scroll TO on a results page — the results are already the
          next thing on screen. */
       + (o.cue === false || o.compact ? ''
-        : '<div class="hero-scroll-cue">Scroll<svg width="16" height="16" viewBox="0 0 24 24"'
-          + ' fill="none" stroke="currentColor" stroke-width="2">'
-          + '<path d="M12 5v14M5 12l7 7 7-7"/></svg></div>');
+        : '<div class="hero-scroll-cue">Scroll'
+          + '<i data-jp-icon="chevronDown" class="jpi-meta"></i></div>');
   }
 
   /** Build the hero into `#siteHero` and mount that page's search card in it.
@@ -372,6 +397,9 @@ const HeroShell = (function () {
        switched it — a second video fetched on every page load, and a visible
        swap on the slow ones. */
     host.innerHTML = heroHtml(Object.assign({ video: o.card || 'flights' }, o));
+    /* The hero carries icon placeholders of its own (the scroll cue), and this
+       runs long after jp-icons.js did its document-wide pass. */
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(host);
     /* THE LANDING PAGE'S CARD IS NOT BUILT ON A RESULTS PAGE.
        `compact` leaves #heroSearchDock empty for search-strip.js to fill —
        a different component with its own markup, not this one made smaller.
@@ -514,7 +542,56 @@ const HeroShell = (function () {
     const header = document.getElementById('siteHeader');
     if (header && !header.dataset.tabNavBound) {
       header.dataset.tabNavBound = '1';
+
+      /* THE ONE PLACE THE UNDERLINE IS DECIDED. Three things move it — a
+         header click, the card's own tab strip, and the first paint — and when
+         each did its own marking they drifted: the header could say Gaming
+         while the card showed Flights. Hoisted above every caller so there is
+         no second copy to fall out of step with this one.
+
+         A tab with no nav entry (Cruises, Villas, Trains...) clears every
+         underline rather than leaving the last one lit. The nav is reporting
+         which product the card is showing; "none of these" is a true answer. */
+      const markCurrent = tab => header.querySelectorAll('.navlinks a, .mobile-nav a')
+        .forEach(link => {
+          const on = PRODUCT_TABS[link.getAttribute('href')] === tab;
+          if (on) link.setAttribute('aria-current', 'page');
+          else if (PRODUCT_TABS[link.getAttribute('href')]) link.removeAttribute('aria-current');
+        });
+
+      /* CONTACT SCROLLS RATHER THAN NAVIGATING, where there is something to
+         scroll to. Two reasons it is not left to the browser's own fragment
+         handling:
+
+         A HASH CHANGE IS A HISTORY EVENT, and travel-explore.js listens for
+         one — its popstate handler clears every filter, re-reads the URL and
+         re-renders the whole result list. The list comes back identical
+         (the URL is unchanged, which is what that handler rebuilds from), so
+         nothing is lost, but a traveller pressing Contact should not silently
+         rebuild the page behind the footer they asked for.
+
+         AND IT LEAVES #jwFContact IN THE ADDRESS BAR, which then sits in the
+         history so Back walks through it instead of leaving the page.
+
+         Modified clicks are left alone — ctrl/cmd/shift/middle still open the
+         landing page in a new tab, which is what the href promises. */
       header.addEventListener('click', e => {
+        const contact = e.target.closest && e.target.closest('a[href$="#jwFContact"]');
+        if (contact && header.contains(contact)
+            && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+          const here = document.getElementById('jwFContact');
+          /* No site footer on this page — let the link navigate to the one
+             page that always has it. */
+          if (here) {
+            e.preventDefault();
+            /* scroll-margin-top on #jwFContact (site-footer.css) is what keeps
+               the heading clear of the fixed header; scrollIntoView honours it
+               exactly as a fragment jump would. */
+            here.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          return;
+        }
+
         const a = e.target.closest('a[href]');
         if (!a || !header.contains(a)) return;
         const tab = PRODUCT_TABS[a.getAttribute('href')];
@@ -524,14 +601,42 @@ const HeroShell = (function () {
         if (!card || typeof BookingCard === 'undefined') return;
         if (!BookingCard.activateTab(tab)) return;   // card cannot serve it — let the link work
         e.preventDefault();
-        /* Mark it current, so the nav agrees with the card it just changed. */
-        header.querySelectorAll('.navlinks a, .mobile-nav a').forEach(link => {
-          const on = PRODUCT_TABS[link.getAttribute('href')] === tab;
-          if (on) link.setAttribute('aria-current', 'page');
-          else if (PRODUCT_TABS[link.getAttribute('href')]) link.removeAttribute('aria-current');
-        });
+        markCurrent(tab);                            // the nav agrees with the card it just changed
         card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
+
+      /* AND WHEN THE CARD'S OWN TAB STRIP IS USED. The header was following
+         only its own clicks, so picking Flights on the card left the header
+         underlining whatever was clicked up there last — two controls for one
+         piece of state, disagreeing in plain sight.
+
+         Delegated on the document because the strip is BookingCard's markup
+         and is re-rendered on mount; bound to the card element it would be
+         lost. Deferred a tick so BookingCard's own handler has run: the tab
+         is read back from the card (`BookingCard.tab`) rather than from the
+         button, so a tab the card REFUSED does not move the underline. */
+      document.addEventListener('click', e => {
+        if (!e.target.closest || !e.target.closest('.search-tab')) return;
+        if (!document.querySelector('.search-card:not(.is-bar)')) return;
+        setTimeout(() => {
+          if (typeof BookingCard === 'undefined') return;
+          markCurrent(BookingCard.tab);
+        }, 0);
+      });
+
+      /* AND ON LOAD, not only after a click. The reference shows Flights
+         underlined on a page nobody has touched yet, because the card opens on
+         Flights — the nav is reporting which product the card is showing, so
+         it has to be right from the first paint too.
+
+         Deferred a frame: BookingCard renders from an inline <script> that may
+         run after this, and asking it for its tab before it exists marks
+         nothing. */
+      setTimeout(() => {
+        if (typeof BookingCard === 'undefined') return;
+        if (!document.querySelector('.search-card:not(.is-bar)')) return;
+        markCurrent(BookingCard.tab);
+      }, 0);
     }
 
     /* My Bookings / Notifications. Delegated on the header, so it serves both
@@ -622,10 +727,8 @@ const HeroShell = (function () {
      --------------------------------------------------------------------- */
   function bookingFooterHtml() {
     return '<div class="wrap bf-row">'
-      + '<button type="button" class="bf-back" data-bf-back>'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
-      + ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Back</button>'
+      + '<button type="button" class="bf-back jpi-row" data-bf-back>'
+      + '<i data-jp-icon="arrowLeft" class="jpi-btn"></i>Back</button>'
       /* "Pvt. Ltd." was wrong: this business is a proprietorship, and a company
          suffix on a copyright line is a representation about the legal entity
          you are contracting with, not decoration. */
@@ -645,6 +748,7 @@ const HeroShell = (function () {
     if (!foot || foot.dataset.bfInit) return;
     foot.dataset.bfInit = '1';
     foot.innerHTML = bookingFooterHtml();
+    if (typeof JPIcon !== 'undefined') JPIcon.mount(foot);
     /* Delegated, so the button survives any later repaint of this footer. */
     foot.addEventListener('click', e => {
       if (!e.target.closest('[data-bf-back]')) return;

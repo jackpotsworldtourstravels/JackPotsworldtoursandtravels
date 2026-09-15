@@ -82,14 +82,14 @@ const AccountCenter = (function () {
     </div>
     <div class="acct-body">
       <nav class="acct-tabs" id="acctTabs">
-        <div class="acct-tab" data-tab="profile"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>My Profile</div>
-        <div class="acct-tab" data-tab="bookings"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg>My Bookings</div>
-        <div class="acct-tab" data-tab="wishlist"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg>Wishlist</div>
-        <div class="acct-tab" data-tab="payments"><svg class="dd-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Payment History</div>
-        <div class="acct-tab" data-tab="notifications"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</div>
-        <div class="acct-tab" data-tab="support"><svg class="dd-icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><circle cx="12" cy="12" r="9"/></svg>Support Center</div>
-        <div class="acct-tab" data-tab="reviews"><svg class="dd-icon" viewBox="0 0 24 24"><path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/></svg>Reviews</div>
-        <div class="acct-tab" data-tab="settings"><svg class="dd-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82"/></svg>Settings</div>
+        <div class="acct-tab" data-tab="profile"><i data-jp-icon="userRound" class="dd-icon"></i>My Profile</div>
+        <div class="acct-tab" data-tab="bookings"><i data-jp-icon="receipt" class="dd-icon"></i>My Bookings</div>
+        <div class="acct-tab" data-tab="wishlist"><i data-jp-icon="heart" class="dd-icon"></i>Wishlist</div>
+        <div class="acct-tab" data-tab="payments"><i data-jp-icon="creditCard" class="dd-icon"></i>Payment History</div>
+        <div class="acct-tab" data-tab="notifications"><i data-jp-icon="bell" class="dd-icon"></i>Notifications</div>
+        <div class="acct-tab" data-tab="support"><i data-jp-icon="circleHelp" class="dd-icon"></i>Support Center</div>
+        <div class="acct-tab" data-tab="reviews"><i data-jp-icon="star" class="dd-icon"></i>Reviews</div>
+        <div class="acct-tab" data-tab="settings"><i data-jp-icon="settings" class="dd-icon"></i>Settings</div>
       </nav>
       <div class="acct-panels">
         <div class="acct-panel" id="acctPanel-profile">
@@ -409,11 +409,12 @@ document.getElementById('acctPasswordForm').addEventListener('submit', async e =
    the client-side demo in booking-store.js — see BookingApi.isLive); this
    renders whatever `product_type`s the endpoint returns, so it needs no
    further change once the others are real too. */
+/* The product mark on a booking row. These were four more blocks of raw path
+   data -- a fourth plane, a third hotel and a second ship, all drawn slightly
+   differently from the ones in the nav directly above them. Names now, so a
+   flight booking in this list and Flights in the header are the same plane. */
 const TYPE_ICONS = {
-  flight: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-1 .1-1.3.5l-.7.7 4.2 3-1.5 1.5-2.5-.5-.7.7 2 2 2 2 .7-.7-.5-2.5 1.5-1.5 3 4.2.7-.7c.4-.3.6-.8.5-1.3Z"/>',
-  hotel: '<path d="M3 21V7a2 2 0 0 1 2-2h6v16"/><path d="M11 9h8a2 2 0 0 1 2 2v10"/><path d="M3 21h18"/>',
-  cruise: '<path d="M2 21c1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0 1.6 1.2 3.4 1.2 5 0"/><path d="M4 18l1-9h14l1 9"/><path d="M10 9V4h4v5"/>',
-  package: '<path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  flight: 'plane', hotel: 'bedDouble', cruise: 'ship', package: 'palmtree',
 };
 let allBookingsCache = [];
 
@@ -578,7 +579,7 @@ function bookingRowHtml(b) {
   const route = bookingRoute(b);
   return `
     <div class="acct-row">
-      <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[b.product_type] || TYPE_ICONS.package}</svg></div>
+      <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[b.product_type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>
       <div class="ar-main">
         <div class="ar-title">${escapeHtml(bookingTitle(b))}</div>
         <div class="ar-sub">${route ? escapeHtml(route) + ' · ' : ''}Booked ${fmtDate(b.created_at)} ${b.travel_date ? '· Travel ' + fmtDate(b.travel_date) : ''}</div>
@@ -804,7 +805,7 @@ async function loadAcctWishlist() {
       const item = catalogs[w.item_type]?.get(w.item_id);
       return `
         <div class="acct-row">
-          <div class="ar-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">${TYPE_ICONS[w.item_type] || TYPE_ICONS.package}</svg></div>
+          <div class="ar-icon">${typeof JPIcon !== 'undefined' ? JPIcon.html(TYPE_ICONS[w.item_type] || TYPE_ICONS.package, { className: 'icon jpi-field' }) : ''}</div>
           <div class="ar-main">
             <div class="ar-title" style="text-transform:none;">${escapeHtml(wishlistLabel(w.item_type, item))}</div>
             <div class="ar-sub" style="text-transform:capitalize;">${w.item_type} · ${wishlistPrice(w.item_type, item)} · Saved ${fmtDate(w.created_at)}</div>

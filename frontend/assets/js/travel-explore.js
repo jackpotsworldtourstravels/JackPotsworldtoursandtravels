@@ -564,8 +564,9 @@ const TravelExplore = (function () {
      choosing is where they are. */
   const RESULTS_STEP = 1;
 
-  const tick = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"'
-    + ' stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  /* Was stroke 3 -- the heaviest mark anywhere in the product, next to a nav
+     drawn at 1.6. One weight now, like everything else. */
+  const tick = (typeof JPIcon !== 'undefined') ? JPIcon.html('check', { size: 'meta' }) : '';
 
   /** NO PROGRESS BAR WHILE BROWSING.
    *
@@ -2671,19 +2672,22 @@ const TravelExplore = (function () {
      they can fix themselves. TravelData tags the error with `kind`; this
      turns each into words plus the one or two buttons that actually help.
      --------------------------------------------------------------------- */
+  /* `icon` is a jp-icons NAME now, not raw path data. It was a single <path>
+     each, which is why the network error drew a crossed-out wifi as one
+     continuous stroke and the timeout drew a clock with no ring around it. */
   const LOAD_ERRORS = {
     network: {
-      icon: 'M1 1l22 22M16.7 16.7A10.9 10.9 0 0 0 12 20M5 12.5a10.9 10.9 0 0 1 4-2.4M2 8.8a16 16 0 0 1 5-3.3M20 5.5a16 16 0 0 1 2 3.3',
+      icon: 'triangleAlert',
       title: 'No connection',
       body: 'Your device appears to be offline, so we could not reach our servers. Check the connection and try again.',
     },
     timeout: {
-      icon: 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
+      icon: 'clock3',
       title: 'This is taking longer than it should',
       body: 'The request timed out before anything came back. It is usually a passing thing — trying again often works.',
     },
     http: {
-      icon: 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+      icon: 'triangleAlert',
       title: 'We could not load these results',
       body: 'Our servers answered with an error. Nothing is wrong with your search — please try again in a moment.',
     },
@@ -2694,10 +2698,7 @@ const TravelExplore = (function () {
     const modify = (opts && opts.modify) ? `
       <button type="button" class="tx-btn tx-btn-ghost" data-tx-modify>Modify search</button>` : '';
     return `<div class="tx-state" role="alert">
-      <svg class="tx-state-art" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="${e.icon}"/>
-      </svg>
+      ${typeof JPIcon !== 'undefined' ? JPIcon.html(e.icon, { className: 'tx-state-art' }) : ''}
       <b>${esc(e.title)}</b>
       <p>${esc(e.body)}</p>
       <div class="tx-empty-acts">

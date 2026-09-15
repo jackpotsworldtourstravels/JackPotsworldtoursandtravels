@@ -136,66 +136,21 @@ const revealObserver = new IntersectionObserver((entries) => {
 }, { threshold: 0.15 });
 revealItems.forEach(el => revealObserver.observe(el));
 
-/* Duplicate auto-scroll tracks for seamless infinite loop.
+/* THREE BLOCKS WERE REMOVED HERE WITH THE SECTIONS THEY DROVE.
 
-   THE SECOND COPY IS SCENERY, AND HAS TO SAY SO. This was
-   `track.innerHTML += track.innerHTML`, which was harmless while the tracks held
-   nothing focusable. The offer cards carry a CTA link now, so a blunt duplicate
-   would put every one of them in the tab order twice and announce the whole
-   carousel twice to a screen reader — the visitor tabs through "Book Flights",
-   "Explore Flights", "Book Hotels", "Explore Tour Packages", and then through
-   the same four again, with no way to tell why.
+   The duplicated marquee track cloned #offersTrack and #partnersTrack to fill
+   the right-hand half of a 32-second loop. #offersTrack had already stopped
+   existing; #partnersTrack went with Trusted travel partners.
 
-   So the clone is marked aria-hidden and every focusable thing inside it is
-   taken out of the tab order. It exists to fill the right-hand half of a
-   32-second loop; it is not content. */
-[document.getElementById('offersTrack'), document.getElementById('partnersTrack')].forEach(track => {
-  if (!track) return;
-  const clone = track.cloneNode(true);
-  clone.querySelectorAll('a[href], button, [tabindex]').forEach(el => {
-    el.setAttribute('tabindex', '-1');
-  });
-  while (clone.firstChild) {
-    const node = clone.firstChild;
-    if (node.nodeType === 1) node.setAttribute('aria-hidden', 'true');
-    track.appendChild(node);
-  }
-});
+   The route-price ticker nudged a hardcoded fare by a random few percent every
+   four seconds under a "Live" badge. Popular fares is gone and so is it.
 
-/* Trending route price flip (simulated live ticker) */
-document.querySelectorAll('.route-price .amt[data-price]').forEach(amt => {
-  setInterval(() => {
-    const base = parseInt(amt.dataset.price, 10);
-    const jitter = Math.round((Math.random() - 0.5) * base * 0.06);
-    amt.classList.remove('flip');
-    void amt.offsetWidth;
-    amt.textContent = '₹' + (base + jitter).toLocaleString('en-IN');
-    amt.classList.add('flip');
-  }, 4000 + Math.random() * 2000);
-});
+   The stat counters counted 2,000,000 Happy Travellers and three more figures
+   nothing measured, on scroll. The statistics band is gone and so are they.
 
-/* Animated stat counters */
-document.querySelectorAll('.stat-num').forEach(stat => {
-  const target = parseInt(stat.dataset.count, 10);
-  const suffix = stat.dataset.suffix || '';
-  const statObserver = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const duration = 1600;
-        const start = performance.now();
-        function tick(now) {
-          const progress = Math.min(1, (now - start) / duration);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          stat.textContent = Math.round(target * eased).toLocaleString('en-US') + suffix;
-          if (progress < 1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-        statObserver.unobserve(stat);
-      }
-    });
-  }, { threshold: 0.4 });
-  statObserver.observe(stat);
-});
+   Flights, Hotels and Tour Packages are untouched: none of this was theirs.
+   The homepage shelf that replaced all three reads the API — see
+   assets/js/home-destinations.js. */
 
 /* Newsletter subscribe */
 document.getElementById('newsletterForm').addEventListener('submit', async e => {
@@ -285,7 +240,14 @@ function applyWishlistState(container) {
   container.querySelectorAll('[data-wl-type]').forEach(btn => {
     const saved = wishlistMap.has(`${btn.dataset.wlType}:${btn.dataset.wlId}`);
     btn.classList.toggle('saved', saved);
-    btn.textContent = saved ? '♥' : '♡';
+    /* Was the text glyphs BLACK HEART and WHITE HEART. Two different characters
+       for one control, whose shapes and weights are whatever the viewer's OS
+       font decided — and on most of them one is a flat outline and the other a
+       full-colour emoji. One drawing now; `saved` carries the state and CSS
+       carries the fill. */
+    btn.innerHTML = (typeof JPIcon !== 'undefined')
+      ? JPIcon.html('heart', { className: 'jpi-btn', label: saved ? 'Saved' : 'Save' })
+      : (saved ? '♥' : '♡');
   });
 }
 /* cardActionsHtml() built the wishlist / Reviews / View Details row for each rendered
@@ -314,7 +276,12 @@ document.addEventListener('click', async e => {
       wishlistMap.set(key, data.id);
       showToast('Saved to wishlist!');
     }
-    applyWishlistState(wlBtn.closest('.pkg-grid'));
+    /* `document`, not `closest('.pkg-grid')`. The grid it named was the Featured
+       tour packages shelf; that section is gone, so the selector matched nothing
+       and this line had quietly become a no-op — the heart stayed in its old
+       state until the next page load. Refreshing every wishlist button on the
+       page is what the call was always trying to do. */
+    applyWishlistState(document);
   } catch (err) { showToast(apiErrorText(err, 'Wishlist update failed.'), true); }
 });
 refreshWishlistState();

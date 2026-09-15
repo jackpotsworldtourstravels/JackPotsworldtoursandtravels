@@ -32,10 +32,16 @@ const JPDestinations = (function () {
   const RECENT_MAX = 5;
   const SUGGEST_MAX = 8;
 
-  /* The destinations the landing page markets — its Popular Destinations band
-     and its featured packages — plus the cities we fly to, since "a hotel near
-     the airport" is the other half of a flight booking. Nothing here is a place
-     we do not sell. */
+  /* The destinations this company markets, plus the cities we fly to, since
+     "a hotel near the airport" is the other half of a flight booking. Nothing
+     here is a place we do not sell.
+
+     THIS IS THE HOTEL SEARCH BOX'S LIST, not the homepage's Destinations
+     shelf. It used to be described as the source for the landing page's
+     Popular Destinations band and its featured packages; both were removed,
+     and the shelf that replaced them reads /api/customer/destinations instead
+     (home-destinations.js). This seed stays because the search box needs a
+     picker before any catalogue has loaded — see the note at the top. */
   const SEED = [
     { key: 'Goa',        label: 'Goa',        sub: 'Beach state · India',    kind: 'region' },
     { key: 'Kashmir',    label: 'Kashmir',    sub: 'Valley · India',         kind: 'region' },

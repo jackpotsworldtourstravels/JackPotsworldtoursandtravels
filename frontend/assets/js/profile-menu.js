@@ -39,15 +39,19 @@ const ProfileMenu = (function () {
 
   /* The menu. Every entry is an Account Center tab, so the list is also the
      answer to "what can this account do" — one place to add the next one. */
+  /* `icon` is a jp-icons NAME. These were eight blocks of raw path data drawn
+     at stroke 1.8 -- a fourth icon system, for the same eight destinations the
+     Account Center's own tab strip already draws. Both read from a library
+     now, so the menu entry and the tab it opens cannot show different marks. */
   const ITEMS = [
-    { tab: 'profile',       label: 'My Profile',      icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/>' },
-    { tab: 'bookings',      label: 'My Bookings',     icon: '<path d="M4 3h16v18l-3-2-2 2-3-2-3 2-2-2-3 2Z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/>' },
-    { tab: 'wishlist',      label: 'Wishlist',        icon: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/>' },
-    { tab: 'payments',      label: 'Payment History', icon: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/>' },
-    { tab: 'notifications', label: 'Notifications',   icon: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
-    { tab: 'support',       label: 'Support Tickets', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3 2.4V14"/><line x1="12" y1="17" x2="12" y2="17"/>' },
-    { tab: 'reviews',       label: 'Reviews',         icon: '<path d="m12 2 3.1 6.6 7.2.8-5.4 4.9 1.5 7.1L12 17.8 5.6 21.4l1.5-7.1-5.4-4.9 7.2-.8Z"/>' },
-    { tab: 'settings',      label: 'Settings',        icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
+    { tab: 'profile',       label: 'My Profile',      icon: 'userRound' },
+    { tab: 'bookings',      label: 'My Bookings',     icon: 'receipt' },
+    { tab: 'wishlist',      label: 'Wishlist',        icon: 'heart' },
+    { tab: 'payments',      label: 'Payment History', icon: 'creditCard' },
+    { tab: 'notifications', label: 'Notifications',   icon: 'bell' },
+    { tab: 'support',       label: 'Support Tickets', icon: 'circleHelp' },
+    { tab: 'reviews',       label: 'Reviews',         icon: 'star' },
+    { tab: 'settings',      label: 'Settings',        icon: 'settings' },
   ];
 
   /** The signed-in traveller, whichever namespace holds them.
@@ -74,9 +78,8 @@ const ProfileMenu = (function () {
   const initialsOf = name => (String(name || '').trim().split(/\s+/)
     .map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'U');
 
-  const svg = body =>
-    `<svg class="pm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const svg = name =>
+    (typeof JPIcon !== 'undefined') ? JPIcon.html(name, { className: 'pm-icon' }) : '';
 
   /** The whole component, signed in or out. A page drops this in a slot and is
    *  finished; it never decides what the menu contains. */
@@ -113,15 +116,14 @@ const ProfileMenu = (function () {
               aria-expanded="false" aria-haspopup="true" aria-controls="pmMenu">
         <span class="pm-avatar" aria-hidden="true">${esc(initialsOf(name))}</span>
         <span class="pm-name">${esc(name)}</span>
-        <svg class="pm-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        ${(typeof JPIcon !== 'undefined') ? JPIcon.html('chevronDown', { className: 'pm-caret' }) : ''}
       </button>
       <div class="pm-menu" id="pmMenu" role="menu" data-pm-menu aria-label="Account menu">
         ${ITEMS.map(i => `<button type="button" role="menuitem" class="pm-item"
             data-pm-tab="${esc(i.tab)}">${svg(i.icon)}<span>${esc(i.label)}</span></button>`).join('')}
         <hr class="pm-sep">
         <button type="button" role="menuitem" class="pm-item pm-logout" data-pm-logout>
-          ${svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>')}
+          ${svg('logOut')}
           <span>Logout</span>
         </button>
       </div>

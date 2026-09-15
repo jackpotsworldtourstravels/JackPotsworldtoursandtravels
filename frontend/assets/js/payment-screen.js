@@ -128,36 +128,35 @@ const JPay = (function () {
   /* ---------------------------------------------------------------------
      Markup
      --------------------------------------------------------------------- */
-  function iconLock() {
-    return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
-  }
+  /* The payment screen drew its own five marks at three stroke weights
+     (2.2, 2 and 2.6). They are jp-icons names now: the padlock beside "secure"
+     here and the padlock in the footer's SSL badge are the same padlock. */
+  const ic = (name, cls) =>
+    (typeof JPIcon !== 'undefined') ? JPIcon.html(name, { className: cls || '' }) : '';
 
-  function iconPhone() {
-    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg>`;
-  }
+  function iconLock() { return ic('lock', 'jpay-ic-sm'); }
 
+  /* UPI. Smartphone, per the spec -- UPI is a phone-first rail. */
+  function iconPhone() { return ic('smartphone', 'jpi-field'); }
+
+  /* A QR code is a THING, not a UI action, and Lucide's QrCode is the only
+     honest drawing of one -- so this stays a custom mark rather than being
+     forced onto a library icon that means something else. Redrawn on the same
+     24-grid at the system's stroke weight so it sits with the rest. */
   function iconQr() {
-    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    return `<span class="jpi jpi-field"><svg viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round"
+      stroke-linejoin="round" aria-hidden="true">
       <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-      <rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/></svg>`;
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/></svg></span>`;
   }
 
-  function iconTick() {
-    return `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M20 6L9 17l-5-5"/></svg>`;
-  }
+  /* Payment success and payment failure, per the spec: CircleCheckBig and
+     TriangleAlert. A bare tick and a bare cross carried the whole outcome of a
+     transaction on two strokes with no shape around them. */
+  function iconTick() { return ic('circleCheckBig', 'jpay-ic-lg'); }
 
-  function iconCross() {
-    return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M18 6L6 18M6 6l12 12"/></svg>`;
-  }
+  function iconCross() { return ic('triangleAlert', 'jpay-ic-lg'); }
 
   function amountCard(s) {
     return `
