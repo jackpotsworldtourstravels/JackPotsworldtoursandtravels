@@ -132,6 +132,11 @@ const sectionTitles = {
      requests) so the topbar never leaves a reader unsure which money
      they are looking at. */
   'customer-payments': 'Customer Payments',
+  /* Manual Booking. The desk raising a record FOR a merchant — see
+     admin-manual-booking.js for why Manual Request posts to the
+     direct-booking path rather than the enquiry-led one. */
+  'manual-enquiry': 'Manual Enquiry',
+  'manual-request': 'Manual Request',
 };
 const loadedSections = new Set();
 
@@ -162,6 +167,17 @@ function loadSection(name) {
   /* CR-9. AdminLiveSupport.init() is idempotent: it wires its handlers once
      and reloads the queue on every later visit, so returning to the section
      refreshes without stacking a second set of listeners. */
+  /* Built on FIRST arrival only — navigateToSection caches by name, the same
+     way every other section here is loaded once. The merchant picker is
+     therefore as fresh as the page: a company onboarded mid-session appears
+     after a reload, which is the behaviour the rest of this portal has.
+
+     ACCESS IS THE SERVER'S TO REFUSE, as it is for every section in this
+     sidebar — this portal has no client-side permission gating and this does
+     not add one. Only `ticket.manual` reaches the create endpoints; an admin
+     without it gets the server's 403 in the form's own message line. */
+  if (name === 'manual-enquiry') return initManualEnquiry();
+  if (name === 'manual-request') return initManualRequest();
   if (name === 'live-support') return AdminLiveSupport.init();
   if (name === 'reports') return loadReports();
   if (name === 'users') return loadMerchants();

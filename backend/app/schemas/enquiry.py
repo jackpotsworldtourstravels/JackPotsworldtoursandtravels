@@ -16,6 +16,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.config import settings
+from app.models_v2 import RequestSource
 from app.schemas.group_booking import GroupImportSummary
 from app.schemas.ticket import PassengerInput
 
@@ -71,6 +72,24 @@ class EnquiryCreate(BaseModel):
     ("Hyderabad"). Both are stored, because the code is what a later search
     filters on and the city name is what a human reads on the enquiry.
     """
+
+    #: MANUAL BOOKING ONLY (Admin portal). The merchant this enquiry is being
+    #: raised FOR, when the desk is typing it in on that merchant's behalf.
+    #:
+    #: Omitted by the Merchant Portal, always — a merchant raising its own
+    #: enquiry is identified by its session, never by a field it could edit,
+    #: and sending one from there is refused rather than trusted. Accepting it
+    #: requires the ``ticket.manual`` permission, which no merchant role holds.
+    #:
+    #: DirectBookingCreate inherits this, so both manual paths take it from one
+    #: definition and cannot drift apart.
+    on_behalf_of_merchant_id: int | None = Field(
+        default=None,
+        description=(
+            "Admin-only. The merchant to raise this for. Requires `ticket.manual`; "
+            "the Merchant Portal never sends it."
+        ),
+    )
 
     trip_type: TripType = "one_way"
     #: Mandatory on a group booking, refused on anything else — see the
@@ -553,8 +572,19 @@ class EnquiryResponse(BaseModel):
     review_claimed_by_name: str | None = None
     review_claimed_at: datetime.datetime | None = None
 
+    #: WHOSE ENQUIRY THIS IS. Present because the desk can now raise one FOR a
+    #: merchant, and on those rows the answer is not the caller: an admin has no
+    #: merchant of its own, and every screen that shows an enquiry raised from
+    #: Manual Booking needs to name the company it was filed against rather than
+    #: the one the reader happens to belong to.
+    merchant_id: int | None = None
     merchant_name: str | None = None
     raised_by: str | None = None
+    #: WHO TYPED IT (0073) — ``merchant_portal``, or ``b2b_manual_enquiry`` when
+    #: our desk filed it for the merchant from Manual Booking. Read-only; see
+    #: ``RequestResponse.source``, which answers the same question for the
+    #: booking this enquiry becomes.
+    source: RequestSource = RequestSource.MERCHANT_PORTAL
     created_at: datetime.datetime
     responded_at: datetime.datetime | None = None
 
@@ -624,8 +654,10 @@ class EnquiryResponse(BaseModel):
             review_claimed_by=d.get("review_claimed_by"),
             review_claimed_by_name=d.get("review_claimed_by_name"),
             review_claimed_at=d.get("review_claimed_at"),
+            merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,
             raised_by=r.user.full_name if r.user else None,
+            source=r.source,
             created_at=r.created_at,
             responded_at=r.approved_at or r.resolved_at,
         )

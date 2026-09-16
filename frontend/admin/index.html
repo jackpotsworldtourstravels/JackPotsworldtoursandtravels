@@ -24,6 +24,12 @@
      and re-points none of the tokens jp-ds owns. -->
 <link rel="stylesheet" href="../assets/css/sidebar-brand.css?v=20260815svc2">
 <link rel="stylesheet" href="../assets/css/live-support.css?v=20260909dg1">
+<!-- The Merchant Portal's own stylesheet, scoped under `.cl-embed` by
+     scripts/build_classic_embed_css.py. Manual Enquiry mounts the real
+     merchant booking-enquiry form, so it needs the real merchant styles —
+     and the scoping is what stops classic.css's reset (body, h1-h5, button,
+     a, table) from restyling this portal around it. -->
+<link rel="stylesheet" href="../assets/css/classic-embed.css?v=20260915me1">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -174,6 +180,25 @@
       <a href="#" class="nav-item" data-section="providers">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
         <span class="nav-label">Provider Management</span>
+      </a>
+    </div>
+
+    <!-- Manual Booking. The desk raising an enquiry or a booking FOR a merchant
+         that telephoned it in — the same records the Merchant Portal creates,
+         with `source` recording that we typed them (migration 0073).
+
+         A nav-group with two items, which is how every other pair in this
+         sidebar is expressed. There is no expand/collapse anywhere in this
+         portal and this does not introduce one. -->
+    <div class="nav-group" id="navGroupManualBooking">
+      <div class="nav-group-label">Manual Booking</div>
+      <a href="#" class="nav-item" data-section="manual-enquiry">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span class="nav-label">Manual Enquiry</span>
+      </a>
+      <a href="#" class="nav-item" data-section="manual-request">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+        <span class="nav-label">Manual Request</span>
       </a>
     </div>
 
@@ -1000,6 +1025,31 @@
     </section>
 
     <!-- ============== Audit Logs (moved here from Super Admin) ============== -->
+    <!-- Both are rendered entirely by admin-manual-booking.js on first arrival:
+         the merchant picker has to be filled from the API before the form is
+         worth showing, so there is no markup here to go stale. -->
+    <!-- THE MERCHANT PORTAL'S MODAL, verbatim, inside the `.cl-embed` wrapper the
+     generated stylesheet is scoped to. clOpenModal() in admin-enquiry-host.js
+     drives these exact ids, which is what lets classic-enquiry.js open its form
+     here without knowing it is not in the Merchant Portal.
+
+     Body-level so nothing above can become its containing block. -->
+<div class="cl-embed">
+  <div class="cl-modal-back" id="clModalBack">
+    <div class="cl-modal" id="clModal" role="dialog" aria-modal="true" aria-labelledby="clModalTitle">
+      <div class="cl-modal-head">
+        <h2 id="clModalTitle">Details</h2>
+        <button type="button" class="cl-modal-close" id="clModalClose" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="cl-modal-body" id="clModalBody"></div>
+      <div class="cl-modal-foot" id="clModalFoot"></div>
+    </div>
+  </div>
+</div>
+
+    <section class="section" id="section-manual-enquiry"></section>
+    <section class="section" id="section-manual-request"></section>
+
     <section class="section" id="section-audit">
       <div class="panel">
         <div class="panel-head"><h2>Audit Logs</h2></div>
@@ -1321,7 +1371,41 @@
 
 <script src="../assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="../assets/js/admin-live-support.js?v=20260909dg1"></script>
+<!-- The enquiry rules and payload contract, shared with the Merchant Portal.
+     MUST precede admin-manual-booking.js. -->
+<script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
 <script src="../assets/js/admin.js?v=20260909dg1"></script>
+<!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
+     and the payload, and admin.js for API_BASE/authHeaders. -->
+<!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
+
+       travel-locations.js   the city search the form's combo reads
+       merchant-api.js       the API client it submits through; its _req is
+                             re-pointed at the admin token in admin-manual-booking.js
+       admin-enquiry-host.js the ten shell helpers classic-enquiry.js expects,
+                             and `$`. MUST precede the form.
+       classic-enquiry.js    THE FORM ITSELF, unmodified, the same file the
+                             Merchant Portal loads. Not a copy.
+
+     classic-shell.js is deliberately absent — see admin-enquiry-host.js for
+     why loading it would redirect this portal to the merchant login. -->
+<script src="../assets/js/travel-locations.js?v=20260915me1"></script>
+<!-- Dial codes, nationalities and the country search the Booking Request
+     screen's contact and passenger fields read (splitDialCode, dialLengthOk,
+     searchNationalities…). Pure data + helpers, no side effects on load. -->
+<script src="../shared/countries.js?v=20260916mr1"></script>
+<script src="../shared/merchant-api.js?v=20260916doc1"></script>
+<script src="../assets/js/admin-enquiry-host.js?v=20260916rb3"></script>
+<script src="../merchant-classic/js/classic-enquiry.js?v=20260915me1"></script>
+<!-- Manual Request mounts the Merchant Portal's Booking Request screen the same
+     way: classic-icons.js first (94 lines, no side effects, supplies clIco),
+     then the screen itself, unmodified. classic-requests.js, -payments.js and
+     -passport-ocr.js are NOT loaded — the screen guards every call into them
+     with `typeof … === 'function'`, so the passport-scan affordance is simply
+     absent here rather than broken. -->
+<script src="../merchant-classic/js/classic-icons.js?v=20260916mr1"></script>
+<script src="../merchant-classic/js/classic-booking.js?v=20260916mr1"></script>
+<script src="../assets/js/admin-manual-booking.js?v=20260916doc2"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>

@@ -36,26 +36,17 @@
    through the same combo, because a merchant can legitimately ask about a
    carrier that is not on this list — the field is a suggestion box, not an
    enum, and the backend stores whatever string arrives. */
-const CL_AIRLINES = [
-  { name: 'Air India', code: 'AI' },
-  { name: 'IndiGo', code: '6E' },
-  { name: 'Akasa Air', code: 'QP' },
-  { name: 'SpiceJet', code: 'SG' },
-  { name: 'Vistara', code: 'UK' },
-  { name: 'Air India Express', code: 'IX' },
-  { name: 'Emirates', code: 'EK' },
-  { name: 'Qatar Airways', code: 'QR' },
-  { name: 'Etihad Airways', code: 'EY' },
-  { name: 'Singapore Airlines', code: 'SQ' },
-  { name: 'Lufthansa', code: 'LH' },
-  { name: 'British Airways', code: 'BA' },
-  { name: 'Thai Airways', code: 'TG' },
-  { name: 'Malaysia Airlines', code: 'MH' },
-  { name: 'Oman Air', code: 'WY' },
-  { name: 'Air Arabia', code: 'G9' },
-  { name: 'Sri Lankan Airlines', code: 'UL' },
-  { name: 'Turkish Airlines', code: 'TK' },
-];
+/* THE THREE CONSTANTS BELOW NOW LIVE IN shared/booking-enquiry-core.js, because
+   the Admin Portal's Manual Booking screens collect the same enquiry and must
+   offer the same carriers, the same cabins and accept the same flight numbers.
+   Two lists that are meant to be identical are two lists that drift; these are
+   aliases so there is only ever one.
+
+   The rest of this file is unchanged and stays this portal's own: the markup,
+   the `cl-` styling and the DOM wiring are Classic's, and the Admin Portal
+   renders its own against the same rules. See the core's header for why the
+   split is at the rules rather than at the component. */
+const CL_AIRLINES = BookingEnquiryCore.AIRLINES;
 
 /* The rows currently on screen, so View Details and Raise Booking can work
    from what was already fetched rather than re-querying per click. */
@@ -731,7 +722,7 @@ const CL_RETURN_DATE_HINT = 'On or after the departure date — a same-day retur
    the server allows, which is the safe direction. Historical enquiries carrying
    a fare-family name still render, because the detail view prints the stored
    string rather than looking it up here. */
-const CL_TRAVEL_CLASSES = ['Economy', 'Premium Economy', 'Business', 'First Class'];
+const CL_TRAVEL_CLASSES = BookingEnquiryCore.TRAVEL_CLASSES;
 
 /* ONE FORM, TWO DESTINATIONS.
    ===========================================================================
@@ -2102,7 +2093,7 @@ const CL_ANY_AIRLINE = 'All Airlines';
    operational suffix: AI217, 6E456, UK 955, AI101A. Mirrors `_FLIGHT_RE` in
    group_booking_service.py, which validates the same thing on the spreadsheet
    rows — one shape for a flight number, wherever it is typed. */
-const CL_FLIGHT_RE = /^[A-Z0-9]{2,3}\s*\d{1,4}[A-Z]?$/i;
+const CL_FLIGHT_RE = BookingEnquiryCore.FLIGHT_RE;
 
 /* "All Airlines" always heads the list and is never filtered out by the query,
    so a merchant who has typed a carrier's name and changed their mind can get

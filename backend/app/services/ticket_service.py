@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from fastapi import HTTPException, status as http_status
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth.rbac import P, has_permission
@@ -297,6 +298,8 @@ def update_draft(
     travel_date: datetime.date | None = None, return_date: datetime.date | None = None,
     contact: dict | None = None, special_requests: str | None = None,
     client_fare: Decimal | None = None,
+    pnr: str | None = None, ticket_number: str | None = None,
+    airline: str | None = None, flight_number: str | None = None,
 ) -> ServiceRequest:
     request = get_request(db, actor, request_id)
     if request.status not in lifecycle.EDITABLE_STATUSES:
@@ -329,7 +332,58 @@ def update_draft(
             details["special_requests"] = special_requests.strip() or None
         request.travel_details = details
 
-    db.commit()
+    # -------------------------------------------------- the ticket, as arranged
+    # WHO THE DESK ALREADY BOUGHT, ON A BOOKING THAT NEVER ENTERS THE WORKFLOW.
+    #
+    # Manual Booking records a ticket the desk arranged off-platform for a
+    # merchant that telephoned: the PNR and the ticket number exist before the
+    # row does. Everywhere else on this platform those two are ALLOCATED by
+    # `issue_ticket`, at the end of the approval workflow — and that function
+    # also DEBITS THE MERCHANT'S WALLET, which is exactly what must not happen
+    # to a ticket somebody already paid for. So this is a second way to set the
+    # same two columns, and it is deliberately the way that moves no money.
+    #
+    # `ticket.manual` ONLY. A merchant editing its own draft must not be able to
+    # type a PNR: on its track the PNR is our statement that we bought the seat,
+    # and a merchant writing one would be asserting a purchase we never made.
+    # Silently ignored rather than refused for a caller without the code — the
+    # merchant's own screen never sends these fields, so a 403 here could only
+    # ever be reached by hand.
+    if any(v is not None for v in (pnr, ticket_number, airline, flight_number)):
+        if has_permission(actor, P.TICKET_MANUAL):
+            if pnr is not None:
+                request.pnr = pnr.strip() or None
+            if ticket_number is not None:
+                request.ticket_number = ticket_number.strip() or None
+            # The airline and the flight ARE part of the itinerary, and the
+            # itinerary is otherwise copied from the enquiry and locked. These
+            # two are the exception on this path for a plain reason: an enquiry
+            # routinely says "All Airlines" and carries no flight number,
+            # because that is what the merchant asked us to find. What we
+            # actually booked is known only now.
+            if airline is not None or flight_number is not None:
+                details = dict(request.travel_details or {})
+                if airline is not None:
+                    details["airline"] = airline.strip() or None
+                if flight_number is not None:
+                    details["flight_number"] = flight_number.strip() or None
+                request.travel_details = details
+
+    # `uq_sr_ticket_number` is a DATABASE guarantee, so the same ticket number
+    # cannot be recorded against two bookings however many desks are typing.
+    # Caught here only to turn the IntegrityError into a sentence the operator
+    # can act on — a 500 would tell them nothing about which field was wrong.
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=(
+                f"Ticket number {ticket_number} is already recorded against another "
+                "booking. Check the number, or find the booking that already has it."
+            ),
+        )
     db.refresh(request)
     return request
 

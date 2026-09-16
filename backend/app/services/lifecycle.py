@@ -79,10 +79,22 @@ class Transition:
         return (self.permission,) if isinstance(self.permission, str) else self.permission
 
 
+#: WHO MAY SUBMIT A DRAFT FOR APPROVAL. The merchant that raised it, or the
+#: desk raising one on that merchant's behalf from Admin -> Manual Booking.
+#: Exactly the any-of case the Transition docstring describes: two different
+#: kinds of actor legitimately walking one edge, neither holding the other's
+#: code.
+#:
+#: DELIBERATELY NOT APPLIED TO THE CANCEL EDGE BESIDE IT. "Cancelled by
+#: merchant" is the merchant withdrawing its own booking, and an admin doing
+#: that is a different act with a different audit meaning — Booking Operations
+#: is where staff cancel.
+_SUBMITTER: tuple[str, ...] = (P.TICKET_REQUEST, P.TICKET_MANUAL)
+
 #: Allowed edges, keyed by current status. Anything not listed is refused.
 TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.DRAFT: (
-        Transition(S.PENDING_APPROVAL, P.TICKET_REQUEST, "Submitted for approval"),
+        Transition(S.PENDING_APPROVAL, _SUBMITTER, "Submitted for approval"),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
     S.PENDING_APPROVAL: (
@@ -139,7 +151,7 @@ _RETURNER: tuple[str, ...] = (P.BOOKING_MERCHANT_RETURN, P.BOOKING_MANAGER_RETUR
 
 CLASSIC_TRANSITIONS: dict[S, tuple[Transition, ...]] = {
     S.DRAFT: (
-        Transition(S.PENDING_APPROVAL, P.TICKET_REQUEST, "Submitted for approval"),
+        Transition(S.PENDING_APPROVAL, _SUBMITTER, "Submitted for approval"),
         Transition(S.CANCELLED, P.TICKET_REQUEST, "Cancelled by merchant"),
     ),
     # CR-3 moved this sign-off to the merchant that raised the booking, so both

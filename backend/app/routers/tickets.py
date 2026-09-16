@@ -56,6 +56,13 @@ from app.services import catalog_service, invoice_service, lifecycle, ticket_ser
 
 router = APIRouter(prefix="/api", tags=["tickets"])
 
+#: Appended to the three draft-editing endpoints' OpenAPI descriptions, so the
+#: reason `ticket.manual` reaches them is stated once rather than three times.
+MANUAL_NOTE = (
+    '\n\n**Manual Booking (Admin portal).** `ticket.manual` also reaches this, for the same reason it reaches `POST /api/enquiries/{id}/booking-request` and `/submit`: the desk that raised a draft for a merchant has to be able to finish it. A draft saved on the Manual Request screen is reopened and completed through exactly these calls, so without them the desk could create a booking and submit it but not edit it in between. Nothing widens — the service layer still resolves the row through `scoped_query`, so the caller reaches only what it could already read.'
+)
+
+
 
 def _detail(db: Session, request, actor: User) -> RequestDetailResponse:
     payments = list(
@@ -236,19 +243,25 @@ def create_request(
     response_model=RequestDetailResponse,
     tags=["merchant · requests"],
     summary="Edit a draft request",
-    description="Requires `ticket.request`. Only permitted while the request is still a draft.",
+    description=(
+        "Requires `ticket.request` or `ticket.manual`. Only permitted while the request is "
+        "still a draft." + MANUAL_NOTE
+    ),
 )
 def update_request(
     request_id: int,
     payload: UpdateDraftRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     request = ticket_service.update_draft(
         db, current_user, request_id,
         remarks=payload.remarks, travel_date=payload.travel_date, return_date=payload.return_date,
         contact=payload.contact, special_requests=payload.special_requests,
         client_fare=payload.client_fare,
+        # Ignored by the service unless the caller holds `ticket.manual`.
+        pnr=payload.pnr, ticket_number=payload.ticket_number,
+        airline=payload.airline, flight_number=payload.flight_number,
     )
     return _detail(db, request, current_user)
 
@@ -259,15 +272,15 @@ def update_request(
     tags=["merchant · requests"],
     summary="Replace the passenger list on a draft",
     description=(
-        "Requires `ticket.request`. Replaces every passenger and reprices the request for the new "
-        "party size. Draft only."
+        "Requires `ticket.request` or `ticket.manual`. Replaces every passenger and reprices "
+        "the request for the new party size. Draft only." + MANUAL_NOTE
     ),
 )
 def replace_passengers(
     request_id: int,
     payload: ReplacePassengersRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     request = ticket_service.replace_passengers(
         db, current_user, request_id, [p.model_dump() for p in payload.passengers]
@@ -308,14 +321,15 @@ def lookup_passenger(
     tags=["merchant · requests"],
     summary="Submit for approval",
     description=(
-        "Requires `ticket.request`. Moves **Created → Pending**, reserves the seats under a row "
-        "lock, and notifies the admins. Fails with 409 if the fare sold out first."
+        "Requires `ticket.request` or `ticket.manual`. Moves **Created → Pending**, reserves "
+        "the seats under a row lock, and notifies the admins. Fails with 409 if the fare sold "
+        "out first."
     ),
 )
 def submit_request(
     request_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     request = ticket_service.submit_request(db, current_user, request_id)
     return _detail(db, request, current_user)

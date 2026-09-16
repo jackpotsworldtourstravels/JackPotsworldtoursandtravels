@@ -70,6 +70,20 @@ class P:
     TICKET_REJECT = "ticket.reject"
     TICKET_ISSUE = "ticket.issue"
 
+    # Raising an enquiry or a booking FOR a merchant, from the Admin portal.
+    #
+    # WHY THIS IS NOT ``TICKET_ENQUIRY`` / ``TICKET_REQUEST``. Those two mean
+    # "raise one as yourself", and every holder of them has a merchant_id to
+    # raise it under. An admin has none, so granting them would not work even
+    # if it were wanted — enquiry_service refuses an actor without a merchant.
+    #
+    # This code means something different: "raise one ON BEHALF OF a named
+    # merchant". It is useless without that name, and the service demands one,
+    # so an admin holding it cannot accidentally file a record against nobody
+    # or against themselves. That is the whole reason it is its own code rather
+    # than a relaxation of the two above.
+    TICKET_MANUAL = "ticket.manual"
+
     # Manager sign-off on a submitted Booking Request (CR-2).
     #
     # WHY THESE ARE NOT ``TICKET_APPROVE`` / ``TICKET_REJECT``
@@ -169,6 +183,10 @@ _ADMIN: frozenset[str] = frozenset({
     # rather than by holding it.
     P.MERCHANT_USER_MANAGE, P.MERCHANT_USER_DELETE,
     P.TICKET_VIEW, P.TICKET_APPROVE, P.TICKET_REJECT, P.TICKET_ISSUE,
+    # Manual Booking (Admin portal). Held by Admin because raising an enquiry
+    # for a merchant that telephoned it in is desk work, not account
+    # administration.
+    P.TICKET_MANUAL,
     # Provider Management is an Admin module. Deliberately not granted to the
     # Super Admin (which holds merchant.view for visibility): what a supplier
     # costs is operations' business, and the Super Admin's role here is account

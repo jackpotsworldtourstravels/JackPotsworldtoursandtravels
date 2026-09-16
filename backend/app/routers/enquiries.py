@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.rbac import P, has_permission, require
 from app.database.session import get_db
-from app.models_v2 import RequestStatus, User
+from app.models_v2 import RequestSource, RequestStatus, User
 from app.schemas.enquiry import (
     DirectBookingCreate,
     EnquiryCreate,
@@ -52,13 +52,20 @@ router = APIRouter(prefix="/api", tags=["enquiries"])
         "Requires `ticket.enquiry`. Creates the enquiry at **Pending** and notifies the Admin "
         "team; there is no draft stage. Returns the `ENQ-YYYYMMDD-NNNNNN` reference. "
         "From and To must differ, the travel date cannot be in the past, a round trip's return "
-        "must be after departure, and adults + children + infants must equal the passenger count."
+        "must be after departure, and adults + children + infants must equal the passenger count.\n\n"
+        "**Manual Booking (Admin portal).** A caller holding `ticket.manual` instead may send "
+        "`on_behalf_of_merchant_id` to raise the enquiry FOR that merchant; the row is stored "
+        "against it with `source = b2b_manual_enquiry`. The two are mutually exclusive — a "
+        "merchant sending the field is refused, and a platform user omitting it is refused, "
+        "because an admin has no merchant of its own to file against."
     ),
 )
 def create_enquiry(
     payload: EnquiryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_ENQUIRY)),
+    # Either code reaches the service; which one the caller holds decides what
+    # the service will let them do with it. See enquiry_service._resolve_owner.
+    current_user: User = Depends(require(P.TICKET_ENQUIRY, P.TICKET_MANUAL)),
 ):
     enquiry = enquiry_service.create(db, current_user, payload)
     return EnquiryResponse.of(enquiry)
@@ -71,13 +78,18 @@ def create_enquiry(
     summary="Ticket Enquiry listing",
     description=(
         "Requires `ticket.view`. A merchant sees only its own enquiries; platform staff see "
-        "every merchant's. Search matches the reference, route, airline and flight number."
+        "every merchant's. Search matches the reference, route, airline and flight number.\n\n"
+        "`source` filters on who RAISED the enquiry (migration 0073) rather than who it is "
+        "for: `b2b_manual_enquiry` is what the Admin portal's Manual Enquiry screen lists, so "
+        "that table survives a page reload instead of showing only the current sitting. "
+        "Scoping is unchanged — a merchant passing it can only narrow within its own rows."
     ),
 )
 def list_enquiries(
     status: RequestStatus | None = None,
     merchant_id: int | None = None,
     search: str | None = None,
+    source: RequestSource | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -86,7 +98,7 @@ def list_enquiries(
     items, total = enquiry_service.list_enquiries(
         db, current_user,
         page=page, page_size=page_size, request_status=status,
-        merchant_id=merchant_id, search=search,
+        merchant_id=merchant_id, search=search, source=source,
     )
     return Page.build([EnquiryResponse.of(i) for i in items], total, page, page_size)
 
@@ -113,8 +125,12 @@ def get_enquiry(
     tags=["merchant · requests"],
     summary="Request Ticket — turn an available enquiry into a draft booking",
     description=(
-        "Requires `ticket.request`. Valid only once the Admin has marked the enquiry "
-        "**Approved**, and only once per enquiry (409 otherwise). Every itinerary field is "
+        "Requires `ticket.request` (merchant) or `ticket.manual` (the desk). A merchant "
+        "may convert only an enquiry the Admin has marked **Approved**; the desk raising a "
+        "booking from Manual Booking may also convert one that is still **Pending** or "
+        "**Under Review**, because it is recording a ticket it arranged rather than waiting "
+        "for its own quotation. Refused for a Rejected or Cancelled enquiry either way, and "
+        "valid only once per enquiry (409 otherwise). Every itinerary field is "
         "copied from the enquiry server-side — only the passengers come from the body — so the "
         "booking that reaches the approvals desk is the journey that was actually answered. "
         "The draft still needs `POST /api/requests/{id}/submit`."
@@ -124,7 +140,12 @@ def enquiry_to_booking_request(
     enquiry_id: int,
     payload: EnquiryToBooking,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    # `ticket.manual` reaches this for the same reason it reaches the enquiry
+    # route: the desk converting a manual enquiry it raised for a merchant is
+    # doing the merchant's action on the merchant's behalf. Nothing widens —
+    # to_booking_request takes the owning merchant from the ENQUIRY, never from
+    # the caller, so an admin cannot move a booking to a different company.
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     booking = enquiry_service.to_booking_request(
         db, current_user, enquiry_id,
@@ -155,13 +176,17 @@ def enquiry_to_booking_request(
         "which is where an unpriced booking has always been priced. Everything after this call "
         "is the existing workflow — Manager approval, then ticketing, then the wallet debit. "
         "Send `submit: true` to put it in front of the Manager in the same call, or leave it "
-        "false and use `POST /api/requests/{id}/submit` later."
+        "false and use `POST /api/requests/{id}/submit` later.\n\n"
+        "**Manual Booking (Admin portal).** A caller holding `ticket.manual` instead may send "
+        "`on_behalf_of_merchant_id` to raise the booking FOR that merchant; the row is stored "
+        "against it with `source = b2b_manual_request`. A group manifest must belong to that "
+        "same merchant."
     ),
 )
 def create_direct_booking(
     payload: DirectBookingCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     booking = enquiry_service.create_direct_booking(db, current_user, payload)
     if payload.submit:

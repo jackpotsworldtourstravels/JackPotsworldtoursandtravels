@@ -70,6 +70,25 @@ function saveBlob(blob, filename) {
 }
 
 const MerchantApi = {
+  /* WHOSE SESSION THIS CALL GOES OUT UNDER. One function, so the multipart
+     calls below and `_req` cannot disagree about it.
+     ===========================================================================
+     It returns the MERCHANT's headers, which is right in the Merchant Portal
+     and is the only behaviour that file has ever had. It exists as a method
+     rather than a direct `partnerAuthHeaders()` call because the Admin portal
+     mounts these same screens and has no merchant session at all: Manual
+     Booking replaces it (see ambInstallApiBridge in admin-manual-booking.js) so
+     the form's own calls travel under the admin's token.
+
+     `_req` was already redirected there by wrapping the method itself. The
+     multipart calls could not be — they bypass `_req` deliberately, because the
+     browser must set its own multipart boundary — so before this hook existed
+     an Admin pressing Upload got a 401 from a merchant session that was never
+     there. Every call now reads its headers from one place. */
+  _headers() {
+    return partnerAuthHeaders();
+  },
+
   /* Single choke point so auth headers, base URL and error shape are uniform.
      Errors are re-thrown untouched — callers read err.response.data.detail,
      which is what the backend returns and what the Premium screens surface. */
@@ -77,7 +96,7 @@ const MerchantApi = {
     const res = await axios({
       method,
       url: `${API_BASE}${path}`,
-      headers: partnerAuthHeaders(),
+      headers: this._headers(),
       params,
       data,
       responseType,
@@ -348,7 +367,19 @@ const MerchantApi = {
     return this._req('put', `/api/requests/${id}/passengers`, { data: { passengers } });
   },
 
-  updateDraft(id, { remarks, contact, specialRequests, clientFare }) {
+  /* `ticket` is the Admin portal's Manual Booking only, and the SERVER is what
+     makes that true: ticket_service.update_draft writes these four fields only
+     for a caller holding `ticket.manual`, and ignores them otherwise. It is
+     accepted here rather than on a second method because Manual Request saves
+     through this same endpoint — the Merchant Portal simply never passes it,
+     so every merchant call is byte-for-byte what it was.
+
+     { pnr, ticketNumber, airline, flightNumber } — the ticket the desk already
+     arranged, typed rather than allocated. Nothing here issues a ticket or
+     moves money; POST /api/admin/requests/{id}/issue-ticket is what does that,
+     and Manual Booking deliberately never calls it. */
+  updateDraft(id, { remarks, contact, specialRequests, clientFare, ticket }) {
+    const t = ticket || {};
     return this._req('put', `/api/requests/${id}`, {
       data: {
         remarks: remarks ?? undefined,
@@ -357,6 +388,13 @@ const MerchantApi = {
         /* `??`, not `||`: 0 is a real client fare. undefined means "not
            supplied", which leaves the stored value untouched. */
         client_fare: clientFare ?? undefined,
+        /* `|| undefined`, not `??`: these are strings off a form, and '' means
+           the operator left the box empty. Sending '' would store an empty
+           PNR; omitting it leaves whatever is there. */
+        pnr: t.pnr || undefined,
+        ticket_number: t.ticketNumber || undefined,
+        airline: t.airline || undefined,
+        flight_number: t.flightNumber || undefined,
       },
     });
   },
@@ -371,7 +409,7 @@ const MerchantApi = {
     form.append('doc_type', docType);
     if (passengerId != null) form.append('passenger_id', String(passengerId));
     return axios.post(`${API_BASE}/api/requests/${requestId}/documents`, form, {
-      headers: partnerAuthHeaders(),
+      headers: MerchantApi._headers(),
     }).then(r => r.data);
   },
 

@@ -99,6 +99,20 @@ class CompanyType(str, enum.Enum):
     DIRECT_CUSTOMER = "direct_customer"
 
 
+class RequestSource(str, enum.Enum):
+    """How a service request came to exist (migration 0073).
+
+    Not who owns it — ``merchant_id`` answers that, and answers it identically
+    whichever of these applies. This says who typed it: the merchant itself, or
+    our desk on the merchant's behalf from the Admin portal's Manual Booking
+    screens.
+    """
+
+    MERCHANT_PORTAL = "merchant_portal"
+    B2B_MANUAL_ENQUIRY = "b2b_manual_enquiry"
+    B2B_MANUAL_REQUEST = "b2b_manual_request"
+
+
 class RequestType(str, enum.Enum):
     CATALOG_ITEM = "catalog_item"
     BOOKING = "booking"
@@ -695,6 +709,15 @@ class ServiceRequest(Base):
 
     request_type: Mapped[RequestType] = mapped_column(
         _pg_enum(RequestType, "request_type_enum"), nullable=False
+    )
+    #: Who typed this row (0073). Defaults to the merchant portal because that
+    #: was the only way to raise one before Manual Booking existed, so every
+    #: pre-existing row genuinely came from there.
+    source: Mapped[RequestSource] = mapped_column(
+        _pg_enum(RequestSource, "request_source_enum"),
+        nullable=False,
+        server_default=RequestSource.MERCHANT_PORTAL.value,
+        index=True,
     )
     booking_reference: Mapped[Optional[str]] = mapped_column(String(40))
     travel_type: Mapped[Optional[TravelType]] = mapped_column(

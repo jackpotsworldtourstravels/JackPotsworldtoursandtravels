@@ -4,6 +4,18 @@
     Admin:    Reviews -> Send Quotation (total fare + remarks) / Decline
     Merchant: Request Ticket -> Booking Request at the quoted fare -> Submit
 
+There is a second way in, and it skips the middle line:
+
+    Admin:    Manual Booking -> Manual Enquiry -> Raise Booking
+                            -> Booking Request at no quoted fare -> Submit
+
+The desk is not asking itself for a quotation, so :func:`to_booking_request`
+lets an actor holding ``ticket.manual`` convert an enquiry that is still
+Pending or Under Review. The resulting booking carries ``total_amount`` 0 and
+``pricing.quoted`` false, which is the pre-CR-5 shape the wallet capture at
+issuance already knows how to price. A **merchant** is still held to the
+quotation, which is the rule this track exists to enforce.
+
 Called **Booking Enquiry** in the merchant portal since CR-5 and **Ticket
 Enquiry** everywhere on the staff side, which is a deliberate split: the
 merchant is starting a booking, the desk is working an enquiry queue. The
@@ -57,9 +69,11 @@ from fastapi import HTTPException, status as http_status
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.auth.rbac import P, has_permission
 from app.models_v2 import (
     Merchant,
     PassengerData,
+    RequestSource,
     RequestStatus as S,
     RequestType,
     ServiceCode,
@@ -146,25 +160,88 @@ def _base_filter(actor: User):
 # ---------------------------------------------------------------------------
 # Merchant
 # ---------------------------------------------------------------------------
-def create(db: Session, actor: User, payload) -> ServiceRequest:
-    """Raise an enquiry and put it straight in front of the Admin team."""
-    if actor.merchant_id is None:
+def _resolve_owner(db: Session, actor: User, payload, noun: str) -> tuple[int, RequestSource]:
+    """Whose merchant does this row belong to, and who typed it.
+
+    THE ONE PLACE THAT DECIDES, for both the enquiry and the direct-booking
+    path, because getting it wrong in one of them and right in the other is
+    exactly the failure worth designing out: a row filed against the wrong
+    company is invisible to the company that asked for it.
+
+    Two shapes, and they are mutually exclusive:
+
+      a merchant raising its own      merchant_id comes from the actor, and
+                                      ``on_behalf_of_merchant_id`` must be absent
+      the desk raising one FOR a      merchant_id comes from the payload, and
+      merchant (Manual Booking)       the actor must hold ``ticket.manual``
+
+    A PLATFORM USER CANNOT FILE ANYTHING AGAINST NOBODY. An admin has no
+    merchant_id, so the on-behalf-of name is required rather than optional for
+    them — which is why ``ticket.manual`` is a separate code from
+    ``ticket.enquiry`` and not a relaxation of it. The permission is useless
+    without the name and the name is refused without the permission, so neither
+    half can be used alone.
+    """
+    target = getattr(payload, "on_behalf_of_merchant_id", None)
+
+    if target is None:
+        if actor.merchant_id is None:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail=f"Only merchant accounts can raise {noun}",
+            )
+        return actor.merchant_id, RequestSource.MERCHANT_PORTAL
+
+    # Acting on behalf. Checked here rather than at the router so the rule
+    # holds for every caller of this service, present and future.
+    if not has_permission(actor, P.TICKET_MANUAL):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only merchant accounts can raise ticket enquiries",
+            detail="Raising a request for another merchant requires ticket.manual",
         )
+    merchant = db.get(Merchant, target)
+    if merchant is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="No merchant with that id",
+        )
+    # The merchant's OWN service access, not the actor's. assert_enabled waves
+    # platform staff through — correct for an admin answering a merchant's
+    # enquiry, wrong here, where the question is whether THIS merchant is
+    # allowed to buy flights at all.
+    if not service_access_service.get_access_map(db, target).get(ServiceCode.FLIGHTS.value):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=f"{merchant.company_name} does not have Flights enabled",
+        )
+    source = (RequestSource.B2B_MANUAL_ENQUIRY if noun.startswith("ticket enquir")
+              else RequestSource.B2B_MANUAL_REQUEST)
+    return target, source
+
+
+def create(db: Session, actor: User, payload) -> ServiceRequest:
+    """Raise an enquiry and put it straight in front of the Admin team."""
+    merchant_id, source = _resolve_owner(db, actor, payload, "ticket enquiries")
     # THE GATE. Fires before anything is built, so a merchant whose company
     # lacks Flights access never gets as far as allocating a reference number.
     # Does not run in list_enquiries/get/respond/start_review — disabling a
     # service must block new creation only, never hide or break what already
     # exists (see migration 0045's docstring for the backfill this depends on).
-    service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
+    # Only for a merchant raising its own — _resolve_owner has already checked
+    # the target merchant's access on the on-behalf-of path, against that
+    # merchant rather than against the admin.
+    if source is RequestSource.MERCHANT_PORTAL:
+        service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
 
     now = _now()
     enquiry = ServiceRequest(
         request_number=_next_reference(db),
-        merchant_id=actor.merchant_id,
+        merchant_id=merchant_id,
+        # WHO TYPED IT, which on the manual path is the admin — deliberately,
+        # so the Activity Timeline names a real person. The row still BELONGS
+        # to merchant_id above; `source` is what tells the two apart.
         user_id=actor.user_id,
+        source=source,
         request_type=RequestType.TICKET_ENQUIRY,
         # Flight-only by design: the form asks for an airline and a flight
         # number, neither of which a hotel or cruise enquiry would carry.
@@ -220,7 +297,10 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         db, actor.user_id, "Ticket enquiry raised",
         activity_type="Enquiry", module="Ticket Enquiry",
         description=f"{actor.full_name} raised {enquiry.request_number}",
-        reference_id=enquiry.request_id, merchant_id=actor.merchant_id,
+        # The merchant the enquiry is FOR — an admin's own merchant_id is None,
+        # and filing the activity against nobody would hide it from the
+        # merchant's own timeline.
+        reference_id=enquiry.request_id, merchant_id=merchant_id,
     )
     notification_service.notify_admins(
         db,
@@ -239,10 +319,22 @@ def list_enquiries(
     request_status: S | None = None,
     merchant_id: int | None = None,
     search: str | None = None,
+    source: RequestSource | None = None,
 ) -> tuple[list[ServiceRequest], int]:
     conditions = [_base_filter(actor)]
     if request_status is not None:
         conditions.append(ServiceRequest.status == request_status)
+    # WHO TYPED IT (migration 0073). The Admin portal's Manual Enquiry screen
+    # lists the enquiries THE DESK raised, which is not the same question as
+    # which merchant they are for — the merchant filter below answers that one.
+    #
+    # It is a filter rather than a separate endpoint because the rows are
+    # ordinary enquiries and every other parameter here applies to them
+    # unchanged. Indexed by `ix_service_requests_source`, so it narrows rather
+    # than scans. `_base_filter` still applies, so a merchant passing this can
+    # only ever narrow within its own enquiries.
+    if source is not None:
+        conditions.append(ServiceRequest.source == source)
     if merchant_id is not None and actor.is_platform_staff:
         conditions.append(ServiceRequest.merchant_id == merchant_id)
     if search:
@@ -523,6 +615,13 @@ def to_booking_request(
     the caller, so the booking that reaches the approvals desk is the journey
     the Admin actually said yes to. Only the passengers are new.
 
+    TWO CALLERS, ONE ROUTE, AND ONE RULE THAT DIFFERS BETWEEN THEM. A merchant
+    arrives here from Request Ticket and may convert only an **Approved**
+    enquiry. The desk arrives from Admin → Manual Booking, holds
+    ``ticket.manual``, and may convert one that is still Pending or Under
+    Review — it is recording a ticket it arranged itself, not asking to be
+    quoted. See the gate below; everything after it is identical for both.
+
     The booking's parent is the **enquiry**, not a catalog row. That is what
     makes the two traceable to each other, and it is safe for the existing
     submit path: ``catalog_service.reserve_units`` returns immediately when
@@ -543,10 +642,51 @@ def to_booking_request(
     # both raise a booking against one answer.
     enquiry = _locked(db, actor, enquiry_id)
 
-    if enquiry.status is not S.APPROVED:
+    # WHO MAY BOOK AN ENQUIRY THAT HAS NOT BEEN ANSWERED YET
+    #
+    # A MERCHANT MAY NOT, and that half is unchanged. Request Ticket exists to
+    # book the journey WE quoted; a merchant reaching this endpoint ahead of the
+    # answer would be raising a booking for a sector and a fare nobody
+    # confirmed, which is the rule the Classic track is built on.
+    #
+    # THE DESK MAY, and that is the change. On the Admin portal's Manual Booking
+    # screens the admin is not waiting to be quoted — it is typing up a ticket
+    # it has ALREADY arranged, for a merchant that telephoned it in. The
+    # quotation it would be waiting for is its own, so the old gate only ever
+    # made the desk wait for itself, with a popup that named no way forward.
+    #
+    # NOTHING DOWNSTREAM NEEDED TEACHING. An enquiry carrying no ``quoted_fare``
+    # produces a zero-amount booking a few lines below, and that is not a new
+    # shape: it is exactly the pre-CR-5 one, where the desk names the fare at
+    # issuance and ``_capture_fare_for_wallet_billing`` still fires because
+    # ``total_amount`` is 0. A manual booking simply rejoins that path.
+    #
+    # BOTH HALVES OF THE TEST ARE REQUIRED — ``ticket.manual`` AND no merchant
+    # of the actor's own. The permission alone would do today, because only
+    # Admin holds it; pairing them is what stops this widening by accident if it
+    # is ever granted to an account that does have a merchant. It is the same
+    # test the ``source`` column below makes, written the same way on purpose.
+    desk_manual = actor.merchant_id is None and has_permission(actor, P.TICKET_MANUAL)
+
+    # ANSWERED-AND-REFUSED IS NOT "NOT ANSWERED YET". A rejected enquiry is one
+    # we said no to, and a cancelled one the merchant withdrew — neither becomes
+    # bookable merely because the desk is the one typing. Only the states that
+    # still mean "in front of us" open up, so removing the quotation
+    # prerequisite does not also remove the two answers that were real.
+    bookable = ({S.APPROVED, S.PENDING_APPROVAL, S.IN_REVIEW} if desk_manual
+                else {S.APPROVED})
+
+    if enquiry.status not in bookable:
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
             detail=(
+                # Two sentences for two different readers. The merchant is being
+                # told to wait for us; the desk is being told this particular
+                # enquiry is closed, which is the only refusal left on its path.
+                f"{enquiry.request_number} is "
+                f"{ENQUIRY_LABELS.get(enquiry.status, enquiry.status.value)} — a booking "
+                "cannot be raised from an enquiry that was refused or withdrawn."
+                if desk_manual else
                 "Only an enquiry our team has marked available can be turned into a "
                 f"booking — this one is "
                 f"{lifecycle.SPEC_LABELS.get(enquiry.status, enquiry.status.value)}"
@@ -602,8 +742,18 @@ def to_booking_request(
     booking = ServiceRequest(
         request_number=ticket_service._next_number(db, "REQ"),
         parent_request_id=enquiry.request_id,
+        # FROM THE ENQUIRY, not the actor. This is what makes it safe to let an
+        # admin walk this path at all: the booking lands on the company that
+        # asked, and no caller can redirect it to another one.
         merchant_id=enquiry.merchant_id,
         user_id=actor.user_id,
+        # WHO TYPED THIS BOOKING, which is not necessarily who typed the
+        # enquiry: the desk can convert an enquiry a merchant raised, and a
+        # merchant can convert one the desk raised for it. Read off the actor,
+        # the same rule _resolve_owner applies — a platform user has no
+        # merchant of its own, so its action is a manual one by definition.
+        source=(RequestSource.B2B_MANUAL_REQUEST if actor.merchant_id is None
+                else RequestSource.MERCHANT_PORTAL),
         request_type=RequestType.BOOKING,
         booking_reference=merchant_service.next_booking_reference(db, merchant),
         travel_type=enquiry.travel_type,
@@ -760,7 +910,7 @@ def _itinerary_details(payload) -> dict:
     }
 
 
-def _manifest_passengers(db: Session, actor: User, payload):
+def _manifest_passengers(db: Session, actor: User, payload, owner_merchant_id: int | None = None):
     """Resolve a group booking's travellers from its uploaded manifest.
 
     Returns ``(import_row, passengers)`` — both ``None``/``[]`` when the payload
@@ -776,6 +926,17 @@ def _manifest_passengers(db: Session, actor: User, payload):
         return None, []
 
     imp = group_booking_service.get(db, actor, import_id)
+    # THE SCOPE CHECK PLATFORM STAFF SKIP. group_booking_service.get applies the
+    # merchant filter only when the actor HAS a merchant, which is right for an
+    # admin reading any merchant's manifest — and wrong here. On the manual
+    # path the admin has named the merchant this booking is for, and a manifest
+    # belonging to a different one would file that company's travellers under
+    # this company's booking. Checked against the resolved owner, not the actor.
+    if owner_merchant_id is not None and imp.merchant_id != owner_merchant_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="That passenger list belongs to a different merchant.",
+        )
     passengers = group_booking_service.passengers_of(imp)
     if not passengers:
         raise HTTPException(
@@ -819,22 +980,21 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
     quotation, which is exactly what the merchant is choosing when it skips the
     enquiry, and it is why the desk still names the fare at issuance.
     """
-    if actor.merchant_id is None:
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only merchant accounts can raise booking requests",
-        )
+    merchant_id, source = _resolve_owner(db, actor, payload, "booking requests")
     # Direct booking has always been Flight-only (no Hotel direct-booking
     # path exists) — gated here the same way `create()` gates a Flight
     # enquiry, closing the one path that could otherwise create a Flight
-    # booking for a merchant with Flights disabled.
-    service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
+    # booking for a merchant with Flights disabled. Only for a merchant
+    # raising its own: _resolve_owner has already checked the target
+    # merchant's access on the on-behalf-of path.
+    if source is RequestSource.MERCHANT_PORTAL:
+        service_access_service.assert_enabled(db, actor, ServiceCode.FLIGHTS)
     # A GROUP BOOKING TAKES ITS TRAVELLERS FROM THE UPLOADED MANIFEST.
     # `_manifest_passengers` returns the import row as well, because it has to
     # be bound to this booking once the row exists — and it refuses anything
     # that is not a wholly valid import, so a sheet with outstanding errors
     # cannot reach the approvals desk.
-    group_import, manifest = _manifest_passengers(db, actor, payload)
+    group_import, manifest = _manifest_passengers(db, actor, payload, merchant_id)
     passengers = manifest if group_import else [p.model_dump() for p in payload.passengers]
     if not passengers:
         raise HTTPException(
@@ -842,11 +1002,14 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
             detail="At least one passenger is required",
         )
 
-    merchant = db.get(Merchant, actor.merchant_id)
+    merchant = db.get(Merchant, merchant_id)
     booking = ServiceRequest(
         request_number=ticket_service._next_number(db, "REQ"),
-        merchant_id=actor.merchant_id,
+        merchant_id=merchant_id,
+        # Who typed it. The booking BELONGS to merchant_id above; `source`
+        # records that the desk entered it rather than the merchant.
         user_id=actor.user_id,
+        source=source,
         request_type=RequestType.BOOKING,
         booking_reference=merchant_service.next_booking_reference(db, merchant),
         travel_type=TravelType.FLIGHT,
@@ -886,7 +1049,10 @@ def create_direct_booking(db: Session, actor: User, payload) -> ServiceRequest:
         db.add(
             PassengerData(
                 request_id=booking.request_id,
-                merchant_id=actor.merchant_id,
+                # The OWNING merchant. An admin's own merchant_id is None, and
+                # a traveller row filed against nobody is invisible to the
+                # merchant whose booking it is.
+                merchant_id=merchant_id,
                 **ticket_service.passenger_columns(p),
             )
         )

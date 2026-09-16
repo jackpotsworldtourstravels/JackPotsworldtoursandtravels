@@ -10,6 +10,7 @@ from app.schemas.hotel_booking import HotelGuestResponse
 from app.models_v2 import (
     Gender,
     PassengerType,
+    RequestSource,
     RequestStatus,
     RequestType,
     SeatPreference,
@@ -195,6 +196,31 @@ class UpdateDraftRequest(BaseModel):
     #: does not need to be: a merchant who mistyped it overwrites it.
     client_fare: Decimal | None = Field(default=None, ge=0, le=Decimal("9999999999.99"))
 
+    # ------------------------------------------- the ticket the desk arranged
+    # MANUAL BOOKING ONLY, and the service enforces that — `ticket_service.
+    # update_draft` writes these four only for a caller holding `ticket.manual`.
+    # They are here rather than on a new schema because the Manual Request
+    # screen saves through exactly this endpoint, and a second "update a draft"
+    # payload that differed only by four fields would be the duplicate the
+    # feature was asked not to create.
+    #
+    # WHY THEY ARE INPUT AT ALL. Everywhere else `pnr` and `ticket_number` are
+    # ALLOCATED by `ticket_service.issue_ticket` at the end of the approval
+    # workflow — which also debits the merchant's wallet. A manual booking
+    # records a ticket that was bought before the row existed, so the numbers
+    # are typed, and no money moves.
+    #
+    # Lengths match the columns (`service_requests.pnr` String(20),
+    # `ticket_number` String(40)) so an over-long value is a 422 naming the
+    # field rather than a truncation or a database error.
+    pnr: str | None = Field(default=None, max_length=20)
+    ticket_number: str | None = Field(default=None, max_length=40)
+    #: The itinerary is otherwise copied from the enquiry and locked. These two
+    #: are the exception: an enquiry routinely says "All Airlines" with no
+    #: flight number, because finding one is what was asked of us.
+    airline: str | None = Field(default=None, max_length=100)
+    flight_number: str | None = Field(default=None, max_length=20)
+
 
 class ReplacePassengersRequest(BaseModel):
     passengers: list[PassengerInput] = Field(min_length=1)
@@ -376,6 +402,19 @@ class RequestResponse(BaseModel):
     merchant_id: int | None = None
     merchant_name: str | None = None
     raised_by: str | None = None
+    #: WHO TYPED THIS ROW (0073): ``merchant_portal`` when the merchant raised it
+    #: itself, ``b2b_manual_request`` when our desk raised it FOR them from the
+    #: Admin portal's Manual Booking screens. Read-only everywhere — it is
+    #: decided from the actor at creation (``enquiry_service._resolve_owner``)
+    #: and no endpoint accepts it as input.
+    #:
+    #: NOT THE SAME QUESTION AS ``raised_by`` BESIDE IT, which is a person's
+    #: name. A merchant reading its own Booking History finds a booking nobody
+    #: at its company created and an admin's name against it; that name alone
+    #: cannot say whether we raised it or merely touched it afterwards, and this
+    #: can. ``merchant_id`` above is a third question again — who it BELONGS
+    #: to — and its answer is the merchant's either way.
+    source: RequestSource = RequestSource.MERCHANT_PORTAL
 
     booking_reference: str | None = None
     pnr: str | None = None
@@ -448,6 +487,11 @@ class RequestResponse(BaseModel):
             merchant_id=r.merchant_id,
             merchant_name=r.merchant.company_name if r.merchant else None,
             raised_by=r.user.full_name if r.user else None,
+            # Column read, not derived. Rows written before 0073 carry the
+            # server default, which is a fact about them rather than a guess:
+            # Manual Booking did not exist, so the merchant portal is where
+            # they came from.
+            source=r.source,
             booking_reference=r.booking_reference,
             pnr=r.pnr,
             ticket_number=r.ticket_number,

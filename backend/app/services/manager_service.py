@@ -32,6 +32,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models_v2 import (
+    RequestSource,
     RequestStatus as S,
     RequestType,
     ServiceRequest,
@@ -154,6 +155,29 @@ def _classic_bookings_filter():
             ServiceRequest.travel_details[key].astext.isnot(None)
             for key in lifecycle.CLASSIC_MARKER_KEYS
         ]),
+        # A MANUAL BOOKING IS NOT AWAITING ANYONE'S SIGN-OFF.
+        #
+        # It carries `enquiry_reference` like every other enquiry-led booking,
+        # so the marker test above matches it — and it must not, because the
+        # desk raised it to RECORD a ticket it had already arranged off-platform
+        # for a merchant that telephoned. There is nothing left to approve: no
+        # seat to reserve, no fare to release, no supplier call to make. Putting
+        # it here would ask a Manager to sign off a purchase that has happened.
+        #
+        # THE STATUS IS NOT ENOUGH TO EXCLUDE IT. A manual booking is saved and
+        # left at DRAFT, deliberately, because it never enters the approval
+        # workflow — and DRAFT is in QUEUE_STATUSES, in the "returned" bucket,
+        # which is where a booking a Manager sent BACK to the merchant appears.
+        # Without this term the desk's own record would surface there looking
+        # like work a Manager had rejected.
+        #
+        # ON `source`, NOT ON A MARKER KEY, because this is a fact about who
+        # raised the row rather than about what kind of booking it is — and it
+        # is a column (migration 0073) with its own index, so the exclusion
+        # costs nothing. `is_classic_track` is deliberately NOT changed: the
+        # Admin Approval Queue excludes classic rows, so a manual booking must
+        # stay classic there or it would start appearing on that queue instead.
+        ServiceRequest.source != RequestSource.B2B_MANUAL_REQUEST,
     )
 
 
