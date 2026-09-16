@@ -722,6 +722,19 @@ def to_booking_request(
         passengers = group_booking_service.passengers_of(inherited)
     elif group_import_id is not None:
         group_import = group_booking_service.get(db, actor, group_import_id)
+        # CHECKED AGAINST THE ENQUIRY'S MERCHANT, NOT THE ACTOR'S.
+        # `group_booking_service.get` applies its merchant filter only when the
+        # caller HAS a merchant — correct for an admin reading any company's
+        # import, and not a scope check at all on the manual path, where the
+        # admin has none. `attach_to_request` does refuse a mismatch further
+        # down, so nothing was ever committed; this refuses it before a single
+        # PassengerData row is built from another company's travellers, and
+        # says whose list it is rather than failing at the last step.
+        if group_import.merchant_id != enquiry.merchant_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="That passenger list belongs to a different merchant.",
+            )
         passengers = group_booking_service.passengers_of(group_import)
 
     if not passengers:

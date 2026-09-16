@@ -116,7 +116,12 @@ def _log(
     ),
 )
 def group_booking_limits(
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    # `ticket.manual` for the same reason the upload has it: this is offered on
+    # the Manual Request screen's group card, and a button the desk can see and
+    # cannot use is worse than no button. Safe to widen — it reads configuration
+    # and generates a blank workbook; there is no merchant's data behind it and
+    # nothing to scope.
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ) -> GroupBookingLimits:
     # Deliberately not logged to activity: it is read on every open of the
     # enquiry form and says nothing about what the merchant did.
@@ -142,7 +147,12 @@ def download_template(
     request: Request,
     journey_type: str = gb.ONE_WAY_GROUP,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    # `ticket.manual` for the same reason the upload has it: this is offered on
+    # the Manual Request screen's group card, and a button the desk can see and
+    # cannot use is worse than no button. Safe to widen — it reads configuration
+    # and generates a blank workbook; there is no merchant's data behind it and
+    # nothing to scope.
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     data = gb.build_template(journey_type)
     _log(
@@ -170,7 +180,15 @@ def download_template(
         "at its first bad row. A file with problems is still stored and answered with `partial` "
         "or `invalid`; only a wholly `valid` import may then be turned into a booking, which "
         "`POST /api/bookings/direct` and the enquiry-led path both enforce. Send `replaces` to "
-        "swap out a previous upload — its row and its bytes are deleted."
+        "swap out a previous upload — its row and its bytes are deleted.\n\n"
+        "**Manual Booking (Admin portal).** A caller holding `ticket.manual` instead may send "
+        "`on_behalf_of_merchant_id` to upload the sheet FOR a merchant that telephoned it in. "
+        "That field is the only way a caller without a merchant of its own can reach this "
+        "route, and a merchant may never send it — the two shapes are mutually exclusive. "
+        "Without it the desk could raise a group enquiry and press Raise Booking but never "
+        "finish the booking, because a group's travellers come from the sheet rather than the "
+        "form. The import is stored against the named merchant, which is what lets "
+        "`attach_to_request` accept it later."
     ),
 )
 async def upload_manifest(
@@ -178,8 +196,14 @@ async def upload_manifest(
     file: UploadFile = File(...),
     journey_type: str = Form(gb.ONE_WAY_GROUP),
     replaces: int | None = Form(None),
+    on_behalf_of_merchant_id: int | None = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.TICKET_REQUEST)),
+    # `ticket.manual` reaches this for the same reason it reaches the enquiry
+    # and booking-request routes: the desk uploading a sheet for a merchant is
+    # doing the merchant's action on the merchant's behalf. Nothing widens —
+    # `_merchant_id_of` refuses the on-behalf field to anyone who has a merchant
+    # of their own, and refuses a staff caller who omits it.
+    current_user: User = Depends(require(P.TICKET_REQUEST, P.TICKET_MANUAL)),
 ):
     _log(
         db, request, current_user, "upload_started",
@@ -188,7 +212,8 @@ async def upload_manifest(
     )
     try:
         imp = gb.create_import(
-            db, current_user, file, journey_type, replaces=replaces
+            db, current_user, file, journey_type, replaces=replaces,
+            on_behalf_of_merchant_id=on_behalf_of_merchant_id,
         )
     except HTTPException as exc:
         # The failure branches are the ones worth having a trail for.

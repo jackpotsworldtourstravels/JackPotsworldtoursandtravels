@@ -150,6 +150,39 @@ function ambInstallApiBridge() {
      the upload against a second client. */
   MerchantApi._headers = () => authHeaders();
 
+  /* THE GROUP MANIFEST, WHICH NEEDS A MERCHANT AS WELL AS A TOKEN.
+     ===========================================================================
+     A group booking's travellers come from a spreadsheet rather than the form,
+     so without this upload the desk could raise a group enquiry for a merchant,
+     press Raise Booking, and then not be able to finish it — the screen offered
+     an upload card that answered 403.
+
+     The token alone is not enough here, unlike every other call. An import row
+     is OWNED by a merchant: it is scoped on read by merchant_id, and
+     `attach_to_request` refuses a manifest whose merchant differs from the
+     booking's. The admin has no merchant, so the upload has to name one.
+
+     WHICH MERCHANT, AND WHY IT IS NOT THE PICKER. It is the merchant of the
+     ENQUIRY being converted — read from `clBookingEnquiry` at the moment of the
+     call, not captured when the screen opened and not taken from the Manual
+     Enquiry dropdown. The operator may well have changed that dropdown since;
+     filing the sheet against whatever it now says would attach one company's
+     travellers to another company's booking, which is exactly what the server's
+     own check would then refuse, after the upload.
+
+     Wrapped rather than parameterised, for the reason the `_req` wrapper gives:
+     classic-booking.js calls this and must not learn it is in another portal. */
+  const originalManifest = MerchantApi.uploadGroupManifest.bind(MerchantApi);
+  MerchantApi.uploadGroupManifest = function (opts) {
+    const merchantId = (typeof clBookingEnquiry !== 'undefined' && clBookingEnquiry)
+      ? clBookingEnquiry.merchant_id : null;
+    if (merchantId == null) return originalManifest(opts);
+    /* The field rides on the FormData the original builds, so the file, the
+       journey type, `replaces` and the progress callback are all still its
+       own — this adds one entry and changes nothing else. */
+    return originalManifest({ ...opts, onBehalfOfMerchantId: merchantId });
+  };
+
   AMB.wired = true;
 }
 

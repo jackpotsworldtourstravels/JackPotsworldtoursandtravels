@@ -63,6 +63,7 @@ Run against a server carrying the change::
     JPW_BASE=http://127.0.0.1:8020 python tests/verify_manual_booking_unquoted.py
 """
 import datetime
+import io
 import sys
 from pathlib import Path
 
@@ -76,6 +77,7 @@ import minihttp as requests  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.database.session import SessionLocal  # noqa: E402
+from app.services import group_booking_service as gb  # noqa: E402
 
 from config import (  # noqa: E402
     ADMIN, BASE, Checker, H, JPEG, MANAGER, MERCHANT, PDF, PNG, login,
@@ -101,6 +103,8 @@ EXPIRY = (datetime.date.today() + datetime.timedelta(days=900)).isoformat()
 #: Unique per run: `uq_sr_ticket_number` is a real constraint, so a fixed
 #: value would make the second run of this script fail on the first run's row.
 TICKET_NO = f"TKT{int(__import__('time').time())}"
+#: Group sheets carry a real date object, not an ISO string.
+GROUP_TRAVEL = datetime.date.today() + datetime.timedelta(days=70)
 
 print(f"\nBASE={BASE}  merchant_id={MERCHANT_ID}  admin_user_id={ADMIN_USER_ID}")
 
@@ -639,5 +643,173 @@ if one_way:
     check("  and cannot attach one either",
           r.status_code in (403, 404), f"{r.status_code} {r.text[:160]}")
 
+# ---------------------------------------------------------------------------
+print("\n== 13. GROUP BOOKING: THE DESK UPLOADS THE MANIFEST ==")
+# ---------------------------------------------------------------------------
+# THE ONE STEP OF MANUAL BOOKING THAT USED TO DEAD-END.
+#
+# A group's travellers come from a spreadsheet, not the form. Every other step
+# already worked on behalf of a named merchant, but POST /api/group-bookings/
+# imports required `ticket.request` and `_merchant_id_of` refused any caller
+# without a merchant of its own — so the desk could raise a group enquiry, press
+# Raise Booking, and then be stopped by a 403 on the upload card with no way
+# forward.
+#
+# The upload now takes `on_behalf_of_merchant_id`, guarded the same way the
+# enquiry route is: the permission is useless without the name, and the name is
+# refused from anyone who has a merchant of their own.
+GB = f"{BASE}/api/group-bookings"
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+def group_sheet(journey_type, rows):
+    """A workbook built from the service's OWN column list, so a column rename
+    breaks this test rather than silently producing an invalid sheet."""
+    from openpyxl import Workbook
+    cols = list(gb.columns_for(journey_type))
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Passengers"
+    for i, c in enumerate(cols, 1):
+        ws.cell(row=1, column=i, value=c)
+    for r, data in enumerate(rows, 2):
+        for i, c in enumerate(cols, 1):
+            ws.cell(row=r, column=i, value=data.get(c))
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+def group_row(**over):
+    base = {
+        "Origin City": "Hyderabad", "Destination City": "Colombo",
+        "Airline": "SriLankan Airlines", "Airline Number": "UL122",
+        "Travel Date": GROUP_TRAVEL, "Preferred Hour": 9,
+        "Preferred Minute": 30, "AM/PM": "AM",
+        "Passenger Name": "Group Traveller", "Gender": "Male",
+        "Date of Birth": datetime.date(1990, 4, 18), "Nationality": "Indian",
+        "Passport Number": "GRP0001", "Passport Expiry": datetime.date(2032, 4, 18),
+        "Booking Class": "Economy", "Adults": 1, "Children": 0, "Infants": 0,
+        "Client Fare": 20000, "Notes": "",
+    }
+    base.update(over)
+    return base
+
+# The desk raises a GROUP enquiry for the merchant.
+g_enq = raise_manual_enquiry(
+    trip_type="group_trip", group_journey_type="one_way_group",
+    travel_date=GROUP_TRAVEL.isoformat(),
+    passenger_count=3, adults=3, flight_number="UL122",
+)
+check("the desk raises a group enquiry for the merchant",
+      g_enq["status"] == "pending_approval", g_enq["status"])
+
+sheet = group_sheet("one_way_group", [
+    group_row(**{"Passenger Name": "Asha Menon", "Passport Number": "GRP0001"}),
+    group_row(**{"Passenger Name": "Ravi Kumar", "Passport Number": "GRP0002"}),
+    group_row(**{"Passenger Name": "Sara Iqbal", "Passport Number": "GRP0003"}),
+])
+
+# ---- THE FIX ----------------------------------------------------------------
+r = requests.post(
+    f"{GB}/imports", headers=H(atok),
+    files={"file": ("party.xlsx", sheet, XLSX)},
+    data={"journey_type": "one_way_group",
+          "on_behalf_of_merchant_id": str(MERCHANT_ID)},
+)
+check("the desk can upload a manifest FOR that merchant",
+      r.status_code == 201, f"{r.status_code} {r.text[:250]}")
+imported = (r.json() or {}).get("imported", {}) if r.status_code == 201 else {}
+check("  the sheet validates clean",
+      imported.get("validation_status") == "valid", str(imported.get("validation_status")))
+check("  with all three travellers",
+      imported.get("passengers_imported") == 3, str(imported.get("passengers_imported")))
+
+import_id = imported.get("import_id")
+if import_id:
+    db = SessionLocal()
+    try:
+        owner = db.execute(
+            text("SELECT merchant_id, uploaded_by FROM group_booking_imports "
+                 "WHERE import_id = :i"), {"i": import_id}).mappings().one()
+    finally:
+        db.close()
+    # THE ROW BELONGS TO THE MERCHANT, NOT THE ADMIN. This is the assertion the
+    # whole feature rests on: `attach_to_request` refuses a manifest whose
+    # merchant differs from the booking's, so an import stored against the admin
+    # (or against nobody) could never be attached.
+    check("  the import is owned by the MERCHANT, not the admin",
+          owner["merchant_id"] == MERCHANT_ID, f"{owner['merchant_id']} != {MERCHANT_ID}")
+    check("  while recording which operator uploaded it",
+          owner["uploaded_by"] == ADMIN_USER_ID, str(owner["uploaded_by"]))
+
+    # ---- AND THE BOOKING COMPLETES -----------------------------------------
+    r = requests.post(
+        f"{BASE}/api/enquiries/{g_enq['id']}/booking-request", headers=H(atok),
+        json={"passengers": [], "group_import_id": import_id, "international": True},
+    )
+    check("Raise Booking completes for a GROUP enquiry",
+          r.status_code == 201, f"{r.status_code} {r.text[:250]}")
+    g_booking = r.json() if r.status_code == 201 else {}
+    if g_booking:
+        check("  the travellers came from the sheet",
+              len(g_booking.get("passengers") or []) == 3,
+              str(len(g_booking.get("passengers") or [])))
+        check("  the booking is the merchant's",
+              g_booking.get("merchant_id") == MERCHANT_ID, str(g_booking.get("merchant_id")))
+        db = SessionLocal()
+        try:
+            gb_row = dict(db.execute(
+                text("SELECT status::text AS status, source::text AS source "
+                     "FROM service_requests WHERE request_id = :r"),
+                {"r": g_booking["id"]}).mappings().one())
+            attached = db.execute(
+                text("SELECT request_id FROM group_booking_imports WHERE import_id = :i"),
+                {"i": import_id}).scalar()
+        finally:
+            db.close()
+        check("  saved as a manual booking, in no workflow",
+              gb_row["status"] == "draft" and gb_row["source"] == "b2b_manual_request",
+              str(gb_row))
+        check("  and the manifest is attached to it",
+              attached == g_booking["id"], f"{attached} != {g_booking['id']}")
+
+# ---- THE TWO REFUSALS THAT KEEP THIS FROM WIDENING -------------------------
+r = requests.post(
+    f"{GB}/imports", headers=H(mtok),
+    files={"file": ("party.xlsx", sheet, XLSX)},
+    data={"journey_type": "one_way_group", "on_behalf_of_merchant_id": "1"},
+)
+check("a MERCHANT cannot upload for another company",
+      r.status_code == 403, f"{r.status_code} {r.text[:200]}")
+
+r = requests.post(
+    f"{GB}/imports", headers=H(atok),
+    files={"file": ("party.xlsx", sheet, XLSX)},
+    data={"journey_type": "one_way_group"},
+)
+check("and the desk must still NAME a merchant",
+      r.status_code == 403, f"{r.status_code} {r.text[:200]}")
+
+# A merchant uploading its OWN sheet is completely unchanged.
+r = requests.post(
+    f"{GB}/imports", headers=H(mtok),
+    files={"file": ("party.xlsx", sheet, XLSX)},
+    data={"journey_type": "one_way_group"},
+)
+check("a merchant uploading its own sheet still works",
+      r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+own_import = (r.json() or {}).get("imported", {}).get("import_id") if r.status_code == 201 else None
+
+# CROSS-MERCHANT ATTACH. The manifest and the booking must belong to the same
+# company; `to_booking_request` now refuses this before building a single
+# passenger row from another company's sheet.
+if own_import and rt:
+    r = requests.post(
+        f"{BASE}/api/enquiries/{rt_enq['id']}/booking-request", headers=H(atok),
+        json={"passengers": [], "group_import_id": own_import, "international": True},
+    )
+    check("a manifest cannot be attached to a different enquiry's booking",
+          r.status_code in (400, 403, 409), f"{r.status_code} {r.text[:200]}")
+
 sys.exit(check.report())
+
 

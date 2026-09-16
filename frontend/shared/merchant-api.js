@@ -162,16 +162,32 @@ const MerchantApi = {
 
      A 4xx here is a real answer, not a transport failure — the server returns
      the row-level detail as `detail`, which clEnquiryError() unpacks. */
-  uploadGroupManifest({ file, journey_type, replaces, onProgress }) {
+  uploadGroupManifest({ file, journey_type, replaces, onProgress,
+                        onBehalfOfMerchantId = null }) {
     const form = new FormData();
     form.append('file', file);
     form.append('journey_type', journey_type);
     if (replaces) form.append('replaces', String(replaces));
+    /* MANUAL BOOKING ONLY, and the server enforces that: `_merchant_id_of`
+       refuses this field from any caller that has a merchant of its own, and
+       refuses a staff caller who omits it. An import is OWNED by a merchant —
+       scoped on read, and `attach_to_request` rejects a manifest whose merchant
+       differs from the booking's — so the desk, which has no merchant, has to
+       name the one it is uploading for. The Merchant Portal never passes it and
+       its request is byte-for-byte what it was. */
+    if (onBehalfOfMerchantId != null) {
+      form.append('on_behalf_of_merchant_id', String(onBehalfOfMerchantId));
+    }
 
     return axios({
       method: 'post',
       url: `${API_BASE}/api/group-bookings/imports`,
-      headers: partnerAuthHeaders(),
+      /* `_headers()`, not partnerAuthHeaders() directly — see its own note. The
+         Admin portal mounts this screen with no merchant session, and this is
+         one of the multipart calls the `_req` wrapper cannot reach. The
+         on-behalf-of merchant is added by the Admin bridge rather than taken as
+         an argument here, so the Merchant Portal's call is unchanged. */
+      headers: MerchantApi._headers(),
       data: form,
       onUploadProgress: e => {
         if (!onProgress || !e.total) return;

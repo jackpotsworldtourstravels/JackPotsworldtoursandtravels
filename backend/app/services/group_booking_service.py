@@ -52,10 +52,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.auth.rbac import P, has_permission
 from app.models_v2 import (
     Gender,
     GroupBookingImport,
     GroupImportStatus,
+    Merchant,
     PassengerType,
     ServiceRequest,
     User,
@@ -943,18 +945,59 @@ def status_for(valid_rows: int, invalid_rows: int) -> GroupImportStatus:
 # ---------------------------------------------------------------------------
 # Storing an import
 # ---------------------------------------------------------------------------
-def _merchant_id_of(actor: User) -> int:
+def _merchant_id_of(db: Session, actor: User, on_behalf_of: int | None = None) -> int:
     """The merchant this import belongs to.
 
-    Platform staff have no merchant of their own, and a manifest with no owner
-    could not be scoped on read — so this is refused rather than defaulted.
+    A manifest with no owner could not be scoped on read, so this always
+    answers with a real merchant id or refuses. There are exactly two ways to
+    get one, and they are mutually exclusive:
+
+      a merchant uploading its own     from the actor, and ``on_behalf_of``
+                                       must be absent
+      the desk uploading FOR one       from ``on_behalf_of``, and the actor
+      (Admin -> Manual Booking)        must hold ``ticket.manual`` and have no
+                                       merchant of its own
+
+    WHY THE DESK NEEDS THIS AT ALL. A group booking's travellers come from a
+    spreadsheet, not from the form — so without an upload the desk could raise
+    a group enquiry for a merchant, press Raise Booking, and then not be able
+    to finish it. Every other step of Manual Booking already works on behalf of
+    a named merchant; this was the one that did not, and the screen dead-ended
+    on a 403 that named a rule the operator could not satisfy.
+
+    DELIBERATELY THE SAME SHAPE AS ``enquiry_service._resolve_owner``, down to
+    the order of the checks: the permission is useless without the name and the
+    name is refused without the permission, so neither half can be used alone.
+    A platform user cannot file a manifest against nobody, and a merchant
+    cannot file one against somebody else.
     """
-    if not actor.merchant_id:
+    if on_behalf_of is None:
+        if not actor.merchant_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Only a merchant can upload a group passenger list.",
+            )
+        return actor.merchant_id
+
+    # A MERCHANT MAY NOT NAME ANOTHER COMPANY, whatever it holds. Checked before
+    # the permission so the refusal says the true thing: the problem is not that
+    # they lack a code, it is that the field is not theirs to send.
+    if actor.merchant_id is not None:
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only a merchant can upload a group passenger list.",
+            detail="A merchant can only upload a passenger list for itself.",
         )
-    return actor.merchant_id
+    if not has_permission(actor, P.TICKET_MANUAL):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Uploading a passenger list for another merchant requires ticket.manual",
+        )
+    if db.get(Merchant, on_behalf_of) is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="No merchant with that id",
+        )
+    return on_behalf_of
 
 
 def _spool(upload: UploadFile) -> tuple[Path, int, str]:
@@ -1005,6 +1048,7 @@ def create_import(
     journey_type: str,
     *,
     replaces: int | None = None,
+    on_behalf_of_merchant_id: int | None = None,
 ) -> GroupBookingImport:
     """Validate an uploaded manifest and record it.
 
@@ -1016,11 +1060,26 @@ def create_import(
     ``replaces`` is "Replace File" — the previous staging row and its bytes go,
     so a merchant cannot accidentally submit against the sheet they just
     replaced.
+
+    ``on_behalf_of_merchant_id`` is Manual Booking: the desk uploading the sheet
+    for a merchant that telephoned it in. See :func:`_merchant_id_of`.
     """
     _assert_journey_type(journey_type)
-    merchant_id = _merchant_id_of(actor)
+    merchant_id = _merchant_id_of(db, actor, on_behalf_of_merchant_id)
 
     if replaces is not None:
+        # THE SCOPE CHECK PLATFORM STAFF WOULD OTHERWISE SKIP. `discard` resolves
+        # the row through `get`, which applies the merchant filter only when the
+        # ACTOR has a merchant — right for an admin reading any company's import,
+        # and wrong here, where "replace" would then delete a sheet belonging to
+        # a company this upload has nothing to do with. Checked against the
+        # resolved owner, not the actor, exactly as `_manifest_passengers` does.
+        previous = get(db, actor, replaces)
+        if previous.merchant_id != merchant_id:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail="That passenger list belongs to a different merchant.",
+            )
         discard(db, actor, replaces)
 
     tmp_path, size, checksum = _spool(upload)
