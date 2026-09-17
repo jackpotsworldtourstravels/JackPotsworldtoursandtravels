@@ -83,6 +83,19 @@ from config import (  # noqa: E402
     ADMIN, BASE, Checker, H, JPEG, MANAGER, MERCHANT, PDF, PNG, login,
 )
 
+def _pdf_text(data: bytes) -> str:
+    """What a rendered invoice actually says.
+
+    Two renders of one document differ in bytes — a PDF stamps its own creation
+    time — and the text is Flate-compressed, so neither a byte comparison nor a
+    raw substring search says anything useful about the invoice. This is the
+    only honest way to assert on one.
+    """
+    import pymupdf
+    with pymupdf.open(stream=data, filetype="pdf") as doc:
+        return "\n".join(page.get_text() for page in doc)
+
+
 check = Checker()
 atok, admin_user = login(*ADMIN, with_user=True)
 mtok, merchant_user = login(*MERCHANT, with_user=True)
@@ -810,6 +823,114 @@ if own_import and rt:
     check("a manifest cannot be attached to a different enquiry's booking",
           r.status_code in (400, 403, 409), f"{r.status_code} {r.text[:200]}")
 
+# ---------------------------------------------------------------------------
+print("\n== 14. INVOICE FROM A MANUAL REQUEST ==")
+# ---------------------------------------------------------------------------
+# WHAT THIS PROTECTS
+#
+# The invoice endpoint refused a manual booking outright — `INVOICEABLE` is
+# {ticket_issued, completed}, and a manual booking is finished at DRAFT on
+# purpose. It also had no invoice number, because `issue_ticket` is what
+# allocates one and that function debits the merchant's wallet, which must
+# never happen for a ticket the desk bought off-platform.
+#
+# So the Generate/Download buttons on Manual Request rest on two things this
+# section pins:
+#   * a manual booking is invoiceable while still at draft, and ONLY because
+#     of its `source` — a merchant's own draft is still refused;
+#   * the number is allocated once, from the same sequence, and re-read after.
+if one_way:
+    # `one_way` is submitted by section 8, so use a booking that is still the
+    # shape Manual Request leaves behind: draft, b2b_manual_request.
+    m_enq = raise_manual_enquiry(flight_number="AI911")
+    r = raise_booking(m_enq["id"])
+    check("a manual booking exists to invoice",
+          r.status_code == 201, f"{r.status_code} {r.text[:160]}")
+    mb = r.json() if r.status_code == 201 else {}
+
+    if mb:
+        # Give it a fare the way Manual Request does — the Ticket details panel
+        # writes `client_fare`, because `total_amount` stays 0 on this track.
+        requests.put(f"{BASE}/api/requests/{mb['id']}", headers=H(atok),
+                     json={"client_fare": "48250.00", "pnr": "INVPNR"})
+
+        r = requests.get(f"{BASE}/api/requests/{mb['id']}/invoice", headers=H(atok))
+        check("Generate Invoice works on a DRAFT manual booking",
+              r.status_code == 200 and r.content[:5] == b"%PDF-",
+              f"{r.status_code} {r.text[:160]}")
+        first = r.content
+
+        db = SessionLocal()
+        try:
+            row = dict(db.execute(
+                text("SELECT status::text AS status, invoice_number "
+                     "FROM service_requests WHERE request_id = :r"),
+                {"r": mb["id"]}).mappings().one())
+        finally:
+            db.close()
+        check("  an invoice number was allocated",
+              bool(row["invoice_number"]), str(row["invoice_number"]))
+        check("  and the booking did NOT change status to get one",
+              row["status"] == "draft", row["status"])
+
+        # DOWNLOAD IS THE SAME CALL, so the two cannot disagree — and the second
+        # press must not burn a second number.
+        #
+        # COMPARED AS TEXT, NOT AS BYTES. A PDF embeds its own creation
+        # timestamp, so two renders of the identical document are never
+        # byte-identical and asserting that fails for a reason that has nothing
+        # to do with the invoice. What must match is what the page SAYS.
+        r2 = requests.get(f"{BASE}/api/requests/{mb['id']}/invoice", headers=H(atok))
+        check("Download Invoice returns the identical document",
+              r2.status_code == 200 and _pdf_text(r2.content) == _pdf_text(first),
+              f"{r2.status_code}, {len(r2.content)} vs {len(first)} bytes")
+
+        db = SessionLocal()
+        try:
+            again = db.execute(
+                text("SELECT invoice_number FROM service_requests WHERE request_id = :r"),
+                {"r": mb["id"]}).scalar()
+            dupes = db.execute(text(
+                "SELECT count(*) FROM (SELECT invoice_number FROM service_requests "
+                "WHERE invoice_number IS NOT NULL GROUP BY invoice_number "
+                "HAVING count(*) > 1) d")).scalar()
+        finally:
+            db.close()
+        check("  the number is reused, not reallocated",
+              again == row["invoice_number"], f"{again} != {row['invoice_number']}")
+        check("  and no invoice number is shared by two bookings",
+              dupes == 0, f"{dupes} duplicated")
+
+        # THE AMOUNT COMES FROM THE COLUMN THIS TRACK ACTUALLY USES. total_amount
+        # is 0 on a manual booking; the fare the desk typed is client_fare, and
+        # an invoice printing 0.00 against a 48,250 booking would be wrong.
+        #
+        # Extracted, not scanned: a PDF's text lives in Flate-compressed content
+        # streams, so searching the raw bytes finds nothing however right the
+        # document is.
+        rendered = _pdf_text(first)
+        check("  the invoice states the fare the desk recorded",
+              "48,250.00" in rendered, f"48,250.00 absent; page reads: {rendered[:160]!r}")
+        check("  and carries its own invoice number",
+              (row["invoice_number"] or "\0") in rendered, row["invoice_number"])
+
+    # A MERCHANT'S OWN DRAFT IS STILL REFUSED. The gate widened on `source`,
+    # which a merchant cannot set — not on the status, which it shares.
+    r = requests.post(f"{BASE}/api/enquiries", headers=H(mtok),
+                      json=itinerary(flight_number="AI912"))
+    if r.status_code == 201:
+        own_enq = r.json()
+        requests.post(f"{BASE}/api/admin/enquiries/{own_enq['id']}/review",
+                      headers=H(atok), json={})
+        requests.post(f"{BASE}/api/admin/enquiries/{own_enq['id']}/respond", headers=H(atok),
+                      json={"available": True, "total_fare": "1000.00", "reason": "ok"})
+        d = raise_booking(own_enq["id"], token=mtok)
+        if d.status_code == 201:
+            r = requests.get(f"{BASE}/api/requests/{d.json()['id']}/invoice", headers=H(mtok))
+            check("a MERCHANT's own draft still has no invoice",
+                  r.status_code == 409, f"{r.status_code} {r.text[:140]}")
+
 sys.exit(check.report())
+
 
 

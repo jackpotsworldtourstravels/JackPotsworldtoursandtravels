@@ -31,13 +31,15 @@ from app.models_v2 import (
     DocumentType,
     PaymentStatus,
     PaymentType,
+    RequestSource,
     RequestStatus as S,
     RequestDocument,
+    RequestType,
     ServiceRequest,
     TravelType,
     User,
 )
-from app.services import ticket_service
+from app.services import invoice_layout, ticket_service
 
 #: Matches the portals' navy/orange so a printed invoice looks like the product.
 NAVY = colors.HexColor("#0A2E52")
@@ -155,15 +157,41 @@ def _header(story, styles, heading: str, request: ServiceRequest, merchant):
 # ---------------------------------------------------------------------------
 # Access
 # ---------------------------------------------------------------------------
+def _is_manual_booking(request: ServiceRequest) -> bool:
+    """A booking the desk typed up in Admin -> Manual Booking.
+
+    It is the one kind of booking that is finished while still at ``draft``:
+    Manual Request saves the record of a ticket the desk already arranged and
+    deliberately enters no workflow, so it never reaches ``ticket_issued``. See
+    ``manager_service._classic_bookings_filter``, which excludes the same rows
+    from the Manager's queue on the same column.
+    """
+    return (request.source is RequestSource.B2B_MANUAL_REQUEST
+            and request.request_type is RequestType.BOOKING)
+
+
 def _billable(db: Session, actor: User, request_id: int) -> ServiceRequest:
     """The booking, if this actor may have its paperwork.
 
     Reuses ``ticket_service.get_request`` so merchant scoping is the same rule
     that governs every other read of a booking — a second scoping rule here is
     exactly how one of them ends up wrong.
+
+    TWO WAYS TO BE INVOICEABLE, BECAUSE THERE ARE TWO KINDS OF BOOKING.
+
+    The ordinary one reaches ``ticket_issued``, which is where ``issue_ticket``
+    allocates the invoice number and bills the wallet. A MANUAL booking never
+    does: it records a ticket the desk had already bought, so it is complete at
+    ``draft`` and no money moves through this platform for it. Holding it to
+    "has it been ticketed" would mean the desk could never invoice the one kind
+    of booking it raises itself.
+
+    The merchant's own draft is still refused. The test is on ``source``, not
+    on the status — a merchant cannot set that column, and nothing but Manual
+    Booking writes ``b2b_manual_request``.
     """
     request = ticket_service.get_request(db, actor, request_id)
-    if request.status not in INVOICEABLE:
+    if request.status not in INVOICEABLE and not _is_manual_booking(request):
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
             detail=(
@@ -174,144 +202,69 @@ def _billable(db: Session, actor: User, request_id: int) -> ServiceRequest:
     return request
 
 
+def _ensure_invoice_number(db: Session, request: ServiceRequest) -> None:
+    """Give a manual booking its invoice number, once.
+
+    ``issue_ticket`` is where every other booking gets one — and that function
+    also DEBITS THE MERCHANT'S WALLET, which must not happen for a ticket the
+    desk bought off-platform. So the number is allocated here instead, from
+    ``ticket_service._next_number``: the SAME PostgreSQL sequence, so a manual
+    invoice cannot collide with an issued one and neither can two desks
+    generating at the same moment.
+
+    IDEMPOTENT, AND THAT IS THE WHOLE POINT. It is written once and re-read
+    ever after, so pressing Generate Invoice five times yields one number, and
+    Download shows the same document Generate did. Nothing else about the
+    booking changes — not its status, not its wallet, not its queue.
+    """
+    if request.invoice_number or not _is_manual_booking(request):
+        return
+    request.invoice_number = ticket_service._next_number(db, "INV")
+    db.commit()
+    db.refresh(request)
+
+
 # ---------------------------------------------------------------------------
 # Invoice
 # ---------------------------------------------------------------------------
 def build_invoice(db: Session, actor: User, request_id: int) -> tuple[bytes, str]:
-    """Render the invoice PDF. Returns ``(bytes, filename)``."""
+    """Render the invoice PDF. Returns ``(bytes, filename)``.
+
+    THE PAGE ITSELF LIVES IN ``invoice_layout``. This function keeps what it
+    always kept — who may ask for it, and whether the booking is far enough
+    along to have one — and hands the rendering to a module that does nothing
+    else. The split is what lets the layout be reworked without touching an
+    access rule, which is the half that must not be got wrong.
+
+    The layout module is also where the document's central safety rule lives:
+    a value the database does not hold prints as a BLANK cell under its label,
+    never as a placeholder. Read its docstring before changing anything there —
+    an invented GSTIN or a guessed tax figure on a tax document is the failure
+    mode that file exists to prevent.
+    """
     request = _billable(db, actor, request_id)
-    merchant = request.merchant
-    styles = _styles()
+    # Lazily, so Generate and Download are the same call and the second press
+    # reuses the first press's number rather than burning another.
+    _ensure_invoice_number(db, request)
+    story = invoice_layout.story(request, request.merchant)
+    name = request.invoice_number or request.request_number
+    return _render_page(story, title=f"Invoice {name}"), f"invoice-{name}.pdf"
 
-    story = []
-    billed_to = _header(story, styles, "TAX INVOICE", request, merchant)
 
-    meta = _kv_table([
-        ("Invoice no.", request.invoice_number or "—"),
-        ("Invoice date", (request.approved_at or request.created_at).strftime("%d %b %Y")),
-        ("Booking ref", request.booking_reference or request.request_number),
-        ("PNR", request.pnr or "—"),
-        ("Ticket no.", request.ticket_number or "—"),
-    ])
-    top = Table([[billed_to, meta]], colWidths=(95 * mm, 100 * mm))
-    top.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
-    story.append(Paragraph("Billed to", styles["h"]))
-    story.append(top)
+def _render_page(story: list, *, title: str) -> bytes:
+    """Build with the invoice layout's own A4 geometry.
 
-    story.append(Paragraph("Booking", styles["h"]))
-    d = request.travel_details or {}
-    is_hotel = request.travel_type is TravelType.HOTEL
-    # A Paragraph, not a bare string: a plain table cell renders markup
-    # literally, so the <br/> would print as the characters "<br/>".
-    if is_hotel:
-        # Not `_sector(request)`: that always interpolates an arrow even with
-        # no origin to put before it, which is fine for a flight sector but
-        # wrong for a stay that never had an origin city at all.
-        stay = d.get("destination_city") or request.title or "—"
-        hotel = _hotel_label(d)
-        description = Paragraph(stay + (f"<br/>{hotel}" if hotel else ""), styles["cell"])
-        traveller_count = str(len(request.hotel_guests))
-    else:
-        # `or ''` and not `.get(k, '')`: both keys are PRESENT AND NULL on an
-        # open enquiry (no carrier named), and a default only applies to a
-        # missing key — so the dict form would interpolate the string "None"
-        # onto an invoice.
-        flight = _flight_label(d)
-        description = Paragraph(
-            _sector(request) + (f"<br/>{flight}" if flight else ""), styles["cell"]
-        )
-        traveller_count = str(len(request.passengers))
-    story.append(_grid(
-        ["Description", "Check-in" if is_hotel else "Travel date", "Guests" if is_hotel else "Passengers", "Amount"],
-        [[
-            description,
-            request.travel_date.strftime("%d %b %Y") if request.travel_date else "—",
-            traveller_count,
-            f"{request.total_amount:,.2f}",
-        ]],
-        widths=(95 * mm, 30 * mm, 25 * mm, 45 * mm),
-    ))
+    Separate from ``_render`` below, which the booking confirmation still uses:
+    the confirmation keeps its original margins, and the invoice's column
+    widths are computed against the margins ``invoice_layout.page_setup``
+    declares. Sharing one renderer would couple the two documents' page
+    geometry for no reason.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, title=title, **invoice_layout.page_setup())
+    doc.build(story)
+    return buf.getvalue()
 
-    # Money. Refunds are netted off here rather than shown as a separate
-    # document, so the invoice always states what is actually owed today.
-    paid = sum(
-        (p.amount for p in request.payments
-         if p.payment_type is PaymentType.BOOKING_PAYMENT
-         and p.payment_status is PaymentStatus.SUCCESS),
-        Decimal("0"),
-    )
-    refunded = sum((p.refund_amount or Decimal("0") for p in request.payments), Decimal("0"))
-    net_due = Decimal(request.total_amount) - paid + refunded
-
-    totals = [
-        ("Booking total", f"{request.total_amount:,.2f}"),
-        ("Paid", f"-{paid:,.2f}"),
-    ]
-    if refunded:
-        totals.append(("Refunded back", f"+{refunded:,.2f}"))
-    totals.append(("Balance due", f"{net_due:,.2f}"))
-
-    tt = Table([[k, v] for k, v in totals], colWidths=(150 * mm, 45 * mm))
-    tt.setStyle(TableStyle([
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("LINEABOVE", (0, -1), (-1, -1), 0.8, NAVY),
-        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-        ("TEXTCOLOR", (0, -1), (-1, -1), NAVY),
-        ("TOPPADDING", (0, -1), (-1, -1), 5),
-    ]))
-    story.append(Spacer(1, 6))
-    story.append(tt)
-
-    # 0040 — what the merchant made on this booking. Deliberately BELOW the
-    # totals block and outside it: the client fare is what the merchant charged
-    # *its own* customer and is not a line of this invoice, which states what we
-    # billed them. Putting it inside the totals would make it look like a
-    # discount we gave, and "Balance due" must be the last figure the reader
-    # takes from that table.
-    #
-    # Rendered only when a client fare was recorded — `saved_amount` is None
-    # when it was not, and "You saved 0.00" on a booking with no client fare
-    # would be a claim about a number the merchant never entered.
-    if request.saved_amount is not None:
-        saved = Table(
-            [[f"Client fare {request.client_fare:,.2f}",
-              f"You saved {request.saved_amount:,.2f}"]],
-            colWidths=(150 * mm, 45 * mm),
-        )
-        saved.setStyle(TableStyle([
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-            ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
-            ("TEXTCOLOR", (0, 0), (-1, -1), NAVY),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        story.append(saved)
-
-    if request.payments:
-        story.append(Paragraph("Payments received", styles["h"]))
-        story.append(_grid(
-            ["Date", "Method", "Reference", "Status", "Amount"],
-            [[
-                (p.paid_date or p.created_at).strftime("%d %b %Y"),
-                (p.payment_method or "—"),
-                (p.transaction_id or "—"),
-                p.payment_status.value.replace("_", " ").title(),
-                f"{p.amount:,.2f}",
-            ] for p in request.payments],
-            widths=(28 * mm, 32 * mm, 60 * mm, 35 * mm, 40 * mm),
-        ))
-
-    story.append(Spacer(1, 14))
-    story.append(Paragraph(
-        f"Currency: {(request.pricing or {}).get('currency', 'INR')}. "
-        "Computer-generated invoice — valid without signature. "
-        f"Generated {datetime.datetime.now().strftime('%d %b %Y %H:%M')}.",
-        styles["small"],
-    ))
-
-    return _render(story, title=f"Invoice {request.invoice_number}"), \
-        f"invoice-{request.invoice_number or request.request_number}.pdf"
 
 
 # ---------------------------------------------------------------------------

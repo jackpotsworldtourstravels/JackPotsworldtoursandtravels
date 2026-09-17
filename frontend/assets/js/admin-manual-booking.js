@@ -1143,25 +1143,25 @@ function ambInstallDocumentsPanel() {
         that belongs with this booking. PDF, JPEG, PNG or WebP, up to
         ${AMB_DOC_MAX_MB} MB each. They are attached when you press Save.
       </p>
-      <div class="cl-form cl-form-2">
-        <div class="cl-field">
-          <label for="ambDocType">Document type</label>
-          <select id="ambDocType">${AMB_DOC_TYPES
-            .map(([v, l]) => `<option value="${v}">${ambEsc(l)}</option>`).join('')}</select>
-        </div>
-        <div class="cl-field">
-          <label for="ambDocPax">Belongs to</label>
-          <select id="ambDocPax"><option value="">The whole booking</option></select>
-          <small id="ambDocPaxHint">Save once to attach a file to a named traveller.</small>
-        </div>
-      </div>
       <div class="cl-field" style="margin-top:4px;">
-        <label for="ambDocFile">Choose a file</label>
+        <label for="ambDocFile">Upload Document</label>
         <input type="file" id="ambDocFile"
           accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp">
       </div>
       <div id="ambDocMsg" class="cl-msg" style="margin-top:8px;"></div>
       <div id="ambDocList" style="margin-top:12px;"></div>
+
+      <!-- THE INVOICE, BESIDE THE UPLOAD BUT NOT PART OF IT. A file the desk
+           attaches is evidence that travels with the booking; the invoice is a
+           document this platform produces from the booking's own rows. They
+           share a panel because that is where the operator looks for
+           paperwork, and nothing else. -->
+      <div class="cl-form-actions" style="margin-top:14px;">
+        <button type="button" class="cl-btn cl-btn-primary" id="ambInvGenerate">Generate Invoice</button>
+        <button type="button" class="cl-btn" id="ambInvDownload">Download Invoice</button>
+        <span class="cl-kpi-sub" id="ambInvHint">Save the booking first — the invoice is built from its saved rows.</span>
+      </div>
+      <div id="ambInvMsg" class="cl-msg" style="margin-top:8px;"></div>
     </div>`;
 
   actions.closest('.cl-panel')?.insertAdjacentElement('beforebegin', panel)
@@ -1171,30 +1171,14 @@ function ambInstallDocumentsPanel() {
   /* Delegated: both lists are re-rendered after every add and removal, so a
      handler bound to a button would not survive its own row. */
   document.getElementById('ambDocList').addEventListener('click', ambDocListClick);
+  document.getElementById('ambInvGenerate').addEventListener('click', () => ambInvoice(false));
+  document.getElementById('ambInvDownload').addEventListener('click', () => ambInvoice(true));
+  ambInvSyncButtons();
 
-  ambDocFillPassengers();
   ambDocRenderList();
   /* A resumed booking already has files on the server. Not awaited — the panel
      is usable immediately and the saved list appears a moment later. */
   ambDocLoadSaved();
-}
-
-/* The passenger dropdown, from the SAVED rows only.
-   `passenger_id` is checked against this request's own passengers server-side,
-   so a traveller that has never been saved has no id to offer and must not
-   appear — the file would be refused with "That passenger is not on this
-   booking request". Whole-booking is always available. */
-function ambDocFillPassengers() {
-  const sel = document.getElementById('ambDocPax');
-  const hint = document.getElementById('ambDocPaxHint');
-  if (!sel) return;
-  const pax = (clBookingDraft?.passengers || []).filter(p => p && p.id != null);
-  if (!pax.length) return;
-  sel.insertAdjacentHTML('beforeend', pax.map(p =>
-    `<option value="${ambEsc(p.id)}">${ambEsc(
-      [p.title, p.first_name, p.last_name].filter(Boolean).join(' ') || `Passenger ${p.id}`)}</option>`
-  ).join(''));
-  if (hint) hint.textContent = 'Or leave it against the whole booking.';
 }
 
 async function ambDocLoadSaved() {
@@ -1241,12 +1225,22 @@ function ambDocChoose(e) {
     return;
   }
 
-  const paxSel = document.getElementById('ambDocPax');
+  /* NO TYPE AND NO TRAVELLER ARE CHOSEN ON THIS SCREEN ANY MORE. Both controls
+     were removed from Manual Request; the desk attaching paperwork to a phone
+     booking was being asked to classify it first, which is a question it does
+     not need to answer to get the file onto the booking.
+
+     `docType` is left undefined, so `MerchantApi.uploadDocument`'s own default
+     of 'other' applies — the same value `routers/documents.py` would have used
+     anyway (`doc_type: DocumentType = Form(DocumentType.OTHER)`). This screen
+     names no type of its own. `passengerId` is null, which is the endpoint's
+     documented "booking-level paperwork" case. Nothing about the upload API
+     changed, and both fields still exist everywhere else they were offered. */
   AMB.docs.queued.push({
     file,
-    docType: document.getElementById('ambDocType').value,
-    passengerId: paxSel.value ? Number(paxSel.value) : null,
-    passengerLabel: paxSel.value ? paxSel.options[paxSel.selectedIndex].text : '',
+    docType: undefined,
+    passengerId: null,
+    passengerLabel: '',
   });
   /* Cleared so the same file can be chosen twice — two scans of a two-page
      passport are a real thing, and `change` does not fire for an identical
@@ -1288,10 +1282,13 @@ function ambDocRenderList() {
 
   /* Queued rows say "On save" where a saved one shows its verification state,
      so the two are never mistaken for each other in the same table. */
+  /* The Type cell stays in the table because SAVED rows still carry one — a
+     file uploaded before this screen dropped the control, or from any other
+     surface. A queued row leaves it blank rather than printing the default it
+     will be given, which would look like a choice the operator made. */
   const queuedRows = queued.map((q, i) => row([
-    `<strong>${ambEsc(q.file.name)}</strong>${q.passengerLabel
-      ? `<div class="cl-kpi-sub" style="font-size:11.5px;">${ambEsc(q.passengerLabel)}</div>` : ''}`,
-    ambEsc(ambDocTypeLabel(q.docType)),
+    `<strong>${ambEsc(q.file.name)}</strong>`,
+    q.docType ? ambEsc(ambDocTypeLabel(q.docType)) : '',
     ambEsc(ambDocSize(q.file.size)),
     '<span class="cl-tag">On save</span>',
     `<button type="button" class="cl-btn cl-btn-sm" data-amb-doc-drop="${i}">Remove</button>`,
@@ -1370,6 +1367,111 @@ async function ambDocUploadQueued(requestId) {
   }
   AMB.docs.queued = [];
   return failed;
+}
+
+/* ------------------------------------------------------------- invoice --
+   THE EXISTING INVOICE, FROM THIS BOOKING'S OWN ROWS.
+   ===========================================================================
+   Both buttons call ONE endpoint — `GET /api/requests/{id}/invoice` — which is
+   the same one the Merchant Portal's Booking History and the Operations desk
+   have always used, rendering through `invoice_service` and `invoice_layout`.
+   No second template, no second generator, no invoice built in this file.
+
+   GENERATE AND DOWNLOAD DIFFER ONLY IN WHAT IS DONE WITH THE BYTES. Generate
+   opens them for reading; Download saves them. They cannot disagree about the
+   document because they are the same request — which is also why pressing
+   Download without pressing Generate first simply works, and needs no "please
+   generate first" message.
+
+   THE INVOICE NUMBER IS THE SERVER'S. `invoice_service._ensure_invoice_number`
+   allocates it from the same PostgreSQL sequence `issue_ticket` uses, once,
+   and re-reads it ever after. Nothing here generates or guesses one.
+
+   WHY THE BOOKING MUST BE SAVED FIRST. The invoice is built from rows —
+   passengers, the fare, the merchant — so there is nothing to render until
+   Save has written them. `ambInvSyncButtons` keeps both buttons disabled until
+   `clBookingDraft` exists, which is the same state the rest of this screen
+   uses to decide create-versus-update. */
+function ambInvSyncButtons() {
+  const gen = document.getElementById('ambInvGenerate');
+  const dl = document.getElementById('ambInvDownload');
+  const hint = document.getElementById('ambInvHint');
+  if (!gen || !dl) return;
+  const saved = !!(clBookingDraft && clBookingDraft.id);
+  gen.disabled = !saved;
+  dl.disabled = !saved;
+  if (hint) {
+    hint.textContent = saved
+      ? `Invoice for ${clBookingDraft.request_number || 'this booking'}.`
+      : 'Save the booking first — the invoice is built from its saved rows.';
+  }
+}
+
+function ambInvMsg(text, kind) {
+  const el = document.getElementById('ambInvMsg');
+  if (!el) return;
+  el.className = `cl-msg${text ? ` cl-msg-${kind || 'muted'}` : ''}`;
+  el.textContent = text || '';
+}
+
+/* `download` picks what happens to the bytes; everything before that is shared.
+   Guarded against a second press while one is in flight — two clicks would be
+   two renders of the same document, and on the FIRST ever press they would
+   race for the invoice number. */
+let ambInvBusy = false;
+
+async function ambInvoice(download) {
+  if (ambInvBusy) return;
+  const booking = clBookingDraft;
+  if (!booking || !booking.id) {
+    return ambInvMsg('Save the booking before generating its invoice.', 'err');
+  }
+
+  const gen = document.getElementById('ambInvGenerate');
+  const dl = document.getElementById('ambInvDownload');
+  ambInvBusy = true;
+  gen.disabled = true;
+  dl.disabled = true;
+  ambInvMsg(download ? 'Preparing the invoice…' : 'Generating the invoice…', 'muted');
+
+  try {
+    /* Through MerchantApi so the request carries the admin's token, the same
+       way every other call on this screen does — `_headers` is replaced once
+       by ambInstallApiBridge. `responseType: 'blob'` because the endpoint
+       answers with a PDF, not JSON. */
+    const blob = await MerchantApi._req(
+      'get', `/api/requests/${booking.id}/invoice`, { responseType: 'blob' });
+    const url = URL.createObjectURL(blob);
+
+    if (download) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${booking.request_number || booking.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      ambInvMsg(`Invoice downloaded for ${booking.request_number || 'this booking'}.`, 'ok');
+    } else {
+      /* Opened rather than saved. The application has no invoice modal of its
+         own — the Merchant Portal and the Operations desk both download — so
+         "preview" here is the browser's own PDF viewer on the very same bytes,
+         which is the closest thing to an existing presentation and cannot
+         drift from what Download produces. */
+      const win = window.open(url, '_blank');
+      ambInvMsg(win
+        ? 'Invoice opened in a new tab.'
+        : 'Your browser blocked the preview window — use Download Invoice instead.',
+        win ? 'ok' : 'err');
+    }
+    /* Revoked on a timer rather than immediately: the tab or the download has
+       to finish reading the object URL first. */
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    ambInvMsg(clError(err, 'Could not produce the invoice.'), 'err');
+  } finally {
+    ambInvBusy = false;
+    ambInvSyncButtons();
+  }
 }
 
 /* THE SAVE. Persists, links, and stops.
@@ -1474,6 +1576,9 @@ async function ambSaveManualBooking() {
     });
     request = detail.request || detail;
     clBookingDraft = request;
+    // The invoice needs saved rows, so the buttons wake up the moment there
+    // are some — without waiting for the operator to leave and come back.
+    ambInvSyncButtons();
   } catch (err) {
     clMsg(msg, clError(err, 'Could not save the booking.'), 'err');
     btn.disabled = false;

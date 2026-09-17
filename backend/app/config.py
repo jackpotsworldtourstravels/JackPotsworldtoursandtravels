@@ -394,6 +394,49 @@ class Settings(BaseSettings):
     #: sync is explicit about what it stored rather than inheriting a default.
     hotelbeds_language: str = "ENG"
 
+    # ------------------------------------------------- invoice identity ----
+    # WHO THE INVOICE SAYS IT IS FROM, AND WHY MOST OF IT IS EMPTY.
+    #
+    # An invoice carries legal identifiers — GSTIN, PAN, CIN, a registered
+    # office — and this platform has nowhere to read them from: there is no
+    # company-profile table, and nothing in `merchants` describes US. So they
+    # are settings, and every one of them defaults to the EMPTY STRING.
+    #
+    # THE EMPTY DEFAULT IS THE POINT, not an oversight waiting to be tidied. A
+    # plausible-looking placeholder on a tax document is worse than a blank in
+    # every direction: a merchant may file against it, it can be mistaken for a
+    # real registration, and nothing downstream can tell an invented GSTIN from
+    # a correct one. `invoice_service` prints the LABEL and leaves the value
+    # blank for each of these, which states "we have not supplied this" — which
+    # is true — rather than asserting a number nobody verified.
+    #
+    # Fill them in from the real certificates, via backend/.env, when they
+    # exist. No code change is needed; the invoice starts printing them the
+    # moment they are non-empty.
+    #
+    # Only two are populated here, and only because they are already published
+    # on the product itself and carry no legal weight:
+    company_legal_name: str = "JACKPOTS WORLD TOURS & TRAVELS"
+    company_website: str = "jackpotsworldtours.com"
+
+    company_regd_office: str = ""
+    company_corp_office: str = ""
+    company_email: str = ""
+    company_phone: str = ""
+    company_state: str = ""
+    company_gstin: str = ""
+    company_pan: str = ""
+    company_cin: str = ""
+
+    #: Terms printed at the foot of the invoice, one per line as
+    #: ``LABEL|text``. Empty means the built-in neutral set is used — see
+    #: ``invoice_service.NEUTRAL_TERMS``, which states only things that are
+    #: true of this document and of airline tickets generally, and makes no
+    #: claim about jurisdiction, payment terms or interest. Those are the
+    #: clauses a business has to decide for itself, so they are left to be
+    #: configured here rather than guessed.
+    invoice_terms: str = ""
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---------------------------------------------------------------- CR-9 --

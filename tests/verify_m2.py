@@ -115,8 +115,18 @@ def main():
     company = requests.get(f"{BASE}/api/auth/me", headers=H(mtok)).json().get("merchant_name")
     check("invoice names the merchant", bool(company) and company in inv,
           f"expected {company!r} in: {inv[:160]}")
-    check("invoice shows a balance line", "Balance due" in inv, inv[:200])
-    check("invoice reconciles paid against total", "Booking total" in inv and "Paid" in inv, inv[:200])
+    # THE LABELS CHANGED WITH THE INVOICE REDESIGN, THE INTENT DID NOT.
+    # The old layout said "Booking total / Paid / Balance due". The current one
+    # follows the travel-industry invoice the business asked for: the amount is
+    # "Net Amount" and what is still owed is "Net Receivable". Both checks below
+    # still ask the same two questions — does the invoice state its value, and
+    # does it reconcile that against the ledger — against the wording the
+    # document now actually uses.
+    check("invoice states its value and what is receivable",
+          "Net Amount" in inv and "Net Receivable" in inv, inv[:200])
+    check("invoice reconciles the ledger against the total",
+          "Gross" in inv and detail["request"]["total_amount"].split(".")[0] in inv.replace(",", ""),
+          inv[:200])
     check("no literal markup leaks into the invoice", "<br/>" not in inv and "<b>" not in inv, inv[:300])
 
     # --------------------------------------------------------- confirmation
