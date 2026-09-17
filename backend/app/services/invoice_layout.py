@@ -75,7 +75,13 @@ from reportlab.platypus import (
 )
 
 from app.config import settings
-from app.models_v2 import PassengerType, PaymentStatus, PaymentType, RequestStatus as S
+from app.models_v2 import (
+    PassengerType,
+    PaymentStatus,
+    PaymentType,
+    RequestSource,
+    RequestStatus as S,
+)
 
 # --------------------------------------------------------------------- ink --
 #: Charcoal rather than pure black: at 6pt the reference's body text is grey-
@@ -187,8 +193,12 @@ def _styles():
         "h": mk("h", fontName="Helvetica-Bold", fontSize=9.5, textColor=INK,
                 leading=12, spaceAfter=3),
         "meta": mk("meta", fontName="Helvetica-Bold", fontSize=9.5, textColor=INK),
-        "pnr": mk("pnr", fontName="Helvetica-Bold", fontSize=10,
-                  textColor=INK, alignment=2),
+        # IDENTICAL TO `meta` BUT RIGHT-ALIGNED. The PNR shares the header band
+        # with the invoice number and date and must read as the third of three,
+        # not as something styled differently that happens to sit beside them —
+        # same font, size, weight and colour, and only the alignment differs.
+        "meta_right": mk("meta_right", fontName="Helvetica-Bold", fontSize=9.5,
+                         textColor=INK, alignment=2),
         # The 18-column grid. 5.6pt is what makes it fit A4 portrait without
         # scaling; the reference sits at about the same size.
         "cell": mk("cell", fontSize=5.6, textColor=INK, leading=7, alignment=1),
@@ -224,8 +234,18 @@ def _kv_lines(st, pairs) -> Paragraph:
 # Header
 # ---------------------------------------------------------------------------
 def _header(st, request) -> list:
-    """Logo left, PNR right — then the invoice number/date band under a rule."""
-    pnr = _v(request.pnr)
+    """Logo on its own, then one band carrying invoice no, date and PNR.
+
+    THE PNR USED TO SIT BESIDE THE LOGO, hard against the top-right corner and
+    a full masthead's height above the invoice number it belongs with. It reads
+    as a stray label up there: the three identifiers a reader looks up — which
+    invoice, from when, against which airline reference — are one fact each and
+    belong on one line.
+
+    So the band is three columns now, left/centre/right, and the PNR is the
+    right-hand one. It keeps `st["meta"]`, the same style the other two use, so
+    nothing about its typography changes — only where it sits.
+    """
     # `kind="proportional"` fits the image INSIDE the box, so the square logo
     # was being constrained by the height and rendering at ~18mm wide — a
     # stamp in the corner of an A4 page. The box is squared off and enlarged so
@@ -233,32 +253,37 @@ def _header(st, request) -> list:
     logo = (Image(str(LOGO), width=34 * mm, height=34 * mm, kind="proportional")
             if LOGO.exists() else Paragraph(_v(settings.company_legal_name), st["co_name"]))
 
-    top = Table(
-        [[logo, Paragraph(f"PNR: {pnr}" if pnr else "PNR:", st["pnr"])]],
-        colWidths=(120 * mm, USABLE - 120 * mm),
-    )
+    top = Table([[logo]], colWidths=(USABLE,))
     top.setStyle(TableStyle([
         ("VALIGN", (0, 0), (0, 0), "MIDDLE"),
-        ("VALIGN", (1, 0), (1, 0), "TOP"),
+        ("ALIGN", (0, 0), (0, 0), "LEFT"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
 
-    # Invoice number and date share one band, as on the reference. Both are
-    # real: `invoice_number` is allocated by issue_ticket, and the date is the
-    # booking's own approval/creation timestamp.
+    # All three are real and none is invented: `invoice_number` is allocated
+    # server-side, the date is the booking's own timestamp, and the PNR is
+    # whatever the booking recorded — blank after its label when there is none,
+    # the same rule the rest of the page follows.
     inv_no = _v(request.invoice_number)
+    pnr = _v(request.pnr)
     date = request.approved_at or request.created_at
     band = Table(
         [[Paragraph(f"Invoice No - {inv_no}" if inv_no else "Invoice No -", st["meta"]),
           Paragraph(f"Invoice Date : {date.strftime('%d-%b-%Y')}" if date
-                    else "Invoice Date :", st["meta"])]],
-        colWidths=(USABLE * 0.46, USABLE * 0.54),
+                    else "Invoice Date :", st["meta"]),
+          Paragraph(f"PNR : {pnr}" if pnr else "PNR :", st["meta_right"])]],
+        colWidths=(USABLE * 0.36, USABLE * 0.36, USABLE * 0.28),
     )
     band.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        # The right column's text is right-aligned by its style, so zeroing the
+        # padding is what puts the PNR flush to the content edge rather than a
+        # few points inside it.
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 2),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
@@ -456,11 +481,32 @@ def _ticketed_by(request) -> str:
 
 
 def _payment_facts(request) -> tuple[str, str, Decimal]:
-    """(invoice status, payment mode, amount settled) — from the payments.
+    """(invoice status, payment mode, amount settled).
 
-    The brief is explicit that this must not default to "Paid". It is decided
-    by what the ledger holds: a successful booking payment covering the total
-    makes it Paid, anything less is Pending.
+    TWO KINDS OF BOOKING ANSWER "IS THIS PAID?" FROM DIFFERENT PLACES.
+
+    A quoted booking answers from the LEDGER: successful booking payments less
+    refunds, against the amount invoiced. That is unchanged, and it must be —
+    the merchant's own invoice states what the wallet actually did.
+
+    A MANUAL booking has no ledger to read. Nothing is billed through this
+    platform for a ticket the desk bought off-platform, so every payment query
+    returns nothing and the answer would always be "Pending" however the money
+    really moved. The desk states it instead, with the Hold checkbox on Manual
+    Booking:
+
+        hold = true   ->  Due     (the merchant has not settled this yet)
+        hold = false  ->  Paid
+
+    DERIVED HERE, EVERY TIME THE INVOICE RENDERS — not stored alongside the
+    flag and not sent by the browser. That is what makes the relationship
+    impossible to break: there is no `invoice_status` column to fall out of
+    step with `hold`, and a caller cannot assert a status the flag disagrees
+    with because no endpoint accepts one.
+
+    An unchecked box is the default, so a manual booking nobody has touched
+    reads Paid — which is the desk's own convention for a ticket it has
+    already arranged and been paid for.
     """
     booking_payments = [
         p for p in (request.payments or [])
@@ -471,11 +517,15 @@ def _payment_facts(request) -> tuple[str, str, Decimal]:
     refunded = sum((p.refund_amount or Decimal("0") for p in (request.payments or [])),
                    Decimal("0"))
     settled = paid - refunded
-    # Against the SAME figure the invoice states, not `total_amount` directly:
-    # a manual booking's total is 0.00, and `0 >= 0` would have marked every
-    # one of them Paid the moment it was created, with nothing paid at all.
-    due = _amount_of(request)
-    status = "Paid" if due > 0 and settled >= due else "Pending"
+
+    if request.source is RequestSource.B2B_MANUAL_REQUEST:
+        status = "Due" if (request.travel_details or {}).get("hold") else "Paid"
+    else:
+        # Against the SAME figure the invoice states, not `total_amount`
+        # directly: a manual booking's total is 0.00, and `0 >= 0` would have
+        # marked every one of them Paid with nothing paid at all.
+        due = _amount_of(request)
+        status = "Paid" if due > 0 and settled >= due else "Pending"
 
     methods = []
     for p in booking_payments:

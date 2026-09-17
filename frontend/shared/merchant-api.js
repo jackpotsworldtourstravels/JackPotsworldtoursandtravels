@@ -394,7 +394,7 @@ const MerchantApi = {
      arranged, typed rather than allocated. Nothing here issues a ticket or
      moves money; POST /api/admin/requests/{id}/issue-ticket is what does that,
      and Manual Booking deliberately never calls it. */
-  updateDraft(id, { remarks, contact, specialRequests, clientFare, ticket }) {
+  updateDraft(id, { remarks, contact, specialRequests, clientFare, ticket, hold }) {
     const t = ticket || {};
     return this._req('put', `/api/requests/${id}`, {
       data: {
@@ -407,6 +407,12 @@ const MerchantApi = {
         /* `|| undefined`, not `??`: these are strings off a form, and '' means
            the operator left the box empty. Sending '' would store an empty
            PNR; omitting it leaves whatever is there. */
+        /* MANUAL BOOKING'S HOLD. `?? undefined`, not `|| undefined`: `false` is
+           a real value here and means "settled", so `||` would drop it and the
+           server would keep whatever was stored — an operator unchecking the
+           box would have found it checked again on reload. Only the flag
+           travels; the invoice status is derived from it server-side. */
+        hold: hold ?? undefined,
         pnr: t.pnr || undefined,
         ticket_number: t.ticketNumber || undefined,
         airline: t.airline || undefined,

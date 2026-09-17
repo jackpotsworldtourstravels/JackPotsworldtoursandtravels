@@ -898,7 +898,7 @@ function initManualRequest() {
   if (!AMB.pendingEnquiry) {
     host.innerHTML = `
       <div class="panel">
-        <div class="panel-head"><h2>Manual Request</h2></div>
+        <div class="panel-head"><h2>Manual Booking</h2></div>
         <p style="padding:4px 0 8px; font-size:13.5px; color:var(--text-muted); max-width:72ch;">
           A booking is raised FROM an enquiry — its journey is copied from that
           enquiry server-side, so there is nothing to type here without one. The
@@ -967,7 +967,65 @@ function initManualRequest() {
   clRenderBookingForm(enquiry);
   ambCorrectUnquotedStep(enquiry);
   ambInstallTicketPanel(enquiry);
+  ambInstallHold();
   ambInstallDocumentsPanel();
+}
+
+/* --------------------------------------------------------------- hold --
+   HAS THE MERCHANT SETTLED THIS BOOKING?
+   ===========================================================================
+   One checkbox, and the invoice's payment status follows from it:
+
+       checked    ->  Invoice Status: Due
+       unchecked  ->  Invoice Status: Paid
+
+   WHY A FLAG AND NOT A STATUS DROPDOWN. A manual booking has no ledger to read
+   — nothing is billed through this platform for a ticket the desk bought
+   off-platform, so every payment query comes back empty and the invoice would
+   say "Pending" however the money really moved. The desk knows the answer; the
+   screen asks for it once, as the single fact it is.
+
+   THE STATUS IS NEVER SENT FROM HERE. Only `hold` is saved;
+   `invoice_layout._payment_facts` derives Due/Paid from it every time the
+   invoice renders. That is what makes hold=true/status=paid unrepresentable
+   rather than merely discouraged — there is no status field to disagree with
+   the flag, and no endpoint that accepts one.
+
+   Placed immediately above Documents, in the merchant screen's own panel
+   markup so it inherits the page's spacing and controls rather than
+   introducing a style of its own. */
+function ambInstallHold() {
+  const docPanelAnchor = document.querySelector('#cl-booking-request .cl-form-actions');
+  if (!docPanelAnchor) return;
+
+  /* The saved value, so reopening a booking shows what was stored rather than
+     resetting to the default. `travel_details.hold` is where update_draft
+     writes it; `details` is how RequestResponse exposes travel_details. */
+  const saved = !!(clBookingDraft?.details || {}).hold;
+
+  const panel = document.createElement('div');
+  panel.className = 'cl-panel';
+  panel.id = 'ambHoldPanel';
+  panel.innerHTML = `
+    <div class="cl-panel-body">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0;">
+        <input type="checkbox" id="ambHold"${saved ? ' checked' : ''}
+               style="width:16px; height:16px; margin:0; cursor:pointer;">
+        <span style="font-weight:600;">Hold</span>
+      </label>
+    </div>`;
+
+  const target = docPanelAnchor.closest('.cl-panel') || docPanelAnchor;
+  target.insertAdjacentElement('beforebegin', panel);
+
+}
+
+/* NO EXPLANATORY NOTE UNDER THE CHECKBOX. There was one, saying which way the
+   invoice would read; it is gone at the operator's request. The label is the
+   whole control now — the desk knows what Hold means, and a sentence repeating
+   it under every booking is noise on a form that already runs long. */
+function ambHoldValue() {
+  return !!document.getElementById('ambHold')?.checked;
 }
 
 /* --------------------------------------------------- the ticket, and [Save] --
@@ -1435,6 +1493,26 @@ async function ambInvoice(download) {
   ambInvMsg(download ? 'Preparing the invoice…' : 'Generating the invoice…', 'muted');
 
   try {
+    /* THE CHECKBOX ON SCREEN IS WHAT THE INVOICE MUST SAY, and until this line
+       existed it was not.
+       -----------------------------------------------------------------------
+       `hold` reached the server only through Save. An operator who ticked Hold
+       and pressed Generate Invoice — which is the obvious thing to do, and
+       exactly what the two buttons invite — got an invoice built from whatever
+       was last SAVED. On a booking that had never had the box touched that is
+       no stored value at all, so the invoice read Paid while the box on screen
+       was ticked. Reported from a real booking: REQ-2026-001489 had
+       `travel_details.hold` NULL with Hold visibly checked.
+       -----------------------------------------------------------------------
+       So the flag is pushed first, every time, and the PDF is fetched second.
+       One extra idempotent call buys the guarantee that what is rendered is
+       what the operator is looking at — including when they tick the box,
+       generate, untick it and generate again without saving in between.
+
+       Only `hold` is sent. Passengers, fare and ticket details are the Save
+       button's business; pressing Generate must not quietly commit a
+       half-edited form. */
+    await MerchantApi.updateDraft(booking.id, { hold: ambHoldValue() });
     /* Through MerchantApi so the request carries the admin's token, the same
        way every other call on this screen does — `_headers` is replaced once
        by ambInstallApiBridge. `responseType: 'blob'` because the endpoint
@@ -1568,6 +1646,9 @@ async function ambSaveManualBooking() {
 
     const detail = await MerchantApi.updateDraft(request.id, {
       remarks,
+      /* The FLAG, not a status. The server turns it into Due/Paid when the
+         invoice renders — see ambInstallHold. */
+      hold: ambHoldValue(),
       /* `?? {}` — the empty object is the point. It is how a contact entered
          earlier is CLEARED; `undefined` would mean "leave it alone". */
       contact: contact ?? {},

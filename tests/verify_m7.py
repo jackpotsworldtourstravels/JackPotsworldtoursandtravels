@@ -212,9 +212,18 @@ else:
     check("this booking carries no e-ticket file — download check skipped", True)
 
 # The gate: a PDF is only meaningful once the invoice number exists.
-draft = get("/api/requests?request_type=booking&status=draft&page_size=1").json()
-if draft["items"]:
-    draft_id = draft["items"][0]["id"]
+# NOT JUST ANY DRAFT. "Un-ticketed means no invoice" is the MERCHANT
+# track's rule, and it stopped being universal when Manual Booking landed:
+# a b2b_manual_request booking is finished at draft on purpose and is
+# invoiceable there, so picking the first draft the API happens to return
+# made this check pass or fail depending on which row came back first.
+# Filtering to the track the rule belongs to is what the assertion always
+# meant, and it is stable.
+draft = get("/api/requests?request_type=booking&status=draft&page_size=50").json()
+_merchant_drafts = [i for i in draft["items"]
+                    if i.get("source") != "b2b_manual_request"]
+if _merchant_drafts:
+    draft_id = _merchant_drafts[0]["id"]
     r = get(f"/api/requests/{draft_id}/invoice")
     check("an un-ticketed booking has no invoice, and says so with a 409",
           r.status_code == 409, f"{r.status_code} {r.text[:150]}")

@@ -166,9 +166,19 @@ def main():
 
     # ------------------------------------------------- not-yet-ticketed guard
     print("\n== paperwork is refused before ticketing ==")
-    drafts = requests.get(f"{BASE}/api/requests?status=draft&page_size=1", headers=H(mtok)).json()
-    if drafts.get("items"):
-        did = drafts["items"][0]["id"]
+    # NOT JUST ANY DRAFT. "Un-ticketed means no invoice" is the MERCHANT
+    # track's rule, and it stopped being universal when Manual Booking landed:
+    # a b2b_manual_request booking is finished at draft on purpose and is
+    # invoiceable there, so picking the first draft the API happens to return
+    # made this check pass or fail depending on which row came back first.
+    # Filtering to the track the rule belongs to is what the assertion always
+    # meant, and it is stable.
+    drafts = requests.get(f"{BASE}/api/requests?status=draft&page_size=50",
+                          headers=H(mtok)).json()
+    _merchant_drafts = [i for i in drafts.get("items", [])
+                        if i.get("source") != "b2b_manual_request"]
+    if _merchant_drafts:
+        did = _merchant_drafts[0]["id"]
         r = requests.get(f"{BASE}/api/requests/{did}/invoice", headers=H(mtok))
         check("invoice on a draft -> 409", r.status_code == 409, f"{r.status_code} {r.text[:220]}")
         check("the 409 explains why", "not been ticketed" in r.text, r.text[:220])

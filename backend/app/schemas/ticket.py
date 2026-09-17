@@ -213,6 +213,16 @@ class UpdateDraftRequest(BaseModel):
     # Lengths match the columns (`service_requests.pnr` String(20),
     # `ticket_number` String(40)) so an over-long value is a 422 naming the
     # field rather than a truncation or a database error.
+    #: MANUAL BOOKING'S "HOLD". True means the merchant has not settled this
+    #: booking yet, and the invoice says Due; false means it has, and the
+    #: invoice says Paid. It is stored as a fact about the booking and the
+    #: STATUS IS DERIVED FROM IT server-side — no caller sends an invoice
+    #: status, so the two can never contradict each other.
+    #:
+    #: `None` means "not supplied by this call" and leaves the stored value
+    #: alone, the same convention every other field here uses. That is what
+    #: lets the Ticket details panel save without resetting the checkbox.
+    hold: bool | None = None
     pnr: str | None = Field(default=None, max_length=20)
     ticket_number: str | None = Field(default=None, max_length=40)
     #: The itinerary is otherwise copied from the enquiry and locked. These two

@@ -196,9 +196,18 @@
         <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         <span class="nav-label">Manual Enquiry</span>
       </a>
+      <!-- "Booking", not "Manual Booking", and the group above it is why: this
+           sidebar's nav-group label is already "Manual Booking", so repeating
+           it on the child reads as two screens with one name rather than as a
+           hierarchy. The SCREEN is called Manual Booking — its page title and
+           its heading both say so; the nav item is the short form under its
+           own group, which is how every other pair in this sidebar reads.
+           `data-section` stays `manual-request`: it is an internal key, not a
+           URL, and renaming it would touch the section element, admin.js's
+           loader and the host's clGo map for no user-visible gain. -->
       <a href="#" class="nav-item" data-section="manual-request">
         <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
-        <span class="nav-label">Manual Request</span>
+        <span class="nav-label">Booking</span>
       </a>
     </div>
 
@@ -1394,7 +1403,7 @@
      screen's contact and passenger fields read (splitDialCode, dialLengthOk,
      searchNationalities…). Pure data + helpers, no side effects on load. -->
 <script src="../shared/countries.js?v=20260916mr1"></script>
-<script src="../shared/merchant-api.js?v=20260916grp1"></script>
+<script src="../shared/merchant-api.js?v=20260917hold1"></script>
 <script src="../assets/js/admin-enquiry-host.js?v=20260916rb3"></script>
 <script src="../merchant-classic/js/classic-enquiry.js?v=20260915me1"></script>
 <!-- Manual Request mounts the Merchant Portal's Booking Request screen the same
@@ -1405,7 +1414,7 @@
      absent here rather than broken. -->
 <script src="../merchant-classic/js/classic-icons.js?v=20260916mr1"></script>
 <script src="../merchant-classic/js/classic-booking.js?v=20260916mr1"></script>
-<script src="../assets/js/admin-manual-booking.js?v=20260917inv1"></script>
+<script src="../assets/js/admin-manual-booking.js?v=20260917hold2"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>

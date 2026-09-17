@@ -262,6 +262,7 @@ def update_request(
         # Ignored by the service unless the caller holds `ticket.manual`.
         pnr=payload.pnr, ticket_number=payload.ticket_number,
         airline=payload.airline, flight_number=payload.flight_number,
+        hold=payload.hold,
     )
     return _detail(db, request, current_user)
 

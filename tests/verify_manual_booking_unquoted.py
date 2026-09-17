@@ -930,7 +930,125 @@ if one_way:
             check("a MERCHANT's own draft still has no invoice",
                   r.status_code == 409, f"{r.status_code} {r.text[:140]}")
 
+# ---------------------------------------------------------------------------
+print("\n== 15. HOLD DECIDES THE INVOICE STATUS ==")
+# ---------------------------------------------------------------------------
+# A manual booking has no ledger to read — nothing is billed through this
+# platform for a ticket the desk bought off-platform — so the invoice could
+# only ever have said "Pending". The Hold checkbox on Manual Booking is where
+# the answer comes from instead:
+#
+#     hold = true   ->  Invoice Status: Due
+#     hold = false  ->  Invoice Status: Paid
+#
+# THE STATUS IS NEVER STORED, only derived. That is the property worth pinning:
+# with no `invoice_status` column there is nothing for `hold` to contradict, so
+# a row reading hold=true/status=paid is not merely wrong, it is unrepresentable.
+h_enq = raise_manual_enquiry(flight_number="AI950")
+r = raise_booking(h_enq["id"])
+check("a manual booking exists to hold",
+      r.status_code == 201, f"{r.status_code} {r.text[:160]}")
+hb = r.json() if r.status_code == 201 else {}
+
+if hb:
+    requests.put(f"{BASE}/api/requests/{hb['id']}", headers=H(atok),
+                 json={"client_fare": "12750.00"})
+
+    def _hold(value):
+        return requests.put(f"{BASE}/api/requests/{hb['id']}", headers=H(atok),
+                            json={"hold": value})
+
+    def _stored():
+        db = SessionLocal()
+        try:
+            return db.execute(
+                text("SELECT travel_details->>'hold' FROM service_requests "
+                     "WHERE request_id = :r"), {"r": hb["id"]}).scalar()
+        finally:
+            db.close()
+
+    def _invoice_status():
+        pdf = requests.get(f"{BASE}/api/requests/{hb['id']}/invoice", headers=H(atok))
+        lines = [l for l in _pdf_text(pdf.content).splitlines() if "Invoice Status" in l]
+        return lines[0] if lines else "(no status line)"
+
+    # ---- unchecked -> Paid -------------------------------------------------
+    check("hold can be set false", _hold(False).status_code == 200)
+    check("  stored as false", _stored() == "false", str(_stored()))
+    check("  and the invoice reads Paid",
+          _invoice_status().endswith("Paid"), _invoice_status())
+
+    # ---- checked -> Due ----------------------------------------------------
+    check("hold can be set true", _hold(True).status_code == 200)
+    check("  stored as true", _stored() == "true", str(_stored()))
+    check("  and the invoice reads Due",
+          _invoice_status().endswith("Due"), _invoice_status())
+
+    # ---- toggled back ------------------------------------------------------
+    # `false` is a real value, not an absence. An earlier cut of the API client
+    # sent it with `|| undefined`, which dropped it — unchecking the box left
+    # the stored `true` untouched and the invoice still said Due.
+    _hold(False)
+    check("toggling back to false is not swallowed",
+          _stored() == "false" and _invoice_status().endswith("Paid"),
+          f"{_stored()} / {_invoice_status()}")
+
+    # ---- THE INVOICE FOLLOWS THE CHECKBOX, NOT THE LAST SAVE ---------------
+    # Reported from a real booking: REQ-2026-001489 had Hold visibly ticked and
+    # `travel_details.hold` NULL, so its invoice read Paid. `hold` reached the
+    # server only through Save, and pressing Generate Invoice — the obvious
+    # thing to do after ticking the box — rendered from whatever was last
+    # stored. The screen now pushes the flag before fetching the PDF, so these
+    # two calls stand for "tick, then Generate, without saving".
+    _hold(True)
+    check("the invoice follows the flag as last set, with no save between",
+          _invoice_status().endswith("Due"), _invoice_status())
+    _hold(False)
+    check("  and follows it back the other way",
+          _invoice_status().endswith("Paid"), _invoice_status())
+
+    # ---- generate and download cannot disagree -----------------------------
+    _hold(True)
+    a = requests.get(f"{BASE}/api/requests/{hb['id']}/invoice", headers=H(atok)).content
+    b = requests.get(f"{BASE}/api/requests/{hb['id']}/invoice", headers=H(atok)).content
+    check("Generate and Download show the SAME status",
+          _pdf_text(a) == _pdf_text(b) and "Due" in _pdf_text(a),
+          "the two renders differ")
+
+    # ---- nothing else moved ------------------------------------------------
+    db = SessionLocal()
+    try:
+        after = dict(db.execute(
+            text("SELECT status::text AS status, source::text AS source "
+                 "FROM service_requests WHERE request_id = :r"),
+            {"r": hb["id"]}).mappings().one())
+    finally:
+        db.close()
+    check("  and holding a booking does not move it into any workflow",
+          after["status"] == "draft" and after["source"] == "b2b_manual_request",
+          str(after))
+
+# A MERCHANT CANNOT SET IT. `hold` rides the same `ticket.manual` gate as the
+# ticket fields, so a merchant editing its own draft is accepted and the flag
+# is ignored — the desk's judgement about settlement is not the merchant's to
+# assert.
+if own and quoted:
+    r = requests.put(f"{BASE}/api/requests/{quoted['id']}", headers=H(mtok),
+                     json={"hold": True})
+    check("a merchant's own draft edit still succeeds", r.status_code == 200,
+          f"{r.status_code} {r.text[:140]}")
+    db = SessionLocal()
+    try:
+        merchant_hold = db.execute(
+            text("SELECT travel_details->>'hold' FROM service_requests WHERE request_id = :r"),
+            {"r": quoted["id"]}).scalar()
+    finally:
+        db.close()
+    check("  but the hold it sent was ignored",
+          merchant_hold is None, str(merchant_hold))
+
 sys.exit(check.report())
+
 
 
 

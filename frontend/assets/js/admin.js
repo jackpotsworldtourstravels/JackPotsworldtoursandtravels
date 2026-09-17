@@ -136,7 +136,7 @@ const sectionTitles = {
      admin-manual-booking.js for why Manual Request posts to the
      direct-booking path rather than the enquiry-led one. */
   'manual-enquiry': 'Manual Enquiry',
-  'manual-request': 'Manual Request',
+  'manual-request': 'Manual Booking',
 };
 const loadedSections = new Set();
 

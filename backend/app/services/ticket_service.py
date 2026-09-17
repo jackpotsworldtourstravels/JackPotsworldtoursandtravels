@@ -300,6 +300,7 @@ def update_draft(
     client_fare: Decimal | None = None,
     pnr: str | None = None, ticket_number: str | None = None,
     airline: str | None = None, flight_number: str | None = None,
+    hold: bool | None = None,
 ) -> ServiceRequest:
     request = get_request(db, actor, request_id)
     if request.status not in lifecycle.EDITABLE_STATUSES:
@@ -349,8 +350,27 @@ def update_draft(
     # Silently ignored rather than refused for a caller without the code — the
     # merchant's own screen never sends these fields, so a 403 here could only
     # ever be reached by hand.
-    if any(v is not None for v in (pnr, ticket_number, airline, flight_number)):
+    if any(v is not None for v in (pnr, ticket_number, airline, flight_number, hold)):
         if has_permission(actor, P.TICKET_MANUAL):
+            # HOLD, AND WHY THE STATUS IS NOT STORED BESIDE IT.
+            #
+            # Only the fact is kept. "Is this settled?" is one question, and
+            # writing both a `hold` flag and an `invoice_status` string would
+            # be two answers that can drift apart — a row reading
+            # hold=true/status=paid is unreadable, and nothing could say which
+            # half was right. The invoice derives its status from this flag
+            # every time it renders (invoice_layout._payment_facts), so there
+            # is exactly one source of truth and no contradictory state is
+            # representable.
+            #
+            # In `travel_details` rather than a new column because that is
+            # where this table keeps booking-level facts — `contact`,
+            # `international`, `special_requests` — and a migration for one
+            # boolean the JSONB already models would be cost without benefit.
+            if hold is not None:
+                details = dict(request.travel_details or {})
+                details["hold"] = bool(hold)
+                request.travel_details = details
             if pnr is not None:
                 request.pnr = pnr.strip() or None
             if ticket_number is not None:
