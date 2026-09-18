@@ -587,10 +587,39 @@ async function clOcrRecordEdits(cards, requestId) {
   await Promise.all(cards.map(async card => {
     const result = clOcrByCard.get(card);
     if (!result) return;
+    /* ONLY THE BOXES A HUMAN TOUCHED. The server records an edit for every
+       field it is SENT whose value differs from what the provider read, and
+       skips any field the payload omits entirely -- so what is left out here
+       is what never reaches the audit.
+
+       THE REASON IT MUST BE LEFT OUT. `normalized` holds the provider's own
+       answer, which for the two country boxes is a zone code: `IND`. The form
+       holds what countryFromIso3 made of it: `Indian`, `India`. Those differ,
+       so sending an untouched country box produced `nationality: IND ->
+       Indian` against a named operator who had done nothing. CR-8 defines
+       passport_ocr_field_edits as one row per field the merchant OVERRODE,
+       and a conversion this module performed is not an override.
+
+       `clOcrFilled` IS ALREADY THE TEST, and this is the same comparison
+       clOcrApply makes when it clears a previous scan's leftovers: it holds
+       the value the scan wrote, it is dropped the moment the box receives
+       input, and it is compared by value rather than trusted as a flag. A box
+       still holding exactly what the scan put there is untouched; anything
+       else -- typed over, typed back, or never scanned at all -- is sent and
+       judged by the server exactly as before.
+
+       NOT A COUNTRY-SPECIFIC RULE. Every field is treated the same way. For
+       the others it changes nothing, because a field still holding what the
+       provider read compared equal on the server anyway and produced no row;
+       the countries are simply the only ones this module rewrites. */
     const values = {};
     Object.keys(CL_OCR_FIELDS).forEach(name => {
       const el = card.querySelector(`[data-field="${name}"]`);
-      if (el) values[name] = (el.value || '').trim() || null;
+      if (!el) return;
+      const current = (el.value || '').trim();
+      const scanned = el.dataset.clOcrFilled;
+      if (scanned !== undefined && current === scanned) return;
+      values[name] = current || null;
     });
     try {
       await MerchantApi.recordPassportEdits(result.id, values, {

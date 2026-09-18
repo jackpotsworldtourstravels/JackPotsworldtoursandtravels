@@ -1027,4 +1027,163 @@ check("...nor fetch its image",
       requests.get(f"{EXTRACT}/{desk_row['id']}/scan",
                    headers=H(rival["token"])).status_code == 404)
 
+# ---------------------------------------------------------------------------
+print("\n== the audit records overrides, not this module's own normalisation ==")
+# ---------------------------------------------------------------------------
+# `normalized` holds the provider's own answer, which for the two country boxes
+# is a zone code -- `GBR`, `IND`, `JPN`. The form holds what countryFromIso3
+# made of it -- `British`, `Indian`, `Japanese`. Those differ, so a country box
+# nobody touched used to produce `nationality: GBR -> British` against a named
+# operator who had done nothing. CR-8 defines passport_ocr_field_edits as one
+# row per field the merchant OVERRODE; a conversion this module performed is
+# not an override.
+#
+# THE SERVER CONTRACT THAT MAKES THE FIX POSSIBLE, asserted here because the
+# fix depends on it: a field the payload omits is skipped entirely, and a field
+# it carries is judged against the provider's value exactly as before. The
+# browser decides which is which from `clOcrFilled`; these assert the two
+# halves of the contract it relies on.
+_n = admin_scan(atok, mine, content=PNG_A)
+check("a scan to audit against", _n.status_code in (200, 202), _n.status_code)
+_nrow = _n.json()
+_nread = {k: (v or {}).get("value") for k, v in (_nrow.get("fields") or {}).items()}
+check("the provider really did answer the country boxes as zone codes",
+      (_nread.get("nationality") or "").isupper()
+      and len(_nread.get("nationality") or "") <= 3, _nread.get("nationality"))
+
+_ne = desk_enquiry()
+_nb = desk_booking(_ne["id"], [{
+    "title": "Ms", "first_name": _nread.get("first_name") or "Anna",
+    "last_name": _nread.get("last_name") or "Eriksson",
+    "gender": "female", "dob": "1974-08-12", "passenger_type": "adult",
+    "nationality": "British",
+    "passport_number": _nread.get("passport_number") or "L898902C3",
+    "passport_expiry": _expiry,
+}])
+check("its booking saves", _nb.status_code == 201, f"{_nb.status_code} {_nb.text[:200]}")
+_nbk = _nb.json()
+_npax = (_nbk.get("passengers") or [{}])[0].get("id")
+
+
+def _audit_for(extraction_id, request_id):
+    rows = requests.get(f"{BASE}/api/admin/requests/{request_id}/passport-ocr",
+                        headers=H(atok)).json()
+    hit = [x for x in rows if x["id"] == extraction_id]
+    return {e["field_name"]: e for e in (hit[0]["edits"] if hit else [])}
+
+
+# --- UNTOUCHED: the browser omits the box, so nothing is recorded for it.
+# Every other scanned field is omitted the same way; the countries are simply
+# the only ones this module rewrites.
+r = requests.post(f"{EXTRACT}/{_nrow['id']}/edits", headers=H(atok), json={
+    "values": {}, "request_id": _nbk["id"], "passenger_id": _npax,
+})
+check("an omitted-everything save is accepted", r.status_code == 200, r.text[:200])
+_a = _audit_for(_nrow["id"], _nbk["id"])
+check("NO nationality row for a box the operator never touched",
+      "nationality" not in _a, sorted(_a))
+check("NO issuing-country row either", "passport_issue_country" not in _a, sorted(_a))
+check("...and nothing else was invented", _a == {}, sorted(_a))
+
+# --- AND THE LINK SURVIVES AN EMPTY PAYLOAD. This is what keeps the previous
+# commit working: request_id and passenger_id are set before the edit loop, so
+# a save where the operator changed nothing still attaches the scan.
+_rows = requests.get(f"{BASE}/api/admin/requests/{_nbk['id']}/passport-ocr",
+                     headers=H(atok)).json()
+check("the scan is still LINKED to the booking after an empty audit payload",
+      any(x["id"] == _nrow["id"] for x in _rows), [x["id"] for x in _rows])
+check("...and to the right traveller",
+      next((x for x in _rows if x["id"] == _nrow["id"]), {}).get("passenger_id") == _npax)
+
+# --- TOUCHED: the browser sends the box, and a real override IS recorded,
+# against the provider's own value rather than the converted one.
+r = requests.post(f"{EXTRACT}/{_nrow['id']}/edits", headers=H(atok), json={
+    "values": {"nationality": "Martian"},
+    "request_id": _nbk["id"], "passenger_id": _npax,
+})
+check("a genuinely changed country IS accepted", r.status_code == 200, r.text[:200])
+_a = _audit_for(_nrow["id"], _nbk["id"])
+check("a real nationality override is recorded", "nationality" in _a, sorted(_a))
+if "nationality" in _a:
+    check("...against what the PROVIDER read, not what the form displayed",
+          _a["nationality"]["ocr_value"] == _nread.get("nationality"),
+          _a["nationality"])
+    check("...carrying the operator's value",
+          _a["nationality"]["edited_value"] == "Martian", _a["nationality"])
+    check("...named to a person", bool(_a["nationality"]["edited_by_name"]))
+check("and exactly one row, not one per save", len(_a) == 1, sorted(_a))
+
+# --- ORDINARY FIELDS ARE UNAFFECTED IN BOTH DIRECTIONS.
+r = requests.post(f"{EXTRACT}/{_nrow['id']}/edits", headers=H(atok), json={
+    "values": {"last_name": (_nread.get("last_name") or "ERIKSSON") + "-JONES",
+               "first_name": _nread.get("first_name")},
+    "request_id": _nbk["id"], "passenger_id": _npax,
+})
+_a = _audit_for(_nrow["id"], _nbk["id"])
+check("a changed surname is still audited", "last_name" in _a, sorted(_a))
+check("a first name sent back UNCHANGED is still not audited",
+      "first_name" not in _a, sorted(_a))
+
+# --- RE-SAVING THE SAME THING DOES NOT ACCUMULATE.
+requests.post(f"{EXTRACT}/{_nrow['id']}/edits", headers=H(atok), json={
+    "values": {"last_name": (_nread.get("last_name") or "ERIKSSON") + "-JONES"},
+    "request_id": _nbk["id"], "passenger_id": _npax,
+})
+_a = _audit_for(_nrow["id"], _nbk["id"])
+check("re-saving an unchanged override leaves exactly one row", len(_a) == 1, sorted(_a))
+
+# --- TWO PASSENGERS, TWO SCANS: one traveller's silence must not silence the
+# other's real edit, and neither scan may borrow the other's audit.
+_p2 = admin_scan(atok, mine, content=PNG_B)
+check("a second, DIFFERENT passport scans", _p2.status_code in (200, 202), _p2.status_code)
+_p2row = _p2.json()
+_p2read = {k: (v or {}).get("value") for k, v in (_p2row.get("fields") or {}).items()}
+_me = desk_enquiry()
+_mb = desk_booking(_me["id"], [
+    {"title": "Ms", "first_name": "One", "last_name": "Traveller",
+     "gender": "female", "dob": "1974-08-12", "passenger_type": "adult",
+     "nationality": "British", "passport_number": "L898902C3",
+     "passport_expiry": _expiry},
+    {"title": "Mr", "first_name": "Two", "last_name": "Traveller",
+     "gender": "male", "dob": "1988-02-03", "passenger_type": "adult",
+     "nationality": "Indian", "passport_number": "Z4471985",
+     "passport_expiry": _expiry},
+])
+check("a two-traveller desk booking saves", _mb.status_code == 201,
+      f"{_mb.status_code} {_mb.text[:200]}")
+_mbk = _mb.json()
+_mp = [p["id"] for p in (_mbk.get("passengers") or [])]
+check("both travellers come back with ids", len(_mp) == 2, _mp)
+
+if len(_mp) == 2:
+    # traveller one: untouched -> nothing.  traveller two: a real edit.
+    requests.post(f"{EXTRACT}/{_nrow['id']}/edits", headers=H(atok), json={
+        "values": {}, "request_id": _mbk["id"], "passenger_id": _mp[0]})
+    requests.post(f"{EXTRACT}/{_p2row['id']}/edits", headers=H(atok), json={
+        "values": {"last_name": "DELIBERATELY-CHANGED"},
+        "request_id": _mbk["id"], "passenger_id": _mp[1]})
+    _rows = requests.get(f"{BASE}/api/admin/requests/{_mbk['id']}/passport-ocr",
+                         headers=H(atok)).json()
+    _by = {x["id"]: x for x in _rows}
+    check("both scans are on the booking", len(_by) == 2, sorted(_by))
+    check("the untouched traveller's scan carries NO edits",
+          _by.get(_nrow["id"], {}).get("edits") == [],
+          _by.get(_nrow["id"], {}).get("edits"))
+    check("the other traveller's real edit survives",
+          any(e["field_name"] == "last_name"
+              for e in _by.get(_p2row["id"], {}).get("edits", [])),
+          _by.get(_p2row["id"], {}).get("edits"))
+    check("each scan is attached to its OWN traveller",
+          _by.get(_nrow["id"], {}).get("passenger_id") == _mp[0]
+          and _by.get(_p2row["id"], {}).get("passenger_id") == _mp[1],
+          [(k, v.get("passenger_id")) for k, v in _by.items()])
+
+# --- THE MERCHANT'S OWN PATH IS JUDGED BY THE SAME SERVER RULE.
+_mscan = scan(mtok, content=PNG_A)[1]
+if _mscan:
+    r = requests.post(f"{EXTRACT}/{_mscan['id']}/edits", headers=H(mtok),
+                      json={"values": {}})
+    check("a merchant omitting every field records nothing either",
+          r.status_code == 200 and not r.json().get("edits"), r.text[:160])
+
 sys.exit(check.report())

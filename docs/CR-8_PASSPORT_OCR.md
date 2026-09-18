@@ -354,14 +354,36 @@ A GROUP BOOKING reaches the same code and does nothing: its travellers come from
 the uploaded manifest rather than from scanned cards, so nothing on the screen is
 in `clOcrByCard` and both calls are no-ops. No special handling was needed.
 
-ONE THING THE AUDIT NOW SHOWS that is worth knowing before reading it. The
+THE AUDIT RECORDS OVERRIDES, NOT THIS MODULE'S OWN NORMALISATION. The
 extraction stores what the provider read — the raw `IND` — while the form
-carries what `countryFromIso3` turned it into. So a scan the operator never
-touched still records `nationality: IND -> Indian` and
-`passport_issue_country: IND -> India`. That is true rather than misleading —
-the values really do differ — but it is normalisation showing up as an
-override, not the operator's own correction, and it will appear on every
-international scan until normalisation moves server-side.
+carries what `countryFromIso3` turned it into, so a naive comparison made every
+international scan look as though the operator had rewritten both country boxes.
+It did, briefly: linking the scan to the booking sent the whole form, and the
+server recorded `nationality: IND -> Indian` against a named person who had
+done nothing. CR-8 defines `passport_ocr_field_edits` as one row per field the
+merchant **overrode**, and a conversion this module performed is not an
+override.
+
+`clOcrRecordEdits` now sends only the boxes a human touched. The test is
+`clOcrFilled`, the same marker `clOcrApply` already uses to tell a previous
+scan's leftovers from something typed: it holds the value the scan wrote, it is
+dropped the moment the box receives input, and it is compared by value rather
+than trusted as a flag. A box still holding exactly what the scan put there is
+omitted from the payload, and the server skips any field it is not sent.
+
+NOT A COUNTRY-SPECIFIC RULE, and not a suppression. Every field is treated the
+same way; for the others it changes nothing, because a field still holding what
+the provider read compared equal on the server anyway. A real change is still
+sent and still judged against the provider's own value — an operator who picks
+British over the scanned `IND` gets `nationality: IND -> British`, and one who
+edits a surname gets that row, exactly as before. An operator who types the
+box back to what the scan said still owns it from then on, because
+`clOcrFilled` is gone by that point; that is the existing rule, not a new one.
+
+NOTHING ELSE MOVED. `normalized` still holds the provider's untouched answer,
+the server's comparison is unchanged, and the request/passenger link is written
+before the edit loop, so a save where nobody changed anything still attaches
+the scan.
 
 ### Known limitation: previous-traveller autofill is inert for the desk
 
