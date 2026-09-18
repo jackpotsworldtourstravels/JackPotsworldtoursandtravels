@@ -183,6 +183,30 @@ function ambInstallApiBridge() {
     return originalManifest({ ...opts, onBehalfOfMerchantId: merchantId });
   };
 
+  /* PASSPORT SCANNING (classic-passport-ocr.js), wrapped for exactly the reason
+     the manifest above is, and reading the merchant the identical way.
+
+     An extraction row is owned by a merchant — `passport_ocr_service` files it
+     under one, scopes every read by it, and refuses to invent one for an admin.
+     So this upload has to name the merchant too, and it must be the merchant of
+     the ENQUIRY being converted, read from `clBookingEnquiry` at the moment of
+     the call. Not the Manual Enquiry dropdown, which the operator may have
+     changed since: filing a passport against whatever it now says would put one
+     company's traveller under another company's booking.
+
+     The other three OCR calls — availability, the poll and the edit audit — go
+     through `MerchantApi._req`, so the `_headers` replacement above already
+     carries the admin's token to them and they need nothing here. This one is
+     multipart and posts through axios directly, which is why it is the only one
+     wrapped. */
+  const originalExtract = MerchantApi.extractPassport.bind(MerchantApi);
+  MerchantApi.extractPassport = function (file, opts = {}) {
+    const merchantId = (typeof clBookingEnquiry !== 'undefined' && clBookingEnquiry)
+      ? clBookingEnquiry.merchant_id : null;
+    if (merchantId == null) return originalExtract(file, opts);
+    return originalExtract(file, { ...opts, onBehalfOfMerchantId: merchantId });
+  };
+
   AMB.wired = true;
 }
 

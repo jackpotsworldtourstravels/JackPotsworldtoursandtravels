@@ -1402,7 +1402,7 @@
 <!-- Dial codes, nationalities and the country search the Booking Request
      screen's contact and passenger fields read (splitDialCode, dialLengthOk,
      searchNationalities…). Pure data + helpers, no side effects on load. -->
-<script src="../shared/countries.js?v=20260916mr1"></script>
+<script src="../shared/countries.js?v=20260918iso1"></script>
 <script src="../shared/merchant-api.js?v=20260917hold1"></script>
 <script src="../assets/js/admin-enquiry-host.js?v=20260916rb3"></script>
 <script src="../merchant-classic/js/classic-enquiry.js?v=20260915me1"></script>
@@ -1414,7 +1414,17 @@
      absent here rather than broken. -->
 <script src="../merchant-classic/js/classic-icons.js?v=20260916mr1"></script>
 <script src="../merchant-classic/js/classic-booking.js?v=20260916mr1"></script>
-<script src="../assets/js/admin-manual-booking.js?v=20260917hold2"></script>
+<!-- Passport scanning, the Merchant Portal's own module reused unchanged.
+     classic-booking.js already calls into it for every passenger card it
+     renders here (`typeof clOcrAttach === 'function'`), so this tag is the
+     whole of the front-end wiring - without it the call was a silent no-op and
+     Manual Booking simply had no scan control. Loaded after classic-booking.js
+     for the same reason the Merchant Portal does, and before
+     admin-manual-booking.js, which wraps MerchantApi.extractPassport to name
+     the merchant the scan is for. Renders nothing unless the deployment has an
+     OCR provider configured. -->
+<script src="../merchant-classic/js/classic-passport-ocr.js?v=20260918iso1"></script>
+<script src="../assets/js/admin-manual-booking.js?v=20260918amb1"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>

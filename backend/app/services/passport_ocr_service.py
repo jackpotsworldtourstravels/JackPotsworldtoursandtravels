@@ -43,12 +43,14 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 from fastapi import HTTPException, UploadFile, status as http_status
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth.rbac import P, has_permission
 from app.config import settings
 from app.database.session import SessionLocal
 from app.models_v2 import (
+    Merchant,
     OcrStatus,
     PassengerData,
     PassportOcrExtraction,
@@ -109,10 +111,24 @@ def _scoped(actor: User, extraction_id: int):
     filling in a form that may never be submitted, and the desk has no business
     reading a passport off an abandoned draft. Staff reach an attached one
     through the booking, which is where the desk's legitimate interest is.
+
+    OR ONE THE SAME MEMBER OF STAFF RAISED THEMSELVES (Manual Booking). The desk
+    scans BEFORE it saves a draft, exactly as a merchant does, so ``request_id``
+    is still NULL when the poll for the result comes back — and the
+    attached-only rule above would 404 an admin on the scan it had just
+    uploaded. Keyed on ``created_by`` rather than on staff-ness, so this widens
+    nothing else: one admin still cannot read another admin's unattached scan,
+    and a merchant's unattached scan stays invisible to the desk exactly as
+    before.
     """
     conditions = [PassportOcrExtraction.extraction_id == extraction_id]
     if actor.is_platform_staff:
-        conditions.append(PassportOcrExtraction.request_id.isnot(None))
+        conditions.append(
+            or_(
+                PassportOcrExtraction.request_id.isnot(None),
+                PassportOcrExtraction.created_by == actor.user_id,
+            )
+        )
     else:
         if actor.merchant_id is None:
             # Neither staff nor a merchant user: no rows, rather than all rows.
@@ -163,12 +179,73 @@ def _reap_if_stale(db: Session, row: PassportOcrExtraction) -> PassportOcrExtrac
 # ---------------------------------------------------------------------------
 # Starting an extraction
 # ---------------------------------------------------------------------------
+def _resolve_scan_owner(
+    db: Session, actor: User, on_behalf_of_merchant_id: int | None
+) -> int:
+    """Which merchant OWNS the scan about to be stored.
+
+    Deliberately the same two shapes, and the same rule, as
+    ``enquiry_service._resolve_owner`` — because a scan taken on the Manual
+    Booking screen belongs to the booking that screen is raising, and the two
+    must not disagree about whose row it is:
+
+      a merchant scanning its own       owner comes from the actor, and
+                                        ``on_behalf_of_merchant_id`` must be absent
+      the desk scanning FOR a merchant  owner comes from the caller, and the
+      (Admin Manual Booking)            actor must hold ``ticket.manual``
+
+    THE OWNER IS NEVER INVENTED AND NEVER ARBITRARY. An admin has no
+    ``merchant_id`` of its own, so the named merchant is required rather than
+    optional — the same reason ``ticket.manual`` is its own permission code
+    rather than a relaxation of ``document.upload``. The permission is useless
+    without the name and the name is refused without the permission, so a scan
+    can be filed neither against nobody nor against a merchant the desk did not
+    name. ``_scoped`` is untouched, so Merchant A still cannot read the result.
+
+    NO FLIGHTS SERVICE-ACCESS GATE HERE, unlike ``_resolve_owner``. That check
+    asks whether a merchant may *buy flights*; a scan is data entry over a form
+    and is used for hotel and package bookings too, so gating it on Flights
+    would refuse scanning for bookings that have nothing to do with flights.
+    The real gate still fires where it belongs — when the enquiry is raised.
+    """
+    if on_behalf_of_merchant_id is None:
+        if actor.merchant_id is None:
+            # Staff with no merchant named: no row to own the scan. Same answer
+            # this gave before Manual Booking could scan, and same wording.
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Passport scanning is for merchant accounts.",
+            )
+        return actor.merchant_id
+
+    # Acting on behalf. Checked in the service rather than at the router so the
+    # rule holds for every caller, present and future.
+    if actor.merchant_id is not None:
+        # A merchant cannot scan "for" somebody else, whatever it sends.
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="A merchant account can only scan passports for its own bookings.",
+        )
+    if not has_permission(actor, P.TICKET_MANUAL):
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Scanning a passport for another merchant requires ticket.manual",
+        )
+    if db.get(Merchant, on_behalf_of_merchant_id) is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail="No merchant with that id",
+        )
+    return on_behalf_of_merchant_id
+
+
 def start_extraction(
     db: Session,
     actor: User,
     upload_file: UploadFile,
     *,
     request_id: int | None = None,
+    on_behalf_of_merchant_id: int | None = None,
 ) -> PassportOcrExtraction:
     """Store the scan, then read it. Returns as soon as there is an answer or a
     job id, whichever comes first.
@@ -178,13 +255,12 @@ def start_extraction(
     never required, and passing none is the normal case — the merchant scans
     first and saves afterwards.
     """
-    if actor.merchant_id is None:
-        # Staff have no merchant to scope a scan to, and this endpoint exists to
-        # fill a merchant's own booking form.
-        raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Passport scanning is for merchant accounts.",
-        )
+    # WHOSE SCAN THIS IS. A merchant's own, or — on Admin Manual Booking — the
+    # merchant the desk named and holds `ticket.manual` for. Everything below
+    # writes `owner_merchant_id`, never `actor.merchant_id`, which is NULL for
+    # staff and would otherwise put the row and its bytes under a merchant that
+    # does not exist.
+    owner_merchant_id = _resolve_scan_owner(db, actor, on_behalf_of_merchant_id)
 
     # Fail before storing anything if there is no provider: writing a scan we
     # cannot read wastes the merchant's upload and leaves a file to clean up.
@@ -220,11 +296,11 @@ def start_extraction(
     # streaming — lives in document_service.store_upload and is not repeated
     # here. A second copy is how one of them ends up missing a check.
     stored = document_service.store_upload(
-        upload_file, prefix=f"passport-scans/{actor.merchant_id}"
+        upload_file, prefix=f"passport-scans/{owner_merchant_id}"
     )
 
     row = PassportOcrExtraction(
-        merchant_id=actor.merchant_id,
+        merchant_id=owner_merchant_id,
         created_by=actor.user_id,
         request_id=request_id,
         stored_path=stored.relative_path,
@@ -243,7 +319,7 @@ def start_extraction(
         db, actor.user_id, "Passport scanned",
         activity_type="Document", module="Booking Request",
         description=f"{actor.full_name} uploaded a passport for extraction",
-        reference_id=row.extraction_id, merchant_id=actor.merchant_id,
+        reference_id=row.extraction_id, merchant_id=owner_merchant_id,
         details={
             "extraction_id": row.extraction_id,
             "provider": row.provider,
@@ -506,8 +582,15 @@ def record_edits(
     and never saved — an extraction is valid with neither.
     """
     row = get_extraction(db, actor, extraction_id)
-    if row.merchant_id != actor.merchant_id:
-        # Staff may READ an attached extraction; only its owner may write to it.
+    # WHO MAY WRITE: the merchant that owns the row, or the member of staff who
+    # raised it on Manual Booking. Staff may still only READ an attached
+    # extraction they did not raise — `created_by` is the actor's own id, so
+    # widening this does not let the desk edit a merchant's own scan, and one
+    # admin cannot edit another's.
+    if not (
+        (actor.merchant_id is not None and row.merchant_id == actor.merchant_id)
+        or (actor.is_platform_staff and row.created_by == actor.user_id)
+    ):
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Only the merchant that scanned this passport can update it.",
@@ -532,7 +615,11 @@ def record_edits(
         owner = db.scalars(
             select(PassengerData).where(PassengerData.passenger_id == passenger_id)
         ).first()
-        if owner is None or owner.merchant_id != actor.merchant_id:
+        # Against the SCAN'S merchant, not the actor's: on Manual Booking the
+        # actor is staff with no merchant of its own, and the passenger belongs
+        # to the merchant the scan was filed for. Identical for a merchant
+        # scanning its own, where the two are the same number by construction.
+        if owner is None or owner.merchant_id != row.merchant_id:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail="That passenger is not on this merchant's booking",

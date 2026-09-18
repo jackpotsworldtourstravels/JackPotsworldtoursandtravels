@@ -458,12 +458,27 @@ const MerchantApi = {
 
      `requestId` is optional and is only a label. Scanning works on a blank form
      with no draft saved, which is the whole point — see the router docstring. */
-  extractPassport(file, { requestId = null } = {}) {
+  extractPassport(file, { requestId = null, onBehalfOfMerchantId = null } = {}) {
     const form = new FormData();
     form.append('file', file);
     if (requestId != null) form.append('request_id', String(requestId));
+    /* Admin Manual Booking only. A scan has to name the merchant it is for,
+       because the row is OWNED by one and the admin has none of its own; the
+       server refuses the field from a merchant account rather than ignoring
+       it. Absent on the merchant portal, where the server reads the owner off
+       the session exactly as it always has. */
+    if (onBehalfOfMerchantId != null) {
+      form.append('on_behalf_of_merchant_id', String(onBehalfOfMerchantId));
+    }
     return axios.post(`${API_BASE}/api/bookings/passport/extract`, form, {
-      headers: partnerAuthHeaders(),
+      /* `_headers()`, not partnerAuthHeaders() directly — the same fix
+         uploadDocument already carries, and for the same reason. The default
+         _headers() IS partnerAuthHeaders(), so this is identical on the
+         merchant portal; the Admin portal replaces _headers and this call was
+         the one multipart route still reaching past that choke point, which
+         sent the admin's uploads out under a merchant session it does not
+         have. See the note on _headers. */
+      headers: MerchantApi._headers(),
       validateStatus: s => (s >= 200 && s < 300),
     }).then(r => r.data);
   },

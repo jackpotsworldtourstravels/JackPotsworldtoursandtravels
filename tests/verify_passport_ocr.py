@@ -51,7 +51,7 @@ import minihttp as requests  # noqa: E402
 
 import flows  # noqa: E402
 from config import (  # noqa: E402
-    ADMIN, BASE, MANAGER, MERCHANT, PDF, PNG, SUPER, Checker, H, login,
+    ADMIN, ADMIN2, BASE, MANAGER, MERCHANT, PDF, PNG, SUPER, Checker, H, login,
 )
 
 check = Checker()
@@ -252,16 +252,22 @@ check("the bands are served, not hard-coded per client",
       avail["confidence_bands"].get("high") == 0.95
       and avail["confidence_bands"].get("medium") == 0.80,
       avail.get("confidence_bands"))
-# Scanning is a merchant act, so the control is gated on `document.upload` —
-# which no platform role holds. Staff are refused the *availability* probe
-# itself, not merely the button: a desk that could read `available: true` would
-# be a desk the portal could offer a scan control to.
+# Scanning is a merchant act OR a Manual Booking act, so the probe is gated on
+# `document.upload` (the merchant) or `ticket.manual` (the desk raising a
+# booking for a named merchant). CHANGED: the Admin portal must be able to read
+# `available` or it cannot decide whether to render a scan control at all, and
+# a desk that is allowed to scan is a desk that is allowed to ask.
+# The rest of the platform is unchanged and still refused outright: a Manager
+# and a Super Admin hold NEITHER code, so they never reach a row.
 _staff_probe = {
     role: requests.get(f"{BASE}/api/bookings/passport/availability", headers=H(tok)).status_code
-    for role, tok in (("admin", atok), ("manager", login(*MANAGER)), ("super", login(*SUPER)))
+    for role, tok in (("manager", login(*MANAGER)), ("super", login(*SUPER)))
 }
-check("staff cannot be offered a merchant scan control",
+check("platform roles WITHOUT ticket.manual cannot be offered a scan control",
       set(_staff_probe.values()) == {403}, _staff_probe)
+check("the desk (ticket.manual) MAY ask whether scanning is available",
+      requests.get(f"{BASE}/api/bookings/passport/availability",
+                   headers=H(atok)).status_code == 200)
 
 OCR_ON = bool(avail.get("available"))
 print(f"     provider: {avail.get('provider')}   available: {OCR_ON}"
@@ -521,14 +527,19 @@ check("another company's scan -> 404, not 403",
       requests.get(f"{EXTRACT}/{keep['id']}", headers=H(rival["token"])).status_code == 404)
 check("...and cannot download its bytes",
       requests.get(f"{EXTRACT}/{keep['id']}/scan", headers=H(rival["token"])).status_code == 404)
-# 403 here and 404 above, deliberately. The rival merchant IS entitled to this
-# endpoint and merely names a row that is not its own, so the row's existence
-# must stay hidden. Staff hold no `document.upload` at all, so they are turned
-# away at the permission gate before any row is looked up — the reply is the
-# same for an id that exists and one that never did. The desk reads scans
-# through the Admin route below, which is keyed by booking.
-check("staff cannot read an UNATTACHED scan",
-      requests.get(f"{EXTRACT}/{keep['id']}", headers=H(atok)).status_code == 403)
+# 404 for both, and for the same reason: the row's existence must stay hidden
+# from anyone not entitled to it. The rival merchant IS entitled to the endpoint
+# and merely names a row that is not its own. The desk now also passes the
+# permission gate — it holds `ticket.manual` so that Manual Booking can scan —
+# and is turned away one step later by `_scoped`, which shows staff an
+# extraction only once it is ATTACHED to a booking or if they raised it
+# themselves. This one is a merchant's own unattached draft, so it is neither.
+# WAS 403 before Manual Booking could scan, when the desk was stopped at the
+# gate. The refusal is unchanged; only which layer says no has moved, and 404
+# hides more than the 403 did. The desk still reads merchant scans through the
+# Admin route below, which is keyed by booking.
+check("staff cannot read a merchant's UNATTACHED scan",
+      requests.get(f"{EXTRACT}/{keep['id']}", headers=H(atok)).status_code == 404)
 check("another company cannot write to it",
       requests.post(f"{EXTRACT}/{keep['id']}/edits", headers=H(rival["token"]),
                     json={"values": {"first_name": "X"}}).status_code in (403, 404))
@@ -749,5 +760,113 @@ check("labelling with another company's booking -> 404",
       requests.post(EXTRACT, headers=H(rival["token"]),
                     files={"file": ("p.png", PNG_A, "image/png")},
                     data={"request_id": booking["id"]}).status_code == 404)
+
+# ---------------------------------------------------------------------------
+print("\n== Admin Manual Booking: the desk scanning FOR a merchant ==")
+# ---------------------------------------------------------------------------
+# The desk raises a booking on a named merchant's behalf, so it scans on that
+# merchant's behalf too. THE OWNER IS NEVER INVENTED: an admin has no
+# merchant_id of its own, so the merchant must be named, and naming one requires
+# `ticket.manual` -- the same pairing enquiry_service._resolve_owner already
+# enforces for the enquiry this scan belongs to. Neither half works alone.
+mine = requests.get(f"{BASE}/api/profile", headers=H(mtok)).json().get("merchant_id")
+check("the demo merchant has a merchant_id to scan against", mine is not None)
+
+
+def admin_scan(token, merchant_id=None, content=PNG_A):
+    """Upload as staff, naming the merchant the booking is being raised for."""
+    data = {} if merchant_id is None else {"on_behalf_of_merchant_id": merchant_id}
+    return requests.post(
+        EXTRACT, headers=H(token),
+        files={"file": ("passport.png", content, "image/png")}, data=data or None,
+    )
+
+
+# --- the permission half -----------------------------------------------------
+r = admin_scan(atok, mine)
+check("admin holding ticket.manual may scan for a named merchant",
+      r.status_code in (200, 202), f"{r.status_code} {r.text[:200]}")
+admin_row = r.json() if r.status_code in (200, 202) else None
+
+check("admin naming NO merchant -> 403 (a scan cannot be filed against nobody)",
+      admin_scan(atok).status_code == 403)
+check("admin naming a merchant that does not exist -> 404",
+      admin_scan(atok, 999999999).status_code == 404)
+check("manager (platform staff, no ticket.manual) -> 403",
+      admin_scan(login(*MANAGER), mine).status_code == 403)
+check("super admin (no ticket.manual) -> 403",
+      admin_scan(login(*SUPER), mine).status_code == 403)
+check("a merchant may not scan 'for' another merchant -> 403",
+      admin_scan(mtok, rival["merchant_id"]).status_code == 403)
+
+# --- ownership and isolation -------------------------------------------------
+# The row belongs to the merchant it was raised FOR, exactly as the booking
+# does. That is the whole ownership model: `source` records that the desk typed
+# it, never `merchant_id`.
+if admin_row:
+    check("the desk may read back the scan it just raised, still UNATTACHED",
+          requests.get(f"{EXTRACT}/{admin_row['id']}",
+                       headers=H(atok)).status_code == 200)
+    check("the merchant it was raised FOR can read it -- it is their row",
+          requests.get(f"{EXTRACT}/{admin_row['id']}",
+                       headers=H(mtok)).status_code == 200)
+    check("ANOTHER merchant cannot read an admin-raised scan -> 404",
+          requests.get(f"{EXTRACT}/{admin_row['id']}",
+                       headers=H(rival["token"])).status_code == 404)
+    check("another merchant cannot fetch its image either -> 404",
+          requests.get(f"{EXTRACT}/{admin_row['id']}/scan",
+                       headers=H(rival["token"])).status_code == 404)
+    # Other platform staff must not reach the desk's unattached draft. A
+    # Manager holds neither `document.upload` nor `ticket.manual`, so it is
+    # refused at the permission gate (403) and never reaches `_scoped` at all.
+    # The scope widening is keyed on `created_by` rather than on staff-ness, so
+    # a second holder of ticket.manual would be refused there too, as a 404.
+    check("platform staff who did NOT raise an unattached scan are refused",
+          requests.get(f"{EXTRACT}/{admin_row['id']}",
+                       headers=H(login(*MANAGER))).status_code in (403, 404))
+
+    # --- the edit audit, on the desk's own row -------------------------------
+    r = requests.post(f"{EXTRACT}/{admin_row['id']}/edits", headers=H(atok),
+                      json={"values": {"first_name": "CORRECTED"}})
+    check("the desk may record its own corrections over a scan it raised",
+          r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+    check("a rival merchant cannot write to the desk's extraction",
+          requests.post(f"{EXTRACT}/{admin_row['id']}/edits",
+                        headers=H(rival["token"]),
+                        json={"values": {"first_name": "X"}}).status_code
+          in (403, 404))
+
+    # ONE DESK IS NOT THE WHOLE DESK. ADMIN2 holds `ticket.manual` exactly as
+    # ADMIN does, so it passes the permission gate and is stopped one layer
+    # later by `_scoped` — which shows staff an extraction only once it is
+    # ATTACHED to a booking, or if they raised it themselves. This row is
+    # neither, so the second admin gets 404 and never learns it exists.
+    # Asserted with a SECOND HOLDER OF THE SAME PERMISSION on purpose: a
+    # Manager would be refused at the gate and would prove nothing about scope.
+    a2 = login(*ADMIN2)
+    check("a second admin holding ticket.manual cannot read an unattached scan "
+          "it did not raise -> 404",
+          requests.get(f"{EXTRACT}/{admin_row['id']}", headers=H(a2)).status_code == 404)
+    check("...and cannot fetch its image either -> 404",
+          requests.get(f"{EXTRACT}/{admin_row['id']}/scan",
+                       headers=H(a2)).status_code == 404)
+    check("...nor write to it",
+          requests.post(f"{EXTRACT}/{admin_row['id']}/edits", headers=H(a2),
+                        json={"values": {"first_name": "X"}}).status_code in (403, 404))
+    # The gate is genuinely open to ADMIN2 — so the 404s above are the SCOPE
+    # rule doing the work, not a permission refusal wearing its clothes.
+    check("...while ADMIN2 may still raise a scan of its own (gate is open to it)",
+          requests.post(EXTRACT, headers=H(a2),
+                        files={"file": ("p.png", PNG_A, "image/png")},
+                        data={"on_behalf_of_merchant_id": mine}).status_code in (200, 202))
+
+check("availability answers for the desk as well as for the merchant",
+      requests.get(f"{BASE}/api/bookings/passport/availability",
+                   headers=H(atok)).status_code == 200)
+
+# NOT COVERED HERE, deliberately: "Fill down after OCR" and "OCR then a
+# successful manual booking" are browser behaviours of classic-booking.js rather
+# than HTTP contracts. This suite would assert nothing real about either; they
+# belong to the browser pass.
 
 sys.exit(check.report())

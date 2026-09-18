@@ -15,6 +15,14 @@ which ``docs/BOOKING_OPS_MILESTONES.md`` §0 treats as a change to approved
 behaviour. Reading one back on the Admin side reuses ``document.verify``, which
 is the desk's existing right to look at a merchant's paperwork.
 
+AND ``ticket.manual`` FOR THE DESK, for the same reason and by the same rule.
+Admin Manual Booking raises a booking on a named merchant's behalf, and
+``ticket.manual`` is the existing, already-approved code for exactly that —
+held by Admin alone, useless without the merchant's name, and refused without
+it. So the desk reaches these endpoints as itself rather than by anyone being
+granted ``document.upload``, which stays what it has always been: a merchant's
+right to send us a file. No new permission code is introduced here.
+
 NO STATIC MOUNT, NO PRESIGNED URL. The scan is streamed by
 :func:`download_scan` after the service has re-checked who is asking, exactly as
 booking documents are. See ``passport_ocr_service.open_scan`` for why a signed
@@ -105,7 +113,8 @@ def _respond(db: Session, actor: User, row, *, travel_date=None) -> ExtractionRe
     response_model=OcrAvailabilityResponse,
     summary="Is passport scanning available on this deployment?",
     description=(
-        "Requires `document.upload`. Read by the merchant portal on load so a "
+        "Requires `document.upload` (merchant) or `ticket.manual` (the desk on "
+        "Admin Manual Booking). Read by the portal on load so a "
         "deployment with no OCR provider configured renders no Scan control at "
         "all, rather than a button that fails when pressed.\n\n"
         "`simulated` is always `false` here: no provider that fabricates data "
@@ -114,7 +123,9 @@ def _respond(db: Session, actor: User, row, *, travel_date=None) -> ExtractionRe
         "`provider: \"simulated\"`, and any screen showing one must say so."
     ),
 )
-def ocr_availability(_: User = Depends(require(P.DOCUMENT_UPLOAD))):
+def ocr_availability(
+    _: User = Depends(require(P.DOCUMENT_UPLOAD, P.TICKET_MANUAL)),
+):
     available = passport_ocr.is_available()
     provider = None
     if available:
@@ -163,11 +174,18 @@ def extract_passport(
     response: Response,
     file: UploadFile = File(...),
     request_id: int | None = Form(default=None),
+    # WHOSE booking this scan is for. Absent for a merchant scanning its own —
+    # sending it as a merchant is refused rather than ignored. Required for the
+    # desk, which has no merchant of its own; `start_extraction` is what
+    # enforces both halves, so the rule holds for every caller of the service
+    # and not merely for this route.
+    on_behalf_of_merchant_id: int | None = Form(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.DOCUMENT_UPLOAD)),
+    current_user: User = Depends(require(P.DOCUMENT_UPLOAD, P.TICKET_MANUAL)),
 ):
     row = passport_ocr_service.start_extraction(
-        db, current_user, file, request_id=request_id
+        db, current_user, file, request_id=request_id,
+        on_behalf_of_merchant_id=on_behalf_of_merchant_id,
     )
     if row.status in (OcrStatus.QUEUED, OcrStatus.PROCESSING):
         # 202, not 200: the caller must poll, and the status code is what says
@@ -191,7 +209,7 @@ def extract_passport(
 def get_extraction(
     extraction_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.DOCUMENT_UPLOAD)),
+    current_user: User = Depends(require(P.DOCUMENT_UPLOAD, P.TICKET_MANUAL)),
 ):
     row = passport_ocr_service.get_extraction(db, current_user, extraction_id)
     return _respond(db, current_user, row)
@@ -260,7 +278,7 @@ def record_edits(
     extraction_id: int,
     payload: RecordEditsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.DOCUMENT_UPLOAD)),
+    current_user: User = Depends(require(P.DOCUMENT_UPLOAD, P.TICKET_MANUAL)),
 ):
     passport_ocr_service.record_edits(
         db, current_user, extraction_id,

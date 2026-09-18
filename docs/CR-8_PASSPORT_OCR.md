@@ -298,7 +298,52 @@ quietly.
   stores `JPN` where one whose page-read succeeded stores `Japanese`. Harmless today —
   nothing keys off nationality — but it is an inconsistency, and the fix is a country table
   rather than a code change.
+  **RESOLVED AT THE UI LAYER (2026-09-18).** `frontend/shared/countries.js` now carries an
+  `iso3` on each of its 132 rows — the same row that already answered "India" and "Indian",
+  read a third way — and `countryFromIso3()` is what the scan asks. `clOcrNormaliseCountries`
+  in `classic-passport-ocr.js` converts both country fields before the form is populated, so
+  `IND` reaches the boxes as `India` / `Indian`. A code the table does not carry fills
+  **nothing**: the field is dropped, marked "not read", and the note names the code. The
+  server still stores whatever arrives, so this narrows what the form offers rather than what
+  the API accepts, and rows written before this date still carry `JPN`.
 - The Azure adapter refuses a document whose `docType` is not a passport (the
   `prebuilt-idDocument` model also matches driving licences and national IDs). If the
   business wants those accepted for domestic bookings, that is a small change to
   `_fields_from` — and a decision, not a bug.
+
+## 13. Admin Manual Booking
+
+Passport scanning is offered on the Admin portal's Manual Booking screens as well as in the
+Merchant Portal, using the same component and the same endpoints. Two rules make that safe:
+
+- **The desk reaches the endpoints as itself.** The write routes take `document.upload`
+  (a merchant) **or** `ticket.manual` (the desk raising a booking for a named merchant).
+  `ticket.manual` is held by Admin alone — not by a Manager, not by a Super Admin — and is
+  useless without the merchant's name, which `_resolve_scan_owner` demands. No new permission
+  code was introduced, and `document.upload` still means what it always did.
+- **The scan belongs to the merchant, not to the desk.** `merchant_id` stays NOT NULL and is
+  the merchant the booking is being raised for; `created_by` records which member of staff
+  scanned it. That is the same split `RequestSource` already draws for the booking itself —
+  `merchant_id` answers *whose*, `source` answers *who typed it*. No migration was required.
+  `_scoped` additionally lets staff read an extraction they raised themselves while it is
+  still unattached, because the desk scans before it saves a draft exactly as a merchant
+  does. Keyed on `created_by`, so one admin cannot read another's unattached scan.
+
+### Known limitation: previous-traveller autofill is inert for the desk
+
+The passport box carries the hint *"Enter the passport number to fill this traveller from a
+previous booking"*. On the **Admin** portal that lookup always fails:
+`GET /api/passengers/lookup` requires `ticket.request`, which is a merchant's permission and
+which no platform role holds. The admin therefore gets **403**, and
+`clBindPassportLookup` swallows it deliberately (`console.debug`, no message), so nothing
+breaks and nothing is shown — the field simply never autofills.
+
+This predates passport scanning and is **not** an OCR defect. It is a Manual Booking
+permission question of its own: the desk arguably should be able to look up a traveller for
+the merchant it is booking for, by the same on-behalf-of rule the scan now uses. Broadening
+`ticket.request` to platform staff would be the wrong fix, because that code also gates
+raising requests. Left alone deliberately.
+
+Note also that this endpoint puts the passport number in a **URL query string**, so it
+reaches access logs and any proxy in front of the API. The scan path does not: uploads are
+`POST` multipart and no passport number, MRZ text, image byte or token is logged anywhere.

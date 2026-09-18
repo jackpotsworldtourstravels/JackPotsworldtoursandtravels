@@ -249,9 +249,55 @@ async function clOcrPoll(extractionId) {
 
 /* ------------------------------------------------------------- the fill */
 
+/* A machine-readable zone names a country in ISO 3166-1 alpha-3 — "IND" — and
+   both country boxes on this form hold what countries.js offers: "India" for
+   the issuing country, "Indian" for nationality. Putting the raw code in left
+   the operator correcting two fields on every single scan, which is most of
+   the typing the scan exists to remove.
+
+   THE MAPPING IS countries.js's OWN, read through `countryFromIso3`. That file
+   is the portal's one country table by design, and a lookup here would be the
+   second one it exists to prevent — so the code sits on the row beside the two
+   names, and this asks the row.
+
+   AN UNKNOWN CODE FILLS NOTHING. The field is dropped from the result, so the
+   rest of this function treats it exactly as a field the scan could not read:
+   marked "not read", left for the operator, never guessed. A passport from a
+   country the table does not carry is a real case, not an error.
+
+   Values that are already names are left alone, so a re-scan and any provider
+   that returns "India" rather than "IND" both pass through untouched. */
+function clOcrNormaliseCountries(fields) {
+  const unknown = [];
+  [['nationality', 'nationality'], ['passport_issue_country', 'country']].forEach(
+    ([name, column]) => {
+      const read = fields[name];
+      if (!read || read.value == null || read.value === '') return;
+      const raw = String(read.value).trim();
+      /* Already a name ("India", "United Arab Emirates"), not a zone code.
+         Bounded at 3 rather than fixed at 3: a German passport's issuing state
+         is the single letter `D`, so an exact-length test silently left the
+         one deviation ICAO actually prints unconverted. */
+      if (raw.length > 3 || /[^A-Za-z]/.test(raw) || raw !== raw.toUpperCase()) return;
+      const row = (typeof countryFromIso3 === 'function') ? countryFromIso3(raw) : null;
+      if (!row) {
+        if (!unknown.includes(raw)) unknown.push(raw);
+        delete fields[name];
+        return;
+      }
+      fields[name] = Object.assign({}, read, { value: row[column] });
+    },
+  );
+  return unknown;
+}
+
 async function clOcrApply(card, result) {
   const field = f => card.querySelector(`[data-field="${f}"]`);
   const fields = result.fields || {};
+  /* Before anything reads `fields`: the two country boxes must carry what the
+     form's own dropdowns offer, or every comparison below — blank vs clash vs
+     unread — is made against a value the operator would never have typed. */
+  const unknownStates = clOcrNormaliseCountries(fields);
 
   /* THE TWO PILES — see the header. Blanks are filled outright; a field
      already holding something DIFFERENT is never replaced without an answer,
@@ -354,6 +400,13 @@ async function clOcrApply(card, result) {
       `<b>${unread.length} field${unread.length === 1 ? '' : 's'} could not be read</b> `
       + `and ${unread.length === 1 ? 'is' : 'are'} marked “not read” — type `
       + `${unread.length === 1 ? 'it' : 'them'} from the passport. Nothing was guessed.`,
+    );
+  }
+  if (unknownStates.length) {
+    parts.push(
+      `<b>The passport names a country this portal does not list `
+      + `(${unknownStates.map(clOcrEsc).join(', ')})</b> — type the nationality and `
+      + 'issuing country from the passport. Nothing was guessed for them.',
     );
   }
   if (result.simulated) {
