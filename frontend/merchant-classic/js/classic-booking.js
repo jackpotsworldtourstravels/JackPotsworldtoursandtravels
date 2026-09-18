@@ -532,12 +532,21 @@ function clRenderBookingForm(e) {
             : `${e.passenger_count} — ${e.adults} adult${e.adults === 1 ? '' : 's'}${
               e.children ? `, ${e.children} child${e.children === 1 ? '' : 'ren'}` : ''}${
               e.infants ? `, ${e.infants} infant${e.infants === 1 ? '' : 's'}` : ''}`}</dd></div>
+          <!-- ROUTE TYPE IS THE TAG AND NOTHING ELSE ON THE DESK'S FORM.
+               Both trailing spans go: the country pair AND the "country not on
+               file - passport optional" fallback. The desk asked for the value
+               alone, and the fallback in particular was answering a question
+               about passports in a field about routes.
+               The tag itself is unchanged, and so is what decides it --
+               clIsInternational, which is travel-locations.js's
+               isInternationalRoute. No second route-detection anywhere.
+               (No backticks in this comment - it is inside a template literal.) -->
           <div><dt>Route type</dt><dd>${intl
             ? `<span class="cl-tag cl-tag-warn">International</span>`
-            : `<span class="cl-tag">Domestic</span>`}${
+            : `<span class="cl-tag">Domestic</span>`}${clAdminBookingForm() ? '' : (
               originCountry && destCountry
                 ? ` <span class="cl-kpi-sub">${escapeHtml(originCountry)} → ${escapeHtml(destCountry)}</span>`
-                : ' <span class="cl-kpi-sub">country not on file — passport optional</span>'}</dd></div>
+                : ' <span class="cl-kpi-sub">country not on file — passport optional</span>')}</dd></div>
         </dl>
       </div>
       ${e.quoted_fare != null ? `<div class="cl-panel-note">
