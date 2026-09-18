@@ -908,6 +908,14 @@ def _itinerary_details(payload) -> dict:
         "flight_number": (payload.flight_number or "").strip().upper() or None,
         "preferred_time": payload.preferred_time,
         "return_preferred_time": payload.return_preferred_time,
+        # Stored present-and-null when not given, like `airline` and
+        # `group_journey_type` above, so every reader stays a plain lookup and
+        # never an `in details` test. Only the B2B desk's form sends either --
+        # the Merchant Portal's does not ask, so a merchant enquiry carries
+        # both keys as null rather than carrying neither.
+        "arrival_time": getattr(payload, "arrival_time", None),
+        "return_arrival_time": getattr(payload, "return_arrival_time", None),
+        "stops": getattr(payload, "stops", None),
         # None on a group booking, whose form asks for neither: the cabin and
         # the fare bucket are settled when the desk quotes the party. Stored as
         # a present-and-null key rather than omitted, like `group_journey_type`

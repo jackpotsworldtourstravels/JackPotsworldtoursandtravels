@@ -29,7 +29,7 @@
      merchant booking-enquiry form, so it needs the real merchant styles —
      and the scoping is what stops classic.css's reset (body, h1-h5, button,
      a, table) from restyling this portal around it. -->
-<link rel="stylesheet" href="../assets/css/classic-embed.css?v=20260915me1">
+<link rel="stylesheet" href="../assets/css/classic-embed.css?v=20260918st1">
 </head>
 <!-- `jp-admin` scopes the dialog & form standard in jp-ds.css §15 to THIS portal.
      jp-ds.css is shared with merchant-classic and super-admin; merchant-classic
@@ -1380,6 +1380,26 @@
 
 <script src="../assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="../assets/js/admin-live-support.js?v=20260909dg1"></script>
+<!-- THE ONE THING THAT TELLS THE SHARED FORMS WHICH PORTAL IS HOSTING THEM.
+     ---------------------------------------------------------------------
+     classic-enquiry.js and classic-booking.js are loaded BY BOTH PORTALS, the
+     same files, deliberately not copies (see the comments further down). That
+     is what keeps one implementation of the enquiry form instead of two that
+     drift apart -- and it is also why an edit made "for the admin form" lands
+     on the merchant's screen too.
+
+     The desk and the merchant are not the same reader. An operator raising an
+     enquiry on the phone does not need the sentence explaining what "All
+     Airlines" means; the merchant filling it in themselves does. So the few
+     places the two genuinely differ are guarded on this flag rather than
+     forked into a second file.
+
+     Set BEFORE every shared script below so nothing has to care about load
+     order. The Merchant Portal never sets it, so `window.CL_ADMIN_FORMS` is
+     undefined there and every guard below is plain falsy -- no merchant-side
+     branch to get wrong, and no way for this to change that portal. -->
+<script>window.CL_ADMIN_FORMS = true;</script>
+
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
@@ -1405,7 +1425,7 @@
 <script src="../shared/countries.js?v=20260916mr1"></script>
 <script src="../shared/merchant-api.js?v=20260917hold1"></script>
 <script src="../assets/js/admin-enquiry-host.js?v=20260916rb3"></script>
-<script src="../merchant-classic/js/classic-enquiry.js?v=20260915me1"></script>
+<script src="../merchant-classic/js/classic-enquiry.js?v=20260918af2"></script>
 <!-- Manual Request mounts the Merchant Portal's Booking Request screen the same
      way: classic-icons.js first (94 lines, no side effects, supplies clIco),
      then the screen itself, unmodified. classic-requests.js, -payments.js and
@@ -1413,7 +1433,7 @@
      with `typeof … === 'function'`, so the passport-scan affordance is simply
      absent here rather than broken. -->
 <script src="../merchant-classic/js/classic-icons.js?v=20260916mr1"></script>
-<script src="../merchant-classic/js/classic-booking.js?v=20260916mr1"></script>
+<script src="../merchant-classic/js/classic-booking.js?v=20260918af2"></script>
 <script src="../assets/js/admin-manual-booking.js?v=20260917hold2"></script>
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
