@@ -869,4 +869,162 @@ check("availability answers for the desk as well as for the merchant",
 # than HTTP contracts. This suite would assert nothing real about either; they
 # belong to the browser pass.
 
+# ---------------------------------------------------------------------------
+print("\n== Admin Manual Booking: the scan reaches the booking it filled ==")
+# ---------------------------------------------------------------------------
+# A scan that fills the desk's form and is then never told which booking it
+# became is an orphan: `request_id` and `passenger_id` stay NULL, the desk's own
+# "Passport scans" panel on the booking finds nothing, and the record of what
+# the operator overrode is never written. The Merchant Portal has always made
+# this call after its own save; Admin Manual Booking is a separate save path and
+# did not, so every desk-raised scan was orphaned. THIS IS THAT LINK.
+_travel = (datetime.date.today() + datetime.timedelta(days=120)).isoformat()
+_expiry = (datetime.date.today() + datetime.timedelta(days=900)).isoformat()
+
+
+def desk_enquiry():
+    """The desk files an enquiry FOR the merchant, as Manual Enquiry does."""
+    r = requests.post(f"{BASE}/api/enquiries", headers=H(atok), json={
+        "trip_type": "one_way",
+        "origin": "HYD", "origin_city": "Hyderabad",
+        "destination": "CMB", "destination_city": "Colombo",
+        "airline": "Air India", "flight_number": "AI283",
+        "travel_date": _travel, "preferred_time": "09:30",
+        "travel_class": "Economy",
+        "passenger_count": 1, "adults": 1, "children": 0, "infants": 0,
+        "notes": "Raised by the desk for the passport-linkage check.",
+        "on_behalf_of_merchant_id": mine,
+    })
+    assert r.status_code == 201, f"desk enquiry: {r.status_code} {r.text[:200]}"
+    return r.json()
+
+
+def desk_booking(enquiry_id, passengers):
+    return requests.post(
+        f"{BASE}/api/enquiries/{enquiry_id}/booking-request", headers=H(atok),
+        json={"passengers": passengers,
+              "remarks": "Entered by the desk.",
+              "contact": {"name": "Desk", "email": "desk@example.com",
+                          "phone": "919000000001"},
+              "international": True},
+    )
+
+
+r = admin_scan(atok, mine)
+check("the desk raises a scan before the booking exists",
+      r.status_code in (200, 202), f"{r.status_code} {r.text[:200]}")
+desk_row = r.json()
+check("...and it starts UNATTACHED, as the merchant's does",
+      desk_row.get("request_id") is None)
+
+scan_read = {k: (v or {}).get("value") for k, v in (desk_row.get("fields") or {}).items()}
+
+_enq = desk_enquiry()
+_bk = desk_booking(_enq["id"], [{
+    "title": "Ms", "first_name": scan_read.get("first_name") or "Asha",
+    "last_name": scan_read.get("last_name") or "Menon",
+    "gender": "female", "dob": "1989-03-11", "passenger_type": "adult",
+    "nationality": "Indian",
+    "passport_number": scan_read.get("passport_number") or "MB0099771",
+    "passport_expiry": _expiry,
+}])
+check("the desk's booking saves", _bk.status_code == 201, f"{_bk.status_code} {_bk.text[:200]}")
+desk_bk = _bk.json()
+desk_pax = (desk_bk.get("passengers") or [])
+check("the save returns the traveller with an id -- what the link is keyed on",
+      len(desk_pax) == 1 and desk_pax[0].get("id") is not None, desk_pax[:1])
+desk_pax_id = desk_pax[0]["id"] if desk_pax else None
+
+# THE LINK ITSELF -- the call the Admin save now makes once the save succeeds.
+linked_values = dict(scan_read)
+linked_values["last_name"] = (scan_read.get("last_name") or "MENON") + "-CORRECTED"
+r = requests.post(f"{EXTRACT}/{desk_row['id']}/edits", headers=H(atok), json={
+    "values": linked_values, "request_id": desk_bk["id"], "passenger_id": desk_pax_id,
+})
+check("the desk may link its scan to the booking it just saved -> 200",
+      r.status_code == 200, f"{r.status_code} {r.text[:250]}")
+
+# WHERE THE LINK IS READ BACK. `GET /extract/{id}` answers ExtractionResponse,
+# which carries neither id -- they are the desk's business, not the scanner's.
+# The admin route is where they surface, and it is the right place to assert
+# from because it is also the only consumer: `for_request` selects on
+# `PassportOcrExtraction.request_id == request_id`, so a scan appearing there
+# AT ALL is the request link, and the row's own `passenger_id` is the other.
+check("the scan is still readable by the desk that raised it",
+      requests.get(f"{EXTRACT}/{desk_row['id']}", headers=H(atok)).status_code == 200)
+
+panel = requests.get(f"{BASE}/api/admin/requests/{desk_bk['id']}/passport-ocr",
+                     headers=H(atok))
+check("the Admin Passport scans panel answers for a desk-raised booking",
+      panel.status_code == 200, panel.status_code)
+prows = panel.json() if panel.status_code == 200 else []
+_mine_rows = [x for x in prows if x["id"] == desk_row["id"]]
+check("...and the desk's scan is IN it -- it never was before this",
+      len(_mine_rows) == 1, [x["id"] for x in prows])
+
+if _mine_rows:
+    prow = _mine_rows[0]
+    pedits = {e["field_name"]: e for e in prow["edits"]}
+    check("the override the operator typed is audited",
+          "last_name" in pedits, sorted(pedits))
+    if "last_name" in pedits:
+        check("...against the value the SCAN read",
+              pedits["last_name"]["ocr_value"] == scan_read.get("last_name"),
+              pedits["last_name"])
+        check("...and names the member of staff who typed it",
+              bool(pedits["last_name"]["edited_by_name"]))
+    check("fields and provider survive the link",
+          bool(prow.get("fields")) and bool(prow.get("provider")))
+    # The two halves of the link, read where they are actually exposed.
+    check("the scan now carries the REQUEST it filled",
+          prow["id"] == desk_row["id"])   # only a request-scoped query returned it
+    check("the scan now carries the TRAVELLER it became",
+          prow.get("passenger_id") == desk_pax_id, prow.get("passenger_id"))
+
+# Saving twice must not produce two links or two audit rows.
+requests.post(f"{EXTRACT}/{desk_row['id']}/edits", headers=H(atok), json={
+    "values": linked_values, "request_id": desk_bk["id"], "passenger_id": desk_pax_id,
+})
+again = requests.get(f"{BASE}/api/admin/requests/{desk_bk['id']}/passport-ocr",
+                     headers=H(atok)).json()
+_again_rows = [x for x in again if x["id"] == desk_row["id"]]
+check("re-saving does not attach a SECOND scan to the booking", len(_again_rows) == 1)
+if _again_rows:
+    check("re-saving replaces the audit rather than appending",
+          len(_again_rows[0]["edits"]) == 1, len(_again_rows[0]["edits"]))
+
+# THE RULE THE WHOLE FEATURE IS BUILT AROUND, on the desk's path too. The link
+# is written after the save and outside its error handling, so a refused link
+# cannot unmake a booking. Asserted by refusing one.
+bad = requests.post(f"{EXTRACT}/{desk_row['id']}/edits", headers=H(atok), json={
+    "values": linked_values, "request_id": desk_bk["id"], "passenger_id": 999999999,
+})
+check("a link naming a traveller that is not on this booking is refused",
+      bad.status_code in (400, 404), bad.status_code)
+check("...and the booking it belongs to is still there, still saved",
+      requests.get(f"{BASE}/api/requests/{desk_bk['id']}",
+                   headers=H(atok)).status_code == 200)
+
+# A desk booking with no scan at all behaves exactly as it always did.
+_enq2 = desk_enquiry()
+_bk2 = desk_booking(_enq2["id"], [{
+    "title": "Mr", "first_name": "Typed", "last_name": "Byhand",
+    "gender": "male", "dob": "1990-01-01", "passenger_type": "adult",
+    "nationality": "Indian", "passport_number": "NOSCAN0001",
+    "passport_expiry": _expiry,
+}])
+check("a desk booking typed with no scan at all still saves",
+      _bk2.status_code == 201, f"{_bk2.status_code} {_bk2.text[:200]}")
+check("...and its Passport scans panel is simply empty, not broken",
+      requests.get(f"{BASE}/api/admin/requests/{_bk2.json()['id']}/passport-ocr",
+                   headers=H(atok)).json() == [])
+
+# Merchant isolation is unchanged by the link existing.
+check("a rival merchant still cannot read the desk's now-ATTACHED scan",
+      requests.get(f"{EXTRACT}/{desk_row['id']}",
+                   headers=H(rival["token"])).status_code == 404)
+check("...nor fetch its image",
+      requests.get(f"{EXTRACT}/{desk_row['id']}/scan",
+                   headers=H(rival["token"])).status_code == 404)
+
 sys.exit(check.report())

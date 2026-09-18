@@ -1690,6 +1690,45 @@ async function ambSaveManualBooking() {
     return;
   }
 
+  /* THE PASSPORT SCANS, NOW THAT THE TRAVELLERS HAVE IDS.
+     The same two calls the Merchant Portal makes after its own save
+     (classic-booking.js, `clOcrRecordEdits` at the end of clSaveBooking), for
+     the same reason and in the same order: stamp the ids the server just
+     returned onto the cards, then tell each scan which booking and traveller
+     it became and which of its values the operator changed on the way.
+
+     WITHOUT THIS THE SCAN IS ORPHANED. `request_id` and `passenger_id` stay
+     NULL, so `GET /api/admin/requests/{id}/passport-ocr` — the desk's own
+     "Passport scans" panel on the booking — finds nothing, and the audit of
+     what was overridden is never written. A merchant's scan has always been
+     linked; a scan the desk took on this screen never was, because this save
+     is its own path and simply did not make the call.
+
+     AFTER THE SAVE AND OUTSIDE ITS ERROR HANDLING, exactly as the documents
+     below are: the booking is already stored by this point, and an audit write
+     that will not land must never turn a saved booking into a reported
+     failure. `clOcrRecordEdits` swallows its own errors too.
+
+     AWAITED, WHICH THE MERCHANT'S CALL IS NOT. That screen stays where it is;
+     this one navigates back to Manual Enquiry a few lines below and tears the
+     cards down with it. Awaiting keeps the write ahead of that teardown rather
+     than racing it. Errors are still swallowed inside, so the wait cannot fail
+     the save — it only makes the linkage deterministic.
+
+     A GROUP BOOKING REACHES HERE TOO AND DOES NOTHING. Its travellers come
+     from the manifest rather than from scanned cards, so nothing on the screen
+     is in `clOcrByCard` and both calls are no-ops. Nothing special is needed
+     and nothing special is done. */
+  if (typeof clOcrRecordEdits === 'function') {
+    if (typeof clSyncPassengerIds === 'function') {
+      clSyncPassengerIds(request.passengers);
+    }
+    await clOcrRecordEdits(
+      [...document.getElementById('clBrPaxList').querySelectorAll('[data-cl-pax]')],
+      request.id,
+    );
+  }
+
   /* THE DOCUMENTS, NOW THAT THERE IS A BOOKING TO ATTACH THEM TO.
      Deliberately AFTER the save and outside its error handling: the booking is
      already stored by this point, so a file that will not attach must be

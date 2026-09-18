@@ -329,6 +329,40 @@ Merchant Portal, using the same component and the same endpoints. Two rules make
   still unattached, because the desk scans before it saves a draft exactly as a merchant
   does. Keyed on `created_by`, so one admin cannot read another's unattached scan.
 
+### The scan is linked to the booking it filled
+
+After a successful save, Admin Manual Booking makes the same two calls the
+Merchant Portal makes after its own — `clSyncPassengerIds` to stamp the ids the
+server just returned onto the cards, then `clOcrRecordEdits` to tell each scan
+which booking and traveller it became and which of its values the operator
+changed. Both run **after** the save and outside its error handling, so an audit
+write that will not land can never turn a saved booking into a reported failure.
+
+It did not always. Manual Booking is its own save path (`admin-manual-booking.js`,
+not `clSaveBooking`), and it simply never made the call, so every desk-raised
+scan was an orphan: `request_id` and `passenger_id` NULL, the desk's own
+"Passport scans" panel on the booking empty, and no record of what was
+overridden. Measured before the fix, on a development database: 0 of 17
+admin-raised extractions carried either id, against 85 of 547 merchant-raised.
+
+The call is AWAITED here and is not on the merchant's screen. That one stays
+put after saving; this one navigates back to Manual Enquiry and takes the cards
+with it, so awaiting keeps the write ahead of the teardown rather than racing
+it. Errors are still swallowed inside `clOcrRecordEdits`.
+
+A GROUP BOOKING reaches the same code and does nothing: its travellers come from
+the uploaded manifest rather than from scanned cards, so nothing on the screen is
+in `clOcrByCard` and both calls are no-ops. No special handling was needed.
+
+ONE THING THE AUDIT NOW SHOWS that is worth knowing before reading it. The
+extraction stores what the provider read — the raw `IND` — while the form
+carries what `countryFromIso3` turned it into. So a scan the operator never
+touched still records `nationality: IND -> Indian` and
+`passport_issue_country: IND -> India`. That is true rather than misleading —
+the values really do differ — but it is normalisation showing up as an
+override, not the operator's own correction, and it will appear on every
+international scan until normalisation moves server-side.
+
 ### Known limitation: previous-traveller autofill is inert for the desk
 
 The passport box carries the hint *"Enter the passport number to fill this traveller from a
