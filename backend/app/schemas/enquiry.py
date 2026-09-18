@@ -63,6 +63,17 @@ TripType = Literal["one_way", "round_trip", "group_trip"]
 #: out of step is how a round-trip group loses its return leg silently.
 GroupJourneyType = Literal["one_way_group", "round_trip_group"]
 
+#: HOW MANY STOPS THE CALLER WILL ACCEPT, which is a preference and not a fact
+#: about a flight. ``customer_booking.py`` already has a ``stops: int`` but that
+#: one counts the stops a CHOSEN flight actually has -- a different thing, on a
+#: different model, and reusing it here would mean "2" meaning "two stops" in
+#: one place and "at most two" in another.
+#:
+#: OPTIONAL, AND None IS THE COMMON CASE. "The caller did not say" is a real
+#: answer and must not collapse into "non-stop": quoting only direct services
+#: to someone who never asked for one narrows the fare pool for no reason.
+StopPreference = Literal["non_stop", "one_stop", "two_stop"]
+
 
 class EnquiryCreate(BaseModel):
     """The Enquire Ticket form.
@@ -135,6 +146,27 @@ class EnquiryCreate(BaseModel):
     return_preferred_time: str | None = Field(
         default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
     )
+
+    #: WHEN THE CALLER WANTS TO LAND, asked for by the B2B desk's form only.
+    #: Same 24-hour "HH:MM" shape as every other time on this model.
+    #:
+    #: OPTIONAL ON THE WIRE even though the desk's form requires it, and that
+    #: gap is deliberate: every enquiry raised before this field existed has no
+    #: arrival time at all, and the Merchant Portal still does not ask for one.
+    #: Making it mandatory here would reject both. The form rule and the API
+    #: rule are allowed to differ when the form is the stricter of the two.
+    arrival_time: str | None = Field(
+        default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
+    )
+    #: The return leg's arrival, for the same reason and on the same terms.
+    #: Cleared on a one way by the validator below, exactly as return_date and
+    #: return_preferred_time are -- an arrival time for a return leg nobody is
+    #: making would be stored against nothing.
+    return_arrival_time: str | None = Field(
+        default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
+    )
+    #: See StopPreference. None means the caller expressed no preference.
+    stops: StopPreference | None = None
 
     #: The CABIN — labelled simply "Class" on the merchant form. Still free text
     #: on the wire, though CR-5 made the merchant form a four-option dropdown
@@ -271,6 +303,7 @@ class EnquiryCreate(BaseModel):
             # here for that same reason.
             self.return_date = None
             self.return_preferred_time = None
+            self.return_arrival_time = None
 
         # THE CABIN IS REQUIRED EVERYWHERE IT IS ASKED FOR.
         # The field became optional so a group booking — whose form no longer
@@ -527,6 +560,11 @@ class EnquiryResponse(BaseModel):
     preferred_time: str | None = None
     return_date: datetime.date | None = None
     return_preferred_time: str | None = None
+    #: Both None on every enquiry raised before these shipped, and on every
+    #: enquiry the Merchant Portal raises -- its form asks for neither.
+    arrival_time: str | None = None
+    return_arrival_time: str | None = None
+    stops: str | None = None
 
     travel_class: str | None = None
     #: The single-letter fare bucket. None on every enquiry raised before this
@@ -631,6 +669,9 @@ class EnquiryResponse(BaseModel):
             preferred_time=d.get("preferred_time"),
             return_date=r.return_date,
             return_preferred_time=d.get("return_preferred_time"),
+            arrival_time=d.get("arrival_time"),
+            return_arrival_time=d.get("return_arrival_time"),
+            stops=d.get("stops"),
             travel_class=d.get("travel_class"),
             booking_class=d.get("booking_class"),
             passenger_count=d.get("passenger_count", r.quantity),

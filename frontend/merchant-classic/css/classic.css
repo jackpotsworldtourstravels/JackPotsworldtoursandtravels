@@ -1042,6 +1042,63 @@ input:user-invalid, select:user-invalid, textarea:user-invalid{
   content:''; position:absolute; inset:4px; border-radius:50%; background:#fff;
 }
 
+/* ---- the Stops radios on the desk's enquiry form ------------------------ */
+/* WHY THESE NEED A RULE OF THEIR OWN, RATHER THAN .cl-check ALONE.
+   .cl-check never sets `appearance`, and the bare-input reset further up this
+   file lists text/email/password/number/date/time/tel/url/search -- radio and
+   checkbox are not in it. So the browser goes on painting its NATIVE radio,
+   and a native radio discards `border` and `border-radius` outright. What it
+   does NOT discard is `background`, so `.cl-check input:checked`'s orange fill
+   landed as a SQUARE behind the native dot. That square is the artifact; it
+   was never a stray box-shadow or a stray element.
+
+   `appearance:none` is the whole fix. It turns the control back into an
+   ordinary box, at which point the border, the radius and the ::after dot all
+   apply as written.
+
+   SCOPED TO #clEnqStops ON PURPOSE. .cl-check is shared -- the Merchant
+   Portal's Reports screen uses it too -- and giving every .cl-check control
+   `appearance:none` would restyle that screen as a side effect of fixing this
+   one. The id only ever exists on the desk's form, so this rule cannot reach
+   the Merchant Portal at all. It also clears jp-ds.css's `.cl-field input`
+   (0,1,1), which these radios match by sitting in a .cl-field.
+
+   THE FILLED-CIRCLE LOOK IS DELIBERATE: ring stays visible, dot sits inside
+   it. .cl-check's checked state fills the whole circle orange and punches a
+   white hole in it, which reads as a filled blob at 18px rather than a radio. */
+#clEnqStops input[type=radio]{
+  appearance:none; -webkit-appearance:none;
+  width:20px; height:20px; flex-shrink:0; margin:0; padding:0; min-height:0;
+  border:2px solid var(--cl-line); border-radius:50%;
+  background:var(--cl-surface);
+  position:relative; cursor:pointer;
+  transition:border-color var(--cl-fast);
+}
+#clEnqStops input[type=radio]:hover{border-color:var(--cl-text-muted);}
+/* The ring KEEPS its surface background when checked -- no fill, so the dot
+   below reads as a dot and not as a hole. */
+#clEnqStops input[type=radio]:checked{
+  border-color:var(--cl-orange);
+  background:var(--cl-surface);
+}
+/* Centred by transform rather than by `inset`, so the dot is exactly 9px
+   whatever the border does -- an inset dot changes size with the border width
+   and is what made the old one look off-centre at some zoom levels. */
+#clEnqStops input[type=radio]::after{
+  content:''; position:absolute; top:50%; left:50%;
+  width:9px; height:9px; border-radius:50%;
+  background:var(--cl-orange);
+  transform:translate(-50%, -50%) scale(0);
+  transition:transform var(--cl-fast);
+}
+#clEnqStops input[type=radio]:checked::after{
+  transform:translate(-50%, -50%) scale(1);
+}
+/* Keyboard focus stays visible -- appearance:none removes the native ring. */
+#clEnqStops input[type=radio]:focus-visible{
+  outline:2px solid var(--cl-orange); outline-offset:2px;
+}
+
 .cl-form-actions{
   display:flex; gap:10px; flex-wrap:wrap; align-items:center;
   margin-top:22px; padding-top:20px; border-top:1px solid var(--cl-line-2);

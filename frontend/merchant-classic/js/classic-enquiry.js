@@ -804,7 +804,7 @@ function clOpenEnquiryForm(direct = false) {
         <input type="radio" name="clEnqType" value="hotel">Hotel ${direct ? 'Booking' : 'Enquiry'}
       </label>
     </div>
-    <p class="cl-hint" style="margin:-8px 0 18px;">Select ${direct ? 'booking' : 'enquiry'} type to show relevant fields.</p>` : ''}
+    ${clAdminForm() ? '' : `<p class="cl-hint" style="margin:-8px 0 18px;">Select ${direct ? 'booking' : 'enquiry'} type to show relevant fields.</p>`}` : ''}
     <div id="clEnqFlightFields"${clEnqForm.enquiryType !== 'flight' ? ' class="cl-hidden"' : ''}>
     <!-- GROUP BOOKING IS OFFERED ON BOTH FORMS.
          It used to be direct-only, on the reasoning that a group fare is
@@ -884,14 +884,14 @@ function clOpenEnquiryForm(direct = false) {
                  placeholder="${escapeHtml(CL_ANY_AIRLINE)}">
           <div class="cl-combo-list" id="clEnqAirlineList" role="listbox"></div>
         </div>
-        <small id="clEnqAirlineHint">Leave as <b>${escapeHtml(CL_ANY_AIRLINE)}</b> and we will
-          quote the best fare we can find on any carrier.</small>
+        ${clAdminForm() ? '' : `<small id="clEnqAirlineHint">Leave as <b>${escapeHtml(CL_ANY_AIRLINE)}</b> and we will
+          quote the best fare we can find on any carrier.</small>`}
       </div>
       <div class="cl-field">
         <label for="clEnqFlight">Airline Number</label>
         <input type="text" id="clEnqFlight" autocomplete="off" placeholder="Optional — e.g. AI217"
                maxlength="20" style="text-transform:uppercase;">
-        <small>Leave blank if you do not have a specific flight number in mind.</small>
+        ${clAdminForm() ? '' : '<small>Leave blank if you do not have a specific flight number in mind.</small>'}
       </div>
     </div>
 
@@ -914,9 +914,34 @@ function clOpenEnquiryForm(direct = false) {
           <input type="date" id="clEnqDate" min="${today}" value="${today}">
         </div>
         <div class="cl-field">
-          <label for="clEnqTimeHour">Preferred time<span class="cl-req">*</span></label>
+          <label for="clEnqTimeHour">${clAdminForm() ? 'Departure time' : 'Preferred time'}<span class="cl-req">*</span></label>
           ${clTimeField('clEnqTime', '09:00', 'Preferred departure time')}
         </div>
+        ${clAdminForm() ? `
+        <div class="cl-field">
+          <label for="clEnqArrTimeHour">Arrival time</label>
+          ${clTimeField('clEnqArrTime', '11:00', 'Arrival time')}
+        </div>
+        <!-- STOPS. Radios, not checkboxes, because the three are one answer and
+             the desk must not be able to claim a sector is both non-stop and
+             two-stop. .cl-check already styles radio and checkbox alike (the
+             radio simply renders round), so this is the form's own control
+             rather than a new one -- single selection comes from the input
+             type, with no JS holding three boxes in line.
+             Nothing is selected by default: "the caller did not say" is a real
+             answer and is not the same as non-stop.
+             cl-field-full spans the two-column grid; the inner row wraps on its
+             own, which is what keeps three options on one line at 1920 and
+             stacked at 375 without a media query. -->
+        <div class="cl-field cl-field-full">
+          <label id="clEnqStopsLabel">Stops</label>
+          <div role="radiogroup" aria-labelledby="clEnqStopsLabel" id="clEnqStops"
+               style="display:flex; flex-wrap:wrap; gap:10px 22px; padding-top:2px;">
+            <label class="cl-check"><input type="radio" name="clEnqStops" value="non_stop">Non-stop</label>
+            <label class="cl-check"><input type="radio" name="clEnqStops" value="one_stop">One Stop</label>
+            <label class="cl-check"><input type="radio" name="clEnqStops" value="two_stop">Two Stop</label>
+          </div>
+        </div>` : ''}
       </div>
     </div>
 
@@ -934,12 +959,17 @@ function clOpenEnquiryForm(direct = false) {
           <input type="date" id="clEnqReturnDate" min="${today}">
           <!-- Answered the moment the field is left, not at submit — see
                clValidateReturnDate. -->
-          <small id="clEnqReturnDateHint">${CL_RETURN_DATE_HINT}</small>
+          <small id="clEnqReturnDateHint"${clAdminForm() ? ' hidden' : ''}>${clAdminForm() ? '' : CL_RETURN_DATE_HINT}</small>
         </div>
         <div class="cl-field">
-          <label for="clEnqReturnTimeHour">Return preferred time<span class="cl-req">*</span></label>
+          <label for="clEnqReturnTimeHour">${clAdminForm() ? 'Departure time' : 'Return preferred time'}<span class="cl-req">*</span></label>
           ${clTimeField('clEnqReturnTime', '18:00', 'Return preferred time')}
         </div>
+        ${clAdminForm() ? `
+        <div class="cl-field">
+          <label for="clEnqReturnArrTimeHour">Arrival time</label>
+          ${clTimeField('clEnqReturnArrTime', '20:00', 'Return arrival time')}
+        </div>` : ''}
       </div>
     </div>
 
@@ -953,7 +983,7 @@ function clOpenEnquiryForm(direct = false) {
       <div class="cl-field">
         <label for="clEnqPax" class="cl-label-sm">No. of Passengers<span class="cl-req">*</span></label>
         <input type="number" id="clEnqPax" min="1" max="99" value="1" inputmode="numeric">
-        <small id="clEnqPaxHint">Type a total, or use the breakdown below — the two stay in step.</small>
+        ${clAdminForm() ? '' : '<small id="clEnqPaxHint">Type a total, or use the breakdown below — the two stay in step.</small>'}
       </div>
       <!-- TWO FIELDS, TWO DIFFERENT THINGS, and the names are genuinely
            confusing so they are worth stating: Class is the CABIN (Economy,
@@ -974,7 +1004,7 @@ function clOpenEnquiryForm(direct = false) {
         <label for="clEnqBookingClass">Booking Class</label>
         <input type="text" id="clEnqBookingClass" maxlength="1" autocomplete="off"
                inputmode="latin" placeholder="Y" class="cl-bkclass">
-        <small>One letter — the airline&rsquo;s fare class. Optional.</small>
+        ${clAdminForm() ? '' : '<small>One letter — the airline&rsquo;s fare class. Optional.</small>'}
       </div>
     </div>
 
@@ -988,8 +1018,8 @@ function clOpenEnquiryForm(direct = false) {
         <label for="clEnqGroupPax">Number of Passengers<span class="cl-req">*</span></label>
         <input type="number" id="clEnqGroupPax" min="1" step="1" value="" inputmode="numeric"
                placeholder="e.g. 45">
-        <small id="clEnqGroupPaxHint">Roughly how many seats you need. You will upload the
-          passenger list once we have answered.</small>
+        <small id="clEnqGroupPaxHint"${clAdminForm() ? ' hidden' : ''}>${clAdminForm() ? '' : `Roughly how many seats you need. You will upload the
+          passenger list once we have answered.`}</small>
       </div>
     </div>
 
@@ -1042,8 +1072,8 @@ function clOpenEnquiryForm(direct = false) {
              plain number it always was. -->
         <input type="text" id="clEnqClientFare" inputmode="decimal" autocomplete="off"
                placeholder="e.g. 20,000">
-        <small>What you have quoted your customer. Optional — leave it blank and you
-               can add it when you raise the booking, once we have quoted you.</small>
+        ${clAdminForm() ? '' : `<small>What you have quoted your customer. Optional — leave it blank and you
+               can add it when you raise the booking, once we have quoted you.</small>`}
       </div>
     </div>
     </div>
@@ -1087,7 +1117,7 @@ function clOpenEnquiryForm(direct = false) {
        generic help would hide the reason their entry was rejected. */
     if (!$('clEnqGroupPaxHint')?.classList.contains('cl-hint-err')) {
       const hint = $('clEnqGroupPaxHint');
-      if (hint) {
+      if (hint && !clAdminForm()) {
         hint.textContent = `Roughly how many seats you need, up to ${limits.max_passengers}. `
           + 'You will upload the passenger list once we have answered.';
       }
@@ -1177,6 +1207,23 @@ function clUploadCard() {
    any more; anything still reaching for one is reading a stale copy of this
    file. `value` is 24-hour "HH:MM", which is both what the caller has and now
    what the merchant sees. */
+/* WHICH PORTAL IS SHOWING THIS FORM.
+   -----------------------------------
+   This file is mounted BY BOTH the Merchant Portal and B2B Admin -- the same
+   file, not a copy -- which is what keeps one enquiry form instead of two that
+   drift. The two audiences are not the same reader though: a desk operator
+   taking an enquiry over the phone does not need the sentence explaining what
+   "All Airlines" means, and does need to record the stops and arrival time the
+   caller is asking for.
+
+   Read at RENDER time rather than captured when this file loads, so the answer
+   cannot depend on script order. The Merchant Portal never sets the flag, so
+   this is false there and every guard below falls to the merchant wording that
+   was always here. */
+function clAdminForm() {
+  return typeof window !== 'undefined' && !!window.CL_ADMIN_FORMS;
+}
+
 function clTimeField(id, value, label) {
   const t = clNormaliseTime(value) || '09:00';
   const [hh, mm] = t.split(':');
@@ -1211,6 +1258,16 @@ function clTimeField(id, value, label) {
    is empty or out of range, so submit falls back to the last good value in the
    form state rather than sending "NaN:NaN" — the same contract the 12-hour
    version had. */
+/* WHICH STOP PREFERENCE IS SELECTED, or null when none is.
+   Null is a real answer and the default one: the caller may simply not have
+   said, and recording that as "non-stop" would put a constraint on the quote
+   that nobody asked for. Returns null on the Merchant Portal too, where the
+   control is not rendered at all. */
+function clReadStops() {
+  const picked = document.querySelector('input[name="clEnqStops"]:checked');
+  return picked ? picked.value : null;
+}
+
 function clReadTimeField(id) {
   const h = $(`${id}Hour`), m = $(`${id}Min`);
   if (!h || !m) return null;
@@ -1315,6 +1372,10 @@ function clWireEnquiryForm() {
      happens in the control on blur, not at submit. ---- */
   clBindTimeField('clEnqTime', v => { clEnqForm.depTime = v; });
   clBindTimeField('clEnqReturnTime', v => { clEnqForm.retTime = v; });
+  /* Admin only -- the control does not exist on the merchant form, and
+     clBindTimeField is a no-op on an id that is not in the DOM. */
+  clBindTimeField('clEnqArrTime', v => { clEnqForm.arrTime = v; });
+  clBindTimeField('clEnqReturnArrTime', v => { clEnqForm.retArrTime = v; });
 
   /* ---- dates ----
      Picked, never typed (clPickerOnly in classic-shell.js), on both legs. The
@@ -1552,9 +1613,10 @@ function clValidateGroupPax() {
   el.classList.toggle('cl-input-err', !!problem);
   if (hint) {
     hint.textContent = problem
-      || (max
+      || (clAdminForm() ? '' : (max
         ? `Roughly how many seats you need, up to ${max}. You will upload the passenger list once we have answered.`
-        : 'Roughly how many seats you need. You will upload the passenger list once we have answered.');
+        : 'Roughly how many seats you need. You will upload the passenger list once we have answered.'));
+    hint.hidden = !hint.textContent;
     hint.classList.toggle('cl-hint-err', !!problem);
   }
   if (problem) return null;
@@ -1958,7 +2020,8 @@ function clValidateReturnDate() {
 
   ret.classList.toggle('cl-input-err', !!problem);
   if (hint) {
-    hint.textContent = problem || CL_RETURN_DATE_HINT;
+    hint.textContent = problem || (clAdminForm() ? '' : CL_RETURN_DATE_HINT);
+    hint.hidden = !hint.textContent;
     hint.classList.toggle('cl-hint-err', !!problem);
   }
   return !problem;
@@ -2384,6 +2447,7 @@ async function clSubmitEnquiry() {
   if (!date) return fail('Choose the travel date.', 'clEnqDate');
   if (date < clTodayIso()) return fail('The travel date cannot be in the past.', 'clEnqDate');
 
+
   const isGroup = f.trip_type === 'group_trip';
 
   /* Cabin and fare bucket are not on screen for a group — see clSyncTripSections
@@ -2477,6 +2541,17 @@ async function clSubmitEnquiry() {
     preferred_time: clReadTimeField('clEnqTime') || f.depTime,
     return_date: returnDate,
     return_preferred_time: returnTime,
+    /* ADDED ONLY BY THE DESK'S FORM, and spread in rather than set to null so
+       a merchant-created enquiry posts the body it always did -- same keys,
+       byte for byte. Both are optional server-side, so an enquiry raised
+       before this shipped reads back with them simply absent. */
+    ...(clAdminForm() ? {
+      arrival_time: clReadTimeField('clEnqArrTime') || f.arrTime || null,
+      return_arrival_time: returnDate
+        ? (clReadTimeField('clEnqReturnArrTime') || f.retArrTime || null)
+        : null,
+      stops: clReadStops(),
+    } : {}),
     /* Omitted on a group booking, whose form shows neither field. The server
        makes both optional and requires the cabin only where it is asked for. */
     travel_class: isGroup ? null : travelClass,

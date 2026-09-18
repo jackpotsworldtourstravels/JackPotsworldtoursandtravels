@@ -532,30 +532,39 @@ function clRenderBookingForm(e) {
             : `${e.passenger_count} — ${e.adults} adult${e.adults === 1 ? '' : 's'}${
               e.children ? `, ${e.children} child${e.children === 1 ? '' : 'ren'}` : ''}${
               e.infants ? `, ${e.infants} infant${e.infants === 1 ? '' : 's'}` : ''}`}</dd></div>
+          <!-- ROUTE TYPE IS THE TAG AND NOTHING ELSE ON THE DESK'S FORM.
+               Both trailing spans go: the country pair AND the "country not on
+               file - passport optional" fallback. The desk asked for the value
+               alone, and the fallback in particular was answering a question
+               about passports in a field about routes.
+               The tag itself is unchanged, and so is what decides it --
+               clIsInternational, which is travel-locations.js's
+               isInternationalRoute. No second route-detection anywhere.
+               (No backticks in this comment - it is inside a template literal.) -->
           <div><dt>Route type</dt><dd>${intl
             ? `<span class="cl-tag cl-tag-warn">International</span>`
-            : `<span class="cl-tag">Domestic</span>`}${
+            : `<span class="cl-tag">Domestic</span>`}${clAdminBookingForm() ? '' : (
               originCountry && destCountry
                 ? ` <span class="cl-kpi-sub">${escapeHtml(originCountry)} → ${escapeHtml(destCountry)}</span>`
-                : ' <span class="cl-kpi-sub">country not on file — passport optional</span>'}</dd></div>
+                : ' <span class="cl-kpi-sub">country not on file — passport optional</span>')}</dd></div>
         </dl>
       </div>
       ${e.quoted_fare != null ? `<div class="cl-panel-note">
         <b>Quoted fare:</b> <b style="font-size:15px;">${escapeHtml(moneyStr(e.quoted_fare))}</b>
         ${e.quotation_remarks
           ? `<div style="white-space:pre-wrap;margin-top:4px;">${escapeHtml(e.quotation_remarks)}</div>` : ''}
-        <div style="margin-top:4px;">This booking is raised at that amount, and it is settled
-          from your wallet once the ticket is issued.</div>
+        ${clAdminBookingForm() ? '' : `<div style="margin-top:4px;">This booking is raised at that amount, and it is settled
+          from your wallet once the ticket is issued.</div>`}
       </div>` : ''}
       ${e.admin_response ? `<div class="cl-panel-note">
         <b>Our response:</b> ${escapeHtml(e.admin_response)}</div>` : ''}
-      <div class="cl-panel-note">
+      ${clAdminBookingForm() ? '' : `<div class="cl-panel-note">
         ${direct
           ? `This is the journey you entered and it cannot be changed here. Discard this booking
              and start again if it needs to change — nothing has been raised yet.`
           : `These details come from the enquiry and cannot be changed here — they are what our team
              quoted. Raise a new enquiry if the journey needs to change.`}
-      </div>
+      </div>`}
     </div>
 
     <!-- CONTACT IS OPTIONAL IN FULL, and nothing in this panel can refuse a
@@ -576,12 +585,12 @@ function clRenderBookingForm(e) {
       <div class="cl-panel-body">
         <div class="cl-form cl-form-2">
           <div class="cl-field">
-            <label for="clBrContactName">Contact name</label>
+            <label for="clBrContactName">Contact name${clAdminBookingForm() ? '<span class="cl-req">*</span>' : ''}</label>
             <input type="text" id="clBrContactName" maxlength="120"
               value="${escapeHtml(contact.name || '')}" placeholder="Who we should ask for">
           </div>
           <div class="cl-field">
-            <label for="clBrContactEmail">Email</label>
+            <label for="clBrContactEmail">Email${clAdminBookingForm() ? '<span class="cl-req">*</span>' : ''}</label>
             <input type="email" id="clBrContactEmail" maxlength="255"
               value="${escapeHtml(contact.email || '')}" placeholder="bookings@yourcompany.com">
           </div>
@@ -610,7 +619,7 @@ function clRenderBookingForm(e) {
                splitDialCode puts the stored digits back into the two controls.
                (No backticks in this comment — it is inside a template literal.) -->
           <div class="cl-field">
-            <label for="clBrContactPhone">Phone</label>
+            <label for="clBrContactPhone">Phone${clAdminBookingForm() ? '<span class="cl-req">*</span>' : ''}</label>
             <div class="cl-phone">
               <select id="clBrContactPhoneCC" class="cl-phone-cc"
                 aria-label="Country code for the phone number">${clDialOptions(contact.phone)}</select>
@@ -619,7 +628,7 @@ function clRenderBookingForm(e) {
                 autocomplete="tel-national"
                 value="${escapeHtml(splitDialCode(contact.phone).number)}">
             </div>
-            <small id="clBrContactPhoneHint">${clPhoneHint(phoneCode)}</small>
+            <small id="clBrContactPhoneHint"${clAdminBookingForm() ? ' hidden' : ''}>${clPhoneHint(phoneCode)}</small>
           </div>
           <div class="cl-field">
             <label for="clBrContactAlt">Alternate phone</label>
@@ -633,18 +642,18 @@ function clRenderBookingForm(e) {
                 value="${escapeHtml(splitDialCode(contact.alternate_phone).number)}"
                 placeholder="Optional">
             </div>
-            <small id="clBrContactAltHint">${clPhoneHint(altCode)}</small>
+            <small id="clBrContactAltHint"${clAdminBookingForm() ? ' hidden' : ''}>${clPhoneHint(altCode)}</small>
           </div>
         </div>
         <!-- Says what a half-filled panel will do, rather than refusing it.
              Written by clReviewContact and empty the rest of the time. -->
         <div class="cl-msg" id="clBrContactMsg"></div>
       </div>
-      <div class="cl-panel-note">
+      ${clAdminBookingForm() ? '' : `<div class="cl-panel-note">
         One contact for the whole party — this is who our team and the airline reach
         about schedule changes, so it should be a monitored address and number.
         Optional: leave it blank and we will use the details we hold for your account.
-      </div>
+      </div>`}
     </div>
 
     <div class="cl-panel">
@@ -721,7 +730,7 @@ function clRenderBookingForm(e) {
            quotation is binding now, so the figure is known here and is the one
            the merchant is committing to — a note still promising a zero would
            contradict the amount printed directly above it. -->
-      <div class="cl-panel-note">
+      ${clAdminBookingForm() ? '' : `<div class="cl-panel-note">
         ${direct
           /* Said here as well as on the enquiry-form banner, and deliberately:
              this is the last screen before the merchant commits, and it is the
@@ -735,7 +744,7 @@ function clRenderBookingForm(e) {
                approved, and settled from your wallet once the ticket is issued.`
             : `This enquiry was answered before fares were quoted on the enquiry, so it carries no
                amount yet — our team confirms the payable amount when the ticket is issued.`)}
-      </div>
+      </div>`}
     </div>`;
 
   /* One passenger row per traveller the enquiry asked about, pre-typed adult /
@@ -1006,9 +1015,9 @@ function clAddPaxCard(list, index, passengerType, saved = null) {
         <label>Passport no.</label>
         <input type="text" data-field="passport_number" autocomplete="off"
                placeholder="Enter the passport number to fill this traveller from a previous booking">
-        <small class="cl-pax-passport-hint">Optional. If this traveller has
+        ${clAdminBookingForm() ? '' : `<small class="cl-pax-passport-hint">Optional. If this traveller has
           booked with you before, their details fill in automatically — you can
-          edit anything after.</small>
+          edit anything after.</small>`}
       </div>
       <div class="cl-field" style="max-width:88px;">
         <label>Title</label>
@@ -1666,8 +1675,22 @@ function clReviewContact() {
    digits and a UK mobile 10), so "the length" is a min and a max that are
    usually equal. */
 
-/* The sentence under the box, for whichever code is selected. */
+/* WHICH PORTAL IS SHOWING THIS SCREEN. Same flag and same reasoning as
+   clAdminForm in classic-enquiry.js: this file is mounted unmodified by both
+   the Merchant Portal and B2B Admin, so the handful of places the desk and the
+   merchant genuinely differ are guarded rather than forked. Named separately
+   from clAdminForm so neither file depends on the other having loaded. */
+function clAdminBookingForm() {
+  return typeof window !== 'undefined' && !!window.CL_ADMIN_FORMS;
+}
+
+/* The sentence under the box, for whichever code is selected.
+   EMPTY ON THE DESK'S FORM, and empty rather than deleted: this same <small> is
+   where clBindPhoneField writes "8 of 10 digits." when the number is the wrong
+   length. Removing the element would take that warning with it, so what goes is
+   the steady-state sentence and not the box that reports the fault. */
 function clPhoneHint(code) {
+  if (clAdminBookingForm()) return '';
   return `Numbers only — ${dialLengthText(code)} digits, without the country code.`;
 }
 
@@ -1755,6 +1778,11 @@ function clBindPhoneField(numId, hintId, ccId) {
     hint.textContent = wrong
       ? `${digits.length} of ${dialLengthText(code)} digits.`
       : clPhoneHint(code);
+    /* Collapses the row when there is nothing to say, which is the steady state
+       on the desk's form. Without it an empty <small> still takes the field's
+       7px flex gap and the phone boxes sit taller than the name and email
+       beside them. */
+    hint.hidden = !hint.textContent;
     hint.classList.toggle('cl-hint-err', wrong);
   };
   el.addEventListener('input', judge);
@@ -1856,6 +1884,27 @@ async function clSubmitBookingRequest(finalize) {
      left off the payload and reported in the panel, and the booking proceeds.
      See clReviewContact. */
   clReviewContact();
+
+  /* EXCEPT ON THE DESK'S FORM, WHERE IT IS A GATE.
+     A merchant booking may leave the panel blank because the account already
+     holds details the team can fall back on. A manual booking has no such
+     fallback: the desk is raising it on behalf of someone whose details exist
+     nowhere else, and a booking the airline cannot reach anybody about is the
+     thing this panel is for. So name, email and phone are all three required
+     here -- alternate phone stays optional, as it is everywhere.
+
+     Placed after clReviewContact so the panel has already marked which boxes
+     are at fault before this sentence appears under the button. */
+  if (clAdminBookingForm()) {
+    const cName = ($('clBrContactName')?.value || '').trim();
+    const cMail = ($('clBrContactEmail')?.value || '').trim();
+    const cPhone = clPhoneValue('clBrContactPhoneCC', 'clBrContactPhone');
+    if (!cName || !cMail || !cPhone) {
+      return clMsg(msg,
+        'Add the contact for this booking — name, email and phone are all required.',
+        'err');
+    }
+  }
 
   /* A GROUP BOOKING SENDS ITS MANIFEST ID, NOT A PASSENGER ARRAY.
      Every check below reads the traveller cards, and a group booking has none
