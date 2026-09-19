@@ -331,6 +331,8 @@
 .search-fields.cols-6 { grid-template-columns: 1.2fr .95fr .95fr .9fr .9fr; }
 .search-fields.cols-5 { grid-template-columns: 1.15fr .9fr .9fr .9fr; }
 .search-fields.cols-3 { grid-template-columns: 1.3fr 1fr; }
+/* Gaming Tour Packages: Destination, Date, Time — three fields on one row. */
+.search-fields.cols-gaming { grid-template-columns: 1.3fr 1fr 1fr; }
 
 .search-foot .search-go {
   /* margin-left:auto, not just justify-content — the note is hidden when empty
@@ -729,7 +731,8 @@
      listed below; adding another one means adding it here too. */
   .flight-grid, .flight-grid.is-round,
   .hotel-grid, .hotel-grid.is-group, .hotel-contact,
-  .search-fields.cols-6, .search-fields.cols-5, .search-fields.cols-3 {
+  .search-fields.cols-6, .search-fields.cols-5, .search-fields.cols-3,
+  .search-fields.cols-gaming {
     grid-template-columns: 1fr;
   }
   .flight-grid, .flight-grid.is-round { grid-template-areas: none; }

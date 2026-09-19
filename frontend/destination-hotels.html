@@ -6,8 +6,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- ONE PAGE, EVERY DESTINATION. Served by the /destination/{slug} route in
-     app/main.py, so the URL path has a segment the document does not: at
+<!-- ONE PAGE, EVERY LOCATION. Served by the /hotels/{destination}/{location}
+     route in app/main.py (the last step of Destination -> famous locations ->
+     hotels), so the URL path has a segment the document does not: at
      /destination/goa a relative "assets/css/main.css" would resolve to
      /destination/assets/css/main.css and 404, and the shared header's
      "index.html" links would point at /destination/index.html.
@@ -16,7 +17,7 @@
      header and footer render into it, which is why it is here rather than
      every path being rewritten by hand. -->
 <base href="/">
-<title>Hotels by destination — JackPots World Tours &amp; Travels</title>
+<title>Hotels — JackPots World Tours &amp; Travels</title>
 <meta name="description" content="Browse hotels and stays by destination with JackPots World Tours &amp; Travels.">
 <link rel="icon" href="assets/images/favicon.ico">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,16 +26,16 @@
 <!-- The same stylesheets, in the same order, as hotels.html. hotel.css is what
      matters most: the cards this page renders are `hr-` cards, the existing
      component, not a second hotel card design. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260912im1">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <!-- The header HeroShell mounts is the landing page's, and its layout lives
      here — without this the nav collapses onto the page content. hotels.html
      loads it for the same reason. -->
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260912dh2">
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260919b2c1">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260919lc2">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
@@ -46,16 +47,16 @@
 <script src="assets/js/hotel-images.js?v=20260824ic9"></script>
 <script src="assets/js/hotel-image-map.js?v=20260911ic7"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260912ct2"></script>
+<script src="assets/js/hero-shell.js?v=20260919lc1"></script>
 </head>
 <body class="sp-continuation" data-sp-service="hotels" data-live-chat>
 <a href="#dhMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/profile-menu.js?v=20260911ic7"></script>
+<script src="assets/js/profile-menu.js?v=20260919b2c1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260915mg1"></script>
+<script src="assets/js/account-center.js?v=20260919b2c1"></script>
 
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('hotels.html');</script>
@@ -103,6 +104,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/destination-hotels.js?v=20260912dh1"></script>
+<script src="assets/js/destination-hotels.js?v=20260919at1"></script>
 </body>
 </html>

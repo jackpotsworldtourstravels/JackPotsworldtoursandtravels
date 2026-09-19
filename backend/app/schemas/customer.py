@@ -82,6 +82,12 @@ class CustomerLoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=72)
 
 
+class CustomerOtpRequest(BaseModel):
+    """Email **or** mobile, and nothing else — the passwordless sign-in."""
+
+    identifier: str = Field(min_length=3, max_length=255)
+
+
 class CustomerLoginChallengeResponse(BaseModel):
     otp_required: bool = True
     challenge_token: str

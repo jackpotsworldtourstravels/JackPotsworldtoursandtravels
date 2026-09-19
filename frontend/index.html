@@ -26,17 +26,17 @@
      that uses it, Yellowtail at its single 400. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260912im1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
 <!-- The company footer. Self-contained (its own --jwf-* tokens), so the same
      stylesheet dresses this page's hand-written footer and the one every other
      page mounts from site-footer.js. -->
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260919lc2">
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -66,14 +66,14 @@
 <script src="assets/js/destinations.js?v=20260912ds4"></script>
 <script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
-<script src="assets/js/booking-card.js?v=20260912qt1"></script>
+<script src="assets/js/booking-card.js?v=20260919b2c3"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
 <!-- The one definition of the company footer. BEFORE hero-shell.js, whose
      mountFooter() delegates to it. -->
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260912ct2"></script>
+<script src="assets/js/hero-shell.js?v=20260919lc1"></script>
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
@@ -578,99 +578,147 @@
 </div>
 
 <div class="modal-overlay" id="authOverlay">
-  <div class="modal-card auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-    <button class="modal-close" id="authCloseBtn" type="button" aria-label="Close">&times;</button>
+  <div class="modal-card auth-card auth-split" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="auth-close" id="authCloseBtn" type="button" aria-label="Close sign in">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
 
     <!-- ===================================================================
-         ONE DOOR FOR TRAVELLERS — email first, branch later.
+         CUSTOMER SIGN-IN — address, then a code. No password.
          ===================================================================
-         This modal used to be two views the traveller had to choose between:
-         "Login" and "Sign Up" opened different forms, and picking the wrong
-         one meant retyping everything in the other. Both header buttons now
-         open THIS, and the flow decides what to ask for.
+         The traveller gives a mobile number or an email; Continue asks
+         /api/customer/auth/request-otp to send a code to the account's email;
+         the code is spent at /verify-otp, which is what starts the session.
+         Signup ends at the same code step, because /signup answers with the
+         same challenge.
 
-         WHY THE BRANCH IS OFFERED RATHER THAN DETECTED. The obvious version of
-         this asks the server "does an account exist for this email?" and jumps
-         straight to Login or Sign Up. That endpoint would be an account
-         enumeration oracle — anyone could test addresses one at a time — and
-         it is exactly what this API deliberately avoids elsewhere:
-         /forgot-password answers "if an account exists for that email…" for
-         precisely this reason (customer_auth.py). So the email step leads to
-         the password step, and a traveller with no account takes the "Create
-         your account" link, which carries the address they already typed. No
-         one types their email twice, and the server still refuses to say who
-         is registered.
+         Steps: identify -> otp  |  identify -> signup -> otp
 
-         Steps: email -> password -> (otp)  |  email -> signup -> (otp)
-                email -> forgot
-         The OTP step is shared, because /login and /signup both answer with
-         the same challenge. -->
+         TWO PANELS, AND ONLY THE RIGHT ONE CHANGES. The picture is outside
+         every .auth-view, and the card has a fixed height on desktop, so moving
+         between steps swaps the form and never re-crops the photograph.
 
-    <!-- STEP 1 ------------------------------------------------------------->
+         The artwork is login-collage.jpg (this business's own plate, shared
+         with the partner sign-in), framed on its Santorini sunset side. The
+         whole panel is aria-hidden: the brand is repeated in the dialog's own
+         heading and nothing in it can be operated — the four services are a
+         picture of what the account is for, not links out of a half-finished
+         sign-in. -->
+    <aside class="auth-visual" aria-hidden="true">
+      <div class="auth-visual-head">
+        <img class="auth-visual-logo" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150" decoding="async">
+        <p class="auth-visual-kicker">Explore <i>&middot;</i> Book <i>&middot;</i> Travel <i>&middot;</i> Repeat</p>
+        <p class="auth-visual-title"><span>Discover</span> <span class="is-gold">a Brighter</span> <span>Tomorrow</span></p>
+        <span class="auth-visual-rule"></span>
+        <p class="auth-visual-sub">Your next destination<br>starts here</p>
+      </div>
+      <p class="auth-visual-script">More journeys<br><span>More memories</span></p>
+      <ul class="auth-services">
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+          <span>Flights</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M2 20V6M2 10h20v10M2 16h20M6 10V8a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2"/><circle cx="7" cy="8" r="0.5"/></svg>
+          <span>Hotels</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3.5"/><path d="M8 17h8M10.5 10h3M12 8.5v3"/></svg>
+          <span>Tour Packages</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+          <span>Global Destinations</span>
+        </li>
+      </ul>
+    </aside>
+
+    <div class="auth-panel">
+    <div class="auth-panel-inner">
+
+    <!-- STEP 1 — mobile number or email ------------------------------------>
     <div class="auth-view" id="authStepEmail">
-      <h2 id="authTitle">Welcome to JackPots World</h2>
-      <p class="modal-sub">Sign in or create an account to book flights, hotels and holidays — and keep every trip in one place.</p>
+      <h2 id="authTitle">Welcome Back</h2>
+      <p class="modal-sub">Sign in to continue your journey with JackPots World.</p>
       <form id="authEmailForm" novalidate>
-        <div class="modal-field">
+        <!-- MOBILE OR EMAIL, and either is a real sign-in identifier:
+             get_by_identifier matches the email case-insensitively, or the
+             mobile exactly as signup stored it — dial code included,
+             separators stripped. That is why the mobile field carries its own
+             country select. Radios, not tabs, so the arrow keys move between
+             them natively. -->
+        <fieldset class="auth-method">
+          <legend class="sr-only">Sign in with</legend>
+          <label><input type="radio" name="authMethod" value="mobile" checked>
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>Mobile Number</span></label>
+          <label><input type="radio" name="authMethod" value="email">
+            <span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/></svg>Email</span></label>
+        </fieldset>
+
+        <div class="modal-field" id="authMobileField">
+          <label for="authMobile">Mobile Number</label>
+          <!-- THE COUNTRY FACE IS A PICTURE OF THE SELECT. The native <select>
+               (239 countries, country-codes.js) sits over it, transparent and
+               full size, so what is clicked, tabbed to and read aloud is the
+               browser's own control; the face only shows the flag and dial
+               code, which is all the closed state needs. India is the
+               default because CountryCodes.DEFAULT_ISO says so. -->
+          <div class="auth-phone">
+            <div class="auth-dial">
+              <span class="auth-dial-face" id="authDialFace" aria-hidden="true">
+                <span class="auth-dial-flag"></span><span class="auth-dial-code">+91</span>
+                <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+              <select id="authDial" aria-label="Country dialling code"></select>
+            </div>
+            <input id="authMobile" type="tel" inputmode="numeric" autocomplete="tel-national"
+                   placeholder="Enter your mobile number" aria-describedby="authMobileErr">
+          </div>
+          <p class="field-error" id="authMobileErr" role="alert"></p>
+        </div>
+
+        <div class="modal-field" id="authEmailField" hidden>
           <label for="authEmail">Email Address</label>
-          <input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"
-                 aria-describedby="authEmailErr">
+          <input id="authEmail" type="email" autocomplete="email"
+                 placeholder="Enter your email address" aria-describedby="authEmailErr">
           <p class="field-error" id="authEmailErr" role="alert"></p>
         </div>
-        <button type="submit" class="btn btn-coral modal-submit">Continue</button>
-        <div class="modal-msg" id="authEmailMsg"></div>
+
+        <button type="submit" class="auth-btn" id="authContinueBtn" disabled>
+          Continue <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <div class="modal-msg" id="authEmailMsg" role="status"></div>
       </form>
-      <!-- "Continue with Google" and "Continue with Mobile" are deliberately
-           absent. Neither exists in this project — no OAuth client, no
-           endpoint, no column to hang a Google id on — and a button that fails
-           when pressed is worse than one that was never offered. -->
-      <div class="modal-switch">Travel agency? <a href="partner-login.html">Sign in to the Partner Portal</a></div>
-      <!-- THE THIRD DOOR, and it is not a sign-in at all — it closes the modal
-           and leaves the traveller where they were. Booking already works
-           signed out (the flight flow collects its own traveller details and
-           contact), so this offers in words what the product already allows and
-           the dialog was hiding behind a required email. Nothing is created,
-           nothing is stored, and there is no guest session: an account is still
-           the only thing that keeps a trip in My Bookings, which is what the
-           line under it says. -->
-      <div class="modal-switch modal-guest">Booking without an account?
-        <a href="#" id="authGuestLink" data-step="guest">Continue as guest</a>
-        <small>You can still book — we will email the ticket. Create an account
-          later to keep every trip in one place.</small>
+
+      <!-- NO "OR CONTINUE WITH" ROW. There is no Google sign-in in this
+           project — no OAuth client, no endpoint, no column to hang a Google
+           id on — and an Email button would only repeat the selector above.
+           A row of buttons that do nothing new is worse than none. -->
+
+      <div class="auth-signup">
+        <p>New to JackPots World?</p>
+        <a href="#" data-step="signup">Create an account <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
+
+      <!-- The guest door stays: booking already works signed out, and this
+           closes the dialog rather than creating anything. -->
+      <p class="auth-alt">
+        <a href="#" id="authGuestLink" data-step="guest">Continue as guest</a>
+        <span aria-hidden="true">&middot;</span>
+        Travel agency? <a href="partner-login.html">Partner sign in</a>
+      </p>
+
+      <p class="auth-legal">By continuing, you agree to our
+        <a href="privacy-policy.html">Privacy Policy</a> and
+        <a href="terms-and-conditions.html">Terms &amp; Conditions</a>.</p>
     </div>
 
-    <!-- STEP 2A — returning traveller ---------------------------------------->
-    <div class="auth-view" id="authStepPassword" hidden>
-      <h2>Welcome back</h2>
-      <p class="modal-sub">Enter your password to continue.</p>
-      <form id="loginForm" novalidate>
-        <div class="modal-field">
-          <label for="liUser">Email Address</label>
-          <div class="field-locked">
-            <input id="liUser" type="text" autocomplete="username" readonly>
-            <button type="button" class="field-change" data-step="email">Change</button>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label for="liPass">Password</label>
-          <input id="liPass" type="password" autocomplete="current-password" required placeholder="Enter your password"
-                 aria-describedby="liPassErr">
-          <p class="field-error" id="liPassErr" role="alert"></p>
-        </div>
-        <div class="modal-remember">
-          <label for="liRemember"><input id="liRemember" type="checkbox"> Remember me</label>
-          <button type="button" class="modal-forgot" data-step="forgot">Forgot Password?</button>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit">Login</button>
-        <div class="modal-msg" id="loginMsg"></div>
-      </form>
-      <div class="modal-switch">New here? <a href="#" data-step="signup">Create your account</a></div>
-    </div>
-
-    <!-- STEP 2B — new traveller ---------------------------------------------->
+    <!-- STEP 2 — new traveller ------------------------------------------------
+         The existing /signup, unchanged. It still asks for a password because
+         the API requires one (CustomerSignupRequest), even though signing in
+         no longer does — the account keeps it for the password reset pages. -->
     <div class="auth-view" id="authStepSignup" hidden>
-      <h2>Create your account</h2>
+      <h2 id="authSuTitle">Create your account</h2>
       <p class="modal-sub">A few details and you are done — we will send a code to confirm it is you.</p>
       <form id="signupForm" novalidate>
         <div class="modal-field">
@@ -680,10 +728,15 @@
         </div>
         <div class="modal-field">
           <label for="suEmail">Email Address</label>
-          <div class="field-locked">
-            <input id="suEmail" type="email" autocomplete="email" required readonly>
-            <button type="button" class="field-change" data-step="email">Change</button>
+          <!-- Locked only when the traveller already typed an email on the
+               first step. Arriving by mobile — or straight from "Create an
+               account" — leaves it an ordinary field (app.js prepareSignup). -->
+          <div class="field-locked" id="suEmailWrap">
+            <input id="suEmail" type="email" autocomplete="email" required readonly
+                   placeholder="you@example.com" aria-describedby="suEmailErr">
+            <button type="button" class="field-change" id="suEmailChange" data-step="email">Change</button>
           </div>
+          <p class="field-error" id="suEmailErr" role="alert"></p>
         </div>
         <div class="modal-field">
           <label for="suMobile">Mobile Number</label>
@@ -719,56 +772,70 @@
           <input id="suPass2" type="password" autocomplete="new-password" required placeholder="Re-enter your password" aria-describedby="suPass2Err">
           <p class="field-error" id="suPass2Err" role="alert"></p>
         </div>
-        <button type="submit" class="btn btn-coral modal-submit" id="suRequestBtn">Create Account</button>
-        <div class="modal-msg" id="signupMsg"></div>
+        <button type="submit" class="auth-btn" id="suRequestBtn">Create Account</button>
+        <div class="modal-msg" id="signupMsg" role="status"></div>
       </form>
-      <div class="modal-switch">Already have an account? <a href="#" data-step="password">Sign in instead</a></div>
+      <p class="auth-alt">Already have an account? <a href="#" data-step="email">Sign in instead</a></p>
     </div>
 
-    <!-- STEP 3 — shared code step, reached from login AND signup -------------->
+    <!-- STEP 3 — the code, reached from sign-in AND signup ------------------>
     <div class="auth-view" id="loginStepOtp" hidden>
-      <h2>Verify it's you</h2>
-      <p class="modal-sub" id="loginOtpSub">Enter the 6-digit code sent to your email.</p>
-      <!-- Dev only. The API returns `dev_otp` ONLY when SMTP is unconfigured
-           (customer_otp_service.issue returns the plaintext in DEV_MODE and
-           None otherwise), so this renders nothing on a mail-configured
-           server. Without it the step is unusable locally while the server's
-           own message says "the code is shown here". -->
-      <div id="liDevOtp"></div>
-      <div class="modal-field">
-        <label for="liOtp">One-Time Code</label>
-        <input id="liOtp" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;"
-               aria-describedby="liOtpErr">
-        <p class="field-error" id="liOtpErr" role="alert"></p>
-      </div>
-      <button type="button" class="btn btn-coral modal-submit" id="liVerifyBtn">Verify &amp; Continue</button>
-      <div class="modal-msg" id="loginOtpMsg"></div>
-      <div class="modal-switch">
-        <a href="#" id="liResendBtn">Resend code</a> &nbsp;&middot;&nbsp;
-        <a href="#" id="liBackBtn">Use a different account</a>
+      <h2 id="authOtpTitle">Verify Your Account</h2>
+      <!-- THE DESTINATION IS MASKED AND NAMED HONESTLY. Every customer code is
+           EMAILED to the address on the account — there is no SMS sender — so
+           a mobile sign-in says the code went to the email registered with
+           that number, never that a text was sent. The server's own message
+           is not shown (in email mode it prints the address in full), and
+           neither is the code itself: in development mode it is in the API
+           response and the server log. -->
+      <p class="modal-sub otp-sub"><span id="loginOtpSub">We've sent a 6-digit OTP to</span>
+        <strong class="otp-dest" id="otpDest"></strong></p>
+      <!-- LOCAL DEVELOPMENT ONLY. Filled solely from `dev_otp` in the API
+           response, which the backend sends only on a non-deployed host in
+           dev delivery mode (customer_otp_service.delivery_mode). A deployed
+           host — DEPLOYED=true, set by deploy/docker-compose.yml and
+           render.yaml — never returns it, so there this stays empty and
+           hidden and the traveller has to use the emailed code. -->
+      <p class="auth-devotp" id="liDevOtp" role="status" hidden></p>
+      <form id="otpForm" novalidate>
+        <!-- SIX BOXES, ONE CODE. app.js moves the caret, spreads a pasted or
+             autofilled code across the six, and joins them into the one string
+             /verify-otp takes. Only the first box carries
+             autocomplete="one-time-code", so a phone's suggested code lands
+             once and is spread rather than offered six times. Every box takes
+             up to six characters because a paste, autofill or IME can deliver
+             several digits into whichever box has focus; the handler keeps
+             digits only and never more than six in total. -->
+        <div class="otp-field">
+          <p class="otp-label" id="otpLabel">Enter OTP</p>
+          <div class="otp-boxes" id="otpBoxes" role="group" aria-labelledby="otpLabel" aria-describedby="liOtpErr">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" aria-label="Digit 1 of 6">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Digit 2 of 6">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Digit 3 of 6">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Digit 4 of 6">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Digit 5 of 6">
+            <input class="otp-box" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Digit 6 of 6">
+          </div>
+          <p class="field-error" id="liOtpErr" role="alert"></p>
+        </div>
+        <button type="submit" class="auth-btn" id="liVerifyBtn" disabled>Verify OTP</button>
+        <div class="modal-msg" id="loginOtpMsg" role="status"></div>
+      </form>
+      <div class="otp-actions">
+        <button type="button" class="otp-resend" id="liResendBtn" disabled>Resend OTP in 30s</button>
+        <button type="button" class="otp-back" id="liBackBtn"><span aria-hidden="true">&larr;</span> <span id="liBackLabel">Change mobile number</span></button>
       </div>
     </div>
 
-    <!-- STEP 4 — forgot password --------------------------------------------->
-    <!-- The reset itself finishes on customer/reset-password.html, because the
-         API issues a LINK token rather than a code (/forgot-password ->
-         /reset-password takes `token`). Collecting an OTP here would mean
-         inventing a second reset mechanism the backend does not have. -->
-    <div class="auth-view" id="authStepForgot" hidden>
-      <h2>Reset your password</h2>
-      <p class="modal-sub">Tell us your email address and we will send you a link to set a new password.</p>
-      <form id="forgotForm" novalidate>
-        <div class="modal-field">
-          <label for="fpEmail">Email Address</label>
-          <input id="fpEmail" type="email" autocomplete="email" required placeholder="you@example.com" aria-describedby="fpEmailErr">
-          <p class="field-error" id="fpEmailErr" role="alert"></p>
-        </div>
-        <button type="submit" class="btn btn-coral modal-submit">Send reset link</button>
-        <div class="modal-msg" id="fpMsg"></div>
-        <div id="fpDevLink"></div>
-      </form>
-      <div class="modal-switch"><a href="#" data-step="password">Back to sign in</a></div>
-    </div>
+    </div><!-- /.auth-panel-inner -->
+    <!-- Decoration only: a faint compass in the panel's corner, as in the
+         reference. Hidden on phones, where there is no corner to spare. -->
+    <svg class="auth-compass" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+      <circle cx="60" cy="60" r="44"/><circle cx="60" cy="60" r="36"/>
+      <path d="M60 8v104M8 60h104M60 22l7 31 31 7-31 7-7 31-7-31-31-7 31-7z"/>
+      <path d="M60 60l22-22M60 60 38 82M60 60l22 22M60 60 38 38"/>
+    </svg>
+    </div><!-- /.auth-panel -->
   </div>
 </div>
 
@@ -960,10 +1027,10 @@
      so the module skips injecting a second copy. -->
 <!-- The profile chip + dropdown. Before account-center.js, whose Logout it
      calls, and before app.js, whose renderAuthNav() asks it to re-render. -->
-<script src="assets/js/profile-menu.js?v=20260911ic7"></script>
+<script src="assets/js/profile-menu.js?v=20260919b2c1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260915mg1"></script>
+<script src="assets/js/account-center.js?v=20260919b2c1"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
@@ -978,8 +1045,8 @@
      assets/destinations/ and both are written by
      scripts/fetch_destination_images.py. -->
 <script src="assets/js/destination-images.js?v=20260912im1"></script>
-<script src="assets/js/home-destinations.js?v=20260912dh1"></script>
-<script src="assets/js/app.js?v=20260912ds4"></script>
+<script src="assets/js/home-destinations.js?v=20260919b2c1"></script>
+<script src="assets/js/app.js?v=20260919b2c1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

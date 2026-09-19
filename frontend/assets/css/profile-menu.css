@@ -89,8 +89,41 @@
   display: inline-flex; align-items: center;
   font: inherit; font-size: 14px; font-weight: 600; text-decoration: none;
 }
-.pm-login { color: inherit; padding: 8px 12px; opacity: .92; }
-.pm-login:hover { opacity: 1; }
+/* THE OUTLINED PILL — person, words, arrow. Everything is drawn in
+   currentColor, because each page already gives the header its ink (white
+   over the hero film, navy on a solid bar — main.css, flights-ref.css,
+   booking-ref.css), so the outline and icons follow whichever that is and the
+   button can never vanish into its own background. */
+.pm-login {
+  gap: 10px; padding: 9px 16px 9px 14px; border-radius: 999px;
+  color: inherit; white-space: nowrap; line-height: 1.2;
+  border: 1.5px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 70%, transparent);
+  background: transparent;
+  transition: background .18s ease, border-color .18s ease;
+}
+.pm-login:hover {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.pm-login:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.pm-login svg {
+  flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.pm-login .pm-login-arrow { width: 18px; height: 18px; transition: transform .18s ease; }
+.pm-login:hover .pm-login-arrow { transform: translateX(3px); }
+/* Phones: the header also carries the logo, wishlist, partner and menu, so
+   the arrow goes first and the pill tightens. */
+@media (max-width: 480px) {
+  .pm-login { gap: 7px; padding: 7px 12px 7px 10px; }
+  .pm-login .pm-login-arrow { display: none; }
+  .pm-login svg { width: 18px; height: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-login .pm-login-arrow { transition: none; }
+  .pm-login:hover .pm-login-arrow { transform: none; }
+}
 .pm-signup {
   margin-left: 6px; padding: 9px 18px; border-radius: 999px;
   background: var(--coral, #E9B949); color: var(--on-accent, #12253F);

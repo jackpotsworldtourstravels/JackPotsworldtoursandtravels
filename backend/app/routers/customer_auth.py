@@ -35,6 +35,7 @@ from app.schemas.customer import (
     CustomerLoginChallengeResponse,
     CustomerLoginRequest,
     CustomerMessageResponse,
+    CustomerOtpRequest,
     CustomerRefreshRequest,
     CustomerResendOtpRequest,
     CustomerResetPasswordRequest,
@@ -177,6 +178,76 @@ def login(request: Request, payload: CustomerLoginRequest, db: Session = Depends
         delivery=mode,
         message=(
             f"A verification code was sent to {customer.email}."
+            if mode == customer_otp_service.EMAIL_MODE
+            else "Development mode — the code is shown here and in the server log."
+        ),
+        dev_otp=dev_code,
+    )
+
+
+@router.post(
+    "/request-otp",
+    response_model=CustomerLoginChallengeResponse,
+    summary="Passwordless step 1 — issue an OTP for an email or mobile",
+    description=(
+        "Public endpoint. Accepts an email address **or** a mobile number (dial code included, "
+        "as signup stored it) and sends a one-time code to the account's email, returning the "
+        "same short-lived challenge token /login does. **No session is issued here** — the "
+        "traveller still has to spend the code at /verify-otp. Rate-limited to 5/minute per IP, "
+        "on top of the 5-codes-per-hour-per-customer limit in customer_otp_service."
+    ),
+)
+@limiter.limit("5/minute")
+def request_otp(request: Request, payload: CustomerOtpRequest, db: Session = Depends(get_db)):
+    """The customer site's sign-in: an address, then a code — no password.
+
+    WHY THIS EXISTS BESIDE /login. /login verifies a password before issuing
+    the code; the public sign-in dialog asks for the address only. This is the
+    same OTP machinery (customer_otp_service, the same challenge token, the
+    same /verify-otp and /resend-otp) reached without the password check. The
+    code is what proves the traveller holds the account's mailbox.
+
+    WHY AN UNKNOWN ADDRESS IS ANSWERED PLAINLY. The alternative, a decoy
+    "code sent" for every address, protects nothing here: /signup already
+    answers "an account with this email/mobile already exists", so whether an
+    address is registered is not a secret this API keeps. Telling a traveller
+    who mistyped their number that no account matched is what lets them fix it
+    instead of waiting for an email that will never arrive. The 5/minute limit
+    is what stops the answer being farmed.
+    """
+    meta = activity_service.request_context(request)
+    customer = customer_auth_service.get_by_identifier(db, payload.identifier)
+    if customer is None:
+        customer_audit_service.log_failure(
+            db, None, "Failed login",
+            f"OTP requested for unknown identifier '{payload.identifier}'", meta=meta,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="We couldn't find an account with those details.",
+        )
+    # Same refusals, in the same words, as the password login.
+    if customer.status is CustomerStatus.BLOCKED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is blocked. Please contact support.",
+        )
+    if customer.status is not CustomerStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
+
+    dev_code = customer_otp_service.issue(db, customer, CustomerOtpPurpose.LOGIN)
+    mode = customer_otp_service.delivery_mode()
+
+    customer_audit_service.log(
+        db, customer, "OTP requested", module="Auth",
+        description=f"{customer.full_name} requested a sign-in code", meta=meta,
+    )
+
+    return CustomerLoginChallengeResponse(
+        challenge_token=create_customer_otp_challenge_token(customer.customer_id),
+        delivery=mode,
+        message=(
+            "A verification code was sent to the email on your account."
             if mode == customer_otp_service.EMAIL_MODE
             else "Development mode — the code is shown here and in the server log."
         ),

@@ -186,16 +186,26 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    group, and the third track takes the remaining space so the utility cluster
    is held against the right edge. Everything is still in flow: no absolute
    positioning, and the row cannot overlap itself. */
+/* CENTRED AGAIN, ON REQUEST (2026-09-19): logo left, products in the exact
+   centre, account cluster right. The two side tracks are EQUAL
+   (`minmax(0,1fr)` each), so the middle track sits on the bar's centre line
+   whatever is in them — signed in or out, a long or short action cluster, a
+   bigger logo. The earlier `auto auto 1fr` kept the nav beside the logo; that
+   is what this replaces.
+
+   `minmax(0, …)` rather than a bare `1fr` is load-bearing: a bare 1fr has an
+   `auto` minimum, so a wide action cluster would widen its own track and push
+   the nav off centre. With a zero minimum the tracks stay equal and the
+   cluster is sized to fit inside its half (see the compaction rules further
+   down, and the drawer below 860px where the centre track is empty). */
 #siteHeader nav.wrap{
-  display:grid; grid-template-columns:auto auto 1fr; align-items:center;
-  gap:0; max-width:var(--max); margin-inline:auto;
+  display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center;
+  gap:12px; max-width:var(--max); margin-inline:auto;
   padding-inline:clamp(16px, 2.5vw, 32px);
 }
-#siteHeader nav.wrap > .logo        { justify-self:start; }
-/* The breathing room the brief asks for between the mark and Flights — close
-   enough to read as one group, far enough not to crowd the logo. */
-#siteHeader nav.wrap > .navlinks    { justify-self:start; margin-left:clamp(18px, 2.2vw, 40px); }
-#siteHeader nav.wrap > .nav-actions { justify-self:end; }
+#siteHeader nav.wrap > .logo        { justify-self:start; grid-column:1; }
+#siteHeader nav.wrap > .navlinks    { justify-self:center; grid-column:2; margin-left:0; }
+#siteHeader nav.wrap > .nav-actions { justify-self:end; grid-column:3; min-width:0; }
 /* THE LOGO IS THE BRAND MARK AND IT IS SIZED LIKE ONE. Both numbers went up
    when six products left the nav: the bar was fitting ten cells plus a
    six-item utility cluster, and every pixel the logo took came off the strip
@@ -1627,4 +1637,476 @@ header .hr-wish .jpi { color:var(--danger); }
 
 @media (prefers-reduced-motion: reduce){
   .jw-loc-chip:hover{transform:none;}
+}
+
+
+/* ==========================================================================
+   CUSTOMER SIGN-IN — the travel panel and the white form
+   ==========================================================================
+   One dialog, three steps (address, signup, code), all in the right-hand
+   panel; the left-hand photograph never changes. Everything is scoped to
+   .auth-split, so the Reviews, Details and Account dialogs that share
+   .modal-card are untouched.
+
+   PALETTE. Deep navy-black, white/cream and the logo's warm gold. Gold
+   carries the brand: the selected method's lettering, the Continue and Verify
+   buttons, the focused OTP box, the decorative type. Wherever gold is TEXT on
+   a light ground it is the deep --auth-gold-ink, because the bright gold only
+   reaches about 2:1 on cream. Error red stays the site's, because an error
+   must not look like a brand accent.
+
+   TYPE. Montserrat for the form, as everywhere on the site. Playfair Display
+   for the display headings and Yellowtail for the one line of script — both
+   already loaded by index.html for the hero, so nothing new is fetched.
+   ========================================================================== */
+.auth-split{
+  --auth-ink:#0E1726;
+  --auth-navy:#081326;
+  --auth-gold:#E0A32E;
+  --auth-gold-lt:#F2C96A;
+  --auth-gold-dk:#C58A1C;
+  --auth-gold-ink:#8A5E0E;
+  --auth-cream:#FFFDF9;
+  --auth-soft:#F4F1EC;
+  --auth-line:#E4DED4;
+  --auth-muted:#667085;
+  --auth-serif:'Playfair Display', Georgia, 'Times New Roman', serif;
+  --auth-script:'Yellowtail', 'Brush Script MT', cursive;
+
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  width:100%;
+  max-width:1120px;
+  height:min(740px, 94vh);
+  max-height:none;
+  padding:0;
+  overflow:hidden;
+  border-radius:28px;
+  background:var(--auth-cream);
+  box-shadow:0 40px 90px -30px rgba(4,10,24,.55);
+  font-family:var(--ff-body);
+}
+
+/* --- close ------------------------------------------------------------- */
+.auth-close{
+  position:absolute; top:22px; right:22px; z-index:4;
+  width:46px; height:46px; border-radius:50%;
+  display:grid; place-items:center;
+  background:#EFECE7; color:var(--auth-ink); border:none; cursor:pointer;
+  transition:background .18s ease, transform .18s ease;
+}
+.auth-close:hover{ background:#E5E1DA; }
+.auth-close:active{ transform:scale(.95); }
+.auth-close:focus-visible{ outline:2px solid var(--auth-gold-dk); outline-offset:3px; }
+
+/* --- left: the photograph -------------------------------------------------
+   Framed on the collage's right-hand side — the sunset over the whitewashed
+   village. Two flat scrims: one darkening the left edge where the words sit,
+   one the foot where the services bar sits. */
+.auth-visual{
+  position:relative;
+  display:flex; flex-direction:column;
+  min-height:0;
+  padding:30px 44px 0;
+  color:#fff;
+  background-color:var(--auth-navy);
+  background-image:
+    linear-gradient(90deg, rgba(6,14,32,.78) 0%, rgba(6,14,32,.40) 55%, rgba(6,14,32,.10) 100%),
+    linear-gradient(180deg, rgba(6,14,32,.30) 0%, rgba(6,14,32,0) 35%, rgba(6,14,32,.15) 60%, rgba(6,14,32,.85) 100%),
+    url('../images/login-collage.jpg?v=20260803b');
+  background-size:cover;
+  background-position:78% center;
+}
+.auth-visual-head{ display:flex; flex-direction:column; align-items:flex-start; }
+.auth-visual-logo{ width:150px; height:auto; margin:0 0 16px 6px; filter:drop-shadow(0 4px 12px rgba(0,0,0,.35)); }
+.auth-visual-kicker{
+  margin:0 0 12px; font-size:12px; font-weight:600; letter-spacing:.32em; text-transform:uppercase;
+  color:rgba(255,255,255,.92);
+}
+.auth-visual-kicker i{ font-style:normal; color:var(--auth-gold); margin:0 .15em; }
+.auth-visual-title{
+  margin:0; font-family:var(--auth-serif); font-weight:700;
+  font-size:54px; line-height:1.02; letter-spacing:-.01em;
+  text-shadow:0 2px 18px rgba(0,0,0,.35);
+}
+.auth-visual-title span{ display:block; }
+.auth-visual-title .is-gold{ color:var(--auth-gold-lt); }
+.auth-visual-rule{
+  display:block; width:300px; max-width:80%; height:1px; margin:20px 0 16px;
+  background:linear-gradient(90deg, var(--auth-gold) 0%, rgba(224,163,46,.15) 100%);
+}
+.auth-visual-sub{
+  margin:0; font-size:13px; font-weight:600; letter-spacing:.34em; line-height:1.9;
+  text-transform:uppercase; color:rgba(255,255,255,.92);
+}
+.auth-visual-script{
+  margin:auto 0 18px; padding-top:16px;
+  font-family:var(--auth-script); font-size:40px; line-height:1.05;
+  color:var(--auth-gold-lt); transform:rotate(-7deg); transform-origin:left bottom;
+  text-shadow:0 2px 12px rgba(0,0,0,.4);
+}
+.auth-visual-script span{ display:inline-block; margin-left:1.4em; }
+
+.auth-services{
+  list-style:none; margin:0 -44px; padding:14px 18px 18px;
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr));
+  background:linear-gradient(180deg, rgba(4,10,22,.55), rgba(4,10,22,.78));
+  border-top:1px solid rgba(242,201,106,.22);
+  backdrop-filter:blur(3px);
+}
+.auth-services li{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:4px 6px; text-align:center;
+  font-size:13px; font-weight:600; line-height:1.25; color:#fff;
+}
+.auth-services li + li{ border-left:1px solid rgba(255,255,255,.18); }
+.auth-services svg{
+  width:28px; height:28px; fill:none; stroke:var(--auth-gold-lt);
+  stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round;
+}
+
+/* --- right: the form ------------------------------------------------------
+   The panel scrolls, the card does not, so the signup form (the tallest
+   step) never resizes the card. Auto margins centre short steps without
+   clipping the top of a tall one. overflow-x is hidden because the step
+   transition travels a few pixels sideways. */
+.auth-panel{
+  position:relative;
+  display:flex; flex-direction:column;
+  min-height:0;
+  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  padding:56px 64px 36px;
+  background:var(--auth-cream);
+}
+.auth-panel-inner{ position:relative; z-index:1; margin:auto 0; width:100%; max-width:470px; }
+.auth-compass{
+  /* Inside the panel's box, not hanging past it: an overhang would give
+     the scrolling panel a scrollbar for a decoration. */
+  position:absolute; right:6px; bottom:6px; width:150px; height:150px;
+  fill:none; stroke:var(--auth-gold-dk); stroke-width:.8; opacity:.16; pointer-events:none;
+}
+
+.auth-split h2{
+  margin:0; font-family:var(--auth-serif); font-weight:700;
+  font-size:44px; line-height:1.1; letter-spacing:-.01em; color:var(--auth-ink);
+}
+.auth-split .modal-sub{ margin:10px 0 28px; font-size:16px; line-height:1.5; color:var(--auth-muted); }
+
+/* One step replaces another with a short fade and a few pixels of travel. */
+.auth-split .auth-view:not([hidden]){ animation:authStepIn .26s cubic-bezier(.22,1,.36,1); }
+@keyframes authStepIn{
+  from{ opacity:0; transform:translateX(12px); }
+  to  { opacity:1; transform:none; }
+}
+
+/* --- Mobile Number | Email ------------------------------------------------ */
+.auth-method{
+  display:grid; grid-template-columns:1fr 1fr; gap:4px;
+  margin:0 0 26px; padding:4px; border:1px solid var(--auth-line); border-radius:999px;
+  background:var(--auth-soft);
+}
+.auth-method label{ position:relative; display:block; margin:0; cursor:pointer; }
+.auth-method input{ position:absolute; opacity:0; width:1px; height:1px; }
+.auth-method span{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  min-height:52px; padding:0 12px; border-radius:999px;
+  font-size:16px; font-weight:600; color:var(--auth-ink);
+  transition:background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.auth-method svg{
+  width:20px; height:20px; flex:none; fill:none; stroke:currentColor;
+  stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;
+}
+.auth-method label:hover span{ background:rgba(14,23,38,.05); }
+.auth-method input:checked + span{
+  background:var(--auth-ink); color:var(--auth-gold-lt);
+  box-shadow:0 8px 18px -10px rgba(8,19,38,.7), inset 0 0 0 1px rgba(242,201,106,.25);
+}
+.auth-method input:focus-visible + span{ outline:2px solid var(--auth-gold-dk); outline-offset:2px; }
+
+/* --- fields -------------------------------------------------------------- */
+.auth-split .modal-field{ margin-bottom:22px; }
+.auth-split .modal-field > label{
+  display:block; margin-bottom:10px;
+  font-size:15px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--auth-ink);
+}
+.auth-split .modal-field input,
+.auth-split .field-dial select{
+  height:56px; padding:0 18px; border-radius:12px;
+  border:1px solid #D9D3C9; background:#fff;
+  font-size:16px; color:var(--auth-ink);
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.auth-split .modal-field input::placeholder{ color:#98A0AC; }
+.auth-split .modal-field input:focus,
+.auth-split .field-dial select:focus{
+  border-color:var(--auth-gold-dk); box-shadow:0 0 0 3px rgba(224,163,46,.22); outline:none;
+}
+.auth-split .field-dial select{ padding:0 10px; }
+
+/* The mobile row: one bordered box, flag + code + chevron, a divider, then
+   the number. The select is laid transparently over the face. */
+.auth-phone{
+  display:flex; align-items:stretch; height:56px;
+  border:1px solid #D9D3C9; border-radius:12px; background:#fff;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.auth-phone:focus-within{ border-color:var(--auth-gold-dk); box-shadow:0 0 0 3px rgba(224,163,46,.22); }
+.auth-dial{ position:relative; flex:none; display:flex; border-right:1px solid var(--auth-line); }
+.auth-dial-face{
+  display:flex; align-items:center; gap:10px; padding:0 14px 0 16px;
+  font-size:16px; font-weight:600; color:var(--auth-ink); pointer-events:none;
+}
+.auth-dial-flag{ font-size:20px; line-height:1; }
+.auth-dial-face svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.auth-dial select{
+  position:absolute; inset:0; width:100%; height:100%;
+  opacity:0; cursor:pointer; border:0; font-size:16px;
+}
+.auth-dial:has(select:focus-visible) .auth-dial-face{ background:rgba(224,163,46,.12); border-radius:11px 0 0 11px; }
+.auth-split .auth-phone input{
+  flex:1; min-width:0; height:auto; border:0; border-radius:0 12px 12px 0; box-shadow:none;
+  padding:0 16px; background:transparent;
+}
+.auth-split .auth-phone input:focus{ box-shadow:none; }
+.auth-phone:has(input.is-invalid){ border-color:var(--coral-dark); }
+
+/* --- the gold button: normal, hover, pressed, disabled, loading ----------- */
+.auth-btn{
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  width:100%; min-height:60px; margin-top:6px; padding:0 24px;
+  border:none; border-radius:999px; cursor:pointer;
+  font-family:inherit; font-size:18px; font-weight:700; letter-spacing:.01em;
+  color:#1C1406;
+  background:linear-gradient(180deg, #F3CE6F 0%, #E3AC3F 55%, #D69A2A 100%);
+  box-shadow:0 14px 28px -14px rgba(176,120,20,.75), inset 0 1px 0 rgba(255,255,255,.45);
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+.auth-btn svg{ width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform .18s ease; }
+.auth-btn:hover:not(:disabled){ filter:brightness(1.04); transform:translateY(-1px); box-shadow:0 18px 32px -14px rgba(176,120,20,.85), inset 0 1px 0 rgba(255,255,255,.45); }
+.auth-btn:hover:not(:disabled) svg{ transform:translateX(3px); }
+.auth-btn:active:not(:disabled){ transform:translateY(0) scale(.99); }
+.auth-btn:focus-visible{ outline:2px solid var(--auth-ink); outline-offset:3px; }
+.auth-btn:disabled{
+  cursor:not-allowed; color:#8E8471; box-shadow:none;
+  background:linear-gradient(180deg, #F3E7CC 0%, #EADCBC 100%);
+}
+.auth-btn.is-loading{
+  cursor:progress; color:#1C1406;
+  background:linear-gradient(180deg, #F3CE6F 0%, #E3AC3F 55%, #D69A2A 100%);
+}
+.auth-btn.is-loading::before{
+  content:""; width:18px; height:18px; flex:none;
+  border:2px solid rgba(28,20,6,.25); border-top-color:#1C1406; border-radius:50%;
+  animation:authSpin .7s linear infinite;
+}
+@keyframes authSpin{ to{ transform:rotate(360deg); } }
+
+.auth-split .modal-msg{ font-size:13.5px; }
+
+/* --- below the button ----------------------------------------------------- */
+.auth-signup{
+  margin-top:30px; padding:20px 18px; border-radius:16px; background:#F2EFEA; text-align:center;
+}
+.auth-signup p{ margin:0 0 6px; font-size:16px; color:var(--auth-ink); }
+.auth-signup a{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:17px; font-weight:700; color:var(--auth-gold-ink);
+}
+.auth-signup a svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform .18s ease; }
+.auth-signup a:hover svg{ transform:translateX(3px); }
+.auth-alt{ margin:16px 0 0; text-align:center; font-size:13.5px; color:var(--auth-muted); }
+.auth-alt a{ color:var(--auth-ink); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+.auth-alt span{ margin:0 6px; }
+.auth-legal{ margin:16px 0 0; font-size:13px; line-height:1.55; color:var(--auth-muted); }
+.auth-legal a{ color:var(--auth-gold-ink); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
+.auth-split a:focus-visible{ outline:2px solid var(--auth-gold-dk); outline-offset:2px; border-radius:4px; }
+
+/* --- signup's own controls, in the same language ------------------------- */
+.auth-split .field-dial{ gap:10px; }
+.auth-split .field-dial select{ max-width:140px; }
+.auth-split .field-locked input{ background:var(--auth-soft); color:var(--auth-muted); }
+.auth-split .field-change{ color:var(--auth-gold-ink); }
+
+/* --- the code step ---------------------------------------------------------- */
+.otp-sub{ line-height:1.6; }
+.otp-dest{ display:block; margin-top:4px; font-size:17px; font-weight:700; color:var(--auth-ink); letter-spacing:.02em; word-break:break-all; }
+.otp-field{ margin-bottom:22px; }
+/* Local development only — see #liDevOtp. Dashed, so it can never be taken
+   for part of the real design. */
+.auth-devotp{
+  margin:-8px 0 18px; padding:10px 14px; border-radius:10px;
+  border:1px dashed var(--auth-gold-dk); background:#FFF7E6;
+  font-size:13.5px; font-weight:600; color:var(--auth-ink);
+}
+.auth-devotp[hidden]{ display:none; }
+.otp-label{ margin:0 0 10px; font-size:15px; font-weight:600; color:var(--auth-ink); }
+.otp-boxes{ display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:12px; }
+/* !important against the site-wide 16px rule for touch screens (it stops iOS
+   zooming into small inputs; 24px is already above that). */
+.otp-box{
+  width:100%; min-width:0; height:62px; padding:0;
+  border:1px solid #D9D3C9; border-radius:12px; background:#fff;
+  text-align:center; font-family:var(--ff-body); font-size:24px !important; font-weight:700;
+  color:var(--auth-ink); caret-color:var(--auth-gold-dk); outline:none;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.otp-box:focus{ border-color:var(--auth-gold-dk); box-shadow:0 0 0 3px rgba(224,163,46,.25); }
+.otp-box.is-invalid{ border-color:var(--coral-dark); background:rgba(192,57,43,.04); }
+.otp-field .field-error{ margin-top:10px; font-weight:600; }
+.otp-actions{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:22px; }
+.otp-resend, .otp-back{
+  background:none; border:none; padding:8px 10px; min-height:40px; border-radius:8px;
+  font:inherit; font-size:15px; font-weight:700; cursor:pointer;
+}
+.otp-resend{ color:var(--auth-gold-ink); }
+.otp-resend:disabled{ color:var(--auth-muted); font-weight:600; cursor:default; }
+.otp-back{ color:var(--auth-ink); }
+.otp-resend:not(:disabled):hover, .otp-back:hover{ text-decoration:underline; }
+.otp-resend:focus-visible, .otp-back:focus-visible{ outline:2px solid var(--auth-gold-dk); outline-offset:2px; }
+
+/* --- shorter desktops: the same layout, a little tighter --------------------- */
+@media (max-height:860px) and (min-width:761px){
+  .auth-visual-logo{ width:118px; margin-bottom:10px; }
+  .auth-visual-title{ font-size:46px; }
+  .auth-visual-rule{ margin:14px 0 12px; }
+  .auth-visual-script{ font-size:34px; margin-bottom:12px; }
+  .auth-panel{ padding-top:40px; padding-bottom:24px; }
+  .auth-split h2{ font-size:40px; }
+  .auth-split .modal-sub{ margin-bottom:22px; }
+  .auth-method{ margin-bottom:20px; }
+  .auth-method span{ min-height:48px; }
+  .auth-split .modal-field{ margin-bottom:18px; }
+  .auth-signup{ margin-top:22px; padding:16px; }
+}
+
+/* --- laptops and tablets: keep the split, scale it down -------------------- */
+@media (max-width:1080px){
+  .auth-visual{ padding:26px 32px 0; }
+  .auth-visual-title{ font-size:44px; }
+  .auth-visual-script{ font-size:32px; }
+  .auth-services{ margin:0 -32px; padding:12px 8px 16px; }
+  .auth-services li{ font-size:12px; }
+  .auth-panel{ padding:52px 40px 30px; }
+  .auth-split h2{ font-size:38px; }
+}
+@media (max-width:900px){
+  .auth-visual-logo{ width:112px; }
+  .auth-visual-kicker{ font-size:10px; letter-spacing:.24em; }
+  .auth-visual-title{ font-size:36px; }
+  .auth-visual-sub{ font-size:11px; letter-spacing:.26em; }
+  .auth-visual-rule{ width:200px; }
+  .auth-services li{ font-size:11px; gap:6px; }
+  .auth-services svg{ width:24px; height:24px; }
+  .auth-panel{ padding:50px 28px 26px; }
+  .auth-split h2{ font-size:32px; }
+  .auth-split .modal-sub{ font-size:14.5px; margin-bottom:22px; }
+  .auth-method span{ font-size:14px; gap:8px; min-height:48px; }
+  .auth-compass{ display:none; }
+  .otp-boxes{ gap:8px; }
+  .otp-box{ height:50px; font-size:20px !important; }
+}
+
+/* --- phones: one column, the picture becomes a banner ---------------------
+   The card scrolls as a whole (the banner scrolls away with it) and sizes to
+   its content. The banner keeps the logo and the headline; the tagline, the
+   script and the services bar would crowd the form out, so they go. */
+@media (max-width:760px){
+  .modal-overlay:has(.auth-split){ padding:12px; align-items:flex-start; }
+  .auth-split{
+    display:flex; flex-direction:column;
+    height:auto; max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px);
+    margin:auto 0;
+    overflow-y:auto; overscroll-behavior:contain;
+    border-radius:22px;
+  }
+  .auth-visual{
+    flex:none; flex-direction:row; align-items:center; gap:14px;
+    padding:18px 70px 18px 18px;
+    background-position:78% 60%;
+  }
+  .auth-visual-head{ flex-direction:row; align-items:center; gap:14px; }
+  .auth-visual-logo{ width:64px; margin:0; }
+  .auth-visual-kicker{ display:none; }
+  .auth-visual-title{ font-size:24px; line-height:1.1; }
+  .auth-visual-title span{ display:inline; }
+  .auth-visual-rule, .auth-visual-sub, .auth-visual-script, .auth-services{ display:none; }
+  .auth-close{ top:14px; right:14px; width:40px; height:40px; background:rgba(255,255,255,.92); }
+  .auth-panel{ overflow:visible; padding:26px 20px 24px; }
+  .auth-panel-inner{ max-width:none; }
+  .auth-split h2{ font-size:30px; }
+  .auth-split .modal-sub{ font-size:14.5px; margin:8px 0 20px; }
+  .auth-method{ margin-bottom:20px; }
+  .auth-method span{ font-size:14px; min-height:46px; gap:8px; }
+  .auth-method svg{ width:18px; height:18px; }
+  .auth-split .modal-field{ margin-bottom:18px; }
+  .auth-phone, .auth-split .modal-field input, .auth-split .field-dial select{ height:52px; }
+  .auth-dial-face{ padding:0 10px 0 12px; gap:6px; }
+  .auth-btn{ min-height:54px; font-size:17px; }
+  .auth-signup{ margin-top:22px; padding:16px 14px; }
+  .auth-signup p{ font-size:15px; }
+  .auth-signup a{ font-size:16px; }
+  .otp-boxes{ gap:8px; }
+  .otp-box{ height:54px; font-size:22px !important; }
+  .auth-compass{ display:none; }
+}
+@media (max-width:400px){
+  .auth-visual-logo{ width:52px; }
+  .auth-visual-title{ font-size:20px; }
+  .auth-split h2{ font-size:27px; }
+  .otp-boxes{ gap:6px; }
+  .otp-box{ height:48px; font-size:20px !important; }
+  .auth-method span{ font-size:13px; white-space:nowrap; }
+  /* The icons go before the words do: "Mobile Number" on two lines inside
+     a pill reads as a broken control. */
+  .auth-method svg{ display:none; }
+}
+/* A phone held sideways has no height for the banner. */
+@media (max-width:760px) and (max-height:560px){
+  .auth-visual{ display:none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .auth-split .auth-view:not([hidden]){ animation:none; }
+  .auth-btn, .auth-btn svg, .auth-signup a svg, .auth-close{ transition:none; }
+  .auth-btn:hover:not(:disabled){ transform:none; }
+  .auth-btn:hover:not(:disabled) svg, .auth-signup a:hover svg{ transform:none; }
+  .auth-btn.is-loading::before{ animation-duration:1.6s; }
+}
+
+/* ==========================================================================
+   "My Partner" is for B2B visitors — gone once a CUSTOMER is signed in.
+   profile-menu.js sets html.jp-customer on a customer session only (never an
+   admin's), so both copies of the door — the header pill and the drawer link
+   — leave together, and come back the moment the traveller signs out.
+   Signed out, the door is shown at every width as before.
+   ========================================================================== */
+html.jp-customer #siteHeader .nav-partner-mark,
+html.jp-customer .mobile-partner-mark { display: none; }
+
+/* ==========================================================================
+   The centred header — room for the nav to sit on the centre line
+   ==========================================================================
+   A centred nav needs each side track to hold the WIDER of its two
+   neighbours (logo left, account cluster right). At 1280 the full cluster —
+   Wishlist, My Partner, the Login / Create pill — is wider than half of what
+   is left beside five labelled cells, and the nav ran into it.
+
+   Two fixes, in this order:
+   1. The bar may run a little wider than the page column (1440 rather than
+      --max's 1280). On a wide screen that alone is enough.
+   2. Below 1400px the two WORDED utility buttons — Wishlist and My Partner —
+      go icon-only. The words are clipped from sight, not removed: each stays
+      the control's accessible name, the same technique the <=600px rule above
+      uses for My Partner. Nothing leaves the bar, and the nav keeps its centre.
+   Under 860px the nav itself moves to the drawer and the centre track is empty,
+   so none of this applies there. */
+#siteHeader nav.wrap { max-width: calc(var(--max) + 160px); }
+@media (min-width: 861px) and (max-width: 1399px) {
+  #siteHeader .nav-actions > .nav-partner-mark { padding: 7px; gap: 0; }
+  #siteHeader .nav-actions > .hr-wish > span:not(.jpi),
+  #siteHeader .nav-actions > .nav-partner-mark > span:not(.jpi) {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+  }
 }

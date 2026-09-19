@@ -897,15 +897,16 @@ const authCloseBtn = document.getElementById('authCloseBtn');
 /** step name -> the element that is its view. */
 const AUTH_STEPS = {
   email:    'authStepEmail',
-  password: 'authStepPassword',
   signup:   'authStepSignup',
   otp:      'loginStepOtp',
-  forgot:   'authStepForgot',
 };
 
 /** Where focus was before the modal took it, so it can be handed back. */
 let authReturnFocus = null;
 let authStep = 'email';
+/** The code step's resend countdown. Declared up here because showStep()
+ *  stops it, and showStep can run before the OTP section below is reached. */
+let resendTimer = null;
 
 function authView(name) { return document.getElementById(AUTH_STEPS[name]); }
 
@@ -913,29 +914,166 @@ function authView(name) { return document.getElementById(AUTH_STEPS[name]); }
 function showStep(name, opts) {
   if (!AUTH_STEPS[name]) return;
 
-  /* The password and signup steps both show the address as a READONLY field,
-     because it was already given on the email step. Landing on either without
-     one leaves a locked, empty box and no way forward, so send them back to
-     the step that collects it. Guards openAuth('signup') from elsewhere on the
-     page as much as anything internal. */
-  if ((name === 'password' || name === 'signup') && !currentAuthEmail()) name = 'email';
+  /* prepareSignup() carries whatever the first step holds across, and
+     unlocks the signup email when the first step did not supply one. */
+  if (name === 'signup') prepareSignup();
+  /* The resend countdown belongs to the code step and must not keep ticking
+     on a form that has no resend button showing. */
+  if (name !== 'otp') stopResendTimer();
 
   authStep = name;
   Object.keys(AUTH_STEPS).forEach(k => { authView(k).hidden = k !== name; });
+  /* The dialog is named by whichever heading is on screen. */
+  const heading = authView(name).querySelector('h2[id]');
+  if (heading) authCard.setAttribute('aria-labelledby', heading.id);
 
   /* Messages belong to the step that produced them. Carrying "that password
      was wrong" onto the signup form would be nonsense. */
   if (!(opts && opts.keepMessage)) {
-    ['authEmailMsg', 'loginMsg', 'signupMsg', 'loginOtpMsg', 'fpMsg']
+    ['authEmailMsg', 'signupMsg', 'loginOtpMsg']
       .forEach(id => setModalMsg(document.getElementById(id), '', 'muted'));
     clearFieldErrors();
   }
 
-  const first = authView(name).querySelector('input:not([readonly]):not([type=checkbox])');
   /* rAF so the field exists on screen before it is focused — focusing a
-     hidden element silently does nothing. */
-  if (first) requestAnimationFrame(() => first.focus());
+     hidden element silently does nothing. Radios and fields inside a hidden
+     wrapper (the Email field while Mobile is selected) are skipped, which is
+     why visibility is checked in the frame rather than by the selector. */
+  requestAnimationFrame(() => {
+    const first = Array.from(authView(name).querySelectorAll(
+      'input:not([readonly]):not([type=checkbox]):not([type=radio])'))
+      .find(el => el.offsetParent !== null);
+    if (first) first.focus();
+  });
 }
+
+/* --- buttons that talk to the server --------------------------------------
+   One helper for every Continue / Send OTP / Verify. While a request is in
+   flight the button is disabled, which is also what stops a second request:
+   a disabled submit button blocks Enter-key submission of its form too, so a
+   double click or an impatient Enter cannot post the same OTP request twice. */
+/* The resting markup is kept whole, not just its text, because Continue
+   carries an arrow icon that a textContent round-trip would strip. */
+const busyMarkup = new WeakMap();
+function setBusy(btn, busy, label) {
+  if (!btn) return;
+  if (busy) {
+    if (!busyMarkup.has(btn)) busyMarkup.set(btn, btn.innerHTML);
+    btn.textContent = label || btn.textContent;
+    btn.classList.add('is-loading');
+    btn.setAttribute('aria-busy', 'true');
+    btn.disabled = true;
+  } else {
+    if (busyMarkup.has(btn)) btn.innerHTML = busyMarkup.get(btn);
+    busyMarkup.delete(btn);
+    btn.classList.remove('is-loading');
+    btn.removeAttribute('aria-busy');
+    btn.disabled = false;
+  }
+}
+const isBusy = btn => !!btn && btn.classList.contains('is-loading');
+
+/* --- step one: Mobile Number or Email --------------------------------------
+   Either is a real identifier for /request-otp (get_by_identifier matches the email
+   case-insensitively, or the mobile exactly as signup stored it: dial code +
+   digits). The two fields keep their own values, so flipping the selector and
+   back does not lose what was typed. */
+const authEmailInput = document.getElementById('authEmail');
+const authMobileInput = document.getElementById('authMobile');
+
+function authMethod() {
+  const r = authOverlay.querySelector('input[name="authMethod"]:checked');
+  return r ? r.value : 'mobile';
+}
+
+function syncAuthMethod() {
+  const email = authMethod() === 'email';
+  document.getElementById('authEmailField').hidden = !email;
+  document.getElementById('authMobileField').hidden = email;
+  syncContinueBtn();
+}
+
+/** Continue is disabled until there is something to continue with. */
+function syncContinueBtn() {
+  const btn = document.getElementById('authContinueBtn');
+  if (isBusy(btn)) return;
+  const input = authMethod() === 'email' ? authEmailInput : authMobileInput;
+  btn.disabled = !input.value.trim();
+}
+
+/** The identifier exactly as /login wants it, or '' when nothing is typed. */
+function stepOneIdentifier() {
+  if (authMethod() === 'email') return authEmailInput.value.trim();
+  const digits = authMobileInput.value.replace(/[\s-]/g, '');
+  return digits ? dialOfSelect('authDial') + digits : '';
+}
+
+/** '+919876543210' -> { iso: 'IN', national: '9876543210' }.
+ *
+ *  Needed to put a remembered mobile back into the two controls, and to mask
+ *  one. The longest dial code that prefixes the number wins, and on a tie
+ *  (+1 is nineteen countries) the default country does — the national number
+ *  is the same whichever of them is picked. */
+function splitMobile(full) {
+  const raw = String(full || '');
+  const digits = raw.replace(/\D/g, '');
+  if (!raw.trim().startsWith('+') || typeof CountryCodes === 'undefined') {
+    return { iso: null, national: digits };
+  }
+  let best = null;
+  CountryCodes.list().forEach(c => {
+    const d = c.dial.slice(1);
+    if (!digits.startsWith(d)) return;
+    const len = best ? best.dial.length - 1 : -1;
+    if (d.length > len || (d.length === len && c.iso === CountryCodes.DEFAULT_ISO)) best = c;
+  });
+  return best
+    ? { iso: best.iso, national: digits.slice(best.dial.length - 1) }
+    : { iso: null, national: digits };
+}
+
+
+/* --- masking ---------------------------------------------------------------
+   The code step shows where the code went without printing the address in
+   full: enough to recognise, not enough to harvest from a shoulder-surf or a
+   screenshot. */
+function maskEmail(email) {
+  const [user, domain] = String(email || '').split('@');
+  if (!user || !domain) return '';
+  return `${user.charAt(0)}***@${domain}`;
+}
+
+function maskMobile(full) {
+  const { iso, national } = splitMobile(full);
+  const dial = iso && typeof CountryCodes !== 'undefined' ? CountryCodes.dialOf(iso) : '';
+  const shown = national.slice(0, -2).replace(/\d/g, 'X') + national.slice(-2);
+  const grouped = shown.length === 10 ? `${shown.slice(0, 5)} ${shown.slice(5)}` : shown;
+  return (dial ? `${dial} ` : '') + grouped;
+}
+
+/* --- signup, reached with or without an address -----------------------------
+   From an email on step one, the signup email is that address, locked, with
+   Change beside it — nobody types it twice. From a mobile, or straight from
+   "Create an account", there is no email yet, so the field is an ordinary one;
+   a mobile already typed is carried into the signup mobile instead. Never
+   overwrites a signup mobile the traveller has already edited. */
+function prepareSignup() {
+  const su = document.getElementById('suEmail');
+  const fromStepOne = authMethod() === 'email' ? authEmailInput.value.trim() : '';
+  const lock = isEmail(fromStepOne);
+  if (lock) su.value = fromStepOne;
+  su.readOnly = lock;
+  document.getElementById('suEmailWrap').classList.toggle('field-locked', lock);
+  document.getElementById('suEmailChange').hidden = !lock;
+
+  const suMobile = document.getElementById('suMobile');
+  const national = authMobileInput.value.trim();
+  if (authMethod() === 'mobile' && national && !suMobile.value.trim()) {
+    suMobile.value = national;
+    document.getElementById('suDial').value = document.getElementById('authDial').value;
+  }
+}
+
 
 /* --- inline validation ---------------------------------------------------
    Every message lands beside its own field. There is not a single alert() or
@@ -1010,25 +1148,40 @@ const isMobile = v => /^\d{6,14}$/.test(String(v).replace(/[\s-]/g, ''));
  *  that is 12KB of markup on a page that mostly never opens this dialog, and
  *  three other forms want the same list (see country-codes.js). */
 (function fillDialCodes() {
-  const sel = document.getElementById('suDial');
-  if (!sel || typeof CountryCodes === 'undefined') return;
-  sel.innerHTML = CountryCodes.options(CountryCodes.DEFAULT_ISO);
+  if (typeof CountryCodes === 'undefined') return;
+  /* Two selects now: signup's, and the sign-in mobile field's. */
+  ['suDial', 'authDial'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) sel.innerHTML = CountryCodes.options(CountryCodes.DEFAULT_ISO);
+  });
 })();
 
-/** '+91', from whatever the select is showing. */
-function signupDial() {
-  const sel = document.getElementById('suDial');
+/** '+91', from whatever the given select is showing. */
+function dialOfSelect(id) {
+  const sel = document.getElementById(id);
   return (typeof CountryCodes !== 'undefined')
     ? CountryCodes.dialOf(sel ? sel.value : null) : '+91';
 }
+function signupDial() { return dialOfSelect('suDial'); }
 
 /* Clear a field's error the moment the traveller starts fixing it — leaving
    it there while they type reads as though the correction is not registering. */
 authOverlay.addEventListener('input', e => {
-  if (e.target.matches('input') && e.target.classList.contains('is-invalid')) {
+  if (e.target.id && e.target.matches('input') && e.target.classList.contains('is-invalid')) {
     setFieldError(e.target.id, '');
   }
   if (e.target.id === 'suPass') renderPasswordStrength();
+  if (e.target === authEmailInput || e.target === authMobileInput) syncContinueBtn();
+});
+
+/* Mobile Number <-> Email. The caret follows the field that just appeared,
+   and an error written against the other one is no longer about anything. */
+authOverlay.addEventListener('change', e => {
+  if (e.target.name !== 'authMethod') return;
+  setFieldError('authEmail', '');
+  setFieldError('authMobile', '');
+  syncAuthMethod();
+  (authMethod() === 'email' ? authEmailInput : authMobileInput).focus();
 });
 
 /* --- open / close --------------------------------------------------------- */
@@ -1044,20 +1197,8 @@ function openAuth(step) {
   authOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   otpChallenge = null;
-
-  /* Remember Me gives back the address, never the password. With one on file
-     the email step has nothing left to ask, so it is skipped. */
-  const remembered = localStorage.getItem(CUSTOMER_KEYS.remember);
-  if (!step && remembered) {
-    document.getElementById('liUser').value = remembered;
-    document.getElementById('liRemember').checked = true;
-    showStep('password');
-    return;
-  }
-  if (remembered) {
-    document.getElementById('authEmail').value = remembered;
-    document.getElementById('liRemember').checked = true;
-  }
+  syncAuthMethod();
+  syncDialFace();
   showStep(step || 'email');
 }
 
@@ -1076,7 +1217,13 @@ function closeAuth() {
   setTimeout(done, 300);
 
   otpChallenge = null;
+  stopResendTimer();
+  clearOtp(false);
+  showDevOtp(null);
   clearFieldErrors();
+  /* Dismissed without signing in: the account tab that opened the modal is
+     no longer wanted. (A successful sign-in took it already, above.) */
+  if (typeof AccountCenter !== 'undefined' && AccountCenter.clearPendingTab) AccountCenter.clearPendingTab();
   if (authReturnFocus && document.contains(authReturnFocus)) authReturnFocus.focus();
   authReturnFocus = null;
 }
@@ -1134,23 +1281,11 @@ authOverlay.addEventListener('click', e => {
      same row of links; showStep() would throw on a name AUTH_STEPS has no
      view for, so it is answered before that. */
   if (next === 'guest') { closeAuth(); return; }
-  /* Carry the address forward so it is never typed twice. */
-  if (next === 'signup') document.getElementById('suEmail').value = currentAuthEmail();
-  if (next === 'password') document.getElementById('liUser').value = currentAuthEmail();
-  if (next === 'forgot') document.getElementById('fpEmail').value = currentAuthEmail();
-  if (next === 'email') document.getElementById('authEmail').value = currentAuthEmail();
+  /* Carrying the address into signup is prepareSignup()'s job, run by
+     showStep; the first step keeps its own values, so coming back to it
+     returns exactly what was typed there. */
   showStep(next);
 });
-
-/** Whichever step holds the address the traveller has given us. */
-function currentAuthEmail() {
-  const ids = ['authEmail', 'liUser', 'suEmail', 'fpEmail'];
-  for (const id of ids) {
-    const v = (document.getElementById(id) || {}).value;
-    if (v && v.trim()) return v.trim();
-  }
-  return '';
-}
 
 authCloseBtn.addEventListener('click', closeAuth);
 authOverlay.addEventListener('click', e => { if (e.target === authOverlay) closeAuth(); });
@@ -1158,51 +1293,73 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && authOverlay.classList.contains('open')) closeAuth();
 });
 
-/* --- step 1: the email ---------------------------------------------------- */
-document.getElementById('authEmailForm').addEventListener('submit', e => {
+/* --- step 1: mobile number or email -> the code ---------------------------
+   Continue validates, then asks /request-otp to send the code. That is the
+   whole sign-in on this side: no password, and no session until the code is
+   spent at /verify-otp. */
+document.getElementById('authEmailForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const email = document.getElementById('authEmail').value.trim();
-  if (!email) return setFieldError('authEmail', 'Enter your email address.');
-  if (!isEmail(email)) return setFieldError('authEmail', 'That does not look like an email address.');
-  setFieldError('authEmail', '');
+  const btn = document.getElementById('authContinueBtn');
+  const msg = document.getElementById('authEmailMsg');
+  if (isBusy(btn)) return;
+  clearFieldErrors();
+  setModalMsg(msg, '', 'muted');
 
-  /* Straight to the password step. If they have no account they take the
-     "Create your account" link below it, which carries this address across. */
-  document.getElementById('liUser').value = email;
-  document.getElementById('suEmail').value = email;
-  showStep('password');
-});
-
-/* --- forgot password ------------------------------------------------------
-   Finishes on customer/reset-password.html, because the API issues a link
-   token rather than a code. The response is deliberately the same whether or
-   not the address is registered, and this shows it verbatim. */
-document.getElementById('forgotForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const email = document.getElementById('fpEmail').value.trim();
-  const msg = document.getElementById('fpMsg');
-  const dev = document.getElementById('fpDevLink');
-  dev.textContent = '';
-  if (!email) return setFieldError('fpEmail', 'Enter your email address.');
-  if (!isEmail(email)) return setFieldError('fpEmail', 'That does not look like an email address.');
-  setFieldError('fpEmail', '');
-
-  setModalMsg(msg, 'Sending…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/forgot-password`, { email });
-    setModalMsg(msg, data.message || 'If an account exists for that email, a reset link is on its way.', 'ok');
-    /* Debug builds return the link so a reset can be tested without SMTP. */
-    if (data.reset_link) {
-      const a = document.createElement('a');
-      a.href = data.reset_link;
-      a.textContent = 'Open the reset link (debug)';
-      a.className = 'modal-devlink';
-      dev.appendChild(a);
+  const byEmail = authMethod() === 'email';
+  const fieldId = byEmail ? 'authEmail' : 'authMobile';
+  if (byEmail) {
+    const email = authEmailInput.value.trim();
+    if (!email) return setFieldError('authEmail', 'Enter your email address.');
+    if (!isEmail(email)) return setFieldError('authEmail', 'Enter a valid email address.');
+  } else {
+    const national = authMobileInput.value.trim();
+    if (!national) return setFieldError('authMobile', 'Enter your mobile number.');
+    if (!isMobile(national)) return setFieldError('authMobile', 'Enter a valid mobile number.');
+    if ((dialOfSelect('authDial') + national).replace(/\D/g, '').length > 15) {
+      return setFieldError('authMobile', 'That number is too long for the country code selected.');
     }
+  }
+
+  const identifier = stepOneIdentifier();
+  setBusy(btn, true, 'Sending OTP…');
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/customer/auth/request-otp`, { identifier });
+    showOtpStep(data, 'login', identifier);
   } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not send a reset link just now.'), 'error');
+    const status = err?.response?.status;
+    /* No account matched: say so beside the field, where the fix is — the
+       "Create an account" panel sits directly under this button. */
+    if (status === 404) {
+      setFieldError(fieldId, byEmail
+        ? "We couldn't find an account with this email. Check it, or create an account below."
+        : "We couldn't find an account with this mobile number. Check it, or create an account below.");
+    } else if (status === 429) {
+      setModalMsg(msg, 'Too many OTP requests. Please wait a little and try again.', 'error');
+    } else if (status === 503) {
+      /* The code could not be emailed (customer_otp_service.issue). Nothing
+         was sent, so saying so is the truth; the generic 5xx line is not. */
+      setModalMsg(msg, "We couldn't send your OTP right now. Please try again in a few minutes.", 'error');
+    } else {
+      setModalMsg(msg, authErrorFor(err, 'We could not send the OTP. Please try again.'), 'error');
+    }
+  } finally {
+    setBusy(btn, false);
+    syncContinueBtn();
   }
 });
+
+/* The country face beside the mobile field shows the flag and dial code
+   only; the native select under it (transparent, full size) is what the
+   traveller actually operates, so keyboard and screen-reader use is the
+   browser's own. */
+function syncDialFace() {
+  const sel = document.getElementById('authDial');
+  const face = document.getElementById('authDialFace');
+  if (!sel || !face || typeof CountryCodes === 'undefined') return;
+  face.querySelector('.auth-dial-flag').textContent = CountryCodes.flag(sel.value);
+  face.querySelector('.auth-dial-code').textContent = CountryCodes.dialOf(sel.value);
+}
+document.getElementById('authDial').addEventListener('change', syncDialFace);
 
 /* Where a MERCHANT lands once signed in. The sign-in itself lives on
    partner-login.html now; this constant stays because the Operations handoff
@@ -1241,49 +1398,166 @@ function setModalMsg(el, text, tone) {
 let otpChallenge = null;
 let otpOrigin = 'login';
 
-/** Move the login view to its code step. Signup borrows this too, which is why
- *  it makes sure the LOGIN view is the one on screen. */
-function showOtpStep(challenge, message, origin) {
+/** Move to the code step. Signup borrows this too.
+ *
+ *  `identifier` is what the traveller signed in with (or, for signup, the
+ *  email they registered) — only ever used to say, masked, where the code
+ *  went. The server's `message` is deliberately not shown: in email mode it
+ *  prints the full address. */
+function showOtpStep(challenge, origin, identifier) {
   otpChallenge = challenge.challenge_token;
   otpOrigin = origin;
-  /* keepMessage: the step machine would otherwise wipe the line the server
-     just gave us, which on this step is the whole instruction. */
-  showStep('otp', { keepMessage: true });
-  document.getElementById('loginOtpSub').textContent = message;
+  showStep('otp');
+
+  const sub = document.getElementById('loginOtpSub');
+  const dest = document.getElementById('otpDest');
+  const back = document.getElementById('liBackLabel');
+  if (isEmail(identifier)) {
+    sub.textContent = "We've sent a 6-digit OTP to";
+    dest.textContent = maskEmail(identifier);
+    back.textContent = origin === 'signup' ? 'Change your details' : 'Change email address';
+  } else {
+    /* Codes are emailed, never texted — see the note on #loginStepOtp. */
+    sub.textContent = "We've sent a 6-digit OTP to the email registered with";
+    dest.textContent = maskMobile(identifier);
+    back.textContent = 'Change mobile number';
+  }
+
   setModalMsg(document.getElementById('loginOtpMsg'), '', 'muted');
   showDevOtp(challenge.dev_otp);
-  const box = document.getElementById('liOtp');
-  box.value = '';
-  box.focus();
+  clearOtp(true);
+  startResendTimer();
 }
 
-/** Show the code instead of emailing it.
+/* --- the six boxes ---------------------------------------------------------
+   Six inputs, one value. Typing moves forward, Backspace on an empty box
+   moves back and clears it, the arrow keys walk, and a pasted or autofilled
+   code is spread across all six from wherever it lands (a full six-digit
+   paste always starts at the first box). Non-digits never make it in. */
+const otpBoxes = Array.from(document.querySelectorAll('#otpBoxes .otp-box'));
+const OTP_LEN = otpBoxes.length;
+
+function otpValue() { return otpBoxes.map(b => b.value).join(''); }
+
+function spreadOtp(digits, start) {
+  const from = digits.length >= OTP_LEN ? 0 : start;
+  digits.slice(0, OTP_LEN - from).split('').forEach((d, k) => { otpBoxes[from + k].value = d; });
+  const next = Math.min(from + digits.length, OTP_LEN - 1);
+  otpBoxes[next].focus();
+  afterOtpChange();
+}
+
+function clearOtp(focus) {
+  otpBoxes.forEach(b => { b.value = ''; });
+  setOtpError('');
+  syncVerifyBtn();
+  if (focus && otpBoxes[0]) otpBoxes[0].focus();
+}
+
+function setOtpError(text) {
+  document.getElementById('liOtpErr').textContent = text || '';
+  otpBoxes.forEach(b => {
+    b.classList.toggle('is-invalid', !!text);
+    b.setAttribute('aria-invalid', text ? 'true' : 'false');
+  });
+}
+
+function syncVerifyBtn() {
+  const btn = document.getElementById('liVerifyBtn');
+  if (!isBusy(btn)) btn.disabled = otpValue().length !== OTP_LEN;
+}
+
+function afterOtpChange() {
+  if (document.getElementById('liOtpErr').textContent) setOtpError('');
+  syncVerifyBtn();
+}
+
+otpBoxes.forEach((box, i) => {
+  box.addEventListener('focus', () => box.select());
+  box.addEventListener('input', () => {
+    const digits = box.value.replace(/\D/g, '');
+    if (digits.length > 1) { box.value = ''; spreadOtp(digits, i); return; }
+    box.value = digits;
+    if (digits && i < OTP_LEN - 1) otpBoxes[i + 1].focus();
+    afterOtpChange();
+  });
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !box.value && i > 0) {
+      e.preventDefault();
+      otpBoxes[i - 1].value = '';
+      otpBoxes[i - 1].focus();
+      afterOtpChange();
+    } else if (e.key === 'ArrowLeft' && i > 0) {
+      e.preventDefault(); otpBoxes[i - 1].focus();
+    } else if (e.key === 'ArrowRight' && i < OTP_LEN - 1) {
+      e.preventDefault(); otpBoxes[i + 1].focus();
+    }
+  });
+  box.addEventListener('paste', e => {
+    const digits = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '');
+    e.preventDefault();
+    if (digits) spreadOtp(digits, i);
+  });
+});
+
+/* --- resend countdown ------------------------------------------------------
+   Thirty seconds between requests, on the client, so an impatient traveller
+   is not the one who spends the server's limit (five codes an hour per
+   customer, five resends a minute per IP — customer_otp_service and the
+   /resend-otp decorator). Those are the real controls; this is manners. */
+const RESEND_SECONDS = 30;
+
+function startResendTimer() {
+  stopResendTimer();
+  const btn = document.getElementById('liResendBtn');
+  let left = RESEND_SECONDS;
+  const tick = () => {
+    if (left <= 0) { stopResendTimer(true); return; }
+    btn.disabled = true;
+    btn.textContent = `Resend OTP in ${left}s`;
+    left -= 1;
+  };
+  tick();
+  resendTimer = setInterval(tick, 1000);
+}
+
+function stopResendTimer(ready) {
+  if (resendTimer) clearInterval(resendTimer);
+  resendTimer = null;
+  if (ready) {
+    const btn = document.getElementById('liResendBtn');
+    btn.disabled = false;
+    btn.textContent = 'Resend OTP';
+  }
+}
+
+
+/** Leave the code step, dropping the challenge.
  *
- *  The API returns `dev_otp` only in DEV_MODE — either because no mail server
- *  is configured, or because OTP_DEV_MODE is on for local work while SMTP
- *  keeps sending everything else. It is never present on a deployed server, so
- *  this is a no-op there and the code arrives by email as normal.
+ *  Back to the first step, which still holds what was typed so it can be
+ *  corrected — or, after a signup, back to the signup form, so a correction
+ *  there does not dump the traveller on a form they never asked for. */
+/** Local development only: show the code the API returned.
  *
- *  It no longer says "email is not configured": that stopped being the only
- *  reason the moment the contact form needed SMTP switched on.
- *
- *  Text content, never innerHTML — the value is echoed from a response and has
- *  no business being parsed as markup. */
+ *  `dev_otp` exists only on a non-deployed host in dev delivery mode — the
+ *  backend never sends it from a deployed one (settings.deployed), so in
+ *  production this always receives nothing and hides the box. The frontend
+ *  decides nothing here; it only displays what the server chose to return.
+ *  Text content, never innerHTML, and never logged or stored. */
 function showDevOtp(code) {
   const el = document.getElementById('liDevOtp');
   if (!el) return;
   el.textContent = code ? `Development mode — your code is ${code}` : '';
-  el.className = code ? 'modal-devbox' : '';
+  el.hidden = !code;
 }
 
-/** Back to the credentials step, dropping the challenge. */
 function showCredsStep() {
   otpChallenge = null;
-  document.getElementById('liOtp').value = '';
-  /* Back to whichever form started the challenge, so "use a different
-     account" after a signup does not dump the traveller on a login form
-     they never asked for. */
-  showStep(otpOrigin === 'signup' ? 'signup' : 'password');
+  stopResendTimer();
+  showDevOtp(null);
+  clearOtp(false);
+  if (otpOrigin === 'signup') showStep('signup');
+  else showStep('email');
 }
 
 /** The one place a customer session is created. */
@@ -1293,6 +1567,11 @@ function completeCustomerSignIn(data) {
                 'customer', c.id);
   otpChallenge = null;
   renderAuthNav();
+  /* Taken BEFORE closeAuth(), which forgets it: a Wishlist (or other account)
+     click that opened this modal gets that screen as soon as the traveller is
+     signed in, instead of having to click it again. */
+  const acctTab = (typeof AccountCenter !== 'undefined' && AccountCenter.takePendingTab)
+    ? AccountCenter.takePendingTab() : null;
   closeAuth();
   /* Reset to the first step for next time, AFTER closing — doing it before
      would flash the email form as the modal fades out. */
@@ -1306,6 +1585,7 @@ function completeCustomerSignIn(data) {
      greeting is skipped: they are leaving. */
   if (returnToNext()) return;
   showToast(`Welcome back, ${(c.full_name || '').split(' ')[0] || 'traveller'}!`);
+  if (acctTab && typeof AccountCenter !== 'undefined') AccountCenter.open(acctTab);
 }
 
 /** Honour `?next=` after signing in.
@@ -1364,7 +1644,10 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
   }
   if (pass !== pass2) return setFieldError('suPass2', 'Both passwords must match.');
 
-  setModalMsg(msg, 'Creating your account…', 'muted');
+  const suBtn = document.getElementById('suRequestBtn');
+  if (isBusy(suBtn)) return;
+  setModalMsg(msg, '', 'muted');
+  setBusy(suBtn, true, 'Creating your account…');
   try {
     const { data } = await axios.post(`${API_BASE}/api/customer/auth/signup`, {
       /* The dial code travels WITH the number. The API stores one string and
@@ -1375,72 +1658,100 @@ document.getElementById('signupForm')?.addEventListener('submit', async e => {
       password: pass, confirm_password: pass2,
     });
     setModalMsg(msg, '', 'muted');
-    showOtpStep(data, data.message || `A verification code was sent to ${email}.`, 'signup');
+    /* The signup code goes to the email just registered, so that is the
+       address shown (masked) on the code step. */
+    showOtpStep(data, 'signup', email);
   } catch (err) {
     setModalMsg(msg, apiErrorText(err, 'We could not create your account.'), 'error');
+  } finally {
+    setBusy(suBtn, false);
   }
 });
 
-/* --- Sign in, step 1: password ------------------------------------------ */
-document.getElementById('loginForm').addEventListener('submit', async e => {
+/* --- Sign in, step 2: the code ------------------------------------------
+   The server's wording is translated into the messages a traveller can act
+   on. Its details are already plain English — this API never returns a stack
+   trace — but "No verification code outstanding" means nothing to someone
+   looking at a code in their inbox, and it is the same situation as an
+   expired one: ask for another. */
+function otpFailureText(err) {
+  const status = err?.response?.status;
+  const detail = String(err?.response?.data?.detail || '');
+  if (status === 400 && /expired|outstanding/i.test(detail)) {
+    return { expired: true, text: 'OTP expired. Please request a new OTP.' };
+  }
+  if (status === 429) return { expired: true, text: 'Too many attempts. Please request a new OTP.' };
+  if (status === 400) return { expired: false, text: 'Invalid OTP. Please try again.' };
+  return null;
+}
+
+/** A server fault is never shown in its own words — a 5xx detail is for the
+ *  log, not the traveller. Everything else keeps apiErrorText's wording,
+ *  which already handles the unreachable-server and rate-limit cases. */
+function authErrorFor(err, fallback) {
+  if ((err?.response?.status || 0) >= 500) return 'Something went wrong on our side. Please try again.';
+  return apiErrorText(err, fallback);
+}
+
+/** The challenge is gone server-side: only asking for a new code can work. */
+function otpSessionExpired() {
+  showCredsStep();
+  setModalMsg(document.getElementById(otpOrigin === 'signup' ? 'signupMsg' : 'authEmailMsg'),
+    'Your sign-in session expired. Please continue again.', 'error');
+}
+
+document.getElementById('otpForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const identifier = document.getElementById('liUser').value.trim();
-  const pass = document.getElementById('liPass').value;
-  const msg = document.getElementById('loginMsg');
-
-  if (!identifier) { setModalMsg(msg, 'Enter your email or mobile number.', 'error'); return; }
-  if (!pass) { setModalMsg(msg, 'Enter your password.', 'error'); return; }
-
-  /* Remember Me holds the ADDRESS only, never the password, and it outlives
-     sign-out on purpose — that is the feature. */
-  if (document.getElementById('liRemember').checked) {
-    localStorage.setItem(CUSTOMER_KEYS.remember, identifier);
-  } else {
-    localStorage.removeItem(CUSTOMER_KEYS.remember);
-  }
-
-  setModalMsg(msg, 'Checking…', 'muted');
-  try {
-    const { data } = await axios.post(`${API_BASE}/api/customer/auth/login`,
-      { identifier, password: pass });
-    setModalMsg(msg, '', 'muted');
-    document.getElementById('liPass').value = '';
-    showOtpStep(data, data.message || 'Enter the 6-digit code we just sent you.', 'login');
-  } catch (err) {
-    /* A merchant or admin address fails here exactly as an unknown one does —
-       the endpoint reads the customer database and nothing else. Saying so
-       would confirm the account exists somewhere, so the copy stays generic. */
-    setModalMsg(msg, apiErrorText(err, 'Those details did not match an account.'), 'error');
-  }
-});
-
-/* --- Sign in, step 2: the code ------------------------------------------ */
-document.getElementById('liVerifyBtn').addEventListener('click', async () => {
-  const code = document.getElementById('liOtp').value.trim();
+  const btn = document.getElementById('liVerifyBtn');
   const msg = document.getElementById('loginOtpMsg');
-  if (!/^\d{4,8}$/.test(code)) { setModalMsg(msg, 'Enter the code we sent you.', 'error'); return; }
-  if (!otpChallenge) { setModalMsg(msg, 'That code has expired — please sign in again.', 'error'); return; }
+  if (isBusy(btn)) return;
+  setModalMsg(msg, '', 'muted');
 
-  setModalMsg(msg, 'Verifying…', 'muted');
+  const code = otpValue();
+  if (!/^\d{6}$/.test(code)) { setOtpError('Enter all 6 digits of the OTP.'); return; }
+  if (!otpChallenge) { otpSessionExpired(); return; }
+
+  setBusy(btn, true, 'Verifying…');
+  let signedIn = false;
   try {
     const { data } = await axios.post(`${API_BASE}/api/customer/auth/verify-otp`,
       { challenge_token: otpChallenge, code });
+    signedIn = true;
+    stopResendTimer();
     completeCustomerSignIn(data);
   } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'That code was not right.'), 'error');
+    /* A dead challenge means the ten-minute window closed. Say so and go
+       back, rather than leaving them retrying a code against a token the
+       server has forgotten. */
+    if (err?.response?.status === 401) { otpSessionExpired(); return; }
+    const known = otpFailureText(err);
+    if (!known) {
+      setModalMsg(msg, authErrorFor(err, 'We could not verify the OTP. Please try again.'), 'error');
+      return;
+    }
+    /* Wrong digits are cleared so the next attempt starts clean; an expired
+       or burned code frees Resend at once — waiting out the countdown for a
+       code that can never work is pointless. */
+    clearOtp(true);
+    setOtpError(known.text);
+    if (known.expired) stopResendTimer(true);
+  } finally {
+    setBusy(btn, false);
+    if (!signedIn) syncVerifyBtn();
   }
 });
 
-/* Enter submits the code, the same as the button. */
-document.getElementById('liOtp').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('liVerifyBtn').click(); }
-});
-
-document.getElementById('liResendBtn').addEventListener('click', async e => {
-  e.preventDefault();
+document.getElementById('liResendBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('liResendBtn');
   const msg = document.getElementById('loginOtpMsg');
-  if (!otpChallenge) { setModalMsg(msg, 'Please sign in again.', 'error'); return; }
-  setModalMsg(msg, 'Sending a new code…', 'muted');
+  if (btn.disabled) return;
+  if (!otpChallenge) { otpSessionExpired(); return; }
+
+  /* Disabled for the whole request and then for a fresh countdown, success
+     or failure alike, so a failing resend cannot be hammered either. */
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  setModalMsg(msg, '', 'muted');
   try {
     const { data } = await axios.post(`${API_BASE}/api/customer/auth/resend-otp`,
       { challenge_token: otpChallenge });
@@ -1449,18 +1760,22 @@ document.getElementById('liResendBtn').addEventListener('click', async e => {
        has to move with it for the same reason. */
     if (data.challenge_token) otpChallenge = data.challenge_token;
     showDevOtp(data.dev_otp);
-    document.getElementById('liOtp').value = '';
-    setModalMsg(msg, data.message || 'A new code is on its way.', 'ok');
+    clearOtp(true);
+    setModalMsg(msg, 'A new OTP has been sent.', 'ok');
   } catch (err) {
-    setModalMsg(msg, apiErrorText(err, 'We could not send another code.'), 'error');
+    if (err?.response?.status === 401) { otpSessionExpired(); return; }
+    setModalMsg(msg, err?.response?.status === 429
+      ? 'Too many OTP requests. Please try again later.'
+      : authErrorFor(err, 'We could not send a new OTP. Please try again.'), 'error');
   }
+  startResendTimer();
 });
 
-document.getElementById('liBackBtn').addEventListener('click', e => {
-  e.preventDefault();
+/* "Change mobile number" / "Change email address": back to the first step,
+   which still holds what was typed, so it can be corrected rather than
+   retyped. The challenge is dropped — a code for the old address is no use. */
+document.getElementById('liBackBtn').addEventListener('click', () => {
   showCredsStep();
-  setModalMsg(document.getElementById('loginMsg'), '', 'muted');
-  document.getElementById('liUser').focus();
 });
 
 /* ---------------------------------------------------------------------------

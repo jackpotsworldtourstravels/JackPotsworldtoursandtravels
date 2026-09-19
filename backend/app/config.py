@@ -53,6 +53,20 @@ class Settings(BaseSettings):
     # password the second factor as well.
     otp_dev_echo: bool = False
 
+    # True on a deployed host, and set by deploy/docker-compose.yml itself —
+    # in `environment:`, which overrides the server's backend/.env — so it
+    # cannot be forgotten or copied away with a .env file.
+    #
+    # It matters more than otp_dev_echo's warning suggests since the customer
+    # sign-in became passwordless (/api/customer/auth/request-otp): a code
+    # returned in the API response there is not a second factor handed over,
+    # it is the WHOLE sign-in — anyone could type a customer's email and read
+    # the code back. So on a deployed host customer codes are always emailed
+    # and never returned, whatever otp_dev_echo or SMTP say, and a code that
+    # cannot be emailed fails the request instead of falling back to dev mode.
+    # Locally it stays False and nothing changes.
+    deployed: bool = False
+
     # Where booking-request documents (passports, visas, IDs) are written.
     # Deliberately OUTSIDE any served directory and never mounted with
     # StaticFiles — these files are returned only through an authenticated

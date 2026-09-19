@@ -4,20 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign In — JackPots World Tours &amp; Travels</title>
-<meta name="description" content="Sign in to your JackPots World customer account to manage your trips and bookings.">
+<meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="../assets/images/favicon-180.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<!-- jp-ds.css FIRST: it declares the --jp-* tokens customer.css then consumes.
-     Reversing these two leaves every token undefined and the page unstyled. -->
-<link rel="stylesheet" href="../assets/css/jp-ds.css?v=20260911b2d1">
-<link rel="stylesheet" href="css/customer.css?v=20260911b2d1">
+<!-- ONE CUSTOMER SIGN-IN. This page used to render its own password -> code
+     form (customer-login.js). The customer sign-in is now the dialog on the
+     home page — mobile or email, then a code — so this address forwards to
+     it and asks to come back to the dashboard afterwards. Both share the
+     jpc_access / jpc_refresh session keys, so the dashboard sees the sign-in.
+     A `next` already on the URL wins; app.js only honours same-origin paths. -->
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (!q.get('next')) q.set('next', '/customer/dashboard.html');
+    q.set('signin', '1');
+    location.replace('../index.html?' + q.toString());
+  })();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=../index.html"></noscript>
 </head>
-<body class="cx">
-  <div class="cx-auth" id="cxShell"></div>
-
-  <script src="js/customer-core.js?v=20260911b2d1"></script>
-  <script src="js/customer-login.js?v=20260911b2d1"></script>
+<body>
+  <p><a href="../index.html?signin=1&amp;next=/customer/dashboard.html">Continue to sign in</a></p>
 </body>
 </html>

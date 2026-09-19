@@ -410,19 +410,50 @@ const BookingCard = (function () {
       + '</div></div>';
   }
 
-  /* Gaming trips. The same two questions the holiday panel asks, because they
-     are the same table (customer_packages, migration 0069) reached through the
-     same flow — only the shelf differs, and the tab is what says which. */
+  /* Gaming Tour Packages: WHERE, WHICH DAY, WHAT TIME — and nothing else.
+
+     The Casino / Poker / Gaming Event type dropdown is gone on request; so is
+     the month select. Destination is filled from GET /api/customer/destinations
+     (fillGamingDestinations below), the same list the homepage shelf shows, so
+     no place name is written here. Date is the card's own date control — the
+     one Hotels and Flights use — and time is a native time input in the same
+     field shell.
+
+     WHAT IT HANDS OVER. gaming-packages.html already filters by `type` (it
+     becomes the destination filter there) and reconciles `month` against real
+     departure months, so the destination travels as `type` and the date's
+     month as `month`; `date` and `time` go along as well. That page is not
+     changed. */
   function gamingPanel() {
     return panelOpen('gaming')
-      + '<div class="search-fields cols-3">'
-      + '<div class="field"><label for="gType">Gaming Package Type</label><select id="gType">'
-      + '<option>Casino Tour Package</option>'
-      + '<option>Poker Tour Package</option>'
-      + '<option>Gaming Event Package</option></select></div>'
-      + '<div class="field"><label for="gMonth">Month</label><select id="gMonth">'
-      + monthOptions('July') + '</select></div>'
+      + '<div class="search-fields cols-gaming">'
+      + '<div class="field"><label for="gDest">Destination</label>'
+      + '<select id="gDest"><option value="">Loading destinations…</option></select></div>'
+      + dateField('gDate', 'Date')
+      + '<div class="field"><label for="gTime">Time</label>'
+      + '<input id="gTime" type="time" step="900"></div>'
       + '</div></div>';
+  }
+
+  /** One read of the destinations list for the Gaming panel's select. Public
+   *  route, same-origin, no token. A failure leaves an honest option rather
+   *  than an invented list, and the validator asks for a destination. */
+  async function fillGamingDestinations() {
+    const sel = $('gDest');
+    if (!sel) return;
+    try {
+      const res = await fetch('/api/customer/destinations', {
+        headers: { Accept: 'application/json' }, credentials: 'same-origin',
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const rows = (await res.json() || []).filter(d => d && d.name);
+      const keep = sel.value;
+      sel.innerHTML = '<option value="">Select destination</option>'
+        + rows.map(d => '<option value="' + esc(d.name) + '">' + esc(d.name) + '</option>').join('');
+      if (keep) sel.value = keep;
+    } catch (e) {
+      sel.innerHTML = '<option value="">Destinations unavailable — try again</option>';
+    }
   }
 
   /* THE PRODUCT TABS, AND WHY ALL FOUR PANELS ARE BUILT.
@@ -501,7 +532,7 @@ const BookingCard = (function () {
     { id: 'flights',  label: 'Flights',          icon: 'flights' },
     { id: 'hotels',   label: 'Hotels',           icon: 'hotels' },
     { id: 'packages', label: 'Tour Packages', icon: 'packages' },
-    { id: 'gaming',   label: 'Gaming Packages',  icon: 'gaming' },
+    { id: 'gaming',   label: 'Gaming Tour Packages',  icon: 'gaming' },
   ];
 
   /* Which tabs can actually run a search. The Search button and the criteria
@@ -853,7 +884,7 @@ const BookingCard = (function () {
     }
 
     if (state.tab === 'gaming') {
-      return [val('gType') || 'Gaming packages', val('gMonth')];
+      return [val('gDest') || 'Gaming tour packages', join([textOf('gDate'), val('gTime')])];
     }
 
     /* cruises is unreachable from TABS now; the branch is kept with
@@ -915,7 +946,7 @@ const BookingCard = (function () {
     const group = state.tab === 'hotels' && state.hotelMode === 'group';
     /* The reference names the product on the button. */
     const LABEL = { flights: 'Search Flights', hotels: 'Search Hotels',
-                    packages: 'Search Packages', gaming: 'Search Gaming Packages',
+                    packages: 'Search Packages', gaming: 'Search Gaming Tours',
                     cruises: 'Search Cruises' };
     const label = group ? 'Request Group Quote' : (LABEL[state.tab] || 'Search');
     /* THE ARROW IS THE DESIGN'S, and it is only on a SEARCH. "Request Group
@@ -1414,7 +1445,16 @@ const BookingCard = (function () {
     if (kind === 'flights') return flightCriteria();
     if (kind === 'hotels') return hotelCriteria();
     if (kind === 'packages') return { type: val('pType'), month: val('pMonth') };
-    if (kind === 'gaming') return { type: val('gType'), month: val('gMonth') };
+    if (kind === 'gaming') {
+      const date = nativeDate('gDate');
+      return {
+        type: val('gDest'),
+        /* The month NAME, which is what the packages page matches. */
+        month: date ? MONTHS[Number(date.slice(5, 7)) - 1] : '',
+        date,
+        time: val('gTime'),
+      };
+    }
     /* An enquiry tab has no criteria to give — its panel carries its own link
        and the Search button is hidden on it. */
     return {};
@@ -1506,6 +1546,13 @@ const BookingCard = (function () {
       return null;
     },
     packages() { return null; },
+    gaming(p) {
+      if (!p.type) return ['Choose a destination.', 'gDest'];
+      if (!p.date) return ['Choose a date.', 'gDate'];
+      if (p.date < isoDay(new Date())) return ['Choose a date from today onwards.', 'gDate'];
+      if (!p.time) return ['Choose a time.', 'gTime'];
+      return null;
+    },
   };
 
   /* ---------------------------------------------------------------------
@@ -2171,6 +2218,11 @@ const BookingCard = (function () {
     const outNative = root.querySelector('[data-hf="out"] .date-native');
     if (inNative) inNative.min = isoDay(today);
     if (outNative) outNative.min = addDays(isoDay(today), 2);
+    /* Gaming: no past dates, and no guessed default — the event day is the
+       traveller's to choose. */
+    const gNative = $('gDate') && $('gDate').closest('.field-date').querySelector('.date-native');
+    if (gNative) gNative.min = isoDay(today);
+    fillGamingDestinations();
 
     bind();
     /* Two empty legs, because one leg is not a multi-city trip and asking the

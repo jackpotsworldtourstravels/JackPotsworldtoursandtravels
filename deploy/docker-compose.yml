@@ -29,6 +29,14 @@ services:
       # has already been answered wrongly once here, from output that looked
       # healthy but described the previous build.
       APP_COMMIT: ${APP_COMMIT:-unknown}
+      # THIS IS A DEPLOYED HOST, and sign-in codes are emailed, never shown.
+      # Set here for the same reason as REDIS_URL: `environment` overrides the
+      # server's backend/.env, so a laptop .env copied up (which carries
+      # OTP_DEV_ECHO=true) cannot put the code in the API response — where,
+      # with the passwordless customer sign-in, it would be the whole login.
+      # See `deployed` in backend/app/config.py.
+      DEPLOYED: "true"
+      OTP_DEV_ECHO: "false"
     restart: unless-stopped
     # No ports mapping: the app is reachable only through Caddy, on the
     # compose network. Publishing 8000 to the host would expose an untrusted

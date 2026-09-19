@@ -139,8 +139,27 @@ img { max-width: 100%; }
 .sp-bookings[aria-current="page"] { background: rgba(255,255,255,.16); }
 @media (max-width: 760px) { .sp-bookings span { display: none; } .sp-bookings { padding: 9px 11px; } }
 
-.sp-login { padding: 9px 15px; border-radius: 999px; font-size: 13.5px; font-weight: 800; background: var(--sp-accent); color: var(--on-accent, #12253F); transition: background .18s ease; }
-.sp-login:hover { background: var(--sp-accent-dk); }
+/* The outlined pill — identical to .pm-login in profile-menu.css, which the
+   booking pages use; these content pages do not load that sheet. */
+.sp-login { display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 14px;
+  border-radius: 999px; border: 1.5px solid rgba(255,255,255,.7); background: transparent;
+  color: var(--sp-header-ink, #fff); font-size: 14px; font-weight: 600; line-height: 1.2;
+  white-space: nowrap; transition: background .18s ease, border-color .18s ease; }
+.sp-login:hover { border-color: #fff; background: rgba(255,255,255,.10); }
+.sp-login:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.sp-login svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sp-login .sp-login-arrow { width: 18px; height: 18px; transition: transform .18s ease; }
+.sp-login:hover .sp-login-arrow { transform: translateX(3px); }
+@media (max-width: 480px) {
+  .sp-login { gap: 7px; padding: 7px 12px 7px 10px; }
+  .sp-login .sp-login-arrow { display: none; }
+  .sp-login svg { width: 18px; height: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-login .sp-login-arrow { transition: none; }
+  .sp-login:hover .sp-login-arrow { transform: none; }
+}
 
 .sp-chip { display: flex; align-items: center; gap: 9px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 1px solid rgba(255,255,255,.22); background: transparent; color: #fff; cursor: pointer; font-family: inherit; }
 .sp-chip:hover { background: rgba(255,255,255,.12); }
@@ -208,3 +227,7 @@ img { max-width: 100%; }
   .sp-chip-name { display: none; }
   .sp-hero { padding: 26px 0 30px; }
 }
+
+/* A signed-in CUSTOMER does not see the B2B "My Partner" door (service-shell.js
+   sets html.jp-customer). Signed out it is shown exactly as before. */
+html.jp-customer .sp-partner { display: none; }

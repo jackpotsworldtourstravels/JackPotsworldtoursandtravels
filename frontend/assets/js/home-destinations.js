@@ -129,8 +129,10 @@
         + ' onerror="this.remove()">'
       : '';
 
-    /* A LINK, NOT A BUTTON. The card opens the destination's own hotels page
-       at /destination/{slug}, so it has to behave like a link: middle-click
+    /* A LINK, NOT A BUTTON. The card opens /destination/{slug} — the
+       destination's famous locations (destination.js), each with a "View
+       Hotels" link on to /hotels/{destination}/{location}. It no longer jumps
+       straight to hotels. It navigates, so it has to behave like a link: middle-click
        and ctrl-click open a tab, the status bar shows the target, and a
        crawler can follow it. It was a button while clicking only expanded an
        in-page panel; now that it navigates, an anchor is the honest element.
@@ -143,7 +145,7 @@
     return '<a role="listitem" class="jw-dest-card"'
       + ' href="' + esc(href) + '"'
       + ' data-dest-id="' + esc(d.id) + '"'
-      + ' aria-label="Hotels in ' + esc(d.name) + '">'
+      + ' aria-label="Explore ' + esc(d.name) + '">'
       + '<span class="jw-dest-art">' + picture + '<span class="jw-dest-scrim"></span></span>'
       + '<span class="jw-dest-body">'
       + '<span class="jw-dest-name">' + esc(d.name) + '</span>'

@@ -23,8 +23,8 @@
      that already has main.css's. The --sp-* tokens booking.css, hotel.css and
      travel-explore.css ask for are bridged onto main.css's palette by
      booking-card.css, under body.sp-continuation. -->
-<link rel="stylesheet" href="assets/css/main.css?v=20260912im1">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
@@ -39,9 +39,9 @@
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
 <!-- The Hotel Results screen. Everything inside is `hr-` scoped, so it cannot
      reach Flights, the Explore band or the shared booking engine. -->
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260912dh2">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260919b2c1">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
-<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260919lc2">
 <!-- The company footer, one stylesheet for every page that renders it. -->
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
@@ -61,13 +61,13 @@
 <script src="assets/js/destinations.js?v=20260912ds4"></script>
 <script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
-<script src="assets/js/booking-card.js?v=20260912qt1"></script>
+<script src="assets/js/booking-card.js?v=20260919b2c3"></script>
 <!-- The shared header, hero and footer. In <head> because all three are
      mounted inline, during parse — the same arrangement index.html and
      flights.html use, so nothing on this page renders a frame later than it
      does over there. -->
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260912ct2"></script>
+<script src="assets/js/hero-shell.js?v=20260919lc1"></script>
 </head>
 <body class="sp-continuation" data-sp-service="hotels" data-live-chat>
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -78,10 +78,10 @@
      below, which asks whether AccountCenter exists to decide whether the chip
      is a button or a link. Same three lines, same order, as flights.html. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="assets/js/profile-menu.js?v=20260911ic7"></script>
+<script src="assets/js/profile-menu.js?v=20260919b2c1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260915mg1"></script>
+<script src="assets/js/account-center.js?v=20260919b2c1"></script>
 
 <!-- The landing page's navigation bar, from hero-shell.js. See that file's
      header for why the markup lives there and index.html keeps its own copy. -->

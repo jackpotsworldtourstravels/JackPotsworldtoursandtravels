@@ -480,6 +480,12 @@ async def warn_if_otp_echo_is_on() -> None:
     nothing else about the running server would reveal that — so the only
     defence against it being set by accident is that it announces itself.
     """
+    if settings.deployed and not (settings.smtp_host and settings.smtp_from_email):
+        logger.error(
+            "DEPLOYED host with no SMTP (SMTP_HOST / SMTP_FROM_EMAIL): customers "
+            "cannot sign in — their codes cannot be emailed, and a deployed host "
+            "never shows them instead. Configure SMTP in backend/.env."
+        )
     if settings.otp_dev_echo:
         logger.warning(
             "OTP_DEV_ECHO is ON: login codes are NOT emailed — they are logged "
@@ -700,17 +706,32 @@ if FRONTEND_DIR.is_dir():
     # since-deleted destination should do.
     #
     # Registered BEFORE the mount below, because the mount matches everything.
-    _DESTINATION_PAGE = FRONTEND_DIR / "destination-hotels.html"
+    #
+    # THE DESTINATION FLOW IS TWO PAGES NOW: Destination -> its famous locations
+    # -> hotels around one location. /destination/{slug} used to BE the hotels
+    # page; it is the locations page (destination.html), and each location's
+    # "View Hotels" opens /hotels/{destination}/{location}, which is the same
+    # destination-hotels.html as before with the location fixed by its path.
+    # Neither route checks that the place exists, for the reason above.
+    _DESTINATION_PAGE = FRONTEND_DIR / "destination.html"
+    _LOCATION_HOTELS_PAGE = FRONTEND_DIR / "destination-hotels.html"
 
-    @app.get("/destination/{slug}", include_in_schema=False)
-    def destination_page(slug: str):                      # noqa: ARG001 — read by the page, not here
+    def _page(path):
         return FileResponse(
-            _DESTINATION_PAGE,
+            path,
             media_type="text/html",
             # Same rule the static mount applies to HTML: always revalidate, so
             # a deploy actually reaches a browser that has been here before.
             headers={"Cache-Control": "no-cache, must-revalidate"},
         )
+
+    @app.get("/destination/{slug}", include_in_schema=False)
+    def destination_page(slug: str):                      # noqa: ARG001 — read by the page, not here
+        return _page(_DESTINATION_PAGE)
+
+    @app.get("/hotels/{destination}/{location}", include_in_schema=False)
+    def location_hotels_page(destination: str, location: str):  # noqa: ARG001 — read by the page
+        return _page(_LOCATION_HOTELS_PAGE)
 
     # Mounted last so every API route above wins the match first.
     app.mount("/", CleanUrlStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

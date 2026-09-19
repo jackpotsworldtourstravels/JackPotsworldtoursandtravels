@@ -47,6 +47,21 @@ class DestinationLocation(BaseModel):
     slug: str = Field(
         description="The location's own slug, unique within its destination but not globally.",
     )
+    description: str | None = Field(
+        default=None,
+        description="One line about the place (migration 0074), or null when none is recorded.",
+    )
+    image: str | None = Field(
+        default=None,
+        description="An image KEY, not a URL — same convention as a destination's `image`.",
+    )
+    hotel_count: int = Field(
+        default=0,
+        description=(
+            "Active hotels mapped to this location by key (customer_hotels.location_id). "
+            "Zero is a true answer about the catalogue, not an error."
+        ),
+    )
 
 
 class DestinationHotelLocation(BaseModel):
@@ -91,6 +106,14 @@ class DestinationHotel(BaseModel):
         description="The location this hotel sits in, or null when unmapped.",
     )
     location_name: str | None = None
+    distance_km: float | None = Field(
+        default=None,
+        description=(
+            "Kilometres from the destination's AIRPORT, as the catalogue records it — the "
+            "same figure the hotel results page labels 'km from airport'. Not a distance "
+            "from the location: no coordinates are held that could measure one."
+        ),
+    )
 
 
 class DestinationHotelsPage(BaseModel):
@@ -102,3 +125,36 @@ class DestinationHotelsPage(BaseModel):
     page: int
     page_size: int
     total: int = Field(description="Total matching hotels, not the size of this page.")
+
+
+class LocationHotelsPage(DestinationHotelsPage):
+    """A page of hotels for one location, with the location itself."""
+
+    location: DestinationLocation
+
+
+class DestinationAttraction(BaseModel):
+    """A famous place to visit — Charminar, the Burj Khalifa (migration 0075)."""
+
+    id: str = Field(description="Namespaced slug: 'hyderabad__charminar'. Unique across the catalogue.")
+    destination_id: str = Field(description="Slug of the destination this belongs to.")
+    name: str
+    slug: str = Field(description="The attraction's own slug, unique within its destination.")
+    description: str | None = None
+    image: str | None = Field(default=None, description="An image KEY, not a URL.")
+    area_id: str | None = Field(
+        default=None,
+        description=(
+            "The nearest listed AREA ('hyderabad__tank-bund') whose hotels View Hotels shows "
+            "- hotels are filed by area, never by landmark. Null when no listed area is close "
+            "enough to call nearby."
+        ),
+    )
+    area_name: str | None = None
+    hotel_count: int = Field(default=0, description="Active hotels in that area; 0 when none or no area.")
+
+
+class AttractionHotelsPage(DestinationHotelsPage):
+    """Hotels near one attraction: the hotels of its nearest listed area."""
+
+    attraction: DestinationAttraction

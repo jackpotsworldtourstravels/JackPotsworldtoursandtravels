@@ -39,7 +39,12 @@ import unicodedata
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models_customer import CustomerDestination, CustomerHotel, CustomerLocation
+from app.models_customer import (
+    CustomerAttraction,
+    CustomerDestination,
+    CustomerHotel,
+    CustomerLocation,
+)
 
 #: Page size ceiling. A destination fed by a content provider can hold hundreds
 #: of properties, and letting a caller ask for all of them in one response is
@@ -111,15 +116,32 @@ def list_locations(db: Session, destination_id: str) -> list[dict] | None:
         .order_by(CustomerLocation.sort_order, CustomerLocation.name)
     ).all()
 
-    return [
-        {
-            "id": f"{dest.slug}__{loc.slug}",
-            "destination_id": dest.slug,
-            "name": loc.name,
-            "slug": loc.slug,
-        }
-        for loc in rows
-    ]
+    # How many active hotels sit in each location, in ONE grouped query rather
+    # than one per card. The join is the location_id foreign key (0072) — the
+    # hotel's free-text location is never read to decide this.
+    counts = dict(db.execute(
+        select(CustomerHotel.location_id, func.count())
+        .where(
+            CustomerHotel.destination_id == dest.customer_destination_id,
+            CustomerHotel.is_active.is_(True),
+            CustomerHotel.location_id.is_not(None),
+        )
+        .group_by(CustomerHotel.location_id)
+    ).all())
+
+    return [_location_row(dest, loc, counts.get(loc.customer_location_id, 0)) for loc in rows]
+
+
+def _location_row(dest: CustomerDestination, loc: CustomerLocation, hotel_count: int = 0) -> dict:
+    return {
+        "id": f"{dest.slug}__{loc.slug}",
+        "destination_id": dest.slug,
+        "name": loc.name,
+        "slug": loc.slug,
+        "description": loc.description,
+        "image": loc.image_key,
+        "hotel_count": int(hotel_count or 0),
+    }
 
 
 def _find_destination(db: Session, destination_id: str) -> CustomerDestination | None:
@@ -168,6 +190,8 @@ def _hotel_row(h: CustomerHotel, loc: CustomerLocation | None, dest: CustomerDes
         #: decided it is in Calangute — and the filter treats it as such.
         "location_id": f"{dest.slug}__{loc.slug}" if loc else None,
         "location_name": loc.name if loc else None,
+        # From the airport — see DestinationHotel.distance_km. Null stays null.
+        "distance_km": float(h.distance_km) if h.distance_km is not None else None,
     }
 
 
@@ -273,3 +297,158 @@ def list_destination_hotels(
         "page_size": page_size,
         "total": int(total),
     }
+
+
+def list_location_hotels(
+    db: Session,
+    location_id: str,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> dict | None:
+    """Hotels in one location, addressed by its namespaced id ('hyderabad__tank-bund').
+
+    The last step of the destination flow (Destination -> location -> hotels).
+    It is ``list_destination_hotels`` with the location fixed, not a second
+    query: the destination half of the id selects the destination, the location
+    half is resolved WITHIN it, and the same foreign-key filter picks the hotels.
+    So a location slug shared by two destinations can never leak hotels across.
+
+    Returns ``None`` — a 404 at the router — when either half names nothing, so
+    "no such place" is never confused with "a real place with no hotels yet",
+    which is an empty ``hotels`` list.
+    """
+    raw = str(location_id or "")
+    if "__" not in raw:
+        return None
+    dest_part, loc_part = raw.split("__", 1)
+
+    dest = _find_destination(db, dest_part)
+    if dest is None:
+        return None
+    loc = db.scalar(
+        select(CustomerLocation).where(
+            CustomerLocation.destination_id == dest.customer_destination_id,
+            CustomerLocation.slug == _slug(loc_part),
+            CustomerLocation.is_active.is_(True),
+        )
+    )
+    if loc is None:
+        return None
+
+    result = list_destination_hotels(
+        db, dest.slug, location_id=loc.slug, page=page, page_size=page_size,
+    )
+    if result is None:
+        return None
+    result["location"] = _location_row(dest, loc, result["total"])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Attractions — the famous places a destination page lists (migration 0075).
+# ---------------------------------------------------------------------------
+def _attraction_row(dest: CustomerDestination, a: CustomerAttraction,
+                    area: CustomerLocation | None, hotel_count: int) -> dict:
+    return {
+        "id": f"{dest.slug}__{a.slug}",
+        "destination_id": dest.slug,
+        "name": a.name,
+        "slug": a.slug,
+        "description": a.description,
+        "image": a.image_key,
+        "area_id": f"{dest.slug}__{area.slug}" if area else None,
+        "area_name": area.name if area else None,
+        "hotel_count": int(hotel_count or 0),
+    }
+
+
+def _hotel_counts_by_area(db: Session, dest: CustomerDestination) -> dict[int, int]:
+    """Active hotels per area of one destination, in ONE grouped query."""
+    return dict(db.execute(
+        select(CustomerHotel.location_id, func.count())
+        .where(
+            CustomerHotel.destination_id == dest.customer_destination_id,
+            CustomerHotel.is_active.is_(True),
+            CustomerHotel.location_id.is_not(None),
+        )
+        .group_by(CustomerHotel.location_id)
+    ).all())
+
+
+def list_attractions(db: Session, destination_id: str) -> list[dict] | None:
+    """The famous places in one destination, or ``None`` if no such destination.
+
+    Each carries the hotel count of its nearest listed area, because that area
+    is what "View Hotels" will show — a count of anything else would promise a
+    page the traveller does not then get.
+    """
+    dest = _find_destination(db, destination_id)
+    if dest is None:
+        return None
+    rows = db.scalars(
+        select(CustomerAttraction)
+        .where(
+            CustomerAttraction.destination_id == dest.customer_destination_id,
+            CustomerAttraction.is_active.is_(True),
+        )
+        .order_by(CustomerAttraction.sort_order, CustomerAttraction.name)
+        .options(selectinload(CustomerAttraction.area))
+    ).all()
+    counts = _hotel_counts_by_area(db, dest)
+    out = []
+    for a in rows:
+        area = a.area if (a.area and a.area.is_active) else None
+        n = counts.get(area.customer_location_id, 0) if area else 0
+        out.append(_attraction_row(dest, a, area, n))
+    return out
+
+
+def list_attraction_hotels(
+    db: Session,
+    attraction_id: str,
+    page: int = 1,
+    page_size: int = DEFAULT_PAGE_SIZE,
+) -> dict | None:
+    """Hotels near one attraction ('hyderabad__charminar'), or ``None`` if unknown.
+
+    Near means IN ITS NEAREST LISTED AREA. Hotels are filed by area (0072) and
+    never by landmark, so this is ``list_destination_hotels`` with that area as
+    the filter — the same foreign-key query, not a second one. An attraction
+    with no nearby area is a real place with no hotels to offer: an empty page,
+    not a 404, and never a distant area's hotels passed off as nearby.
+    """
+    raw = str(attraction_id or "")
+    if "__" not in raw:
+        return None
+    dest_part, slug_part = raw.split("__", 1)
+    dest = _find_destination(db, dest_part)
+    if dest is None:
+        return None
+    a = db.scalar(
+        select(CustomerAttraction)
+        .where(
+            CustomerAttraction.destination_id == dest.customer_destination_id,
+            CustomerAttraction.slug == _slug(slug_part),
+            CustomerAttraction.is_active.is_(True),
+        )
+        .options(selectinload(CustomerAttraction.area))
+    )
+    if a is None:
+        return None
+    area = a.area if (a.area and a.area.is_active) else None
+
+    page = max(1, int(page or 1))
+    page_size = max(1, min(int(page_size or DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE))
+    if area is None:
+        result = {
+            "destination": _destination_row(dest), "locations": [], "hotels": [],
+            "page": page, "page_size": page_size, "total": 0,
+        }
+    else:
+        result = list_destination_hotels(
+            db, dest.slug, location_id=area.slug, page=page, page_size=page_size,
+        )
+        if result is None:
+            return None
+    result["attraction"] = _attraction_row(dest, a, area, result["total"])
+    return result

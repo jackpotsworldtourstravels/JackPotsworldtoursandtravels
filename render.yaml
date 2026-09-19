@@ -22,3 +22,10 @@ services:
         sync: false
       - key: WEB_CONCURRENCY
         value: 2
+      # A deployed host: customer sign-in codes are emailed, never returned
+      # in the API response. See `deployed` in backend/app/config.py and the
+      # same pair in deploy/docker-compose.yml.
+      - key: DEPLOYED
+        value: "true"
+      - key: OTP_DEV_ECHO
+        value: "false"

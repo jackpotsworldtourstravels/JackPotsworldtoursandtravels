@@ -66,6 +66,11 @@ def delivery_mode() -> str:
     ``"dev"`` means the code is logged and returned to the caller instead of
     being mailed.
     """
+    # A deployed host never runs in dev mode — see settings.deployed. This is
+    # checked FIRST so that neither OTP_DEV_ECHO copied into the server's .env
+    # nor a missing SMTP setting can turn it back on.
+    if settings.deployed:
+        return EMAIL_MODE
     # A dev/test host says so explicitly, and then OTPs are never mailed even
     # though SMTP is configured for everything else. Without this the two were
     # one decision: configuring SMTP so the contact form could send mail also
@@ -136,7 +141,16 @@ def issue(
     )
 
     if mode == EMAIL_MODE:
-        email_service.send_otp_email(customer.email, code, OTP_TTL_MINUTES)
+        # A send that fails must not be reported as "code sent". The caller
+        # would show the OTP screen for a code that never left the building;
+        # raising here also rolls the new row back (nothing is committed yet),
+        # so a failed send does not spend one of the hourly five.
+        if not email_service.send_otp_email(customer.email, code, OTP_TTL_MINUTES):
+            logger.error("Customer OTP email to %s could not be sent.", customer.email)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="We couldn't send your code right now. Please try again in a few minutes.",
+            )
     else:
         logger.warning(
             "Customer OTP for %s is %s (SMTP not configured — dev delivery mode). "

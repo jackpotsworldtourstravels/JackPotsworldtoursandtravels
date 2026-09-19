@@ -1,5 +1,17 @@
 'use strict';
-/* The destination hotels page — /destination/{slug}.
+/* The hotels page — /hotels/{destination}/{location}, the last step of
+   Destination -> famous locations -> hotels. (It was /destination/{slug}; that
+   URL is the locations page now, destination.js.)
+
+   TWO MODES, ONE CARD. At /hotels/{d}/{a} — {a} a famous place from the
+   destination page — it reads GET /api/customer/attractions/{d}__{a}/hotels and
+   heads the page "Hotels near {place}". Those are the hotels of the place's
+   NEAREST LISTED AREA (hotels are filed by area, never by landmark), and the
+   lead line names that area so nothing claims more than the data holds. The
+   older destination-wide mode below is kept, reading
+   /api/customer/destinations/{slug}/hotels, so nothing that still links to it
+   breaks. Both render the same hr- cards from the same response shape.
+   ---------------------------------------------------------------------------
    ---------------------------------------------------------------------------
    ONE FILE, EVERY DESTINATION, AND NO PLACE NAME IN IT. Grep this file for
    'goa', 'hyderabad' or any hotel name and you will find none. The only thing
@@ -41,9 +53,15 @@
   /* The slug is the last path segment of /destination/{slug}. Taken from the
      path rather than a query string because that is the URL that was asked
      for, and decodeURIComponent so a slug with an escape survives. */
-  const slug = decodeURIComponent(
-    (location.pathname.replace(/\/+$/, '').split('/').pop() || '')
-  ).trim();
+  /* /hotels/{destination}/{location} -> location mode; anything else is the
+     destination-wide mode, keyed by the last path segment as before. Both
+     halves are the API's own slugs, carried in the link destination.js built. */
+  const parts = location.pathname.replace(/\/+$/, '').split('/').filter(Boolean)
+    .map(p => decodeURIComponent(p).trim());
+  const locationMode = parts.length === 3 && parts[0] === 'hotels';
+  const slug = locationMode ? parts[1] : (parts[parts.length - 1] || '');
+  const locSlug = locationMode ? parts[2] : '';
+  let place = null;                 // the location record, in location mode
 
   let destination = null;
   let locations = [];
@@ -99,6 +117,11 @@
 
     const where = h.location || h.address || h.city || '';
     const locLine = where ? `<p class="hr-loc">${icon('pin')} ${esc(where)}</p>` : '';
+    /* The catalogue's distance is FROM THE AIRPORT (as on the hotel results
+       page), so it is labelled as that — never as a distance from the place
+       this page is about, which nothing in the data measures. */
+    const distance = (h.distance_km != null)
+      ? `<p class="hr-loc dh-dist">${icon('plane')} ${esc(Number(h.distance_km).toFixed(1).replace(/\.0$/, ''))} km from airport</p>` : '';
 
     const desc = h.description
       ? `<p class="dh-desc">${esc(h.description)}</p>` : '';
@@ -138,6 +161,7 @@
             ${stars}
           </div>
           ${locLine}
+          ${distance}
           ${rating}
           ${desc}
           ${amenities}
@@ -145,7 +169,7 @@
         </div>
         <div class="dh-card-foot">
           ${price}
-          <a class="btn dh-view" href="${esc(href)}">View Hotel</a>
+          <a class="btn dh-view" href="${esc(href)}">View Details</a>
         </div>
       </div>
     </article>`;
@@ -153,7 +177,9 @@
 
   /* ---------------------------------------------------------------- chips */
   function paintLocations() {
-    if (!locations.length) { locsEl.hidden = true; return; }
+    /* In location mode the location IS the page; sibling chips would be a
+       second way back to the step the customer just left. */
+    if (locationMode || !locations.length) { locsEl.hidden = true; return; }
     locsEl.hidden = false;
     const chip = (id, label) => {
       const on = activeLocation === id;
@@ -183,6 +209,9 @@
   }
 
   function countLabel() {
+    if (locationMode) {
+      return `${total} ${total === 1 ? 'hotel' : 'hotels'}${place ? ' near ' + place.name : ''}`;
+    }
     const where = destination ? destination.name : '';
     if (activeLocation) {
       const loc = locations.find(l => l.id === activeLocation);
@@ -210,17 +239,33 @@
     }
 
     const qs = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
-    if (activeLocation) qs.set('location_id', activeLocation);
+    if (activeLocation && !locationMode) qs.set('location_id', activeLocation);
 
     try {
-      const data = await getJson(
-        '/api/customer/destinations/' + encodeURIComponent(slug) + '/hotels?' + qs.toString());
+      const data = await getJson(locationMode
+        ? '/api/customer/attractions/' + encodeURIComponent(slug + '__' + locSlug) + '/hotels?' + qs.toString()
+        : '/api/customer/destinations/' + encodeURIComponent(slug) + '/hotels?' + qs.toString());
 
       destination = data.destination || null;
       locations = Array.isArray(data.locations) ? data.locations : [];
       total = Number(data.total) || 0;
+      place = data.attraction || null;
 
-      if (destination) {
+      if (locationMode && place) {
+        titleEl.textContent = 'Hotels near ' + place.name;
+        document.title = 'Hotels near ' + place.name + ' — JackPots World Tours & Travels';
+        countryEl.textContent = destination
+          ? [destination.name, destination.country].filter(Boolean).join(' · ') : '';
+        /* Which hotels these are, in words: the nearest area we list. */
+        leadEl.textContent = place.area_name
+          ? 'Hotels in ' + place.area_name + ', the nearest area we list to ' + place.name + '.'
+          : (place.description || '');
+        const back = document.querySelector('.dh-back');
+        if (back && destination) {
+          back.href = 'destination/' + encodeURIComponent(destination.id);
+          back.lastChild.textContent = ' Back to ' + destination.name;
+        }
+      } else if (destination) {
         titleEl.textContent = destination.name;
         document.title = destination.name + ' hotels — JackPots World Tours & Travels';
         countryEl.textContent = destination.country || '';
@@ -232,10 +277,11 @@
       if (reset && !rows.length) {
         /* A true answer about our catalogue, not a failure — so no retry
            button, which would ask the same question and get the same answer. */
-        showMessage(
-          'No hotels are currently available for '
-          + (destination ? destination.name : 'this destination')
-          + (activeLocation ? ' in this location' : '') + '.',
+        showMessage(locationMode
+          ? 'No hotels are listed near ' + (place ? place.name : 'this location') + ' yet.'
+          : 'No hotels are currently available for '
+            + (destination ? destination.name : 'this destination')
+            + (activeLocation ? ' in this location' : '') + '.',
           false);
         paintLocations();
         return;
@@ -259,11 +305,11 @@
     } catch (err) {
       console.warn('[destination-hotels] failed:', err && err.message);
       if (err && err.status === 404) {
-        titleEl.textContent = 'Destination not found';
+        titleEl.textContent = locationMode ? 'Place not found' : 'Destination not found';
         leadEl.textContent = '';
         countryEl.textContent = '';
         locsEl.hidden = true;
-        showMessage('We could not find that destination.', false);
+        showMessage(locationMode ? 'We could not find that place.' : 'We could not find that destination.', false);
       } else if (reset) {
         showMessage('Unable to load hotels right now.', true);
       } else {

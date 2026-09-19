@@ -107,8 +107,14 @@ const ProfileMenu = (function () {
       const inPlace = typeof openAuth === 'function';
       const href = inPlace ? '#' : 'index.html?signin=1';
       const attr = inPlace ? ' data-pm-auth' : '';
-      return `<a class="pm-login" href="${href}"${attr}>Login</a>
-        <a class="pm-signup" href="${href}"${attr}>Sign Up</a>`;
+      /* ONE DOOR, NOT TWO. Login and Sign Up both opened the same dialog,
+         which has "Create an account" inside it — so the pair was one
+         control drawn twice. It is a single link now, named for both. */
+      return `<a class="pm-login" href="${href}"${attr}>
+        <svg class="pm-login-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.8 4.2-5.7 7.5-5.7s6.3 1.9 7.5 5.7"/></svg>
+        <span>Login / Create</span>
+        <svg class="pm-login-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>`;
     }
     const name = s.name || 'Traveller';
     return `<div class="pm-wrap" data-pm>
@@ -159,6 +165,11 @@ const ProfileMenu = (function () {
     const root = document.documentElement;
     root.classList.toggle('jp-signed-in', on);
     root.classList.toggle('jp-signed-out', !on);
+    /* A CUSTOMER specifically — not an admin on the shared session. The B2C
+       header drops "My Partner" on this (main.css): the partner portal is a
+       B2B door, and a signed-in traveller has no use for it. Signed out, it
+       stays exactly as it was. */
+    root.classList.toggle('jp-customer', !!session());
   }
 
   /* ------------------------------------------------------------------ open */

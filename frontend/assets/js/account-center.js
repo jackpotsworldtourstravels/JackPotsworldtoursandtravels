@@ -53,6 +53,14 @@ const AccountCenter = (function () {
   let apiErrorText = (err, fallback) => fallback;
   let mobileNav = null;
   let openAuth = () => {};
+  /* Whether a REAL openAuth was handed over. Only the landing page carries the
+     sign-in modal (app.js configures this); every other page keeps the no-op
+     above, and asking it to sign someone in used to do nothing at all. */
+  let authConfigured = false;
+  /* The account tab a signed-out click asked for (Wishlist, My Bookings…),
+     opened once the modal's sign-in succeeds. Cleared if the modal is simply
+     closed, so a later, unrelated sign-in does not pop it open. */
+  let pendingTab = null;
   let renderAuthNav = () => {};
   /* The wishlist map is owned by app.js. Logging out has to clear it THERE
      rather than rebind a copy in here, which would leave the hearts on the
@@ -64,7 +72,7 @@ const AccountCenter = (function () {
     if (o.API_BASE      !== undefined) API_BASE      = o.API_BASE;
     if (o.apiErrorText  !== undefined) apiErrorText  = o.apiErrorText;
     if (o.mobileNav     !== undefined) mobileNav     = o.mobileNav;
-    if (o.openAuth      !== undefined) openAuth      = o.openAuth;
+    if (o.openAuth      !== undefined) { openAuth = o.openAuth; authConfigured = true; }
     if (o.renderAuthNav !== undefined) renderAuthNav = o.renderAuthNav;
     if (o.resetWishlist !== undefined) resetWishlist = o.resetWishlist;
   }
@@ -230,7 +238,25 @@ let acctCurrentUser = null;
 
 function openAccountCenter(tab) {
   const { access } = customerSession();
-  if (!access) { openAuth('login'); return; }
+  if (!access) {
+    /* SIGNED OUT: the Login/Create modal, then the tab that was asked for.
+
+       Where the modal exists (the landing page) it opens in place — no
+       navigation — and the tab is parked for completeCustomerSignIn() in
+       app.js to open after the OTP step. Where it does not, the visitor goes
+       to the landing page's modal through the documented ?signin=1 handoff,
+       and `next` brings them back here with ?account=<tab>, which
+       handleServicePageIntent() below opens once they are signed in. */
+    const wanted = tab || 'profile';
+    if (authConfigured) {
+      pendingTab = wanted;
+      openAuth('login');
+    } else {
+      const back = location.pathname + '?account=' + encodeURIComponent(wanted);
+      location.href = 'index.html?signin=1&next=' + encodeURIComponent(back);
+    }
+    return;
+  }
   acctModalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
   goToAcctTab(tab || 'profile');
@@ -1089,8 +1115,15 @@ loadUpcomingJourney();
    Runs last so every function and const it touches is already initialised, and
    the parameter is stripped afterwards — a bookmarked or refreshed URL should
    not keep reopening a dialog the visitor has closed.
+
+   AND IT WAITS FOR THE PAGE'S OTHER SCRIPTS. This file loads BEFORE app.js,
+   and openAuth is app.js's, handed over by AccountCenter.configure() at the
+   bottom of that file. Run at load, this saw the no-op placeholder: it
+   stripped `signin=1` and opened nothing, so every "Login" link on the
+   service pages landed on the home page with no dialog. DOMContentLoaded
+   fires after every classic script in the page has run.
    --------------------------------------------------------------------------- */
-(function handleServicePageIntent() {
+function handleServicePageIntent() {
   const params = new URLSearchParams(location.search);
   const signin = params.get('signin');
   const account = params.get('account');
@@ -1106,13 +1139,21 @@ loadUpcomingJourney();
   params.delete('account');
   const qs = params.toString();
   history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + location.hash);
-})();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', handleServicePageIntent, { once: true });
+} else {
+  handleServicePageIntent();
+}
 
 
   return {
     configure,
     open: openAccountCenter,
     close: closeAccountCenter,
+    /** The tab a signed-out click parked, once — then forgotten. */
+    takePendingTab() { const t = pendingTab; pendingTab = null; return t; },
+    clearPendingTab() { pendingTab = null; },
     loadUpcomingJourney,
     starString,
   };

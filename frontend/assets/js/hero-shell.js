@@ -431,8 +431,8 @@ const HeroShell = (function () {
          as index.html writes it. */
       ProfileMenu.mount(slot.parentNode || document);
     } else {
-      slot.innerHTML = '<a href="index.html?signin=1" class="nav-login">Login</a>'
-        + '<a href="index.html?signin=1" class="btn btn-coral nav-signup">Sign Up</a>';
+      /* One control: the dialog it opens offers "Create an account" too. */
+      slot.innerHTML = '<a href="index.html?signin=1" class="nav-login">Login / Create</a>';
     }
 
   }

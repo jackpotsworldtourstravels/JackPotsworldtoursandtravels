@@ -1175,6 +1175,11 @@ class CustomerLocation(Base):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: One line about the place, shown on its card in the destination flow
+    #: (0074). Null means the card shows the name alone.
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Artwork KEY, same convention as CustomerDestination.image_key (0074).
+    image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
     sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     #: The supplier's zone code for this area (0072). Same rule as the
@@ -1185,6 +1190,50 @@ class CustomerLocation(Base):
     )
 
     destination: Mapped["CustomerDestination"] = relationship(back_populates="locations")
+
+
+class CustomerAttraction(Base):
+    """A famous place to visit inside a destination — Charminar, the Burj Khalifa.
+
+    NOT A LOCATION. ``customer_locations`` are the AREAS hotels are filed under
+    (Banjara Hills, Dubai Marina) and the zones the Hotelbeds sync maps to; a
+    traveller does not visit an area, they visit a landmark. The destination
+    page lists these, and "View Hotels" on one shows the hotels of its
+    ``area_location_id`` — the nearest area we list, stated as such on the page,
+    because hotels are filed by area and never by landmark (0075).
+    """
+
+    __tablename__ = "customer_attractions"
+    __table_args__ = (
+        UniqueConstraint("destination_id", "slug", name="uq_customer_attraction_slug"),
+    )
+
+    customer_attraction_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    destination_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_destinations.customer_destination_id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    #: The nearest listed AREA, whose hotels "View Hotels" shows. Null when no
+    #: listed area is close enough to call nearby (a waterfall 60 km out).
+    area_location_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_locations.customer_location_id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    slug: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Artwork KEY, same convention as CustomerDestination.image_key.
+    image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    destination: Mapped["CustomerDestination"] = relationship()
+    area: Mapped[Optional["CustomerLocation"]] = relationship()
 
 
 # =====================================================================
