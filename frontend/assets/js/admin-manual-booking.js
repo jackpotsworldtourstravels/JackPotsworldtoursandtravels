@@ -201,13 +201,58 @@ function ambInstallApiBridge() {
      wrapped. */
   const originalExtract = MerchantApi.extractPassport.bind(MerchantApi);
   MerchantApi.extractPassport = function (file, opts = {}) {
-    const merchantId = (typeof clBookingEnquiry !== 'undefined' && clBookingEnquiry)
-      ? clBookingEnquiry.merchant_id : null;
-    if (merchantId == null) return originalExtract(file, opts);
+    const merchantId = ambScanMerchantId();
+    /* NO MERCHANT, NO REQUEST. Sending it anyway is what this used to do, and
+       for the desk it could only ever come back 403 "Passport scanning is for
+       merchant accounts" — an answer about merchant accounts, on the Admin
+       portal, to an operator whose account is fine. The upload is skipped and
+       the reason is named instead. Shaped like an axios failure because
+       clOcrErrorText reads `response.data.detail`, which keeps the message on
+       the card with every other scan error rather than inventing a second
+       channel for this one. */
+    if (merchantId == null) {
+      return Promise.reject({ response: { status: 409, data: { detail:
+        'This screen has lost track of which merchant the booking is for, so '
+        + 'the scan cannot be filed against one. Open it again from Manual '
+        + 'Enquiry and scan from there.' } } });
+    }
     return originalExtract(file, { ...opts, onBehalfOfMerchantId: merchantId });
   };
 
   AMB.wired = true;
+}
+
+/* WHICH MERCHANT A SCAN ON THIS SCREEN BELONGS TO.
+   ---------------------------------------------------------------------------
+   An admin has no merchant of its own, so every scan it raises has to name
+   one, and `passport_ocr_service._resolve_scan_owner` refuses the upload
+   without it. The screen holds that answer in more than one place, and which
+   one is populated depends on how the operator got here.
+
+   ONLY `clBookingEnquiry` WAS READ, AND IT IS OFTEN NULL. It is set by
+   clStartBookingRequest on the Manual Enquiry -> Raise Booking path and set
+   back to null by clSaveManualBooking a few hundred lines below, so a scan
+   after a save, after a reload, or on a booking reopened any other way went up
+   with no merchant at all and was refused. The two stand-in enquiries
+   classic-booking.js builds -- clStartDirectBooking and clResumeBookingDraft
+   -- carry no merchant_id either, so anything reaching this screen through
+   them would have failed the same way.
+
+   THE DRAFT IS THE OTHER ANSWER, and a better one once it exists:
+   RequestResponse carries `merchant_id` (schemas/ticket.py), it is the
+   merchant the booking actually BELONGS to, and the server put it there.
+
+   STILL NOT THE MANUAL ENQUIRY DROPDOWN, deliberately, for the reason the
+   group-manifest wrapper above gives: the operator may have changed it since
+   this booking was opened, and filing a passport against whatever it now says
+   would attach one company's traveller to another company's booking. Every
+   source below is the booking's own. */
+function ambScanMerchantId() {
+  const of = (o) => (o && o.merchant_id != null ? o.merchant_id : null);
+  return of(typeof clBookingEnquiry !== 'undefined' ? clBookingEnquiry : null)
+      ?? of(typeof clBookingDraft !== 'undefined' ? clBookingDraft : null)
+      ?? of(AMB.pendingEnquiry)
+      ?? null;
 }
 
 /* ------------------------------------------------------------ row renderer --
