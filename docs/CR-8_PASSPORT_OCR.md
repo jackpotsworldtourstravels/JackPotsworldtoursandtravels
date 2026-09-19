@@ -51,7 +51,7 @@ configured.
 
 | Setting | Default | Notes |
 |---|---|---|
-| `OCR_PROVIDER` | `local` | `local` · `azure` · `none` |
+| `OCR_PROVIDER` | `none` | `local` · `azure` · `none`. **Not in `.env.example` — add the line.** |
 | `OCR_TIMEOUT_SECONDS` | `60` | Whole-call budget |
 | `OCR_INLINE_WAIT_SECONDS` | `8` | Past this the endpoint answers `202` and the client polls |
 | `OCR_LOCAL_DPI` | `300` | PDF render resolution; below ~250 the zone's fillers are lost |
@@ -62,10 +62,12 @@ configured.
 | `OCR_AZURE_API_VERSION` | `2024-11-30` | Recorded on every row |
 | `PASSPORT_VALIDITY_MONTHS` | `6` | **Advisory** — see §6 |
 
-**With `OCR_PROVIDER=none` the merchant portal renders no Scan control at all** and the
-booking form is byte-for-byte what it was.
+**With `OCR_PROVIDER=none` — the default — neither the merchant portal nor Admin Manual
+Booking (§13) renders a Scan control at all** and the booking form is byte-for-byte what
+it was. An unconfigured deployment therefore looks like it lacks the feature, not like it
+is broken, which is the intent.
 
-### The `local` provider — the default, and the only one needing no account
+### The `local` provider — the only one needing no account
 
 `app/services/passport_ocr/local_provider.py` reads the uploaded document on this server.
 No vendor, no credentials, no outbound request. It renders the page (PyMuPDF for PDFs),
