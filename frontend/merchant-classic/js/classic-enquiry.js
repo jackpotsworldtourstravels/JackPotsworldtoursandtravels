@@ -941,6 +941,22 @@ function clOpenEnquiryForm(direct = false) {
             <label class="cl-check"><input type="radio" name="clEnqStops" value="one_stop">One Stop</label>
             <label class="cl-check"><input type="radio" name="clEnqStops" value="two_stop">Two Stop</label>
           </div>
+        </div>
+        <!-- RECEIVED DATE & TIME (0076) -- when the client's request actually
+             arrived (WhatsApp, a call, an email), which is usually before the
+             desk types it in. Defaults to now; today or earlier only, and on
+             today no later than the current minute. The date is the form's own
+             picker-only date input, the time the same typed boxes as Departure
+             time but on the 12-hour clock with AM/PM, as the desk reads a
+             message timestamp. The Merchant Portal never renders this. -->
+        <div class="cl-field cl-field-full">
+          <label for="clEnqRecvDate">Received date &amp; time<span class="cl-req">*</span></label>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <input type="date" id="clEnqRecvDate" max="${today}" value="${today}"
+                   style="flex:1 1 200px; min-width:0;" aria-describedby="clEnqRecvHint">
+            <div style="flex:1 1 240px; min-width:0;">${clTime12Field('clEnqRecvTime', clNowHm(), 'Received time')}</div>
+          </div>
+          <small class="cl-hint" id="clEnqRecvHint">When the client's request came in. Today or earlier.</small>
         </div>` : ''}
       </div>
     </div>
@@ -1254,6 +1270,97 @@ function clTimeField(id, value, label) {
   </div>`;
 }
 
+/* THE 12-HOUR VARIANT, for Received date & time only (0076).
+   The same typed hour and minute boxes as clTimeField, and the AM/PM part the
+   stylesheet has always carried for it (.cl-timesel-p) — a message timestamp
+   reads "3:45 PM", so the desk types what it sees rather than converting to
+   15:45. Hour 01-12, minute 00-59; clBindTime12Field pads and clamps them. */
+function clTime12Field(id, value, label) {
+  const t = clNormaliseTime(value) || '09:00';
+  let h = Number(t.slice(0, 2));
+  const mm = t.slice(3, 5);
+  const pm = h >= 12;
+  h = h % 12 || 12;
+  return `<div class="cl-timesel cl-timesel-24" id="${id}">
+    <input type="text" id="${id}Hour" class="cl-timesel-h" value="${String(h).padStart(2, '0')}"
+           maxlength="2" inputmode="numeric" pattern="[0-9]{2}" autocomplete="off"
+           aria-label="${escapeHtml(label)} — hour, 01 to 12">
+    <span class="cl-timesel-sep" aria-hidden="true">:</span>
+    <input type="text" id="${id}Min" class="cl-timesel-m" value="${mm}"
+           maxlength="2" inputmode="numeric" pattern="[0-9]{2}" autocomplete="off"
+           aria-label="${escapeHtml(label)} — minute, 00 to 59">
+    <select id="${id}Period" class="cl-timesel-p" aria-label="${escapeHtml(label)} — AM or PM">
+      <option value="AM"${pm ? '' : ' selected'}>AM</option>
+      <option value="PM"${pm ? ' selected' : ''}>PM</option>
+    </select>
+  </div>`;
+}
+
+/** The current local time as "HH:MM" — the Received time's default. */
+function clNowHm() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Filter while typing, pad and clamp on the way out: hour 01-12, minute 00-59. */
+function clBindTime12Field(id) {
+  [['Hour', 1, 12], ['Min', 0, 59]].forEach(([part, lo, hi]) => {
+    const el = $(`${id}${part}`);
+    if (!el) return;
+    clDigitsOnly(el, 2);
+    el.addEventListener('change', () => {
+      const n = Number(String(el.value || '').trim());
+      const v = Number.isInteger(n) && String(el.value).trim() !== ''
+        ? Math.min(hi, Math.max(lo, n)) : lo;
+      el.value = String(v).padStart(2, '0');
+    });
+  });
+}
+
+/** Received date & time as the API takes it, or an error naming the field.
+ *
+ *  ISO 8601 WITH THE BROWSER'S OFFSET ("2026-09-19T15:45:00+05:30"), so the
+ *  instant the desk meant is the instant stored, whatever the server's zone.
+ *  Refuses a future date and, on today, a time after the current minute —
+ *  the server applies the same rule, this just says so before the round trip. */
+function clReadReceived() {
+  const date = ($('clEnqRecvDate') || {}).value || '';
+  if (!date) return { error: 'Enter the received date.', field: 'clEnqRecvDate' };
+  const h = Number(($('clEnqRecvTimeHour') || {}).value);
+  const m = Number(($('clEnqRecvTimeMin') || {}).value);
+  const period = ($('clEnqRecvTimePeriod') || {}).value;
+  if (!Number.isInteger(h) || h < 1 || h > 12 || !Number.isInteger(m) || m < 0 || m > 59 || !period) {
+    return { error: 'Enter the received time.', field: 'clEnqRecvTimeHour' };
+  }
+  const h24 = (h % 12) + (period === 'PM' ? 12 : 0);
+  const [y, mo, d] = date.split('-').map(Number);
+  const at = new Date(y, mo - 1, d, h24, m, 0);
+  if (Number.isNaN(at.getTime())) return { error: 'Enter the received date.', field: 'clEnqRecvDate' };
+  if (date > clTodayIso()) {
+    return { error: 'The received date cannot be in the future.', field: 'clEnqRecvDate' };
+  }
+  if (at.getTime() > Date.now()) {
+    return { error: 'The received time cannot be later than now.', field: 'clEnqRecvTimeHour' };
+  }
+  const off = -at.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const oh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0');
+  const om = String(Math.abs(off) % 60).padStart(2, '0');
+  const pad = n => String(n).padStart(2, '0');
+  return { iso: `${date}T${pad(h24)}:${pad(m)}:00${sign}${oh}:${om}` };
+}
+
+/** "19-09-2026 03:45 PM" — the one display format for Received date & time. */
+function clReceivedLabel(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  const h = d.getHours();
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} `
+    + `${pad(h % 12 || 12)}:${pad(d.getMinutes())} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
 /* The two parts, back as the "HH:MM" the API stores. Returns null when either
    is empty or out of range, so submit falls back to the last good value in the
    form state rather than sending "NaN:NaN" — the same contract the 12-hour
@@ -1376,6 +1483,8 @@ function clWireEnquiryForm() {
      clBindTimeField is a no-op on an id that is not in the DOM. */
   clBindTimeField('clEnqArrTime', v => { clEnqForm.arrTime = v; });
   clBindTimeField('clEnqReturnArrTime', v => { clEnqForm.retArrTime = v; });
+  /* Admin only, like the two above — absent on the merchant form. */
+  clBindTime12Field('clEnqRecvTime');
 
   /* ---- dates ----
      Picked, never typed (clPickerOnly in classic-shell.js), on both legs. The
@@ -1386,6 +1495,7 @@ function clWireEnquiryForm() {
      state the pick never produced. */
   clPickerOnly($('clEnqDate'));
   clPickerOnly($('clEnqReturnDate'));
+  clPickerOnly($('clEnqRecvDate'));
 
   $('clEnqDate').addEventListener('change', () => {
     clSyncReturnMin();
@@ -2518,6 +2628,13 @@ async function clSubmitEnquiry() {
     returnTime = clReadTimeField('clEnqReturnTime') || f.retTime;
   }
 
+  /* Received date & time — the desk's form only; required, never ahead of now. */
+  let received = null;
+  if (clAdminForm()) {
+    received = clReadReceived();
+    if (received.error) return fail(received.error, received.field);
+  }
+
   const payload = {
     /* Required since Hotel Enquiry shipped: schemas/enquiry.py's EnquiryCreate
        is now a discriminated union keyed on this field, read before anything
@@ -2551,6 +2668,7 @@ async function clSubmitEnquiry() {
         ? (clReadTimeField('clEnqReturnArrTime') || f.retArrTime || null)
         : null,
       stops: clReadStops(),
+      received_date_time: received ? received.iso : null,
     } : {}),
     /* Omitted on a group booking, whose form shows neither field. The server
        makes both optional and requires the cabin only where it is asked for. */

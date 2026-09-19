@@ -161,6 +161,9 @@ def raise_manual_enquiry(**over):
     """The desk files an enquiry FOR the merchant. Returns the EnquiryResponse."""
     body = itinerary(**over)
     body["on_behalf_of_merchant_id"] = MERCHANT_ID
+    # 0076 — required on the manual path: when the client's request arrived.
+    body.setdefault("received_date_time",
+                    datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"))
     r = requests.post(f"{BASE}/api/enquiries", headers=H(atok), json=body)
     assert r.status_code == 201, f"manual enquiry: {r.status_code} {r.text[:300]}"
     return r.json()

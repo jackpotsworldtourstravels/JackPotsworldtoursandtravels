@@ -279,9 +279,9 @@ function ambInstallRowRenderer() {
              Scrolling the TABLE rather than the page keeps the button reachable
              without the document itself growing a horizontal scrollbar. -->
         <div style="overflow-x:auto;">
-        <table class="data-table" style="min-width:680px;"><thead><tr>
-          <th>Reference</th><th>Merchant</th><th>Sector</th><th>Travel date</th>
-          <th>Status</th><th>Action</th>
+        <table class="data-table" style="min-width:820px;"><thead><tr>
+          <th>Reference</th><th>Merchant</th><th>Sector</th><th>Received date &amp; time</th>
+          <th>Travel date</th><th>Status</th><th>Action</th>
         </tr></thead><tbody>
         ${rows.map(r => {
           /* The API's own fields. EnquiryResponse is flat — origin/destination
@@ -354,6 +354,10 @@ function ambInstallRowRenderer() {
             <td><strong>${ambEsc(r.reference_number || r.request_number || '')}</strong>${stamp}</td>
             <td>${ambEsc(r.merchant_name || r.__merchantName || '')}</td>
             <td>${ambEsc(sector)}</td>
+            <!-- 0076 — when the client asked, "19-09-2026 03:45 PM"; blank on
+                 a row saved before the field existed rather than a guess. -->
+            <td style="white-space:nowrap;">${ambEsc(typeof clReceivedLabel === 'function'
+                  ? clReceivedLabel(r.received_date_time) : (r.received_date_time || ''))}</td>
             <td>${ambEsc(r.travel_date || '')}</td>
             <td>${typeof clTag === 'function'
                   ? clTag(r.status, r.status_label) : ambEsc(r.status_label || r.status || '')}</td>

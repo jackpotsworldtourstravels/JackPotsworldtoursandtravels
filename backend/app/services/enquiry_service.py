@@ -264,6 +264,11 @@ def create(db: Session, actor: User, payload) -> ServiceRequest:
         client_fare=payload.client_fare,
         travel_date=payload.travel_date,
         return_date=payload.return_date,
+        # 0076 — only on the desk's manual path. A merchant's own enquiry is
+        # received the moment it is submitted, so nothing is stored there even
+        # if a client sends the field.
+        received_date_time=(getattr(payload, "received_date_time", None)
+                            if source is RequestSource.B2B_MANUAL_ENQUIRY else None),
         # An enquiry has no draft stage, so the row is born submitted. Writing
         # the history entry here keeps the Activity Timeline complete —
         # lifecycle.transition() owns every *move*, but not the initial value,
@@ -789,6 +794,9 @@ def to_booking_request(
         # the move working untouched. `is not None` rather than a truth test:
         # zero is a real client fare and must not fall through to the enquiry's.
         client_fare=client_fare if client_fare is not None else enquiry.client_fare,
+        # 0076 — the booking inherits WHEN THE CLIENT ASKED from its enquiry,
+        # exactly as it inherits the itinerary; it is not re-entered.
+        received_date_time=enquiry.received_date_time,
         # The enquiry's own details are spread first so the itinerary is
         # verbatim what was answered; only the booking-specific additions are
         # layered on. The review claim is dropped — it belongs to the enquiry's

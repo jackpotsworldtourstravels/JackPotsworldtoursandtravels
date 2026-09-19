@@ -787,6 +787,12 @@ class ServiceRequest(Base):
     )
     travel_date: Mapped[Optional[dt.date]] = mapped_column(Date)
     return_date: Mapped[Optional[dt.date]] = mapped_column(Date)
+    #: 0076 — WHEN THE CLIENT ASKED. The desk types enquiries in after the fact
+    #: (a WhatsApp message at 3:45, keyed in at 4:10), so ``created_at`` is when
+    #: the row was saved, not when the request arrived. Captured on the Admin
+    #: portal's Manual Enquiry form, copied onto the booking raised from it,
+    #: and null on anything the merchant raised itself (it is never asked).
+    received_date_time: Mapped[Optional[dt.datetime]] = mapped_column(_TS)
 
     assigned_admin: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")

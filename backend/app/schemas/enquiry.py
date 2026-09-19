@@ -102,6 +102,20 @@ class EnquiryCreate(BaseModel):
         ),
     )
 
+    #: MANUAL ENQUIRY ONLY (Admin portal, 0076). When the client's request
+    #: actually arrived — by WhatsApp, phone, email — which is usually earlier
+    #: than the moment the desk types it in. Required when the desk raises an
+    #: enquiry for a merchant, never in the future; the Merchant Portal does not
+    #: send it and it is not stored for a merchant's own enquiry.
+    received_date_time: datetime.datetime | None = Field(
+        default=None,
+        description=(
+            "Admin-only, required with `on_behalf_of_merchant_id`: when the client's request "
+            "was received. ISO 8601 with offset, e.g. `2026-09-19T15:45:00+05:30`. "
+            "Cannot be in the future."
+        ),
+    )
+
     trip_type: TripType = "one_way"
     #: Mandatory on a group booking, refused on anything else — see the
     #: validator, which is the only place the pairing is enforced.
@@ -252,6 +266,24 @@ class EnquiryCreate(BaseModel):
 
         if self.travel_date < datetime.date.today():
             raise ValueError("Travel date cannot be in the past")
+
+        # RECEIVED DATE & TIME (0076). Required on the desk's manual path,
+        # which is the only form that asks for it, and never in the future. A
+        # value without an offset is read as the server's local time; two
+        # minutes of grace absorbs a PC clock that runs slightly ahead, so
+        # "now" typed on a slow machine is not refused as tomorrow.
+        #
+        # Enforced for enquiries only: DirectBookingCreate inherits this class,
+        # and its form never collects the field.
+        if self.received_date_time is not None:
+            received = self.received_date_time
+            now = (datetime.datetime.now(received.tzinfo) if received.tzinfo
+                   else datetime.datetime.now())
+            if received > now + datetime.timedelta(minutes=2):
+                raise ValueError("Received date & time cannot be in the future")
+        elif (self.on_behalf_of_merchant_id is not None
+              and type(self).__name__ == "EnquiryCreate"):
+            raise ValueError("Received date & time is required")
 
         # THE PAIRING, BEFORE ANYTHING READS EITHER FIELD.
         # These two describe one choice made on one form, and every rule below
@@ -558,6 +590,8 @@ class EnquiryResponse(BaseModel):
 
     travel_date: datetime.date | None = None
     preferred_time: str | None = None
+    #: 0076 — when the client's request arrived; null unless the desk raised it.
+    received_date_time: datetime.datetime | None = None
     return_date: datetime.date | None = None
     return_preferred_time: str | None = None
     #: Both None on every enquiry raised before these shipped, and on every
@@ -667,6 +701,7 @@ class EnquiryResponse(BaseModel):
             flight_number=d.get("flight_number"),
             travel_date=r.travel_date,
             preferred_time=d.get("preferred_time"),
+            received_date_time=r.received_date_time,
             return_date=r.return_date,
             return_preferred_time=d.get("return_preferred_time"),
             arrival_time=d.get("arrival_time"),

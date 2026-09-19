@@ -519,6 +519,10 @@ function clRenderBookingForm(e) {
           <div><dt>Flight number</dt><dd class="cl-ref">${escapeHtml(e.flight_number || '—')}</dd></div>
           <div><dt>Departure date</dt><dd>${escapeHtml(fmtDate(e.travel_date))}</dd></div>
           <div><dt>Preferred time</dt><dd>${escapeHtml(clTimeLabel(e.preferred_time) || '—')}</dd></div>
+          <!-- 0076 — when the client asked, carried from the enquiry. The desk's
+               screen only; the merchant's booking form is unchanged. -->
+          ${clAdminForm() && e.received_date_time && typeof clReceivedLabel === 'function' ? `
+            <div><dt>Received date &amp; time</dt><dd>${escapeHtml(clReceivedLabel(e.received_date_time))}</dd></div>` : ''}
           ${roundTrip ? `
             <div><dt>Return date</dt><dd>${escapeHtml(fmtDate(e.return_date))}</dd></div>
             <div><dt>Return time</dt><dd>${escapeHtml(clTimeLabel(e.return_preferred_time) || '—')}</dd></div>` : ''}
