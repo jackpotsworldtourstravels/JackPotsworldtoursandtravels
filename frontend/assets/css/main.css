@@ -750,24 +750,9 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 /* Open: it steps back a little so the menu above it is where the eye goes. */
 .fab-menu.open .fab-bot{transform:scale(.93); transition:transform .3s ease;}
 
-/* The name, said once, under the bot. */
-.fab-label{
-  margin-top:9px; padding:7px 14px; border-radius:999px; white-space:nowrap;
-  background:linear-gradient(135deg, rgba(10,13,20,.94), rgba(32,38,52,.94));
-  border:1px solid rgba(240,180,41,.45);
-  color:#fff; font-size:11.5px; font-weight:700; letter-spacing:.2px; line-height:1.2;
-  box-shadow:0 10px 22px rgba(6,9,15,.38);
-  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
-}
 @media (max-width:640px){
   .fab-item{width:46px; height:46px; font-size:19px;}
   .fab-main{width:62px; height:62px;}
-  .fab-label{font-size:10px; padding:6px 11px; margin-top:7px;}
-}
-/* 360px-wide phones: the name is longer than the gap it sits in, so it wraps
-   to two lines rather than pushing itself off the screen. */
-@media (max-width:379px){
-  .fab-label{white-space:normal; max-width:calc(100vw - 48px); text-align:center;}
 }
 /* Nothing here carries meaning by moving. */
 @media (prefers-reduced-motion:reduce){
@@ -776,15 +761,15 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 
 /* ---------- CHATBOT ---------- */
 .chatbot-panel{
-  /* Clears the assistant button AND the name under it — the pill made the
-     column about 40px taller, and a panel that overlaps its own button is a
-     panel you close by trying to open it. */
-  position:fixed; bottom:160px; right:30px; z-index:190; width:340px; max-width:calc(100vw - 40px); background:#fff;
+  /* Clears the assistant button, which is taller than the plus it replaced.
+     A panel that overlaps its own button is a panel you close by trying to
+     open it. */
+  position:fixed; bottom:120px; right:30px; z-index:190; width:340px; max-width:calc(100vw - 40px); background:#fff;
   border-radius:22px; box-shadow:var(--shadow-lg); overflow:hidden; transform:translateY(16px) scale(.97); opacity:0; pointer-events:none;
   transition:transform .25s ease, opacity .25s ease;
 }
 .chatbot-panel.open{transform:translateY(0) scale(1); opacity:1; pointer-events:auto;}
-@media (max-width:640px){.chatbot-panel{bottom:134px; right:20px;}}
+@media (max-width:640px){.chatbot-panel{bottom:96px; right:20px;}}
 .chatbot-head{background:var(--navy); color:#fff; padding:18px 20px;}
 .chatbot-head h4{color:#fff; font-size:15.5px;}
 .chatbot-head p{font-size:12.5px; opacity:.7; margin-top:3px;}

@@ -26,7 +26,7 @@
      that uses it, Yellowtail at its single 400. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260921bot2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260921bot3">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
@@ -570,13 +570,12 @@
   <!-- THE ASSISTANT'S FACE, and the only thing on this page drawn rather than
        iconised. It is one inline SVG on purpose: a sprite entry is a single
        silhouette in one colour, and this is a lit character in four — the
-       white shell, the gold trim, the orange case and the black hat. Nothing
-       here is decoration with a job: the button still opens the same menu,
-       and the label below it is what the menu is FOR, said once.
+       white shell, the gold trim, the orange case and the black hat. The
+       button still opens the same menu; only the face of it changed.
 
        IT IS DECORATIVE TO A SCREEN READER. The button's aria-label is the
-       accessible name; the drawing and the pill are aria-hidden so the name
-       is announced once rather than three times. -->
+       accessible name, and the drawing is aria-hidden so the name is
+       announced once rather than twice. -->
   <button type="button" class="fab-main" id="fabMainBtn" aria-label="Open the Jackpots Tours and Travels assistant menu" aria-haspopup="true" aria-expanded="false" aria-controls="fabItems">
     <span class="fab-bot" aria-hidden="true">
       <svg viewBox="0 0 120 120" focusable="false">
@@ -680,7 +679,6 @@
       </svg>
     </span>
   </button>
-  <span class="fab-label" aria-hidden="true">Jackpots Tours and Travels Assistant</span>
 </div>
 <!-- THE TRAVEL ASSISTANT'S PANEL, filled by assets/js/travel-assistant.js.
      Empty here on purpose: its thread, its suggestion chips and its message
