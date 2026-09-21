@@ -261,6 +261,66 @@ for said, want_intent, want_action in [
           f"{intent}/{action}")
 
 # ---------------------------------------------------------------------------
+print("\n== 3b. One place is where they are going, not a journey ==")
+# ---------------------------------------------------------------------------
+# RULE 1. "I want to visit Goa" names one city and no product. It used to be
+# read two wrong ways: as a route, because the sentence contains the word
+# "to", which filled the To box and left the From box empty; and as
+# sightseeing, because "visit" sat in the sights vocabulary. It is neither.
+# Somebody saying where they are going wants somewhere to stay.
+for said, want_dest in [
+    ("I want to visit Goa", "Goa"),
+    ("I want to go to Goa", "Goa"),
+    ("Goa", "Goa"),
+    ("planning to travel to Jaipur", "Jaipur"),
+    # Places the catalogue has never sold. A shelf we do not stock is not a
+    # sentence we failed to understand, and the hotel search says so itself
+    # rather than the assistant guessing on its behalf.
+    ("I want to visit Paris", "Paris"),
+    ("hotels in Kerala", "Kerala"),
+]:
+    intent, action, origin, dest = routed(said)
+    check(f"{said!r} -> hotels in {want_dest}",
+          (intent, action, dest) == ("hotel", "search_hotels", want_dest),
+          f"{intent}/{action} dest={dest}")
+    check("  and no origin, because half a route is not a route",
+          origin is None, str(origin))
+
+# ...and the sights shelf still belongs to sentences that ask about sights.
+for said in ["places to visit in Goa", "what can I see in Goa",
+             "things to do in Bali", "tourist places in Jaipur"]:
+    intent, action, _, _ = routed(said)
+    check(f"{said!r} still opens the destination page",
+          (intent, action) == ("places", "open_destination"), f"{intent}/{action}")
+
+# ---------------------------------------------------------------------------
+print("\n== 3c. A country is answered with the cities we cover ==")
+# ---------------------------------------------------------------------------
+# RULE 3. Every hotel and every package is filed under a city, so no hotel's
+# address is the word "India": handing the hotel search a country returns an
+# empty page and calls it an answer. What we can say honestly is which of its
+# cities we sell.
+d = say("Show hotels in India")
+country_reply = d.get("reply") or ""
+check("'Show hotels in India' is understood as a hotel request",
+      d.get("intent") == "hotel", str(d.get("intent")))
+check("  it does not open a search that cannot match anything",
+      (d.get("action") or {}).get("type") == "none",
+      str((d.get("action") or {}).get("type")))
+check("  the reply names cities we actually cover",
+      any(city in country_reply for city in ("Goa", "Hyderabad", "Mumbai", "Delhi")),
+      country_reply)
+chips = d.get("suggestions") or []
+check("  and offers them as chips", len(chips) >= 2, str(chips))
+# The chips are ordinary sentences, so the assistant has to understand its own
+# offer. An unanswerable suggestion is worse than none.
+intent, action, _, dest = routed(chips[0]) if chips else (None, None, None, None)
+check(f"  its own chip {chips[0]!r} opens a hotel search" if chips else "  a chip is offered",
+      (intent, action) == ("hotel", "search_hotels") and bool(dest),
+      f"{intent}/{action} dest={dest}")
+
+
+# ---------------------------------------------------------------------------
 print("\n== 4. A person still outranks a search box ==")
 # ---------------------------------------------------------------------------
 for said, want_intent in [
@@ -295,7 +355,58 @@ check("an empty message is refused by the schema, not answered",
       r.status_code == 422, str(r.status_code))
 
 # ---------------------------------------------------------------------------
-print("\n== 7. The limiter is still there ==")
+print("\n== 7. A model may read the sentence; it may not invent a city ==")
+# ---------------------------------------------------------------------------
+# NO HTTP HERE — the provider seam is a pure function, and this is the only
+# part of the feature where the input is GENERATED rather than typed. A model
+# is allowed to choose between readings the rules could also have produced; it
+# is not allowed to introduce a place, and everything it returns is checked
+# back against the traveller's own sentence before any of it reaches a search
+# box. A host with TRAVEL_AI_PROVIDER unset never calls one at all, which is
+# what every check above is running against.
+from app.services import travel_ai                      # noqa: E402
+from app.services import travel_ai_assistant as engine   # noqa: E402
+
+shelf = engine.Places(destinations=[("goa", "Goa")], countries={"India": [("goa", "Goa")]})
+
+check("the default host calls no provider at all",
+      travel_ai.get_provider() is None, str(travel_ai.get_provider()))
+
+honest = travel_ai.Understanding(intent="hotel", destination="Goa", confidence=0.9)
+reading = engine._from_provider(honest, "I want to visit Goa", shelf)
+check("a model reading the sentence correctly is used",
+      reading is not None and reading.place_name == "Goa",
+      str(reading))
+
+invented = travel_ai.Understanding(intent="flight", origin="Hyderabad",
+                                   destination="Dubai", confidence=0.99)
+reading = engine._from_provider(invented, "I want to visit Goa", shelf)
+check("a city nobody said is dropped, however confident the model is",
+      reading is not None and reading.origin_name is None and reading.place_name is None,
+      str(reading))
+
+unsure = travel_ai.Understanding(intent="hotel", destination="Goa", confidence=0.1)
+check("an unsure model does not overrule the rules",
+      engine._from_provider(unsure, "I want to visit Goa", shelf) is None)
+
+nonsense = travel_ai.Understanding(intent="book_it_for_me", confidence=1.0)
+check("an intent outside the list is refused rather than mapped to something near it",
+      engine._from_provider(nonsense, "I want to visit Goa", shelf) is None)
+
+same = travel_ai.Understanding(intent="flight", origin="Goa", destination="Goa",
+                               confidence=0.9)
+reading = engine._from_provider(same, "flights from Goa to Goa", shelf)
+check("one airport cannot be both ends, whoever read the sentence",
+      reading is not None and reading.place_name is None, str(reading))
+
+check("the airport table is the one the booking card reads, not a second copy",
+      engine.resolve_airport("Colombo") == engine.resolve_airport("cmb")
+      and (engine.resolve_airport("Colombo") or {}).get("code") == "CMB",
+      str(engine.resolve_airport("Colombo")))
+
+
+# ---------------------------------------------------------------------------
+print("\n== 8. The limiter is still there ==")
 # ---------------------------------------------------------------------------
 # Asserted last, so the back-off inside say() cannot hide its removal.
 codes = [requests.post(f"{BASE}/api/customer/assistant/message",

@@ -370,6 +370,39 @@ class Settings(BaseSettings):
     #: over that; 30 keeps two clear bursts and is still nowhere near a script.
     assistant_rate_per_minute: int = 30
 
+    # -----------------------------------------------------------------------
+    # Travel Assistant (services/travel_ai_assistant + services/travel_ai).
+    # -----------------------------------------------------------------------
+    # The CUSTOMER-facing one — the panel and the voice popup on the landing
+    # page. Same shape again, and for the same reason: the understanding is
+    # swappable, the answer is not.
+    #
+    #   none     the built-in reader. THE DEFAULT, and a complete feature: it
+    #            is what every rule in the brief is written against, it needs
+    #            no vendor, no key and no network call, and it is what runs
+    #            when a model is unreachable, slow or talking nonsense.
+    #   openai   an OpenAI-compatible chat endpoint classifies the sentence
+    #            first. Needs TRAVEL_AI_API_KEY.
+    #   local    the same wire protocol pointed at a model you host yourself
+    #            (Ollama, vLLM, LM Studio). Needs TRAVEL_AI_BASE_URL and no key.
+    #
+    # WHAT THE MODEL IS ALLOWED TO DECIDE. One intent name out of a fixed list,
+    # and the place names it copies OUT OF THE TRAVELLER'S OWN SENTENCE — every
+    # one of which is checked back against that sentence before it is used. It
+    # never writes the reply, never sees a fare, a room, a booking or a
+    # passenger, and cannot reach the database. So the worst a bad answer from
+    # it can do is open the wrong search screen, which the rules then would
+    # have opened correctly; it can never state a price or an availability,
+    # because no part of this feature knows one.
+    travel_ai_provider: str = "none"
+    travel_ai_api_key: str | None = None
+    #: OpenAI-compatible base. Point it at a local server for 'local'.
+    travel_ai_base_url: str = "https://api.openai.com/v1"
+    travel_ai_model: str = "gpt-4o-mini"
+    #: Short on purpose. This sits in front of someone speaking into a
+    #: microphone, and the rules answering instantly beats a spinner.
+    travel_ai_timeout_seconds: float = 6.0
+
     # ------------------------------------------------------- HOTELBEDS ------
     # The hotel CONTENT provider. This is the static catalogue — properties,
     # addresses, images, facilities, room types — and it is a different thing

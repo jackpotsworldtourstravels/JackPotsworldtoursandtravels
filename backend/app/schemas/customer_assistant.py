@@ -32,7 +32,16 @@ class AssistantAction(BaseModel):
     """The screen the browser should open, if any."""
 
     type: str = Field(description="search_flights | search_hotels | hotels_near | search_packages | open_destination | open_support | open_bookings | none")
-    params: dict = Field(default_factory=dict)
+    params: dict = Field(
+        default_factory=dict,
+        description=(
+            "Only what the traveller actually said, so a screen leaves every other field "
+            "as they left it. A flight carries `from`/`to` as spoken, `trip`, `date` when "
+            "one was named, and `fromCode`/`toCode` when the airport table recognises the "
+            "city — the same table the booking card's picker reads. A hotel carries `dest` "
+            "and `checkIn`; a package `dest`."
+        ),
+    )
 
 
 class AssistantEntities(BaseModel):

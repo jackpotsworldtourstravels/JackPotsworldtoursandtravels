@@ -169,8 +169,13 @@ const TravelAssistant = (function () {
    *  @returns {{opened: boolean, note: string|null}} */
   function openFlightSearchCard(route) {
     const r = route || {};
-    const from = resolveAirport(r.from);
-    let to = resolveAirport(r.to);
+    /* THE CODE THE BACKEND ALREADY RESOLVED, when it had one. It reads the
+       SAME table this does — assets/js/airports.js — so this is not a second
+       opinion; it saves a lookup and, for a city the picker spells its own
+       way, it is the exact airport that was meant. A name is still what
+       arrives for everywhere else, and everywhere else still resolves here. */
+    const from = resolveAirport(r.fromCode || r.from);
+    let to = resolveAirport(r.toCode || r.to);
 
     /* ONE AIRPORT CANNOT BE BOTH ENDS, and only this side can tell. Two
        different words resolve to the same code more often than they look like
@@ -223,6 +228,8 @@ const TravelAssistant = (function () {
           trip: p.trip || e.trip,
           from: p.from || e.origin,
           to: p.to || e.destination,
+          fromCode: p.fromCode,
+          toCode: p.toCode,
           date: p.date || e.date,
         });
       case 'search_hotels': {
