@@ -267,6 +267,35 @@ def update_request(
     return _detail(db, request, current_user)
 
 
+@router.delete(
+    "/requests/{request_id}",
+    status_code=204,
+    tags=["admin · manual booking"],
+    summary="Delete a desk-raised draft booking",
+    description=(
+        "Requires `ticket.manual` — the permission the Manual Booking screens already use. "
+        "Permanently removes ONE booking and the travellers, documents and notes that belong "
+        "to it.\n\n"
+        "**Deliberately narrow.** The row must be a BOOKING (never the enquiry), raised from "
+        "the Admin portal (`source = b2b_manual_request`), still a DRAFT, and with no payment, "
+        "wallet or invoice record against it — a submitted booking is withdrawn with Cancel, "
+        "not deleted. The enquiry it came from survives and becomes bookable again."
+    ),
+    responses={
+        400: {"description": "Not a booking, or no longer a draft."},
+        403: {"description": "Raised by the merchant, not by the desk."},
+        409: {"description": "Payment, wallet or invoice records point at it."},
+    },
+)
+def delete_manual_booking(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require(P.TICKET_MANUAL)),
+):
+    ticket_service.delete_manual_booking(db, current_user, request_id)
+    return Response(status_code=204)
+
+
 @router.put(
     "/requests/{request_id}/passengers",
     response_model=list[PassengerResponse],

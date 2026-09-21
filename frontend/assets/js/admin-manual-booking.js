@@ -1042,6 +1042,130 @@ function initManualRequest() {
   ambInstallTicketPanel(enquiry);
   ambInstallHold();
   ambInstallDocumentsPanel();
+  ambInstallDeleteButton(enquiry);
+}
+
+/* ------------------------------------------------------------------ delete --
+   DELETE BESIDE DISCARD, AND THEY ARE NOT THE SAME ACT.
+
+   Discard (classic-booking.js, untouched) leaves this screen; a saved draft
+   stays in My Requests. Delete destroys that draft: DELETE /api/requests/{id},
+   which the server allows only for a DRAFT booking the DESK raised with no
+   payment, wallet or invoice record against it, and which clears the enquiry's
+   pointer so the same enquiry can be booked again.
+
+   INJECTED FROM HERE, not added to the shared form. classic-booking.js is the
+   Merchant Portal's screen as well, and a merchant has no business deleting
+   rows; this file is loaded by the Admin Portal and nothing else, exactly as
+   the ticket, hold and documents panels above are.
+
+   THE ID COMES FROM THE SERVER, never from the reference on screen.
+   `clBookingDraft` is the record the form itself saved or resumed, so its `id`
+   is the booking row and not the enquiry that spawned it. With no draft there
+   is nothing to delete yet, and the button says so rather than guessing. */
+function ambInstallDeleteButton(enquiry) {
+  const actions = document.querySelector('#cl-booking-request .cl-page-actions');
+  const discard = document.getElementById('clBrCancel');
+  if (!actions || !discard || document.getElementById('ambDeleteBooking')) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'ambDeleteBooking';
+  btn.className = 'cl-btn cl-btn-danger';
+  btn.textContent = 'Delete';
+  /* Delete first, Discard second — the order asked for, and `.cl-page-actions`
+     is a wrapping flex row, so at narrow widths they stack without overflow. */
+  actions.insertBefore(btn, discard);
+
+  btn.addEventListener('click', () => ambConfirmDeleteBooking(enquiry));
+}
+
+/** The confirmation, then the delete. Nothing is removed before the second press. */
+function ambConfirmDeleteBooking(enquiry) {
+  const draft = (typeof clBookingDraft !== 'undefined') ? clBookingDraft : null;
+
+  /* NOTHING SAVED YET. The form is filled in but no booking row exists, so
+     there is nothing for the server to delete — and Discard is the action that
+     throws the typing away. Said plainly instead of offering a delete that
+     would 404. */
+  if (!draft || !draft.id) {
+    return clOpenModal('Nothing to delete yet', `
+      <div class="cl-msg cl-msg-muted" style="margin-top:0">
+        This booking has not been saved, so there is no record to delete.
+      </div>
+      <p style="font-size:13px;">Use <b>Discard</b> to leave without saving it.</p>`,
+      '<button type="button" class="cl-btn" onclick="clCloseModal()">Close</button>');
+  }
+
+  const ref = draft.request_number || '';
+  const from = enquiry && enquiry.reference_number ? enquiry.reference_number : '';
+
+  clOpenModal('Delete Manual Booking?', `
+    <p style="margin:0;font-size:14px;line-height:1.65;color:var(--cl-text-2);">
+      Are you sure you want to delete this manual booking? The travellers and
+      documents entered on it are deleted with it.
+    </p>
+    <dl class="cl-dl" style="margin-top:14px;">
+      <div><dt>Booking</dt><dd class="cl-ref">${ambEsc(ref)}</dd></div>
+      ${from ? `<div><dt>From enquiry</dt><dd class="cl-ref">${ambEsc(from)}</dd></div>` : ''}
+    </dl>
+    <p style="margin:12px 0 0;font-size:13px;color:var(--cl-text-2);">
+      The enquiry itself is kept, and can be booked again. <b>This action cannot be undone.</b>
+    </p>
+    <div class="cl-msg cl-msg-err" id="ambDelErr" style="display:none;"></div>`,
+    `<button type="button" class="cl-btn" id="ambDelCancel">Cancel</button>
+     <button type="button" class="cl-btn cl-btn-danger" id="ambDelConfirm">Delete</button>`);
+
+  document.getElementById('ambDelCancel')
+    .addEventListener('click', () => clCloseModal());
+  document.getElementById('ambDelConfirm')
+    .addEventListener('click', () => ambDeleteBooking(draft));
+}
+
+/** The one call that deletes, guarded against a second press. */
+async function ambDeleteBooking(draft) {
+  const confirmBtn = document.getElementById('ambDelConfirm');
+  const cancelBtn = document.getElementById('ambDelCancel');
+  const errBox = document.getElementById('ambDelErr');
+  /* Disabled for the whole request: the click cannot be repeated, and neither
+     can the DELETE. */
+  if (!confirmBtn || confirmBtn.disabled) return;
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Deleting…';
+  if (cancelBtn) cancelBtn.disabled = true;
+  if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+
+  try {
+    /* Through MerchantApi._req, which this file has already redirected at the
+       admin's token (ambInstallApiBridge) — so no second request layer, and no
+       second place that knows how this portal authenticates. */
+    await MerchantApi._req('delete', `/api/requests/${draft.id}`);
+  } catch (err) {
+    /* THE BOOKING IS STILL THERE, and the screen says so rather than
+       navigating as though it had gone. The server's own words: it refuses a
+       submitted booking, a merchant-raised one and anything with money against
+       it, and each reason is worth reading. */
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Delete';
+    if (cancelBtn) cancelBtn.disabled = false;
+    if (errBox) {
+      errBox.textContent = clError(err, 'The booking could not be deleted.');
+      errBox.style.display = '';
+    }
+    return;
+  }
+
+  clCloseModal();
+  /* The screen the deleted booking was on must not stay open. Its state is
+     dropped first — otherwise clRenderBookingForm would resume a draft the
+     server no longer has — and then the list it came from is re-read, so the
+     row offers Raise Booking again rather than View Booking for a row that
+     has gone. */
+  if (typeof clBookingDraft !== 'undefined') clBookingDraft = null;
+  if (typeof clLoaded !== 'undefined' && clLoaded.delete) clLoaded.delete('booking-request');
+  navigateToSection('manual-enquiry');
+  ambNote(`Manual booking ${draft.request_number || ''} deleted successfully.`.replace('  ', ' '), 'ok');
+  ambRefreshStatuses();
 }
 
 /* --------------------------------------------------------------- hold --

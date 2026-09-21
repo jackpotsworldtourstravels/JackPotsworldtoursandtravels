@@ -31,11 +31,13 @@ from app.models_v2 import (
     PaymentStatus,
     PaymentType,
     RequestDocument,
+    RequestSource,
     RequestStatus as S,
     RequestType,
     ServiceRequest,
     TravelType,
     User,
+    WalletTransaction,
 )
 from app.services import (
     activity_service,
@@ -1716,3 +1718,109 @@ def can_download(request: ServiceRequest, actor: User) -> bool:
     return request.status in (S.TICKET_ISSUED, S.COMPLETED) and (
         actor.is_platform_staff or actor.merchant_id == request.merchant_id
     ) and has_permission(actor, P.TICKET_VIEW)
+
+
+# ---------------------------------------------------------------------------
+# Deleting a manual booking (Admin portal, Manual Booking screen)
+# ---------------------------------------------------------------------------
+def delete_manual_booking(db: Session, actor: User, request_id: int) -> dict:
+    """Permanently remove ONE desk-raised draft booking. Returns what was deleted.
+
+    This is the Delete beside Discard on the Manual Booking screen, and it is
+    the only thing in this application that destroys a service request. Discard
+    is unchanged and still only leaves the screen.
+
+    FOUR GATES, AND EACH REFUSES A DIFFERENT MISTAKE:
+
+    * ``request_type`` must be BOOKING — never the enquiry it came from. The
+      enquiry survives and becomes bookable again (the link is cleared below),
+      which is the whole point: the desk deletes the booking it mis-keyed and
+      raises another from the same enquiry.
+    * ``source`` must be B2B_MANUAL_REQUEST — a booking the DESK raised. A
+      merchant's own booking is not the Admin portal's to delete, even though
+      an admin can see it.
+    * the status must be DRAFT. Once submitted it is in the approval queue, the
+      merchant has been notified and the wallet may have been reserved against
+      it; those are withdrawn with Cancel, which exists, and not by deleting the
+      row out from under them.
+    * nothing financial may point at it. ``payments`` and ``wallet_transactions``
+      are ON DELETE SET NULL, so deleting a row they reference would silently
+      orphan a money record rather than fail — exactly the kind of quiet damage
+      a delete button must not be able to do.
+
+    WHAT GOES WITH IT is what belongs to it and nothing else: the travellers,
+    documents, notes and group-import rows are ON DELETE CASCADE children of
+    this request (migration 0023). Documents already uploaded to S3 are not
+    removed from the bucket here; the rows that referenced them are gone, so
+    nothing in the application can reach them.
+    """
+    request = get_request(db, actor, request_id)
+
+    if request.request_type is not RequestType.BOOKING:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Only a booking can be deleted here.",
+        )
+    if request.source is not RequestSource.B2B_MANUAL_REQUEST:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Only a booking raised from the Manual Booking screen can be deleted. "
+                "This one was raised by the merchant."
+            ),
+        )
+    if request.status is not S.DRAFT:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"{request.request_number} is "
+                f"{lifecycle.SPEC_LABELS.get(request.status, request.status.value)} and can no "
+                "longer be deleted — cancel it instead."
+            ),
+        )
+
+    money = db.scalar(
+        select(func.count()).select_from(Payment).where(Payment.request_id == request.request_id)
+    ) or 0
+    money += db.scalar(
+        select(func.count()).select_from(WalletTransaction)
+        .where(WalletTransaction.request_id == request.request_id)
+    ) or 0
+    if money or request.invoice_number:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=(
+                f"{request.request_number} has payment or invoice records against it and "
+                "cannot be deleted. Cancel it instead."
+            ),
+        )
+
+    number = request.request_number
+    merchant_id = request.merchant_id
+    enquiry_number = None
+
+    # THE ENQUIRY IS NOT DELETED — its pointer to this booking is. Without this
+    # the enquiry keeps offering "View Booking" for a row that no longer exists
+    # and refuses a second booking with "already booked as REQ-…".
+    enquiry = db.get(ServiceRequest, request.parent_request_id) if request.parent_request_id else None
+    if enquiry is not None and enquiry.request_type is RequestType.TICKET_ENQUIRY:
+        details = dict(enquiry.travel_details or {})
+        if details.pop("booking_request_id", None) is not None:
+            details.pop("booking_request_number", None)
+            enquiry.travel_details = details
+        enquiry_number = enquiry.request_number
+
+    # Logged BEFORE the row goes, so the description can still read from it.
+    activity_service.log_activity(
+        db, actor.user_id, "Manual booking deleted",
+        activity_type="Booking", module="Manual Booking",
+        description=(
+            f"{actor.full_name} deleted draft booking {number}"
+            + (f" raised from enquiry {enquiry_number}" if enquiry_number else "")
+        ),
+        merchant_id=merchant_id,
+    )
+
+    db.delete(request)
+    db.commit()
+    return {"request_number": number, "enquiry_number": enquiry_number}
