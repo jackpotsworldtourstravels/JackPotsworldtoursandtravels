@@ -2110,3 +2110,100 @@ html.jp-customer .mobile-partner-mark { display: none; }
     clip-path: inset(50%); overflow: hidden; white-space: nowrap;
   }
 }
+
+/* ==========================================================================
+   THE TRAVEL ASSISTANT AND THE VOICE ASSISTANT
+   ==========================================================================
+   The panel's shell (.chatbot-panel / -head / -body, .chat-msg, .chat-chip) is
+   the one that was already here; these are the parts a real conversation
+   needs and a canned one did not — a close button, a message box, the typing
+   dots — plus the voice popup, which is new.
+   ========================================================================== */
+.chatbot-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.ta-close{
+  flex:none; width:30px; height:30px; border-radius:50%; border:none; cursor:pointer;
+  background:rgba(255,255,255,.14); color:#fff; font-size:20px; line-height:1;
+  display:grid; place-items:center; transition:background .18s ease;
+}
+.ta-close:hover{ background:rgba(255,255,255,.26); }
+.ta-close:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+
+/* The message box. A row that cannot wrap: the send button keeps its size and
+   the input takes whatever is left, at every panel width. */
+.ta-compose{ display:flex; align-items:center; gap:8px; padding:12px 14px; border-top:1px solid var(--line); background:#fff; }
+.ta-compose input{
+  flex:1; min-width:0; height:42px; padding:0 14px; border-radius:999px;
+  border:1.5px solid var(--line); font-family:var(--ff-body); font-size:14px; color:var(--navy);
+  outline:none; transition:border-color .18s ease, box-shadow .18s ease;
+}
+.ta-compose input:focus{ border-color:var(--coral); box-shadow:0 0 0 3px rgba(232,96,76,.16); }
+.ta-send{
+  flex:none; width:42px; height:42px; border-radius:50%; border:none; cursor:pointer;
+  background:linear-gradient(135deg, var(--coral) 0%, var(--coral-dark) 100%); color:#fff;
+  display:grid; place-items:center; transition:filter .18s ease, transform .18s ease;
+}
+.ta-send:hover{ filter:brightness(1.06); transform:translateY(-1px); }
+.ta-send:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+.ta-send svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+/* Three dots while the answer is on its way. */
+.ta-typing{ display:inline-flex; gap:5px; align-items:center; }
+.ta-typing span{ width:7px; height:7px; border-radius:50%; background:var(--muted); animation:taBlink 1.2s infinite; }
+.ta-typing span:nth-child(2){ animation-delay:.18s; }
+.ta-typing span:nth-child(3){ animation-delay:.36s; }
+@keyframes taBlink{ 0%, 60%, 100%{ opacity:.25; } 30%{ opacity:1; } }
+
+.chat-suggestions:empty{ display:none; }
+
+/* --- the voice popup ------------------------------------------------------ */
+.va-overlay{
+  position:fixed; inset:0; z-index:320; display:grid; place-items:center; padding:20px;
+  background:rgba(10,37,64,.55); backdrop-filter:blur(6px);
+}
+.va-overlay[hidden]{ display:none; }
+.va-card{
+  position:relative; width:100%; max-width:420px; padding:34px 28px 30px; border-radius:24px;
+  background:#fff; box-shadow:var(--shadow-lg); text-align:center;
+  animation:taPop .24s cubic-bezier(.22,1,.36,1);
+}
+@keyframes taPop{ from{ opacity:0; transform:translateY(12px) scale(.97);} to{ opacity:1; transform:none; } }
+.va-close{ position:absolute; top:14px; right:14px; background:rgba(10,37,64,.08); color:var(--navy); }
+.va-close:hover{ background:rgba(10,37,64,.16); }
+.va-title{ margin:0; font-size:22px; font-weight:800; color:var(--navy); }
+.va-hint{ margin:8px 0 22px; font-size:14px; line-height:1.5; color:var(--muted); }
+
+/* The microphone, and the ring that says it is listening. */
+.va-mic{
+  position:relative; width:96px; height:96px; border-radius:50%; border:none; cursor:pointer;
+  display:grid; place-items:center; margin:0 auto;
+  background:linear-gradient(135deg, var(--coral) 0%, var(--coral-dark) 100%); color:#fff;
+  box-shadow:0 16px 34px -16px rgba(201,72,47,.8); transition:transform .18s ease, filter .18s ease;
+}
+.va-mic:hover:not(:disabled){ filter:brightness(1.05); transform:translateY(-2px); }
+.va-mic:disabled{ background:#D9D3C9; cursor:not-allowed; box-shadow:none; }
+.va-mic:focus-visible{ outline:3px solid var(--navy); outline-offset:4px; }
+.va-mic svg{ width:40px; height:40px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.va-ring{
+  position:absolute; inset:-6px; border-radius:50%; border:3px solid var(--coral-light);
+  opacity:0; pointer-events:none;
+}
+.va-mic.is-listening .va-ring{ animation:vaPulse 1.5s ease-out infinite; }
+.va-mic.is-listening{ animation:vaBreathe 1.5s ease-in-out infinite; }
+@keyframes vaPulse{ 0%{ opacity:.75; transform:scale(1);} 100%{ opacity:0; transform:scale(1.45);} }
+@keyframes vaBreathe{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.05);} }
+
+.va-heard{ margin:22px 0 0; min-height:22px; font-size:17px; font-weight:700; color:var(--navy); line-height:1.4; }
+.va-reply{ margin:10px 0 0; min-height:20px; font-size:14.5px; line-height:1.55; color:var(--muted); }
+
+@media (max-width:640px){
+  .va-card{ padding:30px 20px 26px; }
+  .va-mic{ width:84px; height:84px; }
+  .va-mic svg{ width:34px; height:34px; }
+  .chatbot-body{ max-height:46vh; }
+}
+@media (prefers-reduced-motion: reduce){
+  .va-card{ animation:none; }
+  .va-mic.is-listening, .va-mic.is-listening .va-ring{ animation:none; }
+  .va-mic.is-listening .va-ring{ opacity:.75; }
+  .ta-typing span{ animation:none; opacity:.6; }
+}

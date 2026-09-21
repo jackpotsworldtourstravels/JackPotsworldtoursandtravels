@@ -25,6 +25,7 @@ from app.routers import (
     booking_ops,
     change_requests,
     customer_account,
+    customer_assistant,
     customer_auth,
     customer_bookings,
     customer_chat,
@@ -350,6 +351,9 @@ app.include_router(admin_chat.router)
 # none; see customer_destination_service for why deriving beats storing here.
 # A new prefix on a new router: no existing route changed to make room for it.
 app.include_router(customer_destinations.router)
+# The landing page's Travel Assistant and Voice Assistant (0077). Guest-friendly
+# on purpose: it answers visitors who have not signed in.
+app.include_router(customer_assistant.router)
 app.include_router(customer_hotel_bookings.router)
 # The real B2C tour-package system (Phase 5): its own tables, its own booking
 # reference series (JPP######) — see migration 0056. Same customer scope;

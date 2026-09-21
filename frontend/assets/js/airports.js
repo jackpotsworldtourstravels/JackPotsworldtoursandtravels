@@ -40,6 +40,9 @@ const JPAirports = (function () {
     VGA: { city: 'Vijayawada',         country: 'India',        utc: IST },
     STV: { city: 'Surat',              country: 'India',        utc: IST },
     BLR: { city: 'Bengaluru',          country: 'India',        utc: IST },
+    /* Colombo is IST because Sri Lanka Standard Time IS +05:30, not because
+       the line above was copied — see the note on offsets at the top. */
+    CMB: { city: 'Colombo',            country: 'Sri Lanka',    utc: IST },
     JED: { city: 'Jeddah',             country: 'Saudi Arabia', utc: 180 },
     MED: { city: 'Madinah',            country: 'Saudi Arabia', utc: 180 },
     BAH: { city: 'Bahrain',            country: 'Bahrain',      utc: 180 },
@@ -68,11 +71,91 @@ const JPAirports = (function () {
     return TABLE[c] || { city: c, country: '', utc: IST };
   }
 
-  /** "HYD" -> "Hyderabad (HYD)". An unknown code prints as itself rather than
-   *  as an empty box. */
+  /* --------------------------------------------------------- the wider table
+     travel-locations.js carries the cities this one does not — Kuala Lumpur,
+     Singapore, the two Hyderabads — and the airports' PROPER NAMES, which this
+     table has never held. It is consulted here for DESCRIPTION ONLY: what a
+     code is called, and what its airport is named.
+
+     `has`, `match`, `POPULAR` and `get` are deliberately NOT widened.
+       - The first three are what the picker OFFERS, and offering a route this
+         business does not sell is a product decision, not a lookup. `recent()`
+         filters on `has`, so a wider code cannot creep into the suggestions
+         that way either.
+       - `get` carries the UTC OFFSET, and the note at the top of this file is
+         about exactly that: a wrong offset silently makes a duration wrong.
+         The wider table has no offsets, so it is never asked for one.
+
+     When travel-locations.js is absent — the Flights page does not load it —
+     every function below behaves exactly as it did before. */
+  function wider(code) {
+    if (typeof travelLocationByCode !== 'function') return null;
+    try { return travelLocationByCode(String(code || '').toUpperCase()); } catch { return null; }
+  }
+
+  /** "HYD" -> "Hyderabad (HYD)". A code only the wider table knows still
+   *  prints as its city; a code neither knows prints as itself rather than as
+   *  an empty box. */
   function label(code) {
     const c = String(code || '').toUpperCase();
-    return TABLE[c] ? TABLE[c].city + ' (' + c + ')' : String(code || '');
+    if (TABLE[c]) return TABLE[c].city + ' (' + c + ')';
+    const w = wider(c);
+    return w ? w.city + ' (' + c + ')' : String(code || '');
+  }
+
+  /** Everything known about one code, for showing a traveller. Never the
+   *  offset — see the note on `wider`.
+   *
+   *  `airportName` is '' when no table has it, which is the honest answer and
+   *  the one the booking card's sub-label is built to print nothing for. */
+  function describe(code) {
+    const c = String(code || '').toUpperCase();
+    const t = TABLE[c];
+    const w = wider(c);
+    if (!t && !w) return null;
+    return {
+      airportCode: c,
+      city: (t && t.city) || (w && w.city) || c,
+      country: (t && t.country) || (w && w.country) || '',
+      airportName: (w && w.airport) || '',
+      label: label(c),
+    };
+  }
+
+  /** A CITY NAME, OR A CODE, AS A TRAVELLER SAID IT -> the airport it means.
+   *
+   *  This is the airport lookup the Travel Assistant resolves against, kept
+   *  here rather than in the assistant because this file is where the airport
+   *  reference lives and two copies would drift.
+   *
+   *      resolve('Hyderabad')
+   *        -> {airportCode:'HYD', city:'Hyderabad',
+   *            airportName:'Rajiv Gandhi International Airport',
+   *            country:'India', label:'Hyderabad (HYD)'}
+   *
+   *  THE TABLE THIS BUSINESS SELLS FROM COMES FIRST, so a city it knows is
+   *  answered with the same words picking from the list would have written.
+   *
+   *  THE WIDER TABLE IS MATCHED EXACTLY — city, code or alias. Its own search
+   *  also falls back to loose substring hits inside airport and country names,
+   *  which is right for someone typing into a listbox and wrong here: "India"
+   *  would come back as whichever Indian airport sorts first, and a guess in
+   *  the From box is worse than an empty one the traveller can finish.
+   *
+   *  @returns the record above, or null when no table answers to it. */
+  function resolve(text) {
+    const said = String(text || '').trim();
+    if (!said) return null;
+    const direct = codeOf(said);
+    if (direct && has(direct)) return describe(direct);
+    if (typeof searchTravelLocations === 'function') {
+      const q = said.toLowerCase();
+      const hit = searchTravelLocations(said, 1)[0];
+      const exact = hit && (hit.city.toLowerCase() === q || hit.code.toLowerCase() === q
+        || (hit.aliases || []).some(a => String(a).toLowerCase() === q));
+      if (exact) return describe(hit.code);
+    }
+    return null;
   }
 
   /** "Hyderabad (HYD)" -> "HYD".
@@ -149,7 +232,8 @@ const JPAirports = (function () {
       .map(c => row(c, ''));
   }
 
-  return { TABLE, IST, POPULAR, has, get, label, codeOf, match, remember, recent, row };
+  return { TABLE, IST, POPULAR, has, get, label, codeOf, match, remember, recent, row,
+           describe, resolve };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = JPAirports;

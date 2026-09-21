@@ -26,7 +26,7 @@
      that uses it, Yellowtail at its single 400. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260921ta1">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
@@ -61,12 +61,22 @@
      foot of the page - so JPIcon did not exist yet and the tabs came out as
      bare words. Every other page already loads it ahead of the card. -->
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
-<script src="assets/js/airports.js?v=20260825t3"></script>
+<!-- The wider city/airport reference. BEFORE airports.js, which reads it for
+     the cities its own table does not carry and for the airports' proper
+     names, and before the inline BookingCard.render() below — the card paints
+     the airport line under each box while it renders, and this arriving at the
+     foot of the page meant that first paint had no name to print.
+
+     IT DOES NOT WIDEN THE PICKER. airports.js keeps its own table for what the
+     suggestions OFFER — the routes this business actually sells — and consults
+     this one only to describe a code. See the note on `wider` in that file. -->
+<script src="assets/js/travel-locations.js?v=20260816cf2"></script>
+<script src="assets/js/airports.js?v=20260921ta5"></script>
 <script src="assets/js/search-widgets.js?v=20260825t3"></script>
 <script src="assets/js/destinations.js?v=20260912ds4"></script>
 <script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
-<script src="assets/js/booking-card.js?v=20260919b2c3"></script>
+<script src="assets/js/booking-card.js?v=20260921ta5"></script>
 <!-- The header's scroll fade, hamburger and hero parallax. Shared with the
      Flights page, which mounts its whole nav from this file — see its header
      comment. This page keeps its static markup and only borrows the behaviour. -->
@@ -547,13 +557,13 @@
     <button type="button" class="fab-item" id="fabTopBtn" data-tooltip="Back to Top" aria-label="Scroll back to top" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="arrowUp"></span></span>
     </button>
-    <button type="button" class="fab-item" id="fabSupportBtn" data-tooltip="Customer Support" aria-label="Open customer support" role="menuitem">
+    <button type="button" class="fab-item" id="fabSupportBtn" data-tooltip="Chat Support" aria-label="Open chat support" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="chat"></span></span>
     </button>
-    <button type="button" class="fab-item" id="fabVoiceBtn" data-tooltip="Voice Search" aria-label="Start voice search" role="menuitem">
+    <button type="button" class="fab-item" id="fabVoiceBtn" data-tooltip="Voice Assistant" aria-label="Open the voice assistant" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="mic"></span></span>
     </button>
-    <button type="button" class="fab-item" id="fabAiBtn" data-tooltip="AI Travel Assistant" aria-label="Open AI travel assistant" aria-expanded="false" role="menuitem">
+    <button type="button" class="fab-item" id="fabAiBtn" data-tooltip="Travel Assistant" aria-label="Open the travel assistant" aria-expanded="false" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="sparkle"></span></span>
     </button>
   </div>
@@ -561,21 +571,13 @@
     <span class="fab-main-icon" aria-hidden="true">+</span>
   </button>
 </div>
-<div class="chatbot-panel" id="chatPanel" role="dialog" aria-label="JackPots World travel assistant">
-  <div class="chatbot-head">
-    <h4>JackPots World Assistant</h4>
-    <p>Need help planning your next adventure?</p>
-  </div>
-  <div class="chatbot-body" id="chatBody">
-    <div class="chat-msg bot">Hi! I can help with fares, packages and bookings. Try one of these:</div>
-  </div>
-  <div class="chat-suggestions" id="chatSuggestions">
-    <button class="chat-chip" data-q="Best Goa package">Best Goa package</button>
-    <button class="chat-chip" data-q="Cheapest flights today">Cheapest flights today</button>
-    <button class="chat-chip" data-q="Hotels near beaches">Hotels near beaches</button>
-    <button class="chat-chip" data-q="Weekend trips under ₹10,000">Weekend trips under ₹10,000</button>
-  </div>
-</div>
+<!-- THE TRAVEL ASSISTANT'S PANEL, filled by assets/js/travel-assistant.js.
+     Empty here on purpose: its thread, its suggestion chips and its message
+     box are one component, and half of it written by hand in this file is how
+     the two drift apart. What it says comes from
+     POST /api/customer/assistant/message — no reply is written in the
+     browser. -->
+<div class="chatbot-panel" id="chatPanel" role="dialog" aria-label="JackPots World travel assistant"></div>
 
 <div class="modal-overlay" id="authOverlay">
   <div class="modal-card auth-card auth-split" role="dialog" aria-modal="true" aria-labelledby="authTitle">
@@ -1030,6 +1032,9 @@
 <script src="assets/js/profile-menu.js?v=20260919b2c1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
+<!-- The Travel Assistant and the Voice Assistant, after live-chat.js and
+     account-center.js because Support and My Bookings hand off to both. -->
+<script src="assets/js/travel-assistant.js?v=20260921ta4"></script>
 <script src="assets/js/account-center.js?v=20260919b2c1"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
@@ -1046,7 +1051,7 @@
      scripts/fetch_destination_images.py. -->
 <script src="assets/js/destination-images.js?v=20260912im1"></script>
 <script src="assets/js/home-destinations.js?v=20260919b2c1"></script>
-<script src="assets/js/app.js?v=20260919b2c1"></script>
+<script src="assets/js/app.js?v=20260921ta1"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

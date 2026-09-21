@@ -143,16 +143,16 @@ const BookingCard = (function () {
 
      The reference prints the airport under the city ("DEL, Delhi Airport
      India") and the weekday under the date ("Thursday"). The airports table
-     carries a code, a city and a country but NOT an airport's proper name, so
-     the line is built from what is actually known — "DEL, Delhi India" — and a
-     code the table does not have prints nothing rather than a guess. The
-     weekday is derived from the date input's own value.
+     carries a code, a city and a country but NOT an airport's proper name —
+     so this line used to read "DEL, Delhi India" and settle for it. It now
+     asks JPAirports.describe, which consults the wider reference too and has
+     the proper names, and a code NO table knows still prints nothing rather
+     than a guess. The weekday is derived from the date input's own value.
 
      Called after every repaint and on every change, because both lines follow
      fields the traveller can edit. */
   function paintSubLabels() {
     if (!root) return;
-    const table = (typeof JPAirports !== 'undefined' && JPAirports.TABLE) || {};
     root.querySelectorAll('.fld-sub[data-sub-for]').forEach(el => {
       const src = root.querySelector('#' + el.dataset.subFor);
       if (!src) { el.textContent = ''; return; }
@@ -166,10 +166,25 @@ const BookingCard = (function () {
       }
 
       const code = (src.dataset.key || codeFrom(src.value) || '').toUpperCase();
-      const row = table[code];
-      el.textContent = (code && row)
-        ? code + ', ' + row.city + (row.country ? ' ' + row.country : '')
-        : '';
+      /* `describe` guarded, not just `JPAirports`: these two files change
+         together and are cache-busted together, but a browser holding one
+         new and one old is a real state and a TypeError here would take the
+         whole card's repaint down with it. Without it, this line falls back
+         to the table and reads exactly as it always did. */
+      const describe = (typeof JPAirports !== 'undefined' && JPAirports.describe)
+        ? JPAirports.describe
+        : c => (((typeof JPAirports !== 'undefined' && JPAirports.TABLE) || {})[c] || null);
+      const a = code ? describe(code) : null;
+      /* THE AIRPORT'S PROPER NAME when one is known — "HYD, Rajiv Gandhi
+         International Airport", which is what the reference prints and what
+         the paragraph above says this line could not do. It still cannot come
+         from the table beside it; JPAirports.describe answers from the wider
+         reference as well now, and still returns nothing rather than a guess
+         for a code no table knows. Where that reference is not loaded, every
+         line here reads exactly as it did before. */
+      el.textContent = !a ? ''
+        : a.airportName ? code + ', ' + a.airportName
+        : code + ', ' + a.city + (a.country ? ' ' + a.country : '');
     });
   }
 
@@ -2114,6 +2129,11 @@ const BookingCard = (function () {
         /* The return leg follows the outbound however it is filled in, and a
            pick does not fire `input`. */
         mirrorRoute();
+        /* The airport line under the box for the same reason, and it is the
+           same omission: bindSubLabels listens for input/change on the card
+           root, which a pick does not send either. It showed as a blank line
+           under a box the traveller had just filled. */
+        paintSubLabels();
       },
     });
   }

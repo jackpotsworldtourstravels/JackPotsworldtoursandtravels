@@ -1192,6 +1192,74 @@ class CustomerLocation(Base):
     destination: Mapped["CustomerDestination"] = relationship(back_populates="locations")
 
 
+class CustomerAssistantSession(Base):
+    """One conversation with the Travel Assistant — signed in or not (0077).
+
+    GUEST FIRST, ACCOUNT LATER. ``customer_id`` is nullable because the
+    assistant answers a visitor who has never signed in; the browser holds the
+    opaque ``session_key`` and sends it with each message. When that visitor
+    signs in, ``/api/customer/assistant/claim`` stamps the account onto the row
+    it already has, so the conversation continues rather than restarting — the
+    "merge temporary history" the brief asks for, done by naming the owner of
+    rows that already exist rather than by copying them.
+
+    NOT THE SUPPORT CHAT. ``customer_conversations`` (CR-9) is a person talking
+    to our staff and requires an account; this is the automated helper and has
+    no agent at the other end. Two different things, two tables, no shared
+    status model.
+    """
+
+    __tablename__ = "customer_assistant_sessions"
+
+    customer_assistant_session_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    #: What the browser holds and sends back. Random, not guessable, and NOT a
+    #: customer id — a guest has none, and a key that encoded one could be
+    #: edited into somebody else's conversation.
+    session_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+    #: 'assistant' (typed) or 'voice' (spoken). The same pipeline serves both;
+    #: this records which door the traveller came through.
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="assistant")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    last_active_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    messages: Mapped[list["CustomerAssistantMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan",
+        order_by="CustomerAssistantMessage.customer_assistant_message_id",
+    )
+
+
+class CustomerAssistantMessage(Base):
+    """One turn of that conversation: what was said, and who said it (0077)."""
+
+    __tablename__ = "customer_assistant_messages"
+
+    customer_assistant_message_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_assistant_sessions.customer_assistant_session_id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    #: 'user' or 'assistant'. Stored rather than inferred from the order, so a
+    #: gap in the history cannot silently re-attribute a line to the wrong side.
+    sender: Mapped[str] = mapped_column(String(16), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    #: The intent this turn was understood as, for the assistant's own replies.
+    #: Null on a traveller's line and on anything not understood.
+    intent: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+
+    session: Mapped["CustomerAssistantSession"] = relationship(back_populates="messages")
+
+
 class CustomerAttraction(Base):
     """A famous place to visit inside a destination — Charminar, the Burj Khalifa.
 

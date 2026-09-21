@@ -649,34 +649,16 @@ function resumePendingSearch() {
   return true;
 }
 
-/* AI chatbot */
-const chatPanel = document.getElementById('chatPanel');
-const chatBody = document.getElementById('chatBody');
+/* THE TRAVEL ASSISTANT'S PANEL IS travel-assistant.js's, thread and all.
+   What used to be here — four canned replies keyed by the chip that was
+   pressed, and no way to type anything else — is the "UI only" the assistant
+   replaces. This is the handle the rest of this file still calls. */
 function toggleChatPanel(forceOpen) {
-  const open = forceOpen !== undefined ? forceOpen : !chatPanel.classList.contains('open');
-  chatPanel.classList.toggle('open', open);
-  fabAiBtn.setAttribute('aria-expanded', String(open));
+  if (typeof TravelAssistant === 'undefined') return;
+  if (forceOpen === true) TravelAssistant.openPanel();
+  else if (forceOpen === false) TravelAssistant.closePanel();
+  else TravelAssistant.togglePanel();
 }
-const chatReplies = {
-  'Best Goa package': "Our top pick is 'Goa Escape' — 4 days, beachfront stay, from ₹5,999. Want me to open it?",
-  'Cheapest flights today': 'Hyderabad → Delhi is trending at ₹2,499 today. Check the Flights tab above for live fares.',
-  'Hotels near beaches': 'Goa has 200+ verified beachfront hotels from ₹1,999/night, free cancellation included.',
-  'Weekend trips under ₹10,000': 'Try Manali (from ₹7,499) or Kerala backwaters (from ₹9,299) — both fit a long weekend.'
-};
-document.querySelectorAll('.chat-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    const q = chip.dataset.q;
-    const userMsg = document.createElement('div');
-    userMsg.className = 'chat-msg user';
-    userMsg.textContent = q;
-    chatBody.appendChild(userMsg);
-    const botMsg = document.createElement('div');
-    botMsg.className = 'chat-msg bot';
-    botMsg.textContent = chatReplies[q] || "Let me look into that for you!";
-    chatBody.appendChild(botMsg);
-    chatBody.scrollTop = chatBody.scrollHeight;
-  });
-});
 
 /* ---------- Floating Action Menu ---------- */
 const fabMenu = document.getElementById('fabMenu');
@@ -716,104 +698,29 @@ fabTopBtn.addEventListener('click', () => {
    falls back to the existing Contact section (already wired to /api/contact) when not */
 fabSupportBtn.addEventListener('click', () => {
   setFabOpen(false);
-  const { access } = getStoredAuth();
-  if (access) {
-    openAccountCenter('support');
-  } else {
-    showToast('Log in to view your support tickets — or send us a message below.');
-    document.getElementById('contact').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  /* Support Center is where LiveChat is docked (account-center.js), so this
+     is the real conversation with our staff rather than a second one. Signed
+     out, openAccountCenter opens the sign-in dialog and returns here after —
+     it no longer needs a branch of its own. */
+  if (typeof AccountCenter !== 'undefined' && AccountCenter.open) AccountCenter.open('support');
 });
 
-/* Button 4: AI Travel Assistant — reuses the existing chatbot panel */
+/* Button 4: Travel Assistant — the real one, talking to
+   /api/customer/assistant (travel-assistant.js). */
 fabAiBtn.addEventListener('click', () => {
   setFabOpen(false);
   toggleChatPanel();
 });
 
-/* Button 3: Voice Search — lazily initialized Web Speech API, fills the active search tab */
-let voiceRecognition = null;
-function getVoiceRecognition() {
-  if (voiceRecognition) return voiceRecognition;
-  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognitionCtor) return null;
-  voiceRecognition = new SpeechRecognitionCtor();
-  voiceRecognition.lang = 'en-IN';
-  voiceRecognition.interimResults = false;
-  voiceRecognition.maxAlternatives = 1;
-  return voiceRecognition;
-}
-function setNativeDate(displayInputId, dateStr) {
-  const display = document.getElementById(displayInputId);
-  const native = display?.closest('.field-date')?.querySelector('.date-native');
-  if (!native) return;
-  native.value = dateStr;
-  native.dispatchEvent(new Event('change'));
-}
-function isoDateOffset(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-function titleCaseWords(s) { return s.replace(/\b\w/g, c => c.toUpperCase()); }
-
-function applyVoiceQuery(transcript) {
-  const text = transcript.trim();
-  const lower = text.toLowerCase();
-  let confidentMatch = false;
-
-  let dateStr = null;
-  if (/\btomorrow\b/.test(lower)) dateStr = isoDateOffset(1);
-  else if (/\btoday\b/.test(lower)) dateStr = isoDateOffset(0);
-  const cleaned = lower.replace(/\b(tomorrow|today)\b/g, '').trim();
-
-  /* HOTELS, CRUISES AND PACKAGES LEAVE THIS PAGE. Their search panels are not
-     in the hero card any more — each product has its own page — so what was
-     heard travels there in the URL rather than being typed into fields that no
-     longer exist here. The toast is spoken before the navigation, because
-     after it there is no page left to show it on. */
-  if (/\bhotels?\b/.test(lower)) {
-    const m = cleaned.match(/\bhotels?\s+(?:in|at|near)\s+([a-z\s]+)/i) || cleaned.match(/\bin\s+([a-z\s]+)$/i);
-    showToast(`Heard: "${text}"`);
-    activateTab('hotels', { dest: m ? titleCaseWords(m[1].trim()) : '', checkIn: dateStr || '' });
-    return;
-  } else if (/\b(packages?|tours?)\b/.test(lower)) {
-    showToast(`Heard: "${text}"`);
-    activateTab('packages');
-    return;
-  } else {
-    activateTab('flights');
-    const m = cleaned.match(/([a-z\s]+?)\s+to\s+([a-z\s]+)/i);
-    if (m) {
-      document.getElementById('fFrom').value = titleCaseWords(m[1].trim());
-      document.getElementById('fTo').value = titleCaseWords(m[2].trim());
-      confidentMatch = true;
-    }
-    if (dateStr) setNativeDate('fDep', dateStr);
-  }
-
-  showToast(`Heard: "${text}"`);
-  if (confidentMatch) {
-    /* One Search button for the whole card now, in its footer — it is no
-       longer inside the active panel. */
-    document.querySelector('.search-card .search-go')?.click();
-  }
-}
+/* Button 3: Voice Assistant — the popup with the microphone, the transcript
+   and the answer. The browser's own speech recogniser turns speech into text;
+   the TEXT then goes to the same endpoint the typed panel uses, so both doors
+   understand exactly the same phrases. travel-assistant.js owns all of it. */
 fabVoiceBtn.addEventListener('click', () => {
   setFabOpen(false);
-  const recognition = getVoiceRecognition();
-  if (!recognition) {
-    showToast("Voice search isn't supported in this browser — try Chrome or Edge.", true);
-    return;
-  }
-  if (fabVoiceBtn.classList.contains('listening')) { recognition.stop(); return; }
-  fabVoiceBtn.classList.add('listening');
-  showToast('Listening… try "Hyderabad to Delhi tomorrow"');
-  recognition.onresult = e => applyVoiceQuery(e.results[0][0].transcript);
-  recognition.onerror = () => showToast("Couldn't hear that — please try again.", true);
-  recognition.onend = () => fabVoiceBtn.classList.remove('listening');
-  try { recognition.start(); } catch (err) { fabVoiceBtn.classList.remove('listening'); }
+  if (typeof TravelAssistant !== 'undefined') TravelAssistant.openVoice();
 });
+
 
 /* ---------------------------------------------------------------------------
    THE LANDING PAGE'S STORED SESSION IS THE CUSTOMER'S.
