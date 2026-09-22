@@ -123,7 +123,7 @@
         <div class="dl-actions">
           <a class="disc-btn" href="${esc(explore)}"
              aria-label="Explore ${esc(loc.name)}">Explore Location ${icon('arrowRight', 16)}</a>
-          <a class="disc-link" href="${esc(href)}"
+          <a class="disc-btn disc-btn-ghost" href="${esc(href)}"
              aria-label="View hotels near ${esc(loc.name)}">View Hotels</a>
         </div>
       </div>
@@ -215,6 +215,63 @@
       else message('Unable to load this destination right now.', true);
     }
   }
+
+  /* -------------------------------------------------------------------------
+     THE SPOTLIGHT — one card is picked out and the rest step back.
+
+     WHY THIS IS SCRIPT AND NOT `:hover`. A phone has no hover and a keyboard
+     has no pointer, and the brief asks for the same effect from all three. So
+     one delegated listener per input method sets the same two classes -
+     `is-engaged` on the grid, `is-active` on the card - and the stylesheet
+     describes what those mean. Nothing here decides how anything looks.
+
+     DELEGATED, so it costs one listener rather than one per card and keeps
+     working after the grid is re-rendered.
+
+     A TAP MUST NOT SWALLOW THE TAP. `pointerdown` marks the card and the
+     click continues to the link underneath, so the first tap both highlights
+     and navigates - a card that needs two taps to open is a card that feels
+     broken. */
+  let active = null;
+
+  function setActive(card) {
+    if (active === card) return;
+    if (active) active.classList.remove('is-active');
+    active = card;
+    if (card) card.classList.add('is-active');
+    grid.classList.toggle('is-engaged', !!card);
+  }
+
+  function cardOf(node) {
+    return node && node.closest ? node.closest('.dl-card') : null;
+  }
+
+  /* Pointer: `pointerover`/`pointerout` rather than enter/leave so one
+     delegated pair covers every card, and moving between two cards swaps the
+     highlight instead of clearing it. */
+  grid.addEventListener('pointerover', e => {
+    const card = cardOf(e.target);
+    if (card) setActive(card);
+  });
+  grid.addEventListener('pointerout', e => {
+    /* Only when the pointer has actually left the grid, not on the way from
+       one card to the next. */
+    if (!e.relatedTarget || !grid.contains(e.relatedTarget)) setActive(null);
+  });
+
+  /* Touch: the card under the finger becomes active and stays active while
+     the browser follows the link. */
+  grid.addEventListener('pointerdown', e => {
+    const card = cardOf(e.target);
+    if (card) setActive(card);
+  });
+
+  /* Keyboard: tabbing to a card's link is the same state. focusin/out bubble,
+     which focus/blur do not. */
+  grid.addEventListener('focusin', e => setActive(cardOf(e.target)));
+  grid.addEventListener('focusout', e => {
+    if (!e.relatedTarget || !grid.contains(e.relatedTarget)) setActive(null);
+  });
 
   if (!slug) { notFound(); return; }
   load();

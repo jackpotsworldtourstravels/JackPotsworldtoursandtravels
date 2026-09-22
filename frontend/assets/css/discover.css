@@ -9,31 +9,53 @@
    should be quiet and dense, a discovery page should be photographic and
    spacious. Kept in one file they were one file's worth of compromise.
 
-   THE PALETTE IS THE BRAND'S, NARROWED TO FIVE TOKENS. Warm off-white page,
-   white cards, near-black type, grey seconds, and gold used only where it
-   means something — a call to action, a rule under a heading, a price. Gold
-   everywhere is a casino; gold on one line is a hotel.
+   THE PALETTE IS SOFT BLUE-GREY, WHITE AND ONE MUTED TEAL. No gold and no
+   black: the photographs are the colour on these pages, and a saturated theme
+   competes with them. The teal appears only where something is interactive or
+   active — a button, the ring on the card under the pointer, a price — and the
+   backgrounds stay within four points of each other so nothing reads as a
+   block of colour.
+
+   THE ONE DARK SURFACE IS A SCRIM OVER A PHOTOGRAPH, and it is a legibility
+   device rather than a theme: white type on an unknown photograph needs a
+   guaranteed floor of contrast. It is tinted towards the ink (#263746) rather
+   than pure black, and it is the only place anything approaching dark appears.
 
    NOTHING HERE IS PAGE-SPECIFIC FURNITURE. The header, the footer, the
    booking card and the results pages are untouched; these rules only apply
    under `.disc`, which only these two pages set.
    =========================================================================== */
 .disc {
-  --disc-bg: #F7F5F0;
+  --disc-bg: #F3F7FA;
+  --disc-bg-2: #EAF1F5;
   --disc-card: #FFFFFF;
-  --disc-ink: #171717;
-  --disc-mute: #666666;
-  --disc-gold: #C9A227;
-  --disc-gold-soft: linear-gradient(135deg, #C9A227, #E0C36A);
-  --disc-line: rgba(23, 23, 23, .08);
-  --disc-shadow: 0 10px 30px -18px rgba(23, 23, 23, .35);
-  --disc-shadow-lift: 0 22px 48px -24px rgba(23, 23, 23, .45);
+  --disc-ink: #263746;
+  --disc-mute: #6B7C89;
+  --disc-accent: #4F8FA8;
+  --disc-accent-deep: #3E7A92;
+  --disc-accent-soft: rgba(79, 143, 168, .08);
+  --disc-accent-line: rgba(79, 143, 168, .35);
+  --disc-line: rgba(38, 55, 70, .10);
+  --disc-shadow: 0 8px 24px -14px rgba(38, 55, 70, .28);
+  --disc-shadow-lift: 0 12px 30px rgba(38, 55, 70, .12);
   /* Playfair for headings, the UI font for everything else. The pair is the
      whole typographic idea: a serif says "place", a grotesque says "book". */
   --disc-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
+
+/* The page itself: a three-stop wash so the background is not a flat fill,
+   and two radial washes at opposite corners for depth. Every one of them is
+   under a tenth of an opacity — at this strength it reads as paper, not as a
+   blue page, which is the difference between a travel site and a dashboard. */
 body.disc { background: var(--disc-bg); }
-.disc .disc-main { background: var(--disc-bg); padding-bottom: 64px; }
+.disc .disc-main {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(79,143,168,.06), transparent 30%),
+    radial-gradient(circle at 92% 82%, rgba(79,143,168,.045), transparent 35%),
+    linear-gradient(135deg, var(--disc-bg) 0%, var(--disc-bg-2) 50%, #F5F8FA 100%);
+  background-attachment: fixed;
+  padding-bottom: 64px;
+}
 
 /* Content column. `wrap` is the site's, so these pages line up with every
    other one; this only caps it where a 1920 screen would otherwise stretch a
@@ -42,62 +64,50 @@ body.disc { background: var(--disc-bg); }
 
 .disc h1, .disc h2, .disc h3 { font-family: var(--disc-serif); color: var(--disc-ink); letter-spacing: -.01em; }
 
-/* A hairline of gold under a section heading. The only structural gold on the
-   page, and it is 44px of it. */
-.disc-h2 {
-  margin: 0 0 4px; font-size: clamp(22px, 2.4vw, 28px); font-weight: 700; line-height: 1.2;
-}
+/* A hairline of teal under a section heading — the only structural accent on
+   the page, and it is 44px of it. */
+.disc-h2 { margin: 0 0 4px; font-size: clamp(22px, 2.4vw, 28px); font-weight: 700; line-height: 1.2; }
 .disc-h2::after {
   content: ''; display: block; width: 44px; height: 3px; margin-top: 10px;
-  border-radius: 3px; background: var(--disc-gold-soft);
+  border-radius: 3px; background: var(--disc-accent);
 }
 .disc-sub { margin: 0; font-size: 15px; line-height: 1.6; color: var(--disc-mute); }
 
-/* Back link — quiet, and the first thing a keyboard reaches. */
 .disc .dh-back {
   display: inline-flex; align-items: center; gap: 8px;
   margin: 22px 0 18px; font-size: 14px; font-weight: 600; color: var(--disc-mute);
   transition: color .2s ease;
 }
-.disc .dh-back:hover { color: var(--disc-ink); }
-.disc .dh-back:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 4px; border-radius: 6px; }
+.disc .dh-back:hover { color: var(--disc-accent); }
+.disc .dh-back:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 4px; border-radius: 6px; }
 
 /* ==========================================================================
    THE DESTINATION HEADER — the city's own photograph, used quietly
-   ==========================================================================
-   The picture is the destination's, from the shelf manifest the homepage
-   already ships, behind a dark scrim so the type on it is legible without
-   depending on which photograph it is. No photograph is not a broken header:
-   the gradient underneath is the design, and the picture is a layer on top.
    ========================================================================== */
 .dl-hero {
   position: relative; overflow: hidden;
   border-radius: 22px; margin-bottom: 30px;
   min-height: 210px; display: flex; align-items: flex-end;
   padding: clamp(22px, 3vw, 40px);
-  background: linear-gradient(120deg, #15181d 0%, #23282f 60%, #2c3138 100%);
+  background: linear-gradient(120deg, #2E4657 0%, #3A5568 60%, #46657A 100%);
   color: #fff;
 }
-.dl-hero-img {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  opacity: .55;
-}
-/* The scrim, not the image, is what guarantees contrast. */
+.dl-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
+/* Tinted towards the ink rather than to black, and lighter at the top so the
+   photograph still reads as a photograph. */
 .dl-hero::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.45) 55%, rgba(0,0,0,.66) 100%);
+  background: linear-gradient(180deg, rgba(38,55,70,.20) 0%, rgba(38,55,70,.46) 55%, rgba(38,55,70,.68) 100%);
 }
 .dl-hero-body { position: relative; z-index: 1; max-width: 680px; }
 .dl-hero-eyebrow {
   margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .18em;
-  text-transform: uppercase; color: #E0C36A;
+  text-transform: uppercase; color: #BFE0EC;
 }
-.dl-hero h1 {
-  margin: 0; color: #fff; font-size: clamp(30px, 4.6vw, 52px); font-weight: 700; line-height: 1.06;
-}
+.dl-hero h1 { margin: 0; color: #fff; font-size: clamp(30px, 4.6vw, 52px); font-weight: 700; line-height: 1.06; }
 .dl-hero-lead {
   margin: 12px 0 0; max-width: 54ch; font-size: clamp(14.5px, 1.3vw, 16.5px);
-  line-height: 1.6; color: rgba(255,255,255,.86);
+  line-height: 1.6; color: rgba(255,255,255,.88);
 }
 .dl-count { margin: 0 0 16px; font-size: 13.5px; font-weight: 600; color: var(--disc-mute); }
 
@@ -105,52 +115,75 @@ body.disc { background: var(--disc-bg); }
    THE CARDS
    ==========================================================================
    `auto-fill` with a 260px floor is what makes the column count a consequence
-   of the width rather than a list of breakpoints: five up at 1920, four at
-   1440, three at 1024, two at 768, one on a phone, and every width between
-   them handled without another media query.
+   of the width rather than a list of breakpoints: four or five up at 1920,
+   four at 1440, three at 1024, two at 768, one on a phone, and every width
+   between them handled without another media query.
    ========================================================================== */
 .dl-grid {
   display: grid; gap: clamp(16px, 1.8vw, 24px);
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 .dl-card {
-  display: flex; flex-direction: column; overflow: hidden;
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
   background: var(--disc-card); border-radius: 20px;
+  border: 1px solid transparent;
   box-shadow: var(--disc-shadow);
-  transition: transform .24s cubic-bezier(.22,.8,.3,1), box-shadow .24s ease;
+  transition: transform 250ms ease, filter 250ms ease, opacity 250ms ease,
+              box-shadow 250ms ease, border-color 250ms ease;
 }
-.dl-card:hover { transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); }
-.dl-card:focus-within { box-shadow: var(--disc-shadow-lift); }
+
+/* --- THE SPOTLIGHT ---------------------------------------------------------
+   One card is picked out and the rest step back. The grid carries
+   `is-engaged` while something is hovered, focused or active, and only then
+   does anything dim — no card is dimmed at rest, which is what keeps the
+   default state honest.
+
+   THE DIM IS BRIGHTNESS AND A LITTLE OPACITY, NOT A COLOUR. Painting the
+   others grey would change what they are; taking 28% of their light leaves
+   every one readable — name, description, count and button all still legible —
+   while the chosen one is plainly the brighter thing on the page.
+
+   `is-active` IS SET BY SCRIPT, not by :hover, because a phone has no hover
+   and a keyboard has no pointer. destination.js sets it on pointerenter, on
+   focus and on tap; the CSS only describes the two states. */
+.dl-grid.is-engaged .dl-card { filter: brightness(.72); opacity: .92; }
+.dl-grid.is-engaged .dl-card.is-active {
+  filter: none; opacity: 1;
+  transform: translateY(-4px) scale(1.015);
+  border-color: var(--disc-accent-line);
+  box-shadow: 0 12px 30px rgba(38, 55, 70, .12);
+}
+/* The keyboard gets the same treatment plus a ring it can see on any
+   background — never colour alone. */
+.dl-card:focus-within { border-color: var(--disc-accent-line); }
+.dl-card a:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; border-radius: 999px; }
 
 .dl-art {
   position: relative; aspect-ratio: 16 / 10; overflow: hidden;
-  background: linear-gradient(135deg, #e9e5db, #f3efe6);
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
 }
 .dl-img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  transition: transform .4s cubic-bezier(.22,.8,.3,1);
+  transition: transform 350ms ease;
 }
-.dl-card:hover .dl-img { transform: scale(1.045); }
-/* Darkens on hover so the white type over the bottom of a bright photograph
-   keeps its contrast, and so the card reads as one object rather than a
-   picture with furniture under it. */
+.dl-grid.is-engaged .dl-card.is-active .dl-img { transform: scale(1.04); }
+/* A hint of the accent across the chosen card's photograph, so the highlight
+   is not only a brightness difference. */
 .dl-art::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.28));
-  opacity: .55; transition: opacity .24s ease;
+  background: linear-gradient(180deg, rgba(79,143,168,0) 55%, rgba(79,143,168,.22));
+  opacity: 0; transition: opacity 250ms ease;
 }
-.dl-card:hover .dl-art::after { opacity: 1; }
-/* The pin marks a card with no photograph, and is a badge on one that has. */
+.dl-grid.is-engaged .dl-card.is-active .dl-art::after { opacity: 1; }
 .dl-pin {
   position: absolute; top: 12px; left: 12px; z-index: 1;
   width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center; color: #fff;
-  background: rgba(23,23,23,.42); backdrop-filter: blur(4px);
+  background: rgba(38,55,70,.42); backdrop-filter: blur(4px);
 }
-.dl-img + .dl-pin { background: rgba(23,23,23,.42); }
 .dl-art:not(:has(.dl-img)) .dl-pin {
   inset: 0; margin: auto; width: 46px; height: 46px;
-  background: rgba(201,162,39,.16); color: var(--disc-gold);
+  background: var(--disc-accent-soft); color: var(--disc-accent);
 }
 
 .dl-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 18px 20px 20px; }
@@ -168,46 +201,52 @@ body.disc { background: var(--disc-bg); }
 .dl-count-line svg, .dl-count-line .jpi { width: 15px; height: 15px; }
 
 .dl-actions { margin-top: auto; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-/* The primary action on this page is to read about the place; hotels are one
-   step further on, and the pair is ordered that way. */
 .disc-btn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 11px 18px; border-radius: 999px;
   font-family: var(--ff-body, inherit); font-size: 14px; font-weight: 700;
-  background: var(--disc-ink); color: #fff;
-  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+  background: var(--disc-accent); color: #fff;
+  transition: background 250ms ease, transform 250ms ease, box-shadow 250ms ease;
 }
-.disc-btn:hover { background: #000; transform: translateY(-1px); box-shadow: 0 10px 22px -14px rgba(0,0,0,.8); }
-.disc-btn:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; }
+.disc-btn:hover { background: var(--disc-accent-deep); transform: translateY(-1px); }
+.disc-btn:focus-visible { outline: 2px solid var(--disc-ink); outline-offset: 3px; }
 .disc-btn svg, .disc-btn .jpi { width: 16px; height: 16px; }
-.dl-card:hover .disc-btn { background: #000; }
-.disc-btn-gold { background: var(--disc-gold-soft); color: #1a1405; }
-.disc-btn-gold:hover { filter: brightness(1.04); background: var(--disc-gold-soft); }
+/* The chosen card's call to action is the clearest thing on it. */
+.dl-grid.is-engaged .dl-card.is-active .disc-btn {
+  background: var(--disc-accent-deep);
+  box-shadow: 0 8px 18px -10px rgba(79, 143, 168, .9);
+}
+/* A quieter second action — outline, not a second solid button. */
+.disc-btn-ghost {
+  background: transparent; color: var(--disc-accent);
+  border: 1px solid var(--disc-accent-line); padding: 10px 17px;
+}
+.disc-btn-ghost:hover { background: var(--disc-accent-soft); color: var(--disc-accent-deep); }
 .disc-link {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 13.5px; font-weight: 700; color: var(--disc-mute);
-  transition: color .2s ease;
+  transition: color 250ms ease;
 }
-.disc-link:hover { color: var(--disc-ink); }
-.disc-link:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; border-radius: 6px; }
+.disc-link:hover { color: var(--disc-accent); }
+.disc-link:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; border-radius: 6px; }
 
 /* ==========================================================================
    ONE PLACE — the detail page
    ========================================================================== */
-/* FULL-BLEED, from inside a centred column: the hero is the photograph and a
+/* FULL-BLEED, from inside a centred column: the hero is the photograph, and a
    photograph with a 32px gutter either side is a thumbnail. */
 .lp-hero {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 34px;
   min-height: clamp(280px, 42vw, 520px);
   padding: clamp(26px, 4vw, 60px) clamp(18px, 6vw, 80px);
-  background: linear-gradient(120deg, #15181d, #2c3138);
+  background: linear-gradient(120deg, #2E4657, #46657A);
   color: #fff;
 }
 .lp-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .lp-hero::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.42) 48%, rgba(0,0,0,.72) 100%);
+  background: linear-gradient(180deg, rgba(38,55,70,.12) 0%, rgba(38,55,70,.40) 50%, rgba(38,55,70,.70) 100%);
 }
 .lp-hero-body { position: relative; z-index: 1; width: min(1320px, 100%); margin-inline: auto; }
 .lp-hero h1 {
@@ -216,20 +255,18 @@ body.disc { background: var(--disc-bg); }
 }
 .lp-where {
   display: flex; align-items: center; gap: 9px; margin: 14px 0 0;
-  font-size: clamp(13.5px, 1.3vw, 16px); font-weight: 600; color: rgba(255,255,255,.9);
+  font-size: clamp(13.5px, 1.3vw, 16px); font-weight: 600; color: rgba(255,255,255,.92);
 }
-.lp-where::before {
-  content: ''; width: 26px; height: 2px; border-radius: 2px; background: var(--disc-gold-soft);
-}
-.lp-hero-pin { position: relative; z-index: 1; color: rgba(255,255,255,.5); }
+.lp-where::before { content: ''; width: 26px; height: 2px; border-radius: 2px; background: #BFE0EC; }
+.lp-hero-pin { position: relative; z-index: 1; color: rgba(255,255,255,.55); }
 
 .lp { display: flex; flex-direction: column; gap: 30px; }
 .lp-sec { display: flex; flex-direction: column; gap: 14px; }
 
-/* The white card every section below the hero sits in. */
 .lp-card {
   background: var(--disc-card); border-radius: 20px;
   padding: clamp(20px, 2.4vw, 30px);
+  border: 1px solid var(--disc-line);
   box-shadow: var(--disc-shadow);
 }
 
@@ -244,13 +281,13 @@ body.disc { background: var(--disc-bg); }
 .lp-fare dd {
   margin: 0; display: flex; align-items: baseline; gap: 5px;
   font-family: var(--disc-serif); font-size: clamp(24px, 2.6vw, 30px); font-weight: 700;
-  color: var(--disc-ink);
+  color: var(--disc-accent-deep);
 }
 .lp-fare dd span { font-family: var(--ff-body, inherit); font-size: 13px; font-weight: 600; color: var(--disc-mute); }
 /* Unavailable is a sentence, in the body font, quiet — never a dash and never
    a number nobody can honour. */
-.lp-fare.is-empty dd { font-family: var(--ff-body, inherit); font-size: 14.5px; font-weight: 600; }
-.lp-fare.is-empty em { font-style: normal; color: var(--disc-mute); }
+.lp-fare.is-empty dd { font-family: var(--ff-body, inherit); font-size: 14.5px; font-weight: 600; color: var(--disc-mute); }
+.lp-fare.is-empty em { font-style: normal; }
 .lp-fare-foot {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--disc-line);
@@ -261,43 +298,38 @@ body.disc { background: var(--disc-bg); }
 .lp-about { margin: 0; font-size: 16px; line-height: 1.75; color: var(--disc-ink); max-width: 72ch; }
 
 /* --- hotels near --------------------------------------------------------- */
-.lp-hotels-head {
-  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
-}
+.lp-hotels-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .lp-hotels { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .lp-hotel {
   display: flex; flex-direction: column; overflow: hidden;
-  background: var(--disc-card); border-radius: 16px; box-shadow: var(--disc-shadow);
-  transition: transform .22s ease, box-shadow .22s ease;
+  background: var(--disc-card); border-radius: 16px;
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
 }
-.lp-hotel:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); }
-.lp-hotel-art {
-  position: relative; aspect-ratio: 4 / 3; overflow: hidden;
-  background: linear-gradient(135deg, #e9e5db, #f3efe6);
-}
+.lp-hotel:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
+.lp-hotel-art { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: linear-gradient(135deg, #E3EDF3, #F1F6F9); }
 .lp-hotel-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .lp-hotel-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 5px; }
 .lp-hotel-name { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
 .lp-hotel-where { margin: 0; font-size: 12.5px; color: var(--disc-mute); }
-.lp-hotel-price { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--disc-ink); }
+.lp-hotel-price { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--disc-accent-deep); }
 .lp-hotel-price span { font-size: 12px; font-weight: 600; color: var(--disc-mute); }
-.lp-hotels-empty { margin: 0; font-size: 14.5px; color: var(--disc-mute); }
 
 /* --- the other places ---------------------------------------------------- */
 .lp-more { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .lp-more-card {
   display: flex; align-items: center; gap: 12px; min-width: 0;
   padding: 10px 16px 10px 10px; border-radius: 14px;
-  background: var(--disc-card); box-shadow: var(--disc-shadow);
+  background: var(--disc-card); border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
   color: var(--disc-ink); font-weight: 700; font-size: 14.5px;
-  transition: transform .2s ease, box-shadow .2s ease;
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
 }
-.lp-more-card:hover { transform: translateY(-2px); box-shadow: var(--disc-shadow-lift); }
-.lp-more-card:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; }
+.lp-more-card:hover { transform: translateY(-2px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
+.lp-more-card:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
 .lp-more-art {
   flex: none; width: 50px; height: 50px; border-radius: 11px; overflow: hidden;
-  display: grid; place-items: center; color: var(--disc-gold);
-  background: linear-gradient(135deg, #efe9da, #f7f3ea);
+  display: grid; place-items: center; color: var(--disc-accent);
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
 }
 .lp-more-art img { width: 100%; height: 100%; object-fit: cover; }
 .lp-more-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -305,10 +337,11 @@ body.disc { background: var(--disc-bg); }
 /* --- status and failure -------------------------------------------------- */
 .disc .dh-status { margin: 10px 0; font-size: 14.5px; color: var(--disc-mute); }
 .disc .dh-retry {
-  margin-top: 4px; padding: 9px 18px; border-radius: 999px; border: 1px solid var(--disc-line);
-  background: #fff; font-size: 13.5px; font-weight: 700; color: var(--disc-ink); cursor: pointer;
+  margin-top: 4px; padding: 9px 18px; border-radius: 999px;
+  border: 1px solid var(--disc-accent-line); background: #fff;
+  font-size: 13.5px; font-weight: 700; color: var(--disc-accent); cursor: pointer;
 }
-.disc .dh-retry:hover { border-color: var(--disc-gold); }
+.disc .dh-retry:hover { background: var(--disc-accent-soft); }
 
 /* --- arrival ------------------------------------------------------------- */
 /* One fade, once, on the body of the page. Cards do not each fly in: eight
@@ -325,11 +358,14 @@ body.disc { background: var(--disc-bg); }
   .lp-fare + .lp-fare { border-left: 0; border-top: 1px solid var(--disc-line); padding-left: 0; padding-top: 14px; }
   .disc-btn { width: 100%; justify-content: center; }
   .dl-actions .disc-link { padding: 6px 0; }
+  /* A tap already moved the page's attention; lifting the card as well makes
+     the thing under the finger jump. */
+  .dl-grid.is-engaged .dl-card.is-active { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .disc-in { animation: none; }
   .dl-card, .dl-img, .lp-hotel, .lp-more-card, .disc-btn { transition: none; }
-  .dl-card:hover { transform: none; }
-  .dl-card:hover .dl-img { transform: none; }
+  .dl-grid.is-engaged .dl-card.is-active { transform: none; }
+  .dl-grid.is-engaged .dl-card.is-active .dl-img { transform: none; }
 }
