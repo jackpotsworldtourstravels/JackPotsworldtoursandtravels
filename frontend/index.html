@@ -26,7 +26,7 @@
      that uses it, Yellowtail at its single 400. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260922gb3">
+<link rel="stylesheet" href="assets/css/main.css?v=20260922fab1">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
@@ -553,33 +553,31 @@
 </footer>
 
 <div class="fab-menu" id="fabMenu">
-  <!-- THE ASSISTANT MENU. Four bare circles with a hover tooltip is what this
-       was: nothing on screen said what any of them did until the pointer
-       arrived, and a tooltip is not an answer on a touch screen, where there
-       is no hover at all. It is one panel now and every row is named, so the
-       menu reads the same to a pointer, a finger and a screen reader.
+  <!-- THE ASSISTANT MENU — four circles, and a name only while one is under
+       the pointer. The labels are in `data-tooltip` rather than in the button,
+       because a permanent label is the panel this deliberately is not.
 
-       THE BUTTONS AND THEIR IDS ARE UNCHANGED — app.js and travel-assistant.js
-       bind fabTopBtn / fabSupportBtn / fabVoiceBtn / fabAiBtn by id and are
-       untouched by this. What changed is the shell around them and the label
-       inside each. `title` is kept beside the visible label for the native
-       tooltip; `aria-label` stays the accessible name. -->
-  <div class="fab-items" id="fabItems" role="menu" aria-label="Assistant menu">
-    <button type="button" class="fab-item" id="fabTopBtn" title="Back to Top" aria-label="Scroll back to top" role="menuitem">
+       `aria-label` IS THE NAME, `data-tooltip` IS THE PICTURE OF IT. They are
+       allowed to differ: the tooltip says "Chat Support" and the accessible
+       name says "Open chat support", which is the sentence a screen reader
+       should hear. There is no `title` — a native tooltip on top of the drawn
+       one is the same word twice, half a second apart.
+
+       THE IDS ARE THE CONTRACT. app.js and travel-assistant.js bind
+       fabTopBtn / fabSupportBtn / fabVoiceBtn / fabAiBtn and are untouched by
+       anything in this block. -->
+  <div class="fab-items" id="fabItems" role="menu" aria-label="Assistant actions">
+    <button type="button" class="fab-item" id="fabTopBtn" data-tooltip="Back to Top" aria-label="Scroll back to top" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="arrowUp"></span></span>
-      <span class="fab-label">Back to Top</span>
     </button>
-    <button type="button" class="fab-item" id="fabSupportBtn" title="Chat Support" aria-label="Open chat support" role="menuitem">
+    <button type="button" class="fab-item" id="fabSupportBtn" data-tooltip="Chat Support" aria-label="Chat Support" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="chat"></span></span>
-      <span class="fab-label">Chat Support</span>
     </button>
-    <button type="button" class="fab-item" id="fabVoiceBtn" title="Voice Assistant" aria-label="Open the voice assistant" role="menuitem">
+    <button type="button" class="fab-item" id="fabVoiceBtn" data-tooltip="Voice Assistant" aria-label="Voice Assistant" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="mic"></span></span>
-      <span class="fab-label">Voice Assistant</span>
     </button>
-    <button type="button" class="fab-item" id="fabAiBtn" title="Travel Assistant" aria-label="Open the travel assistant" aria-expanded="false" role="menuitem">
+    <button type="button" class="fab-item" id="fabAiBtn" data-tooltip="Travel Assistant" aria-label="Travel Assistant" aria-expanded="false" role="menuitem">
       <span class="fab-icon" aria-hidden="true"><span data-jp-icon="sparkle"></span></span>
-      <span class="fab-label">Travel Assistant</span>
     </button>
   </div>
   <!-- THE ASSISTANT'S FACE, and the only thing on this page drawn rather than
