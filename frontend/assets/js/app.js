@@ -1181,24 +1181,36 @@ authOverlay.addEventListener('click', e => {
   if (!target) return;
   e.preventDefault();
   const next = target.dataset.step;
-  /* GUEST IS NOT A STEP, it is the way out — but it is now a state as well.
-     It used to close the dialog and nothing else, which left a traveller who
-     had just chosen "guest" looking at a header that still said Login /
-     Create: the choice was made and the page did not agree it had been.
-     startGuestSession() records it (auth.js), the profile menu redraws as
-     "My Guest", and nothing else changes — there is no token, so every
-     protected path still asks for a real sign-in.
+  /* GUEST IS NOT A STEP, it is the way out - and it is now a real session.
+     startGuestSession() (auth.js) asks the server for one: an anonymous
+     customer with no credentials, and the same tokens a sign-in returns. So
+     the header says "My Guest", the profile menu is the ordinary one, and
+     the wishlist, bookings and the rest all answer with that session's own
+     data. It is asynchronous for the same reason - there is a request behind
+     it now - so the dialog closes on success rather than on the click.
 
      It rides on the same [data-step] dispatcher because it sits in the same
      row of links; showStep() would throw on a name AUTH_STEPS has no view
      for, so it is answered before that. */
   if (next === 'guest') {
-    if (typeof startGuestSession === 'function') startGuestSession();
-    if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
-    closeAuth();
-    if (typeof showToast === 'function') {
-      showToast('Browsing as a guest. Sign in whenever you want to book or save a trip.');
-    }
+    const link = target;
+    const was = link.textContent;
+    link.textContent = 'Starting…';
+    link.style.pointerEvents = 'none';
+    startGuestSession()
+      .then(() => {
+        if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
+        closeAuth();
+        showToast('Browsing as a guest. Your searches and saved trips stay with this session.');
+      })
+      .catch(() => {
+        /* The session is minted by the server, so this can fail like any
+           request. Saying so beats closing the dialog on a guest mode that
+           does not exist — which is the failure this whole change removes. */
+        setModalMsg(document.getElementById('loginMsg'),
+                    'We could not start a guest session. Please try again.', 'error');
+      })
+      .finally(() => { link.textContent = was; link.style.pointerEvents = ''; });
     return;
   }
   /* Carrying the address into signup is prepareSignup()'s job, run by
@@ -1483,8 +1495,25 @@ function showCredsStep() {
 /** The one place a customer session is created. */
 function completeCustomerSignIn(data) {
   const c = data.customer || {};
+  /* TAKEN BEFORE THE NEW SESSION OVERWRITES IT. If the traveller was browsing
+     as a guest, this is the token that names the work they did - the wishlist
+     they built, the searches, anything they booked - and the claim below hands
+     all of it to the account they have just signed into. Read it first or it
+     is gone. */
+  const guestToken = (typeof isGuestSession === 'function' && isGuestSession())
+    ? getCustomerAuth().access : null;
+
   setStoredAuth(data.access_token, data.refresh_token, c.full_name || 'Traveller',
                 'customer', c.id);
+  /* Fire and forget, deliberately: the sign-in has already succeeded, and a
+     migration that fails must not be allowed to look like a login that did.
+     claimGuestSession swallows its own errors for the same reason. */
+  if (guestToken && typeof claimGuestSession === 'function') {
+    /* Nothing is done with the answer on purpose: every account screen loads
+       its own data when it opens, which is after this, so the moved rows are
+       already there by the time anybody looks. */
+    claimGuestSession(guestToken);
+  }
   otpChallenge = null;
   renderAuthNav();
   /* Taken BEFORE closeAuth(), which forgets it: a Wishlist (or other account)

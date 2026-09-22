@@ -32,6 +32,8 @@ from app.models_customer import Customer, CustomerOtpPurpose, CustomerStatus
 from app.schemas.customer import (
     CustomerChangePasswordRequest,
     CustomerForgotPasswordRequest,
+    CustomerGuestClaimRequest,
+    CustomerGuestClaimResponse,
     CustomerLoginChallengeResponse,
     CustomerLoginRequest,
     CustomerMessageResponse,
@@ -48,6 +50,7 @@ from app.services import (
     activity_service,
     customer_audit_service,
     customer_auth_service,
+    customer_guest_service,
     customer_otp_service,
     customer_session_service,
     email_service,
@@ -57,14 +60,22 @@ router = APIRouter(prefix="/api/customer/auth", tags=["customer-auth"])
 
 
 def customer_response(customer: Customer) -> CustomerResponse:
-    """Flatten customer + profile + auth into one response object."""
+    """Flatten customer + profile + auth into one response object.
+
+    A GUEST'S ADDRESS FIELDS COME BACK NULL. The row carries placeholders to
+    satisfy NOT NULL, and those are an implementation detail of "no
+    credentials" rather than something the traveller told us. Returning them
+    would put a fake email on the profile screen and, worse, into anything that
+    later reads a contact address off it.
+    """
     profile = customer.profile
+    guest = customer.is_guest
     return CustomerResponse(
         id=customer.customer_id,
         customer_code=customer.customer_code,
         full_name=customer.full_name,
-        email=customer.email,
-        mobile=customer.mobile,
+        email=None if guest else customer.email,
+        mobile=None if guest else customer.mobile,
         date_of_birth=customer.date_of_birth,
         status=customer.status.value,
         email_verified=customer.email_verified,
@@ -79,6 +90,7 @@ def customer_response(customer: Customer) -> CustomerResponse:
         profile_photo=profile.profile_photo if profile else None,
         last_login=customer.auth.last_login if customer.auth else None,
         created_at=customer.created_at,
+        is_guest=guest,
     )
 
 
@@ -319,6 +331,65 @@ def resend_otp(request: Request, payload: CustomerResendOtpRequest, db: Session 
 
 
 @router.post(
+    "/guest",
+    response_model=CustomerTokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Continue as guest",
+    description=(
+        "Public. Starts an anonymous session and returns the SAME access/refresh pair a "
+        "sign-in returns, so every customer endpoint - wishlist, bookings, notifications, "
+        "reviews, support - works for a guest with no second code path and no new isolation "
+        "rule to get wrong. The customer it names carries `is_guest: true`, no credentials "
+        "and no way to sign back into it: losing the token is losing the session, which is "
+        "what guest means. "
+        "**The server mints the identity.** A `guest_session_id` invented in the browser and "
+        "trusted here would be a login with no password. Rate-limited to 10/minute per IP so "
+        "the table cannot be filled by a script."
+    ),
+)
+@limiter.limit("10/minute")
+def start_guest(request: Request, db: Session = Depends(get_db)):
+    guest, access, refresh = customer_guest_service.start_guest(db)
+    return CustomerTokenResponse(
+        access_token=access, refresh_token=refresh, customer=customer_response(guest),
+    )
+
+
+@router.post(
+    "/guest/claim",
+    response_model=CustomerGuestClaimResponse,
+    summary="Keep what a guest did, after signing in",
+    description=(
+        "Requires a customer session - the ACCOUNT's, not the guest's - and takes the guest "
+        "session's own access token in the body as proof the caller held it. Everything that "
+        "session did (wishlist, bookings, notifications, reviews, support threads, travellers, "
+        "assistant conversations) is repointed at the account in one transaction. Nothing is "
+        "copied, so nothing is duplicated. "
+        "**An unusable token is not an error.** Expired, tampered with, already claimed, or "
+        "naming a real account, all return `claimed: false`: this runs immediately after a "
+        "successful sign-in, and a failure to migrate must never undo the sign-in."
+    ),
+)
+@limiter.limit("20/minute")
+def claim_guest_session(
+    request: Request,
+    payload: CustomerGuestClaimRequest,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(get_current_customer),
+):
+    if customer.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sign in first - a guest session cannot inherit another one.",
+        )
+    guest = customer_guest_service.guest_from_token(db, payload.guest_token)
+    if guest is None or guest.status is not CustomerStatus.ACTIVE:
+        return CustomerGuestClaimResponse(claimed=False)
+    moved = customer_guest_service.claim_guest(db, guest, customer)
+    return CustomerGuestClaimResponse(claimed=True, moved=moved)
+
+
+@router.post(
     "/refresh",
     response_model=CustomerTokenResponse,
     summary="Exchange a customer refresh token for a new pair",
@@ -439,6 +510,9 @@ def change_password(
     db: Session = Depends(get_db),
     customer: Customer = Depends(get_current_customer),
 ):
+    # A guest has never set a password: there is nothing to change and nothing
+    # to check the current one against.
+    customer_guest_service.assert_not_guest(customer, "Changing a password")
     customer_auth_service.change_password(
         db, customer, payload.current_password, payload.new_password
     )

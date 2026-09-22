@@ -113,6 +113,13 @@ class Customer(Base):
     )
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mobile_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: "Continue as guest" (0079). A row with NO credentials: no customer_auth,
+    #: no password, nothing to sign in with, and placeholder address fields that
+    #: are excluded from the real customers' unique indexes. It exists so that a
+    #: guest's wishlist, searches and bookings belong to somebody — every one of
+    #: those tables is filed under customer_id — and so the isolation between
+    #: two guests is the same isolation that already holds between two accounts.
+    is_guest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )

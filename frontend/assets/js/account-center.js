@@ -352,7 +352,17 @@ async function loadAcctHeaderProfile() {
     const initials = data.full_name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'U';
     document.getElementById('acctHeaderAvatar').textContent = initials;
     document.getElementById('acctHeaderName').textContent = data.full_name;
-    document.getElementById('acctHeaderEmail').textContent = data.email;
+    /* A GUEST HAS NO ADDRESS TO SHOW, and the line under the name is where the
+       account type belongs instead. The server sends `email: null` for a guest
+       rather than the placeholder its row carries, so this is the only place
+       that has to know what to put there. */
+    document.getElementById('acctHeaderEmail').textContent =
+      data.is_guest ? 'Account type: Guest' : (data.email || '');
+    document.getElementById('acctHeaderEmail').classList.toggle('is-guest', !!data.is_guest);
+    /* Signing in is what a guest does instead of signing out, and the panel
+       says so once, at the top, rather than on every tab. */
+    const modal = document.getElementById('acctHeaderEmail').closest('.modal-card');
+    if (modal) modal.classList.toggle('acct-guest', !!data.is_guest);
   } catch (err) { /* header just won't populate this cycle */ }
 }
 async function loadAcctProfile() {

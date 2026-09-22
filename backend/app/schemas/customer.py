@@ -177,8 +177,11 @@ class CustomerResponse(BaseModel):
     id: int
     customer_code: str
     full_name: str
-    email: EmailStr
-    mobile: str
+    #: NULL FOR A GUEST, and that is the honest answer. A guest row carries a
+    #: placeholder address to satisfy NOT NULL, which is not a fact about the
+    #: traveller and is never shown to them.
+    email: EmailStr | None = None
+    mobile: str | None = None
     date_of_birth: datetime.date | None = None
     status: str
     email_verified: bool = False
@@ -193,8 +196,34 @@ class CustomerResponse(BaseModel):
     profile_photo: str | None = None
     last_login: datetime.datetime | None = None
     created_at: datetime.datetime | None = None
+    #: "Continue as guest" - a session with no credentials behind it. The
+    #: browser reads this to label the header "My Guest" and to offer
+    #: "Login / Create account" where an account shows "Logout".
+    is_guest: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class CustomerGuestClaimRequest(BaseModel):
+    """The guest session being handed over, at the moment of signing in."""
+
+    guest_token: str = Field(
+        max_length=4096,
+        description=(
+            "The ACCESS TOKEN the guest session was issued. It is proof the caller "
+            "held that session - a raw id would let anybody claim a stranger's "
+            "wishlist by guessing. Expired or unrecognised is not an error: it "
+            "means there is nothing to migrate."
+        ),
+    )
+
+
+class CustomerGuestClaimResponse(BaseModel):
+    claimed: bool = Field(description="False when the token named no live guest session.")
+    moved: dict[str, int] = Field(
+        default_factory=dict,
+        description="Rows moved, by table. Absent tables had nothing to move.",
+    )
 
 
 class CustomerTokenResponse(BaseModel):

@@ -144,6 +144,12 @@ SUITE = [
     # verify_m8, which spends what is left of the rate-limit budget.
     ("verify_customer_portal.py",
      "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
+    # Immediately after it: a guest session is an anonymous CUSTOMER session,
+    # so a failure in the portal's own identity rules above explains a failure
+    # here rather than the other way round. It ends by signing a real account
+    # in, which is why it sits after the script that proves signing in works.
+    ("verify_guest_session.py",
+     "Continue as guest: server-issued session, every profile screen, isolation between guests, migration on sign-in"),
     # The landing page's assistant, which is open to guests and so needs no
     # identity from the script above — but reads the same destinations
     # catalogue, so it runs after the portal that proves the catalogue serves.

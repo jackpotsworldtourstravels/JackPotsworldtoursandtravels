@@ -100,7 +100,7 @@ const ProfileMenu = (function () {
    *
    *  A real customer outranks it, and auth.js enforces that on both sides. */
   function guest() {
-    if (session() || adminSession()) return null;
+    if (adminSession()) return null;
     return (typeof getGuestSession === 'function') ? getGuestSession() : null;
   }
 
@@ -109,34 +109,6 @@ const ProfileMenu = (function () {
     if (!s) {
       if (adminSession()) {
         return `<a class="pm-signup" href="admin/index.html">Dashboard</a>`;
-      }
-      /* BROWSING AS A GUEST — a chip that looks like the signed-in one and is
-         honest about not being it. The menu holds the two things a guest can
-         actually do: become a real account, or stop being a guest. Neither is
-         a label that does nothing, which is why "Continue as guest" is not
-         repeated in here — it is the state they are already in. */
-      if (guest()) {
-        return `<div class="pm-wrap pm-wrap-guest" data-pm>
-      <button type="button" class="pm-chip pm-chip-guest" data-pm-toggle
-              aria-expanded="false" aria-haspopup="true" aria-controls="pmMenu">
-        <span class="pm-avatar pm-avatar-guest" aria-hidden="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1-3.4 3.8-5.2 7-5.2s6 1.8 7 5.2"/></svg>
-        </span>
-        <span class="pm-name">My Guest</span>
-        ${(typeof JPIcon !== 'undefined') ? JPIcon.html('chevronDown', { className: 'pm-caret' }) : ''}
-      </button>
-      <div class="pm-menu" id="pmMenu" role="menu" data-pm-menu aria-label="Guest menu">
-        <p class="pm-note">You're browsing as a guest. Sign in to book, save a
-          trip to your wishlist or see your bookings.</p>
-        <button type="button" role="menuitem" class="pm-item pm-item-primary" data-pm-auth-item>
-          ${svg('userRound')}<span>Login / Create account</span>
-        </button>
-        <hr class="pm-sep">
-        <button type="button" role="menuitem" class="pm-item" data-pm-guest-exit>
-          ${svg('logOut')}<span>Exit guest mode</span>
-        </button>
-      </div>
-    </div>`;
       }
       /* IN PLACE WHERE THE MODAL EXISTS. The landing page carries the sign-in
          dialog, and its static Login/Sign Up links used to open it directly —
@@ -155,11 +127,28 @@ const ProfileMenu = (function () {
         <svg class="pm-login-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>`;
     }
-    const name = s.name || 'Traveller';
-    return `<div class="pm-wrap" data-pm>
+    /* THE SAME MENU FOR A GUEST, which is the whole point: a guest holds a
+       real (anonymous) customer session, so all eight destinations answer for
+       it with its own data. Two differences, both about identity rather than
+       capability - the chip is named "My Guest" and carries an outline avatar
+       because there are no initials to take from it, and the last item offers
+       an account where an account offers the way out of one. */
+    const asGuest = !!guest();
+    const name = asGuest ? 'My Guest' : (s.name || 'Traveller');
+    const avatar = asGuest
+      ? `<span class="pm-avatar pm-avatar-guest" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1-3.4 3.8-5.2 7-5.2s6 1.8 7 5.2"/></svg></span>`
+      : `<span class="pm-avatar" aria-hidden="true">${esc(initialsOf(name))}</span>`;
+    const tail = asGuest
+      ? `<button type="button" role="menuitem" class="pm-item pm-item-primary" data-pm-auth-item>
+          ${svg('userRound')}<span>Login / Create account</span>
+        </button>`
+      : `<button type="button" role="menuitem" class="pm-item pm-logout" data-pm-logout>
+          ${svg('logOut')}<span>Logout</span>
+        </button>`;
+    return `<div class="pm-wrap${asGuest ? ' pm-wrap-guest' : ''}" data-pm>
       <button type="button" class="pm-chip" data-pm-toggle
               aria-expanded="false" aria-haspopup="true" aria-controls="pmMenu">
-        <span class="pm-avatar" aria-hidden="true">${esc(initialsOf(name))}</span>
+        ${avatar}
         <span class="pm-name">${esc(name)}</span>
         ${(typeof JPIcon !== 'undefined') ? JPIcon.html('chevronDown', { className: 'pm-caret' }) : ''}
       </button>
@@ -167,10 +156,7 @@ const ProfileMenu = (function () {
         ${ITEMS.map(i => `<button type="button" role="menuitem" class="pm-item"
             data-pm-tab="${esc(i.tab)}">${svg(i.icon)}<span>${esc(i.label)}</span></button>`).join('')}
         <hr class="pm-sep">
-        <button type="button" role="menuitem" class="pm-item pm-logout" data-pm-logout>
-          ${svg('logOut')}
-          <span>Logout</span>
-        </button>
+        ${tail}
       </div>
     </div>`;
   }
@@ -208,7 +194,10 @@ const ProfileMenu = (function () {
        header drops "My Partner" on this (main.css): the partner portal is a
        B2B door, and a signed-in traveller has no use for it. Signed out, it
        stays exactly as it was. */
-    root.classList.toggle('jp-customer', !!session());
+    /* NOT for a guest: `jp-customer` is what hides "My Partner", and the B2B
+       door belongs on the page for anybody who has not signed into an
+       account. */
+    root.classList.toggle('jp-customer', !!(session() && !guest()));
     /* A GUEST IS ITS OWN STATE, and deliberately not `jp-signed-in`: that
        class reveals My Bookings and Notifications, and both of those can only
        answer "sign in first" to somebody who has no account. What a guest
@@ -257,6 +246,9 @@ const ProfileMenu = (function () {
 
   function logout() {
     close();
+    /* A guest's session is a session: signing out of it ends it the same way,
+       and the flag must not outlive the tokens it describes. */
+    if (typeof endGuestSession === 'function') endGuestSession();
     /* account-center.js owns what signing out MEANS — the API call, clearing
        the session, resetting the wishlist and the Account Center's own state.
        Calling it beats a second version of that here which would drift. */
@@ -291,15 +283,6 @@ const ProfileMenu = (function () {
         close();
         if (typeof openAuth === 'function') openAuth();
         else window.location.href = 'index.html?signin=1';
-        return;
-      }
-      /* Leaving guest mode. Nothing to sign out OF — it clears the flag and
-         redraws, so the header offers the dialog again. */
-      if (e.target.closest('[data-pm-guest-exit]')) {
-        e.preventDefault();
-        close();
-        if (typeof endGuestSession === 'function') endGuestSession();
-        render();
         return;
       }
       const tab = e.target.closest('[data-pm-tab]');

@@ -119,66 +119,87 @@ function getCustomerSession() {
 /* ---------------------------------------------------------------------------
    BROWSING AS A GUEST.
 
-   "Continue as guest" used to close the dialog and nothing else — no identity,
-   no state, and a header that still said Login / Create, so the traveller who
-   chose it could not tell the choice had been made. This is the state behind
-   that button.
+   "Continue as guest" used to close the dialog and set a flag. That gave the
+   header something to say and gave the traveller nothing: with no identity,
+   a wishlist had nowhere to go and a booking would have had no owner.
 
-   IT IS NOT A LOGIN AND MUST NEVER READ AS ONE. There is no token here, no
-   account and nothing the server knows about; `getCustomerSession()` is
-   untouched and still answers "nobody is signed in", which is what keeps every
-   protected path — Wishlist, checkout, payment, My Bookings — asking for a real
-   sign-in exactly as it did before. A guest is a VISITOR WHO HAS SAID SO, and
-   the only thing the flag buys is a header that agrees with them and a way
-   back to the dialog.
+   A GUEST NOW HOLDS A REAL SESSION. POST /api/customer/auth/guest creates an
+   anonymous customer on the server — `is_guest`, no credentials, nothing to
+   sign into — and returns the same access/refresh pair a sign-in returns. So
+   the tokens live in the SAME `jpc_*` keys as any other session, and every
+   screen in the Account Center works for a guest through exactly the code
+   that serves an account. The only thing stored here that is new is a flag
+   saying which kind of session this is.
 
-   WHAT IS STORED: a random id and the moment it was made. No name, no address,
-   no contact details, nothing typed into a booking form. The id exists so the
-   choice survives a reload and so a future screen could tie an anonymous
-   conversation to the same browser — the Travel Assistant already keeps its
-   own session key for that reason.
+   THE SERVER DECIDES WHO A GUEST IS. Nothing in this file invents an id: it
+   asks, and keeps what it is given. A `guest_session_id` minted in JavaScript
+   and trusted by the API would be a login with no password.
 
-   A REAL SIGN-IN ALWAYS WINS. `setCustomerAuth` clears this, and the readers
-   below answer null whenever a customer session exists, so the two states
-   cannot both be true no matter what order things happened in.
+   WHAT THE FLAG IS FOR: the header says "My Guest" rather than a name, the
+   menu offers "Login / Create account" where an account offers "Logout", and
+   the screens that change credentials refuse with a 409 that says to create
+   an account — the server enforces that part, not this flag.
    --------------------------------------------------------------------------- */
 const GUEST_KEY = 'jpc_guest';
 
-function _guestId() {
-  try {
-    if (window.crypto && crypto.randomUUID) return 'g-' + crypto.randomUUID();
-  } catch { /* older browser, or crypto blocked in a hardened profile */ }
-  return 'g-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-}
+/** The API origin, asked for rather than assumed.
+ *
+ *  `API_BASE` is declared in app.js, which the landing page loads and the
+ *  service pages do not — reading it directly would throw a ReferenceError on
+ *  half the site the moment one of these functions was called from there.
+ *  Empty string means same-origin, which is what those pages use anyway. */
+const guestApiBase = () => (typeof API_BASE === 'string' ? API_BASE : '');
 
-/** The guest record, or null. Null whenever a real customer is signed in. */
+/** The guest record, or null. Null the moment a real account signs in. */
 function getGuestSession() {
   try {
-    if (typeof getCustomerAuth === 'function') {
-      const c = getCustomerAuth();
-      if (c && c.access) return null;
-    }
     const raw = localStorage.getItem(GUEST_KEY);
     if (!raw) return null;
     const g = JSON.parse(raw);
-    return (g && g.user_type === 'guest' && g.guest_id) ? g : null;
+    if (!g || g.session_type !== 'guest' || !g.guest_session_id) return null;
+    /* The flag without the tokens is a session that was signed out from
+       another tab, or storage that was half-cleared. Not a guest. */
+    return localStorage.getItem(CUSTOMER_KEYS.access) ? g : null;
   } catch {
-    /* Unparseable, or storage blocked in a private window. Either way the
-       honest answer is "not a guest" rather than an exception in a header. */
+    /* Unparseable, or storage blocked in a private window. The honest answer
+       is "not a guest" rather than an exception inside a header. */
     return null;
   }
 }
 
 const isGuestSession = () => !!getGuestSession();
 
-/** Begin, or continue, browsing as a guest. Returns the record.
+/** Begin, or continue, browsing as a guest. Resolves to the record.
  *
- *  Idempotent: pressing the button twice keeps the first id rather than
- *  minting a second one, so "the same browser" stays the same browser. */
-function startGuestSession() {
+ *  Idempotent: a second press keeps the session already in hand rather than
+ *  stranding the first one's wishlist on a customer row nobody holds a token
+ *  for any more.
+ */
+async function startGuestSession() {
   const existing = getGuestSession();
   if (existing) return existing;
-  const guest = { user_type: 'guest', guest_id: _guestId(), started_at: new Date().toISOString() };
+
+  const res = await fetch(`${guestApiBase()}/api/customer/auth/guest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(`guest session refused (${res.status})`);
+  const data = await res.json();
+  const c = data.customer || {};
+
+  /* The ordinary session keys, because it IS an ordinary session — that is
+     what makes every account screen work without a second code path. */
+  setCustomerAuth(data.access_token, data.refresh_token,
+                  c.full_name || 'My Guest', 'customer', c.id);
+  const guest = {
+    session_type: 'guest',
+    guest_session_id: c.customer_code || String(c.id || ''),
+    started_at: new Date().toISOString(),
+  };
+  /* AFTER setCustomerAuth, which clears this on purpose: a real sign-in must
+     end guest mode, and it cannot know that this particular call is the one
+     starting one. */
   try { localStorage.setItem(GUEST_KEY, JSON.stringify(guest)); } catch { /* private mode */ }
   return guest;
 }
@@ -186,6 +207,34 @@ function startGuestSession() {
 /** Stop being a guest — chosen from the menu, or superseded by a real login. */
 function endGuestSession() {
   try { localStorage.removeItem(GUEST_KEY); } catch { /* private mode */ }
+}
+
+/** Hand a guest session's work to the account that just signed in.
+ *
+ *  Called with the token the GUEST held, after the account's own session is
+ *  already stored. Everything that session did is repointed server-side in one
+ *  transaction (`/auth/guest/claim`), so a wishlist item exists once before
+ *  and once after.
+ *
+ *  IT CAN ONLY EVER FAIL QUIETLY. The sign-in has already succeeded by the
+ *  time this runs; a failed migration must not be allowed to look like a
+ *  failed login, so the worst case is that the guest's items stay on a row
+ *  nobody can reach.
+ */
+async function claimGuestSession(guestAccessToken) {
+  if (!guestAccessToken) return null;
+  const { access } = getCustomerAuth();
+  if (!access) return null;
+  try {
+    const res = await fetch(`${guestApiBase()}/api/customer/auth/guest/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access}` },
+      body: JSON.stringify({ guest_token: guestAccessToken }),
+    });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
 }
 
 function setCustomerAuth(access, refresh, name, role, userId) {
