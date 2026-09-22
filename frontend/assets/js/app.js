@@ -1181,13 +1181,26 @@ authOverlay.addEventListener('click', e => {
   if (!target) return;
   e.preventDefault();
   const next = target.dataset.step;
-  /* GUEST IS NOT A STEP, it is the way out. There is no guest session and
-     nothing is created: booking already works signed out, so the honest
-     implementation of "continue as guest" is to stop asking and give the page
-     back. It rides on the same [data-step] dispatcher because it sits in the
-     same row of links; showStep() would throw on a name AUTH_STEPS has no
-     view for, so it is answered before that. */
-  if (next === 'guest') { closeAuth(); return; }
+  /* GUEST IS NOT A STEP, it is the way out — but it is now a state as well.
+     It used to close the dialog and nothing else, which left a traveller who
+     had just chosen "guest" looking at a header that still said Login /
+     Create: the choice was made and the page did not agree it had been.
+     startGuestSession() records it (auth.js), the profile menu redraws as
+     "My Guest", and nothing else changes — there is no token, so every
+     protected path still asks for a real sign-in.
+
+     It rides on the same [data-step] dispatcher because it sits in the same
+     row of links; showStep() would throw on a name AUTH_STEPS has no view
+     for, so it is answered before that. */
+  if (next === 'guest') {
+    if (typeof startGuestSession === 'function') startGuestSession();
+    if (typeof ProfileMenu !== 'undefined') ProfileMenu.render();
+    closeAuth();
+    if (typeof showToast === 'function') {
+      showToast('Browsing as a guest. Sign in whenever you want to book or save a trip.');
+    }
+    return;
+  }
   /* Carrying the address into signup is prepareSignup()'s job, run by
      showStep; the first step keeps its own values, so coming back to it
      returns exactly what was typed there. */

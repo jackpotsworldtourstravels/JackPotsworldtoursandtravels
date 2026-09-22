@@ -93,11 +93,50 @@ const ProfileMenu = (function () {
     return (s && s.access && s.role === 'admin') ? s : null;
   }
 
+  /** A visitor who pressed "Continue as guest". NOT a session in any sense
+   *  the server would recognise — see auth.js. It changes what this chip says
+   *  and nothing else, which is the point: every protected screen still asks
+   *  for a real sign-in, because there is still no token anywhere.
+   *
+   *  A real customer outranks it, and auth.js enforces that on both sides. */
+  function guest() {
+    if (session() || adminSession()) return null;
+    return (typeof getGuestSession === 'function') ? getGuestSession() : null;
+  }
+
   function html() {
     const s = session();
     if (!s) {
       if (adminSession()) {
         return `<a class="pm-signup" href="admin/index.html">Dashboard</a>`;
+      }
+      /* BROWSING AS A GUEST — a chip that looks like the signed-in one and is
+         honest about not being it. The menu holds the two things a guest can
+         actually do: become a real account, or stop being a guest. Neither is
+         a label that does nothing, which is why "Continue as guest" is not
+         repeated in here — it is the state they are already in. */
+      if (guest()) {
+        return `<div class="pm-wrap pm-wrap-guest" data-pm>
+      <button type="button" class="pm-chip pm-chip-guest" data-pm-toggle
+              aria-expanded="false" aria-haspopup="true" aria-controls="pmMenu">
+        <span class="pm-avatar pm-avatar-guest" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1-3.4 3.8-5.2 7-5.2s6 1.8 7 5.2"/></svg>
+        </span>
+        <span class="pm-name">My Guest</span>
+        ${(typeof JPIcon !== 'undefined') ? JPIcon.html('chevronDown', { className: 'pm-caret' }) : ''}
+      </button>
+      <div class="pm-menu" id="pmMenu" role="menu" data-pm-menu aria-label="Guest menu">
+        <p class="pm-note">You're browsing as a guest. Sign in to book, save a
+          trip to your wishlist or see your bookings.</p>
+        <button type="button" role="menuitem" class="pm-item pm-item-primary" data-pm-auth-item>
+          ${svg('userRound')}<span>Login / Create account</span>
+        </button>
+        <hr class="pm-sep">
+        <button type="button" role="menuitem" class="pm-item" data-pm-guest-exit>
+          ${svg('logOut')}<span>Exit guest mode</span>
+        </button>
+      </div>
+    </div>`;
       }
       /* IN PLACE WHERE THE MODAL EXISTS. The landing page carries the sign-in
          dialog, and its static Login/Sign Up links used to open it directly —
@@ -170,6 +209,11 @@ const ProfileMenu = (function () {
        B2B door, and a signed-in traveller has no use for it. Signed out, it
        stays exactly as it was. */
     root.classList.toggle('jp-customer', !!session());
+    /* A GUEST IS ITS OWN STATE, and deliberately not `jp-signed-in`: that
+       class reveals My Bookings and Notifications, and both of those can only
+       answer "sign in first" to somebody who has no account. What a guest
+       gets is a header that agrees with the choice they made. */
+    root.classList.toggle('jp-guest', !!guest());
   }
 
   /* ------------------------------------------------------------------ open */
@@ -193,7 +237,7 @@ const ProfileMenu = (function () {
     if (btn) btn.setAttribute('aria-expanded', 'true');
   }
 
-  const items = wrap => [...wrap.querySelectorAll('[data-pm-tab], [data-pm-logout]')];
+  const items = wrap => [...wrap.querySelectorAll('[data-pm-tab], [data-pm-logout], [data-pm-auth-item], [data-pm-guest-exit]')];
 
   /** Where a menu item goes.
    *
@@ -240,10 +284,22 @@ const ProfileMenu = (function () {
         wrap.classList.contains('is-open') ? close(wrap) : open(wrap);
         return;
       }
-      /* Login / Sign Up on a page that has the modal. */
-      if (e.target.closest('[data-pm-auth]')) {
+      /* Login / Sign Up on a page that has the modal — the signed-out pill,
+         and the same offer inside the guest menu. */
+      if (e.target.closest('[data-pm-auth]') || e.target.closest('[data-pm-auth-item]')) {
         e.preventDefault();
+        close();
         if (typeof openAuth === 'function') openAuth();
+        else window.location.href = 'index.html?signin=1';
+        return;
+      }
+      /* Leaving guest mode. Nothing to sign out OF — it clears the flag and
+         redraws, so the header offers the dialog again. */
+      if (e.target.closest('[data-pm-guest-exit]')) {
+        e.preventDefault();
+        close();
+        if (typeof endGuestSession === 'function') endGuestSession();
+        render();
         return;
       }
       const tab = e.target.closest('[data-pm-tab]');
@@ -278,7 +334,7 @@ const ProfileMenu = (function () {
 
     /* Signing in or out in ANOTHER tab changes what this header should show. */
     window.addEventListener('storage', e => {
-      if (!e.key || /^(jpc_|jwt_)/.test(e.key)) render();
+      if (!e.key || /^(jpc_|jwt_)/.test(e.key)) render();   /* jpc_guest included */
     });
   }
 
@@ -286,6 +342,9 @@ const ProfileMenu = (function () {
     ITEMS,
     html,
     session,
+    /** The guest record, or null. Same rule as session(): a real customer
+     *  outranks it, so a caller can ask both without ordering them. */
+    guest,
     /** Render every slot and make sure the listeners exist. Idempotent, so a
      *  shell may call it on every header re-render. */
     mount(scope) { wire(); render(scope); },

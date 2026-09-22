@@ -149,3 +149,48 @@
 @media (prefers-reduced-motion: reduce) {
   .pm-menu, .pm-caret, .pm-chip, .pm-item { transition: none; }
 }
+
+/* ==========================================================================
+   BROWSING AS A GUEST
+   ==========================================================================
+   The same chip, saying something different. It is deliberately NOT styled as
+   a second-class control — a traveller who chose "continue as guest" made a
+   choice, and a greyed-out badge would read as a failed login. What separates
+   it from a signed-in chip is the avatar: an outline figure rather than
+   initials, because there is no name to take initials from.
+   ========================================================================== */
+.pm-avatar-guest {
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .34);
+}
+.pm-avatar-guest svg {
+  width: 17px; height: 17px;
+  fill: none; stroke: currentColor; stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* On a white header (service pages, scrolled state) the chip inherits navy
+   ink, so the translucent white avatar would vanish. */
+header.is-solid .pm-avatar-guest {
+  background: rgba(10, 37, 64, .08);
+  border-color: rgba(10, 37, 64, .18);
+}
+
+/* THE PANEL IS SIZED, NOT THE SENTENCE. `.pm-menu` has a min-width and no
+   maximum, so a paragraph inside it laid itself out on ONE LINE and dragged
+   the dropdown across half the page. The width belongs to the panel; the
+   note wraps inside it. */
+.pm-wrap-guest .pm-menu { width: min(272px, calc(100vw - 32px)); }
+
+/* One sentence of context at the top of the guest menu. It is the answer to
+   "why does this menu have two items when the signed-in one has nine". */
+.pm-note {
+  /* The menu sets `white-space: nowrap` for its single-line items, and a
+     paragraph inherited it — the sentence ran straight out of the card. */
+  white-space: normal;
+  margin: 2px 4px 7px; padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(10, 37, 64, .05);
+  color: var(--muted, #5A6B7F);
+  font-size: 12.5px; line-height: 1.45;
+}
+.pm-item-primary { font-weight: 700; }

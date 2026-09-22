@@ -115,7 +115,83 @@ function getCustomerSession() {
   return { access: null, refresh: null, name: null, role: null, userId: null };
 }
 
+
+/* ---------------------------------------------------------------------------
+   BROWSING AS A GUEST.
+
+   "Continue as guest" used to close the dialog and nothing else — no identity,
+   no state, and a header that still said Login / Create, so the traveller who
+   chose it could not tell the choice had been made. This is the state behind
+   that button.
+
+   IT IS NOT A LOGIN AND MUST NEVER READ AS ONE. There is no token here, no
+   account and nothing the server knows about; `getCustomerSession()` is
+   untouched and still answers "nobody is signed in", which is what keeps every
+   protected path — Wishlist, checkout, payment, My Bookings — asking for a real
+   sign-in exactly as it did before. A guest is a VISITOR WHO HAS SAID SO, and
+   the only thing the flag buys is a header that agrees with them and a way
+   back to the dialog.
+
+   WHAT IS STORED: a random id and the moment it was made. No name, no address,
+   no contact details, nothing typed into a booking form. The id exists so the
+   choice survives a reload and so a future screen could tie an anonymous
+   conversation to the same browser — the Travel Assistant already keeps its
+   own session key for that reason.
+
+   A REAL SIGN-IN ALWAYS WINS. `setCustomerAuth` clears this, and the readers
+   below answer null whenever a customer session exists, so the two states
+   cannot both be true no matter what order things happened in.
+   --------------------------------------------------------------------------- */
+const GUEST_KEY = 'jpc_guest';
+
+function _guestId() {
+  try {
+    if (window.crypto && crypto.randomUUID) return 'g-' + crypto.randomUUID();
+  } catch { /* older browser, or crypto blocked in a hardened profile */ }
+  return 'g-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+/** The guest record, or null. Null whenever a real customer is signed in. */
+function getGuestSession() {
+  try {
+    if (typeof getCustomerAuth === 'function') {
+      const c = getCustomerAuth();
+      if (c && c.access) return null;
+    }
+    const raw = localStorage.getItem(GUEST_KEY);
+    if (!raw) return null;
+    const g = JSON.parse(raw);
+    return (g && g.user_type === 'guest' && g.guest_id) ? g : null;
+  } catch {
+    /* Unparseable, or storage blocked in a private window. Either way the
+       honest answer is "not a guest" rather than an exception in a header. */
+    return null;
+  }
+}
+
+const isGuestSession = () => !!getGuestSession();
+
+/** Begin, or continue, browsing as a guest. Returns the record.
+ *
+ *  Idempotent: pressing the button twice keeps the first id rather than
+ *  minting a second one, so "the same browser" stays the same browser. */
+function startGuestSession() {
+  const existing = getGuestSession();
+  if (existing) return existing;
+  const guest = { user_type: 'guest', guest_id: _guestId(), started_at: new Date().toISOString() };
+  try { localStorage.setItem(GUEST_KEY, JSON.stringify(guest)); } catch { /* private mode */ }
+  return guest;
+}
+
+/** Stop being a guest — chosen from the menu, or superseded by a real login. */
+function endGuestSession() {
+  try { localStorage.removeItem(GUEST_KEY); } catch { /* private mode */ }
+}
+
 function setCustomerAuth(access, refresh, name, role, userId) {
+  /* A REAL SIGN-IN ENDS GUEST MODE. Both states would otherwise be true
+     at once, and the header would have to pick one. */
+  if (typeof endGuestSession === 'function') endGuestSession();
   localStorage.setItem(CUSTOMER_KEYS.access, access);
   localStorage.setItem(CUSTOMER_KEYS.refresh, refresh);
   localStorage.setItem(CUSTOMER_KEYS.name, name);

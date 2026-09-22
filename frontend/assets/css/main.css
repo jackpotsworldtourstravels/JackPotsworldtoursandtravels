@@ -688,35 +688,87 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 /* ---------- FLOATING ACTION MENU ---------- */
 .fab-menu{position:fixed; bottom:30px; right:30px; z-index:200; display:flex; flex-direction:column; align-items:flex-end;}
 @media (max-width:640px){.fab-menu{bottom:20px; right:20px;}}
-.fab-items{display:flex; flex-direction:column; align-items:flex-end; gap:14px; margin-bottom:14px;}
+/* ---------------------------------------------------------------------------
+   THE ASSISTANT MENU — one popup, and every row says what it is.
+
+   It was four bare circles stacked above the button, each naming itself only
+   in a CSS tooltip on hover. Two problems with that, and the second is the
+   real one: nothing on screen told you what any of them did until you pointed
+   at it, and ON A TOUCH SCREEN THERE IS NO HOVER, so on the device most of
+   this traffic arrives on the names could not be read at all.
+
+   So it is a panel: a card with a background, rounded corners, a shadow, and
+   a labelled row per action. The label is always visible, the row highlights
+   under the pointer and under keyboard focus, and `title` on each button
+   keeps the native tooltip for anyone who waits for one.
+
+   IT STAYS INSIDE THE VIEWPORT. The column is anchored bottom-right and the
+   panel is sized `min(260px, calc(100vw - 40px))`, so on a 320px phone it is
+   280px wide and still has its margin — there is no width at which it can
+   push the page sideways.
+   --------------------------------------------------------------------------- */
+.fab-items{
+  display:flex; flex-direction:column; align-items:stretch; gap:4px;
+  width:min(260px, calc(100vw - 40px));
+  margin-bottom:12px; padding:8px;
+  background:rgba(255,255,255,.98);
+  border:1px solid rgba(10,37,64,.08);
+  border-radius:18px;
+  box-shadow:0 18px 44px rgba(8,12,20,.22), 0 3px 10px rgba(8,12,20,.08);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  /* Closed: not just transparent — `visibility` keeps the rows out of the tab
+     order while the menu is shut, which a `pointer-events:none` alone does
+     not do. */
+  opacity:0; visibility:hidden; transform:translateY(10px) scale(.96);
+  transform-origin:bottom right;
+  transition:opacity .2s ease, transform .24s cubic-bezier(.22,1,.36,1), visibility .24s;
+}
+.fab-menu.open .fab-items{ opacity:1; visibility:visible; transform:none; }
+
 .fab-item{
-  position:relative; width:50px; height:50px; border-radius:50%; background:#fff; color:var(--navy);
-  box-shadow:var(--shadow-lg); display:flex; align-items:center; justify-content:center; font-size:21px;
-  overflow:hidden; opacity:0; transform:translateY(14px) scale(.7); pointer-events:none; flex-shrink:0;
-  transition:transform .3s cubic-bezier(.22,.9,.32,1), opacity .25s ease, background .2s ease;
+  position:relative; display:flex; align-items:center; gap:11px;
+  width:100%; padding:9px 12px; border-radius:12px;
+  background:transparent; color:var(--navy); text-align:left;
+  font-family:var(--ff-body); font-size:14px; font-weight:600; line-height:1.25;
+  cursor:pointer; border:none;
+  transition:background .16s ease, transform .16s ease;
 }
 .fab-item.is-hidden{display:none;}
-.fab-item:hover, .fab-item:focus-visible{transform:translateY(0) scale(1.1); background:var(--coral-hover);}
-.fab-item:focus-visible{outline:2px solid var(--coral); outline-offset:3px;}
-.fab-item.listening{background:var(--coral); color:var(--on-accent); animation:fabPulse 1.1s ease-in-out infinite;}
-@keyframes fabPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,96,76,.5);} 50%{box-shadow:0 0 0 10px rgba(232,96,76,0);}}
-.fab-menu.open .fab-items .fab-item{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
-/* Expand: item nearest the main FAB (last child) animates in first, cascading upward */
-.fab-menu.open .fab-item:nth-child(4){transition-delay:0s;}
-.fab-menu.open .fab-item:nth-child(3){transition-delay:.06s;}
-.fab-menu.open .fab-item:nth-child(2){transition-delay:.12s;}
-.fab-menu.open .fab-item:nth-child(1){transition-delay:.18s;}
-/* Collapse: topmost item animates out first, cascading downward */
-.fab-menu:not(.open) .fab-item:nth-child(1){transition-delay:0s;}
-.fab-menu:not(.open) .fab-item:nth-child(2){transition-delay:.06s;}
-.fab-menu:not(.open) .fab-item:nth-child(3){transition-delay:.12s;}
-.fab-menu:not(.open) .fab-item:nth-child(4){transition-delay:.18s;}
-.fab-item[data-tooltip]::before{
-  content:attr(data-tooltip); position:absolute; right:60px; top:50%; transform:translateY(-50%) translateX(6px);
-  background:var(--navy); color:#fff; font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:8px;
-  white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease; box-shadow:var(--shadow-sm);
+.fab-item:hover, .fab-item:focus-visible{ background:rgba(232,96,76,.10); transform:translateX(-2px); }
+.fab-item:focus-visible{ outline:2px solid var(--coral); outline-offset:-2px; }
+.fab-label{ flex:1; min-width:0; }
+
+/* The mark keeps the round badge the loose buttons had, at row scale. */
+.fab-icon{
+  flex:none; display:grid; place-items:center; width:34px; height:34px;
+  border-radius:50%; background:rgba(10,37,64,.06); color:var(--navy); font-size:17px;
+  transition:background .16s ease, color .16s ease;
 }
-.fab-item:hover[data-tooltip]::before, .fab-item:focus-visible[data-tooltip]::before{opacity:1; transform:translateY(-50%) translateX(0);}
+.fab-item:hover .fab-icon, .fab-item:focus-visible .fab-icon{
+  background:linear-gradient(135deg, var(--coral), var(--coral-dark)); color:var(--on-accent);
+}
+.fab-item .fab-icon .jpi{ width:19px; height:19px; }
+
+/* Listening: the voice row, while the microphone is live. */
+.fab-item.listening .fab-icon{
+  background:var(--coral); color:var(--on-accent); animation:fabPulse 1.1s ease-in-out infinite;
+}
+@keyframes fabPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,96,76,.5);} 50%{box-shadow:0 0 0 8px rgba(232,96,76,0);}}
+
+/* Rows arrive in sequence, nearest the button first. The delays are on the
+   ROW now rather than on a floating circle, so the panel itself fades in as
+   one object and the contents follow it. */
+.fab-menu.open .fab-item{ animation:fabRowIn .26s cubic-bezier(.22,1,.36,1) backwards; }
+.fab-menu.open .fab-item:nth-child(4){ animation-delay:.02s; }
+.fab-menu.open .fab-item:nth-child(3){ animation-delay:.07s; }
+.fab-menu.open .fab-item:nth-child(2){ animation-delay:.12s; }
+.fab-menu.open .fab-item:nth-child(1){ animation-delay:.17s; }
+@keyframes fabRowIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+
+@media (prefers-reduced-motion:reduce){
+  .fab-items{ transition:opacity .01s; }
+  .fab-menu.open .fab-item{ animation:none; }
+}
 /* THE ASSISTANT BUTTON. A plus sign said "add something" — the wrong verb for
    a menu of a chat, a microphone and a travel assistant. The mascot says what
    it opens, and the pill under it says whose.
@@ -751,7 +803,8 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .fab-menu.open .fab-bot{transform:scale(.93); transition:transform .3s ease;}
 
 @media (max-width:640px){
-  .fab-item{width:46px; height:46px; font-size:19px;}
+  .fab-item{padding:8px 10px; font-size:13.5px;}
+  .fab-icon{width:31px; height:31px; font-size:16px;}
   .fab-main{width:62px; height:62px;}
 }
 /* Nothing here carries meaning by moving. */
@@ -2129,14 +2182,93 @@ html.jp-customer .mobile-partner-mark { display: none; }
    Under 860px the nav itself moves to the drawer and the centre track is empty,
    so none of this applies there. */
 #siteHeader nav.wrap { max-width: calc(var(--max) + 160px); }
-@media (min-width: 861px) and (max-width: 1399px) {
-  #siteHeader .nav-actions > .nav-partner-mark { padding: 7px; gap: 0; }
-  #siteHeader .nav-actions > .hr-wish > span:not(.jpi),
-  #siteHeader .nav-actions > .nav-partner-mark > span:not(.jpi) {
+
+/* WHY "MY PARTNER" SEEMED TO DISAPPEAR, and what replaced the rule that did it.
+
+   A perfectly centred nav costs symmetry: each side track is exactly
+   (bar - nav) / 2, so the account cluster may only ever be as wide as the
+   logo's half. At 1280 that is 349px and the cluster with both labels wants
+   about 420 — so a single rule from 1399px down clipped the words off BOTH
+   Wishlist and My Partner. The pill survived as a bare 37px handshake with no
+   text, which to anyone using the page is the button going missing. Browser
+   zoom lands on the same rule from the other side: zoom changes the CSS
+   viewport width, so 100% on a 1366 laptop and 80% on a 1024 one are just two
+   more widths crossing 1399.
+
+   THE ORDER THINGS GIVE WAY IN IS NOW DELIBERATE, cheapest first:
+
+     1. 1400px and up   everything at full size, nav dead centre.
+     2. 1200-1399px     the nav's own gaps and the cluster's tighten, and
+                        WISHLIST goes icon-only. A heart is understood without
+                        its word; "My Partner" is not, and it is the one door
+                        into the B2B side of the business.
+     3. 861-1199px      the bar stops being a symmetric grid and becomes a
+                        flex row. The nav sits between the logo and the
+                        cluster instead of on the page's centre line — a
+                        couple of degrees off centre, with every label intact,
+                        which is the better trade at a width where the
+                        alternative is deleting words.
+     4. 861px and down  the nav moves into the drawer (existing rule), so the
+                        cluster has the whole bar and keeps its labels.
+     5. 600px and down  the existing phone rule clips the partner label only,
+                        where the logo, the burger and the account chip need
+                        every pixel. The icon stays, and so does the
+                        accessible name.
+
+   NOTHING IS EVER `display:none`, at any width, and nothing is clipped that a
+   screen reader then cannot read: the labels that go are clipped visually and
+   stay in the accessibility tree. */
+/* THE BOUNDS ARE FRACTIONAL ON PURPOSE. A viewport is not always a whole
+   number of CSS pixels — a 125% display scale, or a browser zoom that is not
+   a round percentage, produces widths like 1199.2 — and `max-width:1199px`
+   paired with `min-width:1200px` leaves that width matching NEITHER rule. The
+   header then fell back to the wide layout in a window too narrow for it,
+   which is the same class of fault as the one being fixed here and was
+   reproduced at 1199 during testing. */
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+  /* THE NAV'S OWN SIZING IS LEFT ALONE. It is already compacted further down
+     this file (icon-only below 1150, tighter padding below 1100), and setting
+     a font here — at #siteHeader specificity — overrode that and made the
+     strip WIDER than the rule it was meant to help. The cluster is the only
+     thing this block touches. */
+  #siteHeader .nav-actions { gap: 10px; }
+  #siteHeader .nav-actions > .hr-wish > span:not(.jpi) {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     clip-path: inset(50%); overflow: hidden; white-space: nowrap;
   }
 }
+
+/* The centre line is what gives way here, not the words. `space-between` with
+   the nav free to sit where the room is: logo left, cluster right, nav in the
+   space that is left. */
+@media (min-width: 860.02px) and (max-width: 1199.98px) {
+  #siteHeader nav.wrap {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  #siteHeader nav.wrap > .logo { margin-left: 0; flex: 0 0 auto; }
+  #siteHeader nav.wrap > .navlinks { flex: 0 1 auto; min-width: 0; }
+  #siteHeader nav.wrap > .nav-actions { flex: 0 0 auto; gap: 9px; }
+  #siteHeader .nav-partner-mark { padding: 6px 12px 6px 8px; font-size: 12.5px; }
+  #siteHeader .nav-actions > .hr-wish > span:not(.jpi) {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+  }
+}
+
+/* Between the drawer breakpoint and the phone rule the bar holds three things,
+   so the partner label has room and keeps it. */
+@media (min-width: 600.02px) and (max-width: 860.98px) {
+  #siteHeader .nav-actions { gap: 9px; }
+  #siteHeader .nav-partner-mark { padding: 6px 12px 6px 8px; font-size: 12.5px; }
+}
+
+/* THE BAR MAY NOT CLIP ITS OWN CONTENTS. Said out loud because the failure it
+   prevents is exactly the one reported: a control that is present, laid out,
+   and invisible. If the row ever does run long it scrolls rather than hiding
+   anything. */
+#siteHeader nav.wrap { overflow: visible; }
+#siteHeader .nav-actions { overflow: visible; flex-wrap: nowrap; }
+#siteHeader .nav-partner-mark { flex: 0 0 auto; white-space: nowrap; }
 
 /* ==========================================================================
    THE TRAVEL ASSISTANT AND THE VOICE ASSISTANT
