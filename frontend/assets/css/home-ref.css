@@ -452,14 +452,35 @@ body.home-ref .hr-fp-line {
      without measuring the real length in script and stays correct at every
      size the svg scales to. */
   stroke-dasharray: 100; stroke-dashoffset: 100;
-  animation: hr-fp-draw 3.2s cubic-bezier(.45,.05,.35,1) .35s forwards;
+  /* THE TRAIL STARTS LATER AND FINISHES AT THE SAME INSTANT, which is the
+     whole of the fix. It used to share the aeroplane's delay and duration
+     exactly, so the tip of the line and the aeroplane were in the same place
+     to four decimal places at every frame — and a 689-unit line against a
+     32-unit glyph reads as the LINE arriving first, with the aeroplane
+     tagging along on the end of something already drawn.
+
+     A route is drawn BY the aircraft flying it, so the line has to lag. It
+     starts 220ms after the aeroplane and runs 220ms shorter (0.57s + 2.98s
+     against 0.35s + 3.2s), so both reach 100% together at 3.55s.
+
+     WHY IT CAN NEVER OVERTAKE, rather than "it looked right when I tried it":
+     with the same easing on both, the line's progress argument is
+     (u - 0.22) / (D - 0.22) against the aeroplane's u / D, and for every
+     u <= D the first is the smaller of the two — equal only at the end. The
+     gap is widest through the middle of the curve, where the easing is
+     fastest and the aeroplane is visibly out in front, and closes to nothing
+     as it lands. */
+  animation: hr-fp-draw 2.98s cubic-bezier(.45,.05,.35,1) .57s forwards;
 }
 @keyframes hr-fp-draw { to { stroke-dashoffset: 0; } }
 
-/* THE AIRCRAFT RIDES THE PATH, it does not fly to a guessed end point.
-   Same duration, delay and easing as the draw above, and both are parametrised
-   by distance along the same curve — so the aeroplane sits exactly on the
-   growing tip of the line for the whole animation instead of drifting off it.
+/* THE AIRCRAFT RIDES THE PATH, it does not fly to a guessed end point, and it
+   GOES FIRST. Same easing and the same curve as the draw above — both are
+   parametrised by distance along it — but this one starts earlier and runs
+   longer, so the aeroplane is always ahead of the line and the line is always
+   the trail it has already flown. See the note on .hr-fp-line for why the two
+   cannot cross.
+
    `offset-rotate: auto` is what turns it into the corners and leaves it
    pointing up-right at the end, because that is where the route ends. */
 body.home-ref .hr-fp-plane {
@@ -471,8 +492,12 @@ body.home-ref .hr-fp-plane {
   animation: hr-fp-fly 3.2s cubic-bezier(.45,.05,.35,1) .35s forwards;
 }
 @keyframes hr-fp-fly {
+  /* UP TO FULL OPACITY IN THE FIRST 3%, not 7%. The aeroplane has 220ms alone
+     before the line starts, and fading through most of it wasted the one
+     moment that makes the order obvious. 3% of 3.2s is 96ms — still a fade,
+     and over well before the trail appears. */
   0%   { offset-distance: 0%;   opacity: 0; }
-  7%   { opacity: 1; }
+  3%   { opacity: 1; }
   100% { offset-distance: 100%; opacity: 1; }
 }
 
