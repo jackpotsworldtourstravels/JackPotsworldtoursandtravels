@@ -43,9 +43,20 @@
     ? JPIcon.html(name, { size: size || 16 }) : '';
 
   /* Same resolver rule as home-destinations.js: a KEY from the API, listed in
-     the shipped manifest, or no picture at all. */
+     the shipped manifest, or no picture at all.
+
+     THE MANIFEST IS THE LANDMARKS' OWN. assets/locations/ holds a photograph
+     per famous place, keyed by the attraction id the API sends
+     ('hyderabad__charminar'), written by scripts/fetch_attraction_images.py
+     from that landmark's Wikimedia Commons category. The destination manifest
+     is kept as a fallback for a key that predates it. */
   const artFor = key => {
-    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
+    if (!key) return null;
+    if (typeof LOCATION_IMAGE_FILES === 'object' && LOCATION_IMAGE_FILES && LOCATION_IMAGE_FILES[key]) {
+      const dir = (typeof LOCATION_IMAGE_DIR === 'string') ? LOCATION_IMAGE_DIR : 'assets/locations/';
+      return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    }
+    if (typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
     if (!DESTINATION_IMAGE_FILES[key]) return null;
     const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
     return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
@@ -77,8 +88,11 @@
       ? `${n} ${n === 1 ? 'hotel' : 'hotels'} nearby${loc.area_name ? ' in ' + loc.area_name : ''}`
       : 'No hotels listed nearby yet';
 
-    const href = 'hotels/' + encodeURIComponent(loc.destination_id || dest.id)
-      + '/' + encodeURIComponent(loc.slug);
+    const dest_id = loc.destination_id || dest.id;
+    const href = 'hotels/' + encodeURIComponent(dest_id) + '/' + encodeURIComponent(loc.slug);
+    /* The place's own page: its photograph, what going there costs, what it
+       is, and the way on to these same hotels. */
+    const explore = 'destination/' + encodeURIComponent(dest_id) + '/' + encodeURIComponent(loc.slug);
 
     return `<article class="dl-card" role="listitem">
       <div class="dl-art">${picture}<span class="dl-pin">${icon('mapPin', 22)}</span></div>
@@ -86,8 +100,12 @@
         <h2 class="dl-name">${esc(loc.name)}</h2>
         ${loc.description ? `<p class="dl-desc">${esc(loc.description)}</p>` : ''}
         <p class="dl-count">${icon('hotels', 15)} ${esc(count)}</p>
-        <a class="btn btn-coral dl-view" href="${esc(href)}"
-           aria-label="View hotels near ${esc(loc.name)}">View Hotels</a>
+        <div class="dl-actions">
+          <a class="btn btn-coral dl-view" href="${esc(href)}"
+             aria-label="View hotels near ${esc(loc.name)}">View Hotels</a>
+          <a class="dl-explore" href="${esc(explore)}"
+             aria-label="Explore ${esc(loc.name)}">Explore Location ${icon('arrowRight', 15)}</a>
+        </div>
       </div>
     </article>`;
   }

@@ -719,6 +719,7 @@ if FRONTEND_DIR.is_dir():
     # Neither route checks that the place exists, for the reason above.
     _DESTINATION_PAGE = FRONTEND_DIR / "destination.html"
     _LOCATION_HOTELS_PAGE = FRONTEND_DIR / "destination-hotels.html"
+    _LOCATION_PAGE = FRONTEND_DIR / "location.html"
 
     def _page(path):
         return FileResponse(
@@ -732,6 +733,14 @@ if FRONTEND_DIR.is_dir():
     @app.get("/destination/{slug}", include_in_schema=False)
     def destination_page(slug: str):                      # noqa: ARG001 — read by the page, not here
         return _page(_DESTINATION_PAGE)
+
+    # One famous place. TWO SEGMENTS UNDER /destination, which is why it is
+    # declared after the one-segment route above: FastAPI matches in order and
+    # /destination/{slug} would otherwise swallow nothing here, but the pair
+    # reads as a hierarchy and should stay in that order for the next reader.
+    @app.get("/destination/{slug}/{place}", include_in_schema=False)
+    def location_page(slug: str, place: str):             # noqa: ARG001 - read by the page
+        return _page(_LOCATION_PAGE)
 
     @app.get("/hotels/{destination}/{location}", include_in_schema=False)
     def location_hotels_page(destination: str, location: str):  # noqa: ARG001 — read by the page

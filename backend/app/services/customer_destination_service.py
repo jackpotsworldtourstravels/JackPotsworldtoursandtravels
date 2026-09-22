@@ -403,6 +403,116 @@ def list_attractions(db: Session, destination_id: str) -> list[dict] | None:
     return out
 
 
+def _fare_details(db: Session, dest: CustomerDestination,
+                  area: CustomerLocation | None) -> dict:
+    """What it costs to go, from data we actually hold. Nulls where we do not.
+
+    NOTHING HERE IS ESTIMATED, and two of the three are null on purpose:
+
+      hotels    REAL. ``min(price_per_night)`` over the active hotels of the
+                landmark's nearest listed area - the same hotels "View Hotels"
+                then shows, so the price the traveller reads is the price on
+                the page they land on. Falls back to the whole destination
+                when the landmark has no listed area, and says which it is.
+
+      flights   NULL, ALWAYS, for now. There is no fare table in this
+                database: flights are searched live, and a "from" price would
+                have to be invented or scraped from a search we have not run.
+                The panel says "Currently unavailable" rather than a number
+                nobody can honour.
+
+      packages  NULL, ALWAYS, for now. ``customer_packages`` has no link to a
+                destination - no column, no join table - so a package cannot
+                be attributed to a place without matching its title as text,
+                which is a guess wearing a price tag. A ``destination_id`` on
+                that table is the one change that would make this real.
+
+    The shape is stable either way, so the browser renders the same three rows
+    and fills in the ones that have an answer.
+    """
+    scope = "area" if area else "destination"
+    q = (
+        select(func.min(CustomerHotel.price_per_night))
+        .where(
+            CustomerHotel.destination_id == dest.customer_destination_id,
+            CustomerHotel.is_active.is_(True),
+        )
+    )
+    if area:
+        q = q.where(CustomerHotel.location_id == area.customer_location_id)
+    hotel_from = db.scalar(q)
+
+    return {
+        "currency": "INR",
+        "hotel_from": float(hotel_from) if hotel_from is not None else None,
+        "hotel_scope": scope if hotel_from is not None else None,
+        "hotel_scope_name": (area.name if area else dest.name) if hotel_from is not None else None,
+        "flight_from": None,
+        "package_from": None,
+    }
+
+
+def get_attraction(db: Session, destination_id: str, attraction_id: str) -> dict | None:
+    """One famous place: the row, its fares, and the others in the same city.
+
+    ``attraction_id`` takes either the bare slug ('charminar') or the
+    namespaced id the list endpoint hands out ('hyderabad__charminar'), because
+    both are things a caller legitimately has. A namespaced id naming a
+    different destination is a miss, not a redirect - the two must agree.
+    """
+    dest = _find_destination(db, destination_id)
+    if dest is None:
+        return None
+
+    slug = attraction_id
+    if "__" in attraction_id:
+        owner, _, slug = attraction_id.partition("__")
+        if _slug(owner) != dest.slug:
+            return None
+
+    a = db.scalars(
+        select(CustomerAttraction)
+        .where(
+            CustomerAttraction.destination_id == dest.customer_destination_id,
+            CustomerAttraction.slug == _slug(slug),
+            CustomerAttraction.is_active.is_(True),
+        )
+        .options(selectinload(CustomerAttraction.area))
+    ).first()
+    if a is None:
+        return None
+
+    area = a.area if (a.area and a.area.is_active) else None
+    counts = _hotel_counts_by_area(db, dest)
+    row = _attraction_row(dest, a, area,
+                          counts.get(area.customer_location_id, 0) if area else 0)
+    row["destination_name"] = dest.name
+    row["country"] = dest.country
+    row["fare_details"] = _fare_details(db, dest, area)
+
+    # The others in the same city, for "Explore more locations". Four, because
+    # the row on the detail page holds four without wrapping to a second line
+    # on a laptop; the destination page is where all of them live.
+    others = db.scalars(
+        select(CustomerAttraction)
+        .where(
+            CustomerAttraction.destination_id == dest.customer_destination_id,
+            CustomerAttraction.customer_attraction_id != a.customer_attraction_id,
+            CustomerAttraction.is_active.is_(True),
+        )
+        .order_by(CustomerAttraction.sort_order, CustomerAttraction.name)
+        .limit(4)
+        .options(selectinload(CustomerAttraction.area))
+    ).all()
+    row["nearby"] = [
+        _attraction_row(dest, o, o.area if (o.area and o.area.is_active) else None,
+                        counts.get(o.area.customer_location_id, 0)
+                        if (o.area and o.area.is_active) else 0)
+        for o in others
+    ]
+    return row
+
+
 def list_attraction_hotels(
     db: Session,
     attraction_id: str,

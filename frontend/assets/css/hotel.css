@@ -2011,3 +2011,112 @@ body.hr-booking .sp-hero { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .dl-card, .dl-card:hover { transition: none; transform: none; }
 }
+
+
+/* ==========================================================================
+   ONE FAMOUS PLACE — location.html
+   ==========================================================================
+   The page a card now leads to, between the destination and its hotels. It
+   borrows the destination page's shell (.dh-main, .dh-back, .dh-title) so the
+   three steps read as one journey, and adds only what this step needs: a
+   photograph big enough to be the reason you came, a fare panel, the story,
+   and the way on to the hotels.
+
+   EVERY BLOCK HERE SURVIVES ITS DATA BEING ABSENT. No photograph leaves the
+   hero on its tint; no description removes its section; a fare with no figure
+   prints "Currently unavailable" in the same row rather than dropping it, so
+   the three rows do not dance about between one place and the next.
+   ========================================================================== */
+.lp { display: flex; flex-direction: column; gap: 26px; padding-bottom: 40px; }
+
+/* 16:9 rather than the cards' 4:3: this is the hero of the page, and a 4:3 at
+   900px tall pushes everything else under the fold. The art is 4:3, so the
+   crop is the browser's - object-fit keeps the middle, which is where a
+   landmark sits in a photograph chosen for a card. */
+.lp-hero {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 460px;
+  border-radius: 20px; overflow: hidden;
+  background: linear-gradient(135deg, rgba(10,37,64,.10), rgba(232,96,76,.12));
+  display: grid; place-items: center;
+}
+.lp-hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lp-hero-pin { color: var(--coral, #E8604C); opacity: .5; }
+
+.lp-head { display: flex; flex-direction: column; gap: 6px; }
+.lp-sec { display: flex; flex-direction: column; gap: 12px; }
+.lp-h2 {
+  margin: 0; font-size: 19px; font-weight: 800; letter-spacing: .01em;
+  color: var(--navy, #0A2540);
+}
+
+/* --- the fare panel ------------------------------------------------------ */
+.lp-fares {
+  margin: 0; display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.lp-fare {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 16px; border-radius: 14px;
+  background: var(--hr-surface, #fff);
+  border: 1px solid rgba(10,37,64,.10);
+}
+.lp-fare dt {
+  font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--hr-muted, #5b6b82);
+}
+.lp-fare dd {
+  margin: 0; font-size: 22px; font-weight: 800; color: var(--navy, #0A2540);
+  display: flex; align-items: baseline; gap: 4px;
+}
+.lp-fare dd span { font-size: 13px; font-weight: 600; color: var(--hr-muted, #5b6b82); }
+/* Unavailable is quieter than a price, and still a sentence rather than a
+   dash: the traveller should read it as "we do not know yet", not as nothing. */
+.lp-fare.is-empty dd { font-size: 15px; font-weight: 600; }
+.lp-fare.is-empty em { font-style: normal; color: var(--hr-muted, #5b6b82); }
+.lp-note { margin: 0; font-size: 13px; color: var(--hr-muted, #5b6b82); }
+
+.lp-about { margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--navy, #0A2540); max-width: 70ch; }
+.lp-hotels-line { margin: 0; font-size: 14.5px; color: var(--hr-muted, #5b6b82); }
+.lp-hotels-btn { align-self: flex-start; padding: 11px 22px; }
+.lp-hotels-btn[hidden] { display: none; }
+
+/* --- the other places ---------------------------------------------------- */
+.lp-more { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.lp-more-card {
+  display: flex; align-items: center; gap: 11px; min-width: 0;
+  padding: 10px 14px 10px 10px; border-radius: 14px;
+  background: var(--hr-surface, #fff); border: 1px solid rgba(10,37,64,.10);
+  color: var(--navy, #0A2540); font-weight: 700; font-size: 14.5px;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.lp-more-card:hover {
+  transform: translateY(-2px); border-color: rgba(232,96,76,.45);
+  box-shadow: 0 12px 26px -18px rgba(10,37,64,.5);
+}
+.lp-more-art {
+  flex: none; width: 46px; height: 46px; border-radius: 10px; overflow: hidden;
+  display: grid; place-items: center; color: var(--coral, #E8604C);
+  background: linear-gradient(135deg, rgba(10,37,64,.08), rgba(232,96,76,.12));
+}
+.lp-more-art img { width: 100%; height: 100%; object-fit: cover; }
+/* The name is the only thing that can overflow a narrow card. */
+.lp-more-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .lp { gap: 20px; }
+  .lp-hero { border-radius: 16px; aspect-ratio: 4 / 3; }
+  .lp-fare dd { font-size: 20px; }
+  .lp-h2 { font-size: 17.5px; }
+}
+
+/* --- the card's own Explore link (destination.html) ---------------------- */
+/* A card has two things to do now — read about the place, or go straight to
+   the hotels — so the actions sit in a row that wraps rather than stacking
+   two full-width buttons on a phone. */
+.dl-actions { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dl-explore {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 700; color: var(--coral-dark, #C2442F);
+}
+.dl-explore:hover { text-decoration: underline; }
+.dl-explore:focus-visible { outline: 3px solid var(--navy, #0A2540); outline-offset: 3px; border-radius: 6px; }

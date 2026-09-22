@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.schemas.customer_destination import (
+    AttractionDetail,
     DestinationHotelsPage,
     DestinationLocation,
     DestinationSummary,
@@ -166,6 +167,31 @@ def list_attractions(destination_id: str, db: Session = Depends(get_db)):
     if rows is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No destination with that id.")
     return rows
+
+
+@router.get(
+    "/destinations/{destination_id}/attractions/{attraction_id}",
+    response_model=AttractionDetail,
+    summary="One famous place",
+    description=(
+        "Public. The landmark, its description, its photograph key, the hotels nearby, "
+        "what it costs to go, and the other famous places in the same destination. "
+        "`attraction_id` takes either the bare slug (`charminar`) or the namespaced id the "
+        "list endpoint hands out (`hyderabad__charminar`); a namespaced id naming a different "
+        "destination is a 404 rather than a redirect, because the two must agree. "
+        "**Fares are real or null, never estimated.** `hotel_from` is the lowest nightly rate "
+        "among the hotels View Hotels will actually show. `flight_from` and `package_from` are "
+        "null today and say why in their own descriptions - there is no fare table for flights, "
+        "and packages carry no destination link."
+    ),
+    responses={404: {"description": "No such destination, or no such place in it."}},
+)
+def get_attraction(destination_id: str, attraction_id: str, db: Session = Depends(get_db)):
+    row = destinations.get_attraction(db, destination_id, attraction_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="We could not find that place.")
+    return row
 
 
 @router.get(

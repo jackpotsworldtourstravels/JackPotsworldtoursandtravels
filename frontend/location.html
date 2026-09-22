@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!-- Light shell, as destination.html and destination-hotels.html. -->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- ONE PAGE, EVERY FAMOUS PLACE — step three of Destination -> famous places
+     -> this -> hotels. Served by the /destination/{slug}/{place} route in
+     app/main.py; <base> is what lets its relative asset paths and the shared
+     header's links resolve from a two-segment URL (see destination-hotels.html
+     for the long version).
+
+     NOTHING ABOUT A PARTICULAR PLACE IS IN THIS FILE. The photograph, the
+     name, the city, the description, the fares and the other places to see
+     all arrive from GET /api/customer/destinations/{dest}/attractions/{slug},
+     so a landmark added through the catalogue has a page the same day. -->
+<base href="/">
+<title>Places to visit — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="Famous places to visit, what a trip costs and hotels nearby, with JackPots World Tours &amp; Travels.">
+<link rel="icon" href="assets/images/favicon.ico">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260922fp3">
+<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
+<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
+<link rel="stylesheet" href="assets/css/home-ref.css?v=20260922fp3">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
+<link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
+<link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
+<script src="shared/formatters.js"></script>
+<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
+<script src="assets/js/auth.js?v=20260922gs1"></script>
+<!-- The photographs of the famous places, vendored from Wikimedia Commons by
+     scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
+     a key with no file, or no key at all, leaves the card on its artwork. -->
+<script src="assets/js/location-images.js?v=20260922loc3"></script>
+<script src="assets/js/site-footer.js?v=20260911ic7"></script>
+<script src="assets/js/hero-shell.js?v=20260919lc1"></script>
+</head>
+<body class="sp-continuation" data-sp-service="hotels" data-live-chat>
+<a href="#lpMain" class="skip-link">Skip to content</a>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="assets/js/profile-menu.js?v=20260922gs1"></script>
+<script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
+<script src="assets/js/live-chat.js?v=20260909dg1"></script>
+<script src="assets/js/account-center.js?v=20260922gs1"></script>
+
+<header id="siteHeader"></header>
+<script>HeroShell.mountHeader('hotels.html');</script>
+
+<main id="lpMain" class="dh-main hr-scope">
+  <div class="wrap">
+    <!-- The href is rewritten by location.js once the API says which
+         destination this is. It is a link to the destinations shelf until
+         then, so it is never a control that goes nowhere. -->
+    <a class="dh-back" id="lpBack" href="index.html#destinations">
+      <span data-jp-icon="arrowLeft" aria-hidden="true"></span> <span id="lpBackText">Back to Destinations</span>
+    </a>
+
+    <p class="dh-status" id="lpStatus" role="status" aria-live="polite">Loading this place…</p>
+
+    <article class="lp" id="lpBody" hidden>
+      <div class="lp-hero" id="lpHero"></div>
+
+      <div class="lp-head">
+        <h1 class="dh-title" id="lpTitle"></h1>
+        <p class="dh-lead" id="lpWhere"></p>
+      </div>
+
+      <!-- Each section removes itself when it has nothing true to say, rather
+           than printing an empty heading. -->
+      <section class="lp-sec" id="lpFaresSec">
+        <h2 class="lp-h2">Fare details</h2>
+        <dl class="lp-fares" id="lpFares"></dl>
+        <p class="lp-note" id="lpFareNote"></p>
+      </section>
+
+      <section class="lp-sec" id="lpAboutSec" hidden>
+        <h2 class="lp-h2" id="lpAboutH"></h2>
+        <p class="lp-about" id="lpAbout"></p>
+      </section>
+
+      <section class="lp-sec" id="lpHotelsSec">
+        <h2 class="lp-h2" id="lpHotelsH"></h2>
+        <p class="lp-hotels-line" id="lpHotelsLine"></p>
+        <a class="btn btn-coral lp-hotels-btn" id="lpHotelsBtn" href="#">View Hotels</a>
+      </section>
+
+      <section class="lp-sec" id="lpMoreSec" hidden>
+        <h2 class="lp-h2">Explore more places</h2>
+        <div class="lp-more" id="lpMore" role="list"></div>
+      </section>
+    </article>
+  </div>
+</main>
+
+<footer id="bookingFooter"></footer>
+<script>HeroShell.mountBookingFooter();</script>
+<script src="assets/js/location.js?v=20260922loc1"></script>
+</body>
+</html>
