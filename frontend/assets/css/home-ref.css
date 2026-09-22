@@ -451,35 +451,58 @@ body.home-ref .hr-fp-line {
   /* pathLength NORMALISES THE DASH MATHS TO 100 UNITS, so the draw works
      without measuring the real length in script and stays correct at every
      size the svg scales to. */
-  stroke-dasharray: 100; stroke-dashoffset: 100;
-  /* THE TRAIL STARTS LATER AND FINISHES AT THE SAME INSTANT, which is the
-     whole of the fix. It used to share the aeroplane's delay and duration
-     exactly, so the tip of the line and the aeroplane were in the same place
-     to four decimal places at every frame — and a 689-unit line against a
-     32-unit glyph reads as the LINE arriving first, with the aeroplane
-     tagging along on the end of something already drawn.
+  /* THE TRAIL IS THE AEROPLANE'S POSITION MINUS A FIXED DISTANCE, and it is
+     written that way rather than raced towards it.
 
-     A route is drawn BY the aircraft flying it, so the line has to lag. It
-     starts 220ms after the aeroplane and runs 220ms shorter (0.57s + 2.98s
-     against 0.35s + 3.2s), so both reach 100% together at 3.55s.
+     WHAT WAS WRONG. The trail and the aeroplane had separate animations over
+     the same curve, and the gap between them was made out of TIME - a later
+     start, a shorter run. Time is not distance. The curve carries a loop, the
+     easing is not linear, and through the middle the trail closed on the
+     aeroplane and passed it. A route drawing itself ahead of the aircraft
+     flying it is the one thing this must never show.
 
-     WHY IT CAN NEVER OVERTAKE, rather than "it looked right when I tried it":
-     with the same easing on both, the line's progress argument is
-     (u - 0.22) / (D - 0.22) against the aeroplane's u / D, and for every
-     u <= D the first is the smaller of the two — equal only at the end. The
-     gap is widest through the middle of the curve, where the easing is
-     fastest and the aeroplane is visibly out in front, and closes to nothing
-     as it lands. */
-  animation: hr-fp-draw 2.98s cubic-bezier(.45,.05,.35,1) .57s forwards;
+     WHAT HOLDS IT NOW. Both are the same eased function of the same clock -
+     identical delay, identical duration, identical curve - and the gap is put
+     in SPACE instead, by starting the dash five path-units further back:
+
+         plane   L(t) = 100 * f(t)                 (offset-distance, %)
+         trail   drawn(t) = 100 - dashoffset(t)
+                          = 100 - (105 - 100 * f(t))
+                          = L(t) - 5
+
+     That is the brief's own formula, curveProgress = planeProgress - GAP,
+     with GAP in path length. It cannot drift, because there is nothing to
+     drift: one clock, one easing, a constant subtracted from it. Not at the
+     start, not through the loop, not on a dropped frame, and not if the tab
+     is backgrounded and both resume together.
+
+     WHY `100 200` AND NOT `100`. A bare dasharray of 100 repeats every 200
+     units, so an offset above 100 wraps a second dash onto the front of the
+     path. With a 300-unit period there is one dash, the offset may run past
+     100, and nothing is drawn at all until the aeroplane is five units out.
+
+     THE LAST FIVE UNITS ARE THE TAIL. At 3.2s the aeroplane lands with the
+     trail five units short of it; the second keyframe segment closes that in
+     260ms. Short on purpose - the route should complete immediately behind
+     the aircraft, not pause and then finish with a flourish. */
+  stroke-dasharray: 100 200; stroke-dashoffset: 105;
+  animation: hr-fp-draw 3.46s .35s forwards;
 }
-@keyframes hr-fp-draw { to { stroke-dashoffset: 0; } }
+/* 92.486% is 3.2s of 3.46s: the exact moment the aeroplane lands. The first
+   segment carries the aeroplane's own easing so the two track to the unit;
+   the tail gets its own, because it is a different movement. */
+@keyframes hr-fp-draw {
+  0%       { stroke-dashoffset: 105; animation-timing-function: cubic-bezier(.45,.05,.35,1); }
+  92.486%  { stroke-dashoffset: 5;   animation-timing-function: cubic-bezier(.33,0,.2,1); }
+  100%     { stroke-dashoffset: 0; }
+}
 
 /* THE AIRCRAFT RIDES THE PATH, it does not fly to a guessed end point, and it
-   GOES FIRST. Same easing and the same curve as the draw above — both are
-   parametrised by distance along it — but this one starts earlier and runs
-   longer, so the aeroplane is always ahead of the line and the line is always
-   the trail it has already flown. See the note on .hr-fp-line for why the two
-   cannot cross.
+   IS THE CLOCK. Its delay, duration and easing are what the trail above is
+   written against: the trail is this position minus five path-units, exactly,
+   at every frame. Change the timing here and the trail follows it; change it
+   in only one of the two places and they come apart, which is the fault that
+   note exists to describe.
 
    `offset-rotate: auto` is what turns it into the corners and leaves it
    pointing up-right at the end, because that is where the route ends. */
@@ -492,10 +515,10 @@ body.home-ref .hr-fp-plane {
   animation: hr-fp-fly 3.2s cubic-bezier(.45,.05,.35,1) .35s forwards;
 }
 @keyframes hr-fp-fly {
-  /* UP TO FULL OPACITY IN THE FIRST 3%, not 7%. The aeroplane has 220ms alone
-     before the line starts, and fading through most of it wasted the one
-     moment that makes the order obvious. 3% of 3.2s is 96ms — still a fade,
-     and over well before the trail appears. */
+  /* UP TO FULL OPACITY IN THE FIRST 3%, which is 96ms of 3.2s. That lands just
+     inside the 100ms the aeroplane has to itself, so what the eye catches
+     first is a solid aeroplane starting to move — not an aeroplane and a line
+     fading up together, which is what a longer ramp would give. */
   0%   { offset-distance: 0%;   opacity: 0; }
   3%   { opacity: 1; }
   100% { offset-distance: 100%; opacity: 1; }
