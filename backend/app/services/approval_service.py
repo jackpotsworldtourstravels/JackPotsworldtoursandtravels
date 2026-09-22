@@ -31,11 +31,9 @@ Two kinds of row are unaffected, both correctly:
 """
 import datetime
 
-from sqlalchemy import select
-
 from sqlalchemy.orm import Session
 
-from app.models_v2 import Merchant, MerchantStatus, RequestStatus, RequestType, User
+from app.models_v2 import RequestStatus, RequestType, User
 from app.services import lifecycle, manager_approval, ticket_service
 from app.services.lifecycle import SPEC_LABELS
 
@@ -81,23 +79,11 @@ def list_approval_queue(
 ) -> tuple[list[dict], int]:
     items: list[dict] = []
 
-    include_merchants = request_type is None and status in (None, "pending_approval")
-    if include_merchants:
-        conditions = [Merchant.status == MerchantStatus.PENDING_APPROVAL]
-        if merchant_id is not None:
-            conditions.append(Merchant.merchant_id == merchant_id)
-        if date_from is not None:
-            conditions.append(Merchant.created_at >= date_from)
-        if date_to is not None:
-            conditions.append(Merchant.created_at <= date_to)
-        for m in db.scalars(select(Merchant).where(*conditions)).all():
-            items.append({
-                "id": m.merchant_id, "kind": "merchant", "status": "pending_approval",
-                "status_label": "Pending Approval", "priority": None,
-                "merchant_id": m.merchant_id, "merchant_name": m.company_name,
-                "request_type": None, "title": f"New merchant: {m.company_name}",
-                "submitted_at": m.created_at,
-            })
+    # NO MERCHANTS IN THIS QUEUE ANY MORE. A new company used to appear here as
+    # a "New merchant" row waiting for an Admin to approve it; it is active the
+    # moment it is saved, so there is nothing to wait for and nothing to show.
+    # What is left in the queue is requests and bookings, which are decisions
+    # somebody other than the creator actually makes.
 
     ticket_status = RequestStatus(status) if status else None
     request_types = [request_type] if request_type else None

@@ -105,8 +105,8 @@ def _with_user_counts(db: Session, merchants: list[Merchant]) -> list[MerchantRe
     response_model=Page[MerchantResponse],
     summary="List merchants",
     description=(
-        "Requires `merchant.view`. Filterable by status (use `pending_approval` for the approval "
-        "queue) and company type, with a search across name, code and email."
+        "Requires `merchant.view`. Filterable by status (`active`, `inactive`, `suspended`) "
+        "and company type, with a search across name, code and email."
     ),
 )
 def list_merchants(
@@ -132,8 +132,8 @@ def list_merchants(
     description=(
         "Requires `merchant.create` — Admin only; a Super Admin deliberately cannot do this. "
         "Creates the company plus its first `merchant_admin` user and returns that user's "
-        "password **once**. The merchant starts at `pending_approval` and cannot sign in until "
-        "approved."
+        "password **once**. The merchant is **active as soon as it is saved** — there is no "
+        "approval step — so that first login works immediately."
     ),
 )
 def create_merchant(
@@ -229,23 +229,6 @@ def set_merchant_service_access(
         db, current_user, merchant_id, **payload.model_dump(exclude_unset=True)
     )
     return ServiceAccessResponse(merchant_id=merchant_id, **access)
-
-
-@router.post(
-    "/{merchant_id}/approve",
-    response_model=MerchantResponse,
-    summary="Approve a pending merchant",
-    description=(
-        "Requires `merchant.approve`. Moves the company from `pending_approval` to `active` and "
-        "notifies its users that they can now sign in."
-    ),
-)
-def approve_merchant(
-    merchant_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require(P.MERCHANT_APPROVE)),
-):
-    return MerchantResponse.of(merchant_service.approve_merchant(db, current_user, merchant_id))
 
 
 @router.patch(

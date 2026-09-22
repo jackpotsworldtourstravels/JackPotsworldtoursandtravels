@@ -359,13 +359,10 @@ const OpsApi = {
   updateMerchant(id, payload) {
     return this._req('put', `/api/admin/merchants/${id}`, { data: payload });
   },
-  /* merchant.approve — a company's staff cannot sign in until this happens. */
-  approveMerchant(id) {
-    return this._req('post', `/api/admin/merchants/${id}/approve`, { data: {} });
-  },
-  /* merchant.suspend — status is one of pending_approval / active /
-     inactive / suspended. There is no "reject a merchant" route; declining
-     an application means setting it inactive. */
+  /* merchant.suspend — status is one of active / inactive / suspended.
+     THERE IS NO APPROVE ROUTE ANY MORE: a merchant is active from the moment
+     an Admin saves it, so the only status changes left are the ones somebody
+     decides afterwards. Declining a company means setting it inactive. */
   setMerchantStatus(id, status) {
     return this._req('patch', `/api/admin/merchants/${id}/status`, { data: { status } });
   },
@@ -664,7 +661,7 @@ const OPS_REQUEST_TYPES = ['booking', ...OPS_SERVICE_REQUEST_TYPES, 'ticket_enqu
 const OPS_TRAVEL_TYPES = ['flight', 'hotel', 'cruise', 'package'];
 const OPS_PAYMENT_STATUSES = ['pending', 'processing', 'success', 'failed', 'refunded', 'partially_refunded'];
 const OPS_USER_STATUSES = ['active', 'inactive', 'blocked', 'suspended'];
-const OPS_MERCHANT_STATUSES = ['pending_approval', 'active', 'inactive', 'suspended'];
+const OPS_MERCHANT_STATUSES = ['active', 'inactive', 'suspended'];
 const OPS_COMPANY_TYPES = ['gaming_company', 'corporate_company', 'travel_agency', 'business_partner', 'direct_customer'];
 const OPS_MERCHANT_ROLES = ['manager', 'supervisor', 'operator', 'finance', 'data_operator'];
 const OPS_USER_ROLES = ['super_admin', 'admin', 'merchant_admin', 'merchant_user', 'customer'];

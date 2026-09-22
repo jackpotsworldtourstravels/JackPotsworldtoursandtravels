@@ -185,8 +185,6 @@ function opsDashKpis(data) {
     const mc = a.merchants || {};
     platTiles.push(
       opsKpi({ label: 'Merchants', value: mc.total || 0, sub: 'registered', go: 'merchants' }),
-      opsKpi({ label: 'Pending approval', value: mc.pending_approval || 0,
-        tone: mc.pending_approval ? 'warn' : '', sub: 'new applications', go: 'approvals' }),
       opsKpi({ label: 'Active', value: mc.active || 0, tone: 'ok', sub: 'trading',
         go: 'merchants', filter: { status: 'active' } }),
       opsKpi({ label: 'Suspended', value: mc.suspended || 0, tone: mc.suspended ? 'err' : '',
@@ -205,8 +203,7 @@ function opsDashKpis(data) {
       const mc = sa.merchants || {};
       platTiles.push(
         opsKpi({ label: 'Merchants', value: mc.total || 0, sub: 'registered', go: 'merchants' }),
-        opsKpi({ label: 'Pending approval', value: mc.pending_approval || 0,
-          tone: mc.pending_approval ? 'warn' : '', sub: 'new applications', go: 'merchants' }),
+        opsKpi({ label: 'Active', value: mc.active || 0, sub: 'able to trade', go: 'merchants' }),
         opsKpi({ label: 'Open chats', value: sa.open_chat_threads || 0, sub: 'live chat', go: 'support' }),
       );
     }
@@ -240,7 +237,7 @@ function opsDashQuickActions() {
   }
   if (opsCan('ticket.view')) acts.push({ label: 'Customer search', section: 'customers' });
   if (opsCan('merchant.view')) acts.push({ label: 'Merchant search', section: 'merchants' });
-  if (opsCan('ticket.approve', 'merchant.approve', 'servicerequest.manage')) {
+  if (opsCan('ticket.approve', 'servicerequest.manage')) {
     acts.push({ label: 'Approval queue', section: 'approvals' });
   }
   if (opsCan('payment.verify')) acts.push({ label: 'Verify payments', section: 'payments' });

@@ -142,18 +142,19 @@ def _assert_portal_allowed(user: User, portal: str) -> None:
 
 
 def _assert_merchant_tradeable(user: User) -> None:
-    """A merchant's staff cannot sign in until the company is approved."""
+    """A merchant's staff can sign in while the company is active, and not otherwise.
+
+    THERE IS NO LONGER AN APPROVAL TO WAIT FOR — a merchant is active from the
+    moment an Admin saves it. What is left is the states somebody chose: a
+    suspended, inactive or deleted company, whose staff are turned away with
+    the reason.
+    """
     if user.role not in (UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER):
         return
     merchant = user.merchant
     if merchant is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Account is not linked to a merchant"
-        )
-    if merchant.status is MerchantStatus.PENDING_APPROVAL:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your company is awaiting approval by an administrator.",
         )
     if merchant.status is not MerchantStatus.ACTIVE:
         raise HTTPException(

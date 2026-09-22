@@ -991,7 +991,7 @@ function opsInitApprovals() {
     <div class="ops-page-head">
       <div>
         <h1>Approvals</h1>
-        <p>One queue for both kinds of decision: merchant applications and request approvals.</p>
+        <p>Every request waiting for a decision.</p>
       </div>
     </div>
     <div id="opsApprovalsGrid"></div>`;
@@ -1004,8 +1004,6 @@ function opsInitApprovals() {
     mode: 'server',
     searchable: false,   /* the endpoint has no search parameter */
     filters: [
-      { key: 'kind', label: 'Kind', type: 'select', anyLabel: 'All',
-        options: [{ value: 'merchant', label: 'Merchant applications' }, { value: 'request', label: 'Requests' }] },
       { key: 'request_type', label: 'Type', type: 'select', anyLabel: 'Any',
         options: ['booking', ...OPS_SERVICE_REQUEST_TYPES].map(t => ({ value: t, label: opsLabel(t) })) },
       { key: 'priority', label: 'Priority', type: 'select', anyLabel: 'Any',
@@ -1015,11 +1013,6 @@ function opsInitApprovals() {
       { key: 'date_to', label: 'To', type: 'date' },
     ],
     columns: [
-      { key: 'kind', label: 'Kind', nowrap: true,
-        render: r => (r.kind === 'merchant'
-          ? '<span class="ops-tag ops-tag-info ops-tag-sq">Merchant</span>'
-          : '<span class="ops-tag ops-tag-sq">Request</span>'),
-        text: r => r.kind },
       { key: 'title', label: 'Item', value: r => r.title },
       { key: 'merchant_name', label: 'Merchant', value: r => r.merchant_name },
       OpsCol.enumLabel('request_type', 'Type'),
@@ -1030,22 +1023,16 @@ function opsInitApprovals() {
         render: r => opsTag(r.status, r.status_label), text: r => r.status_label },
       OpsCol.dateTime('submitted_at', 'Submitted'),
       OpsCol.actions([
-        { act: 'open', label: 'Open', when: r => r.kind === 'request' },
-        { act: 'view', label: 'View', when: r => r.kind === 'merchant' },
-        { act: 'approve', label: 'Approve', primary: true,
-          when: r => (r.kind === 'merchant' ? opsCan('merchant.approve') : opsCan('ticket.approve')) },
-        { act: 'reject', label: 'Reject', danger: true,
-          when: r => (r.kind === 'merchant' ? opsCan('merchant.suspend') : opsCan('ticket.reject')) },
+        { act: 'open', label: 'Open' },
+        { act: 'approve', label: 'Approve', primary: true, when: () => opsCan('ticket.approve') },
+        { act: 'reject', label: 'Reject', danger: true, when: () => opsCan('ticket.reject') },
       ]),
     ],
     selectable: false,
-    note: `Two row kinds, two sets of endpoints. <b>Merchant</b> rows approve via
-      <code>POST /api/admin/merchants/{id}/approve</code>; there is no reject route for a
-      merchant, so declining an application sets it <b>inactive</b> instead.
-      <b>Request</b> rows go to the approve/reject routes, or to the service-request resolve
-      route when the type is a change request. Note the date filters are not symmetrical:
-      for merchant rows they match the created date, for request rows they match the
-      <b>travel</b> date.`,
+    note: `Rows go to the approve/reject routes, or to the service-request resolve route
+      when the type is a change request. <b>Merchant applications used to queue here too.</b>
+      A merchant is now active the moment an Admin saves it, so there is nothing left to wait
+      for and the queue holds requests only. The date filters match the <b>travel</b> date.`,
     emptyText: 'Nothing is waiting for a decision.',
     fetch: async ({ page, pageSize, filters: f }) => {
       const params = { page, page_size: pageSize };
@@ -1054,29 +1041,11 @@ function opsInitApprovals() {
       const d = await OpsApi.approvalQueue(params);
       let rows = d.items || [];
       let total = d.total ?? rows.length;
-      /* `kind` is not a server-side filter, so it narrows the page in hand and
-         the count is adjusted to match what is actually shown. */
-      if (f.kind) {
-        rows = rows.filter(r => r.kind === f.kind);
-        total = rows.length;
-      }
       return { rows, total };
     },
     actions: {
       open: row => opsOpenRequest(row.id),
-      view: row => opsOpenMerchant(row.id),
       approve: async row => {
-        if (row.kind === 'merchant') {
-          if (!await opsConfirm(`Approve ${row.merchant_name}? Its staff will be able to sign in immediately.`, 'Approve')) return;
-          try {
-            await OpsApi.approveMerchant(row.id);
-            opsToast(`${row.merchant_name} approved.`, 'ok');
-            opsInvalidate('merchants', 'dashboard');
-            grid.reload();
-            opsLoadBadges();
-          } catch (err) { opsToast(opsError(err, 'Approval failed.'), 'err'); }
-          return;
-        }
         const isService = OPS_SERVICE_REQUEST_TYPES.includes(row.request_type);
         if (isService) {
           if (!await opsConfirm(`Approve ${row.title}?`, 'Approve')) return;
@@ -1103,19 +1072,6 @@ function opsInitApprovals() {
         } catch (err) { opsMsg($('opsApMsg'), opsError(err, 'Approval failed.'), 'err'); }
       },
       reject: async row => {
-        if (row.kind === 'merchant') {
-          const ok = await opsConfirm(
-            `There is no "reject" action for a merchant application. Set ${row.merchant_name} to `
-            + `inactive instead? It stays on file and can be approved later.`, 'Set inactive', { danger: true });
-          if (!ok) return;
-          try {
-            await OpsApi.setMerchantStatus(row.id, 'inactive');
-            opsToast(`${row.merchant_name} set inactive.`, 'ok');
-            opsInvalidate('merchants', 'dashboard');
-            grid.reload();
-          } catch (err) { opsToast(opsError(err, 'The change failed.'), 'err'); }
-          return;
-        }
         const reason = await opsPrompt({
           title: 'Reject request', label: 'Reason', required: true, multiline: true,
           confirmLabel: 'Reject', danger: true,

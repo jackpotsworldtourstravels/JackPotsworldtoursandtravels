@@ -51,6 +51,11 @@ SUITE = [
     ("verify_trustbrick_payments.py",
      "TrustBrick: canonical signing, nonce reuse, callback verification, provider selection"),
     ("verify_api.py", "Phases 1-3: enquiry, booking, documents, admin verification"),
+    # Onboarding, which precedes everything a merchant then does: it creates a
+    # company and signs its first user in, so a failure here explains a failure
+    # in any of the merchant scripts below rather than the other way round.
+    ("verify_merchant_no_approval.py",
+     "Merchant onboarding: saved is active, no approval step, suspension still bites"),
     ("verify_m1.py", "M1: queue, assignment, references, internal notes"),
     ("verify_m1_concurrency.py", "M1: simultaneous assignment and note writes"),
     ("verify_m2.py", "M2: ticket upload, invoice/confirmation PDFs, delivery"),
@@ -80,6 +85,9 @@ SUITE = [
     # the whole endpoint and is asserted against a second real merchant.
     ("verify_passenger_lookup.py",
      "Passenger auto-fill: passport lookup, newest record wins, writes nothing, cross-tenant scope"),
+    # The desk's own version of the same booking, raised without a quotation.
+    ("verify_manual_booking_unquoted.py",
+     "Manual booking: unquoted fare, desk-raised enquiry, received date, delete guard"),
     # Straight after the direct booking script, because a group booking IS a
     # direct or enquiry-led booking whose passengers arrived as a spreadsheet —
     # if that path is broken, every failure here is a symptom of it. It also
@@ -136,6 +144,11 @@ SUITE = [
     # verify_m8, which spends what is left of the rate-limit budget.
     ("verify_customer_portal.py",
      "Customer Portal V1: B2C/B2B isolation both ways, CUS- sequence, signup/login/OTP/reset"),
+    # The landing page's assistant, which is open to guests and so needs no
+    # identity from the script above — but reads the same destinations
+    # catalogue, so it runs after the portal that proves the catalogue serves.
+    ("verify_travel_assistant_routing.py",
+     "Travel Assistant: what a spoken sentence means, which screen it opens, and no fares in the reply"),
     # Immediately after the Customer Portal, which is the module it takes money
     # for: if B2C identity or booking is broken, every payment failure here is a
     # symptom of it. It mints its customer token directly rather than signing

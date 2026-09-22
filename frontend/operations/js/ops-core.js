@@ -347,7 +347,7 @@ const OPS_NAV = [
   { group: 'Operations', items: [
     { id: 'bookings', label: 'Bookings', icon: '☰', any: ['ticket.view'], desks: ['ticketing', 'finance', 'support'] },
     { id: 'requests', label: 'Requests', icon: '⇄', any: ['ticket.view'], desks: ['ticketing', 'support'] },
-    { id: 'approvals', label: 'Approvals', icon: '✓', any: ['ticket.approve', 'ticket.reject', 'merchant.approve', 'servicerequest.manage'], desks: ['ticketing', 'admin'] },
+    { id: 'approvals', label: 'Approvals', icon: '✓', any: ['ticket.approve', 'ticket.reject', 'servicerequest.manage'], desks: ['ticketing', 'admin'] },
     /* Reachable from Requests and from Ctrl+N, not a sidebar entry of its own —
        it is a form you arrive at with a priced item, never a list. */
     { id: 'new-request', label: 'New Request', icon: '✎', any: ['ticket.request'], hidden: true },
@@ -808,7 +808,7 @@ async function opsLoadBadges() {
       opsSetNavCount('support', Number(d.count || 0));
     } catch { /* a badge is never worth an error message */ }
   }
-  if (opsCan('ticket.approve', 'merchant.approve', 'servicerequest.manage')) {
+  if (opsCan('ticket.approve', 'servicerequest.manage')) {
     try {
       const d = await OpsApi.approvalQueue({ page_size: 1 });
       opsSetNavCount('approvals', Number(d.total || 0));

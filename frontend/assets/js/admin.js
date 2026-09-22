@@ -290,7 +290,7 @@ async function loadReports() {
    holds it — they create through the merchant-scoped admin path above, where the company comes
    from the URL rather than from the caller's account. */
 const COMPANY_TYPE_LABELS = { gaming_company: 'Gaming Company', corporate_company: 'Corporate Company', travel_agency: 'Travel Agency', business_partner: 'Business Partner', direct_customer: 'Direct Customer' };
-const MERCHANT_STATUS_BADGE = { active: 'active', pending_approval: 'pending', suspended: 'cancelled', inactive: 'inactive' };
+const MERCHANT_STATUS_BADGE = { active: 'active', suspended: 'cancelled', inactive: 'inactive' };
 
 let merchantsPage = 1;
 let merchantSearchTimer = null;
@@ -606,7 +606,7 @@ async function openOnboardMerchantModal(merchantId) {
       } else {
         const { data } = await axios.post(`${API_BASE}/api/admin/merchants`, payload, { headers: authHeaders() });
         overlay.classList.remove('open');
-        alert(`Merchant created — awaiting approval.\n\nFirst login: ${data.first_user.email}\nTemporary password: ${data.temporary_password}\n\nShare these credentials securely — this password cannot be retrieved again.`);
+        alert(`Merchant created and active.\n\nFirst login: ${data.first_user.email}\nTemporary password: ${data.temporary_password}\n\nShare these credentials securely — this password cannot be retrieved again.`);
         loadMerchants();
       }
     } catch (err) {
@@ -625,9 +625,10 @@ async function openMerchantDetail(merchantId) {
     const { data: m } = await axios.get(`${API_BASE}/api/admin/merchants/${merchantId}`, { headers: authHeaders() });
     /* EDIT AND SUSPEND LIVE HERE NOW, not on the list row. The list carries a
        single View action, so a state change is always made from the screen
-       that shows which merchant it is. Approve appears only while the account
-       is pending, and Suspend/Reactivate swap on the current status — the same
-       three endpoints the row buttons used.
+       that shows which merchant it is. Suspend and Reactivate swap on the
+       current status. THERE IS NO APPROVE HERE: a merchant is active the
+       moment it is saved, so every state on this screen is one somebody
+       chose.
 
        The "Financial position" panel was removed on request. loadMerchantFinance
        and loadMerchantStatement are still defined and still work; they simply
@@ -641,7 +642,6 @@ async function openMerchantDetail(merchantId) {
           <h2>${escapeHtml(m.company_name)}</h2>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-ghost btn-sm" id="editMerchantBtn">Edit</button>
-            ${st === 'pending_approval' ? `<button class="btn btn-coral btn-sm" id="approveMerchantBtn">Approve</button>` : ''}
             ${st === 'active' ? `<button class="btn btn-danger btn-sm" id="suspendMerchantBtn" data-next="suspended">Suspend</button>` : ''}
             ${st === 'suspended' ? `<button class="btn btn-coral btn-sm" id="suspendMerchantBtn" data-next="active">Reactivate</button>` : ''}
             <button class="btn btn-danger btn-sm" id="deleteMerchantBtn">Delete</button>
@@ -677,12 +677,6 @@ async function openMerchantDetail(merchantId) {
     document.getElementById('backToMerchantsBtn').addEventListener('click', () => loadMerchants(merchantsPage));
     document.getElementById('addMerchantUserBtn').addEventListener('click', () => openMerchantUserModal(merchantId, m.company_name));
     document.getElementById('editMerchantBtn').addEventListener('click', () => openOnboardMerchantModal(merchantId));
-    document.getElementById('approveMerchantBtn')?.addEventListener('click', async () => {
-      try {
-        await axios.post(`${API_BASE}/api/admin/merchants/${merchantId}/approve`, {}, { headers: authHeaders() });
-        openMerchantDetail(merchantId);
-      } catch (err) { alert(err.response?.data?.detail || 'Failed to approve merchant.'); }
-    });
     document.getElementById('suspendMerchantBtn')?.addEventListener('click', async e => {
       try {
         await axios.patch(`${API_BASE}/api/admin/merchants/${merchantId}/status`,
@@ -1186,9 +1180,10 @@ async function loadActiveUsers(page = activeUsersPage) {
    sp_admin_list_partner_bookings/sp_resolve_service_request) already
    supported this — there was just no screen to drive them. */
 /* ---------- Approval Queue ---------- GET /api/admin/approval-queue (new, unified —
-   API_CONTRACT.md §4.2 sign-off). Actions route to the existing per-kind endpoints:
-   merchant approvals to POST /api/admin/merchants/{id}/approve, ticket/service requests to
-   POST /api/admin/requests/{id}/approve|reject. */
+   API_CONTRACT.md §4.2 sign-off). Actions route to the existing per-kind
+   endpoints: POST /api/admin/requests/{id}/approve|reject for bookings, and
+   /service-requests/{id}/resolve for the rest. NO MERCHANTS EVER APPEAR HERE:
+   a new company is active the moment it is saved, so it never waits. */
 let aqPage = 1;
 let aqFiltersWired = false;
 function aqStatusBadgeClass(s) {
@@ -1321,11 +1316,7 @@ async function loadApprovalQueue(page = aqPage) {
           return;
         }
         try {
-          if (btn.dataset.kind === 'merchant') {
-            await axios.post(`${API_BASE}/api/admin/merchants/${id}/approve`, {}, { headers: authHeaders() });
-          } else {
-            await axios.post(`${API_BASE}/api/admin/service-requests/${id}/resolve`, { approve: true }, { headers: authHeaders() });
-          }
+          await axios.post(`${API_BASE}/api/admin/service-requests/${id}/resolve`, { approve: true }, { headers: authHeaders() });
           loadApprovalQueue(aqPage);
         } catch (err) { alert(err.response?.data?.detail || 'Failed to approve.'); }
       });

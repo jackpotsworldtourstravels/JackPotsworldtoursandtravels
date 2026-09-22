@@ -51,7 +51,10 @@ class P:
 
     # Merchant lifecycle (Admin)
     MERCHANT_CREATE = "merchant.create"
-    MERCHANT_APPROVE = "merchant.approve"
+    # RETIRED: "merchant.approve". A merchant is active the moment an Admin
+    # saves it, so there is nothing left to approve and no endpoint that asks
+    # for this code. Migration 0078 strips it from the permission arrays of
+    # the admins who were granted it.
     MERCHANT_EDIT = "merchant.edit"
     MERCHANT_SUSPEND = "merchant.suspend"
     MERCHANT_DELETE = "merchant.delete"
@@ -173,7 +176,7 @@ _SUPER_ADMIN: frozenset[str] = frozenset({
 })
 
 _ADMIN: frozenset[str] = frozenset({
-    P.MERCHANT_CREATE, P.MERCHANT_APPROVE, P.MERCHANT_EDIT,
+    P.MERCHANT_CREATE, P.MERCHANT_EDIT,
     P.MERCHANT_SUSPEND, P.MERCHANT_DELETE, P.MERCHANT_VIEW,
     # Full lifecycle of a merchant's staff logins from the Admin portal: list,
     # create (POST /api/admin/merchants/{id}/users), and reset password. The

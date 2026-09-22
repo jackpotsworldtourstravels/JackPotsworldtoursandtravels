@@ -187,14 +187,14 @@ function opsInitMerchants() {
       OpsCol.dateTime('created_at', 'Registered'),
       OpsCol.actions([
         { act: 'open', label: 'Open', primary: true },
-        { act: 'approve', label: 'Approve', when: r => r.status === 'pending_approval' && opsCan('merchant.approve') },
         { act: 'suspend', label: 'Suspend', danger: true, when: r => r.status === 'active' && opsCan('merchant.suspend') },
         { act: 'activate', label: 'Reactivate', when: r => ['suspended', 'inactive'].includes(r.status) && opsCan('merchant.suspend') },
       ]),
     ],
-    note: `A merchant's staff cannot sign in until the company is <b>approved</b> and
-      <b>active</b> — <code>auth._assert_merchant_tradeable</code> blocks the login with an
-      explanatory 403, so suspending a company is an immediate access change, not just a label.`,
+    note: `A merchant is <b>active</b> the moment it is saved — there is no approval step.
+      Its staff can sign in while it stays that way, and
+      <code>auth._assert_merchant_tradeable</code> blocks them with an explanatory 403 once it
+      does not, so suspending a company is an immediate access change and not just a label.`,
     emptyText: 'No merchants match these criteria.',
     fetch: async ({ page, pageSize, search, filters: f }) => {
       const params = { page, page_size: pageSize };
@@ -207,16 +207,6 @@ function opsInitMerchants() {
     onRow: r => opsOpenMerchant(r.id),
     actions: {
       open: row => opsOpenMerchant(row.id),
-      approve: async row => {
-        if (!await opsConfirm(`Approve ${row.company_name}? Its staff will be able to sign in immediately.`, 'Approve')) return;
-        try {
-          await OpsApi.approveMerchant(row.id);
-          opsToast(`${row.company_name} approved.`, 'ok');
-          opsInvalidate('dashboard', 'approvals');
-          grid.reload();
-          opsLoadBadges();
-        } catch (err) { opsToast(opsError(err, 'Approval failed.'), 'err'); }
-      },
       suspend: async row => {
         if (!await opsConfirm(
           `Suspend ${row.company_name}? Every one of its ${row.user_count} user(s) will be refused at sign-in.`,
@@ -292,20 +282,11 @@ async function opsOpenMerchant(id) {
 
     $('opsModalFoot').innerHTML = `
       ${opsCan('merchant.edit') ? '<button type="button" class="ops-btn" id="opsMdEdit">Edit</button>' : ''}
-      ${m.status === 'pending_approval' && opsCan('merchant.approve') ? '<button type="button" class="ops-btn ops-btn-primary" id="opsMdApprove">Approve</button>' : ''}
       <span class="ops-spacer"></span>
       <button type="button" class="ops-btn" id="opsMdClose">Close</button>`;
 
     $('opsMdClose').addEventListener('click', opsCloseModal);
     $('opsMdEdit')?.addEventListener('click', () => opsEditMerchantDialog(m));
-    $('opsMdApprove')?.addEventListener('click', async () => {
-      try {
-        await OpsApi.approveMerchant(m.id);
-        opsToast(`${m.company_name} approved.`, 'ok');
-        opsInvalidate('merchants', 'dashboard', 'approvals');
-        opsOpenMerchant(m.id);
-      } catch (err) { opsMsg($('opsMdMsg'), opsError(err, 'Approval failed.'), 'err'); }
-    });
     $('opsMdRequests')?.addEventListener('click', () => {
       opsCloseModal();
       opsPendingFilter.bookings = { merchant_id: String(m.id) };

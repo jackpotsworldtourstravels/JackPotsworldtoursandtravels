@@ -175,6 +175,6 @@ class MerchantCreatedResponse(BaseModel):
     first_user: AccountResponse
     temporary_password: str
     message: str = (
-        "Merchant created and awaiting approval. Share these credentials securely — "
+        "Merchant created and active. Share these credentials securely — "
         "the password cannot be retrieved again."
     )

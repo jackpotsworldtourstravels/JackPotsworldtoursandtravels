@@ -11,8 +11,11 @@ transaction, because a merchant with no way to sign in is not a usable
 record. The generated password is returned exactly once, in the creation
 response — it is hashed on the way into the database and cannot be read back.
 
-New merchants start at ``pending_approval`` and cannot sign in until an
-Admin approves them (enforced in ``routers/auth.py``).
+NEW MERCHANTS ARE ACTIVE AT ONCE. There was an approval step between
+creation and trading; with one Admin doing both halves it was that Admin
+approving their own decision, so it is gone. A merchant that should not
+trade is suspended or made inactive — a state somebody chose, rather than
+one it was born in.
 """
 import re
 from decimal import Decimal
@@ -42,8 +45,9 @@ from app.services import (
     service_access_service,
 )
 
-#: Statuses an Admin may set directly. ``pending_approval`` is only ever the
-#: creation default — you approve out of it, you don't move back into it.
+#: Statuses an Admin may set directly. The full enum is wider — it still
+#: carries the retired ``pending_approval`` and the terminal ``deleted``,
+#: neither of which is a state anybody may select.
 SETTABLE_STATUSES = (MerchantStatus.ACTIVE, MerchantStatus.INACTIVE, MerchantStatus.SUSPENDED)
 
 
@@ -125,8 +129,14 @@ def create_merchant(
         city=city,
         address=address,
         credit_limit=credit_limit,
-        # The spec has Admin approve a merchant before it can trade.
-        status=MerchantStatus.PENDING_APPROVAL,
+        # ACTIVE FROM THE MOMENT IT IS SAVED. The spec had an Admin approve a
+        # merchant before it could trade, which only makes sense where the
+        # person who creates the company and the person who vets it are two
+        # people. Here they are the same Admin, so the approval step was a
+        # second click on the Admin's own decision — and a company that sat at
+        # "Pending Approval" until they made it, unable to sign in, for no
+        # reason anyone outside this codebase could name.
+        status=MerchantStatus.ACTIVE,
         created_by=actor.user_id,
     )
     db.add(merchant)
@@ -238,31 +248,6 @@ def update_merchant(db: Session, actor: User, merchant_id: int, **fields) -> Mer
         description=f"{actor.full_name} updated merchant {merchant.company_name}",
         reference_id=merchant.merchant_id, merchant_id=merchant.merchant_id,
     )
-    return merchant
-
-
-def approve_merchant(db: Session, actor: User, merchant_id: int) -> Merchant:
-    merchant = get_merchant(db, merchant_id)
-    if merchant.status is not MerchantStatus.PENDING_APPROVAL:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Merchant is already {merchant.status.value}",
-        )
-    merchant.status = MerchantStatus.ACTIVE
-    db.commit()
-    db.refresh(merchant)
-
-    activity_service.log_activity(
-        db, actor.user_id, "Merchant approved",
-        activity_type="Merchant", module="Merchant Management",
-        description=f"{actor.full_name} approved merchant {merchant.company_name}",
-        reference_id=merchant.merchant_id, merchant_id=merchant.merchant_id,
-    )
-    for user in merchant.users:
-        notification_service.create_notification(
-            db, user.user_id, "Your company account has been approved",
-            "You can now sign in to the JackPots merchant portal and start raising requests.",
-        )
     return merchant
 
 

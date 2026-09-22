@@ -93,7 +93,7 @@ below.
 | Screen | Status | Endpoint(s) |
 |---|---|---|
 | Dashboard | **NEW** (§6.1) | `GET /api/admin/dashboard` |
-| Merchant Management | EXISTING | `GET/POST /api/admin/merchants`, `GET/PUT /api/admin/merchants/{id}`, `POST /api/admin/merchants/{id}/approve`, `PATCH /api/admin/merchants/{id}/status`, `GET /api/admin/merchants/{id}/users`, `POST /api/admin/merchants/{id}/users/{user_id}/reset-password` |
+| Merchant Management | EXISTING | `GET/POST /api/admin/merchants`, `GET/PUT /api/admin/merchants/{id}`, `PATCH /api/admin/merchants/{id}/status`, `GET /api/admin/merchants/{id}/users`, `POST /api/admin/merchants/{id}/users/{user_id}/reset-password` |
 | Active Users | **NEW**, thin (§4.1) | `GET /api/admin/users` |
 | Approval Queue | **NEW**, unified (§4.2) | `GET /api/admin/approval-queue` |
 | Payment Management | **NEW**, extends existing (§4.3) | `GET /api/admin/payments`, `POST /api/admin/payments/{id}/refund`, existing `GET /api/admin/payments/pending`, `POST /api/admin/payments/{id}/verify` |
@@ -131,19 +131,20 @@ the Active Users nav item.
 
 ```
 GET /api/admin/approval-queue
-  ?status=pending_approval|in_review|...        (RequestStatus ∪ MerchantStatus="pending_approval"; default = every "awaiting action" state)
+  ?status=pending_approval|in_review|...        (RequestStatus; default = every "awaiting action" state)
   &merchant_id=<int>
   &date_from=<date>&date_to=<date>
-  &request_type=<RequestType>                    (merchant-approval rows are request_type=null / a synthetic "merchant" marker — see shape below)
+  &request_type=<RequestType>
   &priority=low|normal|high|urgent
   &page, &page_size
 → Page[ApprovalQueueItemResponse]
   ApprovalQueueItemResponse = {
-    id, kind: "merchant"|"request", status, priority,
+    id, kind: "request", status, priority,
     merchant_id, merchant_name, request_type?, title, submitted_at,
-    total_amount?,   # null on a merchant row; 0 marks a booking that still needs a fare
-    # discriminated union in one list so the frontend renders one sortable table;
-    # "kind" tells it which detail route to open (/admin/merchants/{id} vs /requests/{id})
+    total_amount?,   # 0 marks a booking that still needs a fare
+    # `kind` is kept for compatibility and is always "request" now. MERCHANT ROWS
+    # ARE GONE (2026-09-22): a merchant is active the moment an Admin saves it, so
+    # a new company never waits for a decision. See §MERCHANT ONBOARDING below.
   }
 Permission: P.MERCHANT_VIEW + P.TICKET_VIEW (require(..., require_all=False) — Admin already holds both)
 ```
@@ -156,11 +157,20 @@ shown "Awaiting amount" and can do nothing. The only move belongs to an admin, v
 `POST /api/admin/requests/{id}/reprice` (§6.3b). An explicit `status=payment_pending` still lists
 every Payment Pending row, priced or not.
 
-Internally this is a `UNION ALL` (or two queries merged in Python) over `merchants` filtered to
-`pending_approval` and `service_requests` filtered to the awaiting-action statuses, sorted by
+Internally this reads `service_requests` filtered to the awaiting-action statuses, sorted by
 `submitted_at DESC` — implemented as one `approval_service.py`, not by changing the existing
 `GET /api/admin/merchants` / `GET /api/requests` endpoints, which keep working standalone for
 their own screens.
+
+**MERCHANT ONBOARDING HAS NO APPROVAL STEP (2026-09-22).** It used to: an Admin created a company,
+the company sat at `pending_approval` unable to sign in, and an Admin approved it. Those are the
+same person here — there is no separate approver — so the step was somebody approving their own
+decision, and a real company waited for it. `POST /api/admin/merchants/{id}/approve` and the
+`merchant.approve` permission are both gone; creation returns a merchant at `active` and its first
+login works immediately. A company that should not trade is suspended or set inactive through
+`PATCH /api/admin/merchants/{id}/status`, which is unchanged. Migration `0078_merchant_no_approval`
+released every merchant still sitting at `pending_approval` and stripped the retired permission
+from the admins who held it; the enum value itself is kept so an older backup still loads.
 
 ### 4.3 Payment Management / Payment History
 
