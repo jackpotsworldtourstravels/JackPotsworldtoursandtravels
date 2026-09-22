@@ -63,6 +63,17 @@
     } catch { return '₹' + Math.round(n); }
   };
 
+  /* The HOTEL shelf's artwork, for the three cards under "Hotels near". Its
+     own manifest and directory, written by scripts/fetch_hotel_images.py; the
+     same contract as the other two - a key the API sent, present here, or no
+     picture. */
+  const hotelArtFor = key => {
+    if (!key || typeof HOTEL_IMAGE_FILES !== 'object' || !HOTEL_IMAGE_FILES) return null;
+    if (!HOTEL_IMAGE_FILES[key]) return null;
+    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
+    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+  };
+
   async function getJson(url) {
     const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
     if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
@@ -88,13 +99,27 @@
     document.getElementById('lpWhere').textContent =
       [a.destination_name, a.country].filter(Boolean).join(', ');
 
+    /* THE PHOTOGRAPH IS THE HERO, full width, with the name over it. It is the
+       one image on the page loaded eagerly - it is the first thing on screen,
+       and lazily loading what somebody is already looking at is a blank box
+       for no saving. The name and city live in the markup, so the hero reads
+       correctly before the picture arrives and if it never does. */
+    const hero = document.getElementById('lpHero');
     const art = artFor(a.image);
-    document.getElementById('lpHero').innerHTML = art
-      ? `<img class="lp-hero-img" src="${esc(art.src)}"
-             srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
-             sizes="(max-width: 900px) 100vw, 900px"
-             alt="${esc(a.name)}" decoding="async">`
-      : `<span class="lp-hero-pin">${icon('mapPin', 34)}</span>`;
+    if (art) {
+      const img = document.createElement('img');
+      img.className = 'lp-hero-img';
+      img.src = art.src;
+      img.srcset = art.small + ' 480w, ' + art.src + ' 960w';
+      img.sizes = '100vw';
+      img.alt = '';                /* decorative: the name is on top of it */
+      img.decoding = 'async';
+      img.fetchPriority = 'high';
+      img.addEventListener('error', () => img.remove());
+      hero.insertBefore(img, hero.firstChild);
+    } else {
+      hero.insertAdjacentHTML('afterbegin', `<span class="lp-hero-pin">${icon('mapPin', 40)}</span>`);
+    }
 
     /* --- fares ------------------------------------------------------- */
     const f = a.fare_details || {};
@@ -108,8 +133,18 @@
     const note = document.getElementById('lpFareNote');
     note.textContent = f.hotel_from != null && f.hotel_scope_name
       ? `Hotel rate is the lowest nightly price we list in ${f.hotel_scope_name}.`
-      : '';
-    note.hidden = !note.textContent;
+      : 'Fare information is currently unavailable for this location.';
+
+    /* View options goes where the only real figure comes from: the hotels of
+       the area this landmark sits in. With no figure there is nothing to
+       open, and the button goes rather than leading somewhere empty. */
+    const fareBtn = document.getElementById('lpFareBtn');
+    if (f.hotel_from != null) {
+      fareBtn.href = 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug);
+      fareBtn.hidden = false;
+    } else {
+      fareBtn.hidden = true;
+    }
 
     /* --- about ------------------------------------------------------- */
     if (a.description) {
@@ -124,9 +159,15 @@
     const line = document.getElementById('lpHotelsLine');
     const btn = document.getElementById('lpHotelsBtn');
     if (n > 0) {
-      line.textContent = `${n} ${n === 1 ? 'hotel' : 'hotels'} we list${a.area_name ? ' in ' + a.area_name : ''}, the nearest area to ${a.name}.`;
+      line.textContent = `Find comfortable stays${a.area_name ? ' in ' + a.area_name : ''}, the nearest area to ${a.name}.`;
       btn.href = 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug);
       btn.hidden = false;
+      /* SHOWN, NOT PROMISED. Three of the hotels the button opens, from the
+         endpoint that page itself uses - no second hotel source, no copy of
+         its query. It is deliberately not awaited: the page is complete
+         without it, and a slow hotel query should not hold up the
+         description somebody is already reading. */
+      loadHotels(a);
     } else {
       /* Said plainly, with no button to a page that would be empty. */
       line.textContent = 'No hotels currently available around this location.';
@@ -152,6 +193,42 @@
     statusEl.textContent = '';
     statusEl.hidden = true;
     body.hidden = false;
+    body.classList.add('disc-in');
+  }
+
+  /* Three hotels from the attraction's own hotels endpoint - the same one
+     "View Hotels" opens - rendered as cards. Failure is silent by design:
+     this is an enrichment under a section that already says what it is and
+     already has its button. */
+  async function loadHotels(a) {
+    const box = document.getElementById('lpHotels');
+    if (!box) return;
+    try {
+      const page = await getJson('/api/customer/attractions/' + encodeURIComponent(a.id)
+        + '/hotels?page=1&page_size=3');
+      const rows = (page && page.hotels) || [];
+      if (!rows.length) { box.innerHTML = ''; return; }
+      box.innerHTML = rows.map(h => {
+        const hart = hotelArtFor(h.image);
+        const price = h.price_per_night != null
+          ? `<p class="lp-hotel-price">${esc(money(h.price_per_night))} <span>/ night</span></p>` : '';
+        return `<article class="lp-hotel">
+          <div class="lp-hotel-art">${hart
+            ? `<img src="${esc(hart.small)}" srcset="${esc(hart.small)} 480w, ${esc(hart.src)} 960w"
+                   sizes="(max-width: 640px) 100vw, 260px" alt="${esc(h.name || '')}"
+                   loading="lazy" decoding="async" onerror="this.remove()">`
+            : `<span class="lp-hero-pin">${icon('hotels', 22)}</span>`}</div>
+          <div class="lp-hotel-body">
+            <h3 class="lp-hotel-name">${esc(h.name || '')}</h3>
+            <p class="lp-hotel-where">${esc(h.location || h.location_name || '')}</p>
+            ${price}
+          </div>
+        </article>`;
+      }).join('');
+      if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(box);
+    } catch {
+      box.innerHTML = '';
+    }
   }
 
   function failed(text, retry) {

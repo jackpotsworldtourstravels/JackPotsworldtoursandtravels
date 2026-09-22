@@ -20,6 +20,12 @@
 <link rel="icon" href="assets/images/favicon.ico">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- ONE EXTRA FAMILY, ON THESE TWO PAGES ONLY. The site is Montserrat
+     throughout and stays that way; a serif is what makes a place read as a
+     place rather than a record, and it is loaded where that matters instead
+     of site-wide. Georgia is named as the fallback, so a blocked font request
+     degrades to a serif rather than to the UI face. -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/main.css?v=20260922fp3">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
@@ -27,6 +33,9 @@
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260922fp3">
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
+<!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
+     shared shell (.dh-main, .dh-status) those pages borrow. -->
+<link rel="stylesheet" href="assets/css/discover.css?v=20260922dis1">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -37,10 +46,14 @@
      scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
      a key with no file, or no key at all, leaves the card on its artwork. -->
 <script src="assets/js/location-images.js?v=20260922loc3"></script>
+<!-- The hotel shelf's artwork, for the three cards under "Hotels near".
+     Same contract again: a key the API sends, resolved through a shipped
+     manifest, never a path built from a name. -->
+<script src="assets/js/hotel-images.js?v=20260912im1"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260919lc1"></script>
 </head>
-<body class="sp-continuation" data-sp-service="hotels" data-live-chat>
+<body class="sp-continuation disc" data-sp-service="hotels" data-live-chat>
 <a href="#lpMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -52,7 +65,7 @@
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('hotels.html');</script>
 
-<main id="lpMain" class="dh-main hr-scope">
+<main id="lpMain" class="dh-main disc-main hr-scope">
   <div class="wrap">
     <!-- The href is rewritten by location.js once the API says which
          destination this is. It is a link to the destinations shelf until
@@ -63,35 +76,53 @@
 
     <p class="dh-status" id="lpStatus" role="status" aria-live="polite">Loading this place…</p>
 
+    <!-- THE HERO IS THE PHOTOGRAPH, full width, with the name on it. It sits
+         OUTSIDE the article so it can break the content column (see .lp-hero
+         in discover.css); everything below it stays in the column. -->
     <article class="lp" id="lpBody" hidden>
-      <div class="lp-hero" id="lpHero"></div>
-
-      <div class="lp-head">
-        <h1 class="dh-title" id="lpTitle"></h1>
-        <p class="dh-lead" id="lpWhere"></p>
+      <div class="lp-hero" id="lpHero">
+        <div class="lp-hero-body">
+          <h1 id="lpTitle"></h1>
+          <p class="lp-where" id="lpWhere"></p>
+        </div>
       </div>
 
       <!-- Each section removes itself when it has nothing true to say, rather
            than printing an empty heading. -->
       <section class="lp-sec" id="lpFaresSec">
-        <h2 class="lp-h2">Fare details</h2>
-        <dl class="lp-fares" id="lpFares"></dl>
-        <p class="lp-note" id="lpFareNote"></p>
+        <h2 class="disc-h2">Fare details</h2>
+        <p class="disc-sub">What it costs to travel here, from what we have on the shelf.</p>
+        <div class="lp-card">
+          <dl class="lp-fares" id="lpFares"></dl>
+          <div class="lp-fare-foot">
+            <p class="lp-note" id="lpFareNote"></p>
+            <a class="disc-btn disc-btn-gold" id="lpFareBtn" href="#">
+              View options <span data-jp-icon="arrowRight" aria-hidden="true"></span>
+            </a>
+          </div>
+        </div>
       </section>
 
       <section class="lp-sec" id="lpAboutSec" hidden>
-        <h2 class="lp-h2" id="lpAboutH"></h2>
-        <p class="lp-about" id="lpAbout"></p>
+        <h2 class="disc-h2" id="lpAboutH"></h2>
+        <div class="lp-card"><p class="lp-about" id="lpAbout"></p></div>
       </section>
 
       <section class="lp-sec" id="lpHotelsSec">
-        <h2 class="lp-h2" id="lpHotelsH"></h2>
-        <p class="lp-hotels-line" id="lpHotelsLine"></p>
-        <a class="btn btn-coral lp-hotels-btn" id="lpHotelsBtn" href="#">View Hotels</a>
+        <div class="lp-hotels-head">
+          <div>
+            <h2 class="disc-h2" id="lpHotelsH"></h2>
+            <p class="disc-sub" id="lpHotelsLine"></p>
+          </div>
+          <a class="disc-btn" id="lpHotelsBtn" href="#">
+            View Hotels <span data-jp-icon="arrowRight" aria-hidden="true"></span>
+          </a>
+        </div>
+        <div class="lp-hotels" id="lpHotels"></div>
       </section>
 
       <section class="lp-sec" id="lpMoreSec" hidden>
-        <h2 class="lp-h2">Explore more places</h2>
+        <h2 class="disc-h2">Explore more places</h2>
         <div class="lp-more" id="lpMore" role="list"></div>
       </section>
     </article>
@@ -100,6 +131,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/location.js?v=20260922loc1"></script>
+<script src="assets/js/location.js?v=20260922dis1"></script>
 </body>
 </html>

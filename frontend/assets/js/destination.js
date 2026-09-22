@@ -25,6 +25,8 @@
    both fields the API sent. Nothing maps a display name to a URL. */
 (function () {
   const grid = document.getElementById('dlGrid');
+  const hero = document.getElementById('dlHero');
+  const countEl = document.getElementById('dlCount');
   const statusEl = document.getElementById('dlStatus');
   const titleEl = document.getElementById('dlTitle');
   const countryEl = document.getElementById('dlCountry');
@@ -50,6 +52,16 @@
      ('hyderabad__charminar'), written by scripts/fetch_attraction_images.py
      from that landmark's Wikimedia Commons category. The destination manifest
      is kept as a fallback for a key that predates it. */
+  /* The DESTINATION shelf's artwork, for the header. Separate from artFor
+     below, which resolves a LANDMARK's photograph: two manifests, two
+     directories, and a key from the API for each. */
+  const destArtFor = key => {
+    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
+    if (!DESTINATION_IMAGE_FILES[key]) return null;
+    const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
+    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+  };
+
   const artFor = key => {
     if (!key) return null;
     if (typeof LOCATION_IMAGE_FILES === 'object' && LOCATION_IMAGE_FILES && LOCATION_IMAGE_FILES[key]) {
@@ -74,9 +86,13 @@
 
   function cardHtml(loc, dest) {
     const art = artFor(loc.image);
+    /* ALT TEXT IS THE PLACE, not empty. These photographs carry the meaning of
+       the card - a decorative alt would leave a screen reader with a name and
+       no idea it is looking at a photograph of it. */
     const picture = art
       ? `<img class="dl-img" src="${esc(art.src)}" srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
-           sizes="(max-width: 640px) 100vw, 360px" alt="" loading="lazy" decoding="async"
+           sizes="(max-width: 640px) 100vw, (max-width: 1100px) 45vw, 320px"
+           alt="${esc(loc.name)}" loading="lazy" decoding="async"
            onerror="this.remove()">`
       : '';
 
@@ -94,17 +110,21 @@
        is, and the way on to these same hotels. */
     const explore = 'destination/' + encodeURIComponent(dest_id) + '/' + encodeURIComponent(loc.slug);
 
+    /* EXPLORE IS THE PRIMARY ACTION NOW. This page is where somebody decides
+       whether they want to go at all; hotels are the step after that, and the
+       pair is ordered to match. Both were already here - only their weight
+       changed. */
     return `<article class="dl-card" role="listitem">
-      <div class="dl-art">${picture}<span class="dl-pin">${icon('mapPin', 22)}</span></div>
+      <div class="dl-art">${picture}<span class="dl-pin">${icon('mapPin', 20)}</span></div>
       <div class="dl-body">
         <h2 class="dl-name">${esc(loc.name)}</h2>
         ${loc.description ? `<p class="dl-desc">${esc(loc.description)}</p>` : ''}
-        <p class="dl-count">${icon('hotels', 15)} ${esc(count)}</p>
+        <p class="dl-count-line">${icon('hotels', 15)} ${esc(count)}</p>
         <div class="dl-actions">
-          <a class="btn btn-coral dl-view" href="${esc(href)}"
+          <a class="disc-btn" href="${esc(explore)}"
+             aria-label="Explore ${esc(loc.name)}">Explore Location ${icon('arrowRight', 16)}</a>
+          <a class="disc-link" href="${esc(href)}"
              aria-label="View hotels near ${esc(loc.name)}">View Hotels</a>
-          <a class="dl-explore" href="${esc(explore)}"
-             aria-label="Explore ${esc(loc.name)}">Explore Location ${icon('arrowRight', 15)}</a>
         </div>
       </div>
     </article>`;
@@ -127,6 +147,7 @@
   }
 
   function notFound() {
+    if (countEl) countEl.textContent = '';
     titleEl.textContent = 'Destination not found';
     leadEl.textContent = '';
     countryEl.textContent = '';
@@ -147,10 +168,32 @@
         || (Array.isArray(all) ? all : []).find(d => d && String(d.id).toLowerCase() === slug.toLowerCase());
       if (!dest) { notFound(); return; }
 
-      titleEl.textContent = dest.name;
+      titleEl.textContent = 'Explore ' + dest.name;
       countryEl.textContent = dest.country || '';
-      leadEl.textContent = 'Famous places to visit in ' + dest.name + '. Choose one to see hotels nearby.';
+      leadEl.textContent = 'Discover the most iconic and photographic places in '
+        + dest.name + ' - and the hotels closest to each one.';
       document.title = dest.name + ' — JackPots World Tours & Travels';
+
+      /* THE CITY'S OWN PHOTOGRAPH, behind its name. It comes from the
+         destination shelf's manifest - the one the homepage already ships -
+         so nothing new is downloaded and no stock image is invented. The
+         header is designed to work without it: the gradient is the design and
+         the picture is a layer on top of it. */
+      const heroArt = destArtFor(dest.image);
+      if (heroArt) {
+        const img = document.createElement('img');
+        img.className = 'dl-hero-img';
+        img.src = heroArt.src;
+        img.srcset = heroArt.small + ' 480w, ' + heroArt.src + ' 960w';
+        img.sizes = '100vw';
+        img.alt = '';                 /* decorative: the name is right beside it */
+        img.decoding = 'async';
+        /* Eager, and only this one: it is the first thing on the page. */
+        img.fetchPriority = 'high';
+        img.addEventListener('error', () => img.remove());
+        hero.insertBefore(img, hero.firstChild);
+      }
+      hero.classList.add('disc-in');
 
       const rows = Array.isArray(locations) ? locations.filter(l => l && l.slug && l.name) : [];
       if (!rows.length) {
@@ -159,7 +202,12 @@
       }
       grid.innerHTML = rows.map(l => cardHtml(l, dest)).join('');
       grid.setAttribute('aria-busy', 'false');
-      statusEl.textContent = rows.length + (rows.length === 1 ? ' place to visit' : ' places to visit');
+      grid.classList.add('disc-in');
+      /* The count is a label above the grid, not a status message: it is a
+         fact about the page rather than a report on the request, and a live
+         region that keeps announcing "7 places to visit" is noise. */
+      countEl.textContent = rows.length + (rows.length === 1 ? ' place to visit' : ' places to visit');
+      statusEl.textContent = '';
       if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(grid);
     } catch (err) {
       console.warn('[destination] failed:', err && err.message);

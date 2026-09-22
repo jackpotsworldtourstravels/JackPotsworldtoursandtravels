@@ -1,0 +1,335 @@
+/* ===========================================================================
+   discover.css — the two discovery pages: a destination's famous places, and
+   one of them in full.
+   ===========================================================================
+   WHY THESE TWO ARE THEIR OWN STYLESHEET. They were `.dl-*` and `.lp-*` blocks
+   inside hotel.css, which is the RESULTS furniture — filter rails, sort bars,
+   hotel rows, pagination. These pages sell a place before anyone is choosing
+   between rooms, and the two jobs pull in opposite directions: a results page
+   should be quiet and dense, a discovery page should be photographic and
+   spacious. Kept in one file they were one file's worth of compromise.
+
+   THE PALETTE IS THE BRAND'S, NARROWED TO FIVE TOKENS. Warm off-white page,
+   white cards, near-black type, grey seconds, and gold used only where it
+   means something — a call to action, a rule under a heading, a price. Gold
+   everywhere is a casino; gold on one line is a hotel.
+
+   NOTHING HERE IS PAGE-SPECIFIC FURNITURE. The header, the footer, the
+   booking card and the results pages are untouched; these rules only apply
+   under `.disc`, which only these two pages set.
+   =========================================================================== */
+.disc {
+  --disc-bg: #F7F5F0;
+  --disc-card: #FFFFFF;
+  --disc-ink: #171717;
+  --disc-mute: #666666;
+  --disc-gold: #C9A227;
+  --disc-gold-soft: linear-gradient(135deg, #C9A227, #E0C36A);
+  --disc-line: rgba(23, 23, 23, .08);
+  --disc-shadow: 0 10px 30px -18px rgba(23, 23, 23, .35);
+  --disc-shadow-lift: 0 22px 48px -24px rgba(23, 23, 23, .45);
+  /* Playfair for headings, the UI font for everything else. The pair is the
+     whole typographic idea: a serif says "place", a grotesque says "book". */
+  --disc-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}
+body.disc { background: var(--disc-bg); }
+.disc .disc-main { background: var(--disc-bg); padding-bottom: 64px; }
+
+/* Content column. `wrap` is the site's, so these pages line up with every
+   other one; this only caps it where a 1920 screen would otherwise stretch a
+   four-card row into five thin ones. */
+.disc .wrap { max-width: 1320px; }
+
+.disc h1, .disc h2, .disc h3 { font-family: var(--disc-serif); color: var(--disc-ink); letter-spacing: -.01em; }
+
+/* A hairline of gold under a section heading. The only structural gold on the
+   page, and it is 44px of it. */
+.disc-h2 {
+  margin: 0 0 4px; font-size: clamp(22px, 2.4vw, 28px); font-weight: 700; line-height: 1.2;
+}
+.disc-h2::after {
+  content: ''; display: block; width: 44px; height: 3px; margin-top: 10px;
+  border-radius: 3px; background: var(--disc-gold-soft);
+}
+.disc-sub { margin: 0; font-size: 15px; line-height: 1.6; color: var(--disc-mute); }
+
+/* Back link — quiet, and the first thing a keyboard reaches. */
+.disc .dh-back {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 22px 0 18px; font-size: 14px; font-weight: 600; color: var(--disc-mute);
+  transition: color .2s ease;
+}
+.disc .dh-back:hover { color: var(--disc-ink); }
+.disc .dh-back:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 4px; border-radius: 6px; }
+
+/* ==========================================================================
+   THE DESTINATION HEADER — the city's own photograph, used quietly
+   ==========================================================================
+   The picture is the destination's, from the shelf manifest the homepage
+   already ships, behind a dark scrim so the type on it is legible without
+   depending on which photograph it is. No photograph is not a broken header:
+   the gradient underneath is the design, and the picture is a layer on top.
+   ========================================================================== */
+.dl-hero {
+  position: relative; overflow: hidden;
+  border-radius: 22px; margin-bottom: 30px;
+  min-height: 210px; display: flex; align-items: flex-end;
+  padding: clamp(22px, 3vw, 40px);
+  background: linear-gradient(120deg, #15181d 0%, #23282f 60%, #2c3138 100%);
+  color: #fff;
+}
+.dl-hero-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: .55;
+}
+/* The scrim, not the image, is what guarantees contrast. */
+.dl-hero::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,.45) 55%, rgba(0,0,0,.66) 100%);
+}
+.dl-hero-body { position: relative; z-index: 1; max-width: 680px; }
+.dl-hero-eyebrow {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: #E0C36A;
+}
+.dl-hero h1 {
+  margin: 0; color: #fff; font-size: clamp(30px, 4.6vw, 52px); font-weight: 700; line-height: 1.06;
+}
+.dl-hero-lead {
+  margin: 12px 0 0; max-width: 54ch; font-size: clamp(14.5px, 1.3vw, 16.5px);
+  line-height: 1.6; color: rgba(255,255,255,.86);
+}
+.dl-count { margin: 0 0 16px; font-size: 13.5px; font-weight: 600; color: var(--disc-mute); }
+
+/* ==========================================================================
+   THE CARDS
+   ==========================================================================
+   `auto-fill` with a 260px floor is what makes the column count a consequence
+   of the width rather than a list of breakpoints: five up at 1920, four at
+   1440, three at 1024, two at 768, one on a phone, and every width between
+   them handled without another media query.
+   ========================================================================== */
+.dl-grid {
+  display: grid; gap: clamp(16px, 1.8vw, 24px);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.dl-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--disc-card); border-radius: 20px;
+  box-shadow: var(--disc-shadow);
+  transition: transform .24s cubic-bezier(.22,.8,.3,1), box-shadow .24s ease;
+}
+.dl-card:hover { transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); }
+.dl-card:focus-within { box-shadow: var(--disc-shadow-lift); }
+
+.dl-art {
+  position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+  background: linear-gradient(135deg, #e9e5db, #f3efe6);
+}
+.dl-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  transition: transform .4s cubic-bezier(.22,.8,.3,1);
+}
+.dl-card:hover .dl-img { transform: scale(1.045); }
+/* Darkens on hover so the white type over the bottom of a bright photograph
+   keeps its contrast, and so the card reads as one object rather than a
+   picture with furniture under it. */
+.dl-art::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.28));
+  opacity: .55; transition: opacity .24s ease;
+}
+.dl-card:hover .dl-art::after { opacity: 1; }
+/* The pin marks a card with no photograph, and is a badge on one that has. */
+.dl-pin {
+  position: absolute; top: 12px; left: 12px; z-index: 1;
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff;
+  background: rgba(23,23,23,.42); backdrop-filter: blur(4px);
+}
+.dl-img + .dl-pin { background: rgba(23,23,23,.42); }
+.dl-art:not(:has(.dl-img)) .dl-pin {
+  inset: 0; margin: auto; width: 46px; height: 46px;
+  background: rgba(201,162,39,.16); color: var(--disc-gold);
+}
+
+.dl-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 18px 20px 20px; }
+.dl-name { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; }
+.dl-desc {
+  margin: 0; font-size: 14px; line-height: 1.55; color: var(--disc-mute);
+  /* Two lines, so a long description cannot make one card taller than its
+     neighbours and leave a hole in the row. */
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.dl-count-line {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 600; color: var(--disc-mute);
+}
+.dl-count-line svg, .dl-count-line .jpi { width: 15px; height: 15px; }
+
+.dl-actions { margin-top: auto; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* The primary action on this page is to read about the place; hotels are one
+   step further on, and the pair is ordered that way. */
+.disc-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-radius: 999px;
+  font-family: var(--ff-body, inherit); font-size: 14px; font-weight: 700;
+  background: var(--disc-ink); color: #fff;
+  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.disc-btn:hover { background: #000; transform: translateY(-1px); box-shadow: 0 10px 22px -14px rgba(0,0,0,.8); }
+.disc-btn:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; }
+.disc-btn svg, .disc-btn .jpi { width: 16px; height: 16px; }
+.dl-card:hover .disc-btn { background: #000; }
+.disc-btn-gold { background: var(--disc-gold-soft); color: #1a1405; }
+.disc-btn-gold:hover { filter: brightness(1.04); background: var(--disc-gold-soft); }
+.disc-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 700; color: var(--disc-mute);
+  transition: color .2s ease;
+}
+.disc-link:hover { color: var(--disc-ink); }
+.disc-link:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; border-radius: 6px; }
+
+/* ==========================================================================
+   ONE PLACE — the detail page
+   ========================================================================== */
+/* FULL-BLEED, from inside a centred column: the hero is the photograph and a
+   photograph with a 32px gutter either side is a thumbnail. */
+.lp-hero {
+  position: relative; overflow: hidden; display: flex; align-items: flex-end;
+  width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 34px;
+  min-height: clamp(280px, 42vw, 520px);
+  padding: clamp(26px, 4vw, 60px) clamp(18px, 6vw, 80px);
+  background: linear-gradient(120deg, #15181d, #2c3138);
+  color: #fff;
+}
+.lp-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lp-hero::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.42) 48%, rgba(0,0,0,.72) 100%);
+}
+.lp-hero-body { position: relative; z-index: 1; width: min(1320px, 100%); margin-inline: auto; }
+.lp-hero h1 {
+  margin: 0; color: #fff; line-height: 1.02;
+  font-size: clamp(34px, 6vw, 68px); font-weight: 700; letter-spacing: -.015em;
+}
+.lp-where {
+  display: flex; align-items: center; gap: 9px; margin: 14px 0 0;
+  font-size: clamp(13.5px, 1.3vw, 16px); font-weight: 600; color: rgba(255,255,255,.9);
+}
+.lp-where::before {
+  content: ''; width: 26px; height: 2px; border-radius: 2px; background: var(--disc-gold-soft);
+}
+.lp-hero-pin { position: relative; z-index: 1; color: rgba(255,255,255,.5); }
+
+.lp { display: flex; flex-direction: column; gap: 30px; }
+.lp-sec { display: flex; flex-direction: column; gap: 14px; }
+
+/* The white card every section below the hero sits in. */
+.lp-card {
+  background: var(--disc-card); border-radius: 20px;
+  padding: clamp(20px, 2.4vw, 30px);
+  box-shadow: var(--disc-shadow);
+}
+
+/* --- fares --------------------------------------------------------------- */
+.lp-fares { margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.lp-fare { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.lp-fare + .lp-fare { border-left: 1px solid var(--disc-line); padding-left: clamp(14px, 2vw, 26px); }
+.lp-fare dt {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--disc-mute);
+}
+.lp-fare dd {
+  margin: 0; display: flex; align-items: baseline; gap: 5px;
+  font-family: var(--disc-serif); font-size: clamp(24px, 2.6vw, 30px); font-weight: 700;
+  color: var(--disc-ink);
+}
+.lp-fare dd span { font-family: var(--ff-body, inherit); font-size: 13px; font-weight: 600; color: var(--disc-mute); }
+/* Unavailable is a sentence, in the body font, quiet — never a dash and never
+   a number nobody can honour. */
+.lp-fare.is-empty dd { font-family: var(--ff-body, inherit); font-size: 14.5px; font-weight: 600; }
+.lp-fare.is-empty em { font-style: normal; color: var(--disc-mute); }
+.lp-fare-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--disc-line);
+}
+.lp-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--disc-mute); max-width: 62ch; }
+
+/* --- about --------------------------------------------------------------- */
+.lp-about { margin: 0; font-size: 16px; line-height: 1.75; color: var(--disc-ink); max-width: 72ch; }
+
+/* --- hotels near --------------------------------------------------------- */
+.lp-hotels-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
+}
+.lp-hotels { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.lp-hotel {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--disc-card); border-radius: 16px; box-shadow: var(--disc-shadow);
+  transition: transform .22s ease, box-shadow .22s ease;
+}
+.lp-hotel:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); }
+.lp-hotel-art {
+  position: relative; aspect-ratio: 4 / 3; overflow: hidden;
+  background: linear-gradient(135deg, #e9e5db, #f3efe6);
+}
+.lp-hotel-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lp-hotel-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 5px; }
+.lp-hotel-name { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.lp-hotel-where { margin: 0; font-size: 12.5px; color: var(--disc-mute); }
+.lp-hotel-price { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--disc-ink); }
+.lp-hotel-price span { font-size: 12px; font-weight: 600; color: var(--disc-mute); }
+.lp-hotels-empty { margin: 0; font-size: 14.5px; color: var(--disc-mute); }
+
+/* --- the other places ---------------------------------------------------- */
+.lp-more { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.lp-more-card {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  padding: 10px 16px 10px 10px; border-radius: 14px;
+  background: var(--disc-card); box-shadow: var(--disc-shadow);
+  color: var(--disc-ink); font-weight: 700; font-size: 14.5px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.lp-more-card:hover { transform: translateY(-2px); box-shadow: var(--disc-shadow-lift); }
+.lp-more-card:focus-visible { outline: 2px solid var(--disc-gold); outline-offset: 3px; }
+.lp-more-art {
+  flex: none; width: 50px; height: 50px; border-radius: 11px; overflow: hidden;
+  display: grid; place-items: center; color: var(--disc-gold);
+  background: linear-gradient(135deg, #efe9da, #f7f3ea);
+}
+.lp-more-art img { width: 100%; height: 100%; object-fit: cover; }
+.lp-more-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- status and failure -------------------------------------------------- */
+.disc .dh-status { margin: 10px 0; font-size: 14.5px; color: var(--disc-mute); }
+.disc .dh-retry {
+  margin-top: 4px; padding: 9px 18px; border-radius: 999px; border: 1px solid var(--disc-line);
+  background: #fff; font-size: 13.5px; font-weight: 700; color: var(--disc-ink); cursor: pointer;
+}
+.disc .dh-retry:hover { border-color: var(--disc-gold); }
+
+/* --- arrival ------------------------------------------------------------- */
+/* One fade, once, on the body of the page. Cards do not each fly in: eight
+   staggered entrances is a slideshow, not a page. */
+@keyframes discIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.disc-in { animation: discIn .42s cubic-bezier(.22,.8,.3,1) both; }
+
+@media (max-width: 640px) {
+  .dl-hero { border-radius: 16px; min-height: 170px; }
+  .lp { gap: 22px; }
+  .lp-card { border-radius: 16px; }
+  /* Stacked, so the divider between fares becomes a rule above each rather
+     than a hairline in the wrong axis. */
+  .lp-fare + .lp-fare { border-left: 0; border-top: 1px solid var(--disc-line); padding-left: 0; padding-top: 14px; }
+  .disc-btn { width: 100%; justify-content: center; }
+  .dl-actions .disc-link { padding: 6px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc-in { animation: none; }
+  .dl-card, .dl-img, .lp-hotel, .lp-more-card, .disc-btn { transition: none; }
+  .dl-card:hover { transform: none; }
+  .dl-card:hover .dl-img { transform: none; }
+}
