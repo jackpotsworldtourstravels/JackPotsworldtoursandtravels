@@ -38,6 +38,14 @@ class PackageListingFields(BaseModel):
         default=None,
         description="Where the trip goes. Today the same words as `name` for every row (0083).",
     )
+    country: str | None = Field(
+        default=None,
+        description=(
+            "The destination's country, read from customer_destinations by slug - not inferred "
+            "from the name. Null when the destination is not in that catalogue, and the card "
+            "then shows the destination alone."
+        ),
+    )
     nights: int | None = Field(default=None, description="days - 1, unless the trip says otherwise.")
     trip_type: str | None = Field(
         default=None,

@@ -40,7 +40,8 @@
   const body = document.getElementById('pkBody');
   if (!statusEl || !body) return;
 
-  /* /package/7 -> '7' */
+  /* /package-details/7 -> '7' (and /package/7, which app.main.py still
+     serves for anything linked before the URL was renamed). */
   const id = decodeURIComponent(
     location.pathname.replace(/\/+$/, '').split('/').filter(Boolean).pop() || ''
   ).trim();

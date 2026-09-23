@@ -60,7 +60,7 @@ router = APIRouter(prefix="/api/customer", tags=["customer-package-bookings"])
 # ---------------------------------------------------------------------------
 # Catalogue
 # ---------------------------------------------------------------------------
-def _listing_row(pkg) -> dict:
+def _listing_row(pkg, country_by_slug: dict | None = None) -> dict:
     """One package as the listing card reads it.
 
     THE TWO PRICES ARE DIFFERENT QUESTIONS and both are answered. `priceFrom`
@@ -73,6 +73,12 @@ def _listing_row(pkg) -> dict:
     `departure_months` comes from the departures table, so the month filter
     offers only months something really leaves in.
     """
+    # The country, from the destinations catalogue rather than from anybody's
+    # knowledge of geography - see catalog.countries(). Absent is fine: the
+    # card then prints the destination on its own.
+    slug = (pkg.image_key or (pkg.destination or "").lower().strip()) or None
+    country = (country_by_slug or {}).get(slug)
+
     live = [d for d in pkg.departures if d.is_active and d.departure_date >= dt.date.today()]
     live.sort(key=lambda d: d.departure_date)
     nxt = live[0] if live else None
@@ -85,6 +91,7 @@ def _listing_row(pkg) -> dict:
         "is_international": pkg.is_international,
         "category": pkg.category,
         "destination": pkg.destination,
+        "country": country,
         "nights": pkg.nights,
         "trip_type": pkg.trip_type,
         "hotel_category": pkg.hotel_category,
@@ -117,11 +124,20 @@ def list_packages(
     db: Session = Depends(get_db),
     category: str | None = Query(
         None,
-        description="'holiday' or 'gaming'. Omit for every shelf.",
+        description=(
+            "TWO VOCABULARIES, ON PURPOSE. 'holiday' or 'gaming' is the shelf a trip is "
+            "merchandised on (0069). 'domestic', 'pilgrimage' or 'international' is the "
+            "journey's own category (0083) and is accepted here as an alias for `trip_type`, "
+            "because that is the word the page and every other caller uses for it. Omit for "
+            "everything."
+        ),
     ),
     trip_type: str | None = Query(
         None,
-        description="'domestic', 'pilgrimage' or 'international' - which shelf of the journey.",
+        description=(
+            "'domestic', 'pilgrimage' or 'international'. Takes precedence over a `category` "
+            "that names one of the same three."
+        ),
     ),
     destination: str | None = Query(None, description="Exact destination, case-insensitive."),
     min_days: int | None = Query(None, ge=1, description="Shortest trip to include, in days."),
@@ -143,22 +159,42 @@ def list_packages(
     # would put holiday trips on the gaming page, which is the one outcome this
     # column exists to prevent. The same argument applies to trip_type, which
     # decides which of the three shelves a traveller is looking at.
-    if category is not None and category not in catalog.CATEGORIES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unknown package category {category!r}.",
-        )
-    if trip_type is not None and trip_type not in catalog.TRIP_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unknown trip type {trip_type!r}.",
-        )
+    # `category=domestic` IS A CATEGORY, and answering it with "unknown
+    # category" because this table happens to call that axis `trip_type` is a
+    # vocabulary problem being made the caller's problem. Case-insensitive,
+    # because "Domestic" is what a menu label looks like.
+    if category is not None:
+        lowered = category.strip().lower()
+        if lowered in catalog.TRIP_TYPES:
+            trip_type = trip_type or lowered
+            category = None
+        elif lowered in catalog.CATEGORIES:
+            category = lowered
+        else:
+            # REJECTED, NOT IGNORED. A typo that fell through to "everything"
+            # would put holiday trips on the gaming page, which is the one
+            # outcome that column exists to prevent.
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Unknown package category {category!r}. Use one of "
+                    f"{', '.join(catalog.CATEGORIES + catalog.TRIP_TYPES)}."
+                ),
+            )
+    if trip_type is not None:
+        trip_type = trip_type.strip().lower()
+        if trip_type not in catalog.TRIP_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown trip type {trip_type!r}. Use one of {', '.join(catalog.TRIP_TYPES)}.",
+            )
     rows = catalog.search_packages(
         db, category=category, trip_type=trip_type, destination=destination,
         min_days=min_days, max_days=max_days, min_price=min_price, max_price=max_price,
         month=month, min_rating=min_rating, hotel_category=hotel_category,
     )
-    return [_listing_row(p) for p in rows]
+    countries = catalog.countries(db)
+    return [_listing_row(p, countries) for p in rows]
 
 
 @router.get(
@@ -259,7 +295,7 @@ def get_package(package_id: int, db: Session = Depends(get_db)):
     # disagree about the price, the rating or the next departure - there is
     # one function that decides those and both callers use it.
     return {
-        **_listing_row(package),
+        **_listing_row(package, catalog.countries(db)),
         "description": package.description,
         "inclusions": list(package.inclusions or []),
         "exclusions": list(package.exclusions or []),

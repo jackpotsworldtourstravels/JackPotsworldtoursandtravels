@@ -21,7 +21,11 @@ from decimal import Decimal
 from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models_customer import CustomerPackage, CustomerPackageDeparture
+from app.models_customer import (
+    CustomerDestination,
+    CustomerPackage,
+    CustomerPackageDeparture,
+)
 
 _PACKAGE_ADDONS = {
     "service": [
@@ -46,6 +50,27 @@ CATEGORIES = ("holiday", "gaming")
 #: DIFFERENT AXIS from CATEGORIES above: that one says holiday or gaming,
 #: this one says where in the world and what kind of trip.
 TRIP_TYPES = ("domestic", "pilgrimage", "international")
+
+
+def countries(db: Session) -> dict[str, str]:
+    """destination slug -> country, from the destinations catalogue.
+
+    A CARD SAYS "Goa, India" AND THE COUNTRY IS NOT TYPED INTO IT. The country
+    lives on ``customer_destinations`` (0070), which is the table that knows
+    it; a package is matched to it by slug - the same slug 0083 wrote into
+    ``image_key`` when it found artwork - and a package whose destination is
+    not in that table simply has no country to show, which the card handles by
+    printing the destination alone.
+
+    NOT A GUESS FROM THE NAME. "Dubai" resolves because a destination row
+    called Dubai exists and says United Arab Emirates, not because anything
+    here knows where Dubai is.
+    """
+    rows = db.execute(
+        select(CustomerDestination.slug, CustomerDestination.country)
+        .where(CustomerDestination.is_active.is_(True))
+    ).all()
+    return {slug: country for slug, country in rows if country}
 
 
 def _departure_months(pkg: CustomerPackage) -> list[str]:

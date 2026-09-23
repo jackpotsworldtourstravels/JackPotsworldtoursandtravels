@@ -756,7 +756,12 @@ if FRONTEND_DIR.is_dir():
     # The id in the path is not checked here - the page loads, asks the API
     # and reports "package not found" itself, exactly as the destination
     # pages do above.
+    # TWO PATHS, ONE PAGE. /package-details/{id} is what the listing links to
+    # and what the flow is specified as; /package/{id} is kept because it was
+    # shipped first and a URL that has been in a browser's history should not
+    # start 404ing. The page takes the id from the last segment either way.
     @app.get("/package/{package_id}", include_in_schema=False)
+    @app.get("/package-details/{package_id}", include_in_schema=False)
     def package_page(package_id: str):                    # noqa: ARG001 - read by the page
         return _page(_PACKAGE_PAGE)
 

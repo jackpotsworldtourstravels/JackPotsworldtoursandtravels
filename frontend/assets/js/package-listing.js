@@ -92,6 +92,11 @@
     },
   };
 
+  /* "Goa, India" where the destinations catalogue knows the country, "Goa"
+     where it does not. The country is looked up server-side against
+     customer_destinations; nothing here infers one from a name. */
+  const where = p => [p.destination, p.country].filter(Boolean).join(', ');
+
   /* THE PRICE A CARD SHOWS is the next departure's where there is one, and
      the shelf price otherwise - and the sort uses the same number, so the
      order on screen matches the figures on screen. */
@@ -273,7 +278,7 @@
       : `<span class="pkl-card-next is-none">No dates on sale</span>`;
 
     return `<article class="pkl-card">
-      <a class="pkl-card-art" href="package/${esc(p.id)}" aria-label="${esc(p.name)} package details">
+      <a class="pkl-card-art" href="package-details/${esc(p.id)}" aria-label="${esc(p.name)} package details">
         ${art ? `<img src="${esc(art.small)}" srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
                  sizes="(max-width: 700px) 92vw, 380px" alt="" loading="lazy" decoding="async"
                  onerror="this.remove()">`
@@ -282,10 +287,10 @@
       </a>
       <div class="pkl-card-body">
         <div class="pkl-card-top">
-          <h3><a href="package/${esc(p.id)}">${esc(p.name)}</a></h3>
+          <h3><a href="package-details/${esc(p.id)}">${esc(p.name)}</a></h3>
           ${rating}
         </div>
-        <p class="pkl-card-where">${icon('mapPin', 13)}<span>${esc(p.destination || '')}</span></p>
+        <p class="pkl-card-where">${icon('mapPin', 13)}<span>${esc(where(p))}</span></p>
         <p class="pkl-card-days">${esc(p.days)} Days${p.nights != null ? ' / ' + esc(p.nights) + ' Nights' : ''}</p>
         ${ticks.length ? `<ul class="pkl-card-ticks">${ticks
           .map(t => `<li>${icon('circleCheck', 13)}<span>${esc(t)}</span></li>`).join('')}</ul>` : ''}
@@ -295,7 +300,7 @@
           </div>
           ${next}
         </div>
-        <a class="disc-btn pkl-card-btn" href="package/${esc(p.id)}">
+        <a class="disc-btn pkl-card-btn" href="package-details/${esc(p.id)}">
           View details ${icon('arrowRight', 15)}
         </a>
       </div>
@@ -312,11 +317,24 @@
       : 'No packages match';
     $('pklSort').value = state.sort;
 
-    /* An empty result says WHICH choice emptied it and offers to undo that
-       one, rather than a shrug and a "clear all". */
+    /* AN EMPTY LIST IS AN ANSWER, NOT A FAILURE, and the two now say
+       different things on screen. A shelf with nothing on it says exactly
+       that; a shelf emptied by a filter names the filter that did it, because
+       "no packages available" under four active filters sends somebody away
+       from a catalogue that has plenty. */
     const empty = $('pklEmpty');
+    const narrowed = FILTER_KEYS.filter(k => k !== 'trip' && state[k]);
     if (rows.length) { empty.hidden = true; }
-    else {
+    else if (!narrowed.length) {
+      empty.innerHTML = `<b>No packages available for this category.</b>
+        <span>Nothing is on sale on this shelf at the moment. Tell us where you want to go and we
+        will put a trip together — or look at what is running on the other shelves.</span>
+        <div class="pkl-empty-acts">
+          <a class="disc-btn" href="contact-us.html">Ask us to plan one ${icon('arrowRight', 15)}</a>
+          <button type="button" class="disc-btn disc-btn-ghost" id="pklAllShelves">See every package</button>
+        </div>`;
+      empty.hidden = false;
+    } else {
       const named = [
         state.destination && `destination ${state.destination}`,
         state.month && monthLabel(state.month),
@@ -334,35 +352,101 @@
 
   /* ======================================================================
      LOADING
-     ====================================================================== */
+     ======================================================================
+     THREE SKELETON CARDS while the request is out, in the shape of the cards
+     that will replace them: a grid that grows from nothing to three rows
+     moves everything under the reader's cursor, and a spinner on its own says
+     "wait" without saying what for. Three because that is a full row on a
+     laptop, and drawing more than arrive is its own small lie. */
+  const skeleton = () => `<article class="pkl-card is-skeleton" aria-hidden="true">
+      <div class="pkl-card-art"></div>
+      <div class="pkl-card-body">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk sk-line sk-short"></div>
+        <div class="sk sk-ticks"></div>
+        <div class="sk sk-foot"></div>
+      </div>
+    </article>`;
+
+  function showSkeletons() {
+    grid.innerHTML = skeleton().repeat(3);
+    grid.setAttribute('aria-busy', 'true');
+    const empty = $('pklEmpty');
+    if (empty) empty.hidden = true;
+    $('pklStatus').hidden = true;
+    $('pklLayout').hidden = false;
+  }
+
   let inflight = 0;
 
+  /* THE LIST IS THE PAGE; THE RAIL AND THE TILES ARE DECORATION AROUND IT.
+     They used to be fetched together in one Promise.all, which meant a 404 on
+     /facets - a server running code older than this page, exactly what a
+     half-finished deploy produces - threw away a perfectly good list of
+     packages and put up "we could not load" over a working catalogue.
+
+     So: the packages are awaited and rendered on their own, and the other two
+     are allowed to fail quietly. A page with no filter rail is a page that
+     still sells trips. */
   async function load(pushed) {
     const mine = ++inflight;
-    grid.setAttribute('aria-busy', 'true');
+    showSkeletons();
+
+    let rows;
     try {
-      const [rows, facets, tiles] = await Promise.all([
-        getJson('/api/customer/packages?' + query()),
-        getJson('/api/customer/packages/facets?category=holiday'),
-        getJson('/api/customer/packages/trip-types?category=holiday'),
-      ]);
-      /* A slower earlier request must not overwrite a newer answer. */
-      if (mine !== inflight) return;
-      renderTiles(tiles);
-      renderRail(facets);
-      renderResults(rows);
-      $('pklStatus').hidden = true;
-      $('pklLayout').hidden = false;
-      if (!pushed) writeUrl(true);
+      rows = await getJson('/api/customer/packages?' + query());
     } catch (err) {
       if (mine !== inflight) return;
-      $('pklLayout').hidden = true;
-      const s = $('pklStatus');
-      s.hidden = false;
-      s.textContent = 'We could not load the tour packages just now.';
-    } finally {
-      grid.removeAttribute('aria-busy');
+      failed(err);
+      return;
     }
+    if (mine !== inflight) return;
+
+    renderResults(rows);
+    $('pklStatus').hidden = true;
+    $('pklLayout').hidden = false;
+    grid.removeAttribute('aria-busy');
+    if (!pushed) writeUrl(true);
+
+    /* Enrichment, not a dependency: each of these renders if it answers and
+       is skipped if it does not. Failures are logged, because a rail that
+       silently never appears is a bug nobody reports. */
+    getJson('/api/customer/packages/trip-types?category=holiday')
+      .then(t => { if (mine === inflight) renderTiles(t); })
+      .catch(e => console.warn('[packages] category counts unavailable:', e.status || e));
+    getJson('/api/customer/packages/facets?category=holiday')
+      .then(f => { if (mine === inflight) renderRail(f); })
+      .catch(e => console.warn('[packages] filters unavailable:', e.status || e));
+  }
+
+  /* THE LIST ITSELF FAILED, which is a different thing from a shelf being
+     empty and is told apart on screen: this one has a reason and a Retry,
+     where an empty shelf has neither because there is nothing to retry.
+     The status code is named - "the server said 500" is what turns "it does
+     not work" into a bug somebody can fix. */
+  function failed(err) {
+    grid.innerHTML = '';
+    grid.removeAttribute('aria-busy');
+    $('pklLayout').hidden = true;
+    const s = $('pklStatus');
+    s.hidden = false;
+    const why = err && err.status
+      ? `The packages service answered ${err.status}.`
+      : 'The packages service could not be reached.';
+    s.innerHTML = `<b>We could not load the tour packages just now.</b>
+      <span>${esc(why)} Nothing is wrong with your connection to the rest of the site —
+      if this persists, the packages API on this server is behind the page.</span>`;
+    s.classList.add('pkl-failed');
+    const old = $('pklRetry');
+    if (old) old.remove();
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'pklRetry';
+    btn.className = 'dh-retry';
+    btn.textContent = 'Retry';
+    btn.addEventListener('click', () => { btn.remove(); s.classList.remove('pkl-failed'); load(true); });
+    s.insertAdjacentElement('afterend', btn);
   }
 
   /* ======================================================================
@@ -403,6 +487,12 @@
   document.addEventListener('click', ev => {
     if (ev.target.closest('#pklClear') || ev.target.closest('#pklReset')) {
       FILTER_KEYS.filter(k => k !== 'trip').forEach(k => { state[k] = ''; });
+      writeUrl(false);
+      load(true);
+    } else if (ev.target.closest('#pklAllShelves')) {
+      /* The only control that also drops the SHELF - offered on an empty
+         shelf, where clearing the filters alone would change nothing. */
+      FILTER_KEYS.forEach(k => { state[k] = ''; });
       writeUrl(false);
       load(true);
     }

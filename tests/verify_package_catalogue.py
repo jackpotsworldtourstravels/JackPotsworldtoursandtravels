@@ -219,7 +219,55 @@ if everything:
                   nums == list(range(1, len(nums) + 1)), str(nums))
 
 # ---------------------------------------------------------------------------
-print("\n== 7. A shelf that does not exist is rejected ==")
+print("\n== 7. `category=domestic` means what it says ==")
+# ---------------------------------------------------------------------------
+# TWO VOCABULARIES MEET ON ONE PARAMETER. `category` is 'holiday' or 'gaming'
+# to this table and 'domestic' / 'pilgrimage' / 'international' to everybody
+# else. Answering the second with "unknown category" is a naming problem made
+# into the caller's problem, so both are accepted and this proves it.
+for word, expect_kind in (("domestic", "domestic"), ("Pilgrimage", "pilgrimage"),
+                          ("INTERNATIONAL", "international")):
+    code, rows = get(f"{PKG}?category={word}")
+    same = get(f"{PKG}?trip_type={expect_kind}")[1]
+    check(f"category={word} is the {expect_kind} shelf",
+          code == 200 and [r["id"] for r in rows] == [r["id"] for r in same],
+          f"{code} {len(rows) if code == 200 else rows} vs {len(same)}")
+
+code, rows = get(f"{PKG}?category=holiday")
+check("category=holiday is still the merchandising shelf, not a trip type",
+      code == 200 and len(rows) == total, f"{code} {len(rows) if code == 200 else rows}")
+
+# ---------------------------------------------------------------------------
+print("\n== 8. A card can name the country without inferring it ==")
+# ---------------------------------------------------------------------------
+# The country is read from customer_destinations by slug, never from the name.
+# A package whose destination is in that catalogue must carry its country; one
+# whose destination is not must carry null rather than a guess.
+code, dests = get(f"{BASE}/api/customer/destinations")
+known = {}
+if code == 200:
+    rows_d = dests if isinstance(dests, list) else dests.get("destinations", [])
+    known = {d["name"].lower(): d.get("country") for d in rows_d}
+wrong = [
+    (p["name"], p.get("country"), known.get((p.get("destination") or "").lower()))
+    for p in everything
+    if (p.get("destination") or "").lower() in known
+    and p.get("country") != known[(p.get("destination") or "").lower()]
+]
+check("every country matches the destinations catalogue", not wrong, str(wrong)[:200])
+
+# ---------------------------------------------------------------------------
+print("\n== 9. Both detail URLs serve the page ==")
+# ---------------------------------------------------------------------------
+if everything:
+    pid = everything[0]["id"]
+    for path in (f"/package/{pid}", f"/package-details/{pid}"):
+        r = requests.get(f"{BASE}{path}")
+        check(f"GET {path} serves the package page",
+              r.status_code == 200 and "pkBody" in r.text, str(r.status_code))
+
+# ---------------------------------------------------------------------------
+print("\n== 10. A shelf that does not exist is rejected ==")
 # ---------------------------------------------------------------------------
 r = requests.get(f"{PKG}?trip_type=pilgramage")          # deliberate typo
 check("an unknown trip_type is 422, not everything", r.status_code == 422, str(r.status_code))

@@ -193,6 +193,38 @@
 .pkl-card-next.is-none { color: #A2704B; }
 .pkl-card-btn { margin-top: 12px; justify-content: center; }
 
+/* --- while the answer is on its way -------------------------------------
+   Skeletons in the shape of the cards that replace them, so the grid does not
+   change height when the data lands. The shimmer is one keyframe on a
+   gradient; `prefers-reduced-motion` turns it into a flat tint, because a
+   loading state is exactly where a moving background is least welcome. */
+.pkl-card.is-skeleton { pointer-events: none; }
+.pkl-card.is-skeleton .pkl-card-art { background: #E6EEF3; }
+.pkl-card.is-skeleton .pkl-card-body { gap: 10px; padding: 18px; }
+.sk {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #E9F0F4 25%, #F4F8FA 50%, #E9F0F4 75%);
+  background-size: 200% 100%;
+  animation: pklShimmer 1.4s ease-in-out infinite;
+}
+.sk-title { height: 20px; width: 62%; }
+.sk-line { height: 12px; width: 84%; }
+.sk-short { width: 46%; }
+.sk-ticks { height: 54px; width: 100%; }
+.sk-foot { height: 34px; width: 100%; margin-top: 6px; }
+@keyframes pklShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* --- when the list itself could not be fetched --------------------------- */
+.disc .dh-status.pkl-failed {
+  display: flex; flex-direction: column; gap: 6px; max-width: 70ch;
+  padding: 20px; border-radius: 16px;
+  background: #FFF6F2; border: 1px solid rgba(178, 106, 86, .28); color: var(--disc-ink);
+}
+.disc .dh-status.pkl-failed b { font-size: 15.5px; }
+.disc .dh-status.pkl-failed span { font-size: 13.5px; line-height: 1.6; color: var(--disc-mute); }
+
+.pkl-empty-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+
 .pkl-empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
   padding: 26px; border-radius: 18px; background: var(--disc-card);
@@ -324,4 +356,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pkl-tile, .pkl-card, .pkl-card-art img, .pk-date { transition: none; }
+  .sk { animation: none; background: #E9F0F4; }
 }
