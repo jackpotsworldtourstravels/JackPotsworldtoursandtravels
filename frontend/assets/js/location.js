@@ -12,18 +12,33 @@
 
        GET /api/customer/destinations/{destination}/attractions/{slug}
 
-   name, city, country, description, photograph key, fares, hotels nearby and
-   the other places in the same city all come from that one answer. NOTHING
-   about a particular landmark is written here: no name, no price, no
-   description, no image path that is not derived from a key the API sent. A
-   place added through the catalogue has this page working the same day.
+   name, city, country, description, photograph keys, fares, hotels nearby,
+   the other places in the same city and the guidebook fields added by
+   migration 0080 all come from that one answer. NOTHING about a particular
+   landmark is written here: no name, no price, no history, no image path that
+   is not derived from a key the API sent. A place added through the catalogue
+   has this page working the same day.
 
-   WHAT IT REFUSES TO INVENT. A fare row with no figure says "Currently
-   unavailable" — flights and packages both do today, and the API's own field
-   descriptions say why. An empty description removes its heading rather than
-   leaving one hanging. No photograph leaves the hero on its tint. None of
-   those states is an error and none of them is filled in with something
-   plausible.
+   WHAT IT REFUSES TO INVENT, which is most of what a page like this usually
+   makes up:
+
+     a rating      There is none. Nothing in this database has ever rated a
+                   landmark, so the hero shows no stars rather than the
+                   flattering 4.8 every travel site prints.
+     a distance    "Top attractions nearby" names each place's nearest listed
+                   area instead of "2.4 km away": this catalogue holds no
+                   coordinates, and a kilometre figure would be a guess
+                   wearing a decimal point.
+     a fare        A card with no figure says "Currently unavailable". Flights
+                   and packages both do today, and the API's own field
+                   descriptions say why.
+     a guidebook   best time, duration, history, how to reach, tips and the
+                   gallery are editorial columns that ship EMPTY. Each section
+                   is hidden until its column is filled — the page is shorter,
+                   never padded.
+
+   None of those states is an error, and none of them is filled in with
+   something plausible.
    =========================================================================== */
 (function () {
   const statusEl = document.getElementById('lpStatus');
@@ -41,6 +56,8 @@
 
   const icon = (name, size) => (typeof JPIcon !== 'undefined' && JPIcon.html)
     ? JPIcon.html(name, { size: size || 16 }) : '';
+
+  const show = (el, on) => { if (el) el.hidden = !on; };
 
   /* The same resolver rule the cards use: a KEY from the API, present in the
      shipped manifest, or no picture at all. */
@@ -80,24 +97,45 @@
     return res.json();
   }
 
-  function fareRow(label, value, suffix) {
-    const has = value != null;
-    return `<div class="lp-fare${has ? '' : ' is-empty'}">
-      <dt>${esc(label)}</dt>
-      <dd>${has ? esc(money(value)) + (suffix ? `<span>${esc(suffix)}</span>` : '')
-                : '<em>Currently unavailable</em>'}</dd>
-    </div>`;
-  }
+  /* Paragraphs, from text somebody typed into a database column. A blank line
+     starts a new one and a single newline is a line break; nothing else in the
+     string is interpreted, and every character is escaped on the way in. */
+  const paras = text => String(text || '')
+    .split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
+    .map(p => '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>').join('');
 
-  function render(a) {
-    const back = document.getElementById('lpBack');
-    back.href = 'destination/' + encodeURIComponent(a.destination_id);
-    document.getElementById('lpBackText').textContent = 'Back to ' + a.destination_name;
-
-    document.title = a.name + ' — JackPots World Tours & Travels';
+  /* ======================================================================
+     THE HERO
+     ====================================================================== */
+  function renderHero(a, shots) {
     document.getElementById('lpTitle').textContent = a.name;
-    document.getElementById('lpWhere').textContent =
-      [a.destination_name, a.country].filter(Boolean).join(', ');
+
+    /* The trail the traveller came down, so a page entered from a search
+       result still says where it sits. */
+    const crumbs = document.getElementById('lpCrumbs');
+    crumbs.innerHTML = [
+      '<a href="index.html">Home</a>',
+      '<a href="index.html#destinations">Destinations</a>',
+      `<a href="destination/${esc(a.destination_id)}">${esc(a.destination_name)}</a>`,
+      `<span aria-current="page">${esc(a.name)}</span>`,
+    ].join('<span class="lp-crumb-sep" aria-hidden="true">/</span>');
+    show(crumbs, true);
+
+    const where = [a.destination_name, a.country].filter(Boolean).join(', ');
+    if (where) {
+      const badge = document.getElementById('lpBadge');
+      badge.innerHTML = icon('mapPin', 15) + `<span>${esc(where)}</span>`;
+      show(badge, true);
+    }
+
+    /* The one-liner goes in the hero only when there is a longer read below
+       it. With nothing else written about the place, that one line IS the
+       About section, and printing it twice would make the page look padded. */
+    if (a.long_description && a.description) {
+      const lead = document.getElementById('lpLead');
+      lead.textContent = a.description;
+      show(lead, true);
+    }
 
     /* THE PHOTOGRAPH IS THE HERO, full width, with the name over it. It is the
        one image on the page loaded eagerly - it is the first thing on screen,
@@ -105,7 +143,7 @@
        for no saving. The name and city live in the markup, so the hero reads
        correctly before the picture arrives and if it never does. */
     const hero = document.getElementById('lpHero');
-    const art = artFor(a.image);
+    const art = shots.length ? shots[0].art : null;
     if (art) {
       const img = document.createElement('img');
       img.className = 'lp-hero-img';
@@ -121,37 +159,255 @@
       hero.insertAdjacentHTML('afterbegin', `<span class="lp-hero-pin">${icon('mapPin', 40)}</span>`);
     }
 
-    /* --- fares ------------------------------------------------------- */
+    /* The strip under the name: how many photographs there are, a map link
+       and a jump to the gallery - each present only when there is something
+       behind it. The map link exists only when somebody checked one into the
+       row, because this table holds no coordinates to build one from. */
+    let any = false;
+    if (shots.length > 1) {
+      const el = document.getElementById('lpShots');
+      el.innerHTML = icon('camera', 14) + `<span>${shots.length} photographs</span>`;
+      show(el, true);
+
+      const gb = document.getElementById('lpGalleryBtn');
+      gb.innerHTML = icon('eye', 14) + '<span>View gallery</span>';
+      gb.addEventListener('click', () => {
+        const sec = document.getElementById('lpGallerySec');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      show(gb, true);
+      any = true;
+    }
+    if (a.map_url) {
+      const ml = document.getElementById('lpMapLink');
+      ml.href = a.map_url;
+      ml.innerHTML = icon('mapPin', 14) + '<span>View on map</span>';
+      show(ml, true);
+      any = true;
+    }
+    show(document.getElementById('lpHeroMeta'), any);
+  }
+
+  /* ======================================================================
+     FARES — three cards, each over a photograph of this place
+     ====================================================================== */
+  function fareCard(art, label, value, suffix, href, cta) {
+    const has = value != null;
+    const figure = has
+      ? esc(money(value)) + (suffix ? `<span>${esc(suffix)}</span>` : '')
+      : 'Currently unavailable';
+    /* NO PHOTOGRAPH, NO PANEL. A quarter of the landmarks have no picture yet,
+       and three empty tinted bands in a row look like three failed images -
+       the card simply becomes a clean price panel instead. */
+    return `<article class="lp-fare${has ? '' : ' is-empty'}${art ? '' : ' is-artless'}">
+      ${art ? `<div class="lp-fare-art">
+        <img src="${esc(art.small)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">
+      </div>` : ''}
+      <div class="lp-fare-body">
+        <p class="lp-fare-label">${esc(label)}</p>
+        <p class="lp-fare-value">${figure}</p>
+        ${href ? `<a class="disc-btn" href="${esc(href)}">${esc(cta)} ${icon('arrowRight', 15)}</a>` : ''}
+      </div>
+    </article>`;
+  }
+
+  function renderFares(a, shots) {
     const f = a.fare_details || {};
+    /* The hotels button is the only one that can lead somewhere empty, so it
+       is the only one that disappears when there is nothing behind it.
+       Flights and packages open a live search, which is a real destination
+       whatever this landmark's figures say. */
+    const hotelsHref = (Number(a.hotel_count) || 0) > 0
+      ? 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug)
+      : null;
+    /* A different photograph behind each card where the place has three, and
+       the same one repeated where it does not. The image is scenery for the
+       figure, never evidence for it. */
+    const art = i => (shots.length ? shots[Math.min(i, shots.length - 1)].art : null);
+
     document.getElementById('lpFares').innerHTML = [
-      fareRow('Flights from', f.flight_from, ''),
-      fareRow('Hotels from', f.hotel_from, ' / night'),
-      fareRow('Tour packages from', f.package_from, ''),
+      fareCard(art(0), 'Flights from', f.flight_from, '', 'flights.html', 'Search flights'),
+      fareCard(art(1), 'Hotels from', f.hotel_from, ' / night', hotelsHref, 'View hotels'),
+      fareCard(art(2), 'Tour packages from', f.package_from, '', 'packages.html', 'Explore packages'),
     ].join('');
+
     /* Where the hotel figure came from, said out loud: a price from the area
        next door is a different promise from a price "at the monument". */
-    const note = document.getElementById('lpFareNote');
-    note.textContent = f.hotel_from != null && f.hotel_scope_name
-      ? `Hotel rate is the lowest nightly price we list in ${f.hotel_scope_name}.`
-      : 'Fare information is currently unavailable for this location.';
+    document.getElementById('lpFareNote').textContent =
+      f.hotel_from != null && f.hotel_scope_name
+        ? `Hotel rate is the lowest nightly price we list in ${f.hotel_scope_name}. Flight and package fares are searched live and are not quoted here.`
+        : 'Fares for this location are searched live and are not quoted here.';
+  }
 
-    /* View options goes where the only real figure comes from: the hotels of
-       the area this landmark sits in. With no figure there is nothing to
-       open, and the button goes rather than leading somewhere empty. */
-    const fareBtn = document.getElementById('lpFareBtn');
-    if (f.hotel_from != null) {
-      fareBtn.href = 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug);
-      fareBtn.hidden = false;
-    } else {
-      fareBtn.hidden = true;
+  /* ======================================================================
+     THE INFORMATION STRIP — editorial columns, empty until somebody edits
+     ====================================================================== */
+  function tile(iconName, label, value, note) {
+    return `<div class="lp-quick-tile">
+      <span class="lp-quick-icon">${icon(iconName, 18)}</span>
+      <div class="lp-quick-text">
+        <p class="lp-quick-label">${esc(label)}</p>
+        <p class="lp-quick-value">${esc(value)}</p>
+        ${note ? `<p class="lp-quick-note">${esc(note)}</p>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function chipTile(iconName, label, items) {
+    return `<div class="lp-quick-tile">
+      <span class="lp-quick-icon">${icon(iconName, 18)}</span>
+      <div class="lp-quick-text">
+        <p class="lp-quick-label">${esc(label)}</p>
+        <p class="lp-chips">${items.map(v => `<span>${esc(v)}</span>`).join('')}</p>
+      </div>
+    </div>`;
+  }
+
+  function renderQuick(a) {
+    const tiles = [];
+    if (a.best_time) tiles.push(tile('calendarDays', 'Best time to visit', a.best_time, a.best_time_note));
+    if (a.ideal_duration) tiles.push(tile('clock3', 'Ideal duration', a.ideal_duration, a.ideal_duration_note));
+    if ((a.famous_for || []).length) tiles.push(chipTile('star', 'Famous for', a.famous_for));
+    if ((a.recommended_for || []).length) tiles.push(chipTile('usersRound', 'Recommended for', a.recommended_for));
+    if (!tiles.length) return;            /* no strip rather than an empty one */
+    document.getElementById('lpQuick').innerHTML = tiles.join('');
+    show(document.getElementById('lpQuickSec'), true);
+  }
+
+  /* ======================================================================
+     ABOUT — the long read, with the facts beside it
+     ====================================================================== */
+  function renderAbout(a) {
+    const text = a.long_description || a.description;
+    const facts = [];
+    const where = [a.destination_name, a.country].filter(Boolean).join(', ');
+    if (where) facts.push(['Where', where]);
+    if (a.area_name) facts.push(['Nearest listed area', a.area_name]);
+    if ((Number(a.hotel_count) || 0) > 0) facts.push(['Hotels listed nearby', String(a.hotel_count)]);
+    if (!text && !facts.length) return;
+
+    document.getElementById('lpAboutH').textContent = 'About ' + a.name;
+    const box = document.getElementById('lpAbout');
+    box.innerHTML = text ? paras(text) : '';
+
+    /* READ MORE APPEARS ONLY WHEN THERE IS MORE. The clamp goes on first and
+       the button is offered only if the text is genuinely taller than it - a
+       "read more" that reveals one more line is furniture. */
+    if (text) {
+      box.classList.add('is-clamped');
+      const btn = document.getElementById('lpReadMore');
+      requestAnimationFrame(() => {
+        if (box.scrollHeight - box.clientHeight < 24) { box.classList.remove('is-clamped'); return; }
+        show(btn, true);
+        btn.addEventListener('click', () => {
+          const clamped = box.classList.toggle('is-clamped');
+          btn.textContent = clamped ? 'Read more' : 'Read less';
+          btn.setAttribute('aria-expanded', String(!clamped));
+        });
+      });
     }
 
-    /* --- about ------------------------------------------------------- */
-    if (a.description) {
-      document.getElementById('lpAboutH').textContent = 'About ' + a.name;
-      document.getElementById('lpAbout').textContent = a.description;
-      document.getElementById('lpAboutSec').hidden = false;
+    if (facts.length) {
+      document.getElementById('lpFactsList').innerHTML = facts
+        .map(pair => `<div><dt>${esc(pair[0])}</dt><dd>${esc(pair[1])}</dd></div>`).join('');
+      show(document.getElementById('lpFacts'), true);
     }
+    show(document.getElementById('lpAboutSec'), true);
+  }
+
+  /* ======================================================================
+     THE OTHER PLACES — located by their area, never by an invented distance
+     ====================================================================== */
+  function renderNearby(a) {
+    const more = a.nearby || [];
+    if (!more.length) return;
+    document.getElementById('lpMoreLine').textContent =
+      'More famous places in ' + a.destination_name + '.';
+    document.getElementById('lpMoreAll').href =
+      'destination/' + encodeURIComponent(a.destination_id);
+
+    document.getElementById('lpMore').innerHTML = more.map(o => {
+      const oart = artFor(o.image);
+      /* NO KILOMETRES. customer_attractions holds no coordinates, so the only
+         true "where" available is the area each place is filed under. */
+      const near = o.area_name
+        ? `<span class="lp-near-where">${icon('mapPin', 13)}<span>${esc(o.area_name)}</span></span>` : '';
+      const line = o.description ? `<span class="lp-near-text">${esc(o.description)}</span>` : '';
+      return `<a class="lp-near" role="listitem"
+         href="destination/${esc(o.destination_id)}/${esc(o.slug)}">
+        <span class="lp-near-art">${oart
+          ? `<img src="${esc(oart.small)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+          : icon('mapPin', 22)}</span>
+        <span class="lp-near-body">
+          <span class="lp-near-name">${esc(o.name)}</span>
+          ${near}${line}
+        </span>
+      </a>`;
+    }).join('');
+    show(document.getElementById('lpMoreSec'), true);
+  }
+
+  /* ======================================================================
+     PLAN YOUR VISIT — three editorial columns, each hidden when empty
+     ====================================================================== */
+  function renderPlan(a) {
+    const blocks = [];
+    if (a.history) {
+      blocks.push(`<div class="lp-card lp-plan-block"><h3>${icon('info', 17)} History</h3>${paras(a.history)}</div>`);
+    }
+    if (a.how_to_reach) {
+      blocks.push(`<div class="lp-card lp-plan-block"><h3>${icon('mapPin', 17)} How to reach</h3>${paras(a.how_to_reach)}</div>`);
+    }
+    if ((a.travel_tips || []).length) {
+      blocks.push(`<div class="lp-card lp-plan-block"><h3>${icon('star', 17)} Travel tips</h3>
+        <ul class="lp-tips">${a.travel_tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`);
+    }
+    if (!blocks.length) return;
+    document.getElementById('lpPlan').innerHTML = blocks.join('');
+    show(document.getElementById('lpPlanSec'), true);
+  }
+
+  /* ======================================================================
+     THE GALLERY — every photograph we hold of this place, in a row
+     ====================================================================== */
+  function renderGallery(a, shots) {
+    if (shots.length < 2) return;        /* the hero alone is not a gallery */
+    document.getElementById('lpGalleryH').textContent = a.name + ' in pictures';
+    document.getElementById('lpGalleryLine').textContent =
+      'Photographs of ' + a.name + ', licensed for reuse and served from this site.';
+    document.getElementById('lpGallery').innerHTML = shots.map((s, i) => `
+      <figure class="lp-shot" role="listitem">
+        <img src="${esc(s.art.small)}" srcset="${esc(s.art.small)} 480w, ${esc(s.art.src)} 960w"
+             sizes="(max-width: 640px) 78vw, 340px" alt="${esc(a.name)}"
+             loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async"
+             onerror="this.closest('figure').remove()">
+      </figure>`).join('');
+    show(document.getElementById('lpGallerySec'), true);
+  }
+
+  /* ====================================================================== */
+  function render(a) {
+    const back = document.getElementById('lpBack');
+    back.href = 'destination/' + encodeURIComponent(a.destination_id);
+    document.getElementById('lpBackText').textContent = 'Back to ' + a.destination_name;
+    document.title = a.name + ' — JackPots World Tours & Travels';
+
+    /* The photographs, resolved once: the API sends KEYS, the manifest says
+       which of them shipped, and everything on the page - hero, fare cards,
+       gallery - draws from this one list. A key with no file is simply not in
+       it, so no section renders a broken image. */
+    /* `gallery` already begins with the hero key, but it is an editorial column
+       and a row that has never been edited can send it empty - so the hero
+       photograph falls back to `image`, the key every card on the site has
+       used since the artwork shipped. A page must not lose its photograph
+       because nobody has added a second one. */
+    const keys = (a.gallery && a.gallery.length) ? a.gallery : (a.image ? [a.image] : []);
+    const shots = keys.map(k => ({ key: k, art: artFor(k) })).filter(s => s.art);
+
+    renderHero(a, shots);
+    renderFares(a, shots);
+    renderQuick(a);
+    renderAbout(a);
 
     /* --- hotels nearby ----------------------------------------------- */
     const n = Number(a.hotel_count) || 0;
@@ -174,26 +430,15 @@
       btn.hidden = true;
     }
 
-    /* --- the others -------------------------------------------------- */
-    const more = a.nearby || [];
-    if (more.length) {
-      document.getElementById('lpMore').innerHTML = more.map(o => {
-        const oart = artFor(o.image);
-        return `<a class="lp-more-card" role="listitem"
-           href="destination/${esc(o.destination_id)}/${esc(o.slug)}">
-          <span class="lp-more-art">${oart
-            ? `<img src="${esc(oart.small)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
-            : icon('mapPin', 20)}</span>
-          <span class="lp-more-name">${esc(o.name)}</span>
-        </a>`;
-      }).join('');
-      document.getElementById('lpMoreSec').hidden = false;
-    }
+    renderNearby(a);
+    renderPlan(a);
+    renderGallery(a, shots);
 
     statusEl.textContent = '';
     statusEl.hidden = true;
     body.hidden = false;
     body.classList.add('disc-in');
+    if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(body);
   }
 
   /* Three hotels from the attraction's own hotels endpoint - the same one

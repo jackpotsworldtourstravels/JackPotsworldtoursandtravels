@@ -490,6 +490,28 @@ def get_attraction(db: Session, destination_id: str, attraction_id: str) -> dict
     row["country"] = dest.country
     row["fare_details"] = _fare_details(db, dest, area)
 
+    # -- What a guidebook says (0080) ------------------------------------
+    # Served exactly as stored, nulls and all. A page that receives null for
+    # "best time to visit" draws no such panel; it never receives a guess.
+    for field in ("long_description", "best_time", "best_time_note",
+                  "ideal_duration", "ideal_duration_note", "history",
+                  "how_to_reach", "map_url"):
+        row[field] = getattr(a, field)
+    for field in ("famous_for", "recommended_for", "travel_tips", "gallery"):
+        row[field] = list(getattr(a, field) or [])
+    # The hero photograph belongs at the front of its own gallery, and it is
+    # not stored twice to achieve that.
+    if a.image_key and a.image_key not in row["gallery"]:
+        row["gallery"].insert(0, a.image_key)
+
+    # NO RATING, AND NOT AN OVERSIGHT. The design shows "4.8 (12.5K reviews)"
+    # under the name; nothing in this database has ever rated a landmark.
+    # customer_reviews could in principle hold one - it is keyed by
+    # (item_type, item_id) - but item_type is a PostgreSQL enum whose members
+    # are the things this business sells, and adding "attraction" to it to
+    # populate a number nobody has given would be inventing the number twice
+    # over. The page shows no rating rather than a plausible one.
+
     # The others in the same city, for "Explore more locations". Four, because
     # the row on the detail page holds four without wrapping to a second line
     # on a laptop; the destination page is where all of them live.

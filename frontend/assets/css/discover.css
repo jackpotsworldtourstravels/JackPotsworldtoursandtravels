@@ -232,36 +232,107 @@ body.disc { background: var(--disc-bg); }
 
 /* ==========================================================================
    ONE PLACE — the detail page
+   ==========================================================================
+   THE ORDER IS THE ARGUMENT: the photograph, what it costs, what to know
+   before going, what the place is, where to sleep, what else is near, how to
+   plan it, and then every photograph of it. A traveller who stops reading
+   after the second screen has still seen the two things they came for.
+
+   EVERY SECTION IS OPTIONAL. Most of what is below draws editorial columns
+   that ship empty (migration 0080), and an empty column means the section is
+   not in the document at all. So these rules are written for a page that has
+   three sections and for a page that has eight, and neither leaves a gap: the
+   article is a flex column with one gap, not a stack of fixed heights.
    ========================================================================== */
 /* FULL-BLEED, from inside a centred column: the hero is the photograph, and a
    photograph with a 32px gutter either side is a thumbnail. */
 .lp-hero {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
   width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 34px;
-  min-height: clamp(280px, 42vw, 520px);
+  min-height: clamp(300px, 46vw, 560px);
   padding: clamp(26px, 4vw, 60px) clamp(18px, 6vw, 80px);
   background: linear-gradient(120deg, #2E4657, #46657A);
   color: #fff;
 }
 .lp-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The one dark surface on these pages, and it is a legibility device rather
+   than a theme: white type over an unknown photograph needs a guaranteed
+   floor of contrast. Tinted towards the ink, heaviest at the bottom where the
+   type is, so the top two thirds still read as a photograph. */
 .lp-hero::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(38,55,70,.12) 0%, rgba(38,55,70,.40) 50%, rgba(38,55,70,.70) 100%);
+  background: linear-gradient(180deg, rgba(38,55,70,.10) 0%, rgba(38,55,70,.38) 48%, rgba(38,55,70,.74) 100%);
 }
 .lp-hero-body { position: relative; z-index: 1; width: min(1320px, 100%); margin-inline: auto; }
 .lp-hero h1 {
   margin: 0; color: #fff; line-height: 1.02;
   font-size: clamp(34px, 6vw, 68px); font-weight: 700; letter-spacing: -.015em;
 }
-.lp-where {
-  display: flex; align-items: center; gap: 9px; margin: 14px 0 0;
-  font-size: clamp(13.5px, 1.3vw, 16px); font-weight: 600; color: rgba(255,255,255,.92);
-}
-.lp-where::before { content: ''; width: 26px; height: 2px; border-radius: 2px; background: #BFE0EC; }
 .lp-hero-pin { position: relative; z-index: 1; color: rgba(255,255,255,.55); }
 
-.lp { display: flex; flex-direction: column; gap: 30px; }
-.lp-sec { display: flex; flex-direction: column; gap: 14px; }
+/* --- the trail ----------------------------------------------------------- */
+.lp-crumbs {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 14px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.72);
+  /* The scrim is deliberately lightest at the top so the photograph still
+     reads as one, which leaves the trail sitting on whatever is up there -
+     often bright sky. A shadow under the letters fixes that for 13px type
+     without darkening the picture the way a heavier scrim would. */
+  text-shadow: 0 1px 4px rgba(38, 55, 70, .6);
+}
+.lp-crumbs a { color: rgba(255,255,255,.82); transition: color .2s ease; }
+.lp-crumbs a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.lp-crumbs a:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 4px; }
+.lp-crumbs [aria-current] { color: #fff; }
+.lp-crumb-sep { color: rgba(255,255,255,.42); }
+
+/* The city, on the photograph, as a plate rather than loose type — the only
+   thing that keeps a small label readable over an unknown image. */
+.lp-badge {
+  display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px;
+  padding: 6px 13px 6px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.26);
+  backdrop-filter: blur(6px);
+  font-size: 13px; font-weight: 700; letter-spacing: .01em; color: #fff;
+}
+.lp-lead {
+  margin: 14px 0 0; max-width: 62ch;
+  font-size: clamp(15px, 1.5vw, 18px); line-height: 1.6; color: rgba(255,255,255,.9);
+  text-shadow: 0 1px 4px rgba(38, 55, 70, .5);
+}
+
+/* --- the strip under the name ------------------------------------------- */
+.lp-hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.lp-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 15px; border-radius: 999px;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.24);
+  backdrop-filter: blur(6px);
+  font: inherit; font-size: 13px; font-weight: 700; color: #fff;
+}
+.lp-chip-act { cursor: pointer; transition: background .2s ease, transform .2s ease; }
+.lp-chip-act:hover { background: rgba(255,255,255,.22); transform: translateY(-1px); }
+.lp-chip-act:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+/* HIDDEN MUST WIN. Most sections on this page are hidden until the API proves
+   they have something to say, and `hidden` is only `display: none` at the user
+   agent's level - any `display: flex` in this file beats it. Without this, a
+   place with no history and one photograph printed "Plan your visit" and
+   "Explore in pictures" over nothing, which is exactly the empty heading every
+   other rule here exists to avoid. */
+.disc [hidden] { display: none !important; }
+
+.lp { display: flex; flex-direction: column; gap: clamp(30px, 4vw, 46px); }
+/* THE SPACING IS THE FLEX GAP AND NOTHING ELSE. main.css carries
+   `section { padding: 110px 0 }` for the landing page's full-width bands, and
+   every section on this page is a <section> - which silently put 220px of
+   nothing between each of them, most visibly after a short section like a
+   single hotel. The gap above owns the rhythm here. */
+.disc .lp-sec { padding: 0; }
+/* "View gallery" scrolls to a section, and the bar is fixed over the top of
+   the page - without this the heading it lands on sits under the bar. */
+.disc .lp-sec { scroll-margin-top: 92px; }
+.lp-sec { display: flex; flex-direction: column; gap: 16px; }
 
 .lp-card {
   background: var(--disc-card); border-radius: 20px;
@@ -270,32 +341,128 @@ body.disc { background: var(--disc-bg); }
   box-shadow: var(--disc-shadow);
 }
 
-/* --- fares --------------------------------------------------------------- */
-.lp-fares { margin: 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.lp-fare { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
-.lp-fare + .lp-fare { border-left: 1px solid var(--disc-line); padding-left: clamp(14px, 2vw, 26px); }
-.lp-fare dt {
-  font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: var(--disc-mute);
+/* --- fares ---------------------------------------------------------------
+   THREE CARDS, EACH OVER A PHOTOGRAPH OF THIS PLACE, because a row of figures
+   is a price list and this is the part of the page where somebody decides to
+   go. The photograph is scenery for the figure and never evidence for it: the
+   card says where its number came from, or says it has none. */
+.lp-fares { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+.lp-fare {
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 20px; background: var(--disc-card);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
 }
-.lp-fare dd {
+.lp-fare:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
+.lp-fare-art {
+  position: relative; aspect-ratio: 16 / 9; overflow: hidden;
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
+}
+.lp-fare-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* A DIFFERENT PART OF THE PICTURE PER CARD. Most landmarks have exactly one
+   photograph, so all three cards show the same file; three identical crops in
+   a row look like a rendering mistake. Framing each one differently makes the
+   row read as one place seen three ways, which is what it is - it is the same
+   photograph either way, and nothing here claims otherwise. */
+.lp-fare:nth-child(1) .lp-fare-art img { object-position: 22% center; }
+.lp-fare:nth-child(2) .lp-fare-art img { object-position: center; }
+.lp-fare:nth-child(3) .lp-fare-art img { object-position: 78% center; }
+/* A wash towards the card colour so the label below never fights the picture
+   above it, and the three cards read as one row rather than three photographs. */
+.lp-fare-art::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(38,55,70,.06) 0%, rgba(255,255,255,.28) 100%);
+}
+.lp-fare-body {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 18px 20px 20px;
+}
+/* A card with no photograph behind it (the JS leaves the panel out rather
+   than drawing an empty one) needs its own top padding back. */
+.lp-fare.is-artless .lp-fare-body { padding-top: 22px; }
+.lp-fare-label {
+  margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--disc-mute);
+}
+.lp-fare-value {
   margin: 0; display: flex; align-items: baseline; gap: 5px;
-  font-family: var(--disc-serif); font-size: clamp(24px, 2.6vw, 30px); font-weight: 700;
+  font-family: var(--disc-serif); font-size: clamp(25px, 2.6vw, 31px); font-weight: 700;
   color: var(--disc-accent-deep);
 }
-.lp-fare dd span { font-family: var(--ff-body, inherit); font-size: 13px; font-weight: 600; color: var(--disc-mute); }
+.lp-fare-value span { font-family: var(--ff-body, inherit); font-size: 13px; font-weight: 600; color: var(--disc-mute); }
 /* Unavailable is a sentence, in the body font, quiet — never a dash and never
    a number nobody can honour. */
-.lp-fare.is-empty dd { font-family: var(--ff-body, inherit); font-size: 14.5px; font-weight: 600; color: var(--disc-mute); }
-.lp-fare.is-empty em { font-style: normal; }
-.lp-fare-foot {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--disc-line);
+.lp-fare.is-empty .lp-fare-value {
+  font-family: var(--ff-body, inherit); font-size: 15px; font-weight: 600; color: var(--disc-mute);
 }
-.lp-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--disc-mute); max-width: 62ch; }
+.lp-fare .disc-btn { margin-top: 10px; }
+.lp-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--disc-mute); max-width: 78ch; }
 
-/* --- about --------------------------------------------------------------- */
-.lp-about { margin: 0; font-size: 16px; line-height: 1.75; color: var(--disc-ink); max-width: 72ch; }
+/* --- the information strip ----------------------------------------------- */
+.lp-quick {
+  display: grid; gap: 1px; overflow: hidden;
+  grid-template-columns: repeat(auto-fit, minmax(226px, 1fr));
+  background: var(--disc-line);         /* the 1px gap IS the divider */
+  border: 1px solid var(--disc-line); border-radius: 20px;
+  box-shadow: var(--disc-shadow);
+}
+.lp-quick-tile {
+  display: flex; align-items: flex-start; gap: 13px;
+  padding: 20px; background: var(--disc-card);
+}
+.lp-quick-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--disc-accent-soft); color: var(--disc-accent);
+}
+.lp-quick-text { min-width: 0; }
+.lp-quick-label {
+  margin: 0 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--disc-mute);
+}
+.lp-quick-value { margin: 0; font-size: 16px; font-weight: 700; color: var(--disc-ink); }
+.lp-quick-note { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--disc-mute); }
+.lp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; }
+.lp-chips span {
+  padding: 4px 11px; border-radius: 999px;
+  background: var(--disc-accent-soft); border: 1px solid var(--disc-accent-line);
+  font-size: 12.5px; font-weight: 700; color: var(--disc-accent-deep);
+}
+
+/* --- about ---------------------------------------------------------------
+   Two columns, because a 90-character line is unreadable and a 70-character
+   one leaves a third of a wide screen empty. The aside carries facts the
+   database actually holds — where it is, which area its hotels are filed
+   under, how many there are — and disappears with them. */
+.lp-about-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); align-items: start; }
+.lp-about-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.lp-about { max-width: 76ch; font-size: 16px; line-height: 1.78; color: var(--disc-ink); }
+.lp-about p { margin: 0 0 14px; }
+.lp-about p:last-child { margin-bottom: 0; }
+/* The clamp fades rather than cuts, so it is obvious there is more. Applied
+   in CSS and measured in JS: the button only appears if the text overflows. */
+.lp-about.is-clamped {
+  max-height: 11.5em; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+          mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+}
+.lp-more-btn {
+  padding: 8px 17px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--disc-accent-line); background: transparent;
+  font: inherit; font-size: 13.5px; font-weight: 700; color: var(--disc-accent);
+  transition: background .2s ease, color .2s ease;
+}
+.lp-more-btn:hover { background: var(--disc-accent-soft); color: var(--disc-accent-deep); }
+.lp-more-btn:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
+.lp-facts-h { margin: 0 0 12px; font-size: 17px; font-weight: 700; }
+.lp-facts dl { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.lp-facts dl > div { display: flex; flex-direction: column; gap: 3px; }
+.lp-facts dl > div + div { padding-top: 12px; border-top: 1px solid var(--disc-line); }
+.lp-facts dt {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--disc-mute);
+}
+.lp-facts dd { margin: 0; font-size: 15px; font-weight: 700; color: var(--disc-ink); }
 
 /* --- hotels near --------------------------------------------------------- */
 .lp-hotels-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
@@ -315,24 +482,82 @@ body.disc { background: var(--disc-bg); }
 .lp-hotel-price { margin: 6px 0 0; font-size: 15px; font-weight: 700; color: var(--disc-accent-deep); }
 .lp-hotel-price span { font-size: 12px; font-weight: 600; color: var(--disc-mute); }
 
-/* --- the other places ---------------------------------------------------- */
-.lp-more { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.lp-more-card {
-  display: flex; align-items: center; gap: 12px; min-width: 0;
-  padding: 10px 16px 10px 10px; border-radius: 14px;
+/* --- the other places ----------------------------------------------------
+   Each card names the AREA its place is filed under. Not a distance: this
+   catalogue holds no coordinates, and "2.4 km away" would be a guess wearing
+   a decimal point. */
+.lp-more { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
+.lp-near {
+  display: flex; align-items: stretch; gap: 14px; min-width: 0;
+  padding: 12px; border-radius: 18px;
   background: var(--disc-card); border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
-  color: var(--disc-ink); font-weight: 700; font-size: 14.5px;
+  color: var(--disc-ink);
   transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
 }
-.lp-more-card:hover { transform: translateY(-2px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
-.lp-more-card:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
-.lp-more-art {
-  flex: none; width: 50px; height: 50px; border-radius: 11px; overflow: hidden;
+.lp-near:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
+.lp-near:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
+.lp-near-art {
+  flex: none; width: 86px; border-radius: 13px; overflow: hidden;
   display: grid; place-items: center; color: var(--disc-accent);
   background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
 }
-.lp-more-art img { width: 100%; height: 100%; object-fit: cover; }
-.lp-more-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-near-art img { width: 100%; height: 100%; object-fit: cover; }
+.lp-near-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 4px 2px 4px 0; }
+.lp-near-name { font-size: 15.5px; font-weight: 700; line-height: 1.25; }
+.lp-near-where {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12.5px; font-weight: 600; color: var(--disc-accent-deep);
+}
+/* Two lines of the one-liner, then an ellipsis: the card is a doorway, not
+   the article. */
+.lp-near-text {
+  font-size: 13px; line-height: 1.5; color: var(--disc-mute);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* --- plan your visit ----------------------------------------------------- */
+.lp-plan { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+.lp-plan-block h3 {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 12px;
+  font-size: 18px; font-weight: 700;
+}
+.lp-plan-block h3 .jpi { color: var(--disc-accent); }
+.lp-plan-block p { margin: 0 0 12px; font-size: 14.5px; line-height: 1.72; color: var(--disc-ink); }
+.lp-plan-block p:last-child { margin-bottom: 0; }
+.lp-tips { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.lp-tips li {
+  position: relative; padding-left: 20px;
+  font-size: 14.5px; line-height: 1.62; color: var(--disc-ink);
+}
+.lp-tips li::before {
+  content: ''; position: absolute; left: 2px; top: .62em;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--disc-accent);
+}
+
+/* --- the gallery ---------------------------------------------------------
+   A ROW THAT SCROLLS, not a grid: these are photographs of one place, and a
+   row reads as "more of the same" where a grid reads as a catalogue. Scroll
+   snapping so a swipe lands on a photograph, and a focusable container so the
+   arrow keys reach it without a mouse. */
+.lp-gallery {
+  display: flex; gap: 14px; overflow-x: auto; padding: 4px 4px 14px;
+  scroll-snap-type: x mandatory; scrollbar-width: thin;
+  scrollbar-color: var(--disc-accent-line) transparent;
+}
+.lp-gallery:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 4px; border-radius: 18px; }
+.lp-gallery::-webkit-scrollbar { height: 8px; }
+.lp-gallery::-webkit-scrollbar-thumb { background: var(--disc-accent-line); border-radius: 999px; }
+.lp-shot {
+  flex: none; margin: 0; width: clamp(240px, 26vw, 340px); aspect-ratio: 4 / 3;
+  overflow: hidden; border-radius: 18px; scroll-snap-align: start;
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+}
+.lp-shot img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform 500ms cubic-bezier(.22,.8,.3,1);
+}
+.lp-shot:hover img { transform: scale(1.05); }
 
 /* --- status and failure -------------------------------------------------- */
 .disc .dh-status { margin: 10px 0; font-size: 14.5px; color: var(--disc-mute); }
@@ -349,14 +574,25 @@ body.disc { background: var(--disc-bg); }
 @keyframes discIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .disc-in { animation: discIn .42s cubic-bezier(.22,.8,.3,1) both; }
 
+/* One column for the About pair before the text column gets narrow enough to
+   read badly - 900px is where 1.75fr of the content column falls under 60
+   characters, not a device width. */
+@media (max-width: 900px) {
+  .lp-about-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 640px) {
   .dl-hero { border-radius: 16px; min-height: 170px; }
-  .lp { gap: 22px; }
+  .lp { gap: 26px; }
   .lp-card { border-radius: 16px; }
-  /* Stacked, so the divider between fares becomes a rule above each rather
-     than a hairline in the wrong axis. */
-  .lp-fare + .lp-fare { border-left: 0; border-top: 1px solid var(--disc-line); padding-left: 0; padding-top: 14px; }
-  .disc-btn { width: 100%; justify-content: center; }
+  .lp-hero { min-height: clamp(240px, 62vw, 340px); }
+  .lp-hero-meta { gap: 8px; }
+  .lp-chip { padding: 8px 13px; font-size: 12.5px; }
+  /* The fare button fills its card; the hero chips stay inline, because three
+     full-width pills under the name is a menu, not a strip. */
+  .lp-fare .disc-btn, .disc-btn { width: 100%; justify-content: center; }
+  .lp-chip-act { width: auto; }
+  .lp-shot { width: 78vw; }
   .dl-actions .disc-link { padding: 6px 0; }
   /* A tap already moved the page's attention; lifting the card as well makes
      the thing under the finger jump. */
@@ -365,7 +601,9 @@ body.disc { background: var(--disc-bg); }
 
 @media (prefers-reduced-motion: reduce) {
   .disc-in { animation: none; }
-  .dl-card, .dl-img, .lp-hotel, .lp-more-card, .disc-btn { transition: none; }
+  .dl-card, .dl-img, .lp-hotel, .lp-near, .lp-fare, .lp-shot img,
+  .lp-chip-act, .disc-btn { transition: none; }
+  .lp-gallery { scroll-snap-type: none; }
   .dl-grid.is-engaged .dl-card.is-active { transform: none; }
   .dl-grid.is-engaged .dl-card.is-active .dl-img { transform: none; }
 }

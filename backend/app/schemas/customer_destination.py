@@ -192,11 +192,37 @@ class AttractionFares(BaseModel):
 
 
 class AttractionDetail(DestinationAttraction):
-    """One famous place, everything its own page needs."""
+    """One famous place, everything its own page needs.
+
+    EVERY EDITORIAL FIELD BELOW IS OPTIONAL AND IS USUALLY NULL. They are
+    columns on customer_attractions (0080) that somebody fills in per
+    landmark; nothing generates them. A null means the page draws no such
+    section - it never means "put something plausible there".
+    """
 
     destination_name: str
     country: str | None = None
     fare_details: AttractionFares
+    #: The long read under "About". `description` stays the one-line summary.
+    long_description: str | None = None
+    best_time: str | None = Field(default=None, description='e.g. "Oct - Feb". Null until edited.')
+    best_time_note: str | None = None
+    ideal_duration: str | None = Field(default=None, description='e.g. "1 - 2 days". Null until edited.')
+    ideal_duration_note: str | None = None
+    famous_for: list[str] = Field(default_factory=list)
+    recommended_for: list[str] = Field(default_factory=list)
+    history: str | None = None
+    how_to_reach: str | None = None
+    travel_tips: list[str] = Field(default_factory=list)
+    gallery: list[str] = Field(
+        default_factory=list,
+        description="Image KEYS, hero first. Resolved through the shipped manifest, never URLs.",
+    )
+    map_url: str | None = Field(
+        default=None,
+        description="Only when somebody has checked it - this table holds no coordinates.",
+    )
+
     nearby: list[DestinationAttraction] = Field(
         default_factory=list,
         description="Other famous places in the same destination, for Explore more.",

@@ -38,12 +38,12 @@
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/discover.css?v=20260922teal1">
+<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp1">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
-<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
+<script src="assets/js/jp-icons.js?v=20260923lp1"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- The photographs of the famous places, vendored from Wikimedia Commons by
      scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
@@ -79,14 +79,24 @@
 
     <p class="dh-status" id="lpStatus" role="status" aria-live="polite">Loading this place…</p>
 
-    <!-- THE HERO IS THE PHOTOGRAPH, full width, with the name on it. It sits
-         OUTSIDE the article so it can break the content column (see .lp-hero
-         in discover.css); everything below it stays in the column. -->
+    <!-- THE HERO IS THE PHOTOGRAPH, full width, with the place named on it. It
+         sits OUTSIDE the content column so it can break out of it; everything
+         below stays in the column. Every strip inside it — the trail, the
+         badge, the one-line description, the photo count, the map link, the
+         gallery button — is hidden until the API answer proves it has
+         something to put there, so the hero never carries an empty control. -->
     <article class="lp" id="lpBody" hidden>
       <div class="lp-hero" id="lpHero">
         <div class="lp-hero-body">
+          <nav class="lp-crumbs" id="lpCrumbs" aria-label="Breadcrumb" hidden></nav>
+          <p class="lp-badge" id="lpBadge" hidden></p>
           <h1 id="lpTitle"></h1>
-          <p class="lp-where" id="lpWhere"></p>
+          <p class="lp-lead" id="lpLead" hidden></p>
+          <div class="lp-hero-meta" id="lpHeroMeta" hidden>
+            <span class="lp-chip" id="lpShots" hidden></span>
+            <a class="lp-chip lp-chip-act" id="lpMapLink" hidden target="_blank" rel="noopener noreferrer"></a>
+            <button type="button" class="lp-chip lp-chip-act" id="lpGalleryBtn" hidden></button>
+          </div>
         </div>
       </div>
 
@@ -95,20 +105,29 @@
       <section class="lp-sec" id="lpFaresSec">
         <h2 class="disc-h2">Fare details</h2>
         <p class="disc-sub">What it costs to travel here, from what we have on the shelf.</p>
-        <div class="lp-card">
-          <dl class="lp-fares" id="lpFares"></dl>
-          <div class="lp-fare-foot">
-            <p class="lp-note" id="lpFareNote"></p>
-            <a class="disc-btn disc-btn-gold" id="lpFareBtn" href="#">
-              View options <span data-jp-icon="arrowRight" aria-hidden="true"></span>
-            </a>
-          </div>
-        </div>
+        <div class="lp-fares" id="lpFares"></div>
+        <p class="lp-note" id="lpFareNote"></p>
+      </section>
+
+      <!-- The information strip: best time, how long to stay, what the place
+           is known for, who it suits. Editorial columns (migration 0080), so
+           the whole strip stays hidden until somebody fills them in. -->
+      <section class="lp-sec" id="lpQuickSec" hidden>
+        <div class="lp-quick" id="lpQuick"></div>
       </section>
 
       <section class="lp-sec" id="lpAboutSec" hidden>
         <h2 class="disc-h2" id="lpAboutH"></h2>
-        <div class="lp-card"><p class="lp-about" id="lpAbout"></p></div>
+        <div class="lp-about-grid">
+          <div class="lp-card lp-about-card">
+            <div class="lp-about" id="lpAbout"></div>
+            <button type="button" class="lp-more-btn" id="lpReadMore" hidden aria-expanded="false">Read more</button>
+          </div>
+          <aside class="lp-card lp-facts" id="lpFacts" hidden>
+            <h3 class="lp-facts-h">Good to know</h3>
+            <dl id="lpFactsList"></dl>
+          </aside>
+        </div>
       </section>
 
       <section class="lp-sec" id="lpHotelsSec">
@@ -125,8 +144,27 @@
       </section>
 
       <section class="lp-sec" id="lpMoreSec" hidden>
-        <h2 class="disc-h2">Explore more places</h2>
+        <div class="lp-hotels-head">
+          <div>
+            <h2 class="disc-h2" id="lpMoreH">Top attractions nearby</h2>
+            <p class="disc-sub" id="lpMoreLine"></p>
+          </div>
+          <a class="disc-btn disc-btn-ghost" id="lpMoreAll" href="#">
+            See all <span data-jp-icon="arrowRight" aria-hidden="true"></span>
+          </a>
+        </div>
         <div class="lp-more" id="lpMore" role="list"></div>
+      </section>
+
+      <section class="lp-sec" id="lpPlanSec" hidden>
+        <h2 class="disc-h2">Plan your visit</h2>
+        <div class="lp-plan" id="lpPlan"></div>
+      </section>
+
+      <section class="lp-sec" id="lpGallerySec" hidden>
+        <h2 class="disc-h2" id="lpGalleryH">Explore in pictures</h2>
+        <p class="disc-sub" id="lpGalleryLine"></p>
+        <div class="lp-gallery" id="lpGallery" role="list" tabindex="0" aria-label="Photographs of this place"></div>
       </section>
     </article>
   </div>
@@ -134,6 +172,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/location.js?v=20260922teal1"></script>
+<script src="assets/js/location.js?v=20260923lp1"></script>
 </body>
 </html>

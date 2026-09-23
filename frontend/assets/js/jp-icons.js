@@ -479,6 +479,12 @@ const JPIcon = (function () {
     check:        `<path data-jpi="pop" style="transform-origin:12px 12px" d="M20 6 9 17l-5-5"/>`,
     menu:         `<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>`,
 
+    /* A photograph, for "12 photographs" on a place's page. Lucide's camera,
+       traced in the same 24-grid and stroke as every other icon here. */
+    camera: `
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/>
+      <circle cx="12" cy="13" r="3"/>`,
+
     mapPin: `
       <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/>
       <circle cx="12" cy="10" r="3"/>`,

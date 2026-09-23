@@ -1301,6 +1301,32 @@ class CustomerAttraction(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     #: Artwork KEY, same convention as CustomerDestination.image_key.
     image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+
+    # -- What a guidebook says about it (0080) -------------------------------
+    # EVERY ONE OF THESE IS NULLABLE AND STARTS EMPTY, and the page draws only
+    # the sections it has. They exist so that "best time to visit" is a fact
+    # somebody edited rather than a sentence typed into a JavaScript file, and
+    # an empty one is a section that does not appear - never a placeholder.
+    #: The long read. `description` above stays the one-line summary the cards
+    #: use; this is the article beneath it.
+    long_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    best_time: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    best_time_note: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    ideal_duration: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    ideal_duration_note: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    famous_for: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(60)), nullable=True)
+    recommended_for: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(60)), nullable=True)
+    history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    how_to_reach: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    travel_tips: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(240)), nullable=True)
+    #: More photographs of the same place - image KEYS, resolved through the
+    #: same manifest image_key is. Never a URL.
+    gallery: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(80)), nullable=True)
+    #: Only when somebody has checked it points at the right place: this table
+    #: holds no coordinates, and a map URL built from a name drops travellers
+    #: wherever the search engine guessed.
+    map_url: Mapped[Optional[str]] = mapped_column(String(400), nullable=True)
+
     sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(
