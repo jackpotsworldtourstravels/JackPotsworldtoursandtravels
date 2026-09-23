@@ -287,14 +287,30 @@ const HeroShell = (function () {
        (it opens directly under a cell and was being cut off at the bottom
        edge). Both are true at once only if the film is clipped by something
        other than the hero, so on this shape it is wrapped. */
+    /* NO FILM ON A RESULTS PAGE, and nothing that would fetch one.
+
+       The film was put back here to stop flights.html looking like a
+       different site from index.html, and it did that — at the cost of a
+       megabyte of video, a 320px band of decoration and a parallax listener
+       on a screen whose job is to show fares. A traveller who has already
+       searched is not being sold the idea of travel any more; they are
+       reading results, and the page should get out of the way.
+
+       WHAT REPLACES IT IS THE BOOKING FLOW'S OWN SHELL: a solid navy band
+       under a 72px bar, which is exactly what `body.bk-inpage` already
+       becomes once a booking opens (booking-ref.css). So the redirected
+       pages now look the same from the first result through to the
+       confirmation, instead of changing shape the moment something is
+       selected.
+
+       NO `#heroBg` AND NO VIDEO LAYER AT ALL, rather than a hidden one: an
+       element with a `src` is a download whether or not anything can see it.
+       bindParallax and bindScrollFade both look for `#heroBg` and no-op
+       without it, and switchHeroVideo iterates a NodeList that is simply
+       empty here — the landing page, which keeps its film, is untouched by
+       every line of this. */
     if (o.compact) {
-      return '<div class="hero-media">'
-        + '<div class="hero-bg" id="heroBg"></div>'
-        + '<div class="hero-video-layer" id="heroVideoLayer">'
-        + heroVideosHtml(o.video || 'flights') + '</div>'
-        + '<div class="hero-overlay"></div>'
-        + '</div>'
-        + '<div class="wrap search-dock" id="heroSearchDock"></div>';
+      return '<div class="wrap search-dock" id="heroSearchDock"></div>';
     }
     return '<div class="hero-bg" id="heroBg"></div>'
       + '<div class="hero-video-layer" id="heroVideoLayer">'

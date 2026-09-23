@@ -1,0 +1,97 @@
+/* ===========================================================================
+   booking-shell.css — one bar and one background, from the search to the
+   confirmation.
+   ===========================================================================
+   WHAT THIS FIXES. A traveller searching from the home page landed on
+   flights.html and met a different site: a 320px band of aeroplane footage, a
+   128px transparent bar and the mark at 120px. They then selected a fare and
+   the shell changed AGAIN, to the white 72px bar `body.bk-inpage` puts up for
+   the booking screens. Two shells and a film inside one journey.
+
+   There is one shell now, and it is the booking flow's own: a solid navy bar
+   at 72px with the mark at 64, over a warm off-white page. Results,
+   passengers, review, payment and confirmation all wear it, so nothing
+   changes shape under the traveller between searching and paying.
+
+   THE TOKENS LIVE HERE AND NOWHERE ELSE. service-page.css's `--sp-*` read
+   from these with the same values as their fallbacks, so the standalone
+   service pages and the booking pages cannot drift apart — one file to edit,
+   and a page that somehow loads only one of the two still gets the right
+   colour rather than a default.
+
+   SCOPED TO `body[data-sp-service]`, which is exactly the redirected pages.
+   index.html carries no such attribute and keeps its hero, its film and its
+   120px mark — nothing in this file can reach it.
+   =========================================================================== */
+:root {
+  --booking-header-bg: #0B2239;   /* deep navy: the bar, and the search band  */
+  --booking-page-bg:   #F7F5F0;   /* warm off-white: what the cards sit on    */
+  --booking-card-bg:   #FFFFFF;
+  --booking-accent:    #C9A227;   /* gold, for accents only - never a surface */
+  --booking-text:      #17202A;
+  --booking-muted:     #667085;
+}
+
+/* The page. `html` as well as `body`, so a short page does not show white
+   under the footer, and the wrappers between them are transparent so no strip
+   of another colour appears between sections.
+
+   `:not(.disc)` keeps the two discovery pages on their own palette: they are
+   a destination story rather than a booking screen, and they carry
+   data-sp-service only because they borrow this header. */
+html:has(body[data-sp-service]:not(.disc)),
+body[data-sp-service]:not(.disc) {
+  background: var(--booking-page-bg);
+}
+body[data-sp-service]:not(.disc) main,
+body[data-sp-service]:not(.disc) .sp-main,
+body[data-sp-service]:not(.disc) #bkRoot { background: transparent; }
+
+/* --- the band the search card sits in ------------------------------------
+   It was the film's box. It is a colour now, and short enough that the first
+   result is near the top of the page rather than below a decorative third of
+   a screen. */
+body[data-sp-service] .hero.is-compact {
+  min-height: 0;
+  padding-top: 92px;            /* clearance for the fixed 72px bar, plus air */
+  padding-bottom: 26px;
+  background: var(--booking-header-bg);
+  border-bottom: none;
+}
+@media (max-width: 900px) {
+  body[data-sp-service] .hero.is-compact { padding-top: 84px; padding-bottom: 18px; }
+}
+
+/* --- the bar -------------------------------------------------------------
+   Solid, because there is no longer a film for it to float over. The ink
+   stays light — it is navy underneath either way — so the colour rules
+   flights-ref.css already carries for its own bar still read correctly. */
+body[data-sp-service] #siteHeader {
+  background-color: var(--booking-header-bg);
+  backdrop-filter: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .06);
+}
+body[data-sp-service] #siteHeader nav.wrap { height: 72px; }
+body[data-sp-service] #siteHeader .logo { margin-left: clamp(8px, 1.6vw, 20px); }
+/* THE MARK IS NOT A NEW NUMBER. 64px is what booking-ref.css already uses
+   once a booking opens, and what main.css uses for its solid header — so the
+   results page now matches both. The clamp only stops it crowding a 375px
+   bar; `width: auto` and the untouched asset keep the proportions. */
+body[data-sp-service] #siteHeader .logo-mark-img {
+  height: clamp(44px, 4.6vw, 64px);
+  max-height: 64px;
+  width: auto;
+}
+/* A booking, once open, keeps the white bar booking-ref.css gives it. That
+   file says so with !important and loads after this one, so nothing here has
+   to know about the exception. */
+
+/* Gold is an accent and never a surface: a rule under a heading, a selected
+   state, a highlight. These two are the only places this file spends it. */
+body[data-sp-service] .sp-accent-rule { background: var(--booking-accent); }
+body[data-sp-service] ::selection { background: rgba(201, 162, 39, .22); }
+
+/* Nothing in this shell may introduce a sideways scrollbar. `clip` rather than
+   `hidden` for the reason booking-ref.css gives: hidden makes <body> a scroll
+   container and position:sticky then has nothing to stick to. */
+body[data-sp-service] { overflow-x: clip; }

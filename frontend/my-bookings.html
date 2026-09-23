@@ -14,7 +14,10 @@
      product. Loaded FIRST so service-page.css still wins on the .sp-* page
      furniture below it, which this page still uses. -->
 <link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
-<link rel="stylesheet" href="assets/css/service-page.css?v=20260919b2c1">
+<!-- One bar and one background for the whole booking journey - the tokens
+     live here and service-page.css reads them. -->
+<link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
+<link rel="stylesheet" href="assets/css/service-page.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
@@ -97,7 +100,7 @@
      the same one every other page wears. -->
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/service-shell.js?v=20260919b2c1"></script>
-<script src="assets/js/hero-shell.js?v=20260919lc1"></script>
+<script src="assets/js/hero-shell.js?v=20260923bk1"></script>
 <script>HeroShell.mountHeader('my-bookings.html');</script>
 <script>HeroShell.mountFooter();</script>
 <script src="assets/js/booking-pay.js?v=20260912pw1"></script>

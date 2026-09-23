@@ -13,7 +13,10 @@
    =========================================================================== */
 
 :root {
-  --sp-bg:        #FBF9F6;
+  /* THE BOOKING FLOW'S PAGE COLOUR, read from booking-shell.css so the
+     standalone service pages and the booking pages cannot drift apart. The
+     fallback is the same value, for a page that loads only this file. */
+  --sp-bg:        var(--booking-page-bg, #F7F5F0);
   --sp-surface:   #FFFFFF;
   --sp-surface-2: #F1F5F9;
   --sp-ink:       #17323C;
@@ -21,7 +24,9 @@
   --sp-line:      #E7E2DA;
   --sp-accent:    #C9482F;
   --sp-accent-dk: #A63A24;
-  --sp-header:    #0B3C4A;
+  /* Deep navy — the sticky service header and, through booking-shell.css,
+     the bar on every redirected page. Same one-definition rule as above. */
+  --sp-header:    var(--booking-header-bg, #0B2239);
   --sp-header-ink:#FFFFFF;
   --sp-gold:      #C9A227;
   --sp-emerald:   #12855F;

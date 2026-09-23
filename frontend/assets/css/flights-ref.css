@@ -36,7 +36,12 @@
    green tint. They are aliases of main.css's values, not new colours.
    ========================================================================== */
 body.sp-continuation[data-sp-service="flights"] {
-  --jw-navy:      var(--navy);
+  /* THE BOOKING SHELL'S NAVY, so the bar does not change shade the moment a
+     booking opens. This aliased `--navy` (#0B3C4A), while the results bar and
+     the search band are painted `--booking-header-bg` (#0B2239) - two navies
+     three pixels apart in name and clearly apart on screen, swapping over on
+     a click. The fallback keeps this file standalone. */
+  --jw-navy:      var(--booking-header-bg, var(--navy));
   --jw-gold:      var(--coral);
   --jw-gold-2:    var(--coral-light);
   --jw-gold-3:    var(--coral-dark);
