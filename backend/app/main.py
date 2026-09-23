@@ -720,6 +720,7 @@ if FRONTEND_DIR.is_dir():
     _DESTINATION_PAGE = FRONTEND_DIR / "destination.html"
     _LOCATION_HOTELS_PAGE = FRONTEND_DIR / "destination-hotels.html"
     _LOCATION_PAGE = FRONTEND_DIR / "location.html"
+    _PACKAGE_PAGE = FRONTEND_DIR / "package.html"
 
     def _page(path):
         return FileResponse(
@@ -745,6 +746,19 @@ if FRONTEND_DIR.is_dir():
     @app.get("/hotels/{destination}/{location}", include_in_schema=False)
     def location_hotels_page(destination: str, location: str):  # noqa: ARG001 — read by the page
         return _page(_LOCATION_HOTELS_PAGE)
+
+    # ONE TOUR PACKAGE, ON ITS OWN URL. The package journey is Tour Packages ->
+    # a shelf (domestic / pilgrimage / international) -> the list -> THIS ->
+    # the booking flow. It needs a real address for the same reasons the
+    # landmark pages do: a package is a thing somebody sends to the person
+    # they are travelling with, and a modal cannot be linked to.
+    #
+    # The id in the path is not checked here - the page loads, asks the API
+    # and reports "package not found" itself, exactly as the destination
+    # pages do above.
+    @app.get("/package/{package_id}", include_in_schema=False)
+    def package_page(package_id: str):                    # noqa: ARG001 - read by the page
+        return _page(_PACKAGE_PAGE)
 
     # Mounted last so every API route above wins the match first.
     app.mount("/", CleanUrlStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

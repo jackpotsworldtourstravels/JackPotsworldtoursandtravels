@@ -18,6 +18,8 @@ Deliberately a separate path and a separate table from both
 ``customer_bookings.py`` (flights) and ``customer_hotel_bookings.py`` — see
 migration 0056. Catalogue routes are public, same reasoning as the other two.
 """
+import datetime as dt
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
@@ -31,12 +33,14 @@ from app.schemas.customer_package_booking import (
     PackageCheckoutRequest,
     PackageCheckoutResponse,
     PackageDetail,
+    PackageFacets,
     PackagePaymentRequest,
     PackageReconcileRequest,
     PackageReconcileResponse,
     PackageQuoteRequest,
     PackageQuoteResponse,
     PackageSearchResult,
+    PackageTripTypeCount,
 )
 from app.services import activity_service, customer_audit_service
 from app.services import customer_account_service as acct
@@ -56,6 +60,47 @@ router = APIRouter(prefix="/api/customer", tags=["customer-package-bookings"])
 # ---------------------------------------------------------------------------
 # Catalogue
 # ---------------------------------------------------------------------------
+def _listing_row(pkg) -> dict:
+    """One package as the listing card reads it.
+
+    THE TWO PRICES ARE DIFFERENT QUESTIONS and both are answered. `priceFrom`
+    is the shelf price on the package row - what "from Rs 21,900" means -
+    while `price_next` is what the soonest actual departure charges. They
+    drift apart the moment a season is dearer than the headline, and a card
+    that prints one while the booking charges the other is how a traveller
+    discovers a price change at the payment step.
+
+    `departure_months` comes from the departures table, so the month filter
+    offers only months something really leaves in.
+    """
+    live = [d for d in pkg.departures if d.is_active and d.departure_date >= dt.date.today()]
+    live.sort(key=lambda d: d.departure_date)
+    nxt = live[0] if live else None
+    return {
+        "customer_package_id": pkg.customer_package_id,
+        "name": pkg.name,
+        "days": pkg.days,
+        "price_from": pkg.price_from,
+        "blurb": pkg.blurb,
+        "is_international": pkg.is_international,
+        "category": pkg.category,
+        "destination": pkg.destination,
+        "nights": pkg.nights,
+        "trip_type": pkg.trip_type,
+        "hotel_category": pkg.hotel_category,
+        # A SCORE ONLY WITH ITS SOURCE, exactly as 0082 does it for landmarks.
+        # A row carrying one without the other is a half-finished edit and the
+        # card has nothing to attribute the number to, so neither is sent.
+        "rating": float(pkg.rating) if (pkg.rating is not None and pkg.rating_source) else None,
+        "rating_count": pkg.rating_count if (pkg.rating is not None and pkg.rating_source) else None,
+        "rating_source": pkg.rating_source if pkg.rating is not None else None,
+        "highlights": list(pkg.highlights or []),
+        "inclusions": list(pkg.inclusions or []),
+        "image_key": pkg.image_key,
+        "departure_months": sorted({d.departure_date.strftime("%Y-%m") for d in live}),
+        "next_departure": nxt.departure_date if nxt else None,
+        "price_next": nxt.price_per_person if nxt else None,
+    }
 @router.get(
     "/packages",
     response_model=list[PackageSearchResult],
@@ -74,16 +119,93 @@ def list_packages(
         None,
         description="'holiday' or 'gaming'. Omit for every shelf.",
     ),
+    trip_type: str | None = Query(
+        None,
+        description="'domestic', 'pilgrimage' or 'international' - which shelf of the journey.",
+    ),
+    destination: str | None = Query(None, description="Exact destination, case-insensitive."),
+    min_days: int | None = Query(None, ge=1, description="Shortest trip to include, in days."),
+    max_days: int | None = Query(None, ge=1, description="Longest trip to include, in days."),
+    min_price: float | None = Query(None, ge=0, description="Lowest from-price to include."),
+    max_price: float | None = Query(None, ge=0, description="Highest from-price to include."),
+    month: str | None = Query(
+        None, pattern=r"^\d{4}-\d{2}$",
+        description="'2026-11'. Matches packages with a LIVE DEPARTURE in that month, not a guess.",
+    ),
+    min_rating: float | None = Query(
+        None, ge=0, le=5,
+        description="Only packages carrying a recorded rating at or above this. Matches nothing today.",
+    ),
+    hotel_category: int | None = Query(
+        None, ge=1, le=7, description="Star standard the trip advertises, where it states one."),
 ):
     # REJECTED, NOT IGNORED. A typo'd category that fell through to "everything"
     # would put holiday trips on the gaming page, which is the one outcome this
-    # column exists to prevent.
+    # column exists to prevent. The same argument applies to trip_type, which
+    # decides which of the three shelves a traveller is looking at.
     if category is not None and category not in catalog.CATEGORIES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unknown package category {category!r}.",
         )
-    return catalog.list_packages(db, category=category)
+    if trip_type is not None and trip_type not in catalog.TRIP_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown trip type {trip_type!r}.",
+        )
+    rows = catalog.search_packages(
+        db, category=category, trip_type=trip_type, destination=destination,
+        min_days=min_days, max_days=max_days, min_price=min_price, max_price=max_price,
+        month=month, min_rating=min_rating, hotel_category=hotel_category,
+    )
+    return [_listing_row(p) for p in rows]
+
+
+@router.get(
+    "/packages/facets",
+    response_model=PackageFacets,
+    summary="What the package filters may offer",
+    description=(
+        "Public. Every value in the filter rail, with the number of packages behind it, "
+        "derived from the catalogue itself - so a filter can never offer a choice that "
+        "returns an empty page. An empty list here means the rail should not draw that "
+        "control at all: `hotel_categories` and `rated_count` are both empty until "
+        "packages carry those facts."
+    ),
+)
+def package_facets(
+    db: Session = Depends(get_db),
+    category: str | None = Query(None, description="'holiday' or 'gaming'. Omit for every shelf."),
+):
+    if category is not None and category not in catalog.CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown package category {category!r}.",
+        )
+    return catalog.facets(db, category=category)
+
+
+@router.get(
+    "/packages/trip-types",
+    response_model=list[PackageTripTypeCount],
+    summary="The three category tiles",
+    description=(
+        "Public. Domestic, pilgrimage and international, each with a live count. "
+        "ALL THREE ARE ALWAYS RETURNED, including the ones with nothing on them: a "
+        "missing tile would suggest the company does not run those trips, where a tile "
+        "reading zero says plainly that none is on sale right now."
+    ),
+)
+def package_trip_types(
+    db: Session = Depends(get_db),
+    category: str | None = Query(None, description="'holiday' or 'gaming'. Omit for every shelf."),
+):
+    if category is not None and category not in catalog.CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown package category {category!r}.",
+        )
+    return catalog.trip_type_counts(db, category=category)
 
 
 @router.get(
@@ -133,7 +255,19 @@ def get_package(package_id: int, db: Session = Depends(get_db)):
     package = catalog.get_package(db, package_id)
     if package is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found.")
-    return package
+    # Built on the listing row so a card and the page it opens can never
+    # disagree about the price, the rating or the next departure - there is
+    # one function that decides those and both callers use it.
+    return {
+        **_listing_row(package),
+        "description": package.description,
+        "inclusions": list(package.inclusions or []),
+        "exclusions": list(package.exclusions or []),
+        "cancellation_policy": package.cancellation_policy,
+        "departures": package.departures,
+        "itinerary": package.itinerary,
+        "hotels": package.hotels,
+    }
 
 
 # ---------------------------------------------------------------------------

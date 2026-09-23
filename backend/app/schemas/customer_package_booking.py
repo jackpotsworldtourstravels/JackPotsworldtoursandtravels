@@ -25,10 +25,82 @@ class DepartureOption(BaseModel):
     seats_left: int
 
 
-class PackageSearchResult(BaseModel):
+class PackageListingFields(BaseModel):
+    """The 0083 columns a listing card and a detail page both read.
+
+    EVERY ONE OF THEM IS OPTIONAL AND MOST ARE NULL TODAY. The card draws the
+    facts it is given: no rating means no stars, no highlights means no tick
+    list, no hotel standard means the card says nothing about hotels. None of
+    them is defaulted to something plausible.
+    """
+
+    destination: str | None = Field(
+        default=None,
+        description="Where the trip goes. Today the same words as `name` for every row (0083).",
+    )
+    nights: int | None = Field(default=None, description="days - 1, unless the trip says otherwise.")
+    trip_type: str | None = Field(
+        default=None,
+        description=(
+            "'domestic' | 'pilgrimage' | 'international' - which of the three Tour Packages "
+            "shelves this sits on. A DIFFERENT AXIS from `category`, which says holiday or gaming."
+        ),
+    )
+    hotel_category: int | None = Field(
+        default=None, description="3, 4 or 5 stars, where the trip advertises a standard.")
+    rating: float | None = Field(
+        default=None,
+        description=(
+            "A recorded score out of 5, served ONLY together with `rating_source` - there are no "
+            "customer reviews of packages to average. Null is the usual answer."
+        ),
+    )
+    rating_count: int | None = None
+    rating_source: str | None = Field(
+        default=None, description="Who gave the score. Shown beside it, never omitted.")
+    highlights: list[str] = Field(
+        default_factory=list, description="The few lines a card shows. Not the contractual inclusions.")
+    inclusions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "What the price covers, as the detail page lists it. Sent to the LISTING too so a card "
+            "can show the first few - a tick list of things the package really includes, rather "
+            "than marketing lines nobody has written."
+        ),
+    )
+    image: str | None = Field(
+        default=None, validation_alias="image_key",
+        description="An image KEY, resolved by the client against shipped artwork. Never a URL.",
+    )
+
+    #: '2026-11' for each month this package really departs in, ascending.
+    #: Computed from customer_package_departures, so the month filter can only
+    #: offer months that have a departure behind them.
+    departure_months: list[str] = []
+    next_departure: dt.date | None = Field(
+        default=None, description="The soonest live departure, or null when none is scheduled.")
+    price_next: Decimal | None = Field(
+        default=None,
+        description=(
+            "Per-person price of that soonest departure. `priceFrom` is the shelf price; this is "
+            "what the next date actually costs, and they are not always the same number."
+        ),
+    )
+
+    @field_validator("highlights", mode="before")
+    @classmethod
+    def _no_nulls(cls, v):
+        """A NULL ARRAY IS AN EMPTY LIST TO A CLIENT. Postgres distinguishes
+        "no highlights yet" (NULL) from "none" ({}), and nothing on a page
+        does - both draw no tick list. Without this the column being unset
+        fails validation and takes the whole response with it."""
+        return [] if v is None else v
+
+
+class PackageSearchResult(PackageListingFields):
     """A row on the Tour Packages grid — the shape ``normalisePackage()`` reads."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str = Field(validation_alias="customer_package_id")
     name: str
@@ -46,11 +118,82 @@ class PackageSearchResult(BaseModel):
         return str(v)
 
 
-class PackageDetail(BaseModel):
-    """Everything the package's own detail view shows: description,
-    inclusions, policy, and every upcoming departure."""
+class PackageItineraryDay(BaseModel):
+    """One day of the trip (0083). Rows, never a parsed paragraph."""
 
     model_config = ConfigDict(from_attributes=True)
+
+    day_number: int
+    title: str
+    description: str | None = None
+    location: str | None = None
+    image: str | None = Field(default=None, validation_alias="image_key")
+    meals: list[str] = []
+
+
+class PackageHotelStay(BaseModel):
+    """A hotel the package puts you in (0083).
+
+    `hotel_id` is set only when the property is one this site actually sells;
+    the page then links to it. Null means the name came from the operator and
+    we hold nothing else about it - which the page says rather than implying
+    otherwise.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    hotel_name: str
+    city: str | None = None
+    star_rating: int | None = None
+    room_type: str | None = None
+    nights: int | None = None
+    hotel_id: int | None = None
+    image: str | None = Field(default=None, validation_alias="image_key")
+
+
+class PackageFacetValue(BaseModel):
+    """One choice in the filter rail, with how many packages it would leave."""
+
+    value: str | int
+    count: int
+
+
+class PackageFacets(BaseModel):
+    """What the filter rail may offer — derived from the catalogue, never a menu.
+
+    A LIST THAT COMES BACK EMPTY IS A FILTER THAT SHOULD NOT BE DRAWN.
+    `hotel_categories` is empty until packages state a standard and
+    `rated_count` is 0 until one carries a rating, and in both cases the rail
+    is expected to leave that control out rather than offer choices that empty
+    the page.
+    """
+
+    trip_types: list[PackageFacetValue] = []
+    destinations: list[PackageFacetValue] = []
+    hotel_categories: list[PackageFacetValue] = []
+    months: list[PackageFacetValue] = []
+    durations: list[PackageFacetValue] = []
+    price_min: float | None = None
+    price_max: float | None = None
+    duration_min: int | None = None
+    duration_max: int | None = None
+    rated_count: int = 0
+    total: int = 0
+
+
+class PackageTripTypeCount(BaseModel):
+    """One of the three category tiles, and what is behind it."""
+
+    trip_type: str
+    count: int = Field(description="Zero is a real answer and the tile says so.")
+
+
+class PackageDetail(PackageListingFields):
+    """Everything the package's own detail view shows: description,
+    inclusions, exclusions, policy, the day-by-day, the hotels, and every
+    upcoming departure."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str = Field(validation_alias="customer_package_id")
     name: str
@@ -59,9 +202,22 @@ class PackageDetail(BaseModel):
     days: int
     priceFrom: Decimal = Field(validation_alias="price_from")
     is_international: bool
+    category: str
     inclusions: list[str]
+    exclusions: list[str] = []
     cancellation_policy: str | None
+
+    @field_validator("exclusions", "inclusions", "itinerary", "hotels", mode="before")
+    @classmethod
+    def _lists(cls, v):
+        return [] if v is None else v
+
     departures: list[DepartureOption]
+    #: Usually EMPTY. An itinerary is a promise about what a traveller will be
+    #: given; 0083 seeded none, and the page shows no itinerary section rather
+    #: than a drafted one.
+    itinerary: list[PackageItineraryDay] = []
+    hotels: list[PackageHotelStay] = []
 
     @field_validator("id", mode="before")
     @classmethod

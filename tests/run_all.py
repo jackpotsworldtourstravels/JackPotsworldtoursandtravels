@@ -150,6 +150,11 @@ SUITE = [
     # in, which is why it sits after the script that proves signing in works.
     ("verify_guest_session.py",
      "Continue as guest: server-issued session, every profile screen, isolation between guests, migration on sign-in"),
+    # The tour-package catalogue: public, read-only, and needs no identity at
+    # all — it runs here because a package's booking flow is tested further
+    # down, and a failure in the shelf it is chosen from should be seen first.
+    ("verify_package_catalogue.py",
+     "Tour packages: three shelves with live counts, filters the database applies, and a page per trip"),
     # The landing page's assistant, which is open to guests and so needs no
     # identity from the script above — but reads the same destinations
     # catalogue, so it runs after the portal that proves the catalogue serves.

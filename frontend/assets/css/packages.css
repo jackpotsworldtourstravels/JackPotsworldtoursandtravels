@@ -1,0 +1,327 @@
+/* ===========================================================================
+   packages.css — the tour-package journey: three shelves, a filter rail, a
+   grid of trips, and one trip in full.
+   ===========================================================================
+   WHAT THIS IS ON TOP OF. discover.css owns the palette, the sky, the hero,
+   the cards and the serif; these two pages are its third and fourth. This
+   file adds only what a TRIP needs that a PLACE does not: the category
+   tiles, the filter rail, the package card, the day-by-day and the
+   departures.
+
+   THE PALETTE IS DISCOVER'S, unchanged - soft blue-grey, white, one muted
+   teal, no gold and no black. Every colour below is a `--disc-*` token, so
+   the two journeys cannot drift apart.
+   =========================================================================== */
+.pkl-main { padding-bottom: 72px; }
+
+/* --- the page's own heading ---------------------------------------------- */
+/* `position: static` because main.css pins EVERY `header` element to the
+   viewport for the sake of the site bar. This block is a page heading and
+   is a <div> for that reason; the rule stays as a guard for the next
+   person who reaches for the semantic element. */
+.pkl-head { position: static; padding: clamp(26px, 4vw, 44px) 0 clamp(18px, 2.4vw, 26px); max-width: 62ch; }
+.pkl-eyebrow {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--disc-accent-deep);
+}
+.pkl-head h1 {
+  margin: 0; font-family: var(--disc-serif); color: var(--disc-ink);
+  font-size: clamp(30px, 4.2vw, 46px); font-weight: 700; line-height: 1.06; letter-spacing: -.015em;
+}
+.pkl-sub { margin: 14px 0 0; font-size: clamp(14.5px, 1.4vw, 16.5px); line-height: 1.6; color: var(--disc-mute); }
+
+/* --- the three shelves ---------------------------------------------------
+   Buttons, not links: choosing one filters the page in place and writes the
+   URL, so Back works and the list never reloads under the reader. The
+   disabled one is a statement of fact - pilgrimage has nothing on sale - and
+   is styled as unavailable rather than removed. */
+.pkl-tiles {
+  display: grid; gap: 16px; margin-bottom: clamp(24px, 3vw, 34px);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.pkl-tile {
+  display: flex; align-items: flex-start; gap: 14px; text-align: left;
+  padding: 20px; border-radius: 18px; cursor: pointer; font: inherit;
+  background: linear-gradient(170deg, #FFFFFF 0%, #FAFCFD 60%, #F1F7FA 100%);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 260ms cubic-bezier(.22,.8,.3,1), box-shadow 260ms ease, border-color 260ms ease;
+}
+.pkl-tile:hover:not(:disabled) {
+  transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line);
+}
+.pkl-tile:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
+.pkl-tile.is-on {
+  border-color: var(--disc-accent); box-shadow: 0 0 0 1px var(--disc-accent) inset, var(--disc-shadow-lift);
+}
+.pkl-tile:disabled { cursor: default; opacity: .72; }
+.pkl-tile-icon {
+  flex: none; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
+  color: #fff; background: linear-gradient(145deg, var(--disc-accent), var(--disc-accent-deep));
+  box-shadow: 0 8px 18px -10px rgba(62, 122, 146, .9);
+}
+.pkl-tile.is-empty .pkl-tile-icon { background: #DCE7ED; color: var(--disc-mute); box-shadow: none; }
+.pkl-tile-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.pkl-tile-name { font-family: var(--disc-serif); font-size: 19px; font-weight: 700; color: var(--disc-ink); }
+.pkl-tile-line { font-size: 13px; line-height: 1.5; color: var(--disc-mute); }
+.pkl-tile-count {
+  flex: none; align-self: center; padding: 6px 12px; border-radius: 999px;
+  background: var(--disc-accent-soft); border: 1px solid var(--disc-accent-line);
+  font-size: 12px; font-weight: 700; color: var(--disc-accent-deep); white-space: nowrap;
+}
+.pkl-tile.is-empty .pkl-tile-count {
+  background: rgba(38,55,70,.05); border-color: var(--disc-line); color: var(--disc-mute);
+}
+
+/* --- rail and results ----------------------------------------------------
+   The rail is 268px because that is what the widest option row needs without
+   wrapping ("8 days or more" plus its count); the grid takes the rest. */
+.pkl-layout { display: grid; gap: 22px; grid-template-columns: 268px minmax(0, 1fr); align-items: start; }
+.pkl-rail {
+  position: sticky; top: 88px;                 /* clear of the fixed 72px bar */
+  display: flex; flex-direction: column; gap: 18px;
+  padding: 20px; border-radius: 20px;
+  background: var(--disc-card); border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  max-height: calc(100vh - 110px); overflow-y: auto;
+}
+.pkl-rail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pkl-rail-head h2 { margin: 0; font-size: 17px; font-weight: 700; }
+.pkl-clear {
+  border: 0; background: none; padding: 0; cursor: pointer; font: inherit;
+  font-size: 12.5px; font-weight: 700; color: var(--disc-accent);
+}
+.pkl-clear:hover { color: var(--disc-accent-deep); text-decoration: underline; }
+.pkl-rail-none { margin: 0; font-size: 13px; color: var(--disc-mute); }
+.pkl-group { display: flex; flex-direction: column; gap: 9px; }
+.pkl-group + .pkl-group { padding-top: 16px; border-top: 1px solid var(--disc-line); }
+.pkl-group h3 {
+  margin: 0; font-family: var(--ff-body, inherit);
+  font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--disc-mute);
+}
+.pkl-opts { display: flex; flex-direction: column; gap: 2px; }
+.pkl-opt {
+  display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 10px;
+  font-size: 13.5px; color: var(--disc-ink); cursor: pointer;
+  transition: background 180ms ease;
+}
+.pkl-opt:hover { background: var(--disc-accent-soft); }
+.pkl-opt.is-on { background: var(--disc-accent-soft); font-weight: 700; }
+.pkl-opt input { accent-color: var(--disc-accent); margin: 0; }
+.pkl-opt span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkl-opt em { font-style: normal; font-size: 12px; font-weight: 600; color: var(--disc-mute); }
+.pkl-price { display: flex; flex-direction: column; gap: 6px; }
+.pkl-price input[type="range"] { width: 100%; accent-color: var(--disc-accent); }
+.pkl-price-read { margin: 0; font-size: 13px; color: var(--disc-mute); }
+.pkl-price-read b { color: var(--disc-ink); }
+.pkl-price-ends { display: flex; justify-content: space-between; margin: 0; font-size: 11.5px; color: var(--disc-mute); }
+
+.pkl-results { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pkl-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border-radius: 14px;
+  background: rgba(255,255,255,.72); border: 1px solid var(--disc-line);
+}
+.pkl-count { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--disc-ink); }
+.pkl-sortwrap { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--disc-mute); }
+.pkl-sort {
+  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--disc-ink);
+  padding: 7px 10px; border-radius: 10px; border: 1px solid var(--disc-line); background: #fff;
+}
+.pkl-sort:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 2px; }
+
+/* --- the package card ----------------------------------------------------
+   A photograph of where it goes, then the facts in the order somebody asks
+   for them: what it is, where, how long, what is included, what it costs. */
+.pkl-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); }
+.pkl-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 20px; background: var(--disc-card);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 280ms cubic-bezier(.22,.8,.3,1), box-shadow 280ms ease, border-color 280ms ease;
+}
+.pkl-card:hover { transform: translateY(-4px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
+.pkl-card-art {
+  position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden;
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
+  display: grid; place-items: center; color: var(--disc-accent);
+}
+.pkl-card-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  transition: transform 600ms cubic-bezier(.22,.8,.3,1); }
+.pkl-card:hover .pkl-card-art img { transform: scale(1.06); }
+.pkl-card-art::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(38,55,70,.28) 0%, transparent 38%, rgba(38,55,70,.12) 100%);
+}
+.pkl-card-tag {
+  position: absolute; z-index: 1; top: 12px; left: 12px;
+  padding: 5px 11px; border-radius: 999px;
+  background: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.7);
+  font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--disc-accent-deep);
+}
+.pkl-card-pin { position: relative; z-index: 1; opacity: .5; }
+.pkl-card-body { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px 18px; }
+.pkl-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pkl-card-top h3 { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.22; }
+.pkl-card-top h3 a { color: var(--disc-ink); }
+.pkl-card-top h3 a:hover { color: var(--disc-accent-deep); }
+.pkl-card-rate {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px; background: var(--disc-accent-soft);
+  font-size: 12px; color: var(--disc-accent-deep);
+}
+.pkl-card-rate .jpi { color: #E8A33D; }
+.pkl-card-rate em { font-style: normal; font-weight: 600; color: var(--disc-mute); }
+.pkl-card-where { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: var(--disc-mute); }
+.pkl-card-days {
+  margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--disc-accent-deep);
+}
+.pkl-card-ticks { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.pkl-card-ticks li { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; line-height: 1.45; color: var(--disc-ink); }
+.pkl-card-ticks .jpi { flex: none; margin-top: 1px; color: var(--disc-accent); }
+.pkl-card-foot {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px;
+  margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--disc-line);
+}
+.pkl-card-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.pkl-card-price b { font-family: var(--disc-serif); font-size: 24px; font-weight: 700; color: var(--disc-accent-deep); }
+.pkl-card-price small { font-size: 12px; font-weight: 600; color: var(--disc-mute); }
+/* Both prices when they differ - see package-listing.js. */
+.pkl-card-from { flex-basis: 100%; font-size: 11.5px; color: var(--disc-mute); }
+.pkl-card-next { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--disc-mute); }
+.pkl-card-next.is-none { color: #A2704B; }
+.pkl-card-btn { margin-top: 12px; justify-content: center; }
+
+.pkl-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 26px; border-radius: 18px; background: var(--disc-card);
+  border: 1px dashed var(--disc-accent-line);
+}
+.pkl-empty b { font-size: 16px; color: var(--disc-ink); }
+.pkl-empty span { font-size: 13.5px; line-height: 1.6; color: var(--disc-mute); max-width: 64ch; }
+.pkl-empty .disc-btn { margin-top: 6px; }
+
+/* ==========================================================================
+   ONE PACKAGE — the detail page
+   ========================================================================== */
+.pk-hero .lp-hero-body { width: min(1320px, 100%); }
+.pk-hero-cta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: clamp(14px, 2vw, 28px);
+  margin-top: 22px;
+}
+.pk-price { display: flex; flex-direction: column; gap: 2px; text-shadow: 0 1px 4px rgba(38,55,70,.5); }
+.pk-price-label { font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.82); }
+.pk-price-value { font-family: var(--disc-serif); font-size: clamp(30px, 3.4vw, 42px); font-weight: 700; color: #fff; line-height: 1; }
+.pk-price-unit { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.8); }
+.pk-book { background: #fff; color: var(--disc-accent-deep); padding: 13px 26px; font-size: 15px; }
+.pk-book:hover { background: #fff; color: var(--disc-ink); }
+.pk-book:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+/* --- the day-by-day ------------------------------------------------------
+   A rail with a numbered marker per day. The line down the left is what makes
+   it read as a sequence rather than as five unrelated cards. */
+.pk-days { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.pk-day {
+  display: grid; gap: 16px; align-items: start;
+  grid-template-columns: 62px minmax(0, 1fr) minmax(0, 210px);
+  position: relative;
+}
+.pk-day::before {
+  content: ''; position: absolute; left: 30px; top: 58px; bottom: -16px; width: 2px;
+  background: linear-gradient(180deg, var(--disc-accent-line), rgba(79,143,168,.08));
+}
+.pk-day:last-child::before { display: none; }
+.pk-day-mark {
+  position: relative; z-index: 1; width: 62px; height: 62px; border-radius: 18px;
+  display: grid; place-items: center; gap: 0; color: #fff;
+  background: linear-gradient(145deg, var(--disc-accent), var(--disc-accent-deep));
+  box-shadow: 0 10px 22px -12px rgba(62,122,146,.95);
+}
+.pk-day-mark span { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
+.pk-day-mark strong { font-family: var(--disc-serif); font-size: 22px; line-height: 1; }
+.pk-day-card { display: flex; flex-direction: column; gap: 8px; }
+.pk-day-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pk-day-head h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.pk-day-where { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--disc-accent-deep); }
+.pk-day-text p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.7; color: var(--disc-ink); }
+.pk-day-text p:last-child { margin-bottom: 0; }
+.pk-day-meals { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 0; font-size: 12.5px; color: var(--disc-mute); }
+.pk-day-art { margin: 0; border-radius: 16px; overflow: hidden; aspect-ratio: 4 / 3; border: 1px solid var(--disc-line); }
+.pk-day-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* --- hotels --------------------------------------------------------------- */
+.pk-hotels { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.pk-hotel-stars {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700;
+  color: var(--disc-accent-deep);
+}
+.pk-hotel-stars .jpi { color: #E8A33D; }
+
+/* --- inclusions and exclusions ------------------------------------------- */
+.pk-includes { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.pk-incl h3, .pk-excl h3 { margin: 0 0 12px; font-size: 17px; font-weight: 700; }
+.pk-incl ul, .pk-excl ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.pk-incl li, .pk-excl li { display: flex; align-items: flex-start; gap: 9px; font-size: 14.5px; line-height: 1.55; color: var(--disc-ink); }
+.pk-incl .jpi { flex: none; margin-top: 2px; color: #3E8E6E; }
+.pk-excl .jpi { flex: none; margin-top: 2px; color: #B4726A; }
+
+/* --- departures ----------------------------------------------------------
+   Buttons, because each one opens the booking card with that date chosen. */
+.pk-dates { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); }
+.pk-date {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer; font: inherit;
+  padding: 15px 17px; border-radius: 16px; background: var(--disc-card);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+.pk-date:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent); }
+.pk-date:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 3px; }
+.pk-date-when { font-size: 15.5px; font-weight: 700; color: var(--disc-ink); }
+.pk-date-price { display: flex; align-items: baseline; gap: 6px; font-family: var(--disc-serif); font-size: 20px; font-weight: 700; color: var(--disc-accent-deep); }
+.pk-date-price small { font-family: var(--ff-body, inherit); font-size: 11.5px; font-weight: 600; color: var(--disc-mute); }
+.pk-date-seats { font-size: 12px; font-weight: 600; color: var(--disc-mute); }
+/* Four or fewer is the only scarcity claim this page makes, and it is the
+   seats_left column read out loud - not a countdown invented to hurry anyone. */
+.pk-date-seats.is-low { color: #A2704B; }
+
+/* --- policies ------------------------------------------------------------- */
+.pk-policies { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.pk-policy h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; font-size: 17px; font-weight: 700; }
+.pk-policy h3 .jpi { color: var(--disc-accent); }
+.pk-policy p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--disc-ink); }
+
+/* ==========================================================================
+   NARROWER SCREENS
+   ========================================================================== */
+@media (max-width: 1000px) {
+  /* The rail stops being a column and becomes a band above the results: at
+     this width a 268px rail leaves the cards too narrow to read. */
+  .pkl-layout { grid-template-columns: minmax(0, 1fr); }
+  .pkl-rail { position: static; max-height: none; }
+  .pkl-rail .pkl-group { padding-top: 14px; }
+}
+
+@media (max-width: 860px) {
+  .pk-day { grid-template-columns: 52px minmax(0, 1fr); }
+  .pk-day-art { grid-column: 2; }
+  .pk-day::before { left: 25px; top: 50px; }
+  .pk-day-mark { width: 52px; height: 52px; border-radius: 15px; }
+  .pk-day-mark strong { font-size: 19px; }
+}
+
+@media (max-width: 640px) {
+  /* The count moves under the text rather than beside it: at 375px a badge
+     in the same row leaves the description four words wide. */
+  .pkl-tile { padding: 16px; flex-wrap: wrap; }
+  .pkl-tile-body { flex-basis: calc(100% - 56px); }
+  .pkl-tile-count { align-self: flex-start; margin-left: 56px; }
+  .pkl-grid { grid-template-columns: minmax(0, 1fr); }
+  .pk-hero-cta { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .pk-book { width: 100%; justify-content: center; }
+  .pkl-toolbar { padding: 10px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pkl-tile, .pkl-card, .pkl-card-art img, .pk-date { transition: none; }
+}

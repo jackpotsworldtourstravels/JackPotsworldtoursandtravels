@@ -1377,9 +1377,106 @@ class CustomerPackage(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(),
     )
 
+    # -- What the listing filters on and the detail page shows (0083) --------
+    #: Where the trip goes. Usually the same words as `name` today, because
+    #: these packages are named for their destination - it is its own column so
+    #: that "Goa Beach Escape" can be filed under Goa without being called it.
+    destination: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: days - 1 for every row that exists; a column because a trip can have a
+    #: night count that is not that (a red-eye out, a day trip at the end).
+    nights: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    #: 'domestic' | 'pilgrimage' | 'international' - the three shelves the
+    #: Tour Packages page offers. NOT the same axis as `category` above, which
+    #: says holiday or gaming. A trip is filed under pilgrimage by a person,
+    #: never by a flag: 0083 backfilled only the other two.
+    trip_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    #: 3, 4 or 5 stars, where the trip advertises a standard. Null is the
+    #: usual answer and the filter offers only the values in use.
+    hotel_category: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    #: A score and WHERE IT CAME FROM, on 0082's rule: the API will not serve
+    #: one without the other, and the card prints both.
+    rating: Mapped[Optional[float]] = mapped_column(Numeric(2, 1), nullable=True)
+    rating_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_source: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    #: The three lines a card shows. `inclusions` below is the contractual
+    #: list on the detail page and is a different thing.
+    highlights: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)), nullable=True)
+    exclusions: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)), nullable=True)
+
     departures: Mapped[list["CustomerPackageDeparture"]] = relationship(
         back_populates="package", order_by="CustomerPackageDeparture.departure_date",
     )
+    itinerary: Mapped[list["CustomerPackageItineraryDay"]] = relationship(
+        back_populates="package", cascade="all, delete-orphan",
+        order_by="CustomerPackageItineraryDay.day_number",
+    )
+    hotels: Mapped[list["CustomerPackageHotel"]] = relationship(
+        back_populates="package", cascade="all, delete-orphan",
+        order_by="CustomerPackageHotel.sort_order",
+    )
+
+
+class CustomerPackageItineraryDay(Base):
+    """One day of a tour package (0083).
+
+    A ROW PER DAY, not a paragraph with "Day 1:" in it. The page renders a
+    numbered list, an editor changes one day without retyping the trip, and
+    nothing has to parse prose to count the days. Empty for every package
+    today: an itinerary is a promise about what a traveller will be given, and
+    the detail page shows no itinerary section rather than a drafted one.
+    """
+
+    __tablename__ = "customer_package_itinerary"
+    __table_args__ = (
+        UniqueConstraint("package_id", "day_number", name="uq_package_itinerary_day"),
+    )
+
+    customer_package_itinerary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    package_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_packages.customer_package_id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    day_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    #: Image KEY, resolved through a shipped manifest. Never a URL.
+    image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    #: 'breakfast', 'lunch', 'dinner' - what the day includes, where it says.
+    meals: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(20)), nullable=True)
+
+    package: Mapped["CustomerPackage"] = relationship(back_populates="itinerary")
+
+
+class CustomerPackageHotel(Base):
+    """A hotel a package puts you in (0083).
+
+    ``hotel_id`` is set when the property is one we actually sell, and the
+    page then shows that hotel's own photograph and details. It is null when
+    the name came from the tour operator and we list nothing of our own for
+    it - which the page says, rather than implying we know the property.
+    """
+
+    __tablename__ = "customer_package_hotels"
+
+    customer_package_hotel_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    package_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customer_packages.customer_package_id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    hotel_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    city: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    star_rating: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    room_type: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    nights: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    hotel_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("customer_hotels.customer_hotel_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    image_key: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+
+    package: Mapped["CustomerPackage"] = relationship(back_populates="hotels")
 
 
 class CustomerPackageDeparture(Base):
