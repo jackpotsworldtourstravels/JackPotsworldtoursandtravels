@@ -1327,6 +1327,16 @@ class CustomerAttraction(Base):
     #: wherever the search engine guessed.
     map_url: Mapped[Optional[str]] = mapped_column(String(400), nullable=True)
 
+    # -- A rating, and where it came from (0082) -----------------------------
+    # NOT an average of our own reviews: customer_reviews holds none, for
+    # landmarks or for anything else. This is a figure somebody recorded from
+    # a named source, and the page prints the source beside the score - which
+    # is what makes it a citation rather than a claim. All three are null
+    # until then, and the hero simply shows no rating.
+    rating: Mapped[Optional[float]] = mapped_column(Numeric(2, 1), nullable=True)
+    rating_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rating_source: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+
     sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(

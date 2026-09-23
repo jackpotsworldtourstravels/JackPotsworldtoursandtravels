@@ -38,12 +38,12 @@
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp2">
+<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp3">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
-<script src="assets/js/jp-icons.js?v=20260923lp2"></script>
+<script src="assets/js/jp-icons.js?v=20260923lp3"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- The photographs of the famous places, vendored from Wikimedia Commons by
      scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
@@ -55,7 +55,7 @@
 <script src="assets/js/hotel-images.js?v=20260912im1"></script>
 <!-- The cities' own photographs, for the panel that illustrates a tour of the
      destination rather than this one landmark. Third manifest, same rule. -->
-<script src="assets/js/destination-images.js?v=20260923lp2"></script>
+<script src="assets/js/destination-images.js?v=20260923lp3"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260923bk1"></script>
 </head>
@@ -96,6 +96,8 @@
           <h1 id="lpTitle"></h1>
           <p class="lp-lead" id="lpLead" hidden></p>
           <div class="lp-hero-meta" id="lpHeroMeta" hidden>
+            <!-- A score AND its source, or neither: see migration 0082. -->
+            <span class="lp-chip lp-chip-rating" id="lpRating" hidden></span>
             <span class="lp-chip" id="lpShots" hidden></span>
             <a class="lp-chip lp-chip-act" id="lpMapLink" hidden target="_blank" rel="noopener noreferrer"></a>
             <button type="button" class="lp-chip lp-chip-act" id="lpGalleryBtn" hidden></button>
@@ -183,6 +185,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/location.js?v=20260923lp2"></script>
+<script src="assets/js/location.js?v=20260923lp3"></script>
 </body>
 </html>

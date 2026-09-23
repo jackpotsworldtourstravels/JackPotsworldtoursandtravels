@@ -22,9 +22,11 @@
    WHAT IT REFUSES TO INVENT, which is most of what a page like this usually
    makes up:
 
-     a rating      There is none. Nothing in this database has ever rated a
-                   landmark, so the hero shows no stars rather than the
-                   flattering 4.8 every travel site prints.
+     a rating      Only a recorded one, and only with its source printed
+                   beside it (0082) - "4.6 Google Maps" is a citation, "4.6"
+                   alone is this site claiming travellers said so. No source,
+                   no chip; nothing is averaged out of the nothing in
+                   customer_reviews.
      a distance    "Top attractions nearby" names each place's nearest listed
                    area instead of "2.4 km away": this catalogue holds no
                    coordinates, and a kilometre figure would be a guess
@@ -126,7 +128,7 @@
   /* ======================================================================
      THE HERO
      ====================================================================== */
-  function renderHero(a, shots) {
+  function renderHero(a, shots, art) {
     document.getElementById('lpTitle').textContent = a.name;
 
     /* The trail the traveller came down, so a page entered from a search
@@ -160,9 +162,15 @@
        one image on the page loaded eagerly - it is the first thing on screen,
        and lazily loading what somebody is already looking at is a blank box
        for no saving. The name and city live in the markup, so the hero reads
-       correctly before the picture arrives and if it never does. */
+       correctly before the picture arrives and if it never does.
+
+       THE CITY'S PHOTOGRAPH COMES FIRST, NOT THE LANDMARK'S. The attraction
+       photographs are documentary shots of one building, usually taken close
+       enough to fill the frame with masonry - cropped to a wide hero they
+       become a wall. The destinations shelf's picture is the wide view of the
+       same place, which is what a hero wants; the landmark's own photograph
+       is then the one standing beside About, where its detail is the point. */
     const hero = document.getElementById('lpHero');
-    const art = shots.length ? shots[0].art : null;
     if (art) {
       const img = document.createElement('img');
       img.className = 'lp-hero-img';
@@ -183,6 +191,20 @@
        behind it. The map link exists only when somebody checked one into the
        row, because this table holds no coordinates to build one from. */
     let any = false;
+    /* THE RATING, WHEN THERE IS ONE AND IT SAYS WHOSE IT IS. The API sends a
+       score only together with its source (0082) and the chip prints both, so
+       "4.6 Google Maps" is a citation rather than this site quietly claiming
+       travellers rated the place. No source, no score, no chip. */
+    if (a.rating != null && a.rating_source) {
+      const el = document.getElementById('lpRating');
+      const count = a.rating_count
+        ? ` <span class="lp-rating-count">(${a.rating_count.toLocaleString('en-IN')})</span>` : '';
+      el.innerHTML = icon('star', 14)
+        + `<span><strong>${esc(a.rating.toFixed(1))}</strong>${count}</span>`
+        + `<span class="lp-rating-src">${esc(a.rating_source)}</span>`;
+      show(el, true);
+      any = true;
+    }
     if (shots.length > 1) {
       const el = document.getElementById('lpShots');
       el.innerHTML = icon('camera', 14) + `<span>${shots.length} photographs</span>`;
@@ -247,7 +269,7 @@
     </article>`;
   }
 
-  function renderFares(a, shots) {
+  function renderFares(a, shots, heroArt) {
     const f = a.fare_details || {};
     /* The hotels button is the only one that can lead somewhere empty, so it
        is the only one that disappears when there is nothing behind it.
@@ -257,6 +279,15 @@
       ? 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug)
       : null;
     const here = shots.length ? shots[0].art : null;
+    /* THE PACKAGES CARD TAKES WHICHEVER PICTURE THE HERO DID NOT. Both the
+       city's photograph and the landmark's are true illustrations of "a tour
+       of this place"; showing the hero's again, a screen further down, just
+       looks like the page ran out of pictures. */
+    const city = destArtFor(a.destination_image);
+    /* BY `src`, NOT BY IDENTITY: each resolver builds a fresh object, so two
+       calls for the same key are never the same reference. */
+    const notHero = [city, here].find(x => x && (!heroArt || x.src !== heroArt.src))
+      || city || here;
 
     document.getElementById('lpFares').innerHTML = [
       fareCard({
@@ -271,7 +302,7 @@
         credit: f.hotel_from != null && f.hotel_name ? 'at ' + f.hotel_name : '',
       }),
       fareCard({
-        art: destArtFor(a.destination_image) || here, mark: 'luggage', label: 'Tour packages from',
+        art: notHero, mark: 'luggage', label: 'Tour packages from',
         value: f.package_from, href: 'packages.html', cta: 'Explore packages',
       }),
     ].join('');
@@ -358,14 +389,14 @@
       show(document.getElementById('lpFacts'), true);
     }
 
-    /* THE SECOND PHOTOGRAPH GOES HERE, not the first: the hero is already
-       showing shots[0] full width, and repeating it beside the text is the
-       same picture twice on one screen. With only one photograph the column
-       falls back to the city's own, and with neither the text simply widens -
-       the grid is one column and the article fills it. */
-    const aside = (shots.length > 1 ? shots[1].art : null)
-      || destArtFor(a.destination_image)
-      || (shots.length ? shots[0].art : null);
+    /* THE LANDMARK'S OWN PHOTOGRAPH GOES HERE. The hero is the wide view of
+       the city, so this column is where the thing the article is about
+       actually appears - close, tall, beside the paragraphs describing it. It
+       falls back to the city's picture only when no photograph of the
+       landmark shipped, and to nothing at all when neither did: the grid is
+       one column then and the article simply fills it. */
+    const aside = (shots.length ? shots[0].art : null)
+      || destArtFor(a.destination_image);
     if (aside) {
       document.getElementById('lpAboutArt').innerHTML =
         `<img src="${esc(aside.small)}" srcset="${esc(aside.small)} 480w, ${esc(aside.src)} 960w"
@@ -464,9 +495,14 @@
        because nobody has added a second one. */
     const keys = (a.gallery && a.gallery.length) ? a.gallery : (a.image ? [a.image] : []);
     const shots = keys.map(k => ({ key: k, art: artFor(k) })).filter(s => s.art);
+    /* One decision, made here and passed down: the hero is the WIDE view -
+       the city's photograph where one shipped, the landmark's where it did
+       not - and the panels below it are told what it took so that no two of
+       them show the same picture. */
+    const heroArt = destArtFor(a.destination_image) || (shots.length ? shots[0].art : null);
 
-    renderHero(a, shots);
-    renderFares(a, shots);
+    renderHero(a, shots, heroArt);
+    renderFares(a, shots, heroArt);
     renderQuick(a);
     renderAbout(a, shots);
 

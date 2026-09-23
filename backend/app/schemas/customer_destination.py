@@ -235,6 +235,19 @@ class AttractionDetail(DestinationAttraction):
         default=None,
         description="Only when somebody has checked it - this table holds no coordinates.",
     )
+    rating: float | None = Field(
+        default=None,
+        description=(
+            "A recorded score out of 5 (0082). NOT an average of reviews on this site - there "
+            "are none. Served only together with `rating_source`, and the page shows the two "
+            "together, because an unattributed number on a booking page is a claim nobody can "
+            "check. Null, which is the usual answer, means the hero draws no rating."
+        ),
+    )
+    rating_count: int | None = Field(
+        default=None, description="How many ratings that score is over, when the source says.")
+    rating_source: str | None = Field(
+        default=None, description="Who gave the score - shown beside it, never omitted.")
 
     nearby: list[DestinationAttraction] = Field(
         default_factory=list,
