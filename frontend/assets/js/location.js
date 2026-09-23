@@ -65,9 +65,17 @@
      shipped manifest, or no picture at all. */
   const artFor = key => {
     if (!key || typeof LOCATION_IMAGE_FILES !== 'object' || !LOCATION_IMAGE_FILES) return null;
-    if (!LOCATION_IMAGE_FILES[key]) return null;
+    const stamp = LOCATION_IMAGE_FILES[key];
+    if (!stamp) return null;
     const dir = (typeof LOCATION_IMAGE_DIR === 'string') ? LOCATION_IMAGE_DIR : 'assets/locations/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
+       key, so replacing a photograph changes the bytes behind a URL that does
+       not change - and a browser that has been here keeps the old picture.
+       The manifest's value is a content stamp of that file, so the URL moves
+       when the picture does. An older manifest whose values are `true` yields
+       no query and behaves exactly as before. */
+    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
+    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
   /* The site's own money formatter where it is loaded, and a plain rupee
@@ -88,9 +96,11 @@
      picture. */
   const hotelArtFor = key => {
     if (!key || typeof HOTEL_IMAGE_FILES !== 'object' || !HOTEL_IMAGE_FILES) return null;
-    if (!HOTEL_IMAGE_FILES[key]) return null;
+    const stamp = HOTEL_IMAGE_FILES[key];
+    if (!stamp) return null;
     const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
+    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
   /* The CITY's artwork, for the packages card: a picture of the destination is
@@ -98,9 +108,11 @@
      contract - a key the API sent, present in the shipped list, or nothing. */
   const destArtFor = key => {
     if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
-    if (!DESTINATION_IMAGE_FILES[key]) return null;
+    const stamp = DESTINATION_IMAGE_FILES[key];
+    if (!stamp) return null;
     const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
+    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
   /* THE ONE PICTURE ON THIS PAGE THAT IS NOT OF ANYWHERE. The flights card

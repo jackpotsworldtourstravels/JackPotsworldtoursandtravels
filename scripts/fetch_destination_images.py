@@ -32,6 +32,7 @@ Requires Pillow: `pip install Pillow`.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -127,6 +128,18 @@ def to_webp(raw: bytes, slug: str) -> list[tuple[str, int]]:
     return written
 
 
+def _stamp(slug: str) -> str:
+    """Eight hex of the 960w file's MD5 — the cache key for that picture."""
+    path = os.path.join(OUT_DIR, f"{slug}.webp")
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.md5(fh.read()).hexdigest()[:8]
+    except OSError:
+        # No file means no stamp, and the manifest should not claim one. The
+        # entry stays truthy so presence still reads correctly.
+        return "1"
+
+
 def write_js(records: dict) -> None:
     """The manifest the browser reads. Data only, and presence is the contract.
 
@@ -134,7 +147,18 @@ def write_js(records: dict) -> None:
     frontend derives ``assets/destinations/<slug>.webp`` without a second lookup
     and without an existence check per card.
     """
-    files = {slug: True for slug in sorted(records)}
+    # A CONTENT STAMP, NOT JUST `true`. The path a browser fetches is derived
+    # from the slug, so replacing a photograph changes the bytes at a URL that
+    # never changes - and every browser that has been to the site keeps the
+    # old picture until its copy expires. (That is exactly what happened when
+    # Goa's photograph was replaced: the file on the server was new, every
+    # visitor's screen was not.)
+    #
+    # The value is the first 8 hex of the file's MD5. Clients append it as a
+    # `?v=`, so new bytes mean a new URL and the swap is immediate. It is also
+    # still TRUTHY, which is the whole contract older readers of this manifest
+    # rely on - nothing that only asks "is this slug present" has to change.
+    files = {slug: _stamp(slug) for slug in sorted(records)}
     credits = {
         slug: {"artist": rec["artist"], "licence": rec["licence"],
                "source": rec["descr_url"]}
@@ -155,7 +179,10 @@ def write_js(records: dict) -> None:
         "",
         "const DESTINATION_IMAGE_DIR = 'assets/destinations/';",
         "",
-        "/* image_key -> true. Presence is the whole contract; paths are derived. */",
+        "/* image_key -> a short content stamp of that file (truthy, like the",
+        "   `true` it replaced). Presence still means 'this slug has artwork';",
+        "   the value is what the client appends as ?v= so that REPLACING a",
+        "   photograph reaches browsers that already cached the old one. */",
         "const DESTINATION_IMAGE_FILES = " + json.dumps(files, indent=2, sort_keys=True) + ";",
         "",
         "/* Photographer credit per slug, for the attribution surface. */",

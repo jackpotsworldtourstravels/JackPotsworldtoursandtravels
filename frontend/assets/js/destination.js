@@ -57,21 +57,38 @@
      directories, and a key from the API for each. */
   const destArtFor = key => {
     if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
-    if (!DESTINATION_IMAGE_FILES[key]) return null;
+    const stamp = DESTINATION_IMAGE_FILES[key];
+    if (!stamp) return null;
     const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
+       key, so replacing a photograph changes the bytes behind a URL that does
+       not change - and a browser that has been here keeps the old picture.
+       The manifest's value is a content stamp of that file, so the URL moves
+       when the picture does. An older manifest whose values are `true` yields
+       no query and behaves exactly as before. */
+    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
+    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
   const artFor = key => {
     if (!key) return null;
+    const q = s => (typeof s === 'string') ? '?v=' + s : '';
+    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
+       key, so replacing a photograph changes the bytes behind a URL that does
+       not change - and a browser that has been here keeps the old picture.
+       The manifest's value is a content stamp of that file, so the URL moves
+       when the picture does. An older manifest whose values are `true` yields
+       no query and behaves exactly as before. */
     if (typeof LOCATION_IMAGE_FILES === 'object' && LOCATION_IMAGE_FILES && LOCATION_IMAGE_FILES[key]) {
       const dir = (typeof LOCATION_IMAGE_DIR === 'string') ? LOCATION_IMAGE_DIR : 'assets/locations/';
-      return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+      const v = q(LOCATION_IMAGE_FILES[key]);
+      return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
     }
     if (typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
     if (!DESTINATION_IMAGE_FILES[key]) return null;
     const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+    const v = q(DESTINATION_IMAGE_FILES[key]);
+    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
   async function getJson(url) {

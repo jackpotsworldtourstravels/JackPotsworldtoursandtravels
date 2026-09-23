@@ -12,16 +12,103 @@
 
 const DESTINATION_IMAGE_DIR = 'assets/destinations/';
 
-/* image_key -> true. Presence is the whole contract; paths are derived. */
+/* image_key -> a short content stamp of that file (truthy, like the
+   `true` it replaced). Presence still means 'this slug has artwork';
+   the value is what the client appends as ?v= so that REPLACING a
+   photograph reaches browsers that already cached the old one. */
 const DESTINATION_IMAGE_FILES = {
-  "goa": true
+  "bali": "9118a49c",
+  "bengaluru": "01687daf",
+  "delhi": "ac7e7757",
+  "dubai": "5f5a6503",
+  "goa": "4da14b33",
+  "hyderabad": "8532428f",
+  "jaipur": "2dd071eb",
+  "kashmir": "18e5c372",
+  "kolkata": "d3ec2d85",
+  "maldives": "5d79a75f",
+  "mumbai": "1a3288e6",
+  "singapore": "c6abed0c",
+  "thailand": "7b65f54e",
+  "tirupati": "f9e159bc",
+  "vijayawada": "2f8fe72c"
 };
 
 /* Photographer credit per slug, for the attribution surface. */
 const DESTINATION_IMAGE_CREDITS = {
+  "bali": {
+    "artist": "CEphoto, Uwe Aranas",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tanah-Lot_Bali_Indonesia_Pura-Tanah-Lot-01.jpg"
+  },
+  "bengaluru": {
+    "artist": "DeepanjanGhosh",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Vidhana_Soudha_LE.jpg"
+  },
+  "delhi": {
+    "artist": "Nikhilb239",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:India_Gate,_New_Delhi_from_West.jpg"
+  },
+  "dubai": {
+    "artist": "imran shahabuddin",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Burj_Khalifa_(worlds_tallest_building)_and_the_Dubai_skyline_(25781049892).jpg"
+  },
   "goa": {
     "artist": "Nico Crisafulli from USA",
     "licence": "CC BY 2.0",
     "source": "https://commons.wikimedia.org/wiki/File:Palolem_Beach_(5580920479).jpg"
+  },
+  "hyderabad": {
+    "artist": "Hari Om Prakash",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Charminar,_Hyderabad,_Telangana.jpg"
+  },
+  "jaipur": {
+    "artist": "Wander-earth",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hawa_Mahal_in_Jaipur_India.jpg"
+  },
+  "kashmir": {
+    "artist": "Vineetmbbs",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dal_Lake,_Srinagar,_July_2012.jpg"
+  },
+  "kolkata": {
+    "artist": "Bernard Gagnon",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Victoria_Memorial,_Kolkata_-_West_facade_01.jpg"
+  },
+  "maldives": {
+    "artist": "B166-er",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Maldives_RBR_beach_6.jpg"
+  },
+  "mumbai": {
+    "artist": "SriSriChinmaya",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Gateway_of_India_in_the_evening,_Mumbai,_India.jpg"
+  },
+  "singapore": {
+    "artist": "-jkb-",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Singapore_Skyline_Marina_Bay_Sands.jpg"
+  },
+  "thailand": {
+    "artist": "Diego Delso",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Templo_Wat_Arun,_Bangkok,_Tailandia,_2013-08-22,_DD_30.jpg"
+  },
+  "tirupati": {
+    "artist": "Nikhilb239",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tirumala_090615.jpg"
+  },
+  "vijayawada": {
+    "artist": "\u0c30\u0c39\u0c4d\u0c2e\u0c3e\u0c28\u0c41\u0c26\u0c4d\u0c26\u0c40\u0c28\u0c4d",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Vijayawada_durga_temple.JPG"
   }
 };

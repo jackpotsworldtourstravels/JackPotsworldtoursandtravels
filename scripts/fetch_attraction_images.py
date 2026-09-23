@@ -57,6 +57,7 @@ application does).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -291,13 +292,29 @@ def to_webp(raw: bytes, key: str) -> list[tuple[str, int]]:
     return written
 
 
+def _stamp(slug: str, out_dir: str) -> str:
+    """Eight hex of the 960w file's MD5 - the cache key for that picture.
+
+    A manifest that said `true` meant a replaced photograph never reached a
+    browser that had already cached the old one: the path is derived from the
+    key, so new bytes sat behind an unchanged URL. The clients append this as
+    `?v=`, and a value of "1" (no file to hash) is still truthy, which is all
+    the older readers of these manifests ever checked.
+    """
+    try:
+        with open(os.path.join(out_dir, f"{slug}.webp"), "rb") as fh:
+            return hashlib.md5(fh.read()).hexdigest()[:8]
+    except OSError:
+        return "1"
+
+
 def write_js(records: dict) -> None:
     """The manifest. The browser resolves a KEY from the API through this.
 
     Same contract as destination-images.js: a key the API sent, present here,
     or no photograph at all. Nothing in the frontend knows a landmark's name.
     """
-    files = {k: True for k in sorted(records)}
+    files = {k: _stamp(k, OUT_DIR) for k in sorted(records)}
     credits = {k: {"title": v["title"], "artist": v["artist"], "licence": v["licence"],
                    "source": v["descr_url"]}
                for k, v in sorted(records.items())}

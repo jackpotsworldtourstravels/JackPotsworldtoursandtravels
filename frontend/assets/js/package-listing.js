@@ -60,7 +60,15 @@
   const fromManifest = (key, files, dir, fallbackDir) => {
     if (!key || typeof files !== 'object' || !files || !files[key]) return null;
     const d = (typeof dir === 'string') ? dir : fallbackDir;
-    return { src: d + key + '.webp', small: d + key + '-480.webp' };
+    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
+       key, so replacing a photograph changes the bytes behind a URL that does
+       not change - and a browser that has been here keeps the old picture.
+       The manifest's value is a content stamp of that file, so the URL moves
+       when the picture does. An older manifest whose values are `true` yields
+       no query and behaves exactly as before. */
+    const stamp = files[key];
+    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
+    return { src: d + key + '.webp' + v, small: d + key + '-480.webp' + v };
   };
   const destArt = key =>
     fromManifest(key, typeof DESTINATION_IMAGE_FILES !== 'undefined' ? DESTINATION_IMAGE_FILES : null,
