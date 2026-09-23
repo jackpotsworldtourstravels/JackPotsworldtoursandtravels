@@ -108,10 +108,70 @@
   const FILTER_KEYS = ['trip', 'destination', 'month', 'hotel', 'rating', 'minDays', 'maxDays', 'maxPrice'];
   const state = { sort: 'price-asc' };
 
+  /* THE LANDING PAGE'S SEARCH CARD SPEAKS ITS OWN LANGUAGE, and this page has
+     to understand it. Choosing "Pilgrimage Tour Package" and a month on the
+     home page navigates here as
+
+         packages.html?type=Pilgrimage%20Tour%20Package&month=July
+
+     - a label, not a slug, and a month NAME, not a YYYY-MM. Those are the
+     words the card has always sent (booking-card.js `criteria('packages')`),
+     and a page that quietly ignored them showed every package under a heading
+     the traveller thought said Pilgrimage. Translated here rather than
+     changed there, because the card also feeds gaming-packages.html. */
+  const TYPE_WORDS = { domestic: 'domestic', international: 'international', pilgrimage: 'pilgrimage' };
+  const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june',
+                       'july', 'august', 'september', 'october', 'november', 'december'];
+
+  function fromCardParams(q) {
+    const type = (q.get('type') || '').toLowerCase();
+    if (!state.trip) {
+      const hit = Object.keys(TYPE_WORDS).find(k => type.includes(k));
+      if (hit) state.trip = TYPE_WORDS[hit];
+    }
+
+    /* "July" means the NEXT July that something departs in. A bare month name
+       has no year in it, and resolving it against the catalogue's own list of
+       departure months is the only reading that cannot produce a month we do
+       not sell. If the facets have not arrived yet the raw value is kept and
+       reconciled once they do. */
+    const raw = (q.get('month') || '').trim();
+    if (raw && !state.month) {
+      if (/^\d{4}-\d{2}$/.test(raw)) state.month = raw;
+      else state.pendingMonth = raw.toLowerCase();
+    }
+  }
+
+  function resolvePendingMonth(months) {
+    if (!state.pendingMonth) return false;
+    const idx = MONTH_NAMES.indexOf(state.pendingMonth);
+    state.pendingMonth = '';
+    if (idx < 0) return false;
+    const match = (months || []).map(m => m.value)
+      .find(v => Number(v.slice(5, 7)) === idx + 1);
+    if (!match) return false;         /* nothing departs that month: show all */
+    state.month = match;
+    return true;
+  }
+
   function readUrl() {
     const q = new URLSearchParams(location.search);
     FILTER_KEYS.forEach(k => { const v = q.get(k); if (v) state[k] = v; });
+    /* THE BUG THIS GUARD EXISTS FOR. `month` is in FILTER_KEYS, so arriving
+       from the landing page's search card - which sends the month as the word
+       "July" - put "July" straight into the query string of the API call. The
+       endpoint takes YYYY-MM and answered 422, and the page reported that it
+       could not load the packages: an empty Tour Packages page for anybody
+       who searched from the home page instead of clicking through.
+
+       A month that is not YYYY-MM is not a month this page can send. It is
+       handed to fromCardParams below, which knows what a month NAME is. */
+    if (state.month && !/^\d{4}-\d{2}$/.test(state.month)) {
+      state.pendingMonth = String(state.month).toLowerCase();
+      state.month = '';
+    }
     if (q.get('sort') && SORTS[q.get('sort')]) state.sort = q.get('sort');
+    fromCardParams(q);
   }
 
   function writeUrl(replace) {
@@ -126,7 +186,10 @@
     const q = new URLSearchParams({ category: 'holiday' });
     if (state.trip) q.set('trip_type', state.trip);
     if (state.destination) q.set('destination', state.destination);
-    if (state.month) q.set('month', state.month);
+    /* Belt as well as braces: nothing that is not a YYYY-MM month reaches the
+       API, whatever put it in `state`. A malformed filter should narrow
+       nothing, never take the whole list down with a 422. */
+    if (state.month && /^\d{4}-\d{2}$/.test(state.month)) q.set('month', state.month);
     if (state.hotel) q.set('hotel_category', state.hotel);
     if (state.rating) q.set('min_rating', state.rating);
     if (state.minDays) q.set('min_days', state.minDays);
@@ -416,7 +479,15 @@
       .then(t => { if (mine === inflight) renderTiles(t); })
       .catch(e => console.warn('[packages] category counts unavailable:', e.status || e));
     getJson('/api/customer/packages/facets?category=holiday')
-      .then(f => { if (mine === inflight) renderRail(f); })
+      .then(f => {
+        if (mine !== inflight) return;
+        /* A month name from the landing card can only be turned into a real
+           month once the catalogue's months are known, so it is resolved here
+           and the list is asked for again - once, because resolvePending
+           clears the pending value whether or not it matched. */
+        if (resolvePendingMonth(f.months)) { writeUrl(true); load(true); return; }
+        renderRail(f);
+      })
       .catch(e => console.warn('[packages] filters unavailable:', e.status || e));
   }
 
@@ -517,5 +588,12 @@
     .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`).join('');
 
   readUrl();
+  /* The landing card's own words are translated on arrival and the URL is
+     rewritten to this page's vocabulary, so a refresh, a bookmark or a shared
+     link carries ?trip=domestic&month=2026-10 rather than a phrase from a
+     dropdown that only one page understands. */
+  const cameFromCard = /[?&](type|month)=/.test(location.search);
+  readUrl();
+  if (cameFromCard) writeUrl(true);
   load(true);
 })();

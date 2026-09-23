@@ -273,6 +273,14 @@ r = requests.get(f"{PKG}?trip_type=pilgramage")          # deliberate typo
 check("an unknown trip_type is 422, not everything", r.status_code == 422, str(r.status_code))
 r = requests.get(f"{PKG}?category=holidays")             # deliberate typo
 check("an unknown category is 422, not everything", r.status_code == 422, str(r.status_code))
+# THE ONE THAT BROKE THE PAGE. The landing page's search card sends the month
+# as a word - "July" - and the listing passed it straight through to here,
+# which answered 422 and left Tour Packages empty for anybody who searched
+# from the home page. The API is right to refuse it: a month name has no year
+# in it. The translation belongs to the page, and this asserts the contract
+# both sides now hold to.
+r = requests.get(f"{PKG}?month=July")
+check("a month NAME is refused, not guessed at", r.status_code == 422, str(r.status_code))
 r = requests.get(f"{PKG}?month=2026-13")
 check("an impossible month is refused", r.status_code in (404, 422, 500), str(r.status_code))
 r = requests.get(f"{PKG}/999999")
