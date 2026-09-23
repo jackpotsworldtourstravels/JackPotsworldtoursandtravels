@@ -70,7 +70,12 @@ WEBP_QUALITY = 80
 #: browser derives the path. No name appears in frontend JavaScript, and adding a
 #: destination is a row plus an entry here — not a code change.
 PHOTOS = {
-    "goa":        "File:Palolem beach - panoramio (2).jpg",
+    # Replaced on request: the old Palolem panoramio shot was a beached boat
+    # under a white sky, which read as a grey card wherever Goa appeared -
+    # the homepage shelf, the destination hero and the package cards. This is
+    # the same beach at golden hour, with the palms, the huts and the curve of
+    # the bay, which is what the page is selling.
+    "goa":        "File:Palolem Beach (5580920479).jpg",
     "hyderabad":  "File:Charminar, Hyderabad, Telangana.jpg",
     "mumbai":     "File:Gateway of India in the evening, Mumbai, India.jpg",
     "delhi":      "File:India Gate, New Delhi from West.jpg",

@@ -8,18 +8,4 @@ NonCommercial or NoDerivatives licence is accepted.
 
 | Destination | Photographer | Licence | Source |
 | --- | --- | --- | --- |
-| `bali` | CEphoto, Uwe Aranas | CC BY-SA 3.0 | [File:Tanah-Lot Bali Indonesia Pura-Tanah-Lot-01.jpg](https://commons.wikimedia.org/wiki/File:Tanah-Lot_Bali_Indonesia_Pura-Tanah-Lot-01.jpg) |
-| `bengaluru` | DeepanjanGhosh | CC BY-SA 4.0 | [File:Vidhana Soudha LE.jpg](https://commons.wikimedia.org/wiki/File:Vidhana_Soudha_LE.jpg) |
-| `delhi` | Nikhilb239 | CC BY-SA 4.0 | [File:India Gate, New Delhi from West.jpg](https://commons.wikimedia.org/wiki/File:India_Gate,_New_Delhi_from_West.jpg) |
-| `dubai` | imran shahabuddin | CC BY 2.0 | [File:Burj Khalifa (worlds tallest building) and the Dubai skyline (25781049892).jpg](https://commons.wikimedia.org/wiki/File:Burj_Khalifa_(worlds_tallest_building)_and_the_Dubai_skyline_(25781049892).jpg) |
-| `goa` | Alexey Komarov | CC BY 3.0 | [File:Palolem beach - panoramio (2).jpg](https://commons.wikimedia.org/wiki/File:Palolem_beach_-_panoramio_(2).jpg) |
-| `hyderabad` | Hari Om Prakash | CC BY-SA 3.0 | [File:Charminar, Hyderabad, Telangana.jpg](https://commons.wikimedia.org/wiki/File:Charminar,_Hyderabad,_Telangana.jpg) |
-| `jaipur` | Wander-earth | CC BY-SA 4.0 | [File:Hawa Mahal in Jaipur India.jpg](https://commons.wikimedia.org/wiki/File:Hawa_Mahal_in_Jaipur_India.jpg) |
-| `kashmir` | Vineetmbbs | CC BY-SA 3.0 | [File:Dal Lake, Srinagar, July 2012.jpg](https://commons.wikimedia.org/wiki/File:Dal_Lake,_Srinagar,_July_2012.jpg) |
-| `kolkata` | Bernard Gagnon | CC BY-SA 3.0 | [File:Victoria Memorial, Kolkata - West facade 01.jpg](https://commons.wikimedia.org/wiki/File:Victoria_Memorial,_Kolkata_-_West_facade_01.jpg) |
-| `maldives` | B166-er | CC BY-SA 3.0 | [File:Maldives RBR beach 6.jpg](https://commons.wikimedia.org/wiki/File:Maldives_RBR_beach_6.jpg) |
-| `mumbai` | SriSriChinmaya | CC BY-SA 4.0 | [File:Gateway of India in the evening, Mumbai, India.jpg](https://commons.wikimedia.org/wiki/File:Gateway_of_India_in_the_evening,_Mumbai,_India.jpg) |
-| `singapore` | -jkb- | CC BY-SA 3.0 | [File:Singapore Skyline Marina Bay Sands.jpg](https://commons.wikimedia.org/wiki/File:Singapore_Skyline_Marina_Bay_Sands.jpg) |
-| `thailand` | Diego Delso | CC BY-SA 3.0 | [File:Templo Wat Arun, Bangkok, Tailandia, 2013-08-22, DD 30.jpg](https://commons.wikimedia.org/wiki/File:Templo_Wat_Arun,_Bangkok,_Tailandia,_2013-08-22,_DD_30.jpg) |
-| `tirupati` | Nikhilb239 | CC BY-SA 4.0 | [File:Tirumala 090615.jpg](https://commons.wikimedia.org/wiki/File:Tirumala_090615.jpg) |
-| `vijayawada` | రహ్మానుద్దీన్ | CC BY-SA 3.0 | [File:Vijayawada durga temple.JPG](https://commons.wikimedia.org/wiki/File:Vijayawada_durga_temple.JPG) |
+| `goa` | Nico Crisafulli from USA | CC BY 2.0 | [File:Palolem Beach (5580920479).jpg](https://commons.wikimedia.org/wiki/File:Palolem_Beach_(5580920479).jpg) |
