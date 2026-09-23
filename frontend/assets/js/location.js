@@ -91,6 +91,25 @@
     return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
   };
 
+  /* The CITY's artwork, for the packages card: a picture of the destination is
+     the honest illustration for "a tour of this place". Third manifest, same
+     contract - a key the API sent, present in the shipped list, or nothing. */
+  const destArtFor = key => {
+    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
+    if (!DESTINATION_IMAGE_FILES[key]) return null;
+    const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
+    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+  };
+
+  /* THE ONE PICTURE ON THIS PAGE THAT IS NOT OF ANYWHERE. The flights card
+     needs an aeroplane and this database holds no photograph of one, so it
+     borrows the site's own landing image - the same file index.html opens
+     with. It sits behind the words "flights from" and illustrates nothing
+     more than that; no route, no aircraft, no carrier is being claimed.
+     Both entries are that single asset, which is why `small` is not a
+     narrower file: there is only one. */
+  const FLIGHT_ART = { src: 'assets/images/hero-sunset.webp', small: 'assets/images/hero-sunset.webp' };
+
   async function getJson(url) {
     const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
     if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
@@ -189,24 +208,41 @@
   }
 
   /* ======================================================================
-     FARES — three cards, each over a photograph of this place
-     ====================================================================== */
-  function fareCard(art, label, value, suffix, href, cta) {
-    const has = value != null;
+     FARES — three photographs you can book from
+     ======================================================================
+     EACH CARD IS A PICTURE OF WHAT IT SELLS, and each picture is one this
+     site already ships:
+
+       flights   the aeroplane the landing page opens with - a site asset,
+                 decoration, and not a claim about any route.
+       hotels    THE HOTEL THE PRICE BELONGS TO. The API sends the cheapest
+                 listed room's own image key beside its figure, so ₹11,200 is
+                 shown over the building it is charged by rather than over a
+                 stock room from a photo library.
+       packages  the destination's own photograph, the same key the
+                 destinations shelf resolves.
+
+     A card with no photograph keeps the layout and loses the picture; it
+     never falls back to something taken somewhere else. */
+  function fareCard(o) {
+    const has = o.value != null;
     const figure = has
-      ? esc(money(value)) + (suffix ? `<span>${esc(suffix)}</span>` : '')
+      ? esc(money(o.value)) + (o.suffix ? `<span>${esc(o.suffix)}</span>` : '')
       : 'Currently unavailable';
-    /* NO PHOTOGRAPH, NO PANEL. A quarter of the landmarks have no picture yet,
-       and three empty tinted bands in a row look like three failed images -
-       the card simply becomes a clean price panel instead. */
-    return `<article class="lp-fare${has ? '' : ' is-empty'}${art ? '' : ' is-artless'}">
-      ${art ? `<div class="lp-fare-art">
-        <img src="${esc(art.small)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">
-      </div>` : ''}
+    /* With no photograph the card keeps its shape and shows the mark for what
+       it sells - an aeroplane, a bed, a case. A drawn icon is honestly a
+       drawing; a photograph of somebody else's hotel would not be. */
+    return `<article class="lp-fare${has ? '' : ' is-empty'}${o.art ? '' : ' is-artless'}">
+      <div class="lp-fare-art" aria-hidden="true">${o.art
+        ? `<img src="${esc(o.art.small)}" srcset="${esc(o.art.small)} 480w, ${esc(o.art.src)} 960w"
+               sizes="(max-width: 700px) 92vw, 420px" alt="" loading="lazy" decoding="async"
+               onerror="this.remove()">`
+        : `<span class="lp-fare-mark">${icon(o.mark, 64)}</span>`}</div>
       <div class="lp-fare-body">
-        <p class="lp-fare-label">${esc(label)}</p>
+        <p class="lp-fare-label">${esc(o.label)}</p>
         <p class="lp-fare-value">${figure}</p>
-        ${href ? `<a class="disc-btn" href="${esc(href)}">${esc(cta)} ${icon('arrowRight', 15)}</a>` : ''}
+        ${o.credit ? `<p class="lp-fare-credit">${esc(o.credit)}</p>` : ''}
+        ${o.href ? `<a class="disc-btn" href="${esc(o.href)}">${esc(o.cta)} ${icon('arrowRight', 15)}</a>` : ''}
       </div>
     </article>`;
   }
@@ -220,15 +256,24 @@
     const hotelsHref = (Number(a.hotel_count) || 0) > 0
       ? 'hotels/' + encodeURIComponent(a.destination_id) + '/' + encodeURIComponent(a.slug)
       : null;
-    /* A different photograph behind each card where the place has three, and
-       the same one repeated where it does not. The image is scenery for the
-       figure, never evidence for it. */
-    const art = i => (shots.length ? shots[Math.min(i, shots.length - 1)].art : null);
+    const here = shots.length ? shots[0].art : null;
 
     document.getElementById('lpFares').innerHTML = [
-      fareCard(art(0), 'Flights from', f.flight_from, '', 'flights.html', 'Search flights'),
-      fareCard(art(1), 'Hotels from', f.hotel_from, ' / night', hotelsHref, 'View hotels'),
-      fareCard(art(2), 'Tour packages from', f.package_from, '', 'packages.html', 'Explore packages'),
+      fareCard({
+        art: FLIGHT_ART, mark: 'planeTakeoff', label: 'Flights from', value: f.flight_from,
+        href: 'flights.html', cta: 'Search flights',
+      }),
+      fareCard({
+        art: hotelArtFor(f.hotel_image) || here, mark: 'bedDouble', label: 'Hotels from',
+        value: f.hotel_from, suffix: ' / night', href: hotelsHref, cta: 'View hotels',
+        /* Named, because the photograph is of a particular hotel and the
+           price is that hotel's - the card should say whose. */
+        credit: f.hotel_from != null && f.hotel_name ? 'at ' + f.hotel_name : '',
+      }),
+      fareCard({
+        art: destArtFor(a.destination_image) || here, mark: 'luggage', label: 'Tour packages from',
+        value: f.package_from, href: 'packages.html', cta: 'Explore packages',
+      }),
     ].join('');
 
     /* Where the hotel figure came from, said out loud: a price from the area
@@ -277,7 +322,7 @@
   /* ======================================================================
      ABOUT — the long read, with the facts beside it
      ====================================================================== */
-  function renderAbout(a) {
+  function renderAbout(a, shots) {
     const text = a.long_description || a.description;
     const facts = [];
     const where = [a.destination_name, a.country].filter(Boolean).join(', ');
@@ -311,6 +356,22 @@
       document.getElementById('lpFactsList').innerHTML = facts
         .map(pair => `<div><dt>${esc(pair[0])}</dt><dd>${esc(pair[1])}</dd></div>`).join('');
       show(document.getElementById('lpFacts'), true);
+    }
+
+    /* THE SECOND PHOTOGRAPH GOES HERE, not the first: the hero is already
+       showing shots[0] full width, and repeating it beside the text is the
+       same picture twice on one screen. With only one photograph the column
+       falls back to the city's own, and with neither the text simply widens -
+       the grid is one column and the article fills it. */
+    const aside = (shots.length > 1 ? shots[1].art : null)
+      || destArtFor(a.destination_image)
+      || (shots.length ? shots[0].art : null);
+    if (aside) {
+      document.getElementById('lpAboutArt').innerHTML =
+        `<img src="${esc(aside.small)}" srcset="${esc(aside.small)} 480w, ${esc(aside.src)} 960w"
+              sizes="(max-width: 900px) 92vw, 430px" alt="${esc(a.name)}"
+              loading="lazy" decoding="async" onerror="this.closest('figure').remove()">`;
+      show(document.getElementById('lpAboutArt'), true);
     }
     show(document.getElementById('lpAboutSec'), true);
   }
@@ -407,7 +468,7 @@
     renderHero(a, shots);
     renderFares(a, shots);
     renderQuick(a);
-    renderAbout(a);
+    renderAbout(a, shots);
 
     /* --- hotels nearby ----------------------------------------------- */
     const n = Number(a.hotel_count) || 0;

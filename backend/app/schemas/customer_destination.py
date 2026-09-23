@@ -175,6 +175,15 @@ class AttractionFares(BaseModel):
         default=None, description="'area' or 'destination' - which set that price came from.")
     hotel_scope_name: str | None = Field(
         default=None, description="The area or destination it came from, named.")
+    hotel_image: str | None = Field(
+        default=None,
+        description=(
+            "Image KEY of the hotel this price belongs to, so a card showing the price can "
+            "show that hotel rather than a stock room. Null when it has no artwork."
+        ),
+    )
+    hotel_name: str | None = Field(
+        default=None, description="That hotel, named - so the page can credit the photograph.")
     flight_from: float | None = Field(
         default=None,
         description=(
@@ -202,6 +211,10 @@ class AttractionDetail(DestinationAttraction):
 
     destination_name: str
     country: str | None = None
+    destination_image: str | None = Field(
+        default=None,
+        description="The CITY's image KEY, for panels that want the destination rather than this landmark.",
+    )
     fare_details: AttractionFares
     #: The long read under "About". `description` stays the one-line summary.
     long_description: str | None = None

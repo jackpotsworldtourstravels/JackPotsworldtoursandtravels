@@ -36,6 +36,14 @@
   --disc-accent-soft: rgba(79, 143, 168, .08);
   --disc-accent-line: rgba(79, 143, 168, .35);
   --disc-line: rgba(38, 55, 70, .10);
+  /* The sky. Three stops of very light blue, no saturation above 12% - a
+     travel page opens onto daylight, not onto a brand colour. */
+  --disc-sky-1: #F5FAFD;
+  --disc-sky-2: #E8F2F9;
+  --disc-sky-3: #DCEAF4;
+  /* Glass, for panels that sit on a photograph. */
+  --disc-glass: rgba(255, 255, 255, .16);
+  --disc-glass-line: rgba(255, 255, 255, .30);
   --disc-shadow: 0 8px 24px -14px rgba(38, 55, 70, .28);
   --disc-shadow-lift: 0 12px 30px rgba(38, 55, 70, .12);
   /* Playfair for headings, the UI font for everything else. The pair is the
@@ -43,18 +51,24 @@
   --disc-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
 
-/* The page itself: a three-stop wash so the background is not a flat fill,
-   and two radial washes at opposite corners for depth. Every one of them is
-   under a tenth of an opacity — at this strength it reads as paper, not as a
-   blue page, which is the difference between a travel site and a dashboard. */
-body.disc { background: var(--disc-bg); }
+/* THE PAGE IS A SKY, not a sheet of paper with a tint. Four layers: two soft
+   white clouds high on the page, a wider blue wash below them, and a vertical
+   gradient that starts pale at the top and deepens slightly towards the
+   bottom - the way light actually falls in a photograph of one. Every layer
+   is under a fifth of an opacity, so it still reads as background behind the
+   photographs rather than as a coloured page competing with them.
+
+   `fixed` attachment is what makes it a sky rather than a texture: the
+   content scrolls over it instead of carrying it along. */
+body.disc { background: var(--disc-sky-1); }
 .disc .disc-main {
   background:
-    radial-gradient(circle at 10% 8%, rgba(79,143,168,.06), transparent 30%),
-    radial-gradient(circle at 92% 82%, rgba(79,143,168,.045), transparent 35%),
-    linear-gradient(135deg, var(--disc-bg) 0%, var(--disc-bg-2) 50%, #F5F8FA 100%);
+    radial-gradient(60% 34% at 16% 6%, rgba(255,255,255,.92), transparent 70%),
+    radial-gradient(48% 26% at 82% 14%, rgba(255,255,255,.72), transparent 72%),
+    radial-gradient(70% 50% at 50% 106%, rgba(79,143,168,.14), transparent 70%),
+    linear-gradient(180deg, var(--disc-sky-1) 0%, var(--disc-sky-2) 42%, var(--disc-sky-3) 100%);
   background-attachment: fixed;
-  padding-bottom: 64px;
+  padding-bottom: 72px;
 }
 
 /* Content column. `wrap` is the site's, so these pages line up with every
@@ -248,20 +262,34 @@ body.disc { background: var(--disc-bg); }
    photograph with a 32px gutter either side is a thumbnail. */
 .lp-hero {
   position: relative; overflow: hidden; display: flex; align-items: flex-end;
-  width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 34px;
-  min-height: clamp(300px, 46vw, 560px);
-  padding: clamp(26px, 4vw, 60px) clamp(18px, 6vw, 80px);
+  width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: 38px;
+  /* FULL HEIGHT, WITH A CEILING. `min(86vh, 760px)` fills a laptop screen and
+     stops a 27-inch monitor turning the photograph into a poster nobody can
+     see past; `dvh` keeps a phone's collapsing address bar from resizing the
+     hero mid-scroll. The 380px floor is for a landscape phone, where 86vh is
+     three hundred pixels of nothing. */
+  min-height: max(380px, min(86vh, 760px));
+  min-height: max(380px, min(86dvh, 760px));
+  padding: clamp(26px, 4vw, 60px) clamp(18px, 6vw, 80px) clamp(34px, 5vw, 72px);
   background: linear-gradient(120deg, #2E4657, #46657A);
   color: #fff;
 }
+/* A slow drift on the photograph, so the first screen is not a still. 24
+   seconds and 4% - at that speed it reads as depth rather than as motion,
+   and prefers-reduced-motion switches it off entirely. */
+@keyframes lpHeroDrift { from { transform: scale(1); } to { transform: scale(1.06); } }
+.lp-hero-img { animation: lpHeroDrift 24s ease-out both; }
 .lp-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* The one dark surface on these pages, and it is a legibility device rather
    than a theme: white type over an unknown photograph needs a guaranteed
    floor of contrast. Tinted towards the ink, heaviest at the bottom where the
-   type is, so the top two thirds still read as a photograph. */
+   type is, so the top two thirds still read as a photograph. The second layer
+   leans the shadow into the left corner the text starts from. */
 .lp-hero::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(38,55,70,.10) 0%, rgba(38,55,70,.38) 48%, rgba(38,55,70,.74) 100%);
+  background:
+    linear-gradient(105deg, rgba(38,55,70,.52) 0%, rgba(38,55,70,.12) 46%, transparent 70%),
+    linear-gradient(180deg, rgba(38,55,70,.08) 0%, rgba(38,55,70,.34) 46%, rgba(38,55,70,.80) 100%);
 }
 .lp-hero-body { position: relative; z-index: 1; width: min(1320px, 100%); margin-inline: auto; }
 .lp-hero h1 {
@@ -346,74 +374,131 @@ body.disc { background: var(--disc-bg); }
    is a price list and this is the part of the page where somebody decides to
    go. The photograph is scenery for the figure and never evidence for it: the
    card says where its number came from, or says it has none. */
-.lp-fares { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+/* THE CARD IS THE PHOTOGRAPH. A price panel that is a white box with a
+   thumbnail on top is a dashboard row; what a travel site puts here is an
+   image you can book from - the picture fills the card, the words sit on
+   glass over it, and the picture moves when you touch it.
+
+   The three are one row of equal heights because the grid says so, not
+   because anything inside them is padded to match. */
+.lp-fares { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(296px, 1fr)); }
 .lp-fare {
-  display: flex; flex-direction: column; overflow: hidden;
-  border-radius: 20px; background: var(--disc-card);
-  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
-  transition: transform 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; align-items: flex-end;
+  min-height: clamp(300px, 27vw, 372px);
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(150deg, #33556A, #4A7086);
+  box-shadow: 0 14px 34px -18px rgba(38, 55, 70, .55);
+  transition: transform 320ms cubic-bezier(.22,.8,.3,1), box-shadow 320ms ease;
 }
-.lp-fare:hover { transform: translateY(-3px); box-shadow: var(--disc-shadow-lift); border-color: var(--disc-accent-line); }
-.lp-fare-art {
-  position: relative; aspect-ratio: 16 / 9; overflow: hidden;
-  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
+.lp-fare:hover { transform: translateY(-5px); box-shadow: 0 22px 46px -20px rgba(38, 55, 70, .6); }
+.lp-fare-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; }
+.lp-fare-art img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transform: scale(1.01);        /* hides the edge the scale animation leaves */
+  transition: transform 700ms cubic-bezier(.22,.8,.3,1);
 }
-.lp-fare-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-/* A DIFFERENT PART OF THE PICTURE PER CARD. Most landmarks have exactly one
-   photograph, so all three cards show the same file; three identical crops in
-   a row look like a rendering mistake. Framing each one differently makes the
-   row read as one place seen three ways, which is what it is - it is the same
-   photograph either way, and nothing here claims otherwise. */
-.lp-fare:nth-child(1) .lp-fare-art img { object-position: 22% center; }
-.lp-fare:nth-child(2) .lp-fare-art img { object-position: center; }
-.lp-fare:nth-child(3) .lp-fare-art img { object-position: 78% center; }
-/* A wash towards the card colour so the label below never fights the picture
-   above it, and the three cards read as one row rather than three photographs. */
+/* HOVER ZOOM ON THE PICTURE, NOT ON THE CARD, so the rounded corners and the
+   glass panel stay exactly where they were and only the photograph moves. */
+.lp-fare:hover .lp-fare-art img,
+.lp-fare:focus-within .lp-fare-art img { transform: scale(1.09); }
+/* The floor of contrast for white type over an unknown photograph: nothing at
+   the top, most of it under the panel. Tinted to the ink, never to black. */
 .lp-fare-art::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(38,55,70,.06) 0%, rgba(255,255,255,.28) 100%);
+  background: linear-gradient(180deg, rgba(38,55,70,.06) 0%, rgba(38,55,70,.34) 46%, rgba(38,55,70,.82) 100%);
 }
+/* The glass. `backdrop-filter` is an enhancement - where it is unsupported the
+   panel is still a legible translucent white over a darkened photograph. */
 .lp-fare-body {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-  padding: 18px 20px 20px;
+  position: relative; width: 100%;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  padding: 18px 20px 20px; border-radius: 16px;
+  background: var(--disc-glass); border: 1px solid var(--disc-glass-line);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  color: #fff;
 }
-/* A card with no photograph behind it (the JS leaves the panel out rather
-   than drawing an empty one) needs its own top padding back. */
-.lp-fare.is-artless .lp-fare-body { padding-top: 22px; }
 .lp-fare-label {
   margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: .14em;
-  text-transform: uppercase; color: var(--disc-mute);
+  text-transform: uppercase; color: rgba(255,255,255,.86);
 }
 .lp-fare-value {
   margin: 0; display: flex; align-items: baseline; gap: 5px;
-  font-family: var(--disc-serif); font-size: clamp(25px, 2.6vw, 31px); font-weight: 700;
-  color: var(--disc-accent-deep);
+  font-family: var(--disc-serif); font-size: clamp(26px, 2.7vw, 33px); font-weight: 700;
+  color: #fff;
 }
-.lp-fare-value span { font-family: var(--ff-body, inherit); font-size: 13px; font-weight: 600; color: var(--disc-mute); }
+.lp-fare-value span { font-family: var(--ff-body, inherit); font-size: 13.5px; font-weight: 600; color: rgba(255,255,255,.82); }
 /* Unavailable is a sentence, in the body font, quiet — never a dash and never
    a number nobody can honour. */
 .lp-fare.is-empty .lp-fare-value {
-  font-family: var(--ff-body, inherit); font-size: 15px; font-weight: 600; color: var(--disc-mute);
+  font-family: var(--ff-body, inherit); font-size: 15.5px; font-weight: 600; color: rgba(255,255,255,.88);
 }
-.lp-fare .disc-btn { margin-top: 10px; }
+/* Whose hotel the price is. The photograph is of a particular building, so
+   the card names it rather than implying the rate is the area's. */
+.lp-fare-credit { margin: 0; font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.78); }
+/* White button on a photograph: the teal fill has nothing to sit against once
+   the background is an image, and white is what every OTA lands on for the
+   same reason. */
+.lp-fare .disc-btn {
+  margin-top: 8px; background: #fff; color: var(--disc-accent-deep);
+  box-shadow: 0 6px 18px -8px rgba(38, 55, 70, .8);
+}
+.lp-fare .disc-btn:hover { background: #fff; color: var(--disc-ink); transform: translateY(-1px); }
+.lp-fare .disc-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+/* NO PHOTOGRAPH: the card keeps its shape and loses the picture, rather than
+   borrowing one taken somewhere else. A soft blue-grey panel, ink type, and
+   the same glass geometry so the row still lines up. */
+.lp-fare.is-artless { background: linear-gradient(155deg, #DCE9F1 0%, #EFF5F9 58%, #E4EEF4 100%); }
+/* The mark for what the card sells, large and faint, where the photograph
+   would have been. It is drawn rather than photographic on purpose: a drawing
+   is obviously a symbol, where a stock photograph of somebody else's hotel
+   would read as a picture of this one. */
+.lp-fare-mark {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  padding-bottom: 84px;            /* clear of the panel that sits at the foot */
+  color: var(--disc-accent); opacity: .26;
+}
+/* The size is set here rather than by JPIcon's `size` option: that option
+   emits a `jpi-N` class, and 72 is not one of the sizes jp-icons.css defines. */
+.lp-fare-mark .jpi, .lp-fare-mark svg { width: 72px; height: 72px; stroke-width: 1.3; }
+.lp-fare.is-artless .lp-fare-body {
+  background: rgba(255, 255, 255, .88); border-color: rgba(38, 55, 70, .08);
+  color: var(--disc-ink); box-shadow: 0 10px 26px -20px rgba(38, 55, 70, .8);
+}
+.lp-fare.is-artless .lp-fare-label { color: var(--disc-mute); }
+.lp-fare.is-artless .lp-fare-value { color: var(--disc-accent-deep); }
+.lp-fare.is-artless .lp-fare-value span,
+.lp-fare.is-artless .lp-fare-credit { color: var(--disc-mute); }
+.lp-fare.is-artless.is-empty .lp-fare-value { color: var(--disc-mute); }
+.lp-fare.is-artless .disc-btn { background: var(--disc-accent); color: #fff; box-shadow: none; }
+.lp-fare.is-artless .disc-btn:hover { background: var(--disc-accent-deep); color: #fff; }
 .lp-note { margin: 2px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--disc-mute); max-width: 78ch; }
 
 /* --- the information strip ----------------------------------------------- */
-.lp-quick {
-  display: grid; gap: 1px; overflow: hidden;
-  grid-template-columns: repeat(auto-fit, minmax(226px, 1fr));
-  background: var(--disc-line);         /* the 1px gap IS the divider */
-  border: 1px solid var(--disc-line); border-radius: 20px;
-  box-shadow: var(--disc-shadow);
-}
+/* FOUR CARDS, NOT A TABLE. They were one panel divided by hairlines, which
+   is how a settings screen groups fields; four cards that each lift under the
+   pointer is how a travel site presents four separate things worth knowing.
+   `auto-fit` takes them to 4 / 2 / 1 across without another breakpoint. */
+.lp-quick { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(236px, 1fr)); }
 .lp-quick-tile {
-  display: flex; align-items: flex-start; gap: 13px;
-  padding: 20px; background: var(--disc-card);
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 22px 20px; border-radius: 18px;
+  background: linear-gradient(170deg, #FFFFFF 0%, #FAFCFD 62%, #F2F8FB 100%);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+  transition: transform 260ms cubic-bezier(.22,.8,.3,1), box-shadow 260ms ease, border-color 260ms ease;
+}
+.lp-quick-tile:hover {
+  transform: translateY(-4px); box-shadow: var(--disc-shadow-lift);
+  border-color: var(--disc-accent-line);
 }
 .lp-quick-icon {
-  flex: none; width: 38px; height: 38px; border-radius: 12px;
-  display: grid; place-items: center;
-  background: var(--disc-accent-soft); color: var(--disc-accent);
+  flex: none; width: 42px; height: 42px; border-radius: 14px;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(145deg, var(--disc-accent), var(--disc-accent-deep));
+  box-shadow: 0 8px 18px -10px rgba(62, 122, 146, .9);
 }
 .lp-quick-text { min-width: 0; }
 .lp-quick-label {
@@ -434,7 +519,24 @@ body.disc { background: var(--disc-bg); }
    one leaves a third of a wide screen empty. The aside carries facts the
    database actually holds — where it is, which area its hotels are filed
    under, how many there are — and disappears with them. */
-.lp-about-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); align-items: start; }
+.lp-about-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
+.lp-about-col { min-width: 0; }
+.lp-about-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* THE PICTURE BESIDE THE TEXT IS THE SECOND PHOTOGRAPH, not the hero again -
+   the JS picks it. Tall rather than wide, because it is standing next to a
+   column of type and a 16:9 panel beside a 400-word article looks like a
+   banner that failed to load. */
+.lp-about-art {
+  margin: 0; overflow: hidden; border-radius: 20px;
+  aspect-ratio: 4 / 5; max-height: 460px;
+  background: linear-gradient(135deg, #E3EDF3, #F1F6F9);
+  border: 1px solid var(--disc-line); box-shadow: var(--disc-shadow);
+}
+.lp-about-art img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform 600ms cubic-bezier(.22,.8,.3,1);
+}
+.lp-about-art:hover img { transform: scale(1.04); }
 .lp-about-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .lp-about { max-width: 76ch; font-size: 16px; line-height: 1.78; color: var(--disc-ink); }
 .lp-about p { margin: 0 0 14px; }
@@ -575,17 +677,25 @@ body.disc { background: var(--disc-bg); }
 .disc-in { animation: discIn .42s cubic-bezier(.22,.8,.3,1) both; }
 
 /* One column for the About pair before the text column gets narrow enough to
-   read badly - 900px is where 1.75fr of the content column falls under 60
-   characters, not a device width. */
+   read badly - 900px is where 1.55fr of the content column falls under 60
+   characters, not a device width. Stacked, the picture goes FIRST: a tall
+   photograph above the article is a lead image, whereas the same photograph
+   under 400 words is a thing nobody scrolls to. */
 @media (max-width: 900px) {
   .lp-about-grid { grid-template-columns: minmax(0, 1fr); }
+  .lp-about-side { order: -1; }
+  .lp-about-art { aspect-ratio: 16 / 10; max-height: 340px; }
 }
 
 @media (max-width: 640px) {
   .dl-hero { border-radius: 16px; min-height: 170px; }
   .lp { gap: 26px; }
   .lp-card { border-radius: 16px; }
-  .lp-hero { min-height: clamp(240px, 62vw, 340px); }
+  /* Still tall enough to be a photograph rather than a strip, but not a whole
+     phone screen the traveller has to scroll past to reach a price. */
+  .lp-hero { min-height: min(70vh, 460px); min-height: min(70dvh, 460px); }
+  .lp-fare { min-height: 290px; padding: 12px; }
+  .lp-fare-body { padding: 16px 17px 18px; }
   .lp-hero-meta { gap: 8px; }
   .lp-chip { padding: 8px 13px; font-size: 12.5px; }
   /* The fare button fills its card; the hero chips stay inline, because three
@@ -602,7 +712,9 @@ body.disc { background: var(--disc-bg); }
 @media (prefers-reduced-motion: reduce) {
   .disc-in { animation: none; }
   .dl-card, .dl-img, .lp-hotel, .lp-near, .lp-fare, .lp-shot img,
+  .lp-fare-art img, .lp-about-art img, .lp-quick-tile,
   .lp-chip-act, .disc-btn { transition: none; }
+  .lp-hero-img { animation: none; }
   .lp-gallery { scroll-snap-type: none; }
   .dl-grid.is-engaged .dl-card.is-active { transform: none; }
   .dl-grid.is-engaged .dl-card.is-active .dl-img { transform: none; }

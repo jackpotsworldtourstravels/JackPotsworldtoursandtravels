@@ -38,12 +38,12 @@
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp1">
+<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp2">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
-<script src="assets/js/jp-icons.js?v=20260923lp1"></script>
+<script src="assets/js/jp-icons.js?v=20260923lp2"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- The photographs of the famous places, vendored from Wikimedia Commons by
      scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
@@ -53,6 +53,9 @@
      Same contract again: a key the API sends, resolved through a shipped
      manifest, never a path built from a name. -->
 <script src="assets/js/hotel-images.js?v=20260912im1"></script>
+<!-- The cities' own photographs, for the panel that illustrates a tour of the
+     destination rather than this one landmark. Third manifest, same rule. -->
+<script src="assets/js/destination-images.js?v=20260923lp2"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260923bk1"></script>
 </head>
@@ -109,24 +112,32 @@
         <p class="lp-note" id="lpFareNote"></p>
       </section>
 
-      <!-- The information strip: best time, how long to stay, what the place
-           is known for, who it suits. Editorial columns (migration 0080), so
-           the whole strip stays hidden until somebody fills them in. -->
+      <!-- Highlights: best time, how long to stay, what the place is known
+           for, who it suits. Editorial columns (0080, filled per landmark by
+           0081 and its successors), so the whole section stays hidden until
+           somebody supplies them - and each card is dropped individually. -->
       <section class="lp-sec" id="lpQuickSec" hidden>
+        <h2 class="disc-h2" id="lpQuickH">Destination highlights</h2>
+        <p class="disc-sub">The things worth knowing before you plan the day.</p>
         <div class="lp-quick" id="lpQuick"></div>
       </section>
 
       <section class="lp-sec" id="lpAboutSec" hidden>
         <h2 class="disc-h2" id="lpAboutH"></h2>
         <div class="lp-about-grid">
-          <div class="lp-card lp-about-card">
-            <div class="lp-about" id="lpAbout"></div>
-            <button type="button" class="lp-more-btn" id="lpReadMore" hidden aria-expanded="false">Read more</button>
+          <div class="lp-about-col">
+            <div class="lp-card lp-about-card">
+              <div class="lp-about" id="lpAbout"></div>
+              <button type="button" class="lp-more-btn" id="lpReadMore" hidden aria-expanded="false">Read more</button>
+            </div>
           </div>
-          <aside class="lp-card lp-facts" id="lpFacts" hidden>
-            <h3 class="lp-facts-h">Good to know</h3>
-            <dl id="lpFactsList"></dl>
-          </aside>
+          <div class="lp-about-side">
+            <figure class="lp-about-art" id="lpAboutArt" hidden></figure>
+            <aside class="lp-card lp-facts" id="lpFacts" hidden>
+              <h3 class="lp-facts-h">Good to know</h3>
+              <dl id="lpFactsList"></dl>
+            </aside>
+          </div>
         </div>
       </section>
 
@@ -172,6 +183,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/location.js?v=20260923lp1"></script>
+<script src="assets/js/location.js?v=20260923lp2"></script>
 </body>
 </html>

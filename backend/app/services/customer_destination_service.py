@@ -431,22 +431,31 @@ def _fare_details(db: Session, dest: CustomerDestination,
     and fills in the ones that have an answer.
     """
     scope = "area" if area else "destination"
+    # THE ROW, NOT JUST THE FIGURE. The card behind this price shows a
+    # photograph, and the only photograph that can honestly sit behind it is
+    # the one belonging to the hotel the price came from - so the cheapest row
+    # is fetched whole rather than as a min(). Same ordering, same filters.
     q = (
-        select(func.min(CustomerHotel.price_per_night))
+        select(CustomerHotel)
         .where(
             CustomerHotel.destination_id == dest.customer_destination_id,
             CustomerHotel.is_active.is_(True),
         )
+        .order_by(CustomerHotel.price_per_night.asc())
+        .limit(1)
     )
     if area:
         q = q.where(CustomerHotel.location_id == area.customer_location_id)
-    hotel_from = db.scalar(q)
+    cheapest = db.scalars(q).first()
+    hotel_from = cheapest.price_per_night if cheapest is not None else None
 
     return {
         "currency": "INR",
         "hotel_from": float(hotel_from) if hotel_from is not None else None,
         "hotel_scope": scope if hotel_from is not None else None,
         "hotel_scope_name": (area.name if area else dest.name) if hotel_from is not None else None,
+        "hotel_image": cheapest.image_key if cheapest is not None else None,
+        "hotel_name": cheapest.name if cheapest is not None else None,
         "flight_from": None,
         "package_from": None,
     }
@@ -488,6 +497,10 @@ def get_attraction(db: Session, destination_id: str, attraction_id: str) -> dict
                           counts.get(area.customer_location_id, 0) if area else 0)
     row["destination_name"] = dest.name
     row["country"] = dest.country
+    # The CITY's own photograph, as a key. The page uses it where a picture of
+    # the destination is wanted rather than of this one landmark - and it is
+    # the same key the destinations shelf already resolves, not a second copy.
+    row["destination_image"] = dest.image_key
     row["fare_details"] = _fare_details(db, dest, area)
 
     # -- What a guidebook says (0080) ------------------------------------
