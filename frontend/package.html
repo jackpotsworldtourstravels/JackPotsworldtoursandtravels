@@ -35,7 +35,7 @@
 <!-- The discovery sheet gives this page its palette, its hero and its cards;
      packages.css adds only what a trip needs that a place does not. -->
 <link rel="stylesheet" href="assets/css/discover.css?v=20260923lp3">
-<link rel="stylesheet" href="assets/css/packages.css?v=20260923pk2">
+<link rel="stylesheet" href="assets/css/packages.css?v=20260923pk4">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -167,6 +167,23 @@
       <!-- Reviews: there are none of packages in this database, so this
            section is here as the place they will go and is never drawn
            empty — see package.js for why nothing is averaged. -->
+      <!-- MORE OF THE SAME DESTINATION. Every other package that goes to this
+           place, from the same catalogue query the listing uses - so the row
+           can never show a trip the listing would not. Hidden when this is
+           the only trip we run there. -->
+      <section class="lp-sec" id="pkMoreSec" hidden>
+        <div class="lp-hotels-head">
+          <div>
+            <h2 class="disc-h2" id="pkMoreH"></h2>
+            <p class="disc-sub" id="pkMoreLine"></p>
+          </div>
+          <a class="disc-btn disc-btn-ghost" id="pkMoreAll" href="packages.html">
+            View all packages <span data-jp-icon="arrowRight" aria-hidden="true"></span>
+          </a>
+        </div>
+        <div class="pkl-grid" id="pkMore"></div>
+      </section>
+
       <section class="lp-sec" id="pkReviewsSec" hidden>
         <h2 class="disc-h2">Traveller reviews</h2>
         <div class="pk-reviews" id="pkReviews"></div>
@@ -200,6 +217,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/package.js?v=20260923pk2"></script>
+<script src="assets/js/package.js?v=20260923pk4"></script>
 </body>
 </html>

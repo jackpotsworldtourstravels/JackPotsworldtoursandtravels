@@ -63,9 +63,15 @@
     const d = (typeof dir === 'string') ? dir : fallbackDir;
     return { src: d + key + '.webp', small: d + key + '-480.webp' };
   };
+  /* A package's key is a city ("goa") OR one place in it ("goa__fort-aguada"),
+     so both manifests are tried in that order - which is what lets four Goa
+     packages carry four different photographs. */
   const destArt = key => fromManifest(
     key, typeof DESTINATION_IMAGE_FILES !== 'undefined' ? DESTINATION_IMAGE_FILES : null,
-    typeof DESTINATION_IMAGE_DIR !== 'undefined' ? DESTINATION_IMAGE_DIR : null, 'assets/destinations/');
+    typeof DESTINATION_IMAGE_DIR !== 'undefined' ? DESTINATION_IMAGE_DIR : null, 'assets/destinations/')
+    || fromManifest(
+      key, typeof LOCATION_IMAGE_FILES !== 'undefined' ? LOCATION_IMAGE_FILES : null,
+      typeof LOCATION_IMAGE_DIR !== 'undefined' ? LOCATION_IMAGE_DIR : null, 'assets/locations/');
   const placeArt = key => fromManifest(
     key, typeof LOCATION_IMAGE_FILES !== 'undefined' ? LOCATION_IMAGE_FILES : null,
     typeof LOCATION_IMAGE_DIR !== 'undefined' ? LOCATION_IMAGE_DIR : null, 'assets/locations/');
@@ -189,6 +195,23 @@
     const price = (p.price_next != null) ? p.price_next : p.priceFrom;
     document.getElementById('pkPrice').textContent = money(price) || '';
     show(document.getElementById('pkHeroCta'), price != null);
+
+    /* NO DATES MEANS NO "BOOK NOW". The booking card opens by choosing a
+       departure, so a Book now on a package with none walks somebody into an
+       empty list and a dead end. A trip we have not scheduled is a trip we
+       arrange on request, and the button says that and goes somewhere that
+       can actually help. */
+    if (!(p.departures || []).some(d => d.date >= new Date().toISOString().slice(0, 10))) {
+      const btn = document.getElementById('pkBookTop');
+      btn.outerHTML = `<a class="disc-btn pk-book" id="pkBookTop"
+          href="contact-us.html?package=${encodeURIComponent(p.name)}">
+          Enquire about dates ${icon('arrowRight', 15)}</a>`;
+      const note = document.createElement('p');
+      note.className = 'pk-dates-note';
+      note.textContent = 'This trip has no scheduled departures at the moment — tell us when you '
+        + 'want to travel and we will price those dates.';
+      document.getElementById('pkHeroCta').insertAdjacentElement('afterend', note);
+    }
   }
 
   /* ======================================================================
@@ -334,6 +357,75 @@
   }
 
   /* ======================================================================
+     MORE OF THE SAME DESTINATION
+     ======================================================================
+     THE SAME QUERY THE LISTING RUNS, narrowed to this destination and with
+     this package taken out - so the row cannot show a trip the listing would
+     not, and cannot disagree with it about a price. Silent on failure and
+     hidden when there is nothing else: one Goa package means no "Top Goa tour
+     packages" heading over an empty row. */
+  async function renderMore(p) {
+    if (!p.destination) return;
+    let rows;
+    try {
+      rows = await getJson('/api/customer/packages?category=holiday&destination='
+        + encodeURIComponent(p.destination));
+    } catch { return; }
+
+    const others = (rows || []).filter(r => String(r.id) !== String(p.id));
+    if (!others.length) return;
+
+    document.getElementById('pkMoreH').textContent = `Top ${p.destination} tour packages`;
+    document.getElementById('pkMoreLine').textContent =
+      `${others.length} more trip${others.length === 1 ? '' : 's'} to ${p.destination}, from the same catalogue.`;
+    document.getElementById('pkMoreAll').href =
+      'packages.html?destination=' + encodeURIComponent(p.destination);
+
+    document.getElementById('pkMore').innerHTML = others.map(o => {
+      const art = destArt(o.image);
+      const price = (o.price_next != null) ? o.price_next : o.priceFrom;
+      const ticks = (o.highlights && o.highlights.length ? o.highlights : (o.inclusions || [])).slice(0, 3);
+      /* Stars only with a source, the same rule the rest of the site follows -
+         so these cards carry none today. */
+      const rating = (o.rating != null && o.rating_source)
+        ? `<span class="pkl-card-rate">${icon('star', 13)}<b>${esc(Number(o.rating).toFixed(1))}</b>
+             <em>${esc(o.rating_source)}</em></span>` : '';
+      const dates = o.next_departure
+        ? `<span class="pkl-card-next">${icon('calendarDays', 13)}Next ${esc(shortDate(o.next_departure))}</span>`
+        : `<span class="pkl-card-next is-none">${icon('mail', 13)}Dates on request</span>`;
+      return `<article class="pkl-card">
+        <a class="pkl-card-art" href="package-details/${esc(o.id)}" aria-label="${esc(o.name)}">
+          ${art ? `<img src="${esc(art.small)}" srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
+                   sizes="(max-width: 700px) 92vw, 340px" alt="" loading="lazy" decoding="async"
+                   onerror="this.remove()">`
+                : `<span class="pkl-card-pin">${icon('packages', 26)}</span>`}
+          <span class="pkl-card-tag">${esc((o.trip_type || '').replace(/^\w/, c => c.toUpperCase()))}</span>
+        </a>
+        <div class="pkl-card-body">
+          <div class="pkl-card-top"><h3><a href="package-details/${esc(o.id)}">${esc(o.name)}</a></h3>${rating}</div>
+          <p class="pkl-card-where">${icon('mapPin', 13)}<span>${esc([o.destination, o.country].filter(Boolean).join(', '))}</span></p>
+          <p class="pkl-card-days">${esc(o.days)} Days${o.nights != null ? ' / ' + esc(o.nights) + ' Nights' : ''}</p>
+          ${ticks.length ? `<ul class="pkl-card-ticks">${ticks
+            .map(t => `<li>${icon('circleCheck', 13)}<span>${esc(t)}</span></li>`).join('')}</ul>` : ''}
+          <div class="pkl-card-foot">
+            <div class="pkl-card-price"><b>${esc(money(price))}</b><small>per person</small></div>
+            ${dates}
+          </div>
+          <a class="disc-btn pkl-card-btn" href="package-details/${esc(o.id)}">View details ${icon('arrowRight', 15)}</a>
+        </div>
+      </article>`;
+    }).join('');
+    show(document.getElementById('pkMoreSec'), true);
+    if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(document.getElementById('pkMoreSec'));
+  }
+
+  const shortDate = iso => {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
+
+  /* ======================================================================
      POLICIES
      ====================================================================== */
   function renderPolicies(p) {
@@ -387,7 +479,10 @@
       BookingFlows.open('package', item, departureId ? { departureId } : undefined);
     };
 
-    document.getElementById('pkBookTop').addEventListener('click', () => open(null));
+    /* Only when it is still a button: with no departures the hero's CTA has
+       become an enquiry link (see renderHero) and has nothing to open. */
+    const top = document.getElementById('pkBookTop');
+    if (top && top.tagName === 'BUTTON') top.addEventListener('click', () => open(null));
     /* A departure tile is the same Book now with the date already chosen -
        the flow still shows the departure step, and the date is simply the
        one already selected there. */
@@ -410,6 +505,9 @@
     renderDates(p);
     renderPolicies(p);
     wireBooking(p);
+    /* Not awaited: the page is complete without it and a second catalogue
+       query should not hold up the trip somebody is already reading. */
+    renderMore(p);
 
     statusEl.textContent = '';
     statusEl.hidden = true;

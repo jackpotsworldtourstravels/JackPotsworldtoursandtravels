@@ -76,7 +76,12 @@ def _listing_row(pkg, country_by_slug: dict | None = None) -> dict:
     # The country, from the destinations catalogue rather than from anybody's
     # knowledge of geography - see catalog.countries(). Absent is fine: the
     # card then prints the destination on its own.
-    slug = (pkg.image_key or (pkg.destination or "").lower().strip()) or None
+    # BY THE DESTINATION, NOT BY THE IMAGE KEY. The key was a workable proxy
+    # while every package's artwork was its city's ("goa"), and wrong the
+    # moment one pointed at a place inside it ("goa__fort-aguada") - which
+    # silently dropped the country off four cards. The destination is the
+    # thing being asked about, so it is the thing looked up.
+    slug = (pkg.destination or "").lower().strip().replace(" ", "-") or None
     country = (country_by_slug or {}).get(slug)
 
     live = [d for d in pkg.departures if d.is_active and d.departure_date >= dt.date.today()]

@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
 <link rel="stylesheet" href="assets/css/discover.css?v=20260923lp3">
-<link rel="stylesheet" href="assets/css/packages.css?v=20260923pk2">
+<link rel="stylesheet" href="assets/css/packages.css?v=20260923pk4">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -43,6 +43,11 @@
      artwork shipped), so the cities' manifest is what resolves a card's
      photograph. A key with no file leaves the card on its tint. -->
 <script src="assets/js/destination-images.js?v=20260923lp2"></script>
+<!-- AND the landmark photographs: a package's image_key names a city ("goa")
+     or a particular place in it ("goa__fort-aguada"), so both manifests are
+     consulted in that order. A heritage tour shows a fort rather than the
+     same coastline as every other trip. -->
+<script src="assets/js/location-images.js?v=20260922loc3"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260923bk1"></script>
 </head>
@@ -101,6 +106,6 @@
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
 <script src="components/toast.js"></script>
-<script src="assets/js/package-listing.js?v=20260923pk3"></script>
+<script src="assets/js/package-listing.js?v=20260923pk4"></script>
 </body>
 </html>

@@ -250,6 +250,14 @@
 .pk-book:hover { background: #fff; color: var(--disc-ink); }
 .pk-book:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
+/* A trip with no scheduled departures says so under the price, where the
+   booking button would have promised otherwise. */
+.pk-dates-note {
+  margin: 12px 0 0; max-width: 56ch;
+  font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.88);
+  text-shadow: 0 1px 4px rgba(38,55,70,.5);
+}
+
 /* --- the day-by-day ------------------------------------------------------
    A rail with a numbered marker per day. The line down the left is what makes
    it read as a sequence rather than as five unrelated cards. */

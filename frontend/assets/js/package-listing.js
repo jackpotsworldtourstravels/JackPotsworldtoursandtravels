@@ -52,12 +52,23 @@
     } catch { return '₹' + Math.round(n); }
   };
 
-  const destArt = key => {
-    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
-    if (!DESTINATION_IMAGE_FILES[key]) return null;
-    const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    return { src: dir + key + '.webp', small: dir + key + '-480.webp' };
+  /* TWO MANIFESTS, IN ORDER. A package's image_key is either a city slug
+     ("goa") or one particular place inside it ("goa__fort-aguada"), and the
+     second is what lets four Goa packages show four different photographs
+     instead of the same coastline four times. Either way it is a KEY that has
+     to be present in artwork that shipped; a path is never built from a name. */
+  const fromManifest = (key, files, dir, fallbackDir) => {
+    if (!key || typeof files !== 'object' || !files || !files[key]) return null;
+    const d = (typeof dir === 'string') ? dir : fallbackDir;
+    return { src: d + key + '.webp', small: d + key + '-480.webp' };
   };
+  const destArt = key =>
+    fromManifest(key, typeof DESTINATION_IMAGE_FILES !== 'undefined' ? DESTINATION_IMAGE_FILES : null,
+                 typeof DESTINATION_IMAGE_DIR !== 'undefined' ? DESTINATION_IMAGE_DIR : null,
+                 'assets/destinations/')
+    || fromManifest(key, typeof LOCATION_IMAGE_FILES !== 'undefined' ? LOCATION_IMAGE_FILES : null,
+                    typeof LOCATION_IMAGE_DIR !== 'undefined' ? LOCATION_IMAGE_DIR : null,
+                    'assets/locations/');
 
   const monthLabel = key => {
     const [y, m] = String(key).split('-').map(Number);
@@ -338,7 +349,11 @@
            <em>${esc(p.rating_source)}</em></span>` : '';
     const next = p.next_departure
       ? `<span class="pkl-card-next">${icon('calendarDays', 13)}Next ${esc(shortDate(p.next_departure))}</span>`
-      : `<span class="pkl-card-next is-none">No dates on sale</span>`;
+      /* NOT "sold out" and not a blank: a package with no departure dates in
+         the catalogue is one we arrange on request, which is a real way tour
+         operators sell and is what the enquiry link on the detail page is
+         for. */
+      : `<span class="pkl-card-next is-none">${icon('mail', 13)}Dates on request</span>`;
 
     return `<article class="pkl-card">
       <a class="pkl-card-art" href="package-details/${esc(p.id)}" aria-label="${esc(p.name)} package details">
