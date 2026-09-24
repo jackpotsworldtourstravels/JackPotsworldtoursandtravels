@@ -207,6 +207,43 @@ def find_payment(db: Session, provider: str, payment: ProviderPayment):
     return None
 
 
+def verify_payment_row(db: Session, row, provider: str):
+    """Run the verifier that owns this payment row. ``None`` if none does.
+
+    Shared by the webhook path below and by a provider's return URL, so a
+    customer coming back from a hosted payment page is verified by exactly the
+    function a webhook would reach -- never by something more lenient.
+
+    WHICH VERIFIER OWNS THIS ROW.
+    Packages, flights and hotels each have one. They are separate modules on
+    purpose: the package verifier was proved against a live provider before the
+    flight one existed, and generalising it would have meant editing the module
+    that decides money arrived while packages were going into production.
+
+    ``None`` is not dead: a payment table added later reaches it, and deferring
+    is the honest answer for a row nothing knows how to verify.
+    """
+    from app.services import payment_verification_service as verify
+
+    if isinstance(row, CustomerPackageBookingPayment):
+        return verify.verify_and_capture(
+            db, row.customer_package_booking_payment_id, provider_name=provider,
+        )
+    if isinstance(row, CustomerBookingPayment):
+        from app.services import payment_verification_flight_service as verify_flight
+
+        return verify_flight.verify_and_capture(
+            db, row.customer_booking_payment_id, provider_name=provider,
+        )
+    if isinstance(row, CustomerHotelBookingPayment):
+        from app.services import payment_verification_hotel_service as verify_hotel
+
+        return verify_hotel.verify_and_capture(
+            db, row.customer_hotel_booking_payment_id, provider_name=provider,
+        )
+    return None
+
+
 def apply_event(
     db: Session, event_row: PaymentProviderEvent, event: ProviderEvent
 ) -> tuple[str, str]:
@@ -271,6 +308,8 @@ def apply_event(
         row.method = payment.method
     if payment.failure_reason:
         row.failure_reason = str(payment.failure_reason)[:255]
+    if getattr(payment, "provider_reference", None):
+        row.provider_reference = str(payment.provider_reference)[:120]
 
     incoming = payment.status
     current = row.status
@@ -284,42 +323,8 @@ def apply_event(
         db.flush()
         from app.services import payment_verification_service as verify
 
-        # ONLY PACKAGES HAVE A VERIFICATION PATH TODAY. Flights and hotels have
-        # the columns and could receive an event, but nothing opens orders for
-        # them yet, so there is no booking total to verify against. Such an
-        # event stays deferred — visible, un-acted-on, and picked up by the
-        # sweep once those products are wired — rather than being guessed at.
-        # WHICH VERIFIER OWNS THIS ROW.
-        # Packages and flights each have one. They are separate modules on
-        # purpose: the package verifier was proved against a live provider
-        # before the flight one existed, and generalising it would have meant
-        # editing the module that decides money arrived while packages were
-        # going into production.
-        #
-        # All three B2C products now have one. The else branch below is not
-        # dead: a payment table added later reaches it, and deferring is the
-        # honest answer for a row nothing knows how to verify.
-        if isinstance(row, CustomerPackageBookingPayment):
-            result = verify.verify_and_capture(
-                db, row.customer_package_booking_payment_id, provider_name=provider,
-            )
-        elif isinstance(row, CustomerBookingPayment):
-            from app.services import (
-                payment_verification_flight_service as verify_flight,
-            )
-
-            result = verify_flight.verify_and_capture(
-                db, row.customer_booking_payment_id, provider_name=provider,
-            )
-        elif isinstance(row, CustomerHotelBookingPayment):
-            from app.services import (
-                payment_verification_hotel_service as verify_hotel,
-            )
-
-            result = verify_hotel.verify_and_capture(
-                db, row.customer_hotel_booking_payment_id, provider_name=provider,
-            )
-        else:
+        result = verify_payment_row(db, row, provider)
+        if result is None:
             return DEFERRED, (
                 f"{event.event_type}: recorded; no verification path for "
                 f"{type(row).__name__} yet."

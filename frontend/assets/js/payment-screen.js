@@ -103,6 +103,25 @@ const JPay = (function () {
     return /android|iphone|ipad|ipod|windows phone/i.test(navigator.userAgent || '');
   }
 
+  /** Does this checkout send the customer to a hosted payment page?
+   *
+   *  HDFC SmartGateway does: the server hands back `redirect_url`, HDFC's own
+   *  `payment_links.web`, and the customer pays on HDFC's page ("Iframe
+   *  Integration is not supported", per HDFC). Razorpay does not: the field is
+   *  null and its drop-in opens over this page as it always has. */
+  function hostedUrl(checkout) {
+    const url = String((checkout && checkout.redirect_url) || '');
+    /* The server already checked this is HDFC's https domain. Checked again
+       here only for the scheme, so a bad value can never become a javascript:
+       or http: navigation. */
+    return /^https:\/\//i.test(url) ? url : '';
+  }
+
+  /** Who is processing the payment, for the one line that names them. */
+  function processorName(checkout) {
+    return (checkout && checkout.provider === 'hdfc') ? 'HDFC Bank SmartGateway' : 'Razorpay';
+  }
+
   /** Load Razorpay's checkout script once, on demand.
    *
    *  Loaded here rather than in every page's <head> so a page that never
@@ -159,11 +178,14 @@ const JPay = (function () {
   function iconCross() { return ic('triangleAlert', 'jpay-ic-lg'); }
 
   function amountCard(s) {
+    /* No amount when confirming a return from a hosted page: this screen was
+       not handed one, and a ₹0.00 would be a figure nobody agreed to. */
+    const amount = s.amountMinor == null ? '' : `
+        <div class="jpay-amount-label">Amount payable</div>
+        <div class="jpay-amount">${esc(rupees(s.amountMinor))}</div>`;
     return `
       <div class="jpay-amount-card">
-        <div class="jpay-brand"><span class="jpay-brand-dot"></span>JackPots World Tours &amp; Travels</div>
-        <div class="jpay-amount-label">Amount payable</div>
-        <div class="jpay-amount">${esc(rupees(s.amountMinor))}</div>
+        <div class="jpay-brand"><span class="jpay-brand-dot"></span>JackPots World Tours &amp; Travels</div>${amount}
         <div class="jpay-amount-sub">${esc(s.packageName || 'Tour package')}</div>
         ${s.bookingRef ? `<div class="jpay-ref">${esc(s.bookingRef)}</div>` : ''}
       </div>`;
@@ -186,7 +208,29 @@ const JPay = (function () {
       </div>`;
   }
 
+  /** The ready screen for a hosted page. Says only what is true of it: the
+   *  customer is about to leave for the bank's page and choose a method there.
+   *  No UPI Intent / QR claim — that sentence is about Razorpay's checkout. */
+  function hostedReadyView(s) {
+    return `
+      <div class="jpay">
+        ${amountCard(s)}
+        <h2 class="jpay-title">Complete your payment</h2>
+        <p class="jpay-sub">You will be taken to ${esc(processorName(s.checkout))}'s secure
+           payment page to pay by UPI, card or net banking, and brought back here
+           afterwards. We never see your card details or UPI PIN.</p>
+        ${s.error ? `<div class="jpay-error" role="alert">${esc(s.error)}</div>` : ''}
+        <div class="jpay-actions">
+          <button type="button" class="jpay-cta" data-jpay-pay>
+            Pay ${esc(rupees(s.amountMinor))}
+          </button>
+        </div>
+        <div class="jpay-secure">${iconLock()} Payments are processed securely by ${esc(processorName(s.checkout))}</div>
+      </div>`;
+  }
+
   function readyView(s) {
+    if (hostedUrl(s.checkout)) return hostedReadyView(s);
     return `
       <div class="jpay">
         ${amountCard(s)}
@@ -244,8 +288,8 @@ const JPay = (function () {
       [STATE.CANCELLED]: {
         cls: 'is-bad', icon: iconCross(),
         h: 'Payment cancelled',
-        p: 'You closed the payment window before it finished. '
-           + 'Nothing has been charged and your booking is still held.',
+        p: s.error || ('You closed the payment window before it finished. '
+           + 'Nothing has been charged and your booking is still held.'),
       },
       [STATE.FAILED]: {
         cls: 'is-bad', icon: iconCross(),
@@ -287,7 +331,7 @@ const JPay = (function () {
         <dl class="jpay-summary">
           <div class="jpay-summary-row"><dt>Booking ID</dt><dd>${esc(s.bookingRef || '—')}</dd></div>
           <div class="jpay-summary-row"><dt>Package</dt><dd>${esc(s.packageName || '—')}</dd></div>
-          <div class="jpay-summary-row"><dt>Amount</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>
+          ${s.amountMinor == null ? '' : `<div class="jpay-summary-row"><dt>Amount</dt><dd class="num">${esc(rupees(s.amountMinor))}</dd></div>`}
           <div class="jpay-summary-row"><dt>Payment status</dt><dd class="is-paid">Paid</dd></div>
         </dl>
         <div class="jpay-actions">
@@ -383,6 +427,17 @@ const JPay = (function () {
 
     async function openCheckout() {
       to(STATE.OPENING);
+
+      /* A HOSTED PAGE: LEAVE FOR IT. Nothing is decided on the way back
+         either -- HDFC returns the browser to our server, which asks HDFC for
+         the order's status and only then lands the customer on My Trips, where
+         this screen polls reconcile exactly as it does after Razorpay. */
+      const hosted = hostedUrl(s.checkout);
+      if (hosted) {
+        window.location.assign(hosted);
+        return;
+      }
+
       let Razorpay;
       try {
         await loadCheckout();
@@ -465,6 +520,12 @@ const JPay = (function () {
 
       if (status === 'confirmed') { clearTimeout(pollTimer); to(STATE.SUCCESS); return; }
       if (status === 'cancelled') { clearTimeout(pollTimer); to(STATE.FAILED); return; }
+      if (status === 'failed') {
+        clearTimeout(pollTimer);
+        to(STATE.FAILED, 'The payment did not go through. If any amount was deducted, '
+          + 'the bank will return it automatically.');
+        return;
+      }
 
       if (Date.now() - pollStartedAt > POLL_FOR_MS) {
         /* Still not confirmed. NOT reported as a failure — the money may well
@@ -476,12 +537,33 @@ const JPay = (function () {
       pollTimer = setTimeout(askServer, POLL_EVERY_MS);
     }
 
+    /* Back from a hosted page via the browser's Back button: the page comes
+       out of the back/forward cache still saying "Opening payment". Put it back
+       to the ready screen -- NOT "cancelled", because we do not know whether
+       they paid before pressing Back; the server will say when asked. */
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted || s.state !== STATE.OPENING) return;
+      /* With autoOpen the ready screen is drawn as nothing, which would leave
+         an invisible overlay over the page -- so say what happened instead. */
+      if (opts.autoOpen) {
+        to(STATE.CANCELLED, 'You left the payment page before it finished. If you did '
+          + 'complete the payment, your booking will show as confirmed on My Trips shortly.');
+      } else {
+        to(STATE.READY);
+      }
+    });
+
     render();
+
+    /* Returned from a hosted page: there is nothing to open, only a question
+       for our server. Straight to confirming, with no handler payload -- the
+       reconcile endpoint settles it from the provider either way. */
+    if (opts.confirmOnly) { beginConfirming(null); }
 
     /* Straight to the provider. Only ever set by a Pay button on a list, where
        the traveller has already said what they want; the booking flow keeps the
        ready screen, because there it is the step rather than a repeat of one. */
-    if (opts.autoOpen) openCheckout();
+    else if (opts.autoOpen) openCheckout();
 
     return {
       destroy() { clearTimeout(pollTimer); },

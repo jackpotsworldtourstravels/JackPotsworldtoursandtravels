@@ -264,6 +264,12 @@ class ProviderPayment:
     paid_at: dt.datetime | None = None
     #: The untouched provider object, for the event log.
     raw: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    #: The provider's transaction reference, when it has one distinct from the
+    #: payment id -- e.g. HDFC SmartGateway's per-attempt ``txn_id``, which is
+    #: what its settlement reports carry. Written to the row's existing
+    #: ``provider_reference`` column (shown to the customer as the transaction
+    #: ref). ``None`` for adapters that have no such thing; never compared.
+    provider_reference: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)

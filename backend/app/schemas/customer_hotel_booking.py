@@ -356,6 +356,11 @@ class HotelCheckoutResponse(BaseModel):
     key_id: str
     booking_ref: str
     options: dict = Field(default_factory=dict)
+    #: A hosted payment page to send the browser to (HDFC SmartGateway), or
+    #: null for a drop-in checkout (Razorpay). It comes from the provider's
+    #: own API response and is checked server-side to be on the provider's
+    #: https domain; the browser never chooses it.
+    redirect_url: str | None = None
     #: Always "pending" from this endpoint: opening a checkout takes no money,
     #: and only the verified provider path may report anything else.
     payment_status: str

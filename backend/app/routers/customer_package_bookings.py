@@ -638,6 +638,7 @@ def start_package_checkout(
         key_id=session.publishable_key,
         booking_ref=booking.booking_ref,
         options=dict(session.options),
+        redirect_url=session.redirect_url,
         # Always pending here. Said explicitly rather than read off the row so
         # that a future change to the row cannot make this endpoint start
         # reporting a success it has no business reporting.

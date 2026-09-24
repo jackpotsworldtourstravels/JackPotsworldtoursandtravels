@@ -486,7 +486,11 @@ def _session_for(payment, booking, customer, provider):
         currency=payment.currency,
         publishable_key=provider.publishable_key,
         provider=provider.name,
-        redirect_url=None,
+        # A hosted page (HDFC) needs its link again; a drop-in answers None,
+        # which is what this always carried.
+        redirect_url=payment_providers.resume_redirect(
+            provider, payment.provider_order_id
+        ),
         options=_checkout_options(booking, customer),
     )
 

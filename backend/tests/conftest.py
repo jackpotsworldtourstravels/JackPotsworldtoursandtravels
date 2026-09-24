@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import BigInteger, create_engine
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
@@ -43,6 +43,18 @@ def _sqlite_array(element, compiler, **kw):  # noqa: D401 - test shim
 def _sqlite_jsonb(element, compiler, **kw):  # noqa: D401 - test shim
     """Likewise for JSONB, used by the webhook event log."""
     return "TEXT"
+
+
+@compiles(BigInteger, "sqlite")
+def _sqlite_bigint(element, compiler, **kw):  # noqa: D401 - test shim
+    """BIGINT as INTEGER, so a BigInteger primary key is SQLite's rowid alias.
+
+    SQLite assigns ids only to an ``INTEGER PRIMARY KEY``. Rows the code under
+    test inserts for itself -- the audit entry and the notification written by
+    ``confirm_booking`` -- carry no explicit id, and would otherwise fail NOT
+    NULL. Rows the tests build still pass their own ids, unchanged.
+    """
+    return "INTEGER"
 
 
 from app.models_customer import (  # noqa: E402
