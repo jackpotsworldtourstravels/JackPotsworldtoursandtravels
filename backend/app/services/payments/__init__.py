@@ -121,9 +121,35 @@ def _build() -> PaymentProvider:
     if name == "trustbrick":
         return _build_trustbrick()
 
+    if name == "hdfc":
+        return _build_hdfc()
+
     raise PaymentMisconfigured(
         f"Unknown PAYMENT_PROVIDER {name!r}. "
-        "Use 'razorpay', 'trustbrick', 'mock' or 'none'."
+        "Use 'razorpay', 'hdfc', 'trustbrick', 'mock' or 'none'."
+    )
+
+
+def _build_hdfc() -> PaymentProvider:
+    """The HDFC SmartGateway adapter, from settings. Raises if it cannot run."""
+    settings = app.config.settings
+    from app.services.payments.hdfc_provider import HDFCSmartGatewayProvider
+
+    return_url = settings.hdfc_sg_return_url or (
+        f"{(settings.frontend_base_url or '').rstrip('/')}/api/payments/hdfc/return"
+    )
+    return HDFCSmartGatewayProvider(
+        base_url=settings.hdfc_sg_base_url,
+        merchant_id=settings.hdfc_sg_merchant_id,
+        api_key=settings.hdfc_sg_api_key,
+        client_id=settings.hdfc_sg_client_id,
+        reseller_id=settings.hdfc_sg_reseller_id,
+        return_url=return_url,
+        webhook_username=settings.hdfc_sg_webhook_username,
+        webhook_password=settings.hdfc_sg_webhook_password,
+        response_key=settings.hdfc_sg_response_key,
+        environment=getattr(settings, "payment_environment", "test") or "test",
+        timeout_seconds=settings.hdfc_sg_timeout_seconds,
     )
 
 
@@ -191,6 +217,39 @@ def get_trustbrick_provider() -> PaymentProvider:
         if _cached_trustbrick is None:
             _cached_trustbrick = _build_trustbrick()
         return _cached_trustbrick
+
+
+# ---------------------------------------------------------------------------
+# HDFC, resolvable by name whatever PAYMENT_PROVIDER says
+# ---------------------------------------------------------------------------
+# Same reasoning as TrustBrick's slot, reason (2) only: HDFC's webhook, its
+# return URL and the verifier all resolve the adapter BY NAME. If an operator
+# switches PAYMENT_PROVIDER from hdfc back to razorpay while HDFC orders are
+# still in flight, those orders must stay verifiable -- a customer who paid
+# must not be stranded by a configuration change. It never COLLECTS unless
+# PAYMENT_PROVIDER=hdfc; get_provider() is untouched.
+_cached_hdfc: PaymentProvider | None = None
+
+
+def get_hdfc_provider() -> PaymentProvider:
+    """The HDFC adapter, whatever PAYMENT_PROVIDER says.
+
+    Raises :class:`PaymentNotConfigured` when HDFC has no settings, so a
+    deployment that has never configured it behaves exactly as before.
+    """
+    global _cached_hdfc
+    settings = app.config.settings
+    if not (settings.hdfc_sg_base_url and settings.hdfc_sg_merchant_id
+            and settings.hdfc_sg_api_key):
+        raise PaymentNotConfigured(
+            "HDFC SmartGateway is not configured on this deployment."
+        )
+    if _cached_hdfc is not None:
+        return _cached_hdfc
+    with _lock:
+        if _cached_hdfc is None:
+            _cached_hdfc = _build_hdfc()
+        return _cached_hdfc
 
 
 def trustbrick_is_available() -> bool:
@@ -281,6 +340,18 @@ def get_provider_named(name: str) -> PaymentProvider:
     if wanted == "trustbrick":
         return get_trustbrick_provider()
 
+    # HDFC likewise, and for the same reason: its webhook and return URL must
+    # find it even after PAYMENT_PROVIDER has moved on. When it IS the default,
+    # the default instance is returned so there is one adapter, not two.
+    if wanted == "hdfc":
+        try:
+            provider = get_provider()
+        except PaymentProviderError:
+            provider = None
+        if provider is not None and provider.name == "hdfc":
+            return provider
+        return get_hdfc_provider()
+
     provider = get_provider()
     if provider.name != wanted:
         raise PaymentNotConfigured(
@@ -289,12 +360,28 @@ def get_provider_named(name: str) -> PaymentProvider:
     return provider
 
 
+def resume_redirect(provider: PaymentProvider, provider_order_id: str | None) -> str | None:
+    """The hosted-page link for an order already opened, or None.
+
+    A drop-in provider (Razorpay, TrustBrick) has no such thing and answers
+    None, which is exactly what a rebuilt session carried before. A hosted-page
+    provider (HDFC) re-reads the link from its own API, so a customer paying an
+    order opened on an earlier visit is sent to a link the server just received
+    rather than one stored long ago.
+    """
+    resume = getattr(provider, "checkout_redirect", None)
+    if not callable(resume) or not provider_order_id:
+        return None
+    return resume(provider_order_id)
+
+
 def reset_provider_cache() -> None:
     """Drop the cached providers. For tests that change the configuration."""
-    global _cached, _cached_trustbrick
+    global _cached, _cached_trustbrick, _cached_hdfc
     with _lock:
         _cached = None
         _cached_trustbrick = None
+        _cached_hdfc = None
 
 
 def is_available() -> bool:
@@ -383,6 +470,8 @@ __all__ = [
     "available_for_booking",
     "get_trustbrick_provider",
     "trustbrick_is_available",
+    "get_hdfc_provider",
+    "resume_redirect",
     "reset_provider_cache",
     "is_available",
     "provider_name",

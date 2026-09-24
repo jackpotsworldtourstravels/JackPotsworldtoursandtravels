@@ -487,6 +487,11 @@ def _record_remote(payment: CustomerPackageBookingPayment, remote) -> None:
         payment.method = remote.method
     if remote.failure_reason:
         payment.failure_reason = str(remote.failure_reason)[:255]
+    # getattr: test doubles and older adapters carry no such attribute, and
+    # only an adapter that reports one (HDFC) ever writes the column.
+    reference = getattr(remote, "provider_reference", None)
+    if reference:
+        payment.provider_reference = str(reference)[:120]
 
 
 def _capture_locally(

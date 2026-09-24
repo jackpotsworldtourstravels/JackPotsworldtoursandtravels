@@ -49,6 +49,7 @@ from app.routers import (
     merchants,
     notifications_v2,
     passport_ocr,
+    payment_returns,
     payment_webhooks,
     profile,
     providers,
@@ -271,6 +272,10 @@ app.include_router(passport_ocr.router)
 # signature over the raw body is what stands in for a session. Mounted apart
 # from every customer and merchant router so it shares none of their deps.
 app.include_router(payment_webhooks.router)
+# Also unauthenticated by necessity: a hosted payment page (HDFC) redirects
+# the customer's browser here. It trusts nothing it is sent -- it picks which
+# order to re-verify with the provider, then lands the customer on My Trips.
+app.include_router(payment_returns.router)
 app.include_router(booking_ops.router)
 app.include_router(change_requests.router)
 # The merchant's manager signing off the service requests its own staff raised,

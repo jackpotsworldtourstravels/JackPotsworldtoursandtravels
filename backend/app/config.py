@@ -165,6 +165,7 @@ class Settings(BaseSettings):
     #
     #   "none"     -- no online payment offered (default)
     #   "razorpay" -- Razorpay Payment Gateway, INR, UPI Intent/QR
+    #   "hdfc"     -- HDFC SmartGateway, hosted payment page (HDFC_SG_* below)
     #   "mock"     -- takes no money, cannot report a success; local/CI only
     payment_provider: str = "none"
 
@@ -257,6 +258,42 @@ class Settings(BaseSettings):
     #: the booking they are testing, which makes the blast radius exactly one
     #: booking and makes it obvious in the configuration which one it was.
     trustbrick_pilot_booking_refs: str = ""
+
+    # -----------------------------------------------------------------------
+    # HDFC SmartGateway (API integration, Basic Auth). PAYMENT_PROVIDER=hdfc.
+    # See services/payments/hdfc_provider.py and docs/HDFC_SMARTGATEWAY.md.
+    #
+    # NONE OF THESE MAY REACH A BROWSER except the merchant id, which HDFC
+    # itself sends to the frontend. The API key authenticates every call to
+    # HDFC; the webhook password authenticates HDFC's calls to us; the response
+    # key verifies the signed return URL.
+    #
+    # NO DEFAULT BASE URL, ON PURPOSE. UAT is https://smartgateway.hdfcuat.bank.in
+    # per HDFC's docs; production is a deliberate configuration change, and the
+    # adapter refuses the production host while PAYMENT_ENVIRONMENT is test.
+    # -----------------------------------------------------------------------
+    hdfc_sg_base_url: str | None = None
+    #: Issued by the bank. Not a secret (HDFC sends it to the browser too).
+    hdfc_sg_merchant_id: str | None = None
+    #: Generated on the SmartGateway dashboard: Settings -> Security -> API Keys.
+    hdfc_sg_api_key: str | None = None
+    #: payment_page_client_id. Optional: "hdfcmaster" on the UAT host and the
+    #: merchant id elsewhere, which is what HDFC's docs prescribe.
+    hdfc_sg_client_id: str | None = None
+    #: x-resellerid. HDFC documents the value "hdfc_reseller".
+    hdfc_sg_reseller_id: str = "hdfc_reseller"
+    #: Where HDFC sends the customer back. https, no query string (HDFC's rule).
+    #: Optional: defaults to {FRONTEND_BASE_URL}/api/payments/hdfc/return.
+    hdfc_sg_return_url: str | None = None
+    #: The dashboard Webhook tab's username and password. HDFC sends them as
+    #: Authorization: Basic base64(username:password) on every webhook.
+    hdfc_sg_webhook_username: str | None = None
+    hdfc_sg_webhook_password: str | None = None
+    #: Optional. The dashboard "Response Key", used when "Use signed response"
+    #: is on. With it set, a return without a valid signature is not believed.
+    hdfc_sg_response_key: str | None = None
+    #: How long HDFC gets to answer. A timeout is "unknown", never "failed".
+    hdfc_sg_timeout_seconds: float = 20.0
 
 
     # -----------------------------------------------------------------------

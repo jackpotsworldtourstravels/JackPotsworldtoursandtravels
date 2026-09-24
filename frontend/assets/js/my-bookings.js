@@ -265,10 +265,50 @@ const MyBookings = (function () {
     });
   }
 
+  /* ?payment_return=hdfc&kind=...&ref=... -- back from a hosted payment page.
+
+     Our server put these here after asking the provider about the order, so
+     they say only WHICH booking to show; the screen then asks the server again,
+     through reconcile, what happened to it. Removed from the address bar at
+     once so a reload or a shared link does not replay the confirming screen. */
+  let returnHandled = false;
+  function handlePaymentReturn() {
+    const q = new URLSearchParams(window.location.search);
+    const from = q.get('payment_return');
+    if (!from || returnHandled) return null;
+    returnHandled = true;
+    const back = { from, ref: q.get('ref') || '', kind: q.get('kind') || '' };
+    try {
+      q.delete('payment_return'); q.delete('kind'); q.delete('ref');
+      const rest = q.toString();
+      window.history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : ''));
+    } catch { /* cosmetic only */ }
+    return back;
+  }
+
   async function init() {
     if (!document.getElementById('mbList')) return;
+    const back = handlePaymentReturn();
     bind();
     await refresh();
+
+    if (back) {
+      const b = rows.find(r => String(r.ref || r.id) === back.ref);
+      if (b && BookingPay.supports(back.kind || b.kind)) {
+        const ov = document.getElementById('mbOverlay');
+        ov.innerHTML = '';
+        ov.classList.add('is-open');
+        document.body.classList.add('bk-locked');
+        BookingPay.resume({
+          ref: back.ref, kind: back.kind || b.kind, title: b.title || b.id, host: ov,
+          onDone: async () => { closeDetail(); await refresh(); },
+        });
+      } else {
+        showToast('We are confirming your payment with the bank. Your booking will '
+          + 'update here as soon as it is confirmed.');
+      }
+      return;
+    }
 
     /* ?pay=REF -- open payment for one booking on arrival.
 

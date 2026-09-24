@@ -117,6 +117,67 @@ const BookingPay = (function () {
     document.body.style.overflow = '';
   }
 
+  /* RECONCILE FIRST, then a plain read. Shared by open() and resume() so a
+     customer back from a hosted page is polled exactly as one who paid in a
+     drop-in -- the same server-side verifier, the same fallback. */
+  async function pollStatus(api, ref, handler, reportFailure) {
+    let st = '';
+    try {
+      const r = await api.reconcile(ref, handler);
+      st = String((r && r.booking_status) || '').toLowerCase();
+      /* Only for a return from a hosted page, where no in-browser failure
+         event exists: the SERVER, having asked the provider, says this
+         payment failed and asking again will not change that. */
+      if (reportFailure && r && r.retryable === false
+          && String(r.payment_status || '').toLowerCase() === 'failed'
+          && st !== 'confirmed' && st !== 'completed') {
+        return 'failed';
+      }
+    } catch {
+      st = '';
+    }
+    if (!st) {
+      const got = await api.read(ref);
+      st = String((got && got.status) || '').toLowerCase();
+    }
+    if (st === 'confirmed' || st === 'completed') return 'confirmed';
+    if (st === 'cancelled') return 'cancelled';
+    return 'pending';
+  }
+
+  /**
+   * The customer is BACK from a hosted payment page (HDFC SmartGateway).
+   *
+   * Nothing in the URL that brought them here is believed -- it names a
+   * booking, nothing more. The screen goes straight to "confirming" and asks
+   * OUR server, whose reconcile endpoint asks the provider. A booking that
+   * turns out not to be theirs simply fails to load, exactly as a typed-in
+   * reference would.
+   *
+   * @param {object} o  ref, kind, title, host?, onDone
+   */
+  function resume(o) {
+    const api = API[o.kind];
+    if (!api || typeof JPay === 'undefined') return false;
+    const managed = !o.host;
+    const host = o.host || makeOverlay();
+    host.style.display = 'block';
+    JPay.mount(host, {
+      confirmOnly: true,
+      bookingRef: o.ref,
+      packageName: o.title || o.ref,
+      amountMinor: null,
+      checkout: null,
+      pollStatus: (handler) => pollStatus(api, o.ref, handler, true),
+      onRetry: async () => api.checkout(o.ref, keyFor(o.ref)),
+      onDone: async () => {
+        if (managed) closeOverlay(host);
+        if (o.onDone) await o.onDone();
+      },
+    });
+    return true;
+  }
+
   /**
    * Open a provider checkout for a booking that ALREADY EXISTS.
    *
@@ -203,22 +264,7 @@ const BookingPay = (function () {
            failure is not fatal: it can 503 while the provider is briefly
            unreachable, and a webhook may already have confirmed the booking, so
            the plain read below still runs. */
-        pollStatus: async (handler) => {
-          let st = '';
-          try {
-            const r = await api.reconcile(ref, handler);
-            st = String((r && r.booking_status) || '').toLowerCase();
-          } catch {
-            st = '';
-          }
-          if (!st) {
-            const got = await api.read(ref);
-            st = String((got && got.status) || '').toLowerCase();
-          }
-          if (st === 'confirmed' || st === 'completed') return 'confirmed';
-          if (st === 'cancelled') return 'cancelled';
-          return 'pending';
-        },
+        pollStatus: (handler) => pollStatus(api, ref, handler),
         onRetry: async () => api.checkout(ref, key),
         onDone: async () => {
           finish();
@@ -243,7 +289,7 @@ const BookingPay = (function () {
     }
   }
 
-  return { open, supports, API, keyFor, windowClosed, isRefunded, PAY_WINDOW_MINUTES };
+  return { open, resume, supports, API, keyFor, windowClosed, isRefunded, PAY_WINDOW_MINUTES };
 })();
 
 if (typeof window !== 'undefined') window.BookingPay = BookingPay;

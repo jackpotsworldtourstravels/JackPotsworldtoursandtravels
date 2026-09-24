@@ -442,6 +442,11 @@ class PackageCheckoutResponse(BaseModel):
     booking_ref: str
     #: Display detail and prefill for the widget. Non-secret by construction.
     options: dict = Field(default_factory=dict)
+    #: A hosted payment page to send the browser to (HDFC SmartGateway), or
+    #: null for a drop-in checkout (Razorpay). It comes from the provider's
+    #: own API response and is checked server-side to be on the provider's
+    #: https domain; the browser never chooses it.
+    redirect_url: str | None = None
     #: Where the payment stands locally. Always "pending" from this endpoint:
     #: opening a checkout takes no money, and only the verified webhook path
     #: may report anything else.
