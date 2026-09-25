@@ -173,7 +173,19 @@ const JPay = (function () {
   /* Payment success and payment failure, per the spec: CircleCheckBig and
      TriangleAlert. A bare tick and a bare cross carried the whole outcome of a
      transaction on two strokes with no shape around them. */
-  function iconTick() { return ic('circleCheckBig', 'jpay-ic-lg'); }
+  /* `jpi--play` FROM THE MOMENT IT IS WRITTEN, not when it is scrolled to.
+     This is the only icon on the screen with a data-jpi="draw" part — the tick
+     stroke — and jp-icons.css starts such a part fully hidden, drawing it only
+     under .jpi--play, :hover, or a hovered [data-jpi-hover] ancestor. mount()
+     below arms the rest of the family through an IntersectionObserver, which
+     is the right trigger for an icon you scroll down to and the wrong one for
+     a modal that opens already in view: it wants 35% of the icon inside a root
+     inset 12% at the bottom, and if that never resolves the traveller is left
+     looking at an empty green disc after paying. Naming the class here makes
+     the draw start with the element. Reduced motion is unaffected — the media
+     query at the foot of jp-icons.css zeroes the dashoffset, so the tick is
+     simply there, undrawn. */
+  function iconTick() { return ic('circleCheckBig', 'jpay-ic-lg jpi--play'); }
 
   function iconCross() { return ic('triangleAlert', 'jpay-ic-lg'); }
 
@@ -386,6 +398,22 @@ const JPay = (function () {
         && (s.state === STATE.READY || s.state === STATE.OPENING);
       if (opts.onChrome) opts.onChrome(!quiet);
       root.innerHTML = quiet ? '' : viewFor(s);
+      /* HYDRATE THE ICONS WE JUST WROTE, or the tick never appears.
+         JPIcon.html() returns markup; it is mount() that ARMS it — observing
+         each .jpi so its entrance plays once, or marking it .jpi--static where
+         motion is reduced. This screen drew its icons and never mounted them,
+         so the tick inside circleCheckBig — a path tagged data-jpi="draw",
+         which jp-icons.css starts at stroke-dashoffset = its full length —
+         stayed INVISIBLE on a successful payment. The green disc showed (that
+         is .jpay-status-icon.is-ok's background) and the ring showed (a plain
+         path), but the tick itself only drew when a pointer crossed it,
+         because `.jpi:hover [data-jpi="draw"]` was then the one selector left
+         that ran the animation. The first thing a traveller sees after paying
+         should not require them to find it with the mouse.
+         Before bind(), so any placeholder mount() replaces is in place before
+         listeners attach; safe on every render, as mount() marks what it has
+         already armed. */
+      if (typeof JPIcon !== 'undefined') JPIcon.mount(root);
       bind();
     }
 
