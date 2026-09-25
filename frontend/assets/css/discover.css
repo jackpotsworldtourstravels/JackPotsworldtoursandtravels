@@ -89,11 +89,18 @@ body.disc { background: var(--disc-sky-1); }
 
 .disc .dh-back {
   display: inline-flex; align-items: center; gap: 8px;
-  margin: 22px 0 18px; font-size: 14px; font-weight: 600; color: var(--disc-mute);
+  margin: 20px 0 18px; font-size: 14px; font-weight: 600; color: var(--disc-mute);
   transition: color .2s ease;
 }
 .disc .dh-back:hover { color: var(--disc-accent); }
 .disc .dh-back:focus-visible { outline: 2px solid var(--disc-accent); outline-offset: 4px; border-radius: 6px; }
+/* THE ARROW NUDGES BACK on hover — the one small motion that says "return",
+   not decoration. First child is the glyph (an <svg>/.jpi after JPIcon mounts,
+   the raw <span data-jp-icon> before it), so :first-child catches it either
+   way. Stilled under reduced motion with everything else at the foot of the
+   page. */
+.disc .dh-back > :first-child { transition: transform .2s var(--jp-ease-out, ease); }
+.disc .dh-back:hover > :first-child { transform: translateX(-3px); }
 
 /* ==========================================================================
    THE DESTINATION HEADER — the city's own photograph, used quietly

@@ -1837,10 +1837,13 @@ body.hr-booking .sp-hero { display: none; }
 .dh-back {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 14px; font-weight: 600; color: var(--hr-muted, #5b6b82);
-  text-decoration: none; margin-bottom: 18px;
+  text-decoration: none; margin: 20px 0 18px;
 }
 .dh-back:hover { color: var(--coral, #C9482F); }
 .dh-back svg, .dh-back .jpi { width: 16px; height: 16px; }
+/* The arrow nudges back on hover — matches the .disc pages' back link. */
+.dh-back > :first-child { transition: transform .2s ease; }
+.dh-back:hover > :first-child { transform: translateX(-3px); }
 
 .dh-head { margin-bottom: 18px; }
 .dh-eyebrow {

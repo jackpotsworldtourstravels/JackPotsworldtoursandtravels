@@ -22,7 +22,7 @@
      degrades to a serif rather than to the UI face. -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260919b2c2">
+<link rel="stylesheet" href="assets/css/main.css?v=20260925ui1">
 <!-- One bar and one background for the whole booking journey - the tokens
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
@@ -30,10 +30,10 @@
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260922loc1">
+<link rel="stylesheet" href="assets/css/hotel.css?v=20260925ui1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/discover.css?v=20260923lp3">
+<link rel="stylesheet" href="assets/css/discover.css?v=20260925ui1">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -48,7 +48,7 @@
      Wikimedia Commons category; no key, no file, no picture. -->
 <script src="assets/js/location-images.js?v=20260923im2"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260923bk1"></script>
+<script src="assets/js/hero-shell.js?v=20260925ui1"></script>
 </head>
 <body class="sp-continuation disc" data-sp-service="hotels" data-live-chat>
 <a href="#dlMain" class="skip-link">Skip to content</a>
@@ -64,10 +64,6 @@
 
 <main id="dlMain" class="dh-main disc-main hr-scope">
   <div class="wrap">
-    <a class="dh-back" href="index.html#destinations">
-      <span data-jp-icon="arrowLeft" aria-hidden="true"></span> Back to Destinations
-    </a>
-
     <!-- A <div>, not a <header>: a bare `header` is position:fixed site-wide.
          The city's own photograph goes in here once the API names it; empty
          until then, because the slug in the URL is never printed as a name. -->
@@ -78,6 +74,12 @@
         <p class="dl-hero-lead" id="dlLead"></p>
       </div>
     </div>
+
+    <!-- BACK LINK UNDER THE HERO, not above it — the city photograph leads,
+         the way back to Destinations sits just beneath it. -->
+    <a class="dh-back" href="index.html#destinations">
+      <span data-jp-icon="arrowLeft" aria-hidden="true"></span> Back to Destinations
+    </a>
 
     <p class="dl-count" id="dlCount"></p>
     <p class="dh-status" id="dlStatus" role="status" aria-live="polite"></p>

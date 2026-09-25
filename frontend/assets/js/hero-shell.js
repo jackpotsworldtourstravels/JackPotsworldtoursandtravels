@@ -742,9 +742,13 @@ const HeroShell = (function () {
      documents anyone is entitled to find from any page.
      --------------------------------------------------------------------- */
   function bookingFooterHtml() {
+    /* NO BACK CONTROL IN THE FOOTER. It read as browser chrome — a "← Back" at
+       the foot of the page — and duplicated the way back these pages already
+       carry: the header nav, and the back link that now sits under each hero.
+       A footer is where a page ends, not a place to walk the flow. The
+       copyright and the two documents anyone is entitled to find from any page
+       are what stays. (The delegated history.back() handler went with it.) */
     return '<div class="wrap bf-row">'
-      + '<button type="button" class="bf-back jpi-row" data-bf-back>'
-      + '<i data-jp-icon="arrowLeft" class="jpi-btn"></i>Back</button>'
       /* "Pvt. Ltd." was wrong: this business is a proprietorship, and a company
          suffix on a copyright line is a representation about the legal entity
          you are contracting with, not decoration. */
@@ -765,17 +769,6 @@ const HeroShell = (function () {
     foot.dataset.bfInit = '1';
     foot.innerHTML = bookingFooterHtml();
     if (typeof JPIcon !== 'undefined') JPIcon.mount(foot);
-    /* Delegated, so the button survives any later repaint of this footer. */
-    foot.addEventListener('click', e => {
-      if (!e.target.closest('[data-bf-back]')) return;
-      /* The browser's own history, which is what every screen in these flows
-         is built on — each hotel booking step is its own history entry, and
-         the results pages write their criteria into the URL. Nothing to
-         reimplement, and nothing that can disagree with the Back links the
-         screens already carry. */
-      if (history.length > 1) history.back();
-      else window.location.href = 'index.html';
-    });
   }
 
   return { mountHeader, mountHero, mountFooter, mountBookingFooter,

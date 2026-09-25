@@ -1372,16 +1372,8 @@ header.is-solid .nav-icon-btn:hover{background:rgba(232,96,76,.08); border-color
   display:flex; align-items:center; gap:18px; flex-wrap:wrap;
   padding:16px 32px; font-size:12.5px; color:var(--muted);
 }
-.bf-back{
-  display:inline-flex; align-items:center; gap:7px; flex:none; cursor:pointer;
-  padding:8px 16px; border-radius:100px;
-  background:none; border:1px solid var(--line); color:var(--navy);
-  font-family:inherit; font-size:13px; font-weight:700;
-  transition:border-color .18s ease, color .18s ease, background .18s ease;
-}
-.bf-back svg{width:15px; height:15px;}
-.bf-back:hover{border-color:var(--coral); color:var(--coral); background:rgba(232,96,76,.06);}
-.bf-back:focus-visible{outline:3px solid var(--coral); outline-offset:2px;}
+/* The Back button that used to sit here is gone (see hero-shell.js's
+   bookingFooterHtml). Its rules went with it. */
 /* The copyright takes the slack so the links sit at the far right. */
 .bf-copy{flex:1 1 auto; min-width:0;}
 .bf-links{display:flex; gap:18px; flex:none;}
@@ -2232,23 +2224,45 @@ html.jp-customer .mobile-partner-mark { display: none; }
    header then fell back to the wide layout in a window too narrow for it,
    which is the same class of fault as the one being fixed here and was
    reproduced at 1199 during testing. */
-@media (min-width: 1200px) and (max-width: 1399.98px) {
-  /* THE NAV'S OWN SIZING IS LEFT ALONE. It is already compacted further down
-     this file (icon-only below 1150, tighter padding below 1100), and setting
-     a font here — at #siteHeader specificity — overrode that and made the
-     strip WIDER than the rule it was meant to help. The cluster is the only
-     thing this block touches. */
+/* THE CENTRED GRID, AND THE ONLY BAND IT IS SAFE IN.
+   ---------------------------------------------------------------------------
+   nav.wrap is capped at max-width:1440px, so the header never has more than
+   1440 - 64 = 1376px of content width no matter how wide the window is. Inside
+   that cap the three clusters are: the logo, the centred product strip
+   (~497px), and the utility cluster. The cluster only fits alongside a centred
+   strip when it is COMPACT — Wishlist and My Partner as their glyphs, not their
+   words. With both words shown the cluster is ~518px and the two side tracks of
+   `minmax(0,1fr) auto minmax(0,1fr)` cannot hold it: it overflowed LEFT, under
+   `justify-self:end`, straight over the last product link ("Contact"). That is
+   the "Wishlist behind Contact" overlap the header carried at every width from
+   1200 up, worst at the widths where the words reappeared.
+
+   SO THE WORDS DO NOT REAPPEAR. Wishlist and My Partner are icon-only for the
+   whole of the centred band; both keep their accessible names (the label is
+   clipped, not `display:none`) and their `title` tooltips. The centred grid
+   starts at 1320 — the width at which the compact cluster clears the strip with
+   a real gap — and below it the flex fallback further down takes over.
+
+   THE STRIP GAP COMES DOWN FROM 30 TO 22 here, and only here. The warning that
+   used to sit on this block was about FONT-SIZE at #siteHeader specificity
+   making the strip WIDER; a smaller gap makes it NARROWER, which is the whole
+   point — it is what lets 1366, the commonest laptop, stay centred instead of
+   dropping to the flex fallback. */
+@media (min-width: 1320px) {
+  #siteHeader .navlinks { gap: 22px; }
   #siteHeader .nav-actions { gap: 10px; }
-  #siteHeader .nav-actions > .hr-wish > span:not(.jpi) {
+  #siteHeader .nav-actions > .hr-wish > span:not(.jpi),
+  #siteHeader .nav-actions > .nav-partner-mark > span:not(.jpi) {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     clip-path: inset(50%); overflow: hidden; white-space: nowrap;
   }
+  #siteHeader .nav-actions > .nav-partner-mark { padding: 7px; gap: 0; }
 }
 
 /* The centre line is what gives way here, not the words. `space-between` with
    the nav free to sit where the room is: logo left, cluster right, nav in the
    space that is left. */
-@media (min-width: 860.02px) and (max-width: 1199.98px) {
+@media (min-width: 860.02px) and (max-width: 1319.98px) {
   #siteHeader nav.wrap {
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
   }
