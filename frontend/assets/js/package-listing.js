@@ -519,7 +519,27 @@
      where an empty shelf has neither because there is nothing to retry.
      The status code is named - "the server said 500" is what turns "it does
      not work" into a bug somebody can fix. */
-  function failed(err) {
+  /* IS THERE AN API ON THIS ORIGIN AT ALL? A 404 has two very different
+     causes and the fix differs completely:
+
+       the endpoint is missing   a server running code older than this page,
+                                 which a redeploy fixes;
+       the API is missing        the page was opened on a plain file server
+                                 (python -m http.server on 8420 serves
+                                 frontend/ and mounts nothing else), so every
+                                 /api call 404s and no amount of redeploying
+                                 helps.
+
+     One probe tells them apart: ask for something that has existed since long
+     before this page. If that 404s too, there is no API here. */
+  async function apiPresent() {
+    try {
+      const r = await fetch('/api/customer/destinations', { headers: { Accept: 'application/json' } });
+      return r.status !== 404;
+    } catch { return false; }
+  }
+
+  async function failed(err) {
     grid.innerHTML = '';
     grid.removeAttribute('aria-busy');
     $('pklLayout').hidden = true;
@@ -528,9 +548,15 @@
     const why = err && err.status
       ? `The packages service answered ${err.status}.`
       : 'The packages service could not be reached.';
+    const noApi = (err && err.status === 404) && !(await apiPresent());
+    const advice = noApi
+      ? `No API is mounted on <b>${esc(location.host)}</b> — this looks like a plain file server.
+         Open the site on the application server instead; that one serves these pages
+         <em>and</em> /api from the same origin.`
+      : `Nothing is wrong with your connection to the rest of the site —
+         if this persists, the packages API on this server is behind the page.`;
     s.innerHTML = `<b>We could not load the tour packages just now.</b>
-      <span>${esc(why)} Nothing is wrong with your connection to the rest of the site —
-      if this persists, the packages API on this server is behind the page.</span>`;
+      <span>${esc(why)} ${advice}</span>`;
     s.classList.add('pkl-failed');
     const old = $('pklRetry');
     if (old) old.remove();
