@@ -54,7 +54,11 @@ const BookingProducts = (function () {
   function field(o) {
     const id = esc(o.id);
     const req = o.required ? ' required' : '';
-    const opt = o.required ? '' : ' <span class="bk-opt">optional</span>';
+    /* NO "optional" WORD. It used to hang a `<span class="bk-opt">optional</span>`
+       off every non-required label — the exact thing the profile form dropped.
+       An optional field is now shown by weight, not by a word (`is-optional`,
+       booking.css): the required ones read a shade stronger, the rest sit back,
+       and the form is quieter for it. */
     let control;
     if (o.type === 'select') {
       control = `<select id="${id}" name="${id}"${req}>
@@ -75,8 +79,8 @@ const BookingProducts = (function () {
         ${o.autocomplete ? `autocomplete="${esc(o.autocomplete)}"` : ''}${req}>`;
     }
     const hint = o.hint ? `<small class="bk-field-hint" id="${id}-hint">${esc(o.hint)}</small>` : '';
-    return `<div class="bk-field ${o.wide ? 'is-wide' : ''}">
-        <label for="${id}">${esc(o.label)}${opt}</label>${control}${hint}
+    return `<div class="bk-field ${o.wide ? 'is-wide' : ''}${o.required ? '' : ' is-optional'}">
+        <label for="${id}">${esc(o.label)}</label>${control}${hint}
       </div>`;
   }
 
@@ -1421,7 +1425,9 @@ const BookingProducts = (function () {
   function bkfField(o) {
     const id = esc(o.id);
     const req = o.required ? '<span class="req">*</span>' : '';
-    const opt = o.optional ? ' <span class="opt">(Optional)</span>' : '';
+    /* Required keeps its asterisk; optional loses its "(Optional)" word and is
+       shown by a lighter label instead (is-optional, booking.css) — the same
+       quieting the shared field() and the profile form use. */
     let control;
     if (o.type === 'select') {
       control = `<select id="${id}" name="${id}">
@@ -1439,8 +1445,8 @@ const BookingProducts = (function () {
         ${o.inputmode ? `inputmode="${esc(o.inputmode)}"` : ''}
         ${o.autocomplete ? `autocomplete="${esc(o.autocomplete)}"` : ''}>`;
     }
-    return `<div class="bkf-f ${o.span ? 'span' + o.span : ''}">
-        <label for="${id}">${esc(o.label)}${req}${opt}</label>${control}
+    return `<div class="bkf-f ${o.span ? 'span' + o.span : ''}${o.optional ? ' is-optional' : ''}">
+        <label for="${id}">${esc(o.label)}${req}</label>${control}
         ${o.note ? `<p class="bkf-note" id="${id}-note" role="status" aria-live="polite"></p>` : ''}
       </div>`;
   }

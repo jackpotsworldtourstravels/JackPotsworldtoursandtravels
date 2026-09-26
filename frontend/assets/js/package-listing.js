@@ -396,6 +396,9 @@
   function renderResults(rows) {
     const sorted = rows.slice().sort(SORTS[state.sort].fn);
     grid.innerHTML = sorted.map(card).join('');
+    /* Cards AND photographs here: this page has no `.disc-in` container
+       fade, so the grid is where the entrance belongs. */
+    if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
 
     const shelf = state.trip ? (TRIPS.find(t => t.key === state.trip) || {}).label : null;
     $('pklCount').textContent = rows.length

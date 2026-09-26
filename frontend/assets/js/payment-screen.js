@@ -318,13 +318,24 @@ const JPay = (function () {
          </div>`
       : '';
 
+    /* THE WAIT STATES WEAR THE BRANDED LOADER. Opening / processing / pending
+       are the blocking, content-less moments the JackPots globe-and-plane was
+       built for — the heading becomes its line, the reassurance its sub-line.
+       The failed / cancelled states keep the plain cross, which is not a
+       "loading" and should not spin a globe. Falls back to the original icon
+       markup wherever jw-loader.js is not on the page, so nothing depends on it. */
+    const isWait = views.cls === 'is-wait';
+    const statusInner = (isWait && typeof JWLoader !== 'undefined')
+      ? JWLoader.markup({ logo: false, text: views.h, sub: views.p })
+      : `<div class="jpay-status-icon ${views.cls}">${views.icon}</div>
+          <h3>${esc(views.h)}</h3>
+          <p>${esc(views.p)}</p>`;
+
     return `
       <div class="jpay">
         ${amountCard(s)}
         <div class="jpay-status">
-          <div class="jpay-status-icon ${views.cls}">${views.icon}</div>
-          <h3>${esc(views.h)}</h3>
-          <p>${esc(views.p)}</p>
+          ${statusInner}
         </div>
         ${retry}
       </div>`;

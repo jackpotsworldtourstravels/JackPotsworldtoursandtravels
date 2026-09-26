@@ -33,6 +33,7 @@ from app.routers import (
     customer_hotel_bookings,
     customer_package_bookings,
     customer_profile,
+    customer_recommendations,
     customer_payment_admin,
     customer_travellers,
     dashboard,
@@ -331,6 +332,7 @@ app.include_router(providers.router)
 # scope="customer"). Neither direction needed a change to the other side.
 app.include_router(customer_auth.router)
 app.include_router(customer_profile.router)
+app.include_router(customer_recommendations.router)
 # The saved traveller list and the booking flow. Same customer scope as the two
 # above; the catalogue routes inside customer_bookings are deliberately public,
 # because a seat map is not private and is browsed before signing in.

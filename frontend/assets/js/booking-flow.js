@@ -114,6 +114,13 @@ const BookingFlow = (function () {
           <h1 class="bk-title">${esc(flow.title)}</h1>
         </div>
 
+        <!-- THE PROGRESS RAIL, back by request but DISPLAY-ONLY. The old rail
+             doubled as the way back, and that coupling was why it was removed;
+             this one only shows where you are — Back stays in the footer. It is
+             painted per step from the flow's own step list, so it can never
+             disagree with the journey the engine is actually running. -->
+        <nav class="bk-steps" id="bkSteps" aria-label="Booking progress"></nav>
+
         <div id="bkItin"></div>
 
         <div class="bk-body">
@@ -136,6 +143,38 @@ const BookingFlow = (function () {
           </div>
         </footer>
       </div>`;
+  }
+
+  /* The progress rail, painted from the flow's OWN steps so it is always the
+     real journey — a product with an add-ons step shows one, a hotel that skips
+     straight to confirmation shows two. `priorSteps` (a flight's Search, done on
+     the results page) render as cleared dots ahead of the live ones. It is
+     read-only: no dot is a link, so none of the back-navigation coupling that
+     retired the first rail comes back with it. */
+  const STEP_TICK = '<svg class="bk-step-tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>';
+  function renderSteps() {
+    const el = document.getElementById('bkSteps');
+    if (!el) return;
+    const prior = (flow.priorSteps || []).map(label => ({ label, state: 'done' }));
+    const live = flow.steps.map((s, i) => ({
+      label: s.label || s.id,
+      state: i < index ? 'done' : (i === index ? 'current' : 'upcoming'),
+    }));
+    const items = prior.concat(live);
+    const count = items.length;
+    const pos = prior.length + index;           /* 0-based index of the live step */
+    const now = items[pos] ? items[pos].label : '';
+    el.style.setProperty('--bk-steps-count', count);
+    el.style.setProperty('--bk-step-pos', pos);
+    el.innerHTML = `
+      <ol class="bk-steps-list">
+        ${items.map((it, i) => `
+          <li class="bk-step is-${it.state}"${it.state === 'current' ? ' aria-current="step"' : ''}>
+            <span class="bk-step-dot">${it.state === 'done' ? STEP_TICK : (i + 1)}</span>
+            <span class="bk-step-label">${esc(it.label)}</span>
+          </li>`).join('')}
+      </ol>
+      <p class="bk-steps-now">Step ${pos + 1} of ${count} &middot; ${esc(now)}</p>`;
   }
 
   /* A skeleton, not a spinner: the block that is coming is a list of cards, so
@@ -404,6 +443,10 @@ const BookingFlow = (function () {
        Flights", so it cannot be rendered once at start(). */
     const itin = root.querySelector('#bkItin');
     if (itin) itin.innerHTML = itineraryHtml(ctx, step);
+
+    /* The progress rail tracks the step we are painting. Cheap, so it repaints
+       every step rather than trying to diff which dot changed. */
+    renderSteps();
 
     main.className = 'bk-main ' + (direction === 'back' ? 'bk-in-back' : 'bk-in');
     if (step.load) main.innerHTML = skeleton(3);

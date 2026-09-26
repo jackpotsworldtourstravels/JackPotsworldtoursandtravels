@@ -187,6 +187,9 @@
 
       titleEl.textContent = 'Explore ' + dest.name;
       countryEl.textContent = dest.country || '';
+      /* Remember this visit for the landing page's Recommended shelf. Kept
+         locally, guarded so a page without jw-interest.js just skips it. */
+      if (typeof JWInterest !== 'undefined') JWInterest.record(dest);
       leadEl.textContent = 'Discover the most iconic and photographic places in '
         + dest.name + ' - and the hotels closest to each one.';
       document.title = dest.name + ' — JackPots World Tours & Travels';
@@ -218,6 +221,10 @@
         return;
       }
       grid.innerHTML = rows.map(l => cardHtml(l, dest)).join('');
+      /* IMAGES ONLY, NO CARD ENTRANCE. This page already has one: the
+         `.disc-in` fade on its body (discover.css). A second entrance per
+         card would be two animations saying the same thing. */
+      if (typeof JWMotion !== 'undefined') JWMotion.developAll(grid);
       grid.setAttribute('aria-busy', 'false');
       grid.classList.add('disc-in');
       /* The count is a label above the grid, not a status message: it is a

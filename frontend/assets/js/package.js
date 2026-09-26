@@ -160,6 +160,7 @@
       img.fetchPriority = 'high';
       img.addEventListener('error', () => img.remove());
       document.getElementById('pkHero').insertBefore(img, document.getElementById('pkHero').firstChild);
+      if (typeof JWMotion !== 'undefined') JWMotion.develop(img, { hero: true });
     }
 
     /* The strip: how long, what standard of hotel, what anybody has scored it,
@@ -260,6 +261,27 @@
       show(document.getElementById('pkFacts'), true);
     }
     show(document.getElementById('pkOverviewSec'), true);
+  }
+
+  /* ======================================================================
+     HIGHLIGHTS — the few things the trip is remembered by
+     ======================================================================
+     Straight off p.highlights, which the detail response already carries and
+     the "more packages" cards below already read. Drawn only when the array
+     has something in it, the same rule every other section on this page
+     follows; a plain city package with none simply skips it. */
+  function renderHighlights(p) {
+    const items = p.highlights || [];
+    if (!items.length) return;
+    const grid = document.getElementById('pkHighlights');
+    grid.innerHTML = items.map(h => `<li class="pk-highlight lp-card">
+        <span class="pk-highlight-ic">${icon('sparkles', 20)}</span>
+        <span class="pk-highlight-text">${esc(h)}</span>
+      </li>`).join('');
+    show(document.getElementById('pkHighlightsSec'), true);
+    /* Same entrance the grids get: reveal + stagger, handed to the shared
+       observer. No images here, so nothing to develop. */
+    if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
   }
 
   /* ======================================================================
@@ -423,6 +445,8 @@
         </div>
       </article>`;
     }).join('');
+    /* Same grid treatment as the listing page it mirrors. */
+    if (typeof JWMotion !== 'undefined') JWMotion.grid(document.getElementById('pkMore'));
     show(document.getElementById('pkMoreSec'), true);
     if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(document.getElementById('pkMoreSec'));
   }
@@ -507,6 +531,7 @@
   function render(p) {
     renderHero(p);
     renderOverview(p);
+    renderHighlights(p);
     renderItinerary(p);
     renderHotels(p);
     renderIncludes(p);

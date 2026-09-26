@@ -1,0 +1,136 @@
+/* ===========================================================================
+   jw-motion.css — the photograph arriving, in the site's own motion language.
+   ===========================================================================
+   WHAT THIS IS, AND WHAT IT DELIBERATELY IS NOT.
+
+   It is ONE behaviour: an image developing as it loads, plus the two hooks
+   that let JS-rendered cards join the reveal system that already exists. It
+   is not a second animation framework.
+
+   THE SYSTEM IT EXTENDS, which stays exactly where it is:
+
+     .reveal / .reveal-zoom     main.css:142  — the entrance
+     .delay-1 .. .delay-4       main.css:146  — the 80ms stagger steps
+     .jw-dest-card hover        main.css:1576 — lift, image scale(1.06), scrim
+     prefers-reduced-motion     main.css:79   — the global kill switch
+     cubic-bezier(.22,1,.36,1)                — the house easing curve
+
+   Nothing above is redefined here. The observer that drives `.reveal` is
+   still the single one in app.js; jw-motion.js hands it the cards that are
+   rendered after page load, which it could never see before.
+
+   WHY THE DEVELOP STARTS ABOVE 1 AND SETTLES DOWN TO IT. Every one of these
+   photographs is `object-fit: cover` inside a fixed frame. Starting at
+   `scale(.98)` would pull the image edges inside the frame and show a sliver
+   of the tint underneath, and on a landmark shot — a tower, a spire, a temple
+   gate — the settle would visibly re-crop the subject. Starting at 1.02 and
+   easing to 1 keeps the frame full for the whole transition and lands on the
+   exact crop the page was designed around.
+
+   FAIL-OPEN IS THE RULE. `.jw-dev` is applied by JavaScript, never in markup,
+   and only to nodes JavaScript has just created — so a page whose script
+   never ran shows plain visible images rather than permanently invisible
+   ones. The reduced-motion block below is a second floor under that: even
+   with the class applied and no script to remove it, the image is visible.
+   =========================================================================== */
+:root {
+  /* The house curve, named once so the develop cannot drift away from the
+     hover and reveal transitions that already use it. */
+  --jw-ease: cubic-bezier(.22, 1, .36, 1);
+  --jw-dev-ms: 620ms;        /* cards: fast enough not to be noticed as a wait */
+  --jw-dev-hero-ms: 880ms;   /* heroes: one beat slower, they are the subject  */
+}
+
+/* --- the develop ---------------------------------------------------------
+   Four properties, three of them compositor-friendly. `filter: blur()` is the
+   one that costs, which is why it is small (6px), short, and never applied to
+   more than the handful of images on screen at once. */
+.jw-dev {
+  opacity: 0;
+  transform: scale(1.02);
+  filter: blur(6px);
+  transition:
+    opacity var(--jw-dev-ms) var(--jw-ease),
+    transform var(--jw-dev-ms) var(--jw-ease),
+    filter var(--jw-dev-ms) var(--jw-ease);
+  will-change: opacity, transform, filter;
+}
+.jw-dev.is-developed {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  /* Dropped once the transition is over: a permanent `will-change` on every
+     photograph on the page is a layer per image for no benefit. */
+  will-change: auto;
+}
+/* A hero is bigger, closer to the reader and the first thing they look at, so
+   it gets the slower beat. Same curve, same properties. */
+.jw-dev-hero { transition-duration: var(--jw-dev-hero-ms); }
+
+/* --- what does NOT develop ----------------------------------------------
+   A card with no approved photograph keeps its drawn pin on its tint, and
+   that state is deliberate (it says "we hold no picture of this"), so it must
+   not fade in as though a photograph had just arrived. The renderers simply
+   never add `.jw-dev` to those, and this rule makes the intent explicit for
+   anyone who adds it by accident. */
+.jw-dev-none, .jw-dev-none.jw-dev {
+  opacity: 1; transform: none; filter: none; transition: none;
+}
+
+/* --- a card that reveals AND hovers --------------------------------------
+   Every card component declares its own `transition` for the hover lift -
+   `.jw-dest-card` (main.css:1584) and `.pkl-card` (packages.css) both name
+   transform, box-shadow and border-color, and both are defined after
+   `.reveal`. The whole property is overwritten, so a revealing card would
+   slide up on the hover's .3s and its OPACITY would not transition at all,
+   because the card's rule never mentions opacity. It would flash in.
+
+   `jw-rv` is added by jw-motion.js alongside `.reveal`, and these two rules -
+   three classes deep, so they win on specificity without !important - give
+   the entrance the reveal timing and hand the card back to its own hover
+   transition the moment it has arrived. */
+.jw-rv.reveal:not(.visible) {
+  transition: opacity .7s var(--jw-ease), transform .7s var(--jw-ease);
+}
+.jw-rv.reveal.visible {
+  transition: opacity .7s var(--jw-ease), transform .3s var(--jw-ease),
+              box-shadow .3s ease, border-color .25s ease;
+}
+
+/* --- stagger for JS-rendered grids ---------------------------------------
+   `.delay-1..4` in main.css cover the hand-written sections. A grid built
+   from an API answer has as many cards as the API sent, so the steps carry on
+   past four and then stop: beyond about the sixth card the wait is longer
+   than the animation and the page feels slow rather than composed. */
+.jw-stagger-5 { transition-delay: .40s; }
+.jw-stagger-6 { transition-delay: .48s; }
+.jw-stagger-7,
+.jw-stagger-8,
+.jw-stagger-9 { transition-delay: .52s; }
+
+/* --- tablet and phone ----------------------------------------------------
+   Less distance and less time, for the reason the brief gives: the same
+   motion that reads as cinematic on a 1440px screen reads as sluggish on a
+   phone held 30cm from the face, and a card that travels 36px on a 375px
+   screen is a card that arrives late. */
+@media (max-width: 1024px) {
+  :root { --jw-dev-ms: 520ms; --jw-dev-hero-ms: 700ms; }
+}
+@media (max-width: 640px) {
+  :root { --jw-dev-ms: 420ms; --jw-dev-hero-ms: 560ms; }
+  .jw-dev { transform: none; filter: blur(4px); }   /* no scale on a phone */
+  .jw-stagger-5, .jw-stagger-6,
+  .jw-stagger-7, .jw-stagger-8, .jw-stagger-9 { transition-delay: .28s; }
+}
+
+/* --- reduced motion ------------------------------------------------------
+   NOT A SECOND IMPLEMENTATION OF THE POLICY. main.css already collapses every
+   duration to 0.01ms globally, which handles the timing. This block handles
+   the STARTING STATE, which a duration cannot: an image that begins at
+   opacity 0 must not depend on a transition finishing to become visible. With
+   this, the picture is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  .jw-dev, .jw-dev.is-developed {
+    opacity: 1; transform: none; filter: none; transition: none; will-change: auto;
+  }
+}

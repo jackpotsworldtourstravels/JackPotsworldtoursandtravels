@@ -1,0 +1,5 @@
+# Load-test tooling. Install into a virtualenv, separate from the backend:
+#   python -m venv .venv-loadtest && . .venv-loadtest/Scripts/activate   (Windows)
+#   pip install -r loadtest/requirements.txt
+locust>=2.31
+requests>=2.31

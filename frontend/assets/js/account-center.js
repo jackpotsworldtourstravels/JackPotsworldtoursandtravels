@@ -102,29 +102,69 @@ const AccountCenter = (function () {
       <div class="acct-panels">
         <div class="acct-panel" id="acctPanel-profile">
           <h2>My Profile</h2>
-          <form id="acctProfileForm">
+          <!-- FLOATING LABELS. Each field is input-then-label with a
+               placeholder of a single space, so :placeholder-shown is what
+               tells an empty field from a filled one and the label rides up
+               when there is a value or focus (main.css, af-float). af-req marks
+               the three fields a booking actually needs — name, email, mobile —
+               and nothing is ever labelled "Optional": the rest simply carry no
+               mark. Selects and the date never sit empty-looking, so they float
+               from the start (af-filled). IDs are unchanged; the load and save
+               code below still reads them. -->
+          <form id="acctProfileForm" novalidate>
             <div class="acct-form-grid">
-              <div class="acct-form-field"><label>Full Name</label><input id="acctProfileName" type="text" required></div>
-              <div class="acct-form-field"><label>Email</label><input id="acctProfileEmail" type="email" disabled></div>
-              <div class="acct-form-field"><label>Mobile</label><input id="acctProfileMobile" type="tel"></div>
-              <div class="acct-form-field">
-                <label>Gender</label>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileName" type="text" placeholder=" " autocomplete="name" required>
+                <label for="acctProfileName">Full name</label>
+                <small class="af-err" id="acctProfileNameErr"></small>
+              </div>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileEmail" type="email" placeholder=" " disabled>
+                <label for="acctProfileEmail">Email</label>
+              </div>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileMobile" type="tel" placeholder=" " autocomplete="tel" inputmode="tel">
+                <label for="acctProfileMobile">Mobile number</label>
+                <small class="af-err" id="acctProfileMobileErr"></small>
+              </div>
+              <div class="acct-form-field af-float af-filled">
                 <select id="acctProfileGender">
-                  <option value="">Select</option>
+                  <option value="">Not specified</option>
                   <option value="female">Female</option>
                   <option value="male">Male</option>
                   <option value="other">Other</option>
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
+                <label for="acctProfileGender">Gender</label>
               </div>
-              <div class="acct-form-field"><label>Date of Birth</label><input id="acctProfileDob" type="date"></div>
-              <div class="acct-form-field"><label>Country</label><input id="acctProfileCountry" type="text"></div>
-              <div class="acct-form-field"><label>State</label><input id="acctProfileState" type="text"></div>
-              <div class="acct-form-field"><label>City</label><input id="acctProfileCity" type="text"></div>
+              <div class="acct-form-field af-float af-filled">
+                <input id="acctProfileDob" type="date" placeholder=" ">
+                <label for="acctProfileDob">Date of birth</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileCountry" type="text" placeholder=" " autocomplete="country-name">
+                <label for="acctProfileCountry">Country</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileState" type="text" placeholder=" " autocomplete="address-level1">
+                <label for="acctProfileState">State</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileCity" type="text" placeholder=" " autocomplete="address-level2">
+                <label for="acctProfileCity">City</label>
+              </div>
             </div>
-            <div class="acct-form-field" style="max-width:none;"><label>Address</label><input id="acctProfileAddress" type="text"></div>
-            <button type="submit" class="btn btn-coral">Save Changes</button>
-            <div class="acct-msg" id="acctProfileMsg"></div>
+            <div class="acct-form-field af-float" style="max-width:none;">
+              <input id="acctProfileAddress" type="text" placeholder=" " autocomplete="street-address">
+              <label for="acctProfileAddress">Address</label>
+            </div>
+            <button type="submit" class="btn btn-coral acct-save-btn" id="acctProfileSaveBtn">
+              <span class="acct-save-label">Save changes</span>
+              <span class="acct-save-tick" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+            </button>
+            <div class="acct-msg" id="acctProfileMsg" role="status" aria-live="polite"></div>
           </form>
         </div>
 
@@ -366,11 +406,20 @@ async function loadAcctHeaderProfile() {
   } catch (err) { /* header just won't populate this cycle */ }
 }
 async function loadAcctProfile() {
+  /* SKELETON WHILE THE ONE /me CALL IS IN FLIGHT. The form's fields shimmer
+     rather than showing empty boxes that then fill — the same "content is
+     arriving" signal the rest of the site uses. Removed in `finally`, so a
+     failed load reveals the (blank) form to try again rather than shimmering
+     forever. */
+  const form = document.getElementById('acctProfileForm');
+  if (form) form.classList.add('is-skeleton');
   try {
     const { data } = await axios.get(`${API_BASE}/api/customer/auth/me`, { headers: customerHeaders() });
     acctCurrentUser = data;
-    document.getElementById('acctProfileName').value = data.full_name;
-    document.getElementById('acctProfileEmail').value = data.email;
+    document.getElementById('acctProfileName').value = data.full_name || '';
+    /* A guest has no email; the field is disabled either way, so an empty one
+       simply reads as "Email" with nothing under it rather than a placeholder. */
+    document.getElementById('acctProfileEmail').value = data.email || '';
     document.getElementById('acctProfileMobile').value = data.mobile || '';
     document.getElementById('acctProfileGender').value = data.gender || '';
     document.getElementById('acctProfileDob').value = data.date_of_birth || '';
@@ -379,10 +428,62 @@ async function loadAcctProfile() {
     document.getElementById('acctProfileCity').value = data.city || '';
     document.getElementById('acctProfileAddress').value = data.address_line1 || '';
   } catch (err) { /* fields stay blank */ }
+  finally { if (form) form.classList.remove('is-skeleton'); }
 }
+
+/* ---------- Profile form: inline validation ----------
+   The three fields a booking needs are name, email and mobile. Email is the
+   login identifier and disabled, so it is never in question; the two that the
+   traveller can edit are checked here before the PATCH goes out. A guest is
+   exempt from the mobile rule — an anonymous session has no number and no way
+   to be reached at one, and blocking their save would trap them on a screen
+   they cannot complete. */
+function acctFieldError(id, message) {
+  const input = document.getElementById(id);
+  const field = input && input.closest('.acct-form-field');
+  const err = field && field.querySelector('.af-err');
+  if (field) field.classList.toggle('af-invalid', !!message);
+  if (err) err.textContent = message || '';
+  return !message;
+}
+function validateAcctProfile() {
+  let firstBad = null;
+  const name = document.getElementById('acctProfileName').value.trim();
+  if (!acctFieldError('acctProfileName', name ? '' : 'Please enter your full name.') && !firstBad) {
+    firstBad = 'acctProfileName';
+  }
+  const mobile = document.getElementById('acctProfileMobile').value.trim();
+  const isGuest = !!(acctCurrentUser && acctCurrentUser.is_guest);
+  let mobileMsg = '';
+  if (!isGuest && !mobile) mobileMsg = 'Please enter a mobile number.';
+  /* A light format check — 7 to 15 digits, the ITU range — so an obvious typo
+     is caught here rather than by the server. Spaces, +, - and () are allowed
+     and ignored. Empty is handled above, so a blank guest field never fails. */
+  else if (mobile && (mobile.replace(/[^\d]/g, '').length < 7 || mobile.replace(/[^\d]/g, '').length > 15)) {
+    mobileMsg = 'Please enter a valid mobile number.';
+  }
+  if (!acctFieldError('acctProfileMobile', mobileMsg) && !firstBad) firstBad = 'acctProfileMobile';
+  if (firstBad) document.getElementById(firstBad).focus();
+  return !firstBad;
+}
+/* Clear a field's error the moment the traveller starts fixing it. */
+['acctProfileName', 'acctProfileMobile'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', () => acctFieldError(id, ''));
+});
 document.getElementById('acctProfileForm').addEventListener('submit', async e => {
   e.preventDefault();
   const msg = document.getElementById('acctProfileMsg');
+  const btn = document.getElementById('acctProfileSaveBtn');
+  /* Client-side gate first: a required field that is empty never reaches the
+     server, and the traveller is shown exactly which one and why. */
+  if (!validateAcctProfile()) {
+    msg.textContent = '';
+    msg.className = 'acct-msg';
+    return;
+  }
+  btn.classList.add('is-saving');
+  btn.disabled = true;
   try {
     /* PATCH, not PUT: every field on CustomerProfileUpdateRequest is optional
        and only what is sent gets written, so the columns this form has no
@@ -391,24 +492,44 @@ document.getElementById('acctProfileForm').addEventListener('submit', async e =>
 
        The email is deliberately absent — it is the login identifier, and no
        endpoint changes it. The field is `disabled` in the markup. */
-    const { data } = await axios.patch(`${API_BASE}/api/customer/profile`, {
-      full_name: document.getElementById('acctProfileName').value,
-      mobile: document.getElementById('acctProfileMobile').value || null,
+    /* MOBILE IS NEVER SENT AS null. The `customers.mobile` column is NOT NULL,
+       so `mobile: value || null` — the old shape — turned an empty box into a
+       500 the moment anyone (a guest editing only their name, say) saved without
+       one. It is a mandatory field, validated non-empty for real accounts above;
+       here it is simply OMITTED when blank, so PATCH leaves whatever the row
+       already holds rather than trying to null a column that cannot be null.
+       The other fields are genuinely nullable and keep the `|| null` clear. */
+    const payload = {
+      full_name: document.getElementById('acctProfileName').value.trim(),
       gender: document.getElementById('acctProfileGender').value || null,
       date_of_birth: document.getElementById('acctProfileDob').value || null,
-      country: document.getElementById('acctProfileCountry').value || null,
-      state: document.getElementById('acctProfileState').value || null,
-      city: document.getElementById('acctProfileCity').value || null,
-      address_line1: document.getElementById('acctProfileAddress').value || null,
-    }, { headers: customerHeaders() });
+      country: document.getElementById('acctProfileCountry').value.trim() || null,
+      state: document.getElementById('acctProfileState').value.trim() || null,
+      city: document.getElementById('acctProfileCity').value.trim() || null,
+      address_line1: document.getElementById('acctProfileAddress').value.trim() || null,
+    };
+    const mobileVal = document.getElementById('acctProfileMobile').value.trim();
+    if (mobileVal) payload.mobile = mobileVal;
+    const { data } = await axios.patch(`${API_BASE}/api/customer/profile`, payload,
+      { headers: customerHeaders() });
     setStoredAuth(getStoredAuth().access, getStoredAuth().refresh, data.full_name, 'customer', data.id);
     renderAuthNav();
     loadAcctHeaderProfile();
     msg.textContent = 'Profile updated.';
-    msg.className = 'acct-msg success';
+    msg.className = 'acct-msg success is-in';
+    /* SUCCESS ANIMATION. The button flips to a drawn checkmark for a beat, then
+       settles back to its label — a confirmation the save landed without a
+       toast or a jump. The class drives a CSS keyframe (main.css); under
+       reduced motion the global switch flattens it to an instant swap. */
+    btn.classList.remove('is-saving');
+    btn.classList.add('is-saved');
+    setTimeout(() => btn.classList.remove('is-saved'), 1600);
   } catch (err) {
     msg.textContent = apiErrorText(err, 'Failed to update profile.');
-    msg.className = 'acct-msg error';
+    msg.className = 'acct-msg error is-in';
+    btn.classList.remove('is-saving');
+  } finally {
+    btn.disabled = false;
   }
 });
 document.getElementById('acctPasswordForm').addEventListener('submit', async e => {

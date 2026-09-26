@@ -26,7 +26,11 @@
      that uses it, Yellowtail at its single 400. One request, same as before. -->
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260925ui1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
+<!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
+     (.reveal / .delay-*) and the card hover language; it replaces neither.
+     See the header of jw-motion.css. -->
+<link rel="stylesheet" href="assets/css/jw-motion.css?v=20260926mo3">
 <!-- The hero card's own controls: trip type, the passenger popover and the
      round-trip return row. Loaded AFTER main.css, which still owns .search-card
      and .field — this file only adds. -->
@@ -61,6 +65,7 @@
      foot of the page - so JPIcon did not exist yet and the tabs came out as
      bare words. Every other page already loads it ahead of the card. -->
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
+<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
 <!-- The wider city/airport reference. BEFORE airports.js, which reads it for
      the cities its own table does not carry and for the airports' proper
      names, and before the inline BookingCard.render() below — the card paints
@@ -360,6 +365,25 @@
 
      The heading and the strapline are the only words here that are ours; the
      rest of the section is empty until the API answers. -->
+<!-- RECOMMENDED FOR YOU — personalised, and only from what this visitor has
+     looked at here. Hidden by default; jw-foryou.js reveals it only when
+     jw-interest.js has a recently-viewed destination to show, so a first-time
+     visitor never sees an empty "Recommended" heading. It reuses the
+     destinations shelf's own markup and stylesheet. -->
+<section class="jw-dest jw-foryou" id="jwForYou" aria-labelledby="jwForYouHead" hidden>
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div>
+        <div class="eyebrow">Recommended for you</div>
+        <h2 id="jwForYouHead">Because you explored <span id="jwForYouCity"></span></h2>
+      </div>
+      <p>Pick up where you left off — the stays and trips for the places you've been looking at.</p>
+    </div>
+    <div class="jw-fy-links" id="jwForYouLinks"></div>
+    <div class="jw-dest-grid" id="jwForYouGrid" role="list"></div>
+  </div>
+</section>
+
 <section class="jw-dest" id="destinations" aria-labelledby="jwDestHead">
   <div class="wrap">
     <div class="section-head reveal">
@@ -1034,29 +1058,64 @@
       <div class="acct-panels">
         <div class="acct-panel" id="acctPanel-profile">
           <h2>My Profile</h2>
-          <form id="acctProfileForm">
+          <!-- Floating-label profile form. Kept identical to the copy in
+               account-center.js MARKUP (this page carries its own inline Account
+               Center, so the two are maintained together). See main.css .af-float
+               for the label/validation/skeleton/save behaviour. -->
+          <form id="acctProfileForm" novalidate>
             <div class="acct-form-grid">
-              <div class="acct-form-field"><label>Full Name</label><input id="acctProfileName" type="text" required></div>
-              <div class="acct-form-field"><label>Email</label><input id="acctProfileEmail" type="email" disabled></div>
-              <div class="acct-form-field"><label>Mobile</label><input id="acctProfileMobile" type="tel"></div>
-              <div class="acct-form-field">
-                <label>Gender</label>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileName" type="text" placeholder=" " autocomplete="name" required>
+                <label for="acctProfileName">Full name</label>
+                <small class="af-err" id="acctProfileNameErr"></small>
+              </div>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileEmail" type="email" placeholder=" " disabled>
+                <label for="acctProfileEmail">Email</label>
+              </div>
+              <div class="acct-form-field af-float af-req">
+                <input id="acctProfileMobile" type="tel" placeholder=" " autocomplete="tel" inputmode="tel">
+                <label for="acctProfileMobile">Mobile number</label>
+                <small class="af-err" id="acctProfileMobileErr"></small>
+              </div>
+              <div class="acct-form-field af-float af-filled">
                 <select id="acctProfileGender">
-                  <option value="">Select</option>
+                  <option value="">Not specified</option>
                   <option value="female">Female</option>
                   <option value="male">Male</option>
                   <option value="other">Other</option>
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
+                <label for="acctProfileGender">Gender</label>
               </div>
-              <div class="acct-form-field"><label>Date of Birth</label><input id="acctProfileDob" type="date"></div>
-              <div class="acct-form-field"><label>Country</label><input id="acctProfileCountry" type="text"></div>
-              <div class="acct-form-field"><label>State</label><input id="acctProfileState" type="text"></div>
-              <div class="acct-form-field"><label>City</label><input id="acctProfileCity" type="text"></div>
+              <div class="acct-form-field af-float af-filled">
+                <input id="acctProfileDob" type="date" placeholder=" ">
+                <label for="acctProfileDob">Date of birth</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileCountry" type="text" placeholder=" " autocomplete="country-name">
+                <label for="acctProfileCountry">Country</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileState" type="text" placeholder=" " autocomplete="address-level1">
+                <label for="acctProfileState">State</label>
+              </div>
+              <div class="acct-form-field af-float">
+                <input id="acctProfileCity" type="text" placeholder=" " autocomplete="address-level2">
+                <label for="acctProfileCity">City</label>
+              </div>
             </div>
-            <div class="acct-form-field" style="max-width:none;"><label>Address</label><input id="acctProfileAddress" type="text"></div>
-            <button type="submit" class="btn btn-coral">Save Changes</button>
-            <div class="acct-msg" id="acctProfileMsg"></div>
+            <div class="acct-form-field af-float" style="max-width:none;">
+              <input id="acctProfileAddress" type="text" placeholder=" " autocomplete="street-address">
+              <label for="acctProfileAddress">Address</label>
+            </div>
+            <button type="submit" class="btn btn-coral acct-save-btn" id="acctProfileSaveBtn">
+              <span class="acct-save-label">Save changes</span>
+              <span class="acct-save-tick" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+              </span>
+            </button>
+            <div class="acct-msg" id="acctProfileMsg" role="status" aria-live="polite"></div>
           </form>
         </div>
 
@@ -1157,7 +1216,7 @@
 <!-- The Travel Assistant and the Voice Assistant, after live-chat.js and
      account-center.js because Support and My Bookings hand off to both. -->
 <script src="assets/js/travel-assistant.js?v=20260921ta2"></script>
-<script src="assets/js/account-center.js?v=20260922gs1"></script>
+<script src="assets/js/account-center.js?v=20260926ac4"></script>
 <!-- Where a Group Deals hotel enquiry goes. Before app.js, whose search
      handler is what calls it. -->
 <script src="assets/js/group-enquiry.js?v=20260827g2"></script>
@@ -1172,13 +1231,16 @@
      assets/destinations/ and both are written by
      scripts/fetch_destination_images.py. -->
 <script src="assets/js/destination-images.js?v=20260923im2"></script>
-<script src="assets/js/home-destinations.js?v=20260923im2"></script>
+<script src="assets/js/jw-interest.js?v=20260926pz1"></script>
+<script src="assets/js/home-destinations.js?v=20260926mo1"></script>
+<script src="assets/js/jw-foryou.js?v=20260926pz1"></script>
 <script src="assets/js/app.js?v=20260922fp3"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that
      render inventory. The landing page carries none of that weight. -->
-<script src="assets/js/payment-screen.js?v=20260925tk1"></script>
+<script src="assets/js/jw-loader.js?v=20260926ld1"></script>
+<script src="assets/js/payment-screen.js?v=20260926ld1"></script>
 <script src="assets/js/booking-pay.js?v=20260924hd1"></script>
 </body>
 </html>

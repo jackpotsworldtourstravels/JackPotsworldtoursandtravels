@@ -581,11 +581,23 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 .tx-path { display: grid; justify-items: center; gap: 4px; min-width: 108px; }
 .tx-dur { font-size: 12px; font-weight: 700; color: var(--tx-muted); white-space: nowrap; }
 .tx-line { width: 100%; height: 2px; background: var(--tx-line); position: relative; border-radius: 2px; }
+/* THE ROUTE DRAWS ITSELF, PLANE FIRST. On a real card the plane sets off from
+   the departure end and the accent line follows it in a beat later — the delay
+   on the fill (.08s) against no delay on the plane is what guarantees the plane
+   leads and the line trails, never the reverse. Both play once on render and
+   hold; under prefers-reduced-motion the global switch (main.css) zeroes the
+   durations, so the plane is simply at the arrival end over a finished line.
+   Skeleton placeholders are excluded — there is no route to fly on a grey box. */
+.tx-flight:not(.tx-sk-flight) .tx-line::before {
+  content: ''; position: absolute; inset: 0; border-radius: 2px;
+  background: var(--tx-accent); transform: scaleX(0); transform-origin: left center;
+  animation: txLineDraw .8s cubic-bezier(.4, 0, .2, 1) .08s forwards;
+}
 /* The aeroplane at the end of the route line was content:'✈' — a text glyph
    that rendered as a different aircraft per platform and as a full-colour emoji
    on some. It is the jp-icons drawing now, so it matches the nav. */
 .tx-line .jpi {
-  position: absolute; right: -6px; top: 50%;
+  position: absolute; right: -6px; top: 50%; z-index: 1;
   /* 45deg, NOT 90. The mark used to be a hand-drawn aeroplane pointing straight
      up, and a quarter turn laid it along the route line. Lucide's Plane is
      already banked: its nose points up and to the RIGHT, about 45 degrees off
@@ -594,6 +606,15 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
   width: 16px; height: 16px; color: var(--tx-accent);
   background: var(--tx-surface); padding-left: 3px;
 }
+/* The flight in: from the departure end to its resting spot at the arrival end.
+   It overrides `right` with an animated `left`, so the keyframes move one
+   property and the 45deg bank in `transform` is left untouched. */
+.tx-flight:not(.tx-sk-flight) .tx-line .jpi {
+  right: auto; left: calc(100% - 10px);
+  animation: txPlaneFly .9s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+@keyframes txLineDraw { to { transform: scaleX(1); } }
+@keyframes txPlaneFly { from { left: -6px; } to { left: calc(100% - 10px); } }
 /* The card is the hover target — a 14px mark is not one. */
 .tx-flight:hover .tx-line .jpi [data-jpi="glide"] { animation: jpiGlide .85s cubic-bezier(.22,1,.36,1); }
 .tx-stops { font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--tx-emerald); }

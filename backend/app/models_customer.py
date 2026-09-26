@@ -2076,3 +2076,34 @@ class CustomerCall(Base):
 
     def can_transition_to(self, status: str) -> bool:
         return status in CALL_TRANSITIONS.get(self.status, ())
+
+
+class CustomerActivity(Base):
+    """One thing a customer looked at, saved or booked — the raw signal
+    recommendation_service.py scores into suggestions. Append-only, keyed on
+    customer_id and read by recency; see migration 0085 for the table and the
+    privacy note that goes with it.
+
+    ``activity_type`` is view / wishlist / booking / search and ``entity_type``
+    is destination / hotel / package; both are validated at the API edge rather
+    than by a DB enum, so a new kind of signal needs no migration. ``entity_id``
+    is the catalogue's own id for that kind (a destination slug, a package id),
+    kept as text so one column serves all three.
+    """
+
+    __tablename__ = "customer_activity"
+
+    activity_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customers.customer_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    activity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )

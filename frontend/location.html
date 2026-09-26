@@ -27,13 +27,17 @@
      degrades to a serif rather than to the UI face. -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/main.css?v=20260925ui1">
+<link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
+<!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
+     (.reveal / .delay-*) and the card hover language; it replaces neither.
+     See the header of jw-motion.css. -->
+<link rel="stylesheet" href="assets/css/jw-motion.css?v=20260926mo3">
 <!-- One bar and one background for the whole booking journey - the tokens
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260915mg1">
+<link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260922fp3">
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260925ui1">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
@@ -44,6 +48,7 @@
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
 <script src="assets/js/jp-icons.js?v=20260923lp3"></script>
+<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- The photographs of the famous places, vendored from Wikimedia Commons by
      scripts/fetch_attraction_images.py. A KEY the API sends is looked up here;
@@ -66,7 +71,7 @@
 <script src="assets/js/profile-menu.js?v=20260922gs1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
-<script src="assets/js/account-center.js?v=20260922gs1"></script>
+<script src="assets/js/account-center.js?v=20260926ac4"></script>
 
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('hotels.html');</script>
@@ -188,6 +193,6 @@
 
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
-<script src="assets/js/location.js?v=20260923im2"></script>
+<script src="assets/js/location.js?v=20260926mo1"></script>
 </body>
 </html>

@@ -194,6 +194,8 @@
       img.fetchPriority = 'high';
       img.addEventListener('error', () => img.remove());
       hero.insertBefore(img, hero.firstChild);
+      /* The hero gets the slower beat - it is the subject of the page. */
+      if (typeof JWMotion !== 'undefined') JWMotion.develop(img, { hero: true });
     } else {
       hero.insertAdjacentHTML('afterbegin', `<span class="lp-hero-pin">${icon('mapPin', 40)}</span>`);
     }
@@ -415,6 +417,7 @@
               sizes="(max-width: 900px) 92vw, 430px" alt="${esc(a.name)}"
               loading="lazy" decoding="async" onerror="this.closest('figure').remove()">`;
       show(document.getElementById('lpAboutArt'), true);
+      if (typeof JWMotion !== 'undefined') JWMotion.developAll(document.getElementById('lpAboutArt'));
     }
     show(document.getElementById('lpAboutSec'), true);
   }
@@ -448,6 +451,10 @@
         </span>
       </a>`;
     }).join('');
+    /* The photographs develop; a card whose landmark has no approved
+       picture keeps its drawn pin and is left alone - developAll only ever
+       touches <img>. */
+    if (typeof JWMotion !== 'undefined') JWMotion.developAll(document.getElementById('lpMore'));
     show(document.getElementById('lpMoreSec'), true);
   }
 
@@ -486,6 +493,7 @@
              loading="${i < 2 ? 'eager' : 'lazy'}" decoding="async"
              onerror="this.closest('figure').remove()">
       </figure>`).join('');
+    if (typeof JWMotion !== 'undefined') JWMotion.developAll(document.getElementById('lpGallery'));
     show(document.getElementById('lpGallerySec'), true);
   }
 
@@ -580,6 +588,7 @@
         </article>`;
       }).join('');
       if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(box);
+      if (typeof JWMotion !== 'undefined') JWMotion.developAll(box);
     } catch {
       box.innerHTML = '';
     }

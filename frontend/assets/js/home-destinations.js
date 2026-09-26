@@ -164,6 +164,9 @@
   function paintShelf() {
     const shown = expanded ? destinations : destinations.slice(0, FIRST_SHOWN);
     grid.innerHTML = shown.map(cardHtml).join('');
+    /* The site's one reveal observer and one image-develop, from
+       jw-motion.js. Guarded so a page that has not loaded it still renders. */
+    if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
     grid.setAttribute('aria-busy', 'false');
 
     const rest = destinations.length - shown.length;

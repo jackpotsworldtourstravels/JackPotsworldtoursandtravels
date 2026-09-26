@@ -239,8 +239,26 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .mobile-partner-mark .npm-mark{width:20px; height:20px; color:inherit;}
 .nav-signup{padding:11px 22px; font-size:14px;}
 .hamburger{display:none; flex-direction:column; gap:5px; width:26px;}
-.hamburger span{height:2px; background:#fff; border-radius:2px;}
-.mobile-nav{display:none; flex-direction:column; gap:2px; background:#0a0a0a; padding:12px 32px 24px; box-shadow:var(--shadow-sm);}
+/* THE BARS MORPH TO AN X WHILE THE DRAWER IS OPEN. Center-to-center is 7px
+   (a 2px bar plus the 5px gap), so that is exactly how far the outer two travel
+   before they cross; the middle one fades out. transform-origin:center pivots
+   each bar on itself rather than swinging it from an end. aria-expanded is the
+   state hero-shell.js already sets on the button, so no new hook is needed. */
+.hamburger span{height:2px; background:#fff; border-radius:2px; transform-origin:center; transition:transform .3s cubic-bezier(.22,.9,.32,1), opacity .2s ease;}
+.hamburger[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg);}
+.hamburger[aria-expanded="true"] span:nth-child(2){opacity:0;}
+.hamburger[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
+/* THE DRAWER ANIMATES OPEN INSTEAD OF SNAPPING. It used to be display:none
+   flipped to display:flex, which cannot transition. It is now always laid out
+   below 861px (the @media min-width:861px rule further down still hides it on
+   desktop with display:none) but collapsed to nothing — max-height:0, faded,
+   nudged up and click-through — until .open wipes it down. Vertical padding
+   animates too so the collapsed box is truly flat. Under prefers-reduced-motion
+   the global switch at the top of this file zeroes every duration, so it simply
+   appears, which is the correct reduced-motion result. */
+.mobile-nav{display:flex; flex-direction:column; gap:2px; background:#0a0a0a; padding:0 32px; box-shadow:var(--shadow-sm);
+  max-height:0; opacity:0; overflow:hidden; transform:translateY(-8px); pointer-events:none;
+  transition:max-height .34s cubic-bezier(.22,.9,.32,1), opacity .24s ease, transform .34s cubic-bezier(.22,.9,.32,1), padding .34s cubic-bezier(.22,.9,.32,1);}
 /* ICON THEN LABEL, ALIGNED. Every drawer row carries the same
    `<i data-jp-icon>` + `<span>` the bar does — index.html's static copy and
    hero-shell's navLinks() both emit it — and as inline content the glyph ran
@@ -255,7 +273,7 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
    the strip below — JPIcon.mount swaps the <i> for a <span class="jpi">, so
    without it the ICON would take this indent on every other row. */
 .mobile-nav a > span:not(.jpi):first-child{margin-left:30px;}
-.mobile-nav.open{display:flex;}
+.mobile-nav.open{max-height:80vh; opacity:1; transform:translateY(0); pointer-events:auto; padding:12px 32px 24px;}
 /* ONE BREAKPOINT FOR THE NAV, NOT THREE.
    The strip hid at 860 (see the ten-product block near the foot of this file),
    the hamburger appeared at 960 and the drawer was gated at 961 — so between
@@ -978,6 +996,78 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .acct-form-grid{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; max-width:620px;}
 .acct-msg{margin-top:12px; font-size:13px; font-weight:600;}
 .acct-msg.error{color:var(--coral-dark);} .acct-msg.success{color:var(--emerald);}
+.acct-msg.is-in{animation:acctMsgIn .28s ease;}
+@keyframes acctMsgIn{from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:none;}}
+
+/* ===========================================================================
+   PROFILE FORM — floating labels, validation, skeleton, save confirmation.
+   ===========================================================================
+   ONE HOME, ON PURPOSE. main.css is loaded on every page that carries the
+   Account Center, so these rules reach the profile form everywhere it opens
+   without being duplicated into account-center.css. Every selector is
+   compound (`.acct-form-field.af-float`, specificity 0,2,1), so it outranks the
+   plain `.acct-form-field` rule in BOTH this file and account-center.css no
+   matter which loads last — the base fields (the settings password form) keep
+   the old look untouched. Reduced motion is handled by the global switch near
+   the top of this file, which zeroes every duration here. */
+
+/* --- floating label ------------------------------------------------------- */
+.acct-form-field.af-float{position:relative; margin-bottom:18px;}
+.acct-form-field.af-float input,
+.acct-form-field.af-float select{padding:19px 14px 7px; height:auto;}
+.acct-form-field.af-float label{
+  position:absolute; left:14px; top:15px; margin:0; padding:0;
+  font-size:14px; font-weight:600; text-transform:none; letter-spacing:0;
+  color:var(--muted); pointer-events:none; transform-origin:left top;
+  transition:transform .16s ease, color .16s ease;
+}
+.acct-form-field.af-float input:focus,
+.acct-form-field.af-float select:focus{
+  border-color:var(--coral);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--coral) 22%, transparent);
+}
+/* The label rides up once the field has focus or a value; the placeholder of a
+   single space is what makes `:placeholder-shown` mean "empty". Selects and the
+   date input never look empty, so `af-filled` keeps their label up from load. */
+.acct-form-field.af-float input:focus + label,
+.acct-form-field.af-float input:not(:placeholder-shown) + label,
+.acct-form-field.af-float select:focus + label,
+.acct-form-field.af-filled label{transform:translateY(-9px) scale(.74); color:var(--navy);}
+/* The three fields a booking needs carry a mark; nothing carries "Optional". */
+.acct-form-field.af-req label::after{content:" *"; color:var(--coral-dark); font-weight:800;}
+
+/* --- validation ----------------------------------------------------------- */
+.acct-form-field.af-invalid input,
+.acct-form-field.af-invalid select{border-color:#D64545; box-shadow:0 0 0 3px rgba(214,69,69,.14);}
+.acct-form-field.af-invalid label{color:#D64545;}
+.af-err{display:block; margin-top:5px; font-size:12px; font-weight:600; color:#D64545;}
+
+/* --- loading skeleton ----------------------------------------------------- */
+#acctProfileForm.is-skeleton .acct-form-field > input,
+#acctProfileForm.is-skeleton .acct-form-field > select,
+#acctProfileForm.is-skeleton .acct-form-field > label,
+#acctProfileForm.is-skeleton .acct-form-field > small,
+#acctProfileForm.is-skeleton .acct-save-btn,
+#acctProfileForm.is-skeleton .acct-msg{visibility:hidden;}
+#acctProfileForm.is-skeleton .acct-form-field{position:relative; min-height:52px;}
+#acctProfileForm.is-skeleton .acct-form-field::after{
+  content:""; position:absolute; left:0; right:0; top:0; height:50px; border-radius:12px;
+  background:linear-gradient(90deg, rgba(10,37,64,.06) 25%, rgba(10,37,64,.12) 37%, rgba(10,37,64,.06) 63%);
+  background-size:400% 100%; animation:acctShimmer 1.3s ease-in-out infinite;
+}
+@keyframes acctShimmer{0%{background-position:100% 0;} 100%{background-position:0 0;}}
+
+/* --- save button confirmation --------------------------------------------- */
+.acct-save-btn{position:relative; display:inline-flex; align-items:center; justify-content:center; gap:8px;}
+.acct-save-btn.is-saving{opacity:.85; cursor:progress;}
+.acct-save-tick{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0;}
+.acct-save-tick svg{width:22px; height:22px; fill:none; stroke:#fff; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round;}
+.acct-save-tick svg path{stroke-dasharray:30; stroke-dashoffset:30;}
+.acct-save-btn.is-saved{background:var(--emerald); border-color:var(--emerald);}
+.acct-save-btn.is-saved .acct-save-label{opacity:0;}
+.acct-save-btn.is-saved .acct-save-tick{opacity:1;}
+.acct-save-btn.is-saved .acct-save-tick svg path{animation:acctTickDraw .5s cubic-bezier(.7,0,.3,1) forwards;}
+@keyframes acctTickDraw{to{stroke-dashoffset:0;}}
 .acct-star-input{display:flex; gap:6px; margin-bottom:16px; font-size:22px; color:var(--line);}
 .acct-star-input span{cursor:pointer; transition:color .15s ease;}
 .acct-star-input span.active{color:var(--gold);}
