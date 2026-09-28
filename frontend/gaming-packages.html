@@ -1,174 +1,183 @@
 <!DOCTYPE html>
-<!-- data-theme="light", the same line flights.html and hotels.html carry:
-     this page wears main.css's shell, whose palette is light by construction,
-     and travel-explore.css's dark palette is keyed to :not([data-theme="light"])
-     so a page like this can opt out of it cleanly. -->
+<!-- GAMING TOUR PACKAGES IS AN ENQUIRY, NOT A SEARCH.
+     This used to be the same destination/date/travellers machinery
+     packages.html runs (see the git history on this file) — a casino trip is
+     quoted by hand, table limits and visas vary too much property to property
+     for a live price, so a searchable grid promised something the business
+     never delivered. This is now a form: POST /api/customer/gaming-tour-enquiries
+     (gaming_tour_enquiry_service.py), no session required, lands on the
+     Admin Portal's Gaming Tour Enquiries queue.
+
+     THE URL DID NOT CHANGE. Eight files link to gaming-packages.html — the
+     header nav, index.html's own card, the package listing shelf — and every
+     one of them keeps working unmodified because "Gaming Tour Packages" still
+     goes exactly where it always did; only what is there changed. -->
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gaming Packages — JackPots World Tours &amp; Travels</title>
-<meta name="description" content="Casino and gaming tour packages with JackPots World Tours &amp; Travels.">
+<title>Gaming Tour Enquiry — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="Tell us your casino tour preferences and travel dates — JackPots World Tours &amp; Travels will call you back with a quote.">
 <link rel="icon" href="assets/images/favicon.ico">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
-<!-- THE LANDING PAGE'S STYLESHEETS, in the landing page's order - this is
-     that page continued, not a service page that resembles it.
-     service-page.css is deliberately absent, the same call flights.html and
-     hotels.html make: it would put a second header design and a second
-     palette on a page that already has main.css's. The --sp-* token names
-     booking.css and travel-explore.css use are bridged onto main.css's
-     palette by booking-card.css, under body.sp-continuation. -->
+<!-- The landing page's own shell — the same header, palette and footer every
+     results page wears. service-page.css is deliberately absent, the same
+     call flights.html/hotels.html make: it would put a second header design
+     on a page that already has main.css's. -->
 <link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
-<!-- One bar and one background for the whole booking journey - the tokens
-     live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
+<!-- Only for .tx-ap-list/.tx-ap-opt — the airport-suggestion dropdown the
+     From/To fields share with flights.html's search card. Nothing else here
+     reads from this stylesheet; the search grid it used to draw is gone. -->
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260926fr1">
+<link rel="stylesheet" href="assets/css/gaming-enquiry.css?v=20260928gt2">
 <link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260926fr1">
-<!-- The results-page search strip. A separate component from the landing
-     page's booking card; index.html loads neither of these two files. -->
-<link rel="stylesheet" href="assets/css/search-strip.css?v=20260911ic7">
-<!-- The landing page's search card, for the strip's Modify button: it opens
-     BookingCard underneath the row, and the reference styling for that card
-     (tabs, fare tiles) lives here. Only the CARD sections apply
-     off the landing page - see the note at the top of the file. -->
-<link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
-<link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
-<!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
-<!-- The company footer, one stylesheet for every page that renders it. -->
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
-<!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
-     renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
-<!-- The shell and the hero search card, in <head> because the header, the
-     hero and the card are all mounted inline during parse - the same
-     arrangement index.html, flights.html and hotels.html use. -->
+<link rel="stylesheet" href="assets/css/jw-motion.css?v=20260926mo3">
 <script src="shared/formatters.js"></script>
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <!-- The session the header chip reflects. Must precede profile-menu.js and
      account-center.js, both of which read it during their own start-up. -->
 <script src="assets/js/auth.js?v=20260922gs1"></script>
-<!-- The airport table travel-data.js reads. Must precede it. -->
+<!-- The airport table + its autocomplete widget, for From/To Airport. -->
 <script src="assets/js/airports.js?v=20260921ta5"></script>
 <script src="assets/js/search-widgets.js?v=20260825t3"></script>
-<script src="assets/js/destinations.js?v=20260912ds4"></script>
-<script src="assets/js/rooms-selector.js?v=20260911ic7"></script>
-<script src="assets/js/pax-selector.js?v=20260911ic7"></script>
-<script src="assets/js/booking-card.js?v=20260921ta5"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260925ui1"></script>
+<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
 </head>
-<!-- THE SAME PAGE AS packages.html, ON A DIFFERENT SHELF.
-     data-sp-service stays "packages" on purpose: the search strip, the grid,
-     the filters and the whole booking flow behind them are the package
-     machinery, and this page wants every one of them. customer_packages is
-     one table (migration 0069 gave it a category), so a gaming trip books
-     through exactly the path a holiday does.
-
-     What the three attributes below change is the QUERY and the WORDS:
-       data-sp-category  which shelf to fetch — see pkgCategory() in
-                         travel-explore.js. Absent means 'holiday', so the
-                         other page did not have to change to keep working.
-       data-sp-heading   the grid heading while nothing is filtered.
-       data-sp-noun      what to call these in a filtered heading and in the
-                         empty state.
-     A second copy of travel-explore's package code under a "gaming" service
-     name would be the same thing twice, kept in step by hand. -->
 <body class="sp-continuation" data-sp-service="packages"
-      data-sp-category="gaming"
-      data-sp-heading="Gaming packages"
-      data-sp-noun="gaming packages"
-      data-live-chat>
-<a href="#spMain" class="skip-link">Skip to content</a>
+      data-sp-heading="Gaming tour enquiry" data-live-chat>
+<a href="#geMain" class="skip-link">Skip to content</a>
 
 <!-- The Account Center, so the profile chip opens it HERE rather than
-     navigating to index.html and discarding whatever is in progress. Must load
-     from inside <body> (it injects its own markup) and BEFORE mountHeader,
-     which asks whether AccountCenter exists to decide whether the chip is a
-     button or a link. -->
+     navigating to index.html and discarding whatever is in progress. -->
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="assets/js/profile-menu.js?v=20260922gs1"></script>
 <script src="assets/js/webrtc-call.js?v=20260909dg1"></script>
 <script src="assets/js/live-chat.js?v=20260909dg1"></script>
 <script src="assets/js/account-center.js?v=20260926ac4"></script>
 
-<!-- The landing page's navigation bar, from hero-shell.js. See that file's
-     header for why the markup lives there and index.html keeps its own copy. -->
 <header id="siteHeader"></header>
 <script>HeroShell.mountHeader('gaming-packages.html');</script>
 
-<!-- The results-page search strip (search-strip.js), in the same compact
-     band Flights and Hotels use. It replaces the richer #txSearchPanel
-     below as this page's search: same fields, one row, at the top. -->
-<section id="siteHero"></section>
-<!-- `card` names the CLIP as well as the tab — mountHero defaults the film
-     to o.card, and without it this page played the flights footage behind a
-     page of tour packages. The strip, not the card, is what mounts in the
-     dock here; compact is what decides that. -->
-<script>HeroShell.mountHero({ card: 'packages', compact: true });</script>
-
-<main id="spMain" class="tx-scope">
-  <section class="tx-section" aria-labelledby="txPkgHead">
-    <div class="tx-head">
-      <div>
-        <h2 id="txPkgHead">Gaming packages</h2>
-        <p>Casino and gaming trips, arranged end to end. Prices are per person
-          on twin sharing and exclude visa fees.</p>
-      </div>
+<main id="geMain">
+  <div class="ge-hero">
+    <div class="ge-wrap">
+      <nav class="ge-crumbs" aria-label="Breadcrumb">
+        <a href="index.html">Home</a> &nbsp;›&nbsp; Gaming Tour Enquiry
+      </nav>
+      <h1>Plan your gaming tour</h1>
+      <p>Casino trips are arranged one traveller at a time — tell us where and when you want
+         to go, and our desk will call you back with a tailored quote.</p>
     </div>
-    <!-- THE PACKAGE SEARCH PANEL IS NOT BUILT HERE ANY MORE.
-         search-strip.js's row at the top of the page is this page's search now,
-         and this panel asked for the same things a second time, lower down.
-         PackageSearch.mount() guards on this element, so removing it stops the
-         panel being rendered — the module's month reconciliation and its
-         destination list are still used, by the strip. -->
+  </div>
 
-    <div class="tx-toolbar" id="txResults"></div>
+  <div class="ge-wrap ge-body">
+    <div class="ge-grid">
+      <div class="ge-card reveal">
+        <form id="geForm" novalidate>
+          <div class="ge-section">
+            <h2 class="ge-section-h">Customer Information</h2>
+            <p class="ge-section-sub">So our team can reach you about this enquiry.</p>
+            <div class="ge-row">
+              <div class="ge-field is-wide">
+                <label for="geName">Full Name<span class="req">*</span></label>
+                <input id="geName" type="text" autocomplete="name" placeholder="Your full name">
+                <small class="ge-err"></small>
+              </div>
+              <div class="ge-field">
+                <label for="geEmail">Email Address<span class="req">*</span></label>
+                <input id="geEmail" type="email" autocomplete="email" placeholder="you@example.com">
+                <small class="ge-err"></small>
+              </div>
+              <div class="ge-field">
+                <label for="geMobile">Mobile Number<span class="req">*</span></label>
+                <input id="geMobile" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210">
+                <small class="ge-err"></small>
+              </div>
+            </div>
+          </div>
 
-    <div class="tx-grid" id="txPackageGrid"></div>
-  </section>
+          <div class="ge-section">
+            <h2 class="ge-section-h">Travel Details</h2>
+            <p class="ge-section-sub">Where you're travelling from and to, and for how long.</p>
+            <div class="ge-row">
+              <div class="ge-field">
+                <label for="geFrom">From Airport<span class="req">*</span></label>
+                <div class="ge-ap-wrap">
+                  <input id="geFrom" type="text" autocomplete="off" placeholder="City or airport">
+                  <div id="geFromList" class="tx-ap-list" role="listbox" hidden></div>
+                </div>
+                <small class="ge-err"></small>
+              </div>
+              <div class="ge-field">
+                <label for="geTo">To Airport<span class="req">*</span></label>
+                <div class="ge-ap-wrap">
+                  <input id="geTo" type="text" autocomplete="off" placeholder="City or airport, e.g. Macau, Colombo">
+                  <div id="geToList" class="tx-ap-list" role="listbox" hidden></div>
+                </div>
+                <small class="ge-err"></small>
+              </div>
+              <div class="ge-field">
+                <label for="geDatetime">Travel Date &amp; Time<span class="req">*</span></label>
+                <input id="geDatetime" type="datetime-local">
+                <small class="ge-err"></small>
+              </div>
+              <div class="ge-field">
+                <label for="geNights">Number of Nights<span class="req">*</span></label>
+                <input id="geNights" type="number" min="1" max="90" step="1" placeholder="e.g. 5">
+                <small class="ge-err"></small>
+              </div>
+            </div>
+          </div>
+
+          <div class="ge-section">
+            <h2 class="ge-section-h">Gaming Preference</h2>
+            <p class="ge-section-sub">Tell us what you're after — as much detail as you like.</p>
+            <div class="ge-field is-wide">
+              <label for="geCasino">Casino Type<span class="req">*</span></label>
+              <textarea id="geCasino" placeholder="VIP Casino, Poker, Blackjack, Roulette, Slot Games"></textarea>
+              <small class="ge-err"></small>
+            </div>
+          </div>
+
+          <button type="submit" class="ge-submit" id="geSubmitBtn">Submit Enquiry</button>
+          <div class="ge-form-msg" id="geFormMsg" role="alert"></div>
+        </form>
+
+        <div class="ge-success" id="geSuccess" role="status" aria-live="polite">
+          <div class="ge-success-icon"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+          <h2>Enquiry received</h2>
+          <p>Please wait, our team will contact you soon.</p>
+          <span class="ge-ref" id="geRef"></span>
+        </div>
+      </div>
+
+      <aside class="ge-side">
+        <div class="ge-side-card reveal delay-1">
+          <h3>What happens next</h3>
+          <ul class="ge-side-list">
+            <li><i data-jp-icon="phone" class="jpi"></i><span>A member of our gaming desk calls you back, usually within one business day.</span></li>
+            <li><i data-jp-icon="fileText" class="jpi"></i><span>We put together a quote covering flights, stay and your gaming preferences.</span></li>
+            <li><i data-jp-icon="shieldCheck" class="jpi"></i><span>Nothing is charged until you confirm the trip with us.</span></li>
+          </ul>
+        </div>
+        <p class="ge-side-note">Prefer to talk now? <a href="contact-us.html">Contact us</a> directly and mention Gaming Tours.</p>
+      </aside>
+    </div>
+  </div>
 </main>
 
-<!-- The landing page's footer, from the same shell as the header.
-     service-shell.js's narrow strip went with service-page.css. -->
-<!-- NO FOOTER ON A RESULTS OR BOOKING PAGE. The footer is the landing
-     page's — company links, contact, the newsletter — and it belongs to a
-     page someone is reading, not one they are working in. It is not
-     hidden here; neither the element nor the mountFooter() call exists,
-     so hero-shell renders nothing. index.html keeps it. -->
-
-<!-- formatters, axios, auth.js, profile-menu.js, account-center.js and the
-     card's own modules are loaded above, in <head> and at the top of <body>,
-     ahead of the header and hero that depend on them. -->
-<script src="components/toast.js"></script>
-<script src="assets/js/travel-data.js?v=20260912hm1"></script>
-<!-- Booking layer. travel-data/booking-data are the read seams, booking-store
-     the write seam; booking-flow is the engine and booking-flows the five
-     product configurations. travel-explore only says WHICH item was chosen. -->
-<script src="assets/js/booking-api.js?v=20260911rt1"></script>
-<script src="assets/js/booking-data.js?v=20260824ph5a"></script>
-<script src="assets/js/booking-store.js?v=20260902p5"></script>
-<script src="assets/js/booking-flow.js?v=20260926ck1"></script>
-<!-- Before booking-products.js: its payment step calls JPay.mount(). -->
-<script src="assets/js/jw-loader.js?v=20260926ld1"></script>
-<script src="assets/js/payment-screen.js?v=20260926ld1"></script>
-<script src="assets/js/booking-products.js?v=20260926ck1"></script>
-<script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
-<script src="assets/js/booking-flows.js?v=20260911ic7"></script>
-<!-- search-widgets.js is in <head> with the hero card, above. -->
-<script src="assets/js/package-search.js?v=20260903all2"></script>
-<script src="assets/js/search-strip.js?v=20260912qt1"></script>
-<script src="assets/js/travel-explore.js?v=20260911ic7"></script>
-<!-- hero-shell.js and jp-icons.js are in <head>; the header, hero and footer
-     are mounted where they sit in the document. service-shell.js is gone with
-     service-page.css - it built the navy shell this page no longer wears. -->
-<!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
-     landing page's contact footer is not rendered on these pages. -->
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
+
+<script src="components/toast.js"></script>
+<script src="assets/js/gaming-enquiry.js?v=20260928gt1"></script>
 </body>
 </html>

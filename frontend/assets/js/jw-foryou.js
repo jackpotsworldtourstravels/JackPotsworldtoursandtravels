@@ -2,38 +2,44 @@
 /* ===========================================================================
    jw-foryou.js — the landing page's "Recommended for you" shelf.
    ===========================================================================
-   PERSONAL, BUT ONLY FROM WHAT THE TRAVELLER DID HERE. It reads the short
-   recently-viewed list jw-interest.js keeps in localStorage and, when there is
-   something in it, shows the destinations they last opened with a quick way
-   back into each — the stays and the trips for that place. Empty history means
-   the section never appears: a brand-new visitor sees the ordinary page, not an
-   empty "Recommended" heading.
+   TWO SOURCES, ONE SHELF, IN THIS ORDER OF TRUST:
 
-   IT REUSES THE DESTINATIONS SHELF WHOLESALE. The cards are `.jw-dest-card`,
-   the grid is `.jw-dest-grid`, the entrance is JWMotion.grid — the same
-   language the section below it speaks, so this is a second shelf of the same
-   kind rather than a new component. The only new styling is the row of quick
-   links, injected here so the section carries its own weight on a page that has
-   not changed its stylesheet.
+     1. THE SERVER, when the traveller holds a session (a guest counts). It asks
+        GET /api/customer/recommendations, scored from what they have viewed,
+        saved and booked, and shows real packages with a price and the reason
+        each was chosen. This is the backend recommendation engine (0085).
 
-   NO REQUEST, NO DEPENDENCY BEYOND THE MANIFEST. The image key stored with each
-   visit resolves through DESTINATION_IMAGE_FILES, already on this page for the
-   destinations shelf; nothing is fetched.
+     2. LOCALSTORAGE, otherwise. A signed-out visitor has no server history, so
+        the shelf falls back to the recently-viewed destinations jw-interest.js
+        keeps locally — the same "pick up where you left off" it always did.
+
+   Empty on both counts means the section never appears: a brand-new visitor
+   sees the ordinary page, not an empty "Recommended" heading. Extend, don't
+   replace — the localStorage path is untouched and is what runs when there is
+   no session or the request fails.
+
+   IT REUSES THE DESTINATIONS SHELF WHOLESALE — `.jw-dest-card`, `.jw-dest-grid`,
+   JWMotion.grid — so this is a second shelf of the same kind, not a new
+   component. The only new styling (quick-link pills, the price badge) is
+   injected here so the section carries its own weight.
    =========================================================================== */
 (function () {
   const sec = document.getElementById('jwForYou');
   const grid = document.getElementById('jwForYouGrid');
   if (!sec || !grid || typeof JWInterest === 'undefined') return;
 
-  const recent = JWInterest.recent(4);
-  if (!recent.length) return;                     // no history → shelf stays hidden
-
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-  /* Same resolver the destinations shelf uses — the key came from the API when
-     the visit was recorded, and the file (if it shipped) is in the manifest. */
+  const money = n => {
+    if (n == null) return '';
+    try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
+    catch { return '₹' + Math.round(n); }
+  };
+
+  /* Same resolver the destinations shelf uses — the image key came from the API
+     and its file, if it shipped, is in the manifest already on this page. */
   const artFor = key => {
     if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
     const stamp = DESTINATION_IMAGE_FILES[key];
@@ -43,47 +49,104 @@
     return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
   };
 
-  function cardHtml(d) {
-    const art = artFor(d.image);
-    const picture = art
+  const pictureHtml = (key, name) => {
+    const art = artFor(key);
+    return art
       ? '<img class="jw-dest-img" src="' + esc(art.src) + '"'
         + ' srcset="' + esc(art.small) + ' 480w, ' + esc(art.src) + ' 960w"'
         + ' sizes="(max-width: 520px) 50vw, (max-width: 900px) 33vw, 25vw"'
-        + ' alt="' + esc(d.name) + '" loading="lazy" decoding="async" onerror="this.remove()">'
+        + ' alt="' + esc(name) + '" loading="lazy" decoding="async" onerror="this.remove()">'
       : '';
+  };
+
+  /* A server recommendation — a real package, with its price and the reason it
+     was chosen. Links to the package detail page the booking flow opens from. */
+  function recCardHtml(r) {
+    const href = (r.type === 'package') ? ('package-details/' + encodeURIComponent(r.id))
+      : ('destination/' + encodeURIComponent(r.destination || r.id));
+    const price = r.price != null
+      ? '<span class="jw-rec-price">' + esc(money(r.price)) + '</span>' : '';
+    return '<a role="listitem" class="jw-dest-card" href="' + esc(href) + '"'
+      + ' aria-label="' + esc(r.name) + '">'
+      + '<span class="jw-dest-art">' + pictureHtml(r.image, r.name)
+      + '<span class="jw-dest-scrim"></span>' + price + '</span>'
+      + '<span class="jw-dest-body">'
+      + '<span class="jw-dest-name">' + esc(r.name) + '</span>'
+      + (r.reason ? '<span class="jw-dest-meta">' + esc(r.reason) + '</span>' : '')
+      + '</span></a>';
+  }
+
+  /* A recently-viewed destination — the localStorage fallback card. */
+  function recentCardHtml(d) {
     const href = 'destination/' + encodeURIComponent(d.id);
     return '<a role="listitem" class="jw-dest-card" href="' + esc(href) + '"'
       + ' aria-label="Continue exploring ' + esc(d.name) + '">'
-      + '<span class="jw-dest-art">' + picture + '<span class="jw-dest-scrim"></span></span>'
+      + '<span class="jw-dest-art">' + pictureHtml(d.image, d.name) + '<span class="jw-dest-scrim"></span></span>'
       + '<span class="jw-dest-body">'
       + '<span class="jw-dest-name">' + esc(d.name) + '</span>'
       + (d.country ? '<span class="jw-dest-meta">' + esc(d.country) + '</span>' : '')
       + '</span></a>';
   }
 
-  /* The headline names the most recent place; the quick links go straight to
-     its stays and its trips — the two things someone who was just reading about
-     a destination is most likely to want next. */
-  const top = recent[0];
   const cityEl = document.getElementById('jwForYouCity');
-  if (cityEl) cityEl.textContent = top.name;
+  const linksEl = document.getElementById('jwForYouLinks');
 
-  const links = document.getElementById('jwForYouLinks');
-  if (links) {
-    links.innerHTML =
-      '<a class="jw-fy-link" href="destination/' + esc(encodeURIComponent(top.id)) + '">'
-        + 'Hotels in ' + esc(top.name) + '</a>'
-      + '<a class="jw-fy-link" href="packages.html?destination=' + esc(encodeURIComponent(top.name)) + '">'
-        + esc(top.name) + ' tour packages</a>';
+  /* The headline + quick links are driven by whatever place is most relevant:
+     the destination behind the top recommendation, or the most recent view. */
+  function fillHead(name) {
+    if (cityEl) cityEl.textContent = name;
+    if (linksEl && name) {
+      linksEl.innerHTML =
+        '<a class="jw-fy-link" href="packages.html?destination=' + esc(encodeURIComponent(name)) + '">'
+          + esc(name) + ' tour packages</a>';
+    }
   }
 
-  grid.innerHTML = recent.map(cardHtml).join('');
-  sec.hidden = false;
-  if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
+  function reveal() {
+    sec.hidden = false;
+    if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
+    injectStyle();
+  }
 
-  /* The quick-link pills are the only markup here the destinations stylesheet
-     does not already cover, so the section brings its own small rule set. */
-  if (!document.getElementById('jw-foryou-style')) {
+  const token = () => {
+    try { if (typeof getCustomerAuth === 'function') { const a = getCustomerAuth(); if (a && a.access) return a.access; } } catch { /* */ }
+    try { return localStorage.getItem('jpc_access') || null; } catch { return null; }
+  };
+
+  function renderRecent() {
+    const recent = JWInterest.recent(4);
+    if (!recent.length) return false;              // nothing local either → stay hidden
+    fillHead(recent[0].name);
+    grid.innerHTML = recent.map(recentCardHtml).join('');
+    reveal();
+    return true;
+  }
+
+  async function run() {
+    const t = token();
+    if (t) {
+      try {
+        const res = await fetch('/api/customer/recommendations', {
+          headers: { Accept: 'application/json', Authorization: 'Bearer ' + t },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const recs = (data && data.recommendations) || [];
+          if (recs.length) {
+            fillHead(recs[0].destination || (recs[0].reason || '').replace(/^Because you explored\s*/i, ''));
+            grid.innerHTML = recs.map(recCardHtml).join('');
+            reveal();
+            return;
+          }
+        }
+      } catch { /* fall through to the local shelf */ }
+    }
+    /* No session, no server recs, or the request failed — the local shelf. */
+    renderRecent();
+  }
+
+  function injectStyle() {
+    if (document.getElementById('jw-foryou-style')) return;
     const style = document.createElement('style');
     style.id = 'jw-foryou-style';
     style.textContent =
@@ -92,7 +155,12 @@
       + 'font-size:13.5px;font-weight:700;color:var(--navy,#0A2540);background:rgba(255,255,255,.7);'
       + 'border:1px solid rgba(10,37,64,.12);text-decoration:none;'
       + 'transition:background .2s ease,border-color .2s ease,transform .2s ease;}'
-      + '.jw-fy-link:hover{background:#fff;border-color:var(--coral,#E9B949);transform:translateY(-1px);}';
+      + '.jw-fy-link:hover{background:#fff;border-color:var(--coral,#E9B949);transform:translateY(-1px);}'
+      + '.jw-rec-price{position:absolute;top:10px;right:10px;padding:5px 10px;border-radius:999px;'
+      + 'background:rgba(255,255,255,.92);color:var(--navy,#0A2540);font-size:12.5px;font-weight:800;'
+      + 'box-shadow:0 2px 8px rgba(10,37,64,.18);}';
     document.head.appendChild(style);
   }
+
+  run();
 })();

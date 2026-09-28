@@ -2120,6 +2120,77 @@ class HotelRoomChild(Base):
 
 
 # =====================================================================
+# Gaming Tour Enquiries (migration 0086)
+# =====================================================================
+class GamingTourEnquiry(Base):
+    """A casino-tour enquiry from the public website — not a merchant's.
+
+    UNLIKE HotelEnquiry/the Ticket Enquiry queue above, this carries no
+    ``merchant_id``: it is raised by a member of the public through
+    ``POST /api/customer/gaming-tour-enquiries`` (no session required), so
+    there is no company, wallet or credit limit to file it against. Contact
+    details are stored as plain columns rather than a foreign key to
+    ``customers`` or ``users`` for the same reason — the person submitting one
+    is not necessarily signed into anything.
+
+    ``assigned_admin_id`` IS a platform staff member (``users.user_id``,
+    SET NULL on delete so removing a staff account never takes an enquiry's
+    history with it) — the desk that WORKS the enquiry, which is exactly who
+    the rest of this file's admin tables already point at.
+    """
+
+    __tablename__ = "gaming_tour_enquiries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    enquiry_reference: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    mobile_number: Mapped[str] = mapped_column(String(30), nullable=False)
+
+    from_airport: Mapped[str] = mapped_column(String(120), nullable=False)
+    to_airport: Mapped[str] = mapped_column(String(120), nullable=False)
+    travel_datetime: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    number_of_nights: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+    #: Free text ("VIP Casino, Poker, Blackjack, Roulette, Slot Games") rather
+    #: than a fixed vocabulary — see the request schema for why a picklist
+    #: would be wrong here.
+    casino_type: Mapped[str] = mapped_column(String(300), nullable=False)
+
+    status: Mapped[str] = mapped_column(String(24), nullable=False, server_default=text("'NEW'"))
+    assigned_admin_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="SET NULL")
+    )
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+    assigned_admin: Mapped[Optional["User"]] = relationship(foreign_keys=[assigned_admin_id])
+
+    __table_args__ = (
+        UniqueConstraint("enquiry_reference", name="uq_gaming_tour_enquiries_reference"),
+        CheckConstraint("number_of_nights > 0", name="ck_gaming_tour_enq_nights_positive"),
+        CheckConstraint(
+            "status IN ('NEW','ASSIGNED','CONTACTED','QUOTE_PREPARED',"
+            "'CUSTOMER_CONFIRMED','BOOKING_CREATED','COMPLETED','CANCELLED')",
+            name="ck_gaming_tour_enq_status",
+        ),
+        Index("ix_gaming_tour_enquiries_status", "status"),
+        Index("ix_gaming_tour_enquiries_created_at", text("created_at DESC")),
+        Index("ix_gaming_tour_enquiries_assigned_admin", "assigned_admin_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<GamingTourEnquiry {self.enquiry_reference} {self.status}>"
+
+
+# =====================================================================
 # Hotel Booking Guests (migration 0048)
 # =====================================================================
 # A booking-stage table, not an enquiry-stage one: it hangs off the

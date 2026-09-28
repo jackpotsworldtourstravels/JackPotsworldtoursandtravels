@@ -62,10 +62,22 @@ class EnquiryCounts(BaseModel):
     answered_today: int = 0
 
 
+class GamingTourEnquiryCounts(BaseModel):
+    """The Gaming Tour Enquiries card and its sidebar badge — a live count,
+    not a push notification: there is nothing to go stale."""
+
+    new: int = 0
+    open: int = 0
+    total: int = 0
+
+
 class AdminDashboardResponse(BaseModel):
     merchants: MerchantCounts
     requests_by_status: RequestsByStatus
     enquiries: EnquiryCounts = EnquiryCounts()
+    # Defaulted for the same reason total_users below is: an older client
+    # reading this payload before the field existed must still validate.
+    gaming_tour_enquiries: GamingTourEnquiryCounts = GamingTourEnquiryCounts()
     # Added for the redesigned Admin Dashboard. Defaulted so an older client
     # reading this payload is unaffected and a partial deploy still validates.
     total_users: int = 0

@@ -168,6 +168,54 @@ def send_hotel_group_enquiry_email(enquiry) -> bool:
                                reply_to=str(enquiry.email))
 
 
+def send_gaming_tour_enquiry_email(reference: str, enquiry) -> bool:
+    """A heads-up to the business inbox when a Gaming Tour enquiry lands.
+
+    UNLIKE `send_hotel_group_enquiry_email`, this is not the enquiry's only
+    record — gaming_tour_enquiry_service.create() has already committed the
+    row before this is called, so a failed send (SMTP down, rate-limited)
+    never loses the enquiry. The Admin queue and its dashboard badge are the
+    reliable notification; this is a courtesy on top of them, which is why
+    the router does not fail the request over its return value."""
+    subject = f"New gaming tour enquiry: {reference} ({enquiry.from_airport} → {enquiry.to_airport})"
+    lines = [
+        f"Reference: {reference}",
+        f"Route: {enquiry.from_airport} -> {enquiry.to_airport}",
+        f"Travel date/time: {enquiry.travel_datetime}",
+        f"Nights: {enquiry.number_of_nights}",
+        f"Casino preference: {enquiry.casino_type}",
+        "",
+        f"Name: {enquiry.name}",
+        f"Email: {enquiry.email}",
+        f"Mobile: {enquiry.mobile}",
+    ]
+    text_body = "New gaming tour enquiry from the website.\n\n" + "\n".join(lines)
+
+    def row(label, value):
+        return (f'<tr><td style="padding:4px 14px 4px 0; color:#666;">{html.escape(label)}</td>'
+                f'<td style="padding:4px 0;"><strong>{html.escape(str(value))}</strong></td></tr>')
+
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif; max-width:560px; margin:0 auto; color:#0A2540;">
+      <h2 style="color:#0A2540;">New gaming tour enquiry — {html.escape(reference)}</h2>
+      <table style="border-collapse:collapse; font-size:14px;">
+        {row('Route', f"{enquiry.from_airport} → {enquiry.to_airport}")}
+        {row('Travel date/time', enquiry.travel_datetime)}
+        {row('Nights', enquiry.number_of_nights)}
+        {row('Casino preference', enquiry.casino_type)}
+      </table>
+      <h3 style="margin-top:24px; color:#0A2540;">Contact</h3>
+      <table style="border-collapse:collapse; font-size:14px;">
+        {row('Name', enquiry.name)}
+        {row('Email', enquiry.email)}
+        {row('Mobile', enquiry.mobile)}
+      </table>
+    </div>
+    """
+    return _send_with_reply_to(CONTACT_FORM_RECIPIENT, subject, text_body, html_body,
+                               reply_to=str(enquiry.email))
+
+
 def _send_with_reply_to(to_email: str, subject: str, text_body: str, html_body: str, reply_to: str) -> bool:
     if not settings.smtp_host or not settings.smtp_from_email:
         logger.warning("SMTP not configured (smtp_host/smtp_from_email unset) — skipping email to %s.", to_email)

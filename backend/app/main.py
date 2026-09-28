@@ -40,6 +40,7 @@ from app.routers import (
     documents,
     enquiries,
     finance,
+    gaming_tour_enquiries,
     group_bookings,
     hotel_enquiries,
     manager,
@@ -244,6 +245,10 @@ app.include_router(enquiries.router)
 # ticket.* permission codes. See routers/hotel_enquiries.py.
 app.include_router(hotel_enquiries.router)
 app.include_router(hotel_enquiries.admin_router)
+# Gaming Tour Enquiry — public submission + its own Admin queue (migration
+# 0086). No merchant scoping and no ticket.* permission gate: see
+# models_v2.GamingTourEnquiry for why this is not shaped like the two above.
+app.include_router(gaming_tour_enquiries.router)
 # Group booking passenger manifests. Alongside enquiries because it is the same
 # workflow's upload step — it grants no new permission code, reusing
 # ticket.request/ticket.view exactly as the booking routes do.

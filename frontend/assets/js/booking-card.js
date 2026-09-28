@@ -425,50 +425,27 @@ const BookingCard = (function () {
       + '</div></div>';
   }
 
-  /* Gaming Tour Packages: WHERE, WHICH DAY, WHAT TIME — and nothing else.
+  /* Gaming Tour Packages is an ENQUIRY now, not a search — a casino trip is
+     quoted by hand (visas, table limits and property relationships vary too
+     much for a live price), so there is no destination/date/time to collect
+     here any more. The tab click is intercepted before it ever reaches
+     activateTab() (see goToTab and the click handler below) and sent straight
+     to gaming-packages.html, which is the enquiry form itself.
 
-     The Casino / Poker / Gaming Event type dropdown is gone on request; so is
-     the month select. Destination is filled from GET /api/customer/destinations
-     (fillGamingDestinations below), the same list the homepage shelf shows, so
-     no place name is written here. Date is the card's own date control — the
-     one Hotels and Flights use — and time is a native time input in the same
-     field shell.
-
-     WHAT IT HANDS OVER. gaming-packages.html already filters by `type` (it
-     becomes the destination filter there) and reconciles `month` against real
-     departure months, so the destination travels as `type` and the date's
-     month as `month`; `date` and `time` go along as well. That page is not
-     changed. */
+     THIS PANEL IS A FALLBACK, NOT THE NORMAL PATH. Every ordinary click or
+     keypress redirects before this is ever shown; it exists only so that
+     activateTab('gaming') — called some other way this file has not
+     anticipated — still lands on something true rather than a crash or a
+     stale search form. 'gaming' is deliberately absent from SEARCHABLE, so
+     the card's own Search button is hidden here exactly as it is for every
+     other enquiry-only tab (see paintSearchButton). */
   function gamingPanel() {
     return panelOpen('gaming')
       + '<div class="search-fields cols-gaming">'
-      + '<div class="field"><label for="gDest">Destination</label>'
-      + '<select id="gDest"><option value="">Loading destinations…</option></select></div>'
-      + dateField('gDate', 'Date')
-      + '<div class="field"><label for="gTime">Time</label>'
-      + '<input id="gTime" type="time" step="900"></div>'
+      + '<p class="search-enquiry-note">Gaming Tour Packages are arranged by our desk, one traveller at '
+      + 'a time. <a href="gaming-packages.html">Open the enquiry form</a> to tell us where and when you '
+      + 'want to go.</p>'
       + '</div></div>';
-  }
-
-  /** One read of the destinations list for the Gaming panel's select. Public
-   *  route, same-origin, no token. A failure leaves an honest option rather
-   *  than an invented list, and the validator asks for a destination. */
-  async function fillGamingDestinations() {
-    const sel = $('gDest');
-    if (!sel) return;
-    try {
-      const res = await fetch('/api/customer/destinations', {
-        headers: { Accept: 'application/json' }, credentials: 'same-origin',
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const rows = (await res.json() || []).filter(d => d && d.name);
-      const keep = sel.value;
-      sel.innerHTML = '<option value="">Select destination</option>'
-        + rows.map(d => '<option value="' + esc(d.name) + '">' + esc(d.name) + '</option>').join('');
-      if (keep) sel.value = keep;
-    } catch (e) {
-      sel.innerHTML = '<option value="">Destinations unavailable — try again</option>';
-    }
   }
 
   /* THE PRODUCT TABS, AND WHY ALL FOUR PANELS ARE BUILT.
@@ -552,10 +529,13 @@ const BookingCard = (function () {
 
   /* Which tabs can actually run a search. The Search button and the criteria
      dispatch both read this, so a tab with no handler can never submit a form.
-     All four can now, which is the point of withdrawing the five that could
-     not. 'cruises' left with the tab; cruisesPanel() is still defined and
-     still unreferenced. */
-  const SEARCHABLE = ['flights', 'hotels', 'packages', 'gaming'];
+     'gaming' is deliberately absent: Gaming Tour Packages is an enquiry now
+     (see gamingPanel), not a search, so its Search button stays hidden the
+     same way an enquiry-only product's always has — that mechanism already
+     existed for Villas/Trains/Buses/Cabs/Visa before this. 'cruises' left
+     with the tab for the same reason it always has; cruisesPanel() is still
+     defined and still unreferenced. */
+  const SEARCHABLE = ['flights', 'hotels', 'packages'];
 
   const panelId = name => 'bcPanel-' + name;
   const tabId = name => 'bcTab-' + name;
@@ -1460,18 +1440,10 @@ const BookingCard = (function () {
     if (kind === 'flights') return flightCriteria();
     if (kind === 'hotels') return hotelCriteria();
     if (kind === 'packages') return { type: val('pType'), month: val('pMonth') };
-    if (kind === 'gaming') {
-      const date = nativeDate('gDate');
-      return {
-        type: val('gDest'),
-        /* The month NAME, which is what the packages page matches. */
-        month: date ? MONTHS[Number(date.slice(5, 7)) - 1] : '',
-        date,
-        time: val('gTime'),
-      };
-    }
     /* An enquiry tab has no criteria to give — its panel carries its own link
-       and the Search button is hidden on it. */
+       and the Search button is hidden on it. Gaming Tour Packages is one of
+       these now (see gamingPanel); it used to build a destination/date/time
+       payload here, back when it was a fourth search rather than an enquiry. */
     return {};
   }
 
@@ -1561,13 +1533,10 @@ const BookingCard = (function () {
       return null;
     },
     packages() { return null; },
-    gaming(p) {
-      if (!p.type) return ['Choose a destination.', 'gDest'];
-      if (!p.date) return ['Choose a date.', 'gDate'];
-      if (p.date < isoDay(new Date())) return ['Choose a date from today onwards.', 'gDate'];
-      if (!p.time) return ['Choose a time.', 'gTime'];
-      return null;
-    },
+    /* No `gaming` entry: it is an enquiry tab (see gamingPanel/SEARCHABLE)
+       and VALIDATORS[kind] is only ever consulted for a searchable one — the
+       lookup at the call site already falls through safely when a kind has
+       no validator. */
   };
 
   /* ---------------------------------------------------------------------
@@ -1823,9 +1792,23 @@ const BookingCard = (function () {
        pattern here: every panel is already built, so moving along the strip
        costs nothing and the traveller sees each product as they arrive at it. */
     const tabBtns = Array.prototype.slice.call(root.querySelectorAll('.search-tab'));
-    const goToTab = btn => { activateTab(btn.dataset.tab); btn.focus(); };
+    /* GAMING IS A REDIRECT, NOT A TAB SWITCH. Every other product answers to
+       activateTab() and stays on this page; Gaming Tour Packages instead goes
+       straight to the enquiry form (gaming-packages.html) — the "destination /
+       date / time" search this tab used to run is gone (see gamingPanel).
+       Intercepted here, before activateTab ever runs, so activateTab's own
+       contract ("never navigates") stays true for every caller that still
+       relies on it — app.js's voice search among them. */
+    const goToTab = btn => {
+      if (btn.dataset.tab === 'gaming') { window.location.href = 'gaming-packages.html'; return; }
+      activateTab(btn.dataset.tab);
+      btn.focus();
+    };
     tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tab === 'gaming') { window.location.href = 'gaming-packages.html'; return; }
+        activateTab(btn.dataset.tab);
+      });
       btn.addEventListener('keydown', e => {
         const at = tabBtns.indexOf(btn);
         let to = -1;
@@ -2238,11 +2221,6 @@ const BookingCard = (function () {
     const outNative = root.querySelector('[data-hf="out"] .date-native');
     if (inNative) inNative.min = isoDay(today);
     if (outNative) outNative.min = addDays(isoDay(today), 2);
-    /* Gaming: no past dates, and no guessed default — the event day is the
-       traveller's to choose. */
-    const gNative = $('gDate') && $('gDate').closest('.field-date').querySelector('.date-native');
-    if (gNative) gNative.min = isoDay(today);
-    fillGamingDestinations();
 
     bind();
     /* Two empty legs, because one leg is not a multi-city trip and asking the

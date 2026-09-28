@@ -529,6 +529,14 @@
 
   /* ====================================================================== */
   function render(p) {
+    /* Tell the recommendation engine this package was viewed — server-side, and
+       only when a session exists (jw-interest.js decides). The engine files it
+       under the package's own destination, so a package view lifts Goa the same
+       way opening the Goa page would. Guarded: harmless where jw-interest.js is
+       not loaded. */
+    if (typeof JWInterest !== 'undefined' && p && p.id != null) {
+      JWInterest.track('view', 'package', p.id, p.destination ? { destination: p.destination } : undefined);
+    }
     renderHero(p);
     renderOverview(p);
     renderHighlights(p);
