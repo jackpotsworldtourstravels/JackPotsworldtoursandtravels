@@ -143,7 +143,8 @@ const sectionTitles = {
   'b2c-customers': 'Customers', 'b2c-bookings': 'Bookings',
   'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
   'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
-  'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
+  'b2c-reconciliation': 'Payment Reconciliation',
+  'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
   'b2c-cat-destinations': 'Destinations',
   'b2c-reports': 'B2C Reports', 'b2c-analytics': 'B2C Analytics',
   /* Four buckets of one queue — see SECTION_ALIAS below and the header of
@@ -282,7 +283,7 @@ function loadSection(name) {
     'b2c-customers': 'Customers', 'b2c-bookings': 'Bookings',
     'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
-    'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
+    'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
     'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',
     'b2c-analytics': 'B2C Analytics', 'b2c-reconciliation': 'Payment Reconciliation',
   };

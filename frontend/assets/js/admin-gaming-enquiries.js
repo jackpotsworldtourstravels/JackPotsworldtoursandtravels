@@ -28,14 +28,23 @@ const GT_STATUS_BADGE = {
 };
 const gtStatusLabel = s => GT_STATUS_LABELS[s] || s;
 
-/* The Gaming Packages nav-group (2026-09-29): four sidebar items sharing this
-   one table and this one pair of endpoints, split by `status` rather than by
-   a new query capability. GT_BUCKETS is the only place that mapping lives —
-   admin.js's loadSection just passes the data-section name straight through. */
+/* The Gaming Tour Packages nav-group: four sidebar items sharing this one
+   table and this one pair of endpoints, split by `status` rather than by a
+   new query capability. GT_BUCKETS is the only place that mapping lives —
+   admin.js's loadSection just passes the data-section name straight through.
+
+   CUSTOMER_CONFIRMED moved to "Converted Bookings" (2026-09-29), out of
+   "Customer Requests" — the owner's rule is that a confirmed customer reads
+   as converted, not as still-in-progress. BOOKING_CREATED sits alongside it
+   rather than being dropped from every bucket: the owner's mapping named
+   seven of the eight statuses and didn't mention it, but a status this
+   screen never shows under ANY bucket is a real row an admin can no longer
+   find, not a deliberate exclusion — and "the booking was actually created"
+   is the same "converted" outcome CUSTOMER_CONFIRMED already reads as here. */
 const GT_BUCKETS = {
   'gaming-new': ['NEW'],
-  'gaming-requests': ['ASSIGNED', 'CONTACTED', 'QUOTE_PREPARED', 'CUSTOMER_CONFIRMED'],
-  'gaming-converted': ['BOOKING_CREATED'],
+  'gaming-requests': ['ASSIGNED', 'CONTACTED', 'QUOTE_PREPARED'],
+  'gaming-converted': ['CUSTOMER_CONFIRMED', 'BOOKING_CREATED'],
   'gaming-closed': ['COMPLETED', 'CANCELLED'],
 };
 const GT_BUCKET_LABELS = {

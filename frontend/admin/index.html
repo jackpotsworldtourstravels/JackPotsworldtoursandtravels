@@ -89,20 +89,13 @@
          driven by `.mobile-open`, never by `.collapsed`. -->
 
     <!-- ============== NAVIGATION ==============
-         B2B MANAGEMENT and B2C MANAGEMENT (2026-09-29) ARE MODE TOGGLES, not
-         nav-groups: clicking one shows ONLY that side's groups and hides the
-         other's — the owner's explicit ask, "must behave as expandable/
-         collapsible parent sections" showing "ONLY" that side's modules. See
-         wireNavModes() in admin.js.
-
-         NOTHING BELOW IS NEW EXCEPT THE TOGGLE CHROME ITSELF AND THE GROUP
-         HEADINGS. Every `data-section`, every badge id and every permission
-         is exactly what it was — this is ordering and headings only, same as
-         every earlier pass over this sidebar. B2B's own groups (B2B
-         Management / B2B Payments & Finance / B2B Reports & Analytics) are
-         the pre-existing Merchant/Operations/Manual Booking/Finance/Reports
-         groups, flattened and relabelled to the owner's tree; nothing in them
-         moved relative to each other. -->
+         B2B MANAGEMENT and B2C MANAGEMENT are mode toggles, not nav-groups:
+         clicking one shows ONLY that side's groups and hides the other's —
+         mutually exclusive, per the owner's spec. See setNavMode() in
+         admin.js. EVERY data-section, badge id and permission below is
+         exactly what it always was; this pass only regrouped which
+         sub-heading each item sits under, moved a few links, and added one
+         new placeholder (Flights). Nothing existing was rebuilt. -->
 
     <div class="nav-group">
       <div class="nav-group-label">Overview</div>
@@ -112,7 +105,12 @@
       </a>
     </div>
 
-    <!-- ============== B2B MODE ============== -->
+    <!-- ============== B2B MODE ==============
+         Audit/System Logs and Support Management/Communication now live
+         INSIDE this toggle (moved off the always-visible footing they had in
+         the previous pass) — the owner's tree puts them under B2B Management
+         explicitly, so they hide along with everything else here when B2C is
+         open. Same sections, same endpoints, same permissions throughout. -->
     <div class="nav-group">
       <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2b" aria-expanded="true">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
@@ -122,7 +120,7 @@
     </div>
     <div class="nav-mode-body" data-mode-body="b2b">
       <div class="nav-group">
-        <div class="nav-group-label">B2B Management</div>
+        <div class="nav-group-label">Merchant Management</div>
         <a href="#" class="nav-item" data-section="users">
           <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span class="nav-label">Merchant Management</span>
@@ -131,6 +129,10 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
           <span class="nav-label">Active Users</span>
         </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Operations</div>
         <!-- Booking Enquiries sits above the Approval Queue deliberately: an
              enquiry precedes the booking it may become, and the two are
              separate workflows with different actions (answer vs approve)
@@ -152,22 +154,6 @@
           <span class="nav-label">Booking Operations</span>
           <span class="nav-badge" id="opsNavBadge" hidden></span>
         </a>
-        <!-- Manual Enquiry / Manual Booking. The desk raising a record FOR a
-             merchant that telephoned it in (migration 0073's `source`). Flat
-             here rather than their own sub-heading, per the owner's tree. -->
-        <a href="#" class="nav-item" data-section="manual-enquiry">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          <span class="nav-label">Manual Enquiry</span>
-        </a>
-        <!-- `data-section` stays `manual-request`: an internal key, not a URL,
-             and renaming it would touch the section element, admin.js's
-             loader and the merchant-portal-embed's clGo map for no
-             user-visible gain. The label is "Manual Booking", matching the
-             owner's tree exactly. -->
-        <a href="#" class="nav-item" data-section="manual-request">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
-          <span class="nav-label">Manual Booking</span>
-        </a>
         <!-- One screen for every service request, whatever its type; the
              settle dialog chooses its action from the request's own type. -->
         <a href="#" class="nav-item" data-section="service-requests-mgmt">
@@ -183,7 +169,25 @@
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-label">B2B Payments &amp; Finance</div>
+        <div class="nav-group-label">Manual Booking</div>
+        <!-- Manual Enquiry / Manual Booking. The desk raising a record FOR a
+             merchant that telephoned it in (migration 0073's `source`). -->
+        <a href="#" class="nav-item" data-section="manual-enquiry">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span class="nav-label">Manual Enquiry</span>
+        </a>
+        <!-- `data-section` stays `manual-request`: an internal key, not a URL,
+             and renaming it would touch the section element, admin.js's
+             loader and the merchant-portal-embed's clGo map for no
+             user-visible gain. -->
+        <a href="#" class="nav-item" data-section="manual-request">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+          <span class="nav-label">Manual Booking</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Payments &amp; Finance</div>
         <a href="#" class="nav-item" data-section="payments">
           <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
           <span class="nav-label">Payment Management</span>
@@ -199,7 +203,7 @@
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-label">B2B Reports &amp; Analytics</div>
+        <div class="nav-group-label">Reports &amp; Analytics</div>
         <a href="#" class="nav-item" data-section="reports-export">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
           <span class="nav-label">Reports</span>
@@ -212,6 +216,35 @@
           <span class="nav-label">Analytics</span>
         </a>
       </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">System</div>
+        <!-- Audit Logs moved here from the Super Admin Portal, with System
+             Logs added beside it. Both endpoints are permission-gated
+             (`audit.view` / `system.activity.view`), which `_ADMIN` already
+             holds. -->
+        <a href="#" class="nav-item" data-section="audit">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span class="nav-label">Audit Logs</span>
+        </a>
+        <a href="#" class="nav-item" data-section="system-logs">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m8 10 2 2-2 2"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
+          <span class="nav-label">System Logs</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Support</div>
+        <a href="#" class="nav-item" data-section="support">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
+          <span class="nav-label">Support Management</span>
+          <span class="nav-badge" id="supportNavBadge" style="display:none;"></span>
+        </a>
+        <a href="#" class="nav-item" data-section="notifications">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="nav-label">Communication</span>
+        </a>
+      </div>
     </div>
 
     <!-- ============== B2C MODE ==============
@@ -220,10 +253,10 @@
          and friends). Live Support and Customer Payments are NOT new and
          were NOT rebuilt: both screens, their JS modules
          (admin-live-support.js, admin-customer-payments.js), endpoints and
-         permissions are exactly what they always were. Only their <a> links
-         moved (and Customer Payments' link appears twice, once here and once
-         under B2C Payments & Finance below, per the owner's tree — the same
-         data-section both times, so clicking either opens the one screen). -->
+         permissions are exactly what they always were — only which
+         sub-heading their link sits under changed. Customer Payments now
+         appears exactly ONCE (under Payments & Finance below), where the
+         previous pass had it twice. -->
     <div class="nav-group">
       <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2c" aria-expanded="false">
         <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
@@ -233,7 +266,7 @@
     </div>
     <div class="nav-mode-body" data-mode-body="b2c" hidden>
       <div class="nav-group">
-        <div class="nav-group-label">B2C Management</div>
+        <div class="nav-group-label">Customer Management</div>
         <a href="#" class="nav-item" data-section="b2c-customers">
           <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
           <span class="nav-label">Customers</span>
@@ -250,19 +283,23 @@
           <svg class="icon" viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7-5.4-4.7 7.1-.6z"/></svg>
           <span class="nav-label">Reviews &amp; Ratings</span>
         </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Support</div>
         <a href="#" class="nav-item" data-section="live-support">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 21l1.9-5A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>
           <span class="nav-label">Live Support</span>
           <span class="nav-badge" id="alsNavBadge" hidden></span>
         </a>
-        <a href="#" class="nav-item" data-section="customer-payments">
-          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-          <span class="nav-label">Customer Payments</span>
+        <a href="#" class="nav-item" data-section="b2c-communication">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"/></svg>
+          <span class="nav-label">Communication</span>
         </a>
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-label">B2C Payments &amp; Finance</div>
+        <div class="nav-group-label">Payments &amp; Finance</div>
         <a href="#" class="nav-item" data-section="customer-payments">
           <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
           <span class="nav-label">Customer Payments</span>
@@ -276,21 +313,24 @@
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-label">B2C Operations</div>
-        <a href="#" class="nav-item" data-section="b2c-communication">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"/></svg>
-          <span class="nav-label">Communication</span>
-        </a>
+        <div class="nav-group-label">User Operations</div>
         <a href="#" class="nav-item" data-section="b2c-activity">
           <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           <span class="nav-label">User Activity</span>
         </a>
       </div>
 
-      <!-- Flights has no supplier integration yet (no live inventory to
-           manage — see docs/tektravels spec), so it carries no nav item here. -->
       <div class="nav-group">
         <div class="nav-group-label">Catalogue Management</div>
+        <!-- Flights: placeholder, same treatment as the other not-yet-built
+             catalogue screens below — see initComingSoon() in admin.js. No
+             supplier integration exists yet (docs/tektravels spec is design
+             only), so there is no live inventory behind this link either;
+             it is here because the owner's tree now asks for the nav item. -->
+        <a href="#" class="nav-item" data-section="b2c-cat-flights">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
+          <span class="nav-label">Flights</span>
+        </a>
         <a href="#" class="nav-item" data-section="b2c-cat-hotels">
           <svg class="icon" viewBox="0 0 24 24"><path d="M2 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14"/><path d="M22 21V11a2 2 0 0 0-2-2h-4"/><line x1="2" y1="21" x2="22" y2="21"/><line x1="6" y1="9" x2="6" y2="9.01"/><line x1="6" y1="13" x2="6" y2="13.01"/><line x1="10" y1="9" x2="10" y2="9.01"/><line x1="10" y1="13" x2="10" y2="13.01"/></svg>
           <span class="nav-label">Hotels</span>
@@ -342,7 +382,7 @@
       </div>
 
       <div class="nav-group">
-        <div class="nav-group-label">B2C Reports &amp; Analytics</div>
+        <div class="nav-group-label">Reports &amp; Analytics</div>
         <a href="#" class="nav-item" data-section="b2c-reports">
           <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
           <span class="nav-label">Reports</span>
@@ -352,39 +392,6 @@
           <span class="nav-label">Analytics</span>
         </a>
       </div>
-    </div>
-
-    <!-- ============== PERSISTENT (outside either mode) ==============
-         Neither B2B- nor B2C-specific in the owner's tree, so neither toggle
-         hides these — Audit/System Logs and the merchant support desk stay
-         reachable regardless of which mode is open. Content and endpoints
-         are unchanged from before this pass; only their grouping/position is. -->
-    <div class="nav-group">
-      <div class="nav-group-label">System</div>
-      <!-- Audit Logs moved here from the Super Admin Portal, with System Logs
-           added beside it. Both endpoints are permission-gated (`audit.view` /
-           `system.activity.view`), which `_ADMIN` already holds. -->
-      <a href="#" class="nav-item" data-section="audit">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-        <span class="nav-label">Audit Logs</span>
-      </a>
-      <a href="#" class="nav-item" data-section="system-logs">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m8 10 2 2-2 2"/><line x1="13" y1="14" x2="16" y2="14"/></svg>
-        <span class="nav-label">System Logs</span>
-      </a>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-group-label">Support</div>
-      <a href="#" class="nav-item" data-section="support">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m3 6 9 7 9-7"/></svg>
-        <span class="nav-label">Support Management</span>
-        <span class="nav-badge" id="supportNavBadge" style="display:none;"></span>
-      </a>
-      <a href="#" class="nav-item" data-section="notifications">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-        <span class="nav-label">Communication</span>
-      </a>
     </div>
 
     <div class="spacer"></div>
@@ -1206,6 +1213,10 @@
       <div class="panel"><div class="panel-head"><h2>User Activity</h2></div>
         <div class="b2c-soon-body"></div></div>
     </section>
+    <section class="section" id="section-b2c-cat-flights">
+      <div class="panel"><div class="panel-head"><h2>Flights</h2></div>
+        <div class="b2c-soon-body"></div></div>
+    </section>
     <section class="section" id="section-b2c-cat-hotels">
       <div class="panel"><div class="panel-head"><h2>Hotels</h2></div>
         <div class="b2c-soon-body"></div></div>
@@ -1601,7 +1612,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0929nav1"></script>
+<script src="../assets/js/admin.js?v=0929nav3"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1652,7 +1663,7 @@
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
-<script src="../assets/js/admin-gaming-enquiries.js?v=0929nav1"></script>
+<script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
