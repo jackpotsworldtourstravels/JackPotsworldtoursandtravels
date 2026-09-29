@@ -467,6 +467,23 @@ class CustomerBooking(Base):
     #: Unique per customer; NULL for bookings made before it existed.
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
+    # ---- supplier references (migration 0086) ---------------------------- #
+    # All NULL for a demo-provider booking, which is every booking today. They
+    # carry a real supplier's own identifiers and price so a confirmed booking
+    # can be traced to the order the supplier issued. The airline's PNR still
+    # lands in ``pnr`` above, not here, and the supplier's price is stored
+    # verbatim in its own currency — never converted into ``total_amount``.
+    supplier: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    supplier_offer_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    supplier_order_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    supplier_total_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    supplier_currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    supplier_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    supplier_order_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    supplier_payment_required_by: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
@@ -501,6 +518,10 @@ class CustomerBookingPassenger(Base):
         nullable=False,
     )
     passenger_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: The supplier's own passenger id for this traveller (migration 0086).
+    #: NULL for a demo booking; set only when a supplier order is created and
+    #: needed to echo the right ids back to the supplier at booking time.
+    supplier_passenger_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     traveller_type: Mapped[str] = mapped_column(
         _TRAVELLER_TYPE, nullable=False, default=CustomerTravellerType.ADULT.value,
     )

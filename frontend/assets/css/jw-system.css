@@ -579,6 +579,28 @@ html.ds-locked { overflow: hidden; }
 .ds-step[aria-current="step"] { color: var(--ds-ink); }
 .ds-step[aria-current="step"]::before { background: var(--ds-navy-800); border-color: var(--ds-navy-800); color: #fff; box-shadow: 0 0 0 5px rgba(217, 178, 111, .25); }
 
+/* MOTION FAMILY: MORPH (a step advancing). Additive, gated by html.ds-motion,
+   and off under reduced motion — the colour transition above is the resting
+   behaviour, these only add the small arrival beat the prompt asks for:
+   a completed check that draws itself in, and a current node whose gold ring
+   settles rather than snapping. Nothing here changes the compact horizontal
+   stepper; it stays a row, never a timeline. */
+html.ds-motion .ds-step.is-done::before { animation: ds-check-pop .42s var(--ds-ease) both; }
+html.ds-motion .ds-step[aria-current="step"]::before { animation: ds-step-ring .5s var(--ds-ease) both; }
+@keyframes ds-check-pop {
+  0% { transform: scale(.55); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes ds-step-ring {
+  0% { box-shadow: 0 0 0 0 rgba(217, 178, 111, 0); }
+  100% { box-shadow: 0 0 0 5px rgba(217, 178, 111, .25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.ds-motion .ds-step.is-done::before,
+  html.ds-motion .ds-step[aria-current="step"]::before { animation: none; }
+}
+
 /* --- 3.15 price ----------------------------------------------------------- */
 .ds-price { display: inline-grid; justify-items: end; line-height: 1.1; }
 .ds-price__from { font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }

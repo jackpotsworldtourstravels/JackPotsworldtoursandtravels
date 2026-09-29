@@ -521,6 +521,27 @@ class Settings(BaseSettings):
     #: configured here rather than guessed.
     invoice_terms: str = ""
 
+    # ---------------------------------------------------------- DUFFEL ------
+    # The flight SUPPLIER switch. "demo" (the default) is the seeded sample
+    # provider the site runs on today — the frontend serves it client-side and
+    # never calls the supplier. "duffel" activates the adapter under
+    # integrations/duffel/, and ONLY then is a token read.
+    #
+    # THE TOKEN IS TEST-MODE ONLY. The client refuses to start unless it begins
+    # with "duffel_test_", so this configuration cannot reach production; going
+    # live is a deliberate code change, never a stray env var. The token is
+    # strictly server-side — it must never reach a browser — and is never
+    # logged. Absent token is not an error: it simply means Duffel is
+    # unavailable and the demo provider stays in force.
+    flight_supplier: str = "demo"
+    duffel_access_token: str | None = None
+    duffel_api_base_url: str = "https://api.duffel.com"
+    duffel_api_version: str = "v2"
+    duffel_timeout_seconds: float = 30.0
+    #: Milliseconds Duffel waits for airline searches (2000–60000). Empty/0
+    #: sends Duffel's own default rather than asserting one.
+    duffel_supplier_timeout_ms: int = 20000
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---------------------------------------------------------------- CR-9 --

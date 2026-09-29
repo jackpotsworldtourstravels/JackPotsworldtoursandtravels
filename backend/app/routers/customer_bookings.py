@@ -43,6 +43,13 @@ from app.services import payment_verification_flight_service as verify_flight
 from app.services import payments as payment_providers
 from app.services import customer_catalog_service as catalog
 from app.services import customer_pricing_service as pricing
+from app.services import flight_supplier_service as flight_supplier
+from app.integrations.duffel.exceptions import (
+    DuffelAPIError,
+    DuffelNotConfigured,
+    DuffelTimeout,
+    DuffelTransportError,
+)
 
 router = APIRouter(prefix="/api/customer", tags=["customer-bookings"])
 
@@ -52,6 +59,38 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Catalogue — what can be added to a flight, and what it costs.
 # ---------------------------------------------------------------------------
+@router.get(
+    "/flights/search",
+    summary="Search flights with the active supplier",
+    description=(
+        "Public. Returns ``{provider, currency, results}`` where ``results`` are internal "
+        "flight objects.\n\n"
+        "With ``FLIGHT_SUPPLIER=demo`` (the default) flights are served client-side from the "
+        "sample set and this route returns an empty envelope. With ``FLIGHT_SUPPLIER=duffel`` it "
+        "searches Duffel TEST MODE and normalises the offers. ``currency`` is the supplier's own "
+        "currency, surfaced without any assumption of INR."
+    ),
+)
+def search_flights(request: Request):
+    """Thin HTTP wrapper over ``flight_supplier_service.search_flights``.
+
+    The service owns provider selection and normalisation; this only maps the
+    supplier's failure modes onto HTTP. A missing/again-only-test token is a
+    503 (misconfiguration), a supplier refusal a 502, a timeout a 504.
+    """
+    params = dict(request.query_params)
+    try:
+        return flight_supplier.search_flights(params)
+    except DuffelNotConfigured as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except DuffelTimeout as exc:
+        raise HTTPException(status.HTTP_504_GATEWAY_TIMEOUT, str(exc))
+    except (DuffelAPIError, DuffelTransportError) as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+
+
 @router.get(
     "/flights/seatmap",
     summary="Seat map for a flight",

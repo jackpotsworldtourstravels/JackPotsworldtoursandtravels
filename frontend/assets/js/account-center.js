@@ -829,6 +829,10 @@ function wireBookingRowActions(container) {
 }
 async function loadAcctBookings() {
   const container = document.getElementById('acctBookingsList');
+  // A shaped skeleton while the request is genuinely in flight, instead of the
+  // word "Loading" — the design system's own row skeleton, overwritten the
+  // moment the rows (or the empty state) arrive. No faked progress.
+  if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
   try {
     const data = await fetchAllCustomerBookings();
     allBookingsCache = data;
@@ -1012,6 +1016,7 @@ function wishlistLabel(type, item) {
 function wishlistPrice(type, item) { return item ? money(type === 'hotel' ? item.price_per_night : item.price) : '—'; }
 async function loadAcctWishlist() {
   const container = document.getElementById('acctWishlistList');
+  if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
   try {
     const { data, catalogs } = await fetchWishlistWithCatalog();
     if (!data.length) {
@@ -1047,6 +1052,7 @@ async function loadAcctWishlist() {
 async function loadAcctNotifications() {
   const container = document.getElementById('acctNotificationsList');
   const clearBar = document.getElementById('acctNotifClearBar');
+  if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
   try {
     const { data } = await axios.get(`${API_BASE}/api/customer/notifications`, { headers: customerHeaders() });
     if (!data.length) {
@@ -1114,6 +1120,7 @@ function starString(rating) {
 }
 async function loadAcctReviews() {
   const container = document.getElementById('acctReviewsList');
+  if (container && window.DS && DS.skeleton) DS.skeleton(container, 'row', 3);
   try {
     const { data } = await axios.get(`${API_BASE}/api/customer/reviews/mine`, { headers: customerHeaders() });
     if (!data.length) {
