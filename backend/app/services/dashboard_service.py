@@ -22,7 +22,7 @@ from app.models_v2 import (
     UserRole,
     UserStatus,
 )
-from app.services import ticket_service
+from app.services import gaming_tour_enquiry_service, ticket_service
 
 #: Terminal-ish statuses a live chat thread no longer needs attention in.
 _CHAT_CLOSED = (RequestStatus.COMPLETED, RequestStatus.REJECTED, RequestStatus.CANCELLED)
@@ -253,10 +253,15 @@ def admin_dashboard(db: Session, actor: User) -> dict:
         )
     ) or 0
 
+    # Gaming Tour Enquiries — its own desk, no merchant to scope by (see
+    # gaming_tour_enquiry_service.counts / models_v2.GamingTourEnquiry).
+    gaming_tour_enquiries = gaming_tour_enquiry_service.counts(db)
+
     return {
         "merchants": merchants,
         "requests_by_status": requests_by_status,
         "enquiries": enquiries,
+        "gaming_tour_enquiries": gaming_tour_enquiries,
         "total_users": total_users,
         "active_service_requests": active_service_requests,
         "payments_pending_count": payments_pending_count,

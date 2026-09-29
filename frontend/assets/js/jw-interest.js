@@ -20,6 +20,45 @@
 (function (global) {
   const KEY = 'jw_recent_dest';
   const CAP = 8;              /* more than any shelf shows; trims the oldest */
+  const API = '/api/customer/activity';
+
+  /* The customer/guest token, if one already exists. We never MINT one to log a
+     view — a signed-out visitor is tracked in localStorage alone, and only a
+     traveller who has chosen to sign in or continue as guest is recorded on the
+     server. That is the privacy line: no anonymous account is created behind
+     anyone's back just to power recommendations. */
+  function token() {
+    try {
+      if (typeof getCustomerAuth === 'function') { const a = getCustomerAuth(); if (a && a.access) return a.access; }
+    } catch { /* auth.js absent on this page */ }
+    try { return localStorage.getItem('jpc_access') || null; } catch { return null; }
+  }
+
+  /** Send one activity to the recommendation engine — fire-and-forget, and only
+   *  when a session already exists. A failed or blocked beacon must never
+   *  disturb the page, so every path here is swallowed. */
+  function send(activityType, entityType, entityId, meta) {
+    const t = token();
+    if (!t || entityId == null) return;
+    try {
+      fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+        body: JSON.stringify({
+          activity_type: activityType, entity_type: entityType,
+          entity_id: String(entityId), meta: meta || undefined,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  }
+
+  /** Record a view of anything the server scores — a hotel or a package the
+   *  recently-viewed shelf does not carry. Destinations go through record()
+   *  below, which also keeps the local shelf; this is the server signal only. */
+  function track(activityType, entityType, entityId, meta) {
+    send(activityType, entityType, entityId, meta);
+  }
 
   function read() {
     try {
@@ -48,6 +87,9 @@
     const list = read().filter(d => d.id !== entry.id);
     list.unshift(entry);
     write(list);
+    /* The same view, sent to the server when there is a session to file it
+       under. localStorage remains the immediate, signed-out-safe copy. */
+    send('view', 'destination', entry.id, { source: 'destination_page' });
   }
 
   /** The most recent `n` destinations (default: everything kept). */
@@ -57,5 +99,5 @@
 
   function clear() { try { localStorage.removeItem(KEY); } catch { /* private mode */ } }
 
-  global.JWInterest = { record, recent, clear };
+  global.JWInterest = { record, recent, clear, track, send };
 })(window);

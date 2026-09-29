@@ -138,6 +138,16 @@
         <span class="nav-label">Booking Enquiries</span>
         <span class="nav-badge" id="enqNavBadge" hidden></span>
       </a>
+      <!-- Gaming Tour Enquiries — a sibling queue to Booking Enquiries above,
+           not a sub-tab of it: those rows belong to a signed-in merchant
+           (wallet, credit limit, a quotation that binds a fare); these are
+           raised by the public, with none of that (models_v2.GamingTourEnquiry).
+           Its own nav item keeps the two from reading as one queue. -->
+      <a href="#" class="nav-item" data-section="gaming-tour-enquiries">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+        <span class="nav-label">Gaming Tour Enquiries</span>
+        <span class="nav-badge" id="gtNavBadge" hidden></span>
+      </a>
       <a href="#" class="nav-item" data-section="partner-requests">
         <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
         <span class="nav-label">Approval Queue</span>
@@ -801,6 +811,38 @@
       </div>
     </section>
 
+    <!-- Gaming Tour Enquiries — public submissions, no merchant scoping.
+         Reads GET /api/admin/gaming-tour-enquiries, answers via
+         PATCH /api/admin/gaming-tour-enquiries/{id}. -->
+    <section class="section" id="section-gaming-tour-enquiries">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Gaming Tour Enquiries</h2>
+          <span class="panel-sub" id="gtQueueSummary"></span>
+        </div>
+        <div class="filter-bar" style="margin-bottom:16px;">
+          <select id="gtStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All</option>
+            <option value="NEW">New</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="CONTACTED">Contacted</option>
+            <option value="QUOTE_PREPARED">Quote Prepared</option>
+            <option value="CUSTOMER_CONFIRMED">Customer Confirmed</option>
+            <option value="BOOKING_CREATED">Booking Created</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+          <input type="search" id="gtSearch" placeholder="Reference, name, email, mobile or airport">
+          <button class="btn btn-ghost btn-sm" id="gtRefreshBtn" type="button">Refresh</button>
+        </div>
+        <div class="table-wrap"><table id="gtTable"><thead><tr>
+          <th>Enquiry ID</th><th>Customer</th><th>Route</th><th>Travel Date</th>
+          <th class="num">Nights</th><th>Casino Type</th><th>Status</th><th>Assigned</th><th>Created</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="gtPagination"></div>
+      </div>
+    </section>
+
     <section class="section" id="section-partner-requests">
       <div class="panel">
         <div class="panel-head"><h2>Approval Queue</h2></div>
@@ -1203,6 +1245,10 @@
   <div class="modal-card modal-lg" id="enqReviewModalBody"></div>
 </div>
 
+<div class="modal-overlay" id="gtModalOverlay">
+  <div class="modal-card modal-lg" id="gtModalBody"></div>
+</div>
+
 <!-- Settle a cancellation or reschedule: quote the amounts, then approve or
      reject. Rendered by admin-change-requests.js, opened from a row on Service
      Request Management. -->
@@ -1451,6 +1497,8 @@
 <!-- Loaded after admin.js: reuses its API_BASE, authHeaders, escapeHtml,
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
+<!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
+<script src="../assets/js/admin-gaming-enquiries.js?v=20260928gt2"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

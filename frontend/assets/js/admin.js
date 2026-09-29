@@ -117,6 +117,7 @@ const sectionTitles = {
   payments: 'Payment Management', 'live-support': 'Live Support',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
   'ticket-enquiries': 'Booking Enquiries',
+  'gaming-tour-enquiries': 'Gaming Tour Enquiries',
   'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
   /* Moved here from the Super Admin Portal; see assets/js/admin-logs.js. */
@@ -196,6 +197,8 @@ function loadSection(name) {
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
   if (name === 'ticket-enquiries') return loadTicketEnquiries();
+  /* Defined in admin-gaming-enquiries.js, loaded after this file. */
+  if (name === 'gaming-tour-enquiries') return loadGamingTourEnquiries();
   if (name === 'booking-ops') return loadBookingOps();
   /* 0039. Defined in admin-providers.js, loaded after this file. */
   if (name === 'providers') return loadProviders();
@@ -256,6 +259,12 @@ async function loadReports() {
        returns no `enquiries` block, and the dashboard should still render. */
     const enq = data.enquiries || { pending: 0, in_review: 0, awaiting_response: 0, answered_today: 0 };
     updateEnquiryNavBadge(enq.awaiting_response);
+    /* Its own badge, not a fifth stat card here — the grid below is
+       deliberately four cards (see the note under it), and a badge on the
+       nav item is where every other queue (Booking Enquiries, Live Support,
+       Booking Operations) already surfaces "there is something open here". */
+    const gt = data.gaming_tour_enquiries || { new: 0, open: 0, total: 0 };
+    updateGamingTourNavBadge(gt.open);
     /* FOUR CARDS, HEADING AND VALUE ONLY.
        Payment Verification, Payments Verified Today, Ticket Issued, Open
        Support Tickets, Open Chat Threads and the Recent Activity feed were all
