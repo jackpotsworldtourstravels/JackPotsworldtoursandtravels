@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=20260902cp2">
+<link rel="stylesheet" href="../assets/css/admin.css?v=0929nav1">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -89,24 +89,20 @@
          driven by `.mobile-open`, never by `.collapsed`. -->
 
     <!-- ============== NAVIGATION ==============
-         SEVEN GROUPS, AND EVERY MODULE THAT WAS HERE IS STILL HERE. Nothing was
-         removed, no `data-section` changed, no badge id changed, and nothing is
-         permission-gated differently — admin.js routes on `data-section` alone
-         and never on position, so this is ordering and headings only.
+         B2B MANAGEMENT and B2C MANAGEMENT (2026-09-29) ARE MODE TOGGLES, not
+         nav-groups: clicking one shows ONLY that side's groups and hides the
+         other's — the owner's explicit ask, "must behave as expandable/
+         collapsible parent sections" showing "ONLY" that side's modules. See
+         wireNavModes() in admin.js.
 
-         WHY THE GROUPS ARE THESE GROUPS. The list had grown to sixteen items
-         under a single "Overview" heading, in the order each was built: Reports
-         sat between Support and Analytics, the wallet sat between Payment
-         Management and Booking Enquiries, and Profile sat below Audit Logs. The
-         headings below are the questions an operator actually arrives with —
-         who are my merchants, what is waiting on the desk, where is the money,
-         what happened — and each group is small enough to scan without reading.
-
-         Two things deliberately did NOT move. Booking Enquiries stays above
-         Approval Queue, because an enquiry precedes the booking it may become.
-         Booking Operations stays directly under Approval Queue, because a
-         booking is in exactly one of the two at any moment and the pair reads
-         as one pipeline. -->
+         NOTHING BELOW IS NEW EXCEPT THE TOGGLE CHROME ITSELF AND THE GROUP
+         HEADINGS. Every `data-section`, every badge id and every permission
+         is exactly what it was — this is ordering and headings only, same as
+         every earlier pass over this sidebar. B2B's own groups (B2B
+         Management / B2B Payments & Finance / B2B Reports & Analytics) are
+         the pre-existing Merchant/Operations/Manual Booking/Finance/Reports
+         groups, flattened and relabelled to the owner's tree; nothing in them
+         moved relative to each other. -->
 
     <div class="nav-group">
       <div class="nav-group-label">Overview</div>
@@ -116,141 +112,258 @@
       </a>
     </div>
 
+    <!-- ============== B2B MODE ============== -->
     <div class="nav-group">
-      <div class="nav-group-label">Merchant Management</div>
-      <a href="#" class="nav-item" data-section="users">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span class="nav-label">Merchant Management</span>
-      </a>
-      <a href="#" class="nav-item" data-section="active-users">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
-        <span class="nav-label">Active Users</span>
-      </a>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-group-label">Operations</div>
-      <!-- Booking Enquiries sits above the Approval Queue deliberately: an enquiry
-           precedes the booking it may become, and the two are separate workflows
-           with different actions (answer vs approve) and no payable stage. -->
-      <a href="#" class="nav-item" data-section="ticket-enquiries">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
-        <span class="nav-label">Booking Enquiries</span>
-        <span class="nav-badge" id="enqNavBadge" hidden></span>
-      </a>
-      <!-- Gaming Tour Enquiries moved to its own "Gaming Packages" nav-group
-           under B2C Management (2026-09-29) — four views over this same
-           queue instead of one, split by status. See that group's own
-           comment. Nothing about the queue, its table or its endpoints
-           changed; only this link's position did. -->
-      <a href="#" class="nav-item" data-section="partner-requests">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-        <span class="nav-label">Approval Queue</span>
-      </a>
-      <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately disjoint
-           from the Approval Queue above: a booking is in exactly one of the two
-           screens at any time, so nothing is ever worked twice. Classic Tours
-           bookings arrive here only once a Manager has approved them. -->
-      <a href="#" class="nav-item" data-section="booking-ops">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
-        <span class="nav-label">Booking Operations</span>
-        <span class="nav-badge" id="opsNavBadge" hidden></span>
-      </a>
-      <!-- One screen for every service request, whatever its type. There used to
-           be a second, "Cancellations & Reschedules", because those two settle
-           money and change the booking while the others do not — but that is a
-           difference in what the Settle button does, not a different queue, and
-           splitting them meant an admin had to know which screen a request had
-           landed on before they could find it. The action is chosen per row from
-           the request's type; the settle dialog itself is unchanged. -->
-      <!-- CR-9's B2C chat queue moved to B2C Management (2026-09-29) — it was
-           always the customer-facing thread list, distinct from Support
-           Management above (the MERCHANT-side list rooted at models_v2.User);
-           only its nav position was misfiled here. Same section, same
-           admin-live-support.js, same endpoints, per the owner's explicit
-           "do not touch the module" instruction. -->
-      <a href="#" class="nav-item" data-section="service-requests-mgmt">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-        <span class="nav-label">Service Request Management</span>
-        <span class="nav-badge" id="srmNavBadge" hidden></span>
-      </a>
-      <!-- 0039 — the external suppliers the desk buys tickets FROM. It sits at the
-           foot of Operations, directly under the queues, because a provider is
-           chosen on Booking Operations at ticket issuance and this is where the
-           resulting purchase history is read. Deliberately NOT in the Merchant
-           group above: a merchant is a customer, a provider is a supplier, and
-           the two lists must not read as variations of one thing. -->
-      <a href="#" class="nav-item" data-section="providers">
+      <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2b" aria-expanded="true">
         <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
-        <span class="nav-label">Provider Management</span>
-      </a>
+        <span class="nav-label">B2B Management</span>
+        <svg class="icon nav-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="nav-mode-body" data-mode-body="b2b">
+      <div class="nav-group">
+        <div class="nav-group-label">B2B Management</div>
+        <a href="#" class="nav-item" data-section="users">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="nav-label">Merchant Management</span>
+        </a>
+        <a href="#" class="nav-item" data-section="active-users">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="m17 11 2 2 4-4"/></svg>
+          <span class="nav-label">Active Users</span>
+        </a>
+        <!-- Booking Enquiries sits above the Approval Queue deliberately: an
+             enquiry precedes the booking it may become, and the two are
+             separate workflows with different actions (answer vs approve)
+             and no payable stage. -->
+        <a href="#" class="nav-item" data-section="ticket-enquiries">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
+          <span class="nav-label">Booking Enquiries</span>
+          <span class="nav-badge" id="enqNavBadge" hidden></span>
+        </a>
+        <a href="#" class="nav-item" data-section="partner-requests">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          <span class="nav-label">Approval Queue</span>
+        </a>
+        <!-- The post-approval desk (M1/M2, surfaced by CR-2). Deliberately
+             disjoint from the Approval Queue above: a booking is in exactly
+             one of the two at any moment, so nothing is worked twice. -->
+        <a href="#" class="nav-item" data-section="booking-ops">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/><circle cx="12" cy="12" r="10"/></svg>
+          <span class="nav-label">Booking Operations</span>
+          <span class="nav-badge" id="opsNavBadge" hidden></span>
+        </a>
+        <!-- Manual Enquiry / Manual Booking. The desk raising a record FOR a
+             merchant that telephoned it in (migration 0073's `source`). Flat
+             here rather than their own sub-heading, per the owner's tree. -->
+        <a href="#" class="nav-item" data-section="manual-enquiry">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span class="nav-label">Manual Enquiry</span>
+        </a>
+        <!-- `data-section` stays `manual-request`: an internal key, not a URL,
+             and renaming it would touch the section element, admin.js's
+             loader and the merchant-portal-embed's clGo map for no
+             user-visible gain. The label is "Manual Booking", matching the
+             owner's tree exactly. -->
+        <a href="#" class="nav-item" data-section="manual-request">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+          <span class="nav-label">Manual Booking</span>
+        </a>
+        <!-- One screen for every service request, whatever its type; the
+             settle dialog chooses its action from the request's own type. -->
+        <a href="#" class="nav-item" data-section="service-requests-mgmt">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+          <span class="nav-label">Service Request Management</span>
+          <span class="nav-badge" id="srmNavBadge" hidden></span>
+        </a>
+        <!-- 0039 — the external suppliers the desk buys tickets FROM. -->
+        <a href="#" class="nav-item" data-section="providers">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 9 12 4l9 5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 21v-7h6v7"/></svg>
+          <span class="nav-label">Provider Management</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">B2B Payments &amp; Finance</div>
+        <a href="#" class="nav-item" data-section="payments">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span class="nav-label">Payment Management</span>
+        </a>
+        <!-- CR-4d — the wallet desk. Per-booking payments on the standard
+             track live on Payment Management above; this is the running
+             merchant account, a different settlement model. -->
+        <a href="#" class="nav-item" data-section="wallet-desk">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
+          <span class="nav-label">Wallet &amp; Top-ups</span>
+          <span class="nav-badge" id="wdNavBadge" hidden></span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">B2B Reports &amp; Analytics</div>
+        <a href="#" class="nav-item" data-section="reports-export">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span class="nav-label">Reports</span>
+        </a>
+        <!-- M6. Dashboard answers "what needs me right now"; this answers
+             "how is the desk doing" over a period. Reports (above) exports
+             rows; this only ever aggregates. -->
+        <a href="#" class="nav-item" data-section="analytics">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
+          <span class="nav-label">Analytics</span>
+        </a>
+      </div>
     </div>
 
-    <!-- Manual Booking. The desk raising an enquiry or a booking FOR a merchant
-         that telephoned it in — the same records the Merchant Portal creates,
-         with `source` recording that we typed them (migration 0073).
-
-         A nav-group with two items, which is how every other pair in this
-         sidebar is expressed. There is no expand/collapse anywhere in this
-         portal and this does not introduce one. -->
-    <div class="nav-group" id="navGroupManualBooking">
-      <div class="nav-group-label">Manual Booking</div>
-      <a href="#" class="nav-item" data-section="manual-enquiry">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        <span class="nav-label">Manual Enquiry</span>
-      </a>
-      <!-- "Booking", not "Manual Booking", and the group above it is why: this
-           sidebar's nav-group label is already "Manual Booking", so repeating
-           it on the child reads as two screens with one name rather than as a
-           hierarchy. The SCREEN is called Manual Booking — its page title and
-           its heading both say so; the nav item is the short form under its
-           own group, which is how every other pair in this sidebar reads.
-           `data-section` stays `manual-request`: it is an internal key, not a
-           URL, and renaming it would touch the section element, admin.js's
-           loader and the host's clGo map for no user-visible gain. -->
-      <a href="#" class="nav-item" data-section="manual-request">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
-        <span class="nav-label">Booking</span>
-      </a>
-    </div>
-
+    <!-- ============== B2C MODE ==============
+         Direct customers — everyone who books through the website/app with
+         no merchant in between (models_customer.py: Customer, CustomerBooking
+         and friends). Live Support and Customer Payments are NOT new and
+         were NOT rebuilt: both screens, their JS modules
+         (admin-live-support.js, admin-customer-payments.js), endpoints and
+         permissions are exactly what they always were. Only their <a> links
+         moved (and Customer Payments' link appears twice, once here and once
+         under B2C Payments & Finance below, per the owner's tree — the same
+         data-section both times, so clicking either opens the one screen). -->
     <div class="nav-group">
-      <div class="nav-group-label">Finance</div>
-      <a href="#" class="nav-item" data-section="payments">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2.5"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-        <span class="nav-label">Payment Management</span>
-      </a>
-      <!-- CR-4d — the wallet desk. Deliberately its own section rather than a tab
-           inside Payment Management: that screen is per-booking payments on the
-           standard track, this one is the running merchant account. Two different
-           settlement models sharing one screen is how a figure ends up read
-           against the wrong one. -->
-      <a href="#" class="nav-item" data-section="wallet-desk">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H5a2 2 0 0 1-2-2z"/><path d="M3 7V6a2 2 0 0 1 2-2h11"/><circle cx="17" cy="13.5" r="1.3"/></svg>
-        <span class="nav-label">Wallet &amp; Top-ups</span>
-        <span class="nav-badge" id="wdNavBadge" hidden></span>
-      </a>
+      <button type="button" class="nav-item nav-mode-toggle" data-mode-toggle="b2c" aria-expanded="false">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+        <span class="nav-label">B2C Management</span>
+        <svg class="icon nav-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="nav-mode-body" data-mode-body="b2c" hidden>
+      <div class="nav-group">
+        <div class="nav-group-label">B2C Management</div>
+        <a href="#" class="nav-item" data-section="b2c-customers">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+          <span class="nav-label">Customers</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-bookings">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+          <span class="nav-label">Bookings</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-refunds">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+          <span class="nav-label">Cancellations &amp; Refunds</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-reviews">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7-5.4-4.7 7.1-.6z"/></svg>
+          <span class="nav-label">Reviews &amp; Ratings</span>
+        </a>
+        <a href="#" class="nav-item" data-section="live-support">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 21l1.9-5A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>
+          <span class="nav-label">Live Support</span>
+          <span class="nav-badge" id="alsNavBadge" hidden></span>
+        </a>
+        <a href="#" class="nav-item" data-section="customer-payments">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+          <span class="nav-label">Customer Payments</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">B2C Payments &amp; Finance</div>
+        <a href="#" class="nav-item" data-section="customer-payments">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+          <span class="nav-label">Customer Payments</span>
+        </a>
+        <!-- Placeholder (Phase 0 of the B2C build-out) — no screen or endpoint
+             behind it yet; see initComingSoon() in admin.js. -->
+        <a href="#" class="nav-item" data-section="b2c-reconciliation">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="nav-label">Payment Reconciliation</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">B2C Operations</div>
+        <a href="#" class="nav-item" data-section="b2c-communication">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"/></svg>
+          <span class="nav-label">Communication</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-activity">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span class="nav-label">User Activity</span>
+        </a>
+      </div>
+
+      <!-- Flights has no supplier integration yet (no live inventory to
+           manage — see docs/tektravels spec), so it carries no nav item here. -->
+      <div class="nav-group">
+        <div class="nav-group-label">Catalogue Management</div>
+        <a href="#" class="nav-item" data-section="b2c-cat-hotels">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M2 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14"/><path d="M22 21V11a2 2 0 0 0-2-2h-4"/><line x1="2" y1="21" x2="22" y2="21"/><line x1="6" y1="9" x2="6" y2="9.01"/><line x1="6" y1="13" x2="6" y2="13.01"/><line x1="10" y1="9" x2="10" y2="9.01"/><line x1="10" y1="13" x2="10" y2="13.01"/></svg>
+          <span class="nav-label">Hotels</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-cat-packages">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20.9 19.8 17 13V5h1a1 1 0 0 0 0-2H6a1 1 0 0 0 0 2h1v8l-3.9 6.8A1.5 1.5 0 0 0 4.4 22h15.2a1.5 1.5 0 0 0 1.3-2.2Z"/></svg>
+          <span class="nav-label">Tour Packages</span>
+        </a>
+        <!-- Gaming Tour Packages: a public call-back enquiry queue, not a
+             browsable catalogue (see gaming-packages.html and
+             models_v2.GamingTourEnquiry) — nested HERE rather than given its
+             own top-level group, per the owner's tree. Expand/collapse only;
+             it has no data-section and no screen of its own.
+
+             FOUR VIEWS, ONE TABLE, NO NEW ENDPOINT beneath it. Each child
+             preselects a bucket of the enquiry's existing 8-value `status`
+             column over the same GET/PATCH /api/admin/gaming-tour-enquiries
+             this queue always had — see GT_BUCKETS in
+             admin-gaming-enquiries.js. Nothing in the schema or the API
+             changed to build this. -->
+        <button type="button" class="nav-item nav-subtoggle" data-subtoggle="gaming-tour-packages" aria-expanded="false">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+          <span class="nav-label">Gaming Tour Packages</span>
+          <span class="nav-badge" id="gtNavBadge" hidden></span>
+          <svg class="icon nav-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <div class="nav-subgroup" data-subgroup="gaming-tour-packages" hidden>
+          <a href="#" class="nav-item" data-section="gaming-new">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+            <span class="nav-label">Gaming Enquiries</span>
+          </a>
+          <a href="#" class="nav-item" data-section="gaming-requests">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
+            <span class="nav-label">Customer Requests</span>
+          </a>
+          <a href="#" class="nav-item" data-section="gaming-converted">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+            <span class="nav-label">Converted Bookings</span>
+          </a>
+          <a href="#" class="nav-item" data-section="gaming-closed">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m9 10 3 3 3-3"/></svg>
+            <span class="nav-label">Closed Requests</span>
+          </a>
+        </div>
+        <a href="#" class="nav-item" data-section="b2c-cat-destinations">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span class="nav-label">Destinations</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">B2C Reports &amp; Analytics</div>
+        <a href="#" class="nav-item" data-section="b2c-reports">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span class="nav-label">Reports</span>
+        </a>
+        <a href="#" class="nav-item" data-section="b2c-analytics">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
+          <span class="nav-label">Analytics</span>
+        </a>
+      </div>
     </div>
 
+    <!-- ============== PERSISTENT (outside either mode) ==============
+         Neither B2B- nor B2C-specific in the owner's tree, so neither toggle
+         hides these — Audit/System Logs and the merchant support desk stay
+         reachable regardless of which mode is open. Content and endpoints
+         are unchanged from before this pass; only their grouping/position is. -->
     <div class="nav-group">
-      <div class="nav-group-label">Reports &amp; Analytics</div>
-      <a href="#" class="nav-item" data-section="reports-export">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-        <span class="nav-label">Reports</span>
-      </a>
-      <!-- M6. Its own section rather than tiles bolted onto the Dashboard: the
-           Dashboard answers "what needs me right now" in counters, and this
-           answers "how is the desk doing" over a period. Mixing the two puts a
-           six-month average beside a live queue badge, and the pair gets read as
-           one number. Reports (above) exports rows; this only ever aggregates. -->
-      <a href="#" class="nav-item" data-section="analytics">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
-        <span class="nav-label">Analytics</span>
-      </a>
+      <div class="nav-group-label">System</div>
       <!-- Audit Logs moved here from the Super Admin Portal, with System Logs
            added beside it. Both endpoints are permission-gated (`audit.view` /
-           `system.activity.view`), which `_ADMIN` already holds — see the header
-           of assets/js/admin-logs.js. No backend change was required. -->
+           `system.activity.view`), which `_ADMIN` already holds. -->
       <a href="#" class="nav-item" data-section="audit">
         <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
         <span class="nav-label">Audit Logs</span>
@@ -271,121 +384,6 @@
       <a href="#" class="nav-item" data-section="notifications">
         <svg class="icon" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
         <span class="nav-label">Communication</span>
-      </a>
-    </div>
-
-    <!-- ============== B2C MANAGEMENT ==============
-         Direct customers — everyone who books through the website/app with
-         no merchant in between (models_customer.py: Customer, CustomerBooking
-         and friends). A parallel structure to the B2B groups above, built on
-         the same nav-item / section / loadSection machinery; nothing above
-         this comment changed to make room for it.
-
-         Live Support and Customer Payments are NOT new here and were not
-         rebuilt: both screens, their JS modules (admin-live-support.js,
-         admin-customer-payments.js), their endpoints and their permissions
-         are exactly what they were under Operations/Finance. Only the two
-         <a> links moved — each <section> stayed exactly where it was in the
-         document, since admin.js toggles sections by id, never by DOM
-         position, so moving a link cannot move or duplicate its screen. -->
-    <div class="nav-group">
-      <div class="nav-group-label">B2C Management</div>
-      <a href="#" class="nav-item" data-section="b2c-customers">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
-        <span class="nav-label">Customers</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-bookings">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
-        <span class="nav-label">Bookings</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-refunds">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
-        <span class="nav-label">Cancellations &amp; Refunds</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-reviews">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7-5.4-4.7 7.1-.6z"/></svg>
-        <span class="nav-label">Reviews &amp; Ratings</span>
-      </a>
-      <!-- MOVED from Operations, 2026-09-29 — see this group's header comment. -->
-      <a href="#" class="nav-item" data-section="live-support">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 21l1.9-5A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>
-        <span class="nav-label">Live Support</span>
-        <span class="nav-badge" id="alsNavBadge" hidden></span>
-      </a>
-      <!-- MOVED from Finance, 2026-09-29 — see this group's header comment. -->
-      <a href="#" class="nav-item" data-section="customer-payments">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
-        <span class="nav-label">Customer Payments</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-communication">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 0 0 2.22 0L21 8M5 19h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"/></svg>
-        <span class="nav-label">Communication</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-activity">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        <span class="nav-label">User Activity</span>
-      </a>
-    </div>
-
-    <!-- Gaming Packages. A public call-back enquiry queue, not a browsable
-         catalogue (see gaming-packages.html and models_v2.GamingTourEnquiry)
-         — it does not sit under Catalogue Management below.
-
-         FOUR VIEWS, ONE TABLE, NO NEW ENDPOINT. Each item preselects a bucket
-         of the enquiry's existing eight-value `status` column over the same
-         GET/PATCH /api/admin/gaming-tour-enquiries this queue always had —
-         see GT_BUCKETS in admin-gaming-enquiries.js. Nothing in the schema or
-         the API changed to build this. -->
-    <div class="nav-group">
-      <div class="nav-group-label">Gaming Packages</div>
-      <a href="#" class="nav-item" data-section="gaming-new">
-        <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
-        <span class="nav-label">Gaming Enquiries</span>
-        <span class="nav-badge" id="gtNavBadge" hidden></span>
-      </a>
-      <a href="#" class="nav-item" data-section="gaming-requests">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
-        <span class="nav-label">Customer Requests</span>
-      </a>
-      <a href="#" class="nav-item" data-section="gaming-converted">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-        <span class="nav-label">Converted Bookings</span>
-      </a>
-      <a href="#" class="nav-item" data-section="gaming-closed">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M4 17V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="m9 10 3 3 3-3"/></svg>
-        <span class="nav-label">Closed Requests</span>
-      </a>
-    </div>
-
-    <!-- Catalogue Management. Flights has no supplier integration yet (no
-         live inventory to manage — see docs/tektravels spec) and Gaming
-         Packages is the enquiry queue above, not a catalogue: neither gets a
-         nav item here. -->
-    <div class="nav-group">
-      <div class="nav-group-label">Catalogue Management</div>
-      <a href="#" class="nav-item" data-section="b2c-cat-hotels">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M2 21V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14"/><path d="M22 21V11a2 2 0 0 0-2-2h-4"/><line x1="2" y1="21" x2="22" y2="21"/><line x1="6" y1="9" x2="6" y2="9.01"/><line x1="6" y1="13" x2="6" y2="13.01"/><line x1="10" y1="9" x2="10" y2="9.01"/><line x1="10" y1="13" x2="10" y2="13.01"/></svg>
-        <span class="nav-label">Hotels</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-cat-packages">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M20.9 19.8 17 13V5h1a1 1 0 0 0 0-2H6a1 1 0 0 0 0 2h1v8l-3.9 6.8A1.5 1.5 0 0 0 4.4 22h15.2a1.5 1.5 0 0 0 1.3-2.2Z"/></svg>
-        <span class="nav-label">Tour Packages</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-cat-destinations">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-        <span class="nav-label">Destinations</span>
-      </a>
-    </div>
-
-    <div class="nav-group">
-      <div class="nav-group-label">B2C Reports &amp; Analytics</div>
-      <a href="#" class="nav-item" data-section="b2c-reports">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-        <span class="nav-label">Reports</span>
-      </a>
-      <a href="#" class="nav-item" data-section="b2c-analytics">
-        <svg class="icon" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="4" height="8" rx="1"/><rect x="11" y="6" width="4" height="13" rx="1"/><rect x="17" y="14" width="4" height="5" rx="1"/></svg>
-        <span class="nav-label">Analytics</span>
       </a>
     </div>
 
@@ -1184,6 +1182,10 @@
       <div class="panel"><div class="panel-head"><h2>Customers</h2></div>
         <div class="b2c-soon-body"></div></div>
     </section>
+    <section class="section" id="section-b2c-reconciliation">
+      <div class="panel"><div class="panel-head"><h2>Payment Reconciliation</h2></div>
+        <div class="b2c-soon-body"></div></div>
+    </section>
     <section class="section" id="section-b2c-bookings">
       <div class="panel"><div class="panel-head"><h2>Bookings</h2></div>
         <div class="b2c-soon-body"></div></div>
@@ -1599,7 +1601,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=20260922ma1"></script>
+<script src="../assets/js/admin.js?v=0929nav1"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1650,7 +1652,7 @@
      fmtDateTime, rowsSkeleton and navigateToSection rather than restating them. -->
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
-<script src="../assets/js/admin-gaming-enquiries.js?v=20260928gt2"></script>
+<script src="../assets/js/admin-gaming-enquiries.js?v=0929nav1"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

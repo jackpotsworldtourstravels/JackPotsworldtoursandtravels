@@ -165,6 +165,34 @@ body.jp-admin{--sidebar-w:308px;}
 .sidebar .nav-item.logout{color:#ffb4b4; margin-top:4px;}
 .sidebar .nav-item.logout:hover{background:rgba(255,77,77,0.14); color:#fff;}
 
+/* ---- B2B/B2C mode toggle + Gaming Tour Packages sub-tree (2026-09-29) ----
+   The ONLY places this sidebar collapses/expands anything. A `<button>`, not
+   an `<a>`, since neither ever navigates by itself — each opens or closes the
+   markup after it. `.nav-item` is the base for both so they keep every plain
+   `.nav-item`'s size, padding and hover; these rules add only what's new. */
+.nav-mode-toggle{
+  width:calc(100% - 24px); border:0; background:none; cursor:pointer;
+  font-family:inherit; text-transform:uppercase; letter-spacing:.04em;
+}
+.nav-mode-toggle .nav-chevron{margin-left:auto; opacity:.6; transition:transform .18s ease;}
+.nav-mode-toggle[aria-expanded="true"] .nav-chevron{transform:rotate(90deg);}
+.nav-mode-body[hidden]{display:none;}
+
+/* Gaming Tour Packages, nested one level under Catalogue Management. Same
+   toggle mechanics as above, indented to read as a child of the group rather
+   than a sibling of Hotels/Tour Packages/Destinations beside it. */
+.nav-subtoggle{width:calc(100% - 24px); border:0; background:none; cursor:pointer; font-family:inherit;}
+/* The badge sits between the label and the chevron on this one item (Gaming
+   Tour Packages carries its queue's badge even while collapsed) — it must
+   NOT also claim the auto margin .nav-badge normally uses to reach the row's
+   right edge, or the two auto margins would fight over the same free space. */
+.nav-subtoggle .nav-badge{margin-left:0;}
+.nav-subtoggle .nav-chevron{margin-left:auto; opacity:.6; transition:transform .18s ease;}
+.nav-subtoggle[aria-expanded="true"] .nav-chevron{transform:rotate(90deg);}
+.nav-subgroup[hidden]{display:none;}
+.nav-subgroup .nav-item{padding-left:44px;}
+.nav-subgroup .nav-item.active::before{left:-12px;}
+
 /* ---- rail rhythm, with the collapse button gone            (2026-08-10) ----
    Scoped to `body.jp-admin` because this stylesheet is also the Manager
    Portal's, and that portal never had the button, never had `.nav-group`, and

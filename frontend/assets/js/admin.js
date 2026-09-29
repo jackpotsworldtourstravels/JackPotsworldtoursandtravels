@@ -192,6 +192,40 @@ document.querySelectorAll('.nav-item[data-section]').forEach(link => {
   });
 });
 
+/* ---------- B2B / B2C mode toggle, and the Gaming Tour Packages sub-tree ----------
+   The only expand/collapse this sidebar has (2026-09-29). A mode toggle shows
+   ONLY its own side's groups and hides the other's — mutually exclusive, not
+   an independent accordion pair — per the owner's explicit spec. Clicking one
+   never navigates by itself: it only reveals or hides the `.nav-mode-body`
+   markup after it, so whatever section is currently open in `.main` is left
+   exactly as it was (the previous side's items just stop being visible in
+   the sidebar, which is the same thing a collapsed accordion group does). */
+function setNavMode(mode) {
+  document.querySelectorAll('.nav-mode-toggle').forEach(btn => {
+    const on = btn.dataset.modeToggle === mode;
+    btn.setAttribute('aria-expanded', String(on));
+  });
+  document.querySelectorAll('.nav-mode-body').forEach(body => {
+    body.hidden = body.dataset.modeBody !== mode;
+  });
+}
+document.querySelectorAll('.nav-mode-toggle').forEach(btn => {
+  btn.addEventListener('click', () => setNavMode(btn.dataset.modeToggle));
+});
+
+/* Gaming Tour Packages, nested under Catalogue Management. A plain toggle,
+   not mode-exclusive — there is only one of these today, but this reads by
+   `data-subtoggle` rather than assuming it, so a second one elsewhere would
+   not need new code. */
+document.querySelectorAll('.nav-subtoggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    const group = document.querySelector(`.nav-subgroup[data-subgroup="${btn.dataset.subtoggle}"]`);
+    if (group) group.hidden = !open;
+  });
+});
+
 function loadSection(name) {
   /* CR-9. AdminLiveSupport.init() is idempotent: it wires its handlers once
      and reloads the queue on every later visit, so returning to the section
@@ -250,7 +284,7 @@ function loadSection(name) {
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
     'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
     'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',
-    'b2c-analytics': 'B2C Analytics',
+    'b2c-analytics': 'B2C Analytics', 'b2c-reconciliation': 'Payment Reconciliation',
   };
   if (name in B2C_SOON) return initComingSoon(name, B2C_SOON[name]);
 }
