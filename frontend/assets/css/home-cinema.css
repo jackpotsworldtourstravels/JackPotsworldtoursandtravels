@@ -1,0 +1,807 @@
+/* ===========================================================================
+   home-cinema.css — the homepage as one continuous, cinematic scroll.
+   ===========================================================================
+   Loaded ONLY by index.html, last of its stylesheets, and every rule is
+   scoped to `body.home-cine` — the seven other pages that share main.css and
+   home-ref.css are untouched by it.
+
+   WHAT IT DRESSES, top to bottom, and where each one's motion lives:
+
+     1. header      transparent over the photograph -> compact dark glass
+     2. hero        photograph, globe canvas, shade, grain, copy, search card
+     3. card        the SAME BookingCard, re-dressed: layered depth, sliding
+                    tab pill, focus underline, border glint, button sheen
+     4. bridge      the route continuing out of the hero through four stops
+     5. shelf       the destinations as an editorial grid, not a uniform one
+     6. why         a statement that fills as it scrolls, promises on a rail
+     7. finale      "Ready to go?" — CTA, contact form, newsletter
+     8. footer      a gold rule drawn across its top edge
+
+   THE MOTION IS home-cinema.js's (GSAP + ScrollTrigger). This file holds the
+   resting composition, the hover/focus microinteractions (pure CSS — they
+   need no scroll), and the one PRE-STATE the opening sequence starts from.
+
+   FAIL-OPEN. The only hidden-by-CSS state is under `html.cine-pre`, which
+   the inline script in <head> sets and which is removed by home-cinema.js
+   or by a 4s timer, whichever comes first. Everything else starts visible
+   and is hidden, if at all, by the script that is about to animate it.
+
+   PERFORMANCE. What moves on scroll is transform and opacity; the two
+   clip-path reveals (the statement fill, the finale's circle) are on small
+   or single layers. No rule here animates layout.
+   =========================================================================== */
+
+@property --cn-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+body.home-cine {
+  --cn-night:    #060a12;
+  --cn-ink:      #0d1422;
+  --cn-ivory:    #f5f0e8;
+  --cn-sand:     #e8dfd1;
+  --cn-gold:     #d9b26f;
+  --cn-gold-lt:  #f0d9a6;
+  --cn-gold-ink: #8a6427;
+  --cn-text:     #151b27;
+  --cn-muted:    #6c6962;
+  --cn-ease:     cubic-bezier(.22, 1, .36, 1);
+  --cn-display:  'Playfair Display', Georgia, 'Times New Roman', serif;
+  --cn-r:        clamp(22px, 2.6vw, 40px);
+  background: var(--cn-ivory);
+}
+body.home-cine main { background: var(--cn-ivory); }
+
+/* Shared editorial furniture ------------------------------------------- */
+body.home-cine .cine-rule {
+  display: inline-block; width: 44px; height: 1px; flex: none;
+  background: currentColor; opacity: .8; transform-origin: 0 50%;
+}
+body.home-cine .cine-kicker {
+  display: flex; align-items: center; gap: 14px; margin: 0 0 22px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .32em; text-transform: uppercase;
+  color: var(--cn-gold-ink);
+}
+/* A masked line: the outer span clips, the inner one rises into it. */
+body.home-cine .cine-line { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
+body.home-cine .cine-line > span { display: inline-block; will-change: transform; }
+body.home-cine .cine-lede { font-size: clamp(15px, 1.15vw, 17.5px); line-height: 1.7; max-width: 44ch; }
+
+/* The pill CTA. Hover lifts 2px, the arrow travels 4px, the ground warms. */
+body.home-cine .cine-cta {
+  display: inline-flex; align-items: center; gap: 14px;
+  padding: 15px 22px 15px 26px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.34); background: rgba(255,255,255,.06);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+  transition: transform .35s var(--cn-ease), background-color .35s ease, border-color .35s ease, box-shadow .35s ease;
+}
+body.home-cine .cine-cta svg {
+  width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .35s var(--cn-ease);
+}
+body.home-cine .cine-cta:hover { transform: translateY(-2px); background: rgba(255,255,255,.14); border-color: var(--cn-gold); }
+body.home-cine .cine-cta:hover svg { transform: translateX(4px); }
+body.home-cine .cine-cta:active { transform: translateY(0); }
+body.home-cine .cine-cta-solid {
+  border: none; background: linear-gradient(135deg, var(--coral), var(--coral-dark));
+  box-shadow: 0 18px 40px -16px rgba(201,72,47,.75);
+}
+body.home-cine .cine-cta-solid:hover { background: linear-gradient(135deg, #d4543a, var(--coral)); box-shadow: 0 24px 46px -16px rgba(201,72,47,.85); }
+
+/* ==========================================================================
+   1. HEADER — now the design system's (jw-header.js + jw-system.css
+   "chrome"): clear over this photograph, compact dark glass on scroll, the
+   sliding indicator under the product the search card is showing.
+   ========================================================================== */
+
+/* ==========================================================================
+   2. HERO
+   ========================================================================== */
+body.home-cine .cine-hero {
+  position: relative; z-index: 2; isolation: isolate;
+  min-height: 100vh; min-height: 100svh;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: clamp(100px, 13vh, 160px) 0 clamp(58px, 7.5vh, 90px);
+  overflow: visible; background: var(--cn-night);
+}
+
+/* The stage clips the photograph and the globe; the section does not clip,
+   so nothing the card opens is ever cut. Bottom corners are rounded: at rest
+   they sit on the same night colour and read as nothing, and as the stage
+   recedes on scroll they become the edge of a frame. */
+body.home-cine .cine-stage {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
+  border-radius: 0 0 var(--cn-r) var(--cn-r);
+  transform-origin: 50% 0; will-change: transform;
+  background: var(--cn-night);
+}
+body.home-cine .cine-media { position: absolute; inset: -8% 0; will-change: transform; }
+body.home-cine .cine-photo {
+  width: 100%; height: 100%; object-fit: cover; object-position: 54% 44%;
+  max-width: none; transform-origin: 54% 44%;
+}
+/* The globe sits right of the headline, centred a little above the middle
+   of the frame. Placed with margins, not a transform: the transform is the
+   script's (arrival and scroll drift). */
+body.home-cine .cine-globe {
+  position: absolute; z-index: 1; pointer-events: none;
+  width: min(56vw, 880px); height: min(56vw, 880px);
+  right: max(-9vw, -130px); top: 40%; margin-top: max(-28vw, -440px);
+}
+body.home-cine .cine-shade {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(4,7,14,.78) 0%, rgba(4,7,14,.46) 30%, rgba(4,7,14,.08) 58%, rgba(4,7,14,0) 72%),
+    linear-gradient(180deg, rgba(4,7,14,.66) 0%, rgba(4,7,14,.08) 26%, rgba(4,7,14,0) 52%, rgba(4,7,14,.62) 82%, rgba(6,10,18,.96) 100%),
+    radial-gradient(ellipse 120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.45) 100%);
+}
+/* FILM GRAIN. A fractal-noise tile, larger than the frame and stepped
+   around with transform only, so it shimmers like stock without a repaint. */
+body.home-cine .cine-grain {
+  position: absolute; inset: -60%; z-index: 3; pointer-events: none;
+  opacity: .11; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: cn-grain 1.1s steps(5) infinite;
+}
+@keyframes cn-grain {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(-6%, 4%); }
+  40%  { transform: translate(5%, -7%); }
+  60%  { transform: translate(-3%, 9%); }
+  80%  { transform: translate(8%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* --- the copy --------------------------------------------------------- */
+body.home-cine .cine-copy { position: relative; z-index: 3; width: 100%; color: #fff; }
+body.home-cine .cine-eyebrow {
+  display: flex; align-items: center; gap: 16px; margin: 0 0 clamp(18px, 2.4vh, 28px);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase;
+  color: rgba(255,255,255,.82);
+}
+body.home-cine .cine-eyebrow .cine-rule { background: var(--cn-gold); opacity: 1; }
+/* h1 AND the class: home-ref.css sizes `body.home-ref .hero h1`, which
+   would otherwise out-rank a single class here. */
+body.home-cine .cine-hero h1.cine-title {
+  margin: 0; max-width: none;
+  font-family: var(--cn-display); font-weight: 500;
+  font-size: clamp(34px, min(8.3vw, 13.5vh), 136px); line-height: .9; letter-spacing: -.02em;
+  text-transform: uppercase; color: #fff;
+  text-shadow: 0 10px 50px rgba(0,0,0,.35);
+}
+body.home-cine .cine-hero h1.cine-title em {
+  font-style: italic; font-weight: 500; letter-spacing: -.01em;
+  background: linear-gradient(100deg, var(--cn-gold-lt) 0%, var(--cn-gold) 45%, #c08b3e 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  padding-right: .04em;
+}
+body.home-cine .cine-cta-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 18px 34px;
+  margin-top: clamp(22px, 3.4vh, 38px);
+}
+/* Desktop: the CTA and the route codes ride the eyebrow's row on the
+   right, so the headline and the card keep the whole first screen. */
+@media (min-width: 1025px) {
+  body.home-cine .cine-copy {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 40px;
+  }
+  body.home-cine .cine-eyebrow { grid-column: 1; grid-row: 1; }
+  body.home-cine .cine-hero h1.cine-title { grid-column: 1 / -1; grid-row: 2; }
+  body.home-cine .cine-cta-row {
+    grid-column: 2; grid-row: 1; margin: 0 0 clamp(18px, 2.4vh, 28px);
+  }
+}
+body.home-cine .cine-route-caption {
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font-size: 11px; letter-spacing: .26em; color: rgba(255,255,255,.62);
+}
+body.home-cine .cine-route-caption b { font-weight: 600; }
+body.home-cine .cine-route-caption i {
+  width: 30px; height: 1px; background: linear-gradient(90deg, rgba(217,178,111,.2), var(--cn-gold));
+}
+
+/* --- the dock --------------------------------------------------------- */
+body.home-cine .cine-dock {
+  position: relative; z-index: 4; margin-top: clamp(28px, 5.5vh, 64px); max-width: var(--max, 1280px);
+  will-change: transform; transform-origin: 50% 100%;
+}
+/* LAYERED DEPTH: a smoked-glass plate behind the card, set in and down, so
+   the card reads as lifted off something rather than pasted on the photo. */
+body.home-cine .cine-dock::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  left: calc(32px + 3.5%); right: calc(32px + 3.5%); top: 22px; bottom: -16px;
+  border-radius: 26px; background: rgba(10,16,28,.5);
+  border: 1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 40px 80px -30px rgba(0,0,0,.8);
+}
+
+/* --- the scroll cue: a line with a bead running down it, which the
+       bridge's route then continues from ------------------------------- */
+body.home-cine .cine-scroll-cue {
+  position: absolute; z-index: 3; left: 50%; bottom: 10px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  font-size: 10px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase;
+  color: rgba(255,255,255,.6); padding-left: .34em;
+}
+body.home-cine .cine-scroll-cue i {
+  position: relative; display: block; width: 1px; height: 40px; overflow: hidden;
+  background: rgba(255,255,255,.18);
+}
+body.home-cine .cine-scroll-cue i::after {
+  content: ''; position: absolute; left: -1px; top: -12px; width: 3px; height: 12px; border-radius: 3px;
+  background: var(--cn-gold); animation: cn-bead 2.2s var(--cn-ease) infinite;
+}
+@keyframes cn-bead { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(58px); opacity: 0; } }
+
+/* --- the opening frame (see the inline script in <head>) -------------- */
+html.cine-pre body.home-cine .cine-photo,
+html.cine-pre body.home-cine .cine-globe,
+html.cine-pre body.home-cine .cine-eyebrow,
+html.cine-pre body.home-cine .cine-cta-row,
+html.cine-pre body.home-cine .cine-dock,
+html.cine-pre body.home-cine .cine-scroll-cue,
+html.cine-pre body.home-cine #siteHeader .jw-hdr__bar { opacity: 0; }
+html.cine-pre body.home-cine .cine-hero .cine-line > span { transform: translateY(112%); }
+
+/* ==========================================================================
+   3. THE SEARCH CARD — same card, same controls, dressed for the scene
+   ========================================================================== */
+body.home-cine .cine-dock .search-card {
+  position: relative; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(249,246,240,.93));
+  -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255,255,255,.75);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.9) inset,
+    0 60px 100px -46px rgba(0,0,0,.85),
+    0 22px 44px -26px rgba(0,0,0,.55);
+}
+/* THE BORDER GLINT. A bright arc of gold that travels once round the edge
+   as the card lands, and orbits slowly while a field inside has focus. The
+   ring is a masked border, so the card's content is never repainted. */
+body.home-cine .cine-dock .search-card::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px;
+  pointer-events: none; opacity: 0; transition: opacity .6s ease;
+  background: conic-gradient(from var(--cn-angle),
+    transparent 0deg, transparent 250deg, rgba(217,178,111,.35) 285deg,
+    var(--cn-gold-lt) 318deg, #fff 326deg, var(--cn-gold) 334deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+body.home-cine .cine-dock .search-card.cine-glint::after { opacity: 1; animation: cn-orbit 2.6s var(--cn-ease) forwards; }
+body.home-cine .cine-dock .search-card:focus-within::after { opacity: .85; animation: cn-orbit 6s linear infinite; }
+@keyframes cn-orbit { from { --cn-angle: 0deg; } to { --cn-angle: 360deg; } }
+
+/* The product tabs: a pill that SLIDES to the chosen tab (home-cinema.js
+   places .cine-tab-ind), instead of an underline that jumps. */
+body.home-cine .cine-dock .search-tabs {
+  position: relative; gap: 4px; padding: 10px 12px;
+  border-bottom: 1px solid rgba(21,27,39,.08);
+}
+body.home-cine .cine-dock .search-tab {
+  position: relative; z-index: 1; border: none; margin: 0; border-radius: 999px;
+  padding: 9px 16px; opacity: 1; color: #5b6272;
+  transition: color .4s var(--cn-ease);
+}
+body.home-cine .cine-dock .search-tab:hover:not(.is-on) { color: var(--cn-text); opacity: 1; }
+body.home-cine .cine-dock .search-tab.is-on { color: #fff; border: none; }
+body.home-cine .cine-dock .search-tab.is-on .jpi { color: var(--cn-gold-lt); }
+body.home-cine .cine-tab-ind {
+  position: absolute; z-index: 0; left: 0; top: 10px; height: calc(100% - 20px); width: 0;
+  border-radius: 999px; pointer-events: none;
+  background: linear-gradient(135deg, #1a2438, #0b111d);
+  box-shadow: 0 10px 22px -12px rgba(8,12,22,.9), inset 0 1px 0 rgba(255,255,255,.1);
+  transition: transform .55s var(--cn-ease), width .55s var(--cn-ease);
+}
+
+/* Fields: a quiet ground that turns white on focus, with a gold rule that
+   draws itself along the foot of the field. */
+body.home-cine .cine-dock .field {
+  transition: background-color .3s ease, box-shadow .35s var(--cn-ease);
+}
+body.home-cine .cine-dock .field::after {
+  content: ''; position: absolute; left: 14px; right: 14px; bottom: 5px; height: 2px;
+  border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--cn-gold), var(--coral-light));
+  transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform .5s var(--cn-ease);
+}
+body.home-cine .cine-dock .field:focus-within {
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(217,178,111,.6), 0 14px 28px -18px rgba(21,27,39,.45);
+}
+body.home-cine .cine-dock .field:focus-within::after { transform: scaleX(1); }
+body.home-cine .cine-dock .field:focus-within label { color: var(--cn-gold-ink); }
+
+/* The search button: lifts 2px, a sheen crosses it, and it presses in. It
+   gets one pulse when the opening sequence hands it the stage. */
+body.home-cine .cine-dock .search-go {
+  position: relative; overflow: hidden; isolation: isolate;
+  transition: transform .35s var(--cn-ease), box-shadow .35s ease, filter .3s ease;
+}
+body.home-cine .cine-dock .search-go::before {
+  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.42), transparent);
+  transform: skewX(-20deg); transition: left .8s var(--cn-ease);
+}
+body.home-cine .cine-dock .search-go:hover { transform: translateY(-2px); box-shadow: 0 22px 40px -16px rgba(201,72,47,.8); filter: none; }
+body.home-cine .cine-dock .search-go:hover::before { left: 130%; }
+body.home-cine .cine-dock .search-go:active { transform: translateY(0) scale(.985); }
+body.home-cine .cine-dock .search-go.cine-live { animation: cn-pulse 1.4s var(--cn-ease) 1; }
+@keyframes cn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(201,72,47,.55), 0 12px 26px -10px rgba(201,72,47,.6); }
+  100% { box-shadow: 0 0 0 22px rgba(201,72,47,0), 0 12px 26px -10px rgba(201,72,47,.6); }
+}
+body.home-cine .cine-dock .trust-row { color: #5b6272; padding-top: 4px; padding-bottom: 14px; }
+body.home-cine .cine-dock .search-foot { padding-bottom: 8px; gap: 6px; }
+
+/* ==========================================================================
+   4. THE BRIDGE — dusk to ivory, and the route through four stops
+   ========================================================================== */
+body.home-cine .cine-dest {
+  position: relative; z-index: 1; background: var(--cn-ivory);
+  padding: 0 0 clamp(90px, 11vw, 160px);
+}
+body.home-cine .cine-dusk {
+  position: absolute; left: 0; right: 0; top: 0; height: clamp(700px, 120vh, 1300px);
+  pointer-events: none; will-change: opacity;
+  background: linear-gradient(180deg, var(--cn-night) 0%, #0b1220 22%, #3a3a44 46%, #b9ab98 72%, rgba(245,240,232,0) 100%);
+}
+body.home-cine .cine-bridge {
+  position: relative; z-index: 1; height: clamp(420px, 64vh, 680px);
+}
+body.home-cine .cine-bridge-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+}
+body.home-cine .cine-bridge-ghost {
+  fill: none; stroke: rgba(217,178,111,.32); stroke-width: 1.2; stroke-dasharray: 2 9; stroke-linecap: round;
+}
+body.home-cine .cine-bridge-line {
+  fill: none; stroke: var(--cn-gold); stroke-width: 2; stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(217,178,111,.55));
+}
+body.home-cine .cine-plane { fill: #fff; filter: drop-shadow(0 0 8px rgba(240,217,166,.9)); }
+body.home-cine .cine-stop {
+  position: absolute; left: 0; top: 0; z-index: 2;
+  display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center;
+  padding: 10px 16px 10px 12px; border-radius: 16px;
+  background: rgba(9,14,24,.74); color: #fff;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(217,178,111,.28);
+  box-shadow: 0 20px 40px -24px rgba(0,0,0,.8);
+  transform-origin: 0 50%; white-space: nowrap;
+}
+body.home-cine .cine-stop i {
+  grid-row: span 2; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cn-gold); box-shadow: 0 0 0 5px rgba(217,178,111,.2), 0 0 18px rgba(240,217,166,.8);
+}
+body.home-cine .cine-stop.is-flip { grid-template-columns: 1fr auto; text-align: right; }
+body.home-cine .cine-stop.is-flip i { grid-column: 2; grid-row: 1 / span 2; }
+body.home-cine .cine-stop.is-flip b,
+body.home-cine .cine-stop.is-flip span { grid-column: 1; }
+body.home-cine .cine-stop b { font-family: var(--cn-display); font-weight: 500; font-size: 19px; line-height: 1.1; }
+body.home-cine .cine-stop span { font-size: 10px; font-weight: 600; letter-spacing: .2em; color: rgba(255,255,255,.62); }
+
+/* ==========================================================================
+   5. THE SHELF — heading and the editorial grid
+   ========================================================================== */
+body.home-cine .cine-head {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: end; gap: 24px 60px;
+}
+body.home-cine .cine-head .cine-kicker { grid-column: 1 / -1; margin-bottom: 0; }
+body.home-cine .cine-h2 {
+  margin: 0; font-family: var(--cn-display); font-weight: 500;
+  font-size: clamp(42px, 6.6vw, 104px); line-height: .94; letter-spacing: -.025em; color: var(--cn-text);
+}
+body.home-cine .cine-h2 em, body.home-cine .cine-finale-title em, body.home-cine .cine-fill-em {
+  font-style: italic;
+}
+body.home-cine .cine-h2 em { color: var(--cn-gold-ink); }
+body.home-cine .cine-head .cine-lede { color: var(--cn-muted); margin: 0 0 .6em; }
+
+body.home-cine .cine-grid {
+  position: relative; z-index: 2;
+  margin-top: clamp(40px, 5.5vw, 84px);
+  display: grid; gap: clamp(14px, 1.6vw, 24px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+body.home-cine .cine-grid .jw-dest-card {
+  aspect-ratio: 4 / 3; border: none; border-radius: 22px;
+  background: var(--cn-ink); transform-origin: 50% 100%;
+  box-shadow: 0 2px 4px rgba(21,27,39,.06), 0 30px 60px -34px rgba(21,27,39,.6);
+  /* NO transform transition: the card's transform is GSAP's (arrival and
+     scroll depth). A CSS transition on the same property would smear every
+     scrubbed frame. Hover moves the CONTENTS instead — see below. */
+  transition: box-shadow .45s ease;
+}
+body.home-cine .cine-grid .jw-dest-card:hover {
+  transform: none;
+  box-shadow: 0 4px 10px rgba(21,27,39,.08), 0 40px 70px -32px rgba(21,27,39,.7);
+}
+body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1) { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+
+/* The photograph is taller than its frame so it can drift inside it. */
+body.home-cine .cine-grid .jw-dest-art { inset: -9% 0; will-change: transform; }
+/* HOVER USES THE INDIVIDUAL `scale` AND `translate` PROPERTIES, not
+   `transform`. The script owns `transform` on the photograph (its develop)
+   and on the text block (its scroll drift); these two properties compose
+   with it instead of being overwritten by the inline style. */
+body.home-cine .cine-grid .jw-dest-img { transition: scale .9s var(--cn-ease); }
+body.home-cine .cine-grid .jw-dest-card:hover .jw-dest-img { transform: none; scale: 1.04; }
+body.home-cine .cine-grid .jw-dest-scrim,
+body.home-cine .cine-grid .jw-dest-card:hover .jw-dest-scrim {
+  opacity: 1;
+  background: linear-gradient(to top, rgba(5,8,15,.86) 0%, rgba(5,8,15,.5) 26%, rgba(5,8,15,.06) 56%, rgba(5,8,15,0) 70%),
+              linear-gradient(to bottom, rgba(5,8,15,.4) 0%, rgba(5,8,15,0) 24%);
+}
+body.home-cine .cine-grid .jw-dest-body {
+  padding: clamp(18px, 2vw, 30px) clamp(20px, 2.2vw, 32px);
+  transition: translate .5s var(--cn-ease);
+}
+body.home-cine .cine-grid .jw-dest-card:hover .jw-dest-body { translate: 0 -4px; }
+body.home-cine .cine-grid .jw-dest-name {
+  font-family: var(--cn-display); font-weight: 500; letter-spacing: -.015em;
+  font-size: clamp(22px, 2vw, 32px); line-height: 1.05;
+}
+body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1) .jw-dest-name { font-size: clamp(30px, 3.4vw, 54px); }
+body.home-cine .cine-grid .jw-dest-meta {
+  margin-top: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--cn-gold-lt);
+}
+body.home-cine .jw-dest-go {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
+  font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #fff;
+  opacity: .88;
+}
+body.home-cine .jw-dest-go svg {
+  width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .45s var(--cn-ease);
+}
+body.home-cine .jw-dest-card:hover .jw-dest-go svg { transform: translateX(5px); }
+body.home-cine .jw-dest-num {
+  position: absolute; z-index: 1; top: clamp(16px, 1.8vw, 26px); right: clamp(18px, 2vw, 28px);
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--cn-display); font-style: italic; font-size: 17px; color: rgba(255,255,255,.82);
+}
+body.home-cine .jw-dest-num::before { content: ''; width: 26px; height: 1px; background: rgba(255,255,255,.5); }
+
+body.home-cine .cine-dest .jw-dest-more,
+body.home-cine .cine-dest .jw-dest-retry {
+  display: flex; margin: clamp(34px, 4vw, 56px) auto 0; padding: 15px 30px; border-radius: 999px;
+  border: 1px solid rgba(21,27,39,.2); background: transparent; color: var(--cn-text);
+  font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+  transition: transform .35s var(--cn-ease), background-color .35s ease, color .35s ease, border-color .35s ease;
+}
+body.home-cine .cine-dest .jw-dest-more:hover { transform: translateY(-2px); background: var(--cn-text); color: #fff; border-color: var(--cn-text); }
+
+/* THE EDITORIAL GRID, desktop: a large card and two small ones, then the
+   same mirrored — for as many cards as the API sends. Every card has an
+   explicit column, and `dense` fills each small card into the first row
+   with room, which is what stacks the pair beside the tall one. The tail
+   rules cover a count that is not a multiple of three. */
+@media (min-width: 1025px) {
+  body.home-cine .cine-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-rows: clamp(210px, 18.5vw, 300px); grid-auto-flow: row dense;
+  }
+  body.home-cine .cine-grid .jw-dest-card { aspect-ratio: auto; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+1) { grid-column: 1 / span 7; grid-row: span 2; aspect-ratio: auto; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+2),
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+3) { grid-column: 8 / span 5; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+4),
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+5) { grid-column: 1 / span 5; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n)   { grid-column: 6 / span 7; grid-row: span 2; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n) .jw-dest-name { font-size: clamp(30px, 3.4vw, 54px); }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(6n+4) .jw-dest-name { font-size: clamp(22px, 2vw, 32px); }
+  /* one card left over: it takes the row */
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):last-child { grid-column: 1 / -1; grid-row: span 2; }
+  /* two left over: they share it */
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):nth-last-child(2) { grid-column: 1 / span 6; grid-row: span 2; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):nth-last-child(2) + .jw-dest-card { grid-column: 7 / span 6; grid-row: span 2; }
+}
+
+/* ==========================================================================
+   6. WHY US
+   ========================================================================== */
+body.home-cine .cine-why {
+  background: linear-gradient(180deg, var(--cn-ivory) 0%, var(--cn-ivory) 55%, var(--cn-night) 55%);
+  padding: 0; overflow: visible; color: #fff;
+}
+body.home-cine .cine-why::before { display: none; }
+body.home-cine .cine-why-panel {
+  position: relative; overflow: hidden;
+  margin: 0 clamp(8px, 1.2vw, 18px); border-radius: var(--cn-r);
+  padding: clamp(96px, 11vw, 170px) 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 85% 0%, rgba(217,178,111,.16), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 0% 100%, rgba(201,72,47,.12), transparent 70%),
+    linear-gradient(180deg, #0c1424 0%, #070b14 100%);
+  transform-origin: 50% 0; will-change: transform;
+}
+body.home-cine .cine-why-arcs {
+  position: absolute; right: -14%; top: 50%; width: min(70vw, 980px); height: min(70vw, 980px);
+  margin-top: max(-35vw, -490px); pointer-events: none;
+  fill: none; stroke: rgba(217,178,111,.14); stroke-width: 1;
+}
+body.home-cine .cine-why-grid {
+  position: relative; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(40px, 6vw, 110px); align-items: start;
+}
+body.home-cine .cine-why-lead { position: sticky; top: 120px; }
+body.home-cine .cine-why .cine-kicker { color: var(--cn-gold); }
+/* THE STATEMENT FILLS. Each word is set twice: an outline (the span's own
+   text, stroked, transparent) and a solid copy on top (::after) that is
+   uncovered left to right as --fill runs 0 -> 1 on scroll. */
+body.home-cine .cine-statement {
+  margin: 0; font-family: var(--cn-display); font-weight: 500; text-transform: uppercase;
+  font-size: clamp(54px, 8.4vw, 148px); line-height: .9; letter-spacing: -.02em; color: #fff;
+}
+body.home-cine .cine-fill {
+  --fill: 1;
+  position: relative; display: block; width: max-content;
+  color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,.3);
+}
+body.home-cine .cine-fill::after {
+  content: attr(data-text); position: absolute; left: 0; top: 0;
+  color: #fff; -webkit-text-stroke: 0;
+  clip-path: inset(0 calc((1 - var(--fill)) * 100%) 0 0);
+}
+body.home-cine .cine-fill-em { font-style: italic; }
+body.home-cine .cine-fill-em::after {
+  background: linear-gradient(100deg, var(--cn-gold-lt), var(--cn-gold) 60%, #c08b3e);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+body.home-cine .cine-why-sub { margin: 30px 0 0; max-width: 36ch; font-size: 16px; line-height: 1.7; color: rgba(255,255,255,.66); }
+
+body.home-cine .cine-why-track { position: relative; perspective: 1200px; }
+body.home-cine .cine-why-rail {
+  position: absolute; left: 27px; top: 34px; bottom: 34px; width: 1px;
+  background: rgba(255,255,255,.1);
+}
+body.home-cine .cine-why-rail i {
+  position: absolute; inset: 0; transform-origin: 50% 0; transform: scaleY(1);
+  background: linear-gradient(180deg, var(--cn-gold-lt), var(--cn-gold) 70%, var(--coral-light));
+  box-shadow: 0 0 12px rgba(217,178,111,.6);
+}
+body.home-cine .cine-why-list { list-style: none; margin: 0; padding: 0; }
+body.home-cine .cine-benefit {
+  position: relative; display: grid; grid-template-columns: 56px 1fr; gap: 26px; align-items: start;
+  padding: 26px 0; border-bottom: 1px solid rgba(255,255,255,.07);
+  transform-origin: 0 50%;
+}
+body.home-cine .cine-benefit:last-child { border-bottom: none; }
+body.home-cine .cine-benefit-icon {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 56px; height: 56px;
+  border-radius: 50%; background: #0d1526; border: 1px solid rgba(217,178,111,.4);
+  box-shadow: 0 0 0 6px rgba(7,11,20,1), 0 14px 30px -12px rgba(217,178,111,.35);
+  color: var(--cn-gold-lt);
+  animation: cn-float 6s ease-in-out infinite;
+  transition: background-color .5s ease, border-color .5s ease;
+}
+body.home-cine .cine-benefit:nth-child(2n) .cine-benefit-icon { animation-delay: -1.5s; }
+body.home-cine .cine-benefit:nth-child(3n) .cine-benefit-icon { animation-delay: -3s; }
+body.home-cine .cine-benefit-icon .jpi { width: 22px; height: 22px; }
+body.home-cine .cine-benefit.is-lit .cine-benefit-icon {
+  background: linear-gradient(135deg, #2a2415, #15110a); border-color: var(--cn-gold);
+}
+@keyframes cn-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+body.home-cine .cine-benefit h3 { margin: 6px 0 6px; font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -.005em; }
+body.home-cine .cine-benefit p { margin: 0; font-size: 14.5px; line-height: 1.65; color: rgba(255,255,255,.6); max-width: 44ch; }
+
+/* ==========================================================================
+   7. THE FINALE — "Ready to go?"
+   ========================================================================== */
+body.home-cine .cine-finale {
+  position: relative; z-index: 1; overflow: hidden; isolation: isolate;
+  min-height: 100vh; min-height: 100svh;
+  padding: clamp(120px, 15vw, 200px) 0 clamp(80px, 10vw, 130px);
+  background: var(--cn-night); color: #fff;
+  display: flex; align-items: center;
+}
+body.home-cine .cine-finale-media {
+  position: absolute; inset: 0; z-index: -1; overflow: hidden;
+  clip-path: circle(150% at 50% 50%);
+}
+body.home-cine .cine-finale-media img {
+  position: absolute; inset: -6% 0; width: 100%; height: 112%; max-width: none;
+  object-fit: cover; object-position: 50% 45%; will-change: transform;
+}
+body.home-cine .cine-finale-shade {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, rgba(5,8,15,.9) 0%, rgba(5,8,15,.6) 42%, rgba(5,8,15,.4) 70%, rgba(5,8,15,.66) 100%),
+    linear-gradient(180deg, rgba(6,10,18,.95) 0%, rgba(6,10,18,.2) 22%, rgba(6,10,18,.25) 70%, #0a1628 100%);
+}
+body.home-cine .cine-finale-route {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  fill: none; stroke: var(--cn-gold); stroke-width: 1.6; stroke-linecap: round; opacity: .75;
+  filter: drop-shadow(0 0 6px rgba(217,178,111,.6));
+}
+body.home-cine .cine-finale-route path { vector-effect: non-scaling-stroke; }
+body.home-cine .cine-finale-grid {
+  position: relative; width: 100%;
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 480px);
+  gap: clamp(40px, 6vw, 110px); align-items: center;
+}
+body.home-cine .cine-finale .cine-kicker { color: var(--cn-gold); }
+body.home-cine .cine-finale-title {
+  margin: 0; font-family: var(--cn-display); font-weight: 500; text-transform: uppercase;
+  font-size: clamp(56px, 9.6vw, 164px); line-height: .88; letter-spacing: -.025em; color: #fff;
+}
+body.home-cine .cine-finale-title em {
+  background: linear-gradient(100deg, var(--cn-gold-lt), var(--cn-gold) 55%, #c08b3e);
+  -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .05em;
+}
+body.home-cine .cine-finale .cine-lede { margin: 26px 0 34px; color: rgba(255,255,255,.76); }
+
+/* The newsletter: still a working form, set as a footnote to the scene. */
+body.home-cine .cine-news {
+  margin-top: clamp(40px, 5vw, 64px); padding-top: 26px; max-width: 480px;
+  border-top: 1px solid rgba(255,255,255,.14);
+}
+body.home-cine .cine-news h3 { margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .02em; }
+body.home-cine .cine-news p { margin: 0; font-size: 13px; color: rgba(255,255,255,.6); }
+body.home-cine .cine-news .newsletter-form {
+  margin: 16px 0 0; max-width: none; padding: 5px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: none;
+  transition: border-color .35s ease, background-color .35s ease;
+}
+body.home-cine .cine-news .newsletter-form:focus-within { border-color: var(--cn-gold); background: rgba(255,255,255,.12); }
+body.home-cine .cine-news .newsletter-form input { color: #fff; padding: 12px 18px; }
+body.home-cine .cine-news .newsletter-form input::placeholder { color: rgba(255,255,255,.5); }
+body.home-cine .cine-news .newsletter-form button {
+  background: #fff; color: var(--cn-text); padding: 12px 22px; font-weight: 700;
+  transition: transform .35s var(--cn-ease), background-color .3s ease;
+}
+body.home-cine .cine-news .newsletter-form button:hover { transform: translateY(-2px); background: var(--cn-gold-lt); }
+body.home-cine .cine-news .newsletter-msg { color: var(--cn-gold-lt); text-align: left; }
+
+/* The contact form, as a smoked-glass card in the scene. */
+body.home-cine .cine-contact { background: transparent; padding: 0; scroll-margin-top: 90px; }
+body.home-cine .cine-contact .contact-form-card {
+  max-width: none; margin: 0; padding: clamp(26px, 3vw, 40px);
+  background: rgba(10,16,28,.62); color: #fff;
+  -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.14); border-radius: 26px;
+  box-shadow: 0 50px 100px -40px rgba(0,0,0,.85);
+}
+body.home-cine .cine-contact h3 { margin: 0; font-family: var(--cn-display); font-weight: 500; font-size: 32px; color: #fff; }
+body.home-cine .cine-contact-sub { margin: 8px 0 24px; font-size: 13.5px; line-height: 1.6; color: rgba(255,255,255,.62); }
+body.home-cine .cine-contact .modal-field label { color: rgba(255,255,255,.6); font-size: 10.5px; letter-spacing: .14em; }
+body.home-cine .cine-contact .modal-field input,
+body.home-cine .cine-contact .modal-field textarea {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); color: #fff;
+  border-radius: 12px; transition: border-color .3s ease, background-color .3s ease, box-shadow .3s ease;
+}
+body.home-cine .cine-contact .modal-field input::placeholder,
+body.home-cine .cine-contact .modal-field textarea::placeholder { color: rgba(255,255,255,.38); }
+body.home-cine .cine-contact .modal-field input:focus,
+body.home-cine .cine-contact .modal-field textarea:focus {
+  border-color: var(--cn-gold); background: rgba(255,255,255,.1); box-shadow: 0 0 0 3px rgba(217,178,111,.16);
+}
+body.home-cine .cine-contact .modal-field textarea { min-height: 104px; }
+body.home-cine .cine-send {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  padding: 15px 24px; border-radius: 999px;
+  transition: transform .35s var(--cn-ease), box-shadow .35s ease;
+}
+body.home-cine .cine-send svg {
+  width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .35s var(--cn-ease);
+}
+body.home-cine .cine-send:hover { transform: translateY(-2px); }
+body.home-cine .cine-send:hover svg { transform: translateX(4px); }
+/* app.js paints the result line emerald or coral inline — dark on this
+   glass — so the line sits on a light chip when it is shown. */
+body.home-cine .cine-contact .modal-msg.show {
+  background: rgba(255,255,255,.94); border-radius: 12px; padding: 10px 14px; max-height: none;
+}
+
+/* ==========================================================================
+   8. FOOTER — the route's last line, drawn across the top of it
+   ========================================================================== */
+/* No gap: the finale's night runs straight into the footer's navy, and the
+   rule below is the seam between them. */
+body.home-cine .jw-footer { position: relative; margin-top: 0; }
+body.home-cine .jw-footer::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 1;
+  background: linear-gradient(90deg, transparent, var(--cn-gold) 20%, var(--cn-gold-lt) 50%, var(--cn-gold) 80%, transparent);
+  transform-origin: 0 50%; transform: scaleX(var(--cn-rule, 1));
+  box-shadow: 0 0 12px rgba(217,178,111,.5);
+}
+
+/* The rest of the page, set on the ivory so nothing reads as a leftover. */
+body.home-cine .upcoming-section,
+body.home-cine .jw-foryou { background: var(--cn-ivory); }
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-width: 1180px) {
+  body.home-cine .cine-route-caption { display: none; }
+}
+@media (max-width: 1024px) {
+  body.home-cine .cine-head { grid-template-columns: 1fr; }
+  body.home-cine .cine-why-grid { grid-template-columns: 1fr; }
+  body.home-cine .cine-why-lead { position: relative; top: 0; }
+  body.home-cine .cine-finale-grid { grid-template-columns: 1fr; }
+  body.home-cine .cine-finale { align-items: flex-start; }
+}
+@media (max-width: 900px) {
+  body.home-cine .cine-hero { padding-top: 104px; padding-bottom: 72px; }
+  /* A phone keeps the globe as a still, larger and further back: part of
+     the sky, not a second subject. */
+  body.home-cine .cine-globe { width: 128vw; height: 128vw; right: -58vw; top: 2vh; margin-top: 0; opacity: .6; }
+  body.home-cine .cine-photo { object-position: 56% 50%; }
+  body.home-cine .cine-dock::before { left: 5%; right: 5%; }
+}
+@media (max-width: 640px) {
+  body.home-cine .cine-hero h1.cine-title { font-size: clamp(36px, 14.2vw, 76px); line-height: .92; }
+  body.home-cine .cine-eyebrow { font-size: 10px; letter-spacing: .26em; gap: 10px; }
+  body.home-cine .cine-eyebrow .cine-rule { width: 26px; }
+  body.home-cine .cine-cta { padding: 13px 18px 13px 20px; font-size: 11px; }
+  body.home-cine .cine-dock { margin-top: 26px; }
+  body.home-cine .cine-dock .search-card { border-radius: 18px; }
+  body.home-cine .cine-scroll-cue { display: none; }
+  body.home-cine .wrap.cine-dock { padding: 0 12px; }
+
+  body.home-cine .cine-bridge { height: 560px; }
+  body.home-cine .cine-stop { padding: 8px 12px 8px 10px; column-gap: 9px; border-radius: 13px; }
+  body.home-cine .cine-stop.is-flip { grid-template-columns: 1fr auto; text-align: right; }
+body.home-cine .cine-stop.is-flip i { grid-column: 2; grid-row: 1 / span 2; }
+body.home-cine .cine-stop.is-flip b,
+body.home-cine .cine-stop.is-flip span { grid-column: 1; }
+body.home-cine .cine-stop b { font-size: 16px; }
+  body.home-cine .cine-stop span { font-size: 8.5px; letter-spacing: .16em; }
+
+  /* The shelf on a phone is its own composition: a tall feature, then two
+     portrait cards side by side, repeating — a magazine rhythm rather than
+     the desktop grid squeezed. */
+  body.home-cine .cine-grid { gap: 12px; }
+  body.home-cine .cine-grid .jw-dest-card { aspect-ratio: 3 / 4; border-radius: 18px; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1) { aspect-ratio: 4 / 5; }
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):nth-last-child(2),
+  body.home-cine .cine-grid .jw-dest-card:nth-child(3n+1):nth-last-child(2) + .jw-dest-card { grid-column: auto; aspect-ratio: 3 / 4; }
+  body.home-cine .cine-grid .jw-dest-card:not(:nth-child(3n+1)) .jw-dest-name { font-size: 20px; }
+  body.home-cine .cine-grid .jw-dest-card:not(:nth-child(3n+1)) .jw-dest-body { padding: 14px 14px 16px; }
+  body.home-cine .cine-grid .jw-dest-card:not(:nth-child(3n+1)) .jw-dest-meta { font-size: 9px; letter-spacing: .18em; }
+  body.home-cine .cine-grid .jw-dest-card:not(:nth-child(3n+1)) .jw-dest-go { display: none; }
+  body.home-cine .jw-dest-num { font-size: 14px; }
+  body.home-cine .jw-dest-num::before { width: 16px; }
+
+  body.home-cine .cine-why-panel { margin: 0 6px; padding: 84px 0; }
+  body.home-cine .cine-benefit { grid-template-columns: 48px 1fr; gap: 18px; padding: 20px 0; }
+  body.home-cine .cine-benefit-icon { width: 48px; height: 48px; }
+  body.home-cine .cine-why-rail { left: 23px; }
+  body.home-cine .cine-benefit h3 { font-size: 16.5px; }
+  body.home-cine .cine-finale { padding-top: 100px; }
+  body.home-cine .cine-contact h3 { font-size: 26px; }
+}
+@media (max-width: 380px) {
+  body.home-cine .wrap { padding-left: 16px; padding-right: 16px; }
+  body.home-cine .cine-grid .jw-dest-card:not(:nth-child(3n+1)) .jw-dest-name { font-size: 17px; }
+}
+
+/* ==========================================================================
+   REDUCED MOTION — the composition, with nothing moving
+   ----------------------------------------------------------------------
+   main.css already collapses every duration; this removes the loops that
+   would otherwise sit at their first frame, and makes sure nothing that a
+   script would have revealed is waiting on it.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  body.home-cine .cine-grain,
+  body.home-cine .cine-scroll-cue i::after,
+  body.home-cine .cine-benefit-icon { animation: none; }
+  body.home-cine .cine-dock .search-card::after { display: none; }
+  body.home-cine .cine-fill { --fill: 1; }
+  /* Nothing lifts the dusk on scroll here, so it ends where the bridge does
+     and the heading sits on the ivory. */
+  body.home-cine .cine-dusk { height: clamp(420px, 64vh, 680px); }
+}
+
+/* The homepage ends on its own "Ready to go?" scene, so the footer's band —
+   the same idea, for every other page — would say it twice. */
+body.home-cine .jw-f-band { display: none; }

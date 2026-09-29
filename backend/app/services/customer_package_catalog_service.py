@@ -275,6 +275,23 @@ def get_departure(db: Session, package_id: int, departure_id: int) -> CustomerPa
     ).scalar_one_or_none()
 
 
+def get_bookable_departure(db: Session, package_id: int, departure_id: int) -> CustomerPackageDeparture | None:
+    """A departure that can still be SOLD: get_departure()'s scoping, plus
+    the date rule every other surface already applies (`departure_date >=
+    today`, as the detail endpoint and the facets do).
+
+    Separate from get_departure() on purpose: cancelling a booking whose trip
+    has already happened still has to find its departure to release the
+    seats, so the plain lookup must keep finding past rows. Only the paths
+    that price or create a booking use this one — without it, a departure
+    that had already left could be quoted, booked and paid for.
+    """
+    departure = get_departure(db, package_id, departure_id)
+    if departure is None or departure.departure_date < dt.date.today():
+        return None
+    return departure
+
+
 def addons() -> dict:
     return {"service": [dict(a) for a in _PACKAGE_ADDONS["service"]]}
 

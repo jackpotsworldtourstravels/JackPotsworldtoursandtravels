@@ -105,7 +105,9 @@ def _price_trip(db: Session, trip: dict, addons: list[dict], coupon_code: str | 
     package = catalog.get_package(db, trip["package_id"])
     if package is None:
         raise PackageBookingError("That package is not available.")
-    departure = catalog.get_departure(db, trip["package_id"], trip["departure_id"])
+    # Bookable, not merely existing: a departure that has already left is
+    # "not available" in exactly the words an unknown one is.
+    departure = catalog.get_bookable_departure(db, trip["package_id"], trip["departure_id"])
     if departure is None:
         raise PackageBookingError("That departure date is not available.")
 

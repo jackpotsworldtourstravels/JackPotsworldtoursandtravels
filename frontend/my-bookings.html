@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,10 +18,10 @@
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260926fr1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260928h1">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -29,9 +29,20 @@
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
-<script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>try{var t=localStorage.getItem('jpc_theme');if(t&&!document.documentElement.hasAttribute('data-theme-lock'))document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<!-- The product pages' layer: the payment screen, the buttons and the
+     cards' arrival ([data-ds-results]). Scoped to body.jw-prod. -->
+<link rel="stylesheet" href="assets/css/jw-products.css?v=0928234819">
+<script src="assets/js/jw-products.js?v=0928222443" defer></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
 </head>
-<body data-sp-service="bookings" data-live-chat>
+<body class="jw-prod mb-page" data-sp-service="bookings" data-live-chat>
 <a href="#spMain" class="skip-link">Skip to content</a>
 
 <!-- The landing page's navigation bar, from hero-shell.js. It replaces
@@ -40,29 +51,38 @@
      the page, after profile-menu.js and account-center.js. -->
 <header id="siteHeader"></header>
 
-<div class="sp-hero">
-  <div class="sp-wrap">
-    <div class="sp-crumb"><a href="index.html">Home</a> &nbsp;›&nbsp; My Bookings</div>
-    <h1>My Bookings</h1>
-    <p>Everything you have booked, with references, tickets and cancellation.</p>
+<!-- THE COMMAND CENTRE'S HERO. The design system's night, a route drawn
+     across it, and — filled by my-bookings.js from the server's bookings
+     only — the next trip and four counts: upcoming, awaiting payment, past,
+     cancelled. Nothing here is a demo row or a guess. -->
+<section class="ds-hero ds-hero--short ds-hero--plain mb-hero" aria-labelledby="mbTitle">
+  <svg class="ds-hero__route" viewBox="0 0 1440 420" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <path class="ghost" d="M-20 330 C 260 250, 420 380, 720 290 S 1160 120, 1460 170"/>
+    <path d="M-20 330 C 260 250, 420 380, 720 290 S 1160 120, 1460 170"/>
+  </svg>
+  <div class="ds-grain" aria-hidden="true"></div>
+  <div class="ds-container ds-hero__inner">
+    <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li aria-current="page">My Bookings</li></ol>
+    <p class="ds-eyebrow is-light" data-ds-reveal>Your travel</p>
+    <h1 class="ds-h1" id="mbTitle" data-ds-reveal>My <em>journeys.</em></h1>
+    <div class="mb-next" id="mbNext" hidden></div>
+    <dl class="mb-stats" id="mbStats" hidden></dl>
   </div>
-</div>
-
-<main id="spMain" class="tx-scope">
-  <section class="tx-section" aria-labelledby="mbHead">
-    <div class="tx-head">
+</section>
+<main id="spMain" class="tx-scope mb-scope">
+  <section class="tx-section mb-section" aria-labelledby="mbHead">
+    <div class="mb-bar">
       <div>
-        <h2 id="mbHead">Your bookings</h2>
-        <p id="mbCount"></p>
+        <h2 id="mbHead" class="mb-h2">Your bookings</h2>
+        <p id="mbCount" class="mb-count" aria-live="polite"></p>
       </div>
-      <span class="tx-sample" id="mbDemoBadge" hidden
-            title="Some bookings below were made in the demo environment">Includes demo bookings</span>
+      <!-- Status first (what needs doing), product second (what it is). -->
+      <div class="ds-tabs mb-seg" id="mbSeg" aria-label="Filter by status"></div>
     </div>
-
-    <!-- Filled by my-bookings.js from BookingStore — the same seam the booking
-         flow writes through, so any product renders from one shape. -->
-    <div class="mb-tabs" id="mbTabs"></div>
-    <div class="mb-list" id="mbList"></div>
+    <div class="mb-tabs" id="mbTabs" role="group" aria-label="Filter by product"></div>
+    <!-- Filled by my-bookings.js from the SERVER's bookings (flights, hotels,
+         tour packages). Local demo rows are not listed on this page. -->
+    <div class="mb-list" id="mbList" data-ds-results></div>
   </section>
 </main>
 
@@ -94,13 +114,13 @@
 <script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
 <script src="assets/js/jw-loader.js?v=20260926ld1"></script>
 <script src="assets/js/payment-screen.js?v=20260926ld1"></script>
-<script src="assets/js/my-bookings.js?v=20260924hd1"></script>
+<script src="assets/js/my-bookings.js?v=0928222443"></script>
 <!-- service-shell.js still runs: it owns this page's theme toggle and its
      .sp-* furniture. It renders NO header here any more - there is no
      #spHeader on the page - so the one nav bar is hero-shell.js's below,
      the same one every other page wears. -->
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/service-shell.js?v=20260919b2c1"></script>
+<script src="assets/js/service-shell.js?v=0928220609"></script>
 <script src="assets/js/hero-shell.js?v=20260925ui1"></script>
 <script>HeroShell.mountHeader('my-bookings.html');</script>
 <script>HeroShell.mountFooter();</script>

@@ -58,6 +58,21 @@
 
   function ensureObserver() {
     if (observer || typeof IntersectionObserver === 'undefined') return observer;
+    /* ONE OBSERVER PER PAGE. Where the design system is loaded (jw-system.js),
+       its shared observer does this job too, rather than a second instance
+       watching the same page. DS.observe fires once per element by default,
+       which is exactly the unobserve-on-first-sight contract below. */
+    if (global.DS && typeof global.DS.observe === 'function') {
+      observer = {
+        observe: el => global.DS.observe(el, (t, on) => {
+          if (!on) return;
+          t.classList.add('visible');
+          settleWithin(t);
+        }),
+        unobserve: () => {},
+      };
+      return observer;
+    }
     observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
@@ -131,6 +146,22 @@
   function develop(img, opts) {
     if (!img || img.tagName !== 'IMG' || img.classList.contains('jw-dev')) return;
     const o = opts || {};
+
+    /* ONE IMAGE LIFECYCLE. Where the design system is loaded (every page that
+       loads this file, today), a photograph takes ITS lifecycle — `ds-dev`,
+       developed by DS.develop through the one shared observer: placeholder,
+       blur, develop, sharp, settled — rather than this file's `jw-dev` /
+       `is-developed` pair, which was a second, parallel implementation of the
+       same idea. DS.develop already waits for the image to be both loaded and
+       on screen, which is what `onReveal` arming did here. The code below
+       remains only for a page without jw-system.js. */
+    if (global.DS && typeof global.DS.develop === 'function') {
+      if (img.classList.contains('ds-dev')) return;
+      img.classList.add('ds-dev');
+      if (o.hero) img.classList.add('ds-dev--hero');
+      global.DS.develop(img);
+      return;
+    }
     img.classList.add('jw-dev');
     if (o.hero) img.classList.add('jw-dev-hero');
 
@@ -163,7 +194,7 @@
    *  that want to know whether anything was there. */
   function developAll(root, opts) {
     if (!root) return 0;
-    const imgs = root.querySelectorAll('img:not(.jw-dev)');
+    const imgs = root.querySelectorAll('img:not(.jw-dev):not(.ds-dev)');
     imgs.forEach(img => develop(img, opts));
     return imgs.length;
   }

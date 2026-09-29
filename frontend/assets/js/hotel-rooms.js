@@ -275,10 +275,6 @@ const HotelRooms = (function () {
      --------------------------------------------------------------------- */
   function summaryHtml() {
     const n = nights();
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    const slug = (detail.image && known[detail.image]) ? detail.image
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
 
     const roomLines = picks.map((p, i) => `
       <div class="hr-sum-line">
@@ -315,7 +311,7 @@ const HotelRooms = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(dir + slug + '-480.webp')}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(detail)}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"
@@ -378,7 +374,7 @@ const HotelRooms = (function () {
         <div class="hr-ab-cta">
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrToGuests"
                   ${ready ? '' : 'disabled'}>
-            Continue to Guest Details
+            Continue<span class="hr-ab-long"> to Guest Details</span>
           </button>
           <span>${esc(note)}</span>
         </div>

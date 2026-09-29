@@ -256,3 +256,68 @@
   .jw-f-link, .jw-f-ct-value { color: #000; }
   .jw-f-bottom { background: #fff; }
 }
+
+/* ==========================================================================
+   THE PREMIUM FOOTER — the design system's tokens (jw-system.css), with the
+   older --jwf-* values as fallbacks for a page that has not loaded it.
+   ========================================================================== */
+.jw-footer {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 70% at 100% 0%, rgba(217, 178, 111, .10), transparent 70%),
+    linear-gradient(180deg, var(--ds-night, #060a12) 0%, var(--ds-navy-900, #0a1120) 100%);
+}
+.jw-f-band { position: relative; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.jw-f-band-row {
+  position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; flex-wrap: wrap;
+  padding-top: clamp(56px, 8vw, 104px); padding-bottom: clamp(40px, 5vw, 64px);
+}
+.jw-f-route { position: absolute; left: 0; right: 0; top: 18%; width: 100%; height: 70%; pointer-events: none; overflow: visible; }
+.jw-f-route path { fill: none; stroke: rgba(217, 178, 111, .32); stroke-width: 1.2; stroke-dasharray: 3 7; vector-effect: non-scaling-stroke; }
+.jw-f-band-copy { position: relative; }
+.jw-f-kicker {
+  display: flex; align-items: center; gap: 14px; margin: 0 0 16px;
+  font-size: 11px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: var(--ds-gold, #d9b26f);
+}
+.jw-f-kicker::before { content: ''; width: 40px; height: 1px; background: currentColor; }
+.jw-f-statement {
+  margin: 0; font-family: var(--ds-display, 'Playfair Display', Georgia, serif); font-weight: 500;
+  font-size: clamp(44px, 7vw, 108px); line-height: .9; letter-spacing: -.025em; text-transform: uppercase; color: #fff;
+}
+.jw-f-statement em {
+  font-style: italic;
+  background: linear-gradient(100deg, var(--ds-gold-lt, #f0d9a6), var(--ds-gold, #d9b26f) 55%, #c08b3e);
+  -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .05em;
+}
+.jw-f-band-cta { position: relative; display: flex; flex-wrap: wrap; gap: 12px; }
+.jw-f-cta {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .3); color: #fff;
+  font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; white-space: nowrap;
+  transition: transform .35s var(--ds-ease, ease), background-color .35s ease, border-color .35s ease;
+}
+.jw-f-cta:hover { transform: translateY(-2px); border-color: var(--ds-gold, #d9b26f); background: rgba(255, 255, 255, .08); }
+.jw-f-cta--solid { border: 0; background: linear-gradient(135deg, var(--ds-coral, #c9482f), var(--ds-coral-dk, #a63a24)); box-shadow: 0 16px 34px -16px rgba(201, 72, 47, .8); }
+.jw-f-cta--solid:hover { background: linear-gradient(135deg, #d4543a, var(--ds-coral, #c9482f)); }
+.jw-f-cta:focus-visible { outline: none; box-shadow: var(--ds-ring, 0 0 0 3px rgba(217, 178, 111, .45)); }
+/* The columns: gold small caps over quiet links. */
+.jw-footer .jw-f-grid { padding-top: clamp(40px, 5vw, 64px); }
+.jw-footer .jw-f-col h3 {
+  font-family: var(--ds-sans, 'Montserrat', sans-serif); font-size: 11px; font-weight: 700;
+  letter-spacing: .24em; text-transform: uppercase; color: var(--ds-gold, #d9b26f);
+}
+.jw-footer .jw-f-about { color: rgba(255, 255, 255, .62); line-height: 1.7; }
+.jw-footer .jw-f-link { color: rgba(255, 255, 255, .74); transition: color .3s ease; }
+.jw-footer .jw-f-link:hover { color: #fff; }
+.jw-footer .jw-f-bottom { border-top-color: rgba(255, 255, 255, .08); background: rgba(0, 0, 0, .18); }
+.jw-footer .jw-f-tagline { font-family: var(--ds-display, Georgia, serif); }
+@media (max-width: 640px) {
+  .jw-f-band-row { align-items: flex-start; }
+  .jw-f-band-cta { width: 100%; }
+  .jw-f-cta { flex: 1 1 auto; justify-content: center; }
+}
+/* A phone pairs the link columns two by two instead of stacking five. */
+@media (max-width: 640px) {
+  .jw-footer .jw-f-grid { grid-template-columns: 1fr 1fr; gap: 34px 20px; }
+  .jw-footer .jw-f-grid > .jw-f-brand, .jw-footer .jw-f-grid > :last-child { grid-column: 1 / -1; }
+}

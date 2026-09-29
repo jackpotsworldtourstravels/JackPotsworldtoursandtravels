@@ -54,11 +54,8 @@
 .acct-panel {display:none;}
 .acct-panel.active {display:block;}
 .acct-panel h2 {font-size:17px; margin-bottom:18px;}
-#accountModalOverlay .modal-card {max-width:100%; height:92vh; max-height:92vh;}
-.acct-body {flex-direction:column;}
-.acct-tabs {width:100%; display:flex; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line); padding:10px;}
-.acct-tab {white-space:nowrap; margin-bottom:0;}
-.acct-panels {padding:20px;}
+/* (The phone layout that stood here, unwrapped, applied at EVERY width and
+   forced the desktop sidebar into a strip. It is in the 760px query below.) */
 .acct-row {display:flex; align-items:center; gap:16px; padding:16px; border-radius:16px; background:#fff; border:1px solid var(--line); margin-bottom:12px; flex-wrap:wrap;}
 .acct-row .ar-icon {width:44px; height:44px; border-radius:12px; background:rgba(255,176,32,0.14); color:var(--gold-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
 .acct-row .ar-main {flex:1; min-width:160px;}
@@ -98,7 +95,8 @@
 .acct-empty-notif .aes {font-size:12.5px; color:var(--muted);}
 #acctConfirmOverlay .modal-card {max-width:520px;}
 #acctConfirmOverlay .modal-close, #acctConfirmOverlay .ticket-actions {display:none;}
-Auth modal — step flow, inline errors, open/close motion
+/* ==========================================================================
+   Auth modal — step flow, inline errors, open/close motion
    ==========================================================================
    Additive: .modal-overlay / .modal-card / .modal-field keep every rule they
    already had. Nothing here restyles the modal, it only adds the states the
@@ -118,13 +116,9 @@ Auth modal — step flow, inline errors, open/close motion
 }
 .modal-overlay.closing { opacity:0; }
 .modal-overlay.closing .modal-card { transform:translateY(6px) scale(.985); transition:transform .18s ease; }
-.modal-overlay.open,
-  .modal-overlay.closing,
-  .modal-overlay.open .modal-card,
-  .modal-overlay.closing .modal-card {
-    animation:none; transition:none; transform:none;
-  }
-.modal-overlay { padding:12px; }
+/* (A copy of the reduced-motion block below stood here unwrapped, switching
+   the open/close motion off for everyone. The media query below is where it
+   belongs.) */
 
 @media (max-width:760px){
   #accountModalOverlay .modal-card{max-width:100%; height:92vh; max-height:92vh;}

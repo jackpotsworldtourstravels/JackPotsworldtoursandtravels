@@ -1,0 +1,920 @@
+/* ===========================================================================
+   jw-products.css — the product results pages in the design system's voice.
+   ===========================================================================
+   Loaded LAST on flights.html (and the other product pages as they move
+   over), after travel-explore.css, booking-ref.css and flights-ref.css. It
+   re-dresses their components — the compact hero, the search strip, the
+   date strip, the filter rail, the result cards, the summary rail — and
+   changes NOTHING they do: every id, data attribute and handler hook is the
+   same element in the same place, so search, filters, fares and booking run
+   exactly as before.
+
+   Scoped to `body.jw-prod`, which only the pages that load this file carry.
+   =========================================================================== */
+
+body.jw-prod { background: var(--ds-ivory); }
+
+/* --- the compact hero: a night band behind the search strip, with a route --- */
+body.jw-prod .hero.is-compact {
+  min-height: 0; padding-top: calc(76px + 26px); padding-bottom: 30px;
+  background:
+    radial-gradient(ellipse 60% 120% at 88% 0%, rgba(217, 178, 111, .18), transparent 70%),
+    radial-gradient(ellipse 50% 100% at 0% 100%, rgba(201, 72, 47, .14), transparent 70%),
+    linear-gradient(180deg, var(--ds-navy-900), var(--ds-night));
+}
+body.jw-prod .hero.is-compact .hero-media, body.jw-prod .hero.is-compact .hero-overlay { opacity: .28; }
+body.jw-prod .hero.is-compact::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(217, 178, 111, .7), transparent);
+}
+
+/* The search strip: the system's glass card, gold focus. */
+body.jw-prod .ss-strip {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(255, 255, 255, .7);
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 255, 255, .9) inset;
+}
+body.jw-prod .ss-cell:focus-within { background: #fff; box-shadow: inset 0 -2px 0 var(--ds-gold); }
+body.jw-prod .ss-go {
+  background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); letter-spacing: .14em;
+  transition: filter .3s ease;
+}
+body.jw-prod .ss-go:hover { filter: brightness(1.08); }
+
+/* --- the heading: the page's H1, in the display face ------------------------ */
+body.jw-prod .tx-section { padding-top: clamp(28px, 4vw, 52px); }
+body.jw-prod .tx-head { align-items: flex-end; margin-bottom: clamp(18px, 2.4vw, 30px); }
+body.jw-prod .tx-head h1 {
+  margin: 0; font-family: var(--ds-display); font-weight: 500; color: var(--ds-ink);
+  font-size: clamp(32px, 4.4vw, 60px); line-height: 1; letter-spacing: -.02em;
+}
+body.jw-prod .tx-head h1::before {
+  content: 'Your journey'; display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+  font: 600 11px var(--ds-sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ds-gold-ink);
+}
+body.jw-prod .tx-head h1::after { display: none; }
+body.jw-prod .tx-head p { margin-top: 10px; font-size: 14px; letter-spacing: .04em; color: var(--ds-muted); }
+body.jw-prod .tx-sample {
+  background: rgba(217, 178, 111, .16); color: var(--ds-gold-ink); border: 0;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; border-radius: var(--ds-r-pill);
+}
+
+/* --- the date strip ------------------------------------------------------- */
+body.jw-prod .fx-dates { border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); background: var(--ds-white); }
+body.jw-prod .fx-date { border-radius: var(--ds-r-md); transition: background-color .3s ease, transform .35s var(--ds-ease); }
+body.jw-prod .fx-date:hover { background: var(--ds-ivory); transform: translateY(-2px); }
+body.jw-prod .fx-date[aria-current], body.jw-prod .fx-date.is-on, body.jw-prod .fx-date.is-active {
+  background: var(--ds-navy-800); border-color: var(--ds-navy-800); color: #fff;
+  box-shadow: 0 12px 24px -14px rgba(8, 12, 22, .9);
+}
+body.jw-prod .fx-date[aria-current] *, body.jw-prod .fx-date.is-on *, body.jw-prod .fx-date.is-active * { color: #fff; }
+body.jw-prod .fx-date[aria-current] .fx-date-fare, body.jw-prod .fx-date.is-on .fx-date-fare, body.jw-prod .fx-date.is-active .fx-date-fare { color: var(--ds-gold-lt); }
+
+/* --- toolbar ------------------------------------------------------------- */
+body.jw-prod .tx-search input, body.jw-prod .tx-sort select {
+  border-radius: var(--ds-r-pill); border: 1px solid var(--ds-line-2); background: var(--ds-paper);
+  transition: border-color .3s ease, box-shadow .3s ease;
+}
+body.jw-prod .tx-search input:focus, body.jw-prod .tx-sort select:focus { outline: none; border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
+
+/* --- the filter rail: no dead space, quiet type, gold accents ------------- */
+body.jw-prod .tx-filters {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+}
+body.jw-prod .ff-group { min-height: 0; padding-block: 16px; }
+body.jw-prod .ff-body { min-height: 0; }
+body.jw-prod .ff-heading { font-family: var(--ds-display); font-size: 22px; font-weight: 500; letter-spacing: -.01em; text-transform: none; }
+body.jw-prod .ff-title { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-ink-2); }
+body.jw-prod .ff-opt input { accent-color: var(--ds-navy-800); }
+body.jw-prod .ff-range-fill { background: var(--ds-gold); }
+body.jw-prod .ff-range-track input::-webkit-slider-thumb { border-color: var(--ds-gold); }
+
+/* --- THE FLIGHT CARD: a boarding pass --------------------------------------
+   Two zones. The JOURNEY — carrier, then the route as the hero: departure
+   and arrival in the display face with the airport codes beneath, and
+   between them the arc of the flight drawn from origin to destination with
+   its stops as nodes — and the STUB, torn off along a perforation, which
+   carries the fare and the one decision. The arc draws itself and the
+   aeroplane rides it to the mid-point the first time a card is seen
+   (jw-products.js releases the paused SMIL). The in-card details drawer
+   (.tx-details, appended by travel-explore.js) spans both zones. */
+body.jw-prod .tx-flight.jf {
+  --jf-bg: var(--ds-white); --jf-stub: #fbf8f2;
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(180px, 26%, 214px);
+  gap: 0; padding: 0; overflow: visible; isolation: isolate;
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--jf-bg);
+  box-shadow: var(--ds-sh-1); transform: none;
+  transition: box-shadow .5s ease, border-color .4s ease, translate .5s var(--ds-ease);
+}
+body.jw-prod .tx-flight.jf + .tx-flight.jf { margin-top: 16px; }
+body.jw-prod .tx-flight.jf::before { display: none; }
+body.jw-prod .tx-flight.jf:hover { translate: 0 -4px; transform: none; box-shadow: var(--ds-sh-3); border-color: rgba(217, 178, 111, .55); }
+body.jw-prod .tx-flight.jf.is-open { border-color: rgba(217, 178, 111, .7); box-shadow: var(--ds-sh-2); }
+
+.jf-main { min-width: 0; padding: clamp(18px, 2vw, 26px) clamp(18px, 2.2vw, 30px) clamp(16px, 1.8vw, 22px); }
+.jf-carrier { display: flex; align-items: center; gap: 12px; }
+.jf .tx-logo { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 12px;
+  background: var(--ds-ivory); border: 1px solid var(--ds-line); overflow: hidden; }
+.jf .tx-logo img { width: 30px; height: 30px; object-fit: contain; }
+.jf .tx-logo-fb { font: 700 12px var(--ds-sans); letter-spacing: .06em; color: var(--ds-navy-800); }
+.jf-carrier-txt { display: grid; gap: 2px; min-width: 0; }
+.jf-airline { font: 700 15px/1.2 var(--ds-sans); color: var(--ds-ink); }
+.jf-no { font-size: 12px; color: var(--ds-muted); letter-spacing: .02em; }
+.jf-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--ds-r-pill);
+  background: var(--ds-success-soft); color: var(--ds-success); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; white-space: nowrap; }
+.jf-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.jf-route { display: grid; grid-template-columns: auto minmax(120px, 1fr) auto; align-items: center; gap: clamp(10px, 2vw, 26px); margin-top: clamp(16px, 2vw, 22px); }
+.jf-end { display: grid; gap: 3px; justify-items: start; min-width: 0; }
+.jf-end--to { justify-items: end; text-align: right; }
+.jf-time { font-family: var(--ds-display); font-weight: 500; font-size: clamp(30px, 3vw, 42px); line-height: .95; letter-spacing: -.02em; color: var(--ds-ink); font-variant-numeric: tabular-nums; }
+.jf-time--tba { font-family: var(--ds-sans); font-size: 15px; font-weight: 700; letter-spacing: .14em; color: var(--ds-muted); padding: 8px 0; }
+.jf-code { font-size: 12px; font-weight: 800; letter-spacing: .24em; color: var(--ds-gold-ink); }
+.jf-city { font-size: 12.5px; color: var(--ds-muted); max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jf-arc { display: grid; justify-items: center; gap: 2px; min-width: 0; }
+.jf-dur { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; color: var(--ds-ink-2); }
+.jf-stops { font-size: 10px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-success); }
+.jf-stops.has-stops { color: var(--ds-warning); }
+.jf-svg { width: 100%; max-width: 300px; height: auto; overflow: visible; }
+.jf-ghost { fill: none; stroke: var(--ds-line-2); stroke-width: 1.3; stroke-dasharray: 1.5 5; stroke-linecap: round; }
+.jf-draw { fill: none; stroke: var(--ds-gold); stroke-width: 1.8; stroke-linecap: round; }
+.jf-node { fill: var(--ds-white); stroke: var(--ds-navy-800); stroke-width: 2; }
+.jf-node--to { fill: var(--ds-navy-800); }
+.jf-halo { fill: none; stroke: var(--ds-gold); stroke-width: 1.2; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.jf-stop { fill: var(--ds-white); stroke: var(--ds-warning); stroke-width: 2; }
+.jf-plane path { fill: var(--ds-navy-800); }
+/* Before the card is seen: the arc undrawn, the plane waiting. After: the
+   line develops in the time the plane takes to reach its apex. */
+html.ds-motion .jf:not(.tx-sk-flight) .jf-draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+html.ds-motion .jf:not(.tx-sk-flight) .jf-plane { opacity: 0; }
+html.ds-motion .jf.is-flown .jf-draw { stroke-dashoffset: 0; transition: stroke-dashoffset 1.5s var(--ds-ease); }
+html.ds-motion .jf.is-flown .jf-plane { opacity: 1; transition: opacity .3s ease; }
+html.ds-motion .jf.is-flown .jf-halo { animation: jf-land 1.6s var(--ds-ease) 1.1s 1 both; }
+.jf:hover .jf-halo { animation: jf-land 1.4s var(--ds-ease) 1; }
+@keyframes jf-land { 0% { opacity: .9; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.8); } }
+
+.jf-facts { display: flex; flex-wrap: wrap; gap: 6px; margin: clamp(16px, 1.8vw, 20px) 0 0; padding: 14px 0 0; list-style: none; border-top: 1px solid var(--ds-line); }
+.jf-fact { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: var(--ds-r-pill); background: var(--ds-ivory);
+  font-size: 11.5px; font-weight: 600; color: var(--ds-ink-2); }
+.jf-fact span { font-weight: 500; color: var(--ds-muted); }
+.jf-fact.is-good { background: var(--ds-success-soft); color: var(--ds-success); }
+.jf-fact.is-warn { background: var(--ds-danger-soft); color: var(--ds-danger); }
+
+/* The stub: a perforation down its edge, two notches bitten out of the card. */
+.jf-stub { position: relative; display: grid; align-content: center; gap: 16px; padding: clamp(18px, 2vw, 26px) clamp(16px, 1.8vw, 24px);
+  background: var(--jf-stub); border-left: 2px dashed rgba(21, 27, 39, .12); border-radius: 0 var(--ds-r-lg) var(--ds-r-lg) 0; }
+.jf-stub::before, .jf-stub::after { content: ''; position: absolute; left: -12px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--ds-ivory); }
+.jf-stub::before { top: -12px; }
+.jf-stub::after { bottom: -12px; }
+.jf-fare { display: grid; justify-items: end; text-align: right; line-height: 1.1; }
+.jf-from, .jf-tax { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+.jf-amt { font-family: var(--ds-display); font-weight: 600; font-size: clamp(28px, 2.4vw, 36px); letter-spacing: -.01em; color: var(--ds-ink); margin: 2px 0; font-variant-numeric: tabular-nums; }
+.jf-amt--req { font-size: 20px; }
+.jf-acts { display: grid; gap: 8px; }
+.jf .jf-select { width: 100%; }
+.jf-more { justify-self: center; padding: 6px 2px; border: 0; background: none; cursor: pointer;
+  font: 700 11px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink-2);
+  border-bottom: 1px solid var(--ds-gold); transition: color .3s ease, border-color .3s ease; }
+.jf-more:hover { color: var(--ds-ink); border-color: var(--ds-coral); }
+.jf-more:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 4px; }
+body.jw-prod .tx-flight.jf:focus-within { border-color: rgba(217, 178, 111, .6); }
+
+/* The details drawer: a spec sheet across the whole pass. */
+body.jw-prod .jf .tx-details { grid-column: 1 / -1; margin: 0; border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg);
+  border-top: 1px solid var(--ds-line); background: var(--ds-ivory); padding: 20px clamp(18px, 2.2vw, 30px);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px 22px;
+  animation: jf-open .5s var(--ds-ease) both; }
+body.jw-prod .jf.is-open .jf-stub { border-radius: 0 var(--ds-r-lg) 0 0; }
+body.jw-prod .jf .tx-detail span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); margin-bottom: 4px; }
+body.jw-prod .jf .tx-detail b { font-size: 13.5px; font-weight: 600; color: var(--ds-ink); }
+body.jw-prod .jf .tx-detail-wide { grid-column: 1 / -1; }
+@keyframes jf-open { from { opacity: 0; transform: translateY(-8px); } }
+
+/* Skeleton pieces. */
+.jf-sk-logo { width: 40px; height: 40px; border-radius: 12px; }
+.jf-sk-time { width: 86px; height: 36px; border-radius: 8px; }
+.jf-sk-amt { width: 110px; height: 32px; border-radius: 8px; justify-self: end; }
+body.jw-prod .tx-sk-flight.jf:hover { translate: none; box-shadow: var(--ds-sh-1); }
+
+/* A narrow results column (tablet, a phone, or the three-column desktop
+   squeezed): the stub drops beneath the journey and tears along its top. */
+@container txlist (max-width: 600px) {
+  body.jw-prod .tx-flight.jf { grid-template-columns: 1fr; }
+  .jf-stub { grid-template-columns: 1fr auto; align-items: center; border-left: 0; border-top: 2px dashed rgba(21, 27, 39, .12); border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg); }
+  .jf-stub::before { left: -12px; top: -12px; }
+  .jf-stub::after { left: auto; right: -12px; top: -12px; bottom: auto; }
+  .jf-fare { justify-items: start; text-align: left; }
+  .jf-acts { grid-auto-flow: column; align-items: center; gap: 14px; }
+  .jf .jf-select { width: auto; }
+  body.jw-prod .jf.is-open .jf-stub { border-radius: 0; }
+}
+@container txlist (max-width: 440px) {
+  .jf-main { padding: 16px 16px 14px; }
+  .jf-time { font-size: 28px; }
+  .jf-route { grid-template-columns: auto minmax(64px, 1fr) auto; gap: 8px; }
+  .jf-city { display: none; }
+  .jf-status { display: none; }
+  .jf-stub { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+  .jf-acts { grid-auto-flow: row; }
+  .jf .jf-select { width: 100%; }
+  .jf-fare { grid-auto-flow: column; justify-content: space-between; align-items: baseline; justify-items: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jf .jf-halo { animation: none !important; }
+  body.jw-prod .tx-flight.jf:hover { translate: none; }
+}
+
+/* --- STATES: one composition for every empty / error the renderers write ---
+   travel-explore.js and its siblings write `.tx-empty` with a <b> title, a
+   sentence and a row of `.tx-btn`s. It takes the design system's state
+   (DS.state) composition here: the route drawing, a display-face title. */
+body.jw-prod .tx-empty {
+  display: grid; justify-items: center; text-align: center; gap: 10px; padding: clamp(40px, 6vw, 72px) 24px;
+  border-radius: var(--ds-r-lg); background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1);
+  color: var(--ds-muted); font-size: 15px; line-height: 1.65;
+}
+body.jw-prod .tx-empty::before {
+  content: ''; width: 180px; height: 72px; margin-bottom: 8px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 72'><path d='M14 58 C 60 -6, 120 -6, 166 58' fill='none' stroke='%23d9b26f' stroke-width='1.8' stroke-dasharray='3 7' stroke-linecap='round'/><circle cx='14' cy='58' r='5' fill='%23d9b26f'/><circle cx='14' cy='58' r='10' fill='none' stroke='%23d9b26f' stroke-width='1.5'/><circle cx='166' cy='58' r='5' fill='%23d9b26f'/><circle cx='166' cy='58' r='10' fill='none' stroke='%23d9b26f' stroke-width='1.5'/></svg>") center / contain no-repeat;
+}
+body.jw-prod .tx-empty > b:first-child {
+  display: block; max-width: 22ch; font-family: var(--ds-display); font-weight: 500; font-size: clamp(24px, 2.8vw, 34px);
+  line-height: 1.08; letter-spacing: -.01em; text-transform: uppercase; color: var(--ds-ink);
+}
+body.jw-prod .tx-empty-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 10px; }
+
+body.jw-prod .tx-btn {
+  border-radius: var(--ds-r-pill); min-height: 42px; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: transform .35s var(--ds-ease), background-color .3s ease, color .3s ease, border-color .3s ease, box-shadow .3s ease;
+}
+body.jw-prod .tx-btn:hover { transform: translateY(-2px); }
+body.jw-prod .tx-btn-primary {
+  background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; border: 0;
+  box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .8);
+}
+body.jw-prod .tx-btn-ghost { background: transparent; color: var(--ds-ink); border: 1px solid var(--ds-line-2); }
+body.jw-prod .tx-btn-ghost:hover { border-color: var(--ds-ink); background: var(--ds-ink); color: #fff; }
+body.jw-prod .tx-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+
+/* The offers strip and the count line. */
+body.jw-prod .fx-offers { border-radius: var(--ds-r-md); background: linear-gradient(90deg, rgba(217, 178, 111, .16), rgba(217, 178, 111, .04)); border: 1px dashed rgba(133, 96, 42, .35); }
+body.jw-prod .fx-offers-label { color: var(--ds-gold-ink); }
+body.jw-prod .tx-count-line { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+
+/* --- the booking summary rail: a dark ticket ---------------------------------- */
+body.jw-prod .tx-summary-rail > * {
+  border-radius: var(--ds-r-lg); overflow: hidden; border: 1px solid var(--ds-line-dark);
+  background: linear-gradient(180deg, var(--ds-navy-800), var(--ds-night)); color: var(--ds-on-dark); box-shadow: var(--ds-sh-3);
+}
+body.jw-prod .tx-summary-rail h2, body.jw-prod .tx-summary-rail h3, body.jw-prod .tx-summary-rail b,
+body.jw-prod .tx-summary-rail strong { color: #fff; }
+body.jw-prod .tx-summary-rail .tx-sum-head { background: transparent; border-bottom: 1px solid var(--ds-line-dark); }
+body.jw-prod .tx-summary-rail .tx-sum-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; }
+body.jw-prod .tx-summary-rail * { border-color: var(--ds-line-dark); }
+/* Every text node in the rail is light: travel-explore.css colours several of
+   them (the route, the totals) with its own ink token, dark on this ground. */
+body.jw-prod .tx-summary-rail > * * { color: var(--ds-on-dark); }
+body.jw-prod .tx-summary-rail p, body.jw-prod .tx-summary-rail li, body.jw-prod .tx-summary-rail .tx-sum-line span:first-child { color: var(--ds-on-dark-2); }
+body.jw-prod .tx-summary-rail .tx-sum-arrow { color: var(--ds-gold); }
+body.jw-prod .tx-summary-rail svg { color: var(--ds-gold); }
+
+
+/* --- phones: the card is a ticket stub, stacked ----------------------------- */
+@media (max-width: 760px) {
+  body.jw-prod .tx-act { border-left: 0; padding-left: 0; border-top: 1px dashed var(--ds-line-2); padding-top: 14px; margin-top: 4px; }
+  body.jw-prod .tx-head h1 { font-size: clamp(30px, 9vw, 40px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.jw-prod .tx-line::after { transform: scaleX(1); }
+}
+
+/* HOTELS moved to jw-hotels.css with the hotel journey's redesign — the
+   stay hero, the three-zone card, the rails and every booking screen. */
+
+/* ==========================================================================
+   TOUR PACKAGES — packages.html (package-listing.js). The hero is the
+   system's; the shelves, filter rail and cards re-dressed.
+   ========================================================================== */
+body.jw-prod.pk main.pkl-main { padding-top: 0; }
+body.jw-prod.pk .pkl-hero { margin-bottom: clamp(32px, 4vw, 56px); }
+body.jw-prod.pk .pkl-tiles > * {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+  transition: translate .45s var(--ds-ease), box-shadow .45s ease, border-color .35s ease;
+}
+body.jw-prod.pk .pkl-tiles > *:hover { translate: 0 -3px; box-shadow: var(--ds-sh-2); border-color: rgba(217, 178, 111, .5); }
+body.jw-prod.pk .pkl-tiles > [aria-pressed="true"], body.jw-prod.pk .pkl-tiles > .is-on {
+  background: linear-gradient(180deg, var(--ds-navy-800), var(--ds-night)); color: #fff; border-color: transparent;
+}
+body.jw-prod.pk .pkl-tiles > [aria-pressed="true"] *, body.jw-prod.pk .pkl-tiles > .is-on * { color: inherit; }
+body.jw-prod.pk .pkl-rail > * , body.jw-prod.pk .pkl-toolbar {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+}
+body.jw-prod.pk .pkl-group h3 { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-ink-2); }
+body.jw-prod.pk .pkl-count { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+/* The card: a tall photograph with the tag and the length on it; the name in
+   the display face; the from-price the anchor of the foot. */
+body.jw-prod.pk .pkl-grid { gap: clamp(16px, 1.8vw, 24px); }
+body.jw-prod.pk .pkl-card {
+  overflow: hidden; border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+}
+body.jw-prod.pk .pkl-card:hover { box-shadow: var(--ds-sh-3); border-color: rgba(217, 178, 111, .5); }
+body.jw-prod.pk .pkl-card-art { aspect-ratio: 4 / 3; }
+body.jw-prod.pk .pkl-card-art::after { background: linear-gradient(to top, rgba(5, 8, 15, .55), transparent 55%); }
+body.jw-prod.pk .pkl-card:hover .pkl-card-art img { transform: scale(1.04); }
+body.jw-prod.pk .pkl-card-tag {
+  background: rgba(10, 16, 28, .7); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-radius: var(--ds-r-pill); font-size: 10px; letter-spacing: .16em;
+}
+body.jw-prod.pk .pkl-card-body { padding: 20px 22px 22px; }
+body.jw-prod.pk .pkl-card h3, body.jw-prod.pk .pkl-card-top h3, body.jw-prod.pk .pkl-card-name {
+  font-family: var(--ds-display); font-weight: 500; font-size: 24px; line-height: 1.1; letter-spacing: -.01em;
+}
+body.jw-prod.pk .pkl-card-days { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-gold-ink); }
+body.jw-prod.pk .pkl-card-where { color: var(--ds-muted); }
+body.jw-prod.pk .pkl-card-price b, body.jw-prod.pk .pkl-card-price strong {
+  font-family: var(--ds-display); font-weight: 600; font-size: 28px; color: var(--ds-ink);
+}
+body.jw-prod.pk .pkl-card-btn {
+  border-radius: var(--ds-r-pill); background: var(--ds-navy-800); color: #fff; border: 0;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: transform .35s var(--ds-ease), background-color .3s ease;
+}
+body.jw-prod.pk .pkl-card-btn:hover { transform: translateY(-2px); background: var(--ds-coral); }
+
+/* ==========================================================================
+   CRUISES — each card draws its own itinerary (travel-explore.js
+   cruiseRoute): the ports in the row's route, in the order sailed.
+   ========================================================================== */
+body.jw-cruise .tx-card {
+  overflow: hidden; border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white);
+  box-shadow: var(--ds-sh-1); transition: translate .45s var(--ds-ease), box-shadow .45s ease;
+}
+body.jw-cruise .tx-card:hover { translate: 0 -4px; box-shadow: var(--ds-sh-3); }
+.tx-cruise-map {
+  position: relative; aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(ellipse 70% 70% at 80% 0%, rgba(217, 178, 111, .2), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 22px),
+    linear-gradient(180deg, var(--ds-navy-700), var(--ds-night));
+}
+.tx-route-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tx-route-svg .ghost { fill: none; stroke: rgba(255, 255, 255, .14); stroke-width: 1; stroke-dasharray: 2 5; }
+.tx-route-svg .line { fill: none; stroke: var(--ds-gold); stroke-width: 1.8; stroke-linecap: round;
+  stroke-dasharray: 1 1; stroke-dashoffset: 1; animation: tx-route-draw 1.8s var(--ds-ease) .2s forwards; }
+.tx-card:hover .tx-route-svg .line { animation: tx-route-draw 1.2s var(--ds-ease) forwards; }
+.tx-route-svg circle { fill: var(--ds-gold-lt); }
+.tx-route-svg circle.end { fill: var(--ds-gold); stroke: rgba(217, 178, 111, .35); stroke-width: 6; }
+.tx-route-svg text { fill: rgba(255, 255, 255, .82); font: 600 9.5px var(--ds-sans); letter-spacing: .06em; }
+@keyframes tx-route-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+body.jw-cruise .tx-badge { background: rgba(10, 16, 28, .7); color: #fff; border-radius: var(--ds-r-pill); letter-spacing: .14em; text-transform: uppercase; font-size: 10px; }
+body.jw-cruise .tx-title { font-family: var(--ds-display); font-weight: 500; font-size: 24px; letter-spacing: -.01em; }
+body.jw-cruise .tx-price b { font-family: var(--ds-display); font-weight: 600; font-size: 26px; }
+body.jw-cruise .tx-btn { border-radius: var(--ds-r-pill); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+body.jw-cruise .tx-btn-primary { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); border: 0; color: #fff; }
+body.jw-cruise .tx-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: clamp(28px, 3.4vw, 44px); }
+@media (prefers-reduced-motion: reduce) { .tx-route-svg .line { animation: none; stroke-dashoffset: 0; } }
+
+/* ==========================================================================
+   THE JOURNEY HERO (flights.html; built by jw-products.js)
+   --------------------------------------------------------------------------
+   The compact band grows into the trip: the destination city's own curated
+   photograph developing behind the night, product tabs and the trip-type
+   control above the strip, and under it the route drawn from origin code
+   to destination code beside the page's H1. Without the script it is the
+   plain compact band it always was.
+   ========================================================================== */
+body.jw-prod .hero.is-compact.jp-jh {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 0;
+  min-height: clamp(440px, 58vh, 580px); padding-top: calc(76px + 22px); padding-bottom: 0;
+}
+.jp-jh__media { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.jp-jh__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .62; }
+html.ds-motion .jp-jh__media img.ds-dev { opacity: .1; }
+html.ds-motion .jp-jh__media img.ds-dev.is-dev { opacity: .62; transition: opacity 1.4s var(--ds-ease), filter 1.4s var(--ds-ease), transform 2.4s var(--ds-ease); }
+.jp-jh__media img.is-leaving { opacity: 0 !important; transition: opacity .8s ease !important; }
+.jp-jh__media::after { content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, .92) 0%, rgba(6, 10, 18, .45) 34%, rgba(6, 10, 18, .35) 60%, rgba(6, 10, 18, .96) 100%),
+    linear-gradient(90deg, rgba(6, 10, 18, .85) 0%, rgba(6, 10, 18, .15) 55%, rgba(6, 10, 18, .4) 100%); }
+body.jw-prod .jp-jh.has-img .hero-media, body.jw-prod .jp-jh.has-img .hero-overlay { opacity: 0; }
+.jp-jh > .wrap, .jp-jh .search-dock { position: relative; z-index: 3; width: 100%; }
+.jp-jh .search-dock { z-index: 6; }
+
+.jp-jh__bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.jp-prodtabs { display: flex; gap: 4px; max-width: 100%; min-width: 0; padding: 5px; border-radius: var(--ds-r-pill); background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .1); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); overflow-x: auto; scrollbar-width: none; }
+.jp-prodtabs::-webkit-scrollbar { display: none; }
+.jp-prodtabs a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 18px; border-radius: var(--ds-r-pill);
+  color: var(--ds-on-dark-2); font: 600 11.5px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+  transition: color .3s ease, background-color .3s ease; }
+.jp-prodtabs a:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.jp-prodtabs a[aria-current="page"] { color: var(--ds-ink); background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); }
+.jp-prodtabs a:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.jp-jh .jp-trip { max-width: 100%; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }
+.jp-jh .jp-trip .ds-tab { color: var(--ds-on-dark-2); font-size: 12px; min-height: 34px; }
+.jp-jh .jp-trip .ds-tab:hover { color: #fff; }
+.jp-jh .jp-trip .ds-tab[aria-selected="true"] { color: var(--ds-ink); }
+.jp-jh .jp-trip .ds-tabs__ind { background: #fff; }
+/* The select the control drives stays in the DOM, out of the row. */
+body.jw-prod .jp-trip-on .ss-flights .ss-cell:has(#ssTrip) { display: none; }
+
+.jp-jh__band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 46%); align-items: end; gap: 24px;
+  padding-top: clamp(26px, 4vw, 48px); padding-bottom: clamp(22px, 3vw, 36px); }
+body.jw-prod .jp-jh .tx-head { display: block; margin: 0; }
+body.jw-prod .jp-jh .tx-head h1 { color: #fff; font-size: clamp(36px, 5vw, 72px); line-height: .98; text-shadow: 0 12px 50px rgba(0, 0, 0, .45); }
+body.jw-prod .jp-jh .tx-head h1::before { color: var(--ds-gold); }
+body.jw-prod .jp-jh .tx-head p { color: var(--ds-on-dark); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-top: 14px; }
+body.jw-prod .jp-jh .tx-sample { display: inline-block; margin-top: 14px; background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
+.jp-jh__route { order: 2; width: 100%; height: auto; overflow: visible; }
+.jp-jh__route .g { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.4; stroke-dasharray: 2 8; stroke-linecap: round; }
+.jp-jh__route .d { fill: none; stroke: var(--ds-gold); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(217, 178, 111, .55)); }
+.jp-jh__route .n { fill: var(--ds-night); stroke: var(--ds-gold); stroke-width: 2.5; }
+.jp-jh__route .n--to { fill: var(--ds-gold); }
+.jp-jh__route .h { fill: none; stroke: var(--ds-gold); stroke-width: 1.2; opacity: .5; transform-box: fill-box; transform-origin: center; animation: jp-pulse 2.6s var(--ds-ease) infinite; }
+.jp-jh__route .c { fill: #fff; font: 600 26px var(--ds-display); letter-spacing: .12em; }
+.jp-jh__route .c--to { fill: var(--ds-gold-lt); }
+.jp-jh__route .p path { fill: #fff; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .5)); }
+html.ds-motion .jp-jh__route .d { stroke-dasharray: 1; stroke-dashoffset: 1; }
+html.ds-motion .jp-jh__route .p { opacity: 0; }
+html.ds-motion .jp-jh__band.is-drawn .jp-jh__route .d { stroke-dashoffset: 0; transition: stroke-dashoffset 2.2s var(--ds-ease) .25s; }
+html.ds-motion .jp-jh__band.is-drawn .jp-jh__route .p { opacity: 1; transition: opacity .4s ease .25s; }
+@keyframes jp-pulse { 0% { transform: scale(.5); opacity: .8; } 100% { transform: scale(1.7); opacity: 0; } }
+/* The band's foot: a gold hairline that fades out at both ends. */
+.jp-jh::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(217, 178, 111, .8), transparent); }
+/* The H1 left the ivory section; the section keeps its rhythm without it. */
+body.jw-prod .tx-section:not(:has(.tx-head)) { padding-top: clamp(22px, 3vw, 36px); }
+
+@media (max-width: 900px) {
+  body.jw-prod .hero.is-compact.jp-jh { min-height: 0; padding-top: calc(76px + 14px); }
+  .jp-jh__bar { flex-direction: column; align-items: stretch; }
+  .jp-prodtabs { justify-content: flex-start; }
+  .jp-jh .jp-trip { align-self: flex-start; }
+  .jp-jh__band { grid-template-columns: 1fr; gap: 6px; padding-top: 18px; }
+  .jp-jh__route { order: -1; max-width: 420px; margin: 0 auto; }
+  body.jw-prod .jp-jh .tx-head h1 { font-size: clamp(32px, 9vw, 48px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jp-jh__route .h { animation: none; opacity: 0; }
+}
+
+/* The phone's folded search: one line, the trip as searched. */
+.jp-jh__sum { display: none; }
+@media (max-width: 720px) {
+  .jp-jh.jp-fold .jp-jh__sum {
+    position: relative; z-index: 4; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 12px;
+    width: calc(100% - 2 * var(--ds-gutter)); margin: 0 auto; padding: 14px 18px; text-align: left; cursor: pointer;
+    border-radius: var(--ds-r-lg); border: 1px solid rgba(255, 255, 255, .16); color: #fff;
+    background: rgba(255, 255, 255, .08); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    transition: background-color .3s ease, border-color .3s ease;
+  }
+  .jp-jh.jp-fold .jp-jh__sum:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+  .jp-jh__sum-route { font: 600 20px var(--ds-display); letter-spacing: .06em; }
+  .jp-jh__sum-route i { font-style: normal; color: var(--ds-gold); margin: 0 4px; }
+  .jp-jh__sum-meta { grid-column: 1; font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ds-on-dark-2); }
+  .jp-jh__sum-edit { grid-column: 2; grid-row: 1 / span 2; padding: 8px 16px; border-radius: var(--ds-r-pill);
+    background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink);
+    font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+  .jp-jh.jp-fold:not(.jp-unfold) .search-dock, .jp-jh.jp-fold:not(.jp-unfold) .jp-trip { display: none; }
+  .jp-jh.jp-unfold .jp-jh__sum { background: rgba(255, 255, 255, .14); border-color: var(--ds-gold); }
+  .jp-jh.jp-unfold .jp-jh__sum-edit { background: rgba(255, 255, 255, .12); color: #fff; }
+  .jp-jh.jp-unfold .search-dock { margin-top: 12px; animation: jf-open .45s var(--ds-ease) both; }
+  .jp-jh__bar { margin-bottom: 12px; }
+  .jp-jh .jp-trip { margin-top: 10px; }
+  .jp-jh__band { padding-top: 10px; }
+  .jp-jh__route { max-width: 300px; }
+}
+
+/* --- the filter bottom sheet (phones and tablets): the design system's sheet --
+   Same element, same handlers (travel-explore.js openFilterSheet); it now
+   rises over the header as well as the page, eases like the system's
+   drawers, and its scrim is the system's blurred night. */
+@media (max-width: 1000px) {
+  body.jw-prod .tx-sheet-scrim { z-index: 1000; background: rgba(4, 7, 14, .6); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); transition: opacity .4s ease; }
+  body.jw-prod .tx-filters { z-index: 1001; border-radius: var(--ds-r-xl) var(--ds-r-xl) 0 0; background: var(--ds-paper);
+    transition: transform .6s var(--ds-ease), visibility 0s linear .6s; box-shadow: var(--ds-sh-4); }
+  body.jw-prod .tx-filters.tx-open { transition: transform .6s var(--ds-ease); }
+  body.jw-prod .tx-filters::before { background: var(--ds-line-2); width: 44px; }
+  body.jw-prod .tx-filters .ff-top { background: var(--ds-paper); }
+  body.jw-prod .tx-sheet-done { z-index: 1002; background: var(--ds-paper); border-top-color: var(--ds-line); }
+  body.jw-prod .tx-sheet-done .tx-btn { min-height: 52px; font-size: 12.5px; }
+  /* The floating Filters pill, in the system's night and gold. */
+  body.jw-prod .tx-filter-toggle { background: var(--ds-navy-900); color: #fff; border: 1px solid rgba(217, 178, 111, .45);
+    box-shadow: 0 18px 36px -14px rgba(0, 0, 0, .7); letter-spacing: .06em; }
+  body.jw-prod .tx-filter-toggle[data-count]::after { background: var(--ds-gold); color: var(--ds-ink); }
+}
+
+/* ==========================================================================
+   THE PAYMENT SCREEN (payment-screen.js, JPay) — shared by Flights, Hotels
+   and Tour packages. Re-dressed, not rewired: the seven states, the method
+   list, every button and the server-confirmed success are JPay's, unchanged.
+   The amount card becomes the night folio with the figure in the display
+   face; methods become the system's selectable tiles; the one decision is
+   the coral pill.
+   ========================================================================== */
+body.jw-prod .jpay { max-width: 620px; }
+body.jw-prod .jpay-amount-card {
+  border-radius: var(--ds-r-xl); padding: clamp(24px, 3vw, 34px) clamp(20px, 3vw, 32px);
+  background:
+    radial-gradient(ellipse 80% 90% at 100% 0%, rgba(217, 178, 111, .24), transparent 70%),
+    radial-gradient(ellipse 60% 70% at 0% 100%, rgba(201, 72, 47, .16), transparent 70%),
+    linear-gradient(160deg, var(--ds-navy-800), var(--ds-night));
+  border: 1px solid var(--ds-line-dark); box-shadow: var(--ds-sh-3);
+}
+body.jw-prod .jpay-amount-card::after {
+  content: ''; position: absolute; left: 10%; right: 10%; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(217, 178, 111, .8), transparent);
+}
+body.jw-prod .jpay-brand { font-size: 10.5px; letter-spacing: .28em; color: var(--ds-gold-lt); }
+body.jw-prod .jpay-brand-dot { background: var(--ds-gold); box-shadow: 0 0 0 4px rgba(217, 178, 111, .2); }
+body.jw-prod .jpay-amount-label { font-size: 10.5px; letter-spacing: .24em; color: var(--ds-on-dark-2); }
+body.jw-prod .jpay-amount { font-family: var(--ds-display); font-weight: 600; font-size: clamp(38px, 6vw, 56px); color: #fff; }
+body.jw-prod .jpay-amount-sub { color: var(--ds-on-dark); font-weight: 500; }
+body.jw-prod .jpay-ref { background: rgba(255, 255, 255, .08); border: 1px solid rgba(217, 178, 111, .4); color: var(--ds-gold-lt); letter-spacing: .14em; }
+html.ds-motion body.jw-prod .jpay-amount-card { animation: hd-rise .9s var(--ds-ease) backwards; }
+
+body.jw-prod .jpay-title { font-family: var(--ds-display); font-weight: 500; font-size: 26px; letter-spacing: -.01em; color: var(--ds-ink); }
+body.jw-prod .jpay-sub { font-size: 14px; color: var(--ds-muted); }
+body.jw-prod .jpay-method {
+  border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2); background: var(--ds-paper); padding: 16px 18px;
+  transition: border-color .3s ease, background-color .3s ease, box-shadow .3s ease, transform .35s var(--ds-ease);
+}
+body.jw-prod .jpay-method:hover { border-color: rgba(217, 178, 111, .7); transform: translateY(-1px); }
+body.jw-prod .jpay-method.is-on { border-color: var(--ds-navy-800); background: #fff; box-shadow: 0 0 0 1px var(--ds-navy-800), var(--ds-sh-1); }
+body.jw-prod .jpay-method input { accent-color: var(--ds-navy-800); }
+body.jw-prod .jpay-method-body b { font-size: 15px; color: var(--ds-ink); }
+body.jw-prod .jpay-method-body span { color: var(--ds-muted); }
+body.jw-prod .jpay-method-tag { background: var(--ds-success-soft); color: var(--ds-success); letter-spacing: .14em; text-transform: uppercase; font-size: 9.5px; }
+body.jw-prod .jpay-cta {
+  min-height: 54px; border-radius: var(--ds-r-pill); border: 0;
+  background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff;
+  font: 700 12.5px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase;
+  box-shadow: 0 16px 30px -16px rgba(201, 72, 47, .85);
+  transition: transform .35s var(--ds-ease), box-shadow .3s ease, filter .3s ease;
+}
+body.jw-prod .jpay-cta:hover:not(:disabled) { background: linear-gradient(135deg, var(--ds-coral-lt), var(--ds-coral)); transform: translateY(-2px); }
+body.jw-prod .jpay-cta:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+body.jw-prod .jpay-cta.is-ghost { background: transparent; color: var(--ds-ink); border: 1px solid var(--ds-line-2); box-shadow: none; }
+body.jw-prod .jpay-cta.is-ghost:hover:not(:disabled) { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body.jw-prod .jpay-secure { color: var(--ds-muted); letter-spacing: .04em; }
+body.jw-prod .jpay-howto { border-radius: var(--ds-r-md); background: var(--ds-ivory); border: 0; }
+body.jw-prod .jpay-summary { border-radius: var(--ds-r-md); border: 1px solid var(--ds-line); background: var(--ds-white); }
+body.jw-prod .jpay-summary-row dt { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+body.jw-prod .jpay-summary-row dd.is-paid { color: var(--ds-success); }
+body.jw-prod .jpay-status h3 { font-family: var(--ds-display); font-weight: 500; font-size: 28px; color: var(--ds-ink); }
+body.jw-prod .jpay-status-icon { width: 76px; height: 76px; }
+body.jw-prod .jpay-status-icon.is-wait { background: rgba(217, 178, 111, .16); color: var(--ds-gold-ink); }
+body.jw-prod .jpay-status-icon.is-ok { background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); box-shadow: 0 0 0 10px rgba(217, 178, 111, .14); }
+body.jw-prod .jpay-status-icon.is-bad { background: var(--ds-danger-soft); color: var(--ds-danger); }
+html.ds-motion body.jw-prod .jpay-status-icon.is-ok { animation: cf-pop .9s var(--ds-ease) both; }
+body.jw-prod .jpay-spinner { border-color: rgba(217, 178, 111, .25); border-top-color: var(--ds-gold); }
+body.jw-prod .jpay-error { border-radius: var(--ds-r-md); border: 0; border-left: 3px solid var(--ds-danger); background: var(--ds-danger-soft); color: var(--ds-danger); }
+@keyframes cf-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: none; } }
+@keyframes hd-rise { from { opacity: 0; transform: translateY(24px); } }
+
+/* The flight sheet's cancellation panel is bound to the chosen fare
+   (booking-products.js bkfCancelHtml): green only when the fare IS
+   refundable; a non-refundable fare is stated plainly, not dressed as good
+   news. */
+body.jw-prod .bkf-assure.is-plain { background: var(--ds-ivory); border-color: var(--ds-line); }
+body.jw-prod .bkf-assure.is-plain svg { color: var(--ds-muted); }
+body.jw-prod .bkf-assure.is-plain b { color: var(--ds-ink); }
+body.jw-prod .bkf-assure.is-plain span { color: var(--ds-ink-2); }
+
+/* ==========================================================================
+   THE FLIGHT BOOKING SHEET (booking-flow.js + booking-products.js, styled
+   by booking-ref.css under `.bk-sheet.is-flight`) — in the design system.
+   Fare → Travellers → Seats → Add-ons → Review → Payment → Confirmation.
+   Every colour in booking-ref.css flows through its --bkf-* tokens, so the
+   palette moves with them: navy is where you are, gold is what is done,
+   green is only for a fact that is actually good news (a refundable fare, a
+   seat that is free), and coral is the one decision on the screen. Then the
+   pieces are recomposed: the itinerary as a boarding pass, the fare as a
+   selectable tile, the Fare Summary as the dark folio every product shares.
+   ========================================================================== */
+body.jw-prod .bk-sheet.is-flight {
+  --bkf-line: var(--ds-line); --bkf-ink: var(--ds-ink); --bkf-muted: var(--ds-muted);
+  --bkf-red: var(--ds-coral-dk); --bkf-red-soft: rgba(217, 178, 111, .2);
+  --bkf-green: var(--ds-success); --bkf-green-ink: var(--ds-success); --bkf-green-soft: var(--ds-success-soft);
+  --bkf-card: var(--ds-r-lg);
+}
+body.jw-prod.bk-inpage, body.jw-prod.bk-inpage #bkRoot { background: var(--ds-ivory); }
+
+/* --- the progress track (booking-steps.js .bk-steps, shared by every product) --- */
+body.jw-prod .bk-steps { margin: 4px 0 clamp(18px, 2.4vw, 28px); padding: 16px 12px 14px; border-radius: var(--ds-r-lg);
+  background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
+body.jw-prod .bk-steps-list::before { background: var(--ds-line); height: 1px; top: 14px; }
+body.jw-prod .bk-steps-list::after { background: linear-gradient(90deg, var(--ds-gold), var(--ds-gold-lt)); height: 2px; top: 13.5px;
+  transition: width .9s var(--ds-ease); box-shadow: 0 0 10px rgba(217, 178, 111, .5); }
+body.jw-prod .bk-step-dot { width: 28px; height: 28px; border-width: 1px; border-color: var(--ds-line-2); color: var(--ds-muted); font-size: 12px; font-weight: 700; }
+body.jw-prod .bk-step.is-done .bk-step-dot { background: var(--ds-gold); border-color: var(--ds-gold); color: var(--ds-ink); }
+body.jw-prod .bk-step.is-done .bk-step-tick { stroke: var(--ds-ink); }
+body.jw-prod .bk-step.is-current .bk-step-dot { background: var(--ds-navy-800); border-color: var(--ds-navy-800); color: #fff; box-shadow: 0 0 0 5px rgba(217, 178, 111, .25); }
+body.jw-prod .bk-step-label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ds-muted); }
+body.jw-prod .bk-step.is-current .bk-step-label, body.jw-prod .bk-step.is-done .bk-step-label { color: var(--ds-ink); }
+body.jw-prod .bk-steps-now { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink); }
+
+/* --- cards and titles --------------------------------------------------------- */
+body.jw-prod .bk-sheet.is-flight :is(.bkf-itin, .bkf-card, .bk-price) {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+}
+body.jw-prod .bk-sheet.is-flight :is(.bkf-h2, .bkf-itin-title, .bk-price h3.bkf-fare-title, .bkf-rvtitle span) {
+  font-family: var(--ds-display); font-weight: 500; letter-spacing: -.01em; color: var(--ds-ink);
+}
+body.jw-prod .bk-sheet.is-flight .bkf-h2 { font-size: clamp(24px, 2.4vw, 32px); }
+body.jw-prod .bk-sheet.is-flight .bkf-itin-title { font-size: 22px; }
+body.jw-prod .bk-sheet.is-flight .bkf-itin.is-review .bkf-itin-title { color: var(--ds-ink); }
+body.jw-prod .bk-sheet.is-flight .bkf-chip { border-radius: var(--ds-r-pill); background: var(--ds-ivory); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+body.jw-prod .bk-sheet.is-flight .bkf-n { background: rgba(217, 178, 111, .2); color: var(--ds-gold-ink); }
+body.jw-prod .bk-sheet.is-flight .bkf-edit, body.jw-prod .bk-sheet.is-flight .bkf-obtn {
+  border-radius: var(--ds-r-pill); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
+
+/* --- the itinerary: a boarding pass ---------------------------------------- */
+body.jw-prod .bk-sheet.is-flight .bkf-leg-time { font-family: var(--ds-display); font-weight: 500; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+body.jw-prod .bk-sheet.is-flight .bkf-leg-code { font-size: 11.5px; font-weight: 800; letter-spacing: .24em; color: var(--ds-gold-ink); }
+body.jw-prod .bk-sheet.is-flight .bkf-leg-line { background: none; border-top: 1.5px dashed var(--ds-line-2); }
+body.jw-prod .bk-sheet.is-flight .bkf-leg-stops { font-size: 10px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; }
+body.jw-prod .bk-sheet.is-flight .bkf-seg-head { border-bottom-style: dashed; }
+
+/* --- the fare tile ------------------------------------------------------------ */
+body.jw-prod .bk-sheet.is-flight .bkf-ff { border-radius: var(--ds-r-lg); border: 1px solid var(--ds-line-2); background: var(--ds-paper);
+  transition: border-color .35s ease, box-shadow .35s ease, transform .4s var(--ds-ease); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff:hover { transform: translateY(-2px); border-color: rgba(217, 178, 111, .7); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff.is-on { background: #fff; border-color: var(--ds-navy-800); box-shadow: 0 0 0 1px var(--ds-navy-800), var(--ds-sh-2); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff.is-on .bkf-radio { border-color: var(--ds-navy-800); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff.is-on .bkf-radio::after { background: var(--ds-navy-800); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-name { font-family: var(--ds-display); font-weight: 500; font-size: 22px; }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-price b { font-family: var(--ds-display); font-weight: 600; font-size: clamp(28px, 2.6vw, 36px); letter-spacing: -.01em; }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-grp { font-size: 9.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-muted); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-tag { border-radius: var(--ds-r-pill); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; background: var(--ds-ivory); color: var(--ds-ink-2); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-tag.is-good { background: var(--ds-success-soft); color: var(--ds-success); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-cta { border-radius: var(--ds-r-pill); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-cta.is-on { background: var(--ds-navy-800); color: #fff; border-color: var(--ds-navy-800); }
+body.jw-prod .bk-sheet.is-flight .bkf-ff-rules { color: var(--ds-muted); }
+body.jw-prod .bk-sheet.is-flight .bkf-warn { border-radius: var(--ds-r-md); background: var(--ds-warning-soft); color: var(--ds-warning); border-color: transparent; }
+
+/* --- the Fare Summary: the dark folio ------------------------------------------ */
+body.jw-prod .bk-sheet.is-flight .bk-price {
+  padding: 20px 22px; color: var(--ds-on-dark); border: 1px solid var(--ds-line-dark);
+  background: radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .14), transparent 70%), linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
+  box-shadow: var(--ds-sh-3);
+}
+body.jw-prod .bk-sheet.is-flight .bk-price h3.bkf-fare-title { color: #fff; font-size: 24px; }
+body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-fare-trip, .bkf-fare-seg, .bk-price-line, .bkf-fare-group > summary) { color: var(--ds-on-dark); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line > span:first-child, body.jw-prod .bk-sheet.is-flight .bk-price .bkf-incl { color: var(--ds-on-dark-2); }
+body.jw-prod .bk-sheet.is-flight .bk-price :is(.bkf-rule) { background: var(--ds-line-dark); }
+body.jw-prod .bk-sheet.is-flight .bk-price svg, body.jw-prod .bk-sheet.is-flight .bk-price .bkf-chev { color: var(--ds-gold); }
+body.jw-prod .bk-sheet.is-flight .bk-price-total { border-top-color: var(--ds-line-dark); color: var(--ds-on-dark); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+body.jw-prod .bk-sheet.is-flight .bk-price-total > span:last-child { font-family: var(--ds-display); font-size: 32px; font-weight: 600; color: var(--ds-gold-lt); letter-spacing: -.01em; text-transform: none; }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-price-line.is-discount > span { color: #9fe3c0; }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon { border-top-color: var(--ds-line-dark); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon-row input { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .18); color: #fff; border-radius: var(--ds-r-pill); }
+body.jw-prod .bk-sheet.is-flight .bk-price .bk-coupon-apply { border-radius: var(--ds-r-pill); background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); border: 0; }
+body.jw-prod .bk-sheet.is-flight .bkf-assure { border-radius: var(--ds-r-md); background: var(--ds-success-soft); border: 0; border-left: 3px solid var(--ds-success); }
+body.jw-prod .bk-sheet.is-flight .bkf-assure.is-plain { background: var(--ds-white); border-left-color: var(--ds-line-2); }
+body.jw-prod .bk-sheet.is-flight .bkf-benefits { border-radius: var(--ds-r-md); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
+body.jw-prod .bk-sheet.is-flight .bkf-benefits svg { color: var(--ds-gold-ink); }
+
+/* --- the action bar --------------------------------------------------------------- */
+body.jw-prod .bk-sheet.is-flight .bk-foot { background: rgba(253, 251, 248, .95); border-top: 1px solid rgba(217, 178, 111, .45); box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45); }
+body.jw-prod .bk-sheet.is-flight .bkf-foot-total b { font-family: var(--ds-display); font-weight: 600; font-size: 26px; }
+body.jw-prod .bk-sheet.is-flight .bk-foot-cta .bk-btn-primary {
+  min-height: 50px; padding: 0 28px; border: 0; border-radius: var(--ds-r-pill);
+  background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  box-shadow: 0 14px 28px -14px rgba(201, 72, 47, .85); transition: transform .35s var(--ds-ease), box-shadow .3s ease;
+}
+body.jw-prod .bk-sheet.is-flight .bk-foot-cta .bk-btn-primary:hover:not(:disabled) { transform: translateY(-2px); }
+body.jw-prod .bk-sheet.is-flight .bk-foot-cta .bk-btn-primary:disabled { background: var(--ds-sand); color: var(--ds-muted); box-shadow: none; }
+
+/* --- the sheet's arrival: each step's cards rise into place ------------------------ */
+html.ds-motion body.jw-prod .bk-sheet.is-flight :is(.bkf-itin, .bkf-card, .bk-price, .bkf-ff) { animation: hd-rise .8s var(--ds-ease) backwards; }
+html.ds-motion body.jw-prod .bk-sheet.is-flight .bkf-card { animation-delay: .08s; }
+html.ds-motion body.jw-prod .bk-sheet.is-flight .bk-price { animation-delay: .16s; }
+@media (prefers-reduced-motion: reduce) {
+  body.jw-prod .bk-sheet.is-flight :is(.bkf-itin, .bkf-card, .bk-price, .bkf-ff) { animation: none !important; }
+}
+
+/* --- every booking form field (flight .bkf-f, shared engine .bk-field) ------
+   The design system's field: a visible label in small tracked capitals, a
+   paper ground that turns white on focus with the gold ring, and an invalid
+   state that is the danger colour, not the brand accent. */
+body.jw-prod :is(.bkf-f > label, .bk-field label) { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ds-ink-2); opacity: 1; }
+body.jw-prod :is(.bkf-f.is-optional > label, .bk-field.is-optional label) { color: var(--ds-muted); }
+body.jw-prod :is(.bkf-f > label .req) { color: var(--ds-coral); }
+body.jw-prod :is(.bkf-f input, .bkf-f select, .bk-field input, .bk-field select, .bk-field textarea) {
+  min-height: 48px; border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2); background-color: var(--ds-paper);
+  color: var(--ds-ink); font-family: var(--ds-sans); font-weight: 500;
+  transition: border-color .3s ease, background-color .3s ease, box-shadow .3s ease;
+}
+body.jw-prod :is(.bkf-f input, .bkf-f select, .bk-field input, .bk-field select, .bk-field textarea):hover { border-color: rgba(21, 27, 39, .32); }
+body.jw-prod :is(.bkf-f input, .bkf-f select, .bk-field input, .bk-field select, .bk-field textarea):focus {
+  border-color: var(--ds-gold); background-color: #fff; box-shadow: var(--ds-ring);
+}
+body.jw-prod :is(.bkf-f, .bk-field) .is-invalid, body.jw-prod .bk-sheet .is-invalid {
+  border-color: var(--ds-danger) !important; box-shadow: 0 0 0 3px var(--ds-danger-soft) !important; background-color: #fff;
+}
+
+/* ==========================================================================
+   PACKAGE DETAIL (package.html, package.js) — the trip beside its folio.
+   ========================================================================== */
+body.jw-prod.pk .pk-layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(300px, 28%, 360px); gap: clamp(20px, 2.6vw, 40px);
+  align-items: start; margin-top: clamp(8px, 1.4vw, 18px); }
+body.jw-prod.pk .pk-flow { min-width: 0; }
+body.jw-prod.pk .pk-flow > .lp-sec:first-child { margin-top: 0; }
+body.jw-prod.pk .pk-folio {
+  position: sticky; top: calc(var(--ds-header-h, 88px) + 16px); display: grid; gap: 18px; padding: clamp(22px, 2.4vw, 30px);
+  border-radius: var(--ds-r-xl); color: var(--ds-on-dark); border: 1px solid var(--ds-line-dark);
+  background: radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .16), transparent 70%), linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
+  box-shadow: var(--ds-sh-3);
+}
+html.ds-motion body.jw-prod.pk .pk-folio { animation: hd-rise .9s var(--ds-ease) .2s backwards; }
+.pk-folio-k { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: var(--ds-gold); }
+.pk-folio-price { display: grid; gap: 2px; padding-bottom: 16px; border-bottom: 1px solid var(--ds-line-dark); }
+.pk-folio-price span { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-on-dark-2); }
+.pk-folio-price b { font-family: var(--ds-display); font-weight: 600; font-size: clamp(34px, 3vw, 44px); color: var(--ds-gold-lt); letter-spacing: -.01em; }
+.pk-folio-facts { margin: 0; display: grid; gap: 10px; }
+.pk-folio-facts div { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.pk-folio-facts dt { color: var(--ds-on-dark-2); }
+.pk-folio-facts dd { margin: 0; color: #fff; font-weight: 600; text-align: right; }
+.pk-folio-note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--ds-on-dark-2); }
+
+/* The sections: display-face headings with a gold rule, cards in the system. */
+body.jw-prod.pk .pk-flow .disc-h2 { font-family: var(--ds-display); font-weight: 500; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: -.015em; }
+body.jw-prod.pk .pk-flow .lp-card { border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
+body.jw-prod.pk .pk-includes { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 1.6vw, 20px); }
+body.jw-prod.pk .pk-incl { border-top: 3px solid var(--ds-success); }
+body.jw-prod.pk .pk-excl { border-top: 3px solid var(--ds-line-2); }
+body.jw-prod.pk .pk-incl h3, body.jw-prod.pk .pk-excl h3 { font-family: var(--ds-display); font-weight: 500; font-size: 20px; }
+body.jw-prod.pk .pk-highlights li { font-size: 15px; line-height: 1.6; }
+/* The hero's own CTA: the design system's primary pill. */
+body.jw-prod.pk .pk-book { border-radius: var(--ds-r-pill); min-height: 50px; padding: 0 26px; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+@media (max-width: 1000px) {
+  body.jw-prod.pk .pk-layout { grid-template-columns: 1fr; }
+  body.jw-prod.pk .pk-folio { position: static; }  /* after the trip: the hero already opens with the price */
+}
+@media (max-width: 640px) { body.jw-prod.pk .pk-includes { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   THE SHARED BOOKING SHEET (booking-flow.js, booking.css) — every product
+   that is not a flight: tour packages, cruises, visas. Same vocabulary as
+   the flight sheet above: a display-face title under a gold kicker, choices
+   as selectable tiles (navy when chosen), the price as the dark folio, the
+   one decision as the coral pill. Nothing about what a step asks or submits
+   changes.
+   ========================================================================== */
+body.jw-prod .bk-sheet:not(.is-flight) { background: var(--ds-ivory); }
+body.jw-prod .bk-kicker { font-size: 10.5px; font-weight: 700; letter-spacing: .28em; color: var(--ds-gold-ink); }
+body.jw-prod .bk-title { font-family: var(--ds-display); font-weight: 500; font-size: clamp(32px, 3.6vw, 52px); line-height: 1; letter-spacing: -.02em; color: var(--ds-ink); }
+body.jw-prod .bk-step-title { font-family: var(--ds-display); font-weight: 500; font-size: clamp(24px, 2.4vw, 32px); letter-spacing: -.01em; color: var(--ds-ink); }
+body.jw-prod .bk-step-sub { color: var(--ds-muted); }
+body.jw-prod .bk-choice {
+  border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2); background: var(--ds-paper);
+  transition: border-color .35s ease, box-shadow .35s ease, transform .4s var(--ds-ease), background-color .3s ease;
+}
+body.jw-prod .bk-choice:hover { transform: translateY(-2px); border-color: rgba(217, 178, 111, .7); box-shadow: var(--ds-sh-1); }
+body.jw-prod .bk-choice.is-on { background: #fff; border-color: var(--ds-navy-800); box-shadow: 0 0 0 1px var(--ds-navy-800), var(--ds-sh-2); }
+body.jw-prod .bk-choice input { accent-color: var(--ds-navy-800); }
+body.jw-prod .bk-choice:has(:focus-visible) { outline: none; box-shadow: var(--ds-ring); }
+body.jw-prod .bk-choice-price b { font-family: var(--ds-display); font-weight: 600; font-size: 22px; color: var(--ds-ink); }
+body.jw-prod .bk-scarce { color: var(--ds-warning); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+html.ds-motion body.jw-prod .bk-choices > .bk-choice { animation: hd-rise .7s var(--ds-ease) backwards; }
+html.ds-motion body.jw-prod .bk-choices > .bk-choice:nth-child(2) { animation-delay: .05s; }
+html.ds-motion body.jw-prod .bk-choices > .bk-choice:nth-child(3) { animation-delay: .1s; }
+html.ds-motion body.jw-prod .bk-choices > .bk-choice:nth-child(n+4) { animation-delay: .15s; }
+
+/* The price: the dark folio, as on Hotels and Flights. */
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price {
+  padding: 22px; border-radius: var(--ds-r-lg); color: var(--ds-on-dark); border: 1px solid var(--ds-line-dark);
+  background: radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .14), transparent 70%), linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
+  box-shadow: var(--ds-sh-3);
+}
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price h3 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; letter-spacing: -.01em; text-transform: none; color: #fff; }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price :is(p, span, .bk-price-line) { color: var(--ds-on-dark-2); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price .bk-price-line > span:last-child { color: #fff; }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price-total { border-top-color: var(--ds-line-dark); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price-total > span:first-child { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-on-dark); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price-total > span:last-child { font-family: var(--ds-display); font-weight: 600; font-size: 30px; color: var(--ds-gold-lt); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price :is(input) { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .18); color: #fff; border-radius: var(--ds-r-pill); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price :is(a) { color: var(--ds-gold-lt); }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-price .bk-coupon-apply { border-radius: var(--ds-r-pill); background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); border: 0; }
+
+/* Buttons: the coral pill and its outline partner. */
+body.jw-prod .bk-btn { min-height: 48px; border-radius: var(--ds-r-pill); font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: transform .35s var(--ds-ease), box-shadow .3s ease, background-color .3s ease, color .3s ease, border-color .3s ease; }
+body.jw-prod .bk-btn-primary { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; border-color: transparent;
+  box-shadow: 0 14px 28px -14px rgba(201, 72, 47, .85); }
+body.jw-prod .bk-btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, var(--ds-coral-lt), var(--ds-coral)); transform: translateY(-2px); }
+body.jw-prod .bk-btn-ghost { border-color: var(--ds-line-2); color: var(--ds-ink); }
+body.jw-prod .bk-btn-ghost:hover { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body.jw-prod .bk-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+/* The action bar is sticky with no z-index of its own, so anything in the
+   step that forms a stacking context (a transformed tile, a select) painted
+   over its buttons on a phone. It sits above the step it drives. */
+body.jw-prod .bk-sheet .bk-foot { z-index: 20; }
+body.jw-prod .bk-sheet:not(.is-flight) .bk-foot { background: rgba(253, 251, 248, .95); border-top: 1px solid rgba(217, 178, 111, .45); box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45); }
+
+/* The "sample data" note on a booking step whose options are generated
+   locally (cruise cabins, the flight seat map) rather than read from a
+   supplier: stated plainly, in the gold of the "Sample fares" label. */
+body.jw-prod .bk-sample-note { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 14px; padding: 6px 12px;
+  border-radius: var(--ds-r-pill); background: rgba(217, 178, 111, .16); color: var(--ds-gold-ink);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .02em; }
+
+/* ==========================================================================
+   MY BOOKINGS — the travel command centre (my-bookings.html / .js).
+   The hero carries the next trip and four counts from the server's bookings;
+   below, status segments, product chips and one boarding-pass card per
+   booking — kind stub, the trip, and the folio with status, total and the
+   actions. Status tone is the server's status: gold waiting, green
+   confirmed, grey cancelled.
+   ========================================================================== */
+body.jw-prod.mb-page { background: var(--ds-ivory); }
+body.jw-prod .mb-hero .ds-hero__inner { display: grid; gap: 0; }
+.mb-next { display: grid; gap: 4px; margin-top: clamp(20px, 2.4vw, 30px); padding: 16px 20px; max-width: 560px;
+  border-radius: var(--ds-r-lg); background: rgba(255, 255, 255, .06); border: 1px solid rgba(217, 178, 111, .35);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+html.ds-motion .mb-next:not([hidden]) { animation: hd-rise .9s var(--ds-ease) .25s backwards; }
+.mb-next-k { font-size: 10px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: var(--ds-gold); }
+.mb-next-t { font-family: var(--ds-display); font-weight: 500; font-size: clamp(22px, 2.2vw, 30px); color: #fff; line-height: 1.1; }
+.mb-next-d { font-size: 12.5px; letter-spacing: .04em; color: var(--ds-on-dark-2); }
+.mb-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: clamp(18px, 2vw, 26px) 0 0; max-width: 720px;
+  border-top: 1px solid var(--ds-line-dark); }
+.mb-stats > div { padding: 14px 16px 0 0; }
+.mb-stats > div + div { padding-left: 16px; border-left: 1px solid var(--ds-line-dark); }
+.mb-stats dt { font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-on-dark-2); }
+.mb-stats dd { margin: 6px 0 0; font-family: var(--ds-display); font-weight: 600; font-size: clamp(28px, 3vw, 40px); color: #fff; line-height: 1; }
+html.ds-motion .mb-stats:not([hidden]) > div { animation: hd-rise .8s var(--ds-ease) backwards; }
+html.ds-motion .mb-stats > div:nth-child(2) { animation-delay: .08s; }
+html.ds-motion .mb-stats > div:nth-child(3) { animation-delay: .16s; }
+html.ds-motion .mb-stats > div:nth-child(4) { animation-delay: .24s; }
+
+body.jw-prod .mb-section { padding-top: clamp(26px, 3.4vw, 44px); }
+.mb-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.mb-h2 { margin: 0; font-family: var(--ds-display); font-weight: 500; font-size: clamp(28px, 3vw, 40px); letter-spacing: -.015em; color: var(--ds-ink); }
+.mb-count { margin: 6px 0 0; font-size: 11.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-muted); }
+.mb-seg-n { margin-left: 4px; font-size: 11px; opacity: .6; }
+body.jw-prod .mb-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; border: 0; }
+body.jw-prod .mb-list { display: flex; flex-direction: column; gap: clamp(14px, 1.6vw, 20px); }
+
+/* --- the booking card: a boarding pass --- */
+body.jw-prod .mbc {
+  position: relative; display: grid; grid-template-columns: 116px minmax(0, 1fr) clamp(210px, 26%, 260px); gap: 0; padding: 0;
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+  overflow: hidden; transition: box-shadow .5s ease, translate .5s var(--ds-ease), border-color .4s ease;
+}
+body.jw-prod .mbc:hover { translate: 0 -3px; box-shadow: var(--ds-sh-3); border-color: rgba(217, 178, 111, .5); }
+body.jw-prod .mbc.is-cancelled { opacity: .72; }
+.mbc-kind { display: grid; place-content: center; justify-items: center; gap: 8px; padding: 18px 10px; text-align: center;
+  background: linear-gradient(180deg, var(--ds-navy-800), var(--ds-night)); color: var(--ds-gold);
+  font-size: 10px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.mbc-kind svg { width: 26px; height: 26px; }
+.mbc-kind span { color: var(--ds-on-dark-2); }
+.mbc-main { min-width: 0; padding: clamp(18px, 2vw, 24px) clamp(18px, 2vw, 28px); display: grid; gap: 8px; align-content: center; }
+.mbc-when { margin: 0; font-size: 10.5px; font-weight: 800; letter-spacing: .22em; text-transform: uppercase; color: var(--ds-gold-ink); }
+.mbc-title { margin: 0; font-family: var(--ds-display); font-weight: 500; font-size: clamp(22px, 2vw, 28px); line-height: 1.1; color: var(--ds-ink); }
+.mbc-sub { margin: 0; font-size: 13px; color: var(--ds-muted); }
+.mbc-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 6px 0 0; padding-top: 12px; border-top: 1px dashed var(--ds-line); }
+.mbc-facts dt { font-size: 9.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+.mbc-facts dd { margin: 3px 0 0; font-size: 13.5px; font-weight: 600; color: var(--ds-ink); font-variant-numeric: tabular-nums; }
+.mbc-folio { position: relative; display: grid; align-content: center; justify-items: end; gap: 10px; padding: clamp(18px, 2vw, 24px);
+  background: #fbf8f2; border-left: 2px dashed rgba(21, 27, 39, .12); text-align: right; }
+.mbc-folio::before, .mbc-folio::after { content: ''; position: absolute; left: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--ds-ivory); }
+.mbc-folio::before { top: -12px; }
+.mbc-folio::after { bottom: -12px; }
+.mbc-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: var(--ds-r-pill);
+  font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.mbc-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.mbc-status.is-ok { background: var(--ds-success-soft); color: var(--ds-success); }
+.mbc-status.is-wait { background: var(--ds-warning-soft); color: var(--ds-warning); }
+.mbc-status.is-cancelled { background: var(--ds-sand); color: var(--ds-muted); }
+.mbc-total { font-family: var(--ds-display); font-weight: 600; font-size: clamp(24px, 2.2vw, 30px); color: var(--ds-ink); font-variant-numeric: tabular-nums; }
+.mbc-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px 14px; }
+.mbc-link { padding: 4px 0; border: 0; background: none; cursor: pointer; font: 700 10.5px var(--ds-sans); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ds-ink-2); border-bottom: 1px solid var(--ds-gold); transition: color .3s ease, border-color .3s ease; }
+.mbc-link:hover { color: var(--ds-ink); border-color: var(--ds-coral); }
+.mbc-link.is-danger { color: var(--ds-danger); border-color: rgba(163, 48, 42, .35); }
+.mbc-link:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 4px; }
+body.jw-prod .mb-unpayable { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--ds-muted); }
+body.jw-prod .mb-list .ds-state { background: var(--ds-white); border-radius: var(--ds-r-lg); box-shadow: var(--ds-sh-1); max-width: none; }
+
+@media (max-width: 860px) {
+  body.jw-prod .mbc { grid-template-columns: 84px minmax(0, 1fr); }
+  .mbc-folio { grid-column: 1 / -1; grid-template-columns: auto 1fr; align-items: center; justify-items: start; text-align: left;
+    border-left: 0; border-top: 2px dashed rgba(21, 27, 39, .12); }
+  .mbc-folio::before { left: -12px; top: -12px; }
+  .mbc-folio::after { left: auto; right: -12px; top: -12px; bottom: auto; }
+  .mbc-total { justify-self: end; }
+  .mbc-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .mb-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mb-stats > div:nth-child(3) { padding-left: 0; border-left: 0; }
+  body.jw-prod .mbc { grid-template-columns: 1fr; }
+  .mbc-kind { grid-auto-flow: column; place-content: start; justify-items: start; padding: 10px 16px; }
+  .mbc-kind svg { width: 18px; height: 18px; }
+  body.jw-prod .mb-seg { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { body.jw-prod .mbc:hover { translate: none; } }

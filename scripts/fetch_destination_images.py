@@ -58,9 +58,14 @@ OUT_DIR = os.path.join(ROOT, "frontend", "assets", "destinations")
 JS_OUT = os.path.join(ROOT, "frontend", "assets", "js", "destination-images.js")
 CREDITS = os.path.join(OUT_DIR, "CREDITS.md")
 
-#: 4:3 at two widths, matching the hotel art so the two shelves crop alike.
-#: 960 covers a full-bleed mobile card on a 2x screen; 480 the desktop column.
-WIDTHS = (960, 480)
+#: 4:3 at three widths, matching the hotel art so the two shelves crop alike.
+#: 960 covers a full-bleed mobile card on a 2x screen; 480 the desktop column;
+#: 1600 the homepage's featured editorial cards on a 2x screen. <slug>.webp
+#: stays the 960w file, so every existing reader of the manifest is unchanged.
+WIDTHS = (960, 480, 1600)
+#: What Commons is asked to render: the largest width, so every variant is a
+#: downsample.
+FETCH_WIDTH = max(WIDTHS)
 ASPECT = (4, 3)
 WEBP_QUALITY = 80
 
@@ -77,20 +82,34 @@ PHOTOS = {
     # the same beach at golden hour, with the palms, the huts and the curve of
     # the bay, which is what the page is selling.
     "goa":        "File:Palolem Beach (5580920479).jpg",
-    "hyderabad":  "File:Charminar, Hyderabad, Telangana.jpg",
+    # 2026-09 AUDIT. Every title below was re-compared against 15-20 Commons
+    # candidates for its place (landmark, light, crop, resolution). Five kept
+    # their photograph and only gained the 1600w variant; ten were replaced -
+    # a flat daytime or grey-sky shot, a frame seen through a balcony railing,
+    # a minor pavilion standing in for Wat Arun, a stage rig in front of India
+    # Gate - by the strongest image of the same place.
+    "hyderabad":  "File:Charminar night view in Hyderabad 31.jpg",
     "mumbai":     "File:Gateway of India in the evening, Mumbai, India.jpg",
-    "delhi":      "File:India Gate, New Delhi from West.jpg",
+    "delhi":      "File:20191205 Grobowiec Humajuna w Delhi 1055 6794.jpg",
     "bengaluru":  "File:Vidhana Soudha LE.jpg",
-    "kashmir":    "File:Dal Lake, Srinagar, July 2012.jpg",
-    "jaipur":     "File:Hawa Mahal in Jaipur India.jpg",
-    "kolkata":    "File:Victoria Memorial, Kolkata - West facade 01.jpg",
-    "vijayawada": "File:Vijayawada durga temple.JPG",
+    "kashmir":    "File:Dal Lake Hazratbal Srinagar.jpg",
+    "jaipur":     "File:Hawa Mahal - Jaipur - Rajasthan - 001.jpg",
+    "kolkata":    "File:Victoria Memorial situated in Kolkata.jpg",
+    "vijayawada": "File:View of Temple at Praksam Barage with Night Lights.jpg",
     "tirupati":   "File:Tirumala 090615.jpg",
-    "dubai":      "File:Burj Khalifa (worlds tallest building) and the Dubai skyline (25781049892).jpg",
+    "dubai":      "File:Downtown, Dubai (36714617205).jpg",
     "bali":       "File:Tanah-Lot Bali Indonesia Pura-Tanah-Lot-01.jpg",
-    "maldives":   "File:Maldives RBR beach 6.jpg",
-    "singapore":  "File:Singapore Skyline Marina Bay Sands.jpg",
-    "thailand":   "File:Templo Wat Arun, Bangkok, Tailandia, 2013-08-22, DD 30.jpg",
+    # Never a hotel or resort as a place's picture (Anantara Kihavah was here).
+    "maldives":   "File:Beach Scene - Male - Maldives - 01 (14064527178).jpg",
+    # Never a hotel as a city's picture (Marina Bay Sands was here).
+    "singapore":  "File:Merlion (I).jpg",
+    "thailand":   "File:Wat Arun Sunset.jpg",
+}
+
+#: Where the 4:3 crop sits horizontally, 0 = hard left, 1 = hard right. Only for
+#: photographs whose landmark is off-centre; everything else crops centred.
+FOCUS_X = {
+    "hyderabad": 0.18,   # Charminar stands in the left third of the frame
 }
 
 
@@ -110,7 +129,7 @@ def to_webp(raw: bytes, slug: str) -> list[tuple[str, int]]:
     w, h = img.size
     if w / h > target:
         new_w = round(h * target)
-        left = (w - new_w) // 2
+        left = round((w - new_w) * FOCUS_X.get(slug, 0.5))
         img = img.crop((left, 0, left + new_w, h))
     else:
         new_h = round(w / target)
@@ -170,7 +189,7 @@ def write_js(records: dict) -> None:
         "   Run `python scripts/fetch_destination_images.py` to add or replace one.",
         "",
         "   Every slug listed here exists in frontend/assets/destinations/ as",
-        "   <slug>.webp (960w) and <slug>-480.webp (480w). Licence and attribution",
+        "   <slug>.webp (960w), <slug>-480.webp and <slug>-1600.webp. Licence and attribution",
         "   for each are in frontend/assets/destinations/CREDITS.md.",
         "",
         "   THE SLUG IS THE DATABASE'S image_key. The API sends the key, this file",
@@ -242,11 +261,11 @@ def main() -> int:
     for slug in wanted:
         title = PHOTOS[slug]
         primary = os.path.join(OUT_DIR, f"{slug}.webp")
-        if os.path.exists(primary) and not args.force:
+        if os.path.exists(primary) and os.path.exists(os.path.join(OUT_DIR, f"{slug}-1600.webp")) and not args.force:
             log(f"{slug}: present, skipping download")
         log(f"{slug}: {title}")
         try:
-            meta = fetch_metadata(title, WIDTHS[0])
+            meta = fetch_metadata(title, FETCH_WIDTH)
         except Exception as exc:                      # noqa: BLE001 — reported, not raised
             log(f"  ! metadata failed: {exc}")
             skipped.append(slug)
@@ -257,7 +276,7 @@ def main() -> int:
             skipped.append(slug)
             continue
 
-        if not os.path.exists(primary) or args.force:
+        if not os.path.exists(os.path.join(OUT_DIR, f"{slug}-1600.webp")) or args.force:
             try:
                 raw = download(meta["thumb_url"])
                 for name, size in to_webp(raw, slug):

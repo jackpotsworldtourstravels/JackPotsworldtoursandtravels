@@ -252,7 +252,7 @@ body[data-sp-service="flights"] .fx-offer span {
 /* ==========================================================================
    6. RESULTS HEAD, TOOLBAR, DIRECT-ONLY
    ========================================================================== */
-body[data-sp-service="flights"] .tx-head h2 {
+body[data-sp-service="flights"] .tx-head h1, body[data-sp-service="flights"] .tx-head h2 {
   font-size: 21px; font-weight: 800; letter-spacing: -.01em;
 }
 body[data-sp-service="flights"] .tx-head p { font-size: 12.5px; }

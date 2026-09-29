@@ -95,12 +95,6 @@ const HotelReview = (function () {
     if (n >= 3.5) return 'Good';
     return 'Pleasant';
   }
-  function heroSlug() {
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    return (detail.image && known[detail.image]) ? detail.image
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-  }
-  const imgDir = () => (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
 
   /* ---------------------------------------------------------------------
      The quote — the only source of a total.
@@ -181,8 +175,7 @@ const HotelReview = (function () {
     const n = nights();
     return section('stay', 'Hotel details', `
       <div class="hr-rv-hotel">
-        <img class="hr-rv-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}"
-             alt="${esc(detail.name)}" loading="lazy">
+        <div class="hr-rv-thumb">${HotelPhoto.thumb(detail)}</div>
         <div class="hr-rv-hotel-body">
           <div class="hr-name-row">
             <h3 class="hr-rv-name">${esc(detail.name)}</h3>
@@ -396,7 +389,7 @@ const HotelReview = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(detail)}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"
@@ -458,7 +451,7 @@ const HotelReview = (function () {
         </div>
         <div class="hr-ab-cta">
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrToPayment"
-                  ${ready ? '' : 'disabled'}>Continue to Payment</button>
+                  ${ready ? '' : 'disabled'}>Continue<span class="hr-ab-long"> to Payment</span></button>
           <span>${esc(note)}</span>
         </div>
       </div>`;

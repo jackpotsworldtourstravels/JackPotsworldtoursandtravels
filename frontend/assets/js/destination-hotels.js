@@ -35,9 +35,10 @@
    entirely rather than printing "₹0". Catalogue is not availability: nothing
    on this page claims a room is free on any date.
 
-   It does not invent an image. Photographs come from the project's existing
-   resolver (hotel-image-map.js), which falls back to default-hotel.webp and
-   reports whether the match was the property itself or merely its brand. */
+   It does not invent an image. Photographs come from THE shared resolver
+   (hotel-image-map.js): the property's own verified photograph, a city
+   photograph labelled as such, or an honest placeholder - never another
+   hotel's picture. */
 (function () {
   const grid = document.getElementById('dhGrid');
   const statusEl = document.getElementById('dhStatus');
@@ -96,13 +97,8 @@
   function cardHtml(h, index) {
     /* The existing hotel photograph system. `city` helps it disambiguate two
        properties of the same brand; both come from the API record. */
-    const media = (typeof hotelImageHtml === 'function')
-      ? hotelImageHtml({
-          name: h.name,
-          city: h.city || h.location_name || '',
-          sizes: '(max-width: 720px) 100vw, 260px',
-          eager: index < 2,
-        })
+    const media = (typeof HotelPhoto !== 'undefined')
+      ? HotelPhoto.html(h, { surface: 'card', sizes: '(max-width: 720px) 100vw, 260px', eager: index < 2 })
       : '';
 
     /* Every block below is conditional on the field actually being present.
@@ -295,7 +291,7 @@
 
       /* The photographs need their skeletons cleared after every render —
          a cached file can finish loading before the listener exists. */
-      if (typeof hotelImageSettle === 'function') hotelImageSettle(grid);
+      if (typeof HotelPhoto !== 'undefined') HotelPhoto.develop(grid);
       if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(grid);
 
       const remaining = total - loaded;

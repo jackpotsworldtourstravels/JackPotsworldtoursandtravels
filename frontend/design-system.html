@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-theme-lock="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- The design system's reference sheet: every component in jw-system.css,
+     rendered, so a change to the system is checked in a browser rather than
+     in a diff. Not a customer page; kept out of search. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Design System — JackPots World Tours &amp; Travels</title>
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="components/focus-trap.js"></script>
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<style>
+  body { margin: 0; background: var(--ds-ivory); color: var(--ds-ink); font-family: var(--ds-sans); }
+  .sg-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .sg-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .sg-sw { border-radius: 14px; overflow: hidden; box-shadow: var(--ds-sh-1); background: #fff; }
+  .sg-sw i { display: block; height: 70px; }
+  .sg-sw span { display: block; padding: 10px 12px; font-size: 12px; font-weight: 600; }
+  .sg-h { margin: 0 0 22px; }
+  section.ds-section { border-top: 1px solid var(--ds-line); }
+</style>
+</head>
+<body>
+<header class="ds-hero ds-hero--plain ds-hero--short">
+  <svg class="ds-hero__route" viewBox="0 0 1440 520" preserveAspectRatio="none" aria-hidden="true">
+    <path class="ghost" d="M-20 440 C 300 380, 420 120, 760 180 S 1180 460, 1460 90"/>
+    <path d="M-20 440 C 300 380, 420 120, 760 180 S 1180 460, 1460 90"/>
+  </svg>
+  <div class="ds-grain" aria-hidden="true"></div>
+  <div class="ds-container ds-hero__inner">
+    <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li aria-current="page">Design system</li></ol>
+    <p class="ds-eyebrow is-light">JackPots World &middot; Brand system</p>
+    <h1 class="ds-display">One journey, <em>one language.</em></h1>
+    <p class="ds-lede">Every token and component the customer site is built from, in one place.</p>
+  </div>
+</header>
+
+<main>
+<section class="ds-section"><div class="ds-container">
+  <p class="ds-eyebrow">Colour</p><h2 class="ds-h2 sg-h">Night, ivory, <em>champagne</em>, coral.</h2>
+  <div class="sg-grid" data-ds-stagger>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-night)"></i><span>Night #060a12</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-navy-800)"></i><span>Navy 800 #0f1b2e</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-navy-600)"></i><span>Navy 600 #22375a</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-ivory)"></i><span>Ivory #f5f0e8</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-sand)"></i><span>Sand #ebe3d6</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-gold)"></i><span>Champagne #d9b26f</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-gold-ink)"></i><span>Gold ink #85602a</span></div>
+    <div class="sg-sw" data-ds-reveal><i style="background:var(--ds-coral)"></i><span>Coral #c9482f</span></div>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container ds-stack">
+  <p class="ds-eyebrow">Typography</p>
+  <p class="ds-display" style="font-size:clamp(40px,6vw,88px)">The world <em>awaits.</em></p>
+  <h2 class="ds-h1">Destinations, <em>chosen with care.</em></h2>
+  <h3 class="ds-h2">Your upcoming journey</h3>
+  <h4 class="ds-h3">Overview</h4>
+  <p class="ds-lede">Playfair Display for the editorial voice; Montserrat for everything a traveller operates. Body copy sits at 15&ndash;17px with a 1.7 line height.</p>
+</div></section>
+
+<section class="ds-section ds-section--night ds-on-dark"><div class="ds-container ds-stack">
+  <p class="ds-eyebrow">Buttons &middot; on night</p>
+  <div class="sg-row">
+    <a class="ds-btn ds-btn--primary" href="#">Plan your journey <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <a class="ds-btn ds-btn--gold" href="#">Explore <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <a class="ds-btn ds-btn--ghost" href="#">View details <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <button class="ds-btn ds-btn--primary is-busy" type="button">Paying</button>
+  </div>
+  <div class="ds-tabs" style="margin-top:24px"><button class="ds-tab" aria-selected="true">Flights</button><button class="ds-tab">Hotels</button><button class="ds-tab">Tours</button><button class="ds-tab">Cruises</button></div>
+  <div class="ds-card ds-card--glass ds-card--pad" style="max-width:460px;margin-top:28px">
+    <div class="ds-field"><label class="ds-label" for="sgMail">Email address</label><div class="ds-control"><input class="ds-input" id="sgMail" type="email" placeholder="you@example.com"></div><p class="ds-hint">We only write about your bookings.</p></div>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container ds-stack">
+  <p class="ds-eyebrow">Buttons &middot; on ivory</p>
+  <div class="sg-row">
+    <a class="ds-btn ds-btn--primary ds-btn--lg" href="#">Search flights <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <a class="ds-btn ds-btn--dark" href="#">Continue <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <a class="ds-btn ds-btn--outline" href="#">View all destinations</a>
+    <a class="ds-btn ds-btn--link" href="#">Read the policy</a>
+    <a class="ds-btn ds-btn--outline ds-btn--sm" href="#" data-ds-tip="Saved to your wishlist">Save</a>
+  </div>
+  <div class="ds-tabs"><button class="ds-tab" aria-selected="true">One way</button><button class="ds-tab">Round trip</button><button class="ds-tab">Multi city</button></div>
+  <div class="sg-row">
+    <button class="ds-chip" aria-pressed="true">Non-stop <span class="ds-chip__count">12</span></button>
+    <button class="ds-chip" aria-pressed="false">1 stop <span class="ds-chip__count">31</span></button>
+    <button class="ds-chip" aria-pressed="false">Free cancellation</button>
+    <span class="ds-badge ds-badge--success">Confirmed</span>
+    <span class="ds-badge ds-badge--warning">Payment pending</span>
+    <span class="ds-badge ds-badge--danger">Cancelled</span>
+    <span class="ds-badge ds-badge--info">Refund in progress</span>
+    <span class="ds-badge ds-badge--gold ds-badge--plain">Sample fares</span>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container">
+  <p class="ds-eyebrow">Forms</p>
+  <div class="ds-card ds-card--pad" style="max-width:720px;display:grid;gap:18px;grid-template-columns:1fr 1fr">
+    <div class="ds-field"><label class="ds-label" for="sgFirst">First name <span class="ds-req">*</span></label><div class="ds-control"><input class="ds-input" id="sgFirst" autocomplete="given-name"></div></div>
+    <div class="ds-field is-invalid"><label class="ds-label" for="sgLast">Last name <span class="ds-req">*</span></label><div class="ds-control"><input class="ds-input" id="sgLast" aria-invalid="true" aria-describedby="sgLastErr"></div><p class="ds-error" id="sgLastErr">Enter the last name exactly as it appears on the passport.</p></div>
+    <div class="ds-field"><label class="ds-label" for="sgNat">Nationality</label><div class="ds-control"><select class="ds-select" id="sgNat"><option>India</option><option>United Arab Emirates</option></select></div></div>
+    <div class="ds-field"><label class="ds-label" for="sgDob">Date of birth</label><div class="ds-control"><input class="ds-input" id="sgDob" type="date"></div></div>
+    <div class="ds-field" style="grid-column:1/-1"><label class="ds-label" for="sgNote">Special requests</label><div class="ds-control"><textarea class="ds-textarea" id="sgNote" placeholder="A high floor, a late check-in…"></textarea></div></div>
+    <label class="ds-check" style="grid-column:1/-1"><input type="checkbox"> I agree to the Terms &amp; Conditions and the Privacy Policy</label>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container">
+  <p class="ds-eyebrow">Cards</p>
+  <div class="sg-grid" data-ds-stagger>
+    <a class="ds-media-card" href="#" data-ds-reveal="scale"><img class="ds-media-card__img ds-dev" src="assets/destinations/kashmir.webp" alt="Dal Lake, Kashmir"><span class="ds-media-card__body"><span class="ds-media-card__title">Kashmir</span><span class="ds-media-card__meta">India</span><span class="ds-media-card__go">Explore <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span></a>
+    <a class="ds-media-card" href="#" data-ds-reveal="scale"><img class="ds-media-card__img ds-dev" src="assets/destinations/thailand.webp" alt="Wat Arun, Bangkok"><span class="ds-media-card__body"><span class="ds-media-card__title">Thailand</span><span class="ds-media-card__meta">Thailand</span><span class="ds-media-card__go">Explore <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span></a>
+    <div class="ds-card ds-card--pad ds-card--hover" data-ds-reveal><p class="ds-caps" style="color:var(--ds-gold-ink)">Booking reference</p><p class="ds-h3" style="margin:6px 0 14px">JPW-24A91</p><span class="ds-badge ds-badge--success">Confirmed</span><div style="margin-top:18px" class="ds-price"><span class="ds-price__from">Total paid</span><span class="ds-price__amt">&#8377;29,400</span><span class="ds-price__per">2 adults</span></div></div>
+    <div class="ds-card ds-card--dark ds-card--pad" data-ds-reveal><p class="ds-eyebrow is-light">Upcoming</p><p class="ds-h3" style="color:#fff">Hyderabad &rarr; Dubai</p><p class="ds-lede" style="color:var(--ds-on-dark-2);margin-top:8px">Mon 12 Oct &middot; 1 stop</p></div>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container ds-stack">
+  <p class="ds-eyebrow">Alerts &amp; stepper</p>
+  <ol class="ds-stepper"><li class="ds-step is-done">Guests</li><li class="ds-step is-done">Review</li><li class="ds-step" aria-current="step">Add-ons</li><li class="ds-step">Payment</li><li class="ds-step">Confirmation</li></ol>
+  <div class="ds-alert ds-alert--success"><svg class="ds-alert__icon" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg><div><span class="ds-alert__title">Payment received</span>Your booking is being confirmed with the hotel.</div></div>
+  <div class="ds-alert ds-alert--warning"><svg class="ds-alert__icon" viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg><div><span class="ds-alert__title">Fare changed</span>The airline updated this fare. Review the new total before paying.</div></div>
+  <div class="ds-alert ds-alert--danger"><svg class="ds-alert__icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><div><span class="ds-alert__title">Payment failed</span>No money was taken. You can try again or choose another method.</div></div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container">
+  <p class="ds-eyebrow">Skeletons</p>
+  <div class="sg-grid" id="sgSkelCards"></div>
+  <div id="sgSkelRows" style="display:grid;gap:14px;margin-top:18px"></div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container">
+  <p class="ds-eyebrow">States</p>
+  <div class="sg-grid" style="grid-template-columns:repeat(auto-fill,minmax(360px,1fr))">
+    <div class="ds-card" id="sgS1"></div><div class="ds-card" id="sgS2"></div><div class="ds-card" id="sgS3"></div>
+    <div class="ds-card" id="sgS4"></div><div class="ds-card" id="sgS5"></div><div class="ds-card ds-card--dark ds-on-dark" id="sgS6"></div>
+  </div>
+</div></section>
+
+<section class="ds-section"><div class="ds-container sg-row">
+  <p class="ds-eyebrow" style="width:100%">Overlays</p>
+  <button class="ds-btn ds-btn--dark" type="button" id="sgOpenModal">Open modal</button>
+  <button class="ds-btn ds-btn--outline" type="button" id="sgOpenDrawer">Open filters</button>
+</div></section>
+</main>
+
+<div class="ds-modal" id="sgModal" aria-labelledby="sgModalT">
+  <p class="ds-eyebrow">Before you pay</p>
+  <h2 class="ds-h2" id="sgModalT">Review your journey</h2>
+  <p class="ds-lede" style="margin:12px 0 24px">Two adults, Hyderabad to Dubai, Mon 12 Oct. The fare is held for 15 minutes.</p>
+  <div class="sg-row"><button class="ds-btn ds-btn--primary" data-ds-close>Continue to payment</button><button class="ds-btn ds-btn--outline" data-ds-close>Back</button></div>
+</div>
+<aside class="ds-drawer" id="sgDrawer" aria-labelledby="sgDrawerT">
+  <div class="ds-drawer__head"><h2 class="ds-drawer__title" id="sgDrawerT">Filters</h2><button class="ds-close" data-ds-close aria-label="Close filters"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="ds-drawer__body ds-stack">
+    <p class="ds-caps">Stops</p><div class="sg-row"><button class="ds-chip" aria-pressed="true">Non-stop</button><button class="ds-chip" aria-pressed="false">1 stop</button></div>
+    <p class="ds-caps">Price</p><div class="ds-field"><label class="ds-label" for="sgMax">Up to</label><div class="ds-control"><input class="ds-input" id="sgMax" inputmode="numeric" value="12500"></div></div>
+  </div>
+  <div class="ds-drawer__foot"><button class="ds-btn ds-btn--outline" data-ds-close>Clear</button><button class="ds-btn ds-btn--dark ds-btn--block" data-ds-close>Show 43 flights</button></div>
+</aside>
+
+<script>
+  DS.skeleton(document.getElementById('sgSkelCards'), 'card', 3);
+  DS.skeleton(document.getElementById('sgSkelRows'), 'row', 2);
+  DS.state(document.getElementById('sgS1'), { kind: 'loading' });
+  DS.state(document.getElementById('sgS2'), { kind: 'empty', title: 'Your next journey starts here.', body: 'Save a destination, a hotel or a package and it waits for you here.', actions: [{ label: 'Explore destinations', href: 'index.html#destinations' }] });
+  DS.state(document.getElementById('sgS3'), { kind: 'notfound', title: 'We couldn’t find that destination', actions: [{ label: 'All destinations', href: 'index.html#destinations' }] });
+  DS.state(document.getElementById('sgS4'), { kind: 'error', actions: [{ label: 'Try again', onClick: () => {} }, { label: 'Contact support', href: 'contact-us.html' }] });
+  DS.state(document.getElementById('sgS5'), { kind: 'expired', actions: [{ label: 'Sign in', onClick: () => {} }] });
+  DS.state(document.getElementById('sgS6'), { kind: 'offline', actions: [{ label: 'Retry', variant: 'gold', onClick: () => {} }] });
+  document.getElementById('sgOpenModal').onclick = () => DS.open(document.getElementById('sgModal'));
+  document.getElementById('sgOpenDrawer').onclick = () => DS.open(document.getElementById('sgDrawer'));
+</script>
+</body>
+</html>

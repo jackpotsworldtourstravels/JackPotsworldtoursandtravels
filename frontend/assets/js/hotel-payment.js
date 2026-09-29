@@ -147,12 +147,6 @@ const HotelPayment = (function () {
     return isNaN(d) ? '—' : d.toLocaleDateString('en-IN',
       { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   }
-  function heroSlug() {
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    return (detail.image && known[detail.image]) ? detail.image
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-  }
-  const imgDir = () => (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
   const signedIn = () => typeof BookingApi !== 'undefined' && BookingApi.isSignedIn();
   const methodLabel = id => (methods.find(m => m.id === id) || {}).name || id;
 
@@ -276,7 +270,7 @@ const HotelPayment = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(detail)}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"

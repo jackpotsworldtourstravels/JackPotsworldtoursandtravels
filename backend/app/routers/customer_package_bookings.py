@@ -281,7 +281,11 @@ def get_package_departures(package: int = Query(..., description="The package's 
             "seatsLeft": d.seats_left,
             "price": float(d.price_per_person),
         }
+        # The dates this package actually SELLS: active, and not yet gone —
+        # the same rule as the detail endpoint's `live` list above. Listing
+        # last month's departures here put them on the Departure step.
         for d in property_.departures
+        if d.is_active and d.departure_date >= dt.date.today()
     ]
 
 
@@ -327,7 +331,7 @@ def quote_package_booking(payload: PackageQuoteRequest, db: Session = Depends(ge
     package = catalog.get_package(db, payload.trip.package_id)
     if package is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That package is not available.")
-    departure = catalog.get_departure(db, payload.trip.package_id, payload.trip.departure_id)
+    departure = catalog.get_bookable_departure(db, payload.trip.package_id, payload.trip.departure_id)
     if departure is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That departure date is not available.")
     try:

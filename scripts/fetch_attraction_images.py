@@ -113,6 +113,71 @@ NOT_A_PHOTOGRAPH = re.compile(
 CATEGORY_OVERRIDES: dict[str, str] = {}
 
 
+#: HAND-CHOSEN, 2026-09 AUDIT. The category pick above is right for most
+#: landmarks and wrong for some: a bird in a park, a sign, a museum courtyard
+#: for a museum, or a category with nothing usable at all. Each title here was
+#: compared against a row of candidates and checked to show THIS place. It
+#: takes precedence over the category pick; the licence gate still applies.
+#: Places with no verifiable photograph (a reef, a dive site) are left out
+#: on purpose and keep the fallback artwork.
+CURATED = {
+    'bali__mount-batur': 'File:Gunung Batur Kintamani.jpg',
+    'bali__sacred-monkey-forest-sanctuary': 'File:Crab-eating macaque - Ubud Monkey Forest 2017-08-21 01.jpg',
+    'bali__tanah-lot-temple': 'File:Bali - Pura Tanah Lot, 20220827 0958 1114.jpg',
+    'bali__ubud-palace': 'File:Puri Saren Agung (33172644978).jpg',
+    'bali__uluwatu-temple': 'File:Kuta Bali Indonesia Pura-Luhur-Uluwatu-03.jpg',
+    'bengaluru__cubbon-park': 'File:Sheshadri Iyer Memorial Hall (STATE CENTRAL LIBRARY).jpg',
+    'bengaluru__iskcon-temple': 'File:ISKCON Temple Bangalore (3475538274).jpg',
+    'bengaluru__lalbagh-botanical-garden': 'File:Lalbagh glass house during flower show Jan 2012 1443.jpg',
+    'delhi__akshardham-temple': 'File:Delhi Akshardham Temple.JPG',
+    'delhi__humayuns-tomb': 'File:Humayun’s Tomb, Delhi 4.jpg',
+    'delhi__qutub-minar': 'File:Qutub Minar, Delhi 3.jpg',
+    'delhi__red-fort': 'File:The Red Fort of Delhi, India (12).jpg',
+    'dubai__al-fahidi-historical-district': 'File:Al Fahidi Historical Neighbourhood (Bastakiya).jpg',
+    'dubai__burj-al-arab': 'File:Burj Al Arab and Jumeirah Beach (9601659067).jpg',
+    'dubai__burj-khalifa': 'File:Burj Khalifa (16260269606).jpg',
+    'dubai__dubai-fountain': 'File:Dubai Fountain 7.JPG',
+    'dubai__gold-souk': 'File:Dubai - City of Gold – Gold Souk - مدينة الذهب - panoramio.jpg',
+    'goa__baga-beach': 'File:Baga Beach-Goa India-Andres Larin.jpg',
+    'goa__basilica-of-bom-jesus': 'File:Basilica of Bom Jesus 4 (Old Goa).jpg',
+    'hyderabad__ramoji-film-city': 'File:Ramoji Film City, Hyderabad - views from Ramoji Film City (40).JPG',
+    'hyderabad__salar-jung-museum': 'File:Salar Jung Museum Hyderabad, India 01.jpg',
+    'jaipur__amer-fort': 'File:Amer Fort or Amber Fort - Jaipur 6.jpg',
+    'jaipur__city-palace': 'File:Jaipur, India, City Palace, Diwan-i Khas.jpg',
+    'jaipur__jal-mahal': 'File:20191218 Jal Mahal Palace in Jaipur 1429 9234.jpg',
+    'jaipur__jantar-mantar': 'File:20191218 Jantar Mantar, Jaipur 0906 8983 DxO.jpg',
+    'jaipur__nahargarh-fort': 'File:Jaipur City and Nahargarh fort.jpg',
+    'kashmir__dal-lake': 'File:Dal Lake at sunset, Srinagar.jpg',
+    'kashmir__gulmarg-gondola': 'File:Gulmarg Gondola Kashmir 2.jpg',
+    'kashmir__nishat-bagh': 'File:Nishat Bagh Garden - Srinagar - Jammu & Kashmir - India (26237439274).jpg',
+    'kashmir__shalimar-bagh': 'File:Garden Scene - Shalimar Bagh Garden - Srinagar - Jammu & Kashmir - India - 03 (26237591094).jpg',
+    'kolkata__eco-park': 'File:Eco park-13-new town smart city-kolkata-India.jpg',
+    'kolkata__howrah-bridge': 'File:Howrah Bridge Kolkata Photography by Argha Mallick 01.jpg',
+    'kolkata__indian-museum': 'File:Indian Museum, Courtyard, Kolkata, India.jpg',
+    'kolkata__st-pauls-cathedral': "File:St. Paul's Cathedral, Cathedral Road in Kolkata 23.jpg",
+    'maldives__artificial-beach': 'File:Beach Scene - Male - Maldives - 01 (14064527178).jpg',
+    'maldives__hukuru-miskiy': "File:Male' Hukuru Miskiy 3.jpg",
+    'mumbai__bandra-worli-sea-link': 'File:Sealink worli view.jpg',
+    'mumbai__chhatrapati-shivaji-maharaj-terminus': 'File:Mumbai Chatrapati Shivaji Maharaj Terminus.jpg',
+    'mumbai__juhu-beach': 'File:Juhu, bombay! (47187395891).jpg',
+    'mumbai__marine-drive': 'File:Marine Lines Mumbai 2021.jpg',
+    'mumbai__siddhivinayak-temple': 'File:Shree Siddhivinayak Mandir.jpg',
+    'singapore__marina-bay-sands': 'File:Cricket match and Marina Bay Sands Hotel in Singapore.jpg',
+    'singapore__merlion-park': 'File:Merlion (I).jpg',
+    'singapore__singapore-botanic-gardens': 'File:Swan Lake (Singapore).jpg',
+    'thailand__doi-suthep': 'File:Phra That Doi Suthep 01.jpg',
+    'thailand__grand-palace': 'File:Grand Palace, Bangkok 3.jpg',
+    'thailand__phi-phi-islands': 'File:Isla Ko Phi Phi Don, Tailandia, 2013-08-19, DD 12.JPG',
+    'thailand__railay-beach': 'File:Railay, Krabi, Thailand.jpg',
+    'tirupati__silathoranam': 'File:Silathoranam Tirupati.jpg',
+    'tirupati__sri-padmavathi-ammavari-temple': 'File:Tiruchanur 09.JPG',
+    'tirupati__talakona-waterfall': 'File:Talakona Fall.jpg',
+    'vijayawada__bhavani-island': 'File:Bhavani island sunset.jpg',
+    'vijayawada__kanaka-durga-temple': 'File:Vijayawada Kanakadurga Temple on Indrakeeladri.jpg',
+    'vijayawada__undavalli-caves': 'File:Undavalli Caves, Vijayawada.JPG',
+}
+
+
 def log(msg: str) -> None:
     """Print, on a console that cannot necessarily spell what Commons calls things.
 
@@ -466,13 +531,19 @@ def main() -> int:
             continue
 
         log(f"  {key}  ({s['name']}, {s['city']})")
-        category = find_category(s["name"], s["city"], key)
+        if key in CURATED:
+            chosen = {"title": CURATED[key], "width": 0, "height": 0, "licence": "curated"}
+            log(f"      curated -> {chosen['title']}")
+            category = "curated"
+        else:
+            category = find_category(s["name"], s["city"], key)
+            chosen = None
         if not category:
             log("      no Commons category - left on the fallback artwork")
             failed.append((key, "no category"))
             continue
 
-        chosen = pick(category)
+        chosen = chosen or pick(category)
         if not chosen:
             log(f"      {category}: nothing usable (licence, size or subject)")
             failed.append((key, f"nothing usable in {category}"))

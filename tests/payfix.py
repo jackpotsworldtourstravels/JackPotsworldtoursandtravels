@@ -174,9 +174,15 @@ class PaymentFixture:
         # which point every run fails on "Only 0 seats are left". That reads as
         # an inventory bug and is really just a dirty fixture, so the fixture
         # chooses rather than assumes.
+        # ...and one that can still be SOLD. A departure that has already left
+        # is refused by the booking path ("That departure date is not
+        # available") since customer_package_catalog_service.
+        # get_bookable_departure(); picking one here made every run fail at the
+        # first booking once the seeded dates slipped into the past.
         self.departure_id = self.db.execute(text(
             "SELECT customer_package_departure_id FROM customer_package_departures "
-            "WHERE package_id = :p ORDER BY seats_left DESC, "
+            "WHERE package_id = :p AND is_active AND departure_date >= CURRENT_DATE "
+            "ORDER BY seats_left DESC, "
             "customer_package_departure_id ASC LIMIT 1"), {"p": PACKAGE_ID}).scalar()
         if self.departure_id is None:
             raise RuntimeError(f"Package {PACKAGE_ID} has no departures seeded.")

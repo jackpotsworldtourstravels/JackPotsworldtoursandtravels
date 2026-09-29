@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- Light shell, as destination-hotels.html and hotels.html. -->
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,10 @@
      version). -->
 <base href="/">
 <title>Destination — JackPots World Tours &amp; Travels</title>
-<meta name="description" content="Explore famous locations and find hotels near them with JackPots World Tours &amp; Travels.">
+<meta name="description" content="Explore a destination with JackPots World Tours &amp; Travels: its famous places, the hotels closest to them, tour packages and flights.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="JackPots World Tours &amp; Travels">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/images/favicon.ico">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -20,43 +23,45 @@
      place rather than a record, and it is loaded where that matters instead
      of site-wide. Georgia is named as the fallback, so a blocked font request
      degrades to a serif rather than to the UI face. -->
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
 <!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
      (.reveal / .delay-*) and the card hover language; it replaces neither.
      See the header of jw-motion.css. -->
-<link rel="stylesheet" href="assets/css/jw-motion.css?v=20260926mo3">
 <!-- One bar and one background for the whole booking journey - the tokens
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
-<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
-<link rel="stylesheet" href="assets/css/home-ref.css?v=20260912qt1">
-<link rel="stylesheet" href="assets/css/hotel.css?v=20260925ui1">
+<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
 <!-- The discovery pages' own sheet. Loaded after hotel.css, which keeps the
      shared shell (.dh-main, .dh-status) those pages borrow. -->
-<link rel="stylesheet" href="assets/css/discover.css?v=20260925ui1">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
-<link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260928ft2">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
-<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- The destination artwork manifest the homepage shelf uses. A location's
      image key resolves against the same one; no key, no picture, a tint. -->
-<script src="assets/js/destination-images.js?v=20260923im2"></script>
+<script src="assets/js/destination-images.js?v=0928221731"></script>
 <!-- A photograph per famous place, keyed by the attraction id the API sends.
      Written by scripts/fetch_attraction_images.py from each landmark's own
      Wikimedia Commons category; no key, no file, no picture. -->
-<script src="assets/js/location-images.js?v=20260923im2"></script>
-<script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260925ui1"></script>
+<script src="assets/js/location-images.js?v=20260928im4"></script>
+<script src="assets/js/site-footer.js?v=20260928ft2"></script>
+<script src="assets/js/hero-shell.js?v=20260928hd1"></script>
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<link rel="stylesheet" href="assets/css/jw-editorial.css?v=0928221340">
+<script src="components/focus-trap.js"></script>
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
 </head>
-<body class="sp-continuation disc" data-sp-service="hotels" data-live-chat>
-<a href="#dlMain" class="skip-link">Skip to content</a>
+<body class="ed-page" data-live-chat>
+<a href="#main" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="assets/js/profile-menu.js?v=20260922gs1"></script>
@@ -65,36 +70,43 @@
 <script src="assets/js/account-center.js?v=20260926ac4"></script>
 
 <header id="siteHeader"></header>
-<script>HeroShell.mountHeader('hotels.html');</script>
+<script>HeroShell.mountHeader('destinations.html');</script>
 
-<main id="dlMain" class="dh-main disc-main hr-scope">
-  <div class="wrap">
-    <!-- A <div>, not a <header>: a bare `header` is position:fixed site-wide.
-         The city's own photograph goes in here once the API names it; empty
-         until then, because the slug in the URL is never printed as a name. -->
-    <div class="dl-hero" id="dlHero">
-      <div class="dl-hero-body">
-        <p class="dl-hero-eyebrow" id="dlCountry"></p>
-        <h1 id="dlTitle">Loading…</h1>
-        <p class="dl-hero-lead" id="dlLead"></p>
-      </div>
+<!-- ONE DESTINATION — /destination/{slug}. Everything named on this page is
+     the API's: the destination (name, country, photograph key), its famous
+     places (attractions: name, description, photograph key, nearest area and
+     its hotel count) and the tour packages whose destination is this one.
+     destination.js renders it; this markup is the frame. -->
+<main id="main">
+  <section class="ds-hero" id="dlHero" aria-labelledby="dlTitle">
+    <div class="ds-hero__media" id="dlHeroMedia"></div>
+    <div class="ds-hero__shade"></div>
+    <svg class="ds-hero__route" viewBox="0 0 1440 700" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="ghost" d="M-20 560 C 300 600, 420 300, 760 330 S 1160 560, 1460 200"/>
+      <path d="M-20 560 C 300 600, 420 300, 760 330 S 1160 560, 1460 200"/>
+    </svg>
+    <div class="ds-grain" aria-hidden="true"></div>
+    <div class="ds-container ds-hero__inner">
+      <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li><a href="destinations.html">Destinations</a></li><li aria-current="page" id="dlCrumb">&hellip;</li></ol>
+      <p class="ds-eyebrow is-light" id="dlCountry" data-ds-reveal>&nbsp;</p>
+      <h1 class="ds-display" id="dlTitle" data-ds-reveal><span class="ds-skel" style="display:inline-block;width:min(60vw,640px);height:.8em;background:rgba(255,255,255,.12)"></span></h1>
+      <p class="ds-lede" id="dlLead" data-ds-reveal style="--ds-delay:.12s"></p>
+      <div class="dl-stats" id="dlStats" data-ds-reveal style="--ds-delay:.2s"></div>
     </div>
+  </section>
 
-    <!-- BACK LINK UNDER THE HERO, not above it — the city photograph leads,
-         the way back to Destinations sits just beneath it. -->
-    <a class="dh-back" href="index.html#destinations">
-      <span data-jp-icon="arrowLeft" aria-hidden="true"></span> Back to Destinations
-    </a>
+  <nav class="dl-subnav" id="dlSubnav" aria-label="On this page" hidden>
+    <div class="ds-container dl-subnav__row">
+      <a href="#overview">Overview</a><a href="#places">Famous places</a><a href="#hotels">Hotels</a><a href="#tours">Tours</a><a href="#flights">Flights</a>
+      <span class="dl-subnav__ind" aria-hidden="true"></span>
+    </div>
+  </nav>
 
-    <p class="dl-count" id="dlCount"></p>
-    <p class="dh-status" id="dlStatus" role="status" aria-live="polite"></p>
-    <div class="dl-grid" id="dlGrid" role="list" aria-busy="true"></div>
-  </div>
+  <div id="dlBody" aria-busy="true"></div>
 </main>
 
-<footer id="bookingFooter"></footer>
-<script>HeroShell.mountBookingFooter();</script>
+<footer data-site-footer></footer>
 <script src="assets/js/jw-interest.js?v=20260926pz1"></script>
-<script src="assets/js/destination.js?v=20260926mo2"></script>
+<script src="assets/js/destination.js?v=0928221731"></script>
 </body>
 </html>

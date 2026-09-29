@@ -10,16 +10,27 @@ NonCommercial or NoDerivatives licence is accepted.
 | --- | --- | --- | --- |
 | `bali` | CEphoto, Uwe Aranas | CC BY-SA 3.0 | [File:Tanah-Lot Bali Indonesia Pura-Tanah-Lot-01.jpg](https://commons.wikimedia.org/wiki/File:Tanah-Lot_Bali_Indonesia_Pura-Tanah-Lot-01.jpg) |
 | `bengaluru` | DeepanjanGhosh | CC BY-SA 4.0 | [File:Vidhana Soudha LE.jpg](https://commons.wikimedia.org/wiki/File:Vidhana_Soudha_LE.jpg) |
-| `delhi` | Nikhilb239 | CC BY-SA 4.0 | [File:India Gate, New Delhi from West.jpg](https://commons.wikimedia.org/wiki/File:India_Gate,_New_Delhi_from_West.jpg) |
-| `dubai` | imran shahabuddin | CC BY 2.0 | [File:Burj Khalifa (worlds tallest building) and the Dubai skyline (25781049892).jpg](https://commons.wikimedia.org/wiki/File:Burj_Khalifa_(worlds_tallest_building)_and_the_Dubai_skyline_(25781049892).jpg) |
+| `delhi` | Jakub Hałun | CC BY-SA 4.0 | [File:20191205 Grobowiec Humajuna w Delhi 1055 6794.jpg](https://commons.wikimedia.org/wiki/File:20191205_Grobowiec_Humajuna_w_Delhi_1055_6794.jpg) |
+| `dubai` | https://pixabay.com/users/bulletrain743-3598825/ | CC0 | [File:Downtown, Dubai (36714617205).jpg](https://commons.wikimedia.org/wiki/File:Downtown,_Dubai_(36714617205).jpg) |
 | `goa` | Nico Crisafulli from USA | CC BY 2.0 | [File:Palolem Beach (5580920479).jpg](https://commons.wikimedia.org/wiki/File:Palolem_Beach_(5580920479).jpg) |
-| `hyderabad` | Hari Om Prakash | CC BY-SA 3.0 | [File:Charminar, Hyderabad, Telangana.jpg](https://commons.wikimedia.org/wiki/File:Charminar,_Hyderabad,_Telangana.jpg) |
-| `jaipur` | Wander-earth | CC BY-SA 4.0 | [File:Hawa Mahal in Jaipur India.jpg](https://commons.wikimedia.org/wiki/File:Hawa_Mahal_in_Jaipur_India.jpg) |
-| `kashmir` | Vineetmbbs | CC BY-SA 3.0 | [File:Dal Lake, Srinagar, July 2012.jpg](https://commons.wikimedia.org/wiki/File:Dal_Lake,_Srinagar,_July_2012.jpg) |
-| `kolkata` | Bernard Gagnon | CC BY-SA 3.0 | [File:Victoria Memorial, Kolkata - West facade 01.jpg](https://commons.wikimedia.org/wiki/File:Victoria_Memorial,_Kolkata_-_West_facade_01.jpg) |
-| `maldives` | B166-er | CC BY-SA 3.0 | [File:Maldives RBR beach 6.jpg](https://commons.wikimedia.org/wiki/File:Maldives_RBR_beach_6.jpg) |
+| `hyderabad` | Tarunsamanta | CC BY-SA 4.0 | [File:Charminar night view in Hyderabad 31.jpg](https://commons.wikimedia.org/wiki/File:Charminar_night_view_in_Hyderabad_31.jpg) |
+| `jaipur` | Rupeshsarkar | CC BY-SA 4.0 | [File:Hawa Mahal - Jaipur - Rajasthan - 001.jpg](https://commons.wikimedia.org/wiki/File:Hawa_Mahal_-_Jaipur_-_Rajasthan_-_001.jpg) |
+| `kashmir` | Suhail Skindar Sofi | CC BY-SA 4.0 | [File:Dal Lake Hazratbal Srinagar.jpg](https://commons.wikimedia.org/wiki/File:Dal_Lake_Hazratbal_Srinagar.jpg) |
+| `kolkata` | Subhrajyoti07 | CC BY-SA 4.0 | [File:Victoria Memorial situated in Kolkata.jpg](https://commons.wikimedia.org/wiki/File:Victoria_Memorial_situated_in_Kolkata.jpg) |
+| `maldives` | Adam Jones from Kelowna, BC, Canada | CC BY-SA 2.0 | [File:Beach Scene - Male - Maldives - 01 (14064527178).jpg](https://commons.wikimedia.org/wiki/File:Beach_Scene_-_Male_-_Maldives_-_01_(14064527178).jpg) |
 | `mumbai` | SriSriChinmaya | CC BY-SA 4.0 | [File:Gateway of India in the evening, Mumbai, India.jpg](https://commons.wikimedia.org/wiki/File:Gateway_of_India_in_the_evening,_Mumbai,_India.jpg) |
-| `singapore` | -jkb- | CC BY-SA 3.0 | [File:Singapore Skyline Marina Bay Sands.jpg](https://commons.wikimedia.org/wiki/File:Singapore_Skyline_Marina_Bay_Sands.jpg) |
-| `thailand` | Diego Delso | CC BY-SA 3.0 | [File:Templo Wat Arun, Bangkok, Tailandia, 2013-08-22, DD 30.jpg](https://commons.wikimedia.org/wiki/File:Templo_Wat_Arun,_Bangkok,_Tailandia,_2013-08-22,_DD_30.jpg) |
+| `singapore` | Supanut Arunoprayote | CC BY 4.0 | [File:Merlion (I).jpg](https://commons.wikimedia.org/wiki/File:Merlion_(I).jpg) |
+| `thailand` | miketnorton | CC BY 2.0 | [File:Wat Arun Sunset.jpg](https://commons.wikimedia.org/wiki/File:Wat_Arun_Sunset.jpg) |
 | `tirupati` | Nikhilb239 | CC BY-SA 4.0 | [File:Tirumala 090615.jpg](https://commons.wikimedia.org/wiki/File:Tirumala_090615.jpg) |
-| `vijayawada` | రహ్మానుద్దీన్ | CC BY-SA 3.0 | [File:Vijayawada durga temple.JPG](https://commons.wikimedia.org/wiki/File:Vijayawada_durga_temple.JPG) |
+| `vijayawada` | Krishna Chaitanya Velaga | CC BY-SA 4.0 | [File:View of Temple at Praksam Barage with Night Lights.jpg](https://commons.wikimedia.org/wiki/File:View_of_Temple_at_Praksam_Barage_with_Night_Lights.jpg) |
+
+## Maldives and Singapore (2026-09-28)
+
+The destination set used to show **Anantara Kihavah** for `maldives` and
+**Marina Bay Sands** for `singapore` — photographs of one resort and one hotel,
+standing in for a whole country and a whole city. A property is never used as a
+place's picture on this site. Both slots now hold the landmark photographs
+already vendored under `assets/locations/` (Malé's Artificial Beach, the
+Merlion), copied locally at their 960px size — the `-1600` file is that same
+960px image until `scripts/fetch_destination_images.py` is re-run, which now
+names these same Commons files and will fetch them at full width.

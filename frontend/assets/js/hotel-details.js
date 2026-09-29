@@ -118,74 +118,60 @@ const HotelDetails = (function () {
     ? HotelResults.icon(name, cls) : '';
 
   /* ---------------------------------------------------------------------
-     Images
+     The property hero.
+
+     THE PHOTOGRAPH IS THE SHARED RESOLVER'S ANSWER, NOT THE API'S. The detail
+     response carries `image` / `images` keys, and the seed set those to chain
+     files — the Taj Mahal Palace in Mumbai for a Taj in Banjara Hills, the
+     Hyatt in London for a Hyatt in Hyderabad. The old gallery trusted them and
+     captioned the mismatch "Representative photograph of the group". It is
+     gone: HotelPhoto shows this property's verified photograph, else the
+     city's — labelled ON the picture as not the hotel — else the honest
+     placeholder. With one verified photograph at most, there is no thumbnail
+     strip and no "1 / N" to print.
      --------------------------------------------------------------------- */
-  /** Every slug this property has a real file for. `images` is the source of
-   *  truth; `image` is the primary and is included even if `images` is empty,
-   *  so a property with only the one key still gets its photograph. */
-  function slugs() {
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    const all = [];
-    const push = s => { if (s && known[s] && !all.includes(s)) all.push(s); };
-    push(detail.image);
-    (detail.images || []).forEach(push);
-    if (!all.length) {
-      all.push(typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-    }
-    return all;
+  function areaOf() {
+    const parts = String(detail.location || '').split(',').map(s => s.trim()).filter(Boolean);
+    return { area: parts.length > 1 ? parts[0] : '', city: parts[parts.length - 1] || '' };
   }
 
-  function imgTag(slug, cls, eager) {
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    return `<img class="${cls || ''}" src="${esc(dir + slug + '.webp')}"
-      srcset="${esc(dir + slug + '-480.webp')} 480w, ${esc(dir + slug + '.webp')} 1024w"
-      sizes="(max-width: 900px) 96vw, 620px"
-      alt="${esc(detail.name)}"
-      ${eager ? '' : 'loading="lazy"'} decoding="async"
-      onerror="this.closest('.hr-gal-frame')?.classList.add('is-broken'); this.remove();">`;
-  }
-
-  /** The attribution line. Required by the photographs' licences, and honest
-   *  about whether the picture is of this property or of the chain. */
-  function creditHtml(slug) {
-    const credits = typeof HOTEL_IMAGE_CREDITS !== 'undefined' ? HOTEL_IMAGE_CREDITS : {};
-    const c = credits[slug];
-    const level = (typeof hotelImageMatchLevel === 'function')
-      ? hotelImageMatchLevel(slug, 'property') : 'property';
-
-    const standIn = level === 'brand'
-      ? `<span class="hr-gal-standin">Representative photograph of the ${esc(brandWord())} group — not this property.</span>`
-      : '';
-    if (!c) return standIn;
-    return `${standIn}<span class="hr-gal-credit">Photo: ${esc(c.artist)} · ${esc(c.licence)}
-      ${c.source ? `<a href="${esc(c.source)}" target="_blank" rel="noopener noreferrer">source</a>` : ''}</span>`;
-  }
-
-  function brandWord() {
-    return String(detail.name || '').split(/\s+/)[0] || 'hotel';
-  }
-
-  function galleryHtml() {
-    const all = slugs();
-    const primary = all[0];
+  function heroHtml() {
+    const { area, city } = areaOf();
+    const photo = (typeof HotelPhoto !== 'undefined')
+      ? HotelPhoto.html(detail, { surface: 'hero', eager: true, sizes: '(max-width: 900px) 100vw, 1100px' }) : '';
     return `
-      <figure class="hr-gallery">
-        <div class="hr-gal-frame" data-gal-main>
-          ${imgTag(primary, 'hr-gal-img', true)}
-          <span class="hr-gal-broken">Photograph unavailable</span>
-        </div>
-        ${all.length > 1 ? `
-          <div class="hr-gal-thumbs" role="group" aria-label="Photographs of ${esc(detail.name)}">
-            ${all.map((s, i) => `
-              <button type="button" class="hr-gal-thumb ${i === 0 ? 'is-on' : ''}"
-                      data-gal-pick="${esc(s)}" aria-pressed="${i === 0}"
-                      aria-label="Show photograph ${i + 1} of ${all.length}">
-                ${imgTag(s, '')}
-              </button>`).join('')}
+      <section class="hd-hero" aria-labelledby="hdName">
+        <div class="hd-hero-media">${photo}</div>
+        <div class="hd-hero-body">
+          ${area || city ? `<p class="hc-kicker">${esc(area)}${area && city ? '<i aria-hidden="true">·</i>' : ''}${esc(city)}</p>` : ''}
+          <h1 class="hr-hd-name" id="hdName">${esc(detail.name)}</h1>
+          <div class="hc-meta">
+            ${detail.stars ? `<span class="hr-stars" role="img" aria-label="${esc(detail.stars)}-star hotel">${
+              typeof JPIcon !== 'undefined' ? JPIcon.stars(detail.stars, detail.stars) : ''}</span>` : ''}
+            ${detail.guest_rating != null ? `<span class="hc-score"><b>${esc(Number(detail.guest_rating).toFixed(1))}</b>${
+              esc(ratingWord(detail.guest_rating))}<span class="hr-sr">guest rating out of 5</span></span>` : ''}
           </div>
-          <span class="hr-gal-count">1 / ${all.length}</span>` : ''}
-        <figcaption class="hr-gal-cap">${creditHtml(primary)}</figcaption>
-      </figure>`;
+        </div>
+      </section>`;
+  }
+
+  /** The five facts that decide a stay, each from a column or the room list:
+   *  the lowest nightly rate, how many room types, the meal plans, whether
+   *  cancellation is free, and the airport distance. A missing one is absent. */
+  function glanceHtml() {
+    const rooms = detail.rooms || [];
+    const meals = [...new Set(rooms.map(r => r.meal_plan).filter(Boolean))];
+    const free = String(detail.cancellation_policy || '').trim().toLowerCase().startsWith('free cancellation');
+    const cells = [
+      rooms.length ? ['From', `${rupees(lowestRate())}<small>/ night</small>`] : null,
+      rooms.length ? ['Room types', String(rooms.length)] : null,
+      meals.length ? ['Meal plans', meals.length === 1 ? esc(meals[0]) : `${meals.length} options`] : null,
+      detail.cancellation_policy ? ['Cancellation', free ? 'Free' : 'See policy', free] : null,
+      detail.distanceKm != null ? ['Airport', `${esc(Number(detail.distanceKm))} km`] : null,
+    ].filter(Boolean);
+    if (!cells.length) return '';
+    return `<dl class="hd-glance" data-ds-stagger=".07">${cells.map(c =>
+      `<div data-ds-reveal class="${c[2] ? 'is-good' : ''}"><dt>${c[0]}</dt><dd>${c[1]}</dd></div>`).join('')}</dl>`;
   }
 
   /* ---------------------------------------------------------------------
@@ -287,7 +273,7 @@ const HotelDetails = (function () {
       <h3 class="hr-panel-title">Location</h3>
       <p class="hr-prose">${icon('pin')} ${esc(detail.location)}</p>
       ${detail.distanceKm != null ? `
-        <p class="hr-panel-note">${esc(detail.distanceKm)} km from the airport.</p>` : ''}
+        <p class="hr-panel-note">${esc(Number(detail.distanceKm))} km from the airport.</p>` : ''}
       <div id="hdMapSlot" class="hr-mapslot" hidden></div>`;
   }
 
@@ -299,37 +285,10 @@ const HotelDetails = (function () {
   /* ---------------------------------------------------------------------
      Render
      --------------------------------------------------------------------- */
-  function headerHtml() {
-    const meals = [...new Set((detail.rooms || []).map(r => r.meal_plan).filter(Boolean))]
-      .filter(isInclusion);
-    const free = String(detail.cancellation_policy || '').trim().toLowerCase()
-      .startsWith('free cancellation');
-    return `
-      <div class="hr-hd-head">
-        <div class="hr-name-row">
-          <h1 class="hr-hd-name">${esc(detail.name)}</h1>
-          ${detail.stars ? `<span class="hr-stars" role="img"
-            aria-label="${esc(detail.stars)} star hotel">${typeof JPIcon !== 'undefined' ? JPIcon.stars(detail.stars, detail.stars) : ''}</span>` : ''}
-        </div>
-        <p class="hr-loc">${icon('pin')} ${esc(detail.location)}
-          ${detail.distanceKm != null
-            ? `<span class="hr-dot">·</span> ${esc(detail.distanceKm)} km from airport` : ''}</p>
-        ${detail.guest_rating != null ? `
-          <div class="hr-rating-row">
-            <span class="hr-rating">${esc(Number(detail.guest_rating).toFixed(1))}</span>
-            <span class="hr-rating-word">${esc(ratingWord(detail.guest_rating))}</span>
-          </div>` : ''}
-        ${(detail.amenities || []).length ? `
-          <div class="hr-amenities">${detail.amenities.map(a =>
-            `<span class="hr-amenity">${icon('check')} ${esc(a)}</span>`).join('')}</div>` : ''}
-        <div class="hr-notes">
-          ${meals.length ? `<span class="hr-note-ok">${icon('check')} ${esc(meals[0])}</span>` : ''}
-          ${free ? `<span class="hr-note-ok">${icon('check')} Free cancellation</span>` : ''}
-          ${detail.cancellation_policy
-            ? `<span class="hr-note-plain">${esc(detail.cancellation_policy)}</span>` : ''}
-        </div>
-      </div>`;
-  }
+  /* headerHtml() drew the identity column beside the old gallery: name,
+     stars, score, every amenity, the meal and cancellation notes. The name,
+     stars and score are the hero's now; the facts are the glance strip's; the
+     amenities and the policy text are the Overview and Policies panels'. */
 
   function tabsHtml() {
     const avail = TABS.filter(t => t.has(detail));
@@ -353,7 +312,6 @@ const HotelDetails = (function () {
   function summaryHtml() {
     const cost = stayCost();
     const n = nights();
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
     const free = String(detail.cancellation_policy || '').trim().toLowerCase()
       .startsWith('free cancellation');
     return `
@@ -361,7 +319,7 @@ const HotelDetails = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(dir + slugs()[0] + '-480.webp')}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(detail)}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(detail.name)}</p>
               ${detail.stars ? `<span class="hr-stars" role="img"
@@ -425,7 +383,7 @@ const HotelDetails = (function () {
         </div>
         <div class="hr-ab-cta">
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" data-hd-rooms>
-            Continue to Room Selection
+            Continue<span class="hr-ab-long"> to Room Selection</span>
           </button>
           <span>You can choose your room next</span>
         </div>
@@ -446,18 +404,17 @@ const HotelDetails = (function () {
     paintChrome();
     const main = $('hdMain');
     if (main) {
-      /* Gallery and identity sit SIDE BY SIDE, as they do in the reference —
-         stacking them put a 571px-tall photograph above the fold and pushed
-         the hotel's own name off it. The tabs span the full width below. */
+      /* The hero carries the photograph AND the name over it, so the name is
+         above the fold however tall the picture is; the facts follow as one
+         strip, the tabs below. */
       main.innerHTML = `
         <button type="button" class="hr-backlink" data-hd-back>
           ${icon('chevron', 'hr-back-ico')} Back to Hotel Results
         </button>
-        <div class="hr-hd-hero">
-          ${galleryHtml()}
-          ${headerHtml()}
-        </div>
+        ${heroHtml()}
+        ${glanceHtml()}
         ${tabsHtml()}`;
+      if (typeof DS !== 'undefined') DS.reveal(main);
     }
     const sum = $('hdSummary');
     if (sum) sum.innerHTML = summaryHtml();
@@ -466,7 +423,7 @@ const HotelDetails = (function () {
   }
 
   /* Only the tab strip and its panel are re-rendered on a tab change, so the
-     gallery is not torn down and re-decoded every time. */
+     hero photograph is not torn down and re-developed every time. */
   function paintTabs() {
     const strip = $('hdMain') && $('hdMain').querySelector('.hr-tabs');
     const panel = $('hdMain') && $('hdMain').querySelector('.hr-panel');
@@ -497,26 +454,6 @@ const HotelDetails = (function () {
         return;
       }
 
-      const pick = e.target.closest('[data-gal-pick]');
-      if (pick) {
-        const slug = pick.getAttribute('data-gal-pick');
-        const frame = root.querySelector('[data-gal-main]');
-        const all = slugs();
-        if (frame) {
-          frame.classList.remove('is-broken');
-          frame.innerHTML = imgTag(slug, 'hr-gal-img', true)
-            + '<span class="hr-gal-broken">Photograph unavailable</span>';
-        }
-        root.querySelectorAll('[data-gal-pick]').forEach(b => {
-          const on = b === pick;
-          b.classList.toggle('is-on', on);
-          b.setAttribute('aria-pressed', String(on));
-        });
-        const cap = root.querySelector('.hr-gal-cap');
-        if (cap) cap.innerHTML = creditHtml(slug);
-        const count = root.querySelector('.hr-gal-count');
-        if (count) count.textContent = `${all.indexOf(slug) + 1} / ${all.length}`;
-      }
     });
 
     /* Arrow keys move between tabs, which is what a tablist is expected to do
@@ -619,10 +556,12 @@ const HotelDetails = (function () {
     sbListening = true;
     document.addEventListener('hr:searchchange', () => {
       const el = document.getElementById('hdRoot');
-      if (!el || el.hidden) return;
-      paintMain();
-      paintSummary();
-      paintActionbar();
+      if (!el || el.hidden || !detail) return;
+      /* The whole screen: this module never had paintMain / paintSummary /
+         paintActionbar, so a date edited here used to throw a ReferenceError
+         and leave the old price on screen. paint() does not touch the search
+         strip, so the field being edited is not replaced under the cursor. */
+      paint();
     });
   }
 

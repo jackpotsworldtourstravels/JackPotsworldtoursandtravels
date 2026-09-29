@@ -3,7 +3,7 @@
    Run `python scripts/fetch_destination_images.py` to add or replace one.
 
    Every slug listed here exists in frontend/assets/destinations/ as
-   <slug>.webp (960w) and <slug>-480.webp (480w). Licence and attribution
+   <slug>.webp (960w), <slug>-480.webp and <slug>-1600.webp. Licence and attribution
    for each are in frontend/assets/destinations/CREDITS.md.
 
    THE SLUG IS THE DATABASE'S image_key. The API sends the key, this file
@@ -17,21 +17,21 @@ const DESTINATION_IMAGE_DIR = 'assets/destinations/';
    the value is what the client appends as ?v= so that REPLACING a
    photograph reaches browsers that already cached the old one. */
 const DESTINATION_IMAGE_FILES = {
-  "bali": "9118a49c",
-  "bengaluru": "01687daf",
-  "delhi": "ac7e7757",
-  "dubai": "5f5a6503",
-  "goa": "4da14b33",
-  "hyderabad": "8532428f",
-  "jaipur": "2dd071eb",
-  "kashmir": "18e5c372",
-  "kolkata": "d3ec2d85",
-  "maldives": "5d79a75f",
-  "mumbai": "1a3288e6",
-  "singapore": "c6abed0c",
-  "thailand": "7b65f54e",
-  "tirupati": "f9e159bc",
-  "vijayawada": "2f8fe72c"
+  "bali": "33a6ca59",
+  "bengaluru": "92672edb",
+  "delhi": "1889a5aa",
+  "dubai": "a1c41c5a",
+  "goa": "bbc2f3b2",
+  "hyderabad": "a90e4bc2",
+  "jaipur": "2a1d5af6",
+  "kashmir": "7c05c70e",
+  "kolkata": "33fb003c",
+  "maldives": "3e61baf1",
+  "mumbai": "46f2196c",
+  "singapore": "72ede1e5",
+  "thailand": "2bf204a5",
+  "tirupati": "f8e0d8c9",
+  "vijayawada": "7fbbf111"
 };
 
 /* Photographer credit per slug, for the attribution surface. */
@@ -47,14 +47,14 @@ const DESTINATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Vidhana_Soudha_LE.jpg"
   },
   "delhi": {
-    "artist": "Nikhilb239",
+    "artist": "Jakub Ha\u0142un",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:India_Gate,_New_Delhi_from_West.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:20191205_Grobowiec_Humajuna_w_Delhi_1055_6794.jpg"
   },
   "dubai": {
-    "artist": "imran shahabuddin",
-    "licence": "CC BY 2.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Burj_Khalifa_(worlds_tallest_building)_and_the_Dubai_skyline_(25781049892).jpg"
+    "artist": "https://pixabay.com/users/bulletrain743-3598825/",
+    "licence": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Downtown,_Dubai_(36714617205).jpg"
   },
   "goa": {
     "artist": "Nico Crisafulli from USA",
@@ -62,29 +62,29 @@ const DESTINATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Palolem_Beach_(5580920479).jpg"
   },
   "hyderabad": {
-    "artist": "Hari Om Prakash",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Charminar,_Hyderabad,_Telangana.jpg"
+    "artist": "Tarunsamanta",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Charminar_night_view_in_Hyderabad_31.jpg"
   },
   "jaipur": {
-    "artist": "Wander-earth",
+    "artist": "Rupeshsarkar",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Hawa_Mahal_in_Jaipur_India.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Hawa_Mahal_-_Jaipur_-_Rajasthan_-_001.jpg"
   },
   "kashmir": {
-    "artist": "Vineetmbbs",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Dal_Lake,_Srinagar,_July_2012.jpg"
+    "artist": "Suhail Skindar Sofi",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dal_Lake_Hazratbal_Srinagar.jpg"
   },
   "kolkata": {
-    "artist": "Bernard Gagnon",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Victoria_Memorial,_Kolkata_-_West_facade_01.jpg"
+    "artist": "Subhrajyoti07",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Victoria_Memorial_situated_in_Kolkata.jpg"
   },
   "maldives": {
-    "artist": "B166-er",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Maldives_RBR_beach_6.jpg"
+    "artist": "Adam Jones from Kelowna, BC, Canada",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Beach_Scene_-_Male_-_Maldives_-_01_(14064527178).jpg"
   },
   "mumbai": {
     "artist": "SriSriChinmaya",
@@ -92,14 +92,14 @@ const DESTINATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Gateway_of_India_in_the_evening,_Mumbai,_India.jpg"
   },
   "singapore": {
-    "artist": "-jkb-",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Singapore_Skyline_Marina_Bay_Sands.jpg"
+    "artist": "Supanut Arunoprayote",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Merlion_(I).jpg"
   },
   "thailand": {
-    "artist": "Diego Delso",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Templo_Wat_Arun,_Bangkok,_Tailandia,_2013-08-22,_DD_30.jpg"
+    "artist": "miketnorton",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Wat_Arun_Sunset.jpg"
   },
   "tirupati": {
     "artist": "Nikhilb239",
@@ -107,8 +107,8 @@ const DESTINATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Tirumala_090615.jpg"
   },
   "vijayawada": {
-    "artist": "\u0c30\u0c39\u0c4d\u0c2e\u0c3e\u0c28\u0c41\u0c26\u0c4d\u0c26\u0c40\u0c28\u0c4d",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Vijayawada_durga_temple.JPG"
+    "artist": "Krishna Chaitanya Velaga",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:View_of_Temple_at_Praksam_Barage_with_Night_Lights.jpg"
   }
 };

@@ -2,300 +2,319 @@
 /* The destination page — /destination/{slug}.
    ---------------------------------------------------------------------------
    STEP TWO OF THREE: Destination -> its famous places -> hotels near one.
-   The homepage card lands here, on the LANDMARKS a traveller visits and
-   photographs — Charminar, Birla Mandir — and each one's "View Hotels" opens
-   /hotels/{destination}/{attraction}.
 
-   LANDMARKS, NOT AREAS. This page used to list customer_locations (Banjara
-   Hills, HITEC City). Those are how hotels are filed and they still drive the
-   hotels themselves, but nobody visits an area; the owner asked for the places
-   people go to see. Each landmark names its nearest listed area, and that is
-   the area whose hotels "View Hotels" shows — the hotels page says so.
+   LANDMARKS, NOT AREAS. The places listed are the attractions a traveller
+   visits and photographs; each names its nearest listed AREA, and that area
+   is whose hotels "hotels near X" opens (/hotels/{destination}/{attraction}).
 
-   NO PLACE NAME IN THIS FILE. Everything shown comes from two public reads:
+   NO PLACE NAME IN THIS FILE. Everything shown comes from three public reads,
+   run in parallel:
 
        GET /api/customer/destinations                        name, country, art
        GET /api/customer/destinations/{slug}/attractions     the famous places
+       GET /api/customer/packages                            tours whose
+                                                             destination is this
 
-   The first is the same list the homepage shelf already fetched; there is no
-   single-destination route and adding one to save a few hundred bytes would be
-   a second way to answer one question. The two run in parallel.
+   There is no single-destination route; the list is the same one the
+   homepage fetched. A package belongs here when its `destination` equals
+   this destination's name — two values from the API compared to each other,
+   not a name written into the browser.
 
-   THE LINK IS BUILT FROM THE API'S OWN KEYS: /hotels/{destination_id}/{slug},
-   both fields the API sent. Nothing maps a display name to a URL. */
+   THE PAGE (editorial, design system: jw-system.css + jw-editorial.css):
+     hero       the destination's photograph, full bleed; name, country, and
+                three real counts — famous places, hotels near them, tours
+     overview   the facts, and a gallery rail of the places that have photos
+     places     the editorial grid of every famous place -> its own page
+     hotels     "N hotels near X" for each place that has any, or says none
+     tours      this destination's packages with their real from-prices
+     flights    a band that opens the flight search
+
+   NOTHING IS INVENTED. No description is written for the destination (the
+   API has none); no rating, no price that the package rows do not carry. */
 (function () {
-  const grid = document.getElementById('dlGrid');
-  const hero = document.getElementById('dlHero');
-  const countEl = document.getElementById('dlCount');
-  const statusEl = document.getElementById('dlStatus');
+  const heroMedia = document.getElementById('dlHeroMedia');
+  const body = document.getElementById('dlBody');
   const titleEl = document.getElementById('dlTitle');
   const countryEl = document.getElementById('dlCountry');
   const leadEl = document.getElementById('dlLead');
-  if (!grid || !statusEl || !titleEl) return;
+  const crumbEl = document.getElementById('dlCrumb');
+  const statsEl = document.getElementById('dlStats');
+  const subnav = document.getElementById('dlSubnav');
+  if (!body || !titleEl) return;
 
-  const slug = decodeURIComponent(
-    (location.pathname.replace(/\/+$/, '').split('/').pop() || '')
-  ).trim();
-
+  const slug = decodeURIComponent((location.pathname.replace(/\/+$/, '').split('/').pop() || '')).trim();
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  const inr = n => '₹' + Math.round(Number(n)).toLocaleString('en-IN');
 
-  const icon = (name, size) => (typeof JPIcon !== 'undefined' && JPIcon.html)
-    ? JPIcon.html(name, { size: size || 16 }) : '';
-
-  /* Same resolver rule as home-destinations.js: a KEY from the API, listed in
-     the shipped manifest, or no picture at all.
-
-     THE MANIFEST IS THE LANDMARKS' OWN. assets/locations/ holds a photograph
-     per famous place, keyed by the attraction id the API sends
-     ('hyderabad__charminar'), written by scripts/fetch_attraction_images.py
-     from that landmark's Wikimedia Commons category. The destination manifest
-     is kept as a fallback for a key that predates it. */
-  /* The DESTINATION shelf's artwork, for the header. Separate from artFor
-     below, which resolves a LANDMARK's photograph: two manifests, two
-     directories, and a key from the API for each. */
-  const destArtFor = key => {
-    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
-    const stamp = DESTINATION_IMAGE_FILES[key];
-    if (!stamp) return null;
+  /* Two manifests, two directories, a key from the API for each. A key not
+     listed means no picture — never a borrowed one. `?v=` is the manifest's
+     content stamp, so replacing a photograph reaches cached browsers. */
+  const stampQ = s => (typeof s === 'string') ? '?v=' + s : '';
+  function destArt(key) {
+    if (!key || typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES || !DESTINATION_IMAGE_FILES[key]) return null;
     const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
-       key, so replacing a photograph changes the bytes behind a URL that does
-       not change - and a browser that has been here keeps the old picture.
-       The manifest's value is a content stamp of that file, so the URL moves
-       when the picture does. An older manifest whose values are `true` yields
-       no query and behaves exactly as before. */
-    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
-    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
-  };
-
-  const artFor = key => {
+    const v = stampQ(DESTINATION_IMAGE_FILES[key]);
+    return { s: dir + key + '-480.webp' + v, m: dir + key + '.webp' + v, l: dir + key + '-1600.webp' + v };
+  }
+  function placeArt(key) {
     if (!key) return null;
-    const q = s => (typeof s === 'string') ? '?v=' + s : '';
-    /* ?v=<stamp> WHEN THE MANIFEST CARRIES ONE. The path is derived from the
-       key, so replacing a photograph changes the bytes behind a URL that does
-       not change - and a browser that has been here keeps the old picture.
-       The manifest's value is a content stamp of that file, so the URL moves
-       when the picture does. An older manifest whose values are `true` yields
-       no query and behaves exactly as before. */
     if (typeof LOCATION_IMAGE_FILES === 'object' && LOCATION_IMAGE_FILES && LOCATION_IMAGE_FILES[key]) {
       const dir = (typeof LOCATION_IMAGE_DIR === 'string') ? LOCATION_IMAGE_DIR : 'assets/locations/';
-      const v = q(LOCATION_IMAGE_FILES[key]);
-      return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
+      const v = stampQ(LOCATION_IMAGE_FILES[key]);
+      return { s: dir + key + '-480.webp' + v, m: dir + key + '.webp' + v };
     }
-    if (typeof DESTINATION_IMAGE_FILES !== 'object' || !DESTINATION_IMAGE_FILES) return null;
-    if (!DESTINATION_IMAGE_FILES[key]) return null;
-    const dir = (typeof DESTINATION_IMAGE_DIR === 'string') ? DESTINATION_IMAGE_DIR : 'assets/destinations/';
-    const v = q(DESTINATION_IMAGE_FILES[key]);
-    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
-  };
+    return destArt(key);
+  }
+  const imgTag = (a, sizes, alt, cls, eager) => a
+    ? '<img class="' + (cls || '') + ' ds-dev" src="' + esc(a.m) + '" srcset="' + esc(a.s) + ' 480w, ' + esc(a.m) + ' 960w'
+      + (a.l ? ', ' + esc(a.l) + ' 1600w' : '') + '" sizes="' + sizes + '" alt="' + esc(alt) + '"'
+      + (eager ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async" onerror="this.remove()">'
+    : '';
 
   async function getJson(url) {
     const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-    if (!res.ok) {
-      const err = new Error('HTTP ' + res.status);
-      err.status = res.status;
-      throw err;
-    }
+    if (!res.ok) { const err = new Error('HTTP ' + res.status); err.status = res.status; throw err; }
     return res.json();
   }
 
-  function cardHtml(loc, dest) {
-    const art = artFor(loc.image);
-    /* ALT TEXT IS THE PLACE, not empty. These photographs carry the meaning of
-       the card - a decorative alt would leave a screen reader with a name and
-       no idea it is looking at a photograph of it. */
-    const picture = art
-      ? `<img class="dl-img" src="${esc(art.src)}" srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
-           sizes="(max-width: 640px) 100vw, (max-width: 1100px) 45vw, 320px"
-           alt="${esc(loc.name)}" loading="lazy" decoding="async"
-           onerror="this.remove()">`
-      : '';
-
-    /* The count is the nearest AREA's, counted by foreign key — the hotels
-       "View Hotels" will actually show — and it names that area, so "1 hotel"
-       is never read as "1 hotel at the monument". Zero is said plainly. */
-    const n = Number(loc.hotel_count) || 0;
-    const count = n > 0
-      ? `${n} ${n === 1 ? 'hotel' : 'hotels'} nearby${loc.area_name ? ' in ' + loc.area_name : ''}`
-      : 'No hotels listed nearby yet';
-
-    const dest_id = loc.destination_id || dest.id;
-    const href = 'hotels/' + encodeURIComponent(dest_id) + '/' + encodeURIComponent(loc.slug);
-    /* The place's own page: its photograph, what going there costs, what it
-       is, and the way on to these same hotels. */
-    const explore = 'destination/' + encodeURIComponent(dest_id) + '/' + encodeURIComponent(loc.slug);
-
-    /* EXPLORE IS THE PRIMARY ACTION NOW. This page is where somebody decides
-       whether they want to go at all; hotels are the step after that, and the
-       pair is ordered to match. Both were already here - only their weight
-       changed. */
-    return `<article class="dl-card" role="listitem">
-      <div class="dl-art">${picture}<span class="dl-pin">${icon('mapPin', 20)}</span></div>
-      <div class="dl-body">
-        <h2 class="dl-name">${esc(loc.name)}</h2>
-        ${loc.description ? `<p class="dl-desc">${esc(loc.description)}</p>` : ''}
-        <p class="dl-count-line">${icon('hotels', 15)} ${esc(count)}</p>
-        <div class="dl-actions">
-          <a class="disc-btn" href="${esc(explore)}"
-             aria-label="Explore ${esc(loc.name)}">Explore Location ${icon('arrowRight', 16)}</a>
-          <a class="disc-btn disc-btn-ghost" href="${esc(href)}"
-             aria-label="View hotels near ${esc(loc.name)}">View Hotels</a>
-        </div>
-      </div>
-    </article>`;
+  /* --------------------------------------------------------------- sections */
+  function head(kicker, title, lede, id) {
+    return '<div class="ed-head">'
+      + '<p class="ds-eyebrow" data-ds-reveal>' + kicker + '</p>'
+      + '<h2 class="ds-h1"' + (id ? ' id="' + id + '"' : '') + ' data-ds-reveal>' + title + '</h2>'
+      + (lede ? '<p class="ds-lede" data-ds-reveal>' + lede + '</p>' : '')
+      + '</div>';
   }
 
-  function message(text, retry) {
-    grid.innerHTML = '';
-    grid.setAttribute('aria-busy', 'false');
-    statusEl.textContent = text;
-    const old = document.getElementById('dlRetry');
-    if (old) old.remove();
-    if (!retry) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'dlRetry';
-    btn.className = 'dh-retry';
-    btn.textContent = 'Retry';
-    btn.addEventListener('click', () => { btn.remove(); load(); });
-    statusEl.insertAdjacentElement('afterend', btn);
+  function overview(dest, places, hotels, tours) {
+    const shots = places.filter(p => placeArt(p.image)).slice(0, 8);
+    const facts = [
+      ['Country', esc(dest.country || '—')],
+      ['Famous places', places.length],
+      ['Hotels near them', hotels],
+      ['Tour packages', tours.length],
+    ];
+    const from = tours.map(t => Number(t.priceFrom)).filter(n => n > 0);
+    if (from.length) facts.push(['Tours from', inr(Math.min.apply(null, from))]);
+    return '<section class="ds-section" id="overview" aria-labelledby="dlOvHead"><div class="ds-container">'
+      + '<div class="dl-overview">'
+      +   '<div>' + '<p class="ds-eyebrow" data-ds-reveal>Overview</p>'
+      +     '<h2 class="ds-h1" id="dlOvHead" data-ds-reveal>' + esc(dest.name) + ', <em>at a glance.</em></h2></div>'
+      +   '<dl class="ed-facts" data-ds-reveal>' + facts.map(f => '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>').join('') + '</dl>'
+      + '</div>'
+      + (shots.length ? '<div class="ed-rail dl-gallery" data-ds-stagger aria-label="Photographs of ' + esc(dest.name) + '">'
+        + shots.map(p => '<figure class="dl-shot" data-ds-reveal="scale">'
+          + imgTag(placeArt(p.image), '(max-width: 640px) 78vw, 32vw', p.name)
+          + '<figcaption>' + esc(p.name) + '</figcaption>'
+          + '<a href="' + esc(placeHref(dest, p)) + '" aria-label="' + esc(p.name) + '"></a></figure>').join('') + '</div>' : '')
+      + '</div></section>';
   }
 
+  const placeHref = (dest, p) => 'destination/' + encodeURIComponent(p.destination_id || dest.id) + '/' + encodeURIComponent(p.slug);
+  const hotelsHref = (dest, p) => 'hotels/' + encodeURIComponent(p.destination_id || dest.id) + '/' + encodeURIComponent(p.slug);
+
+  function placesSection(dest, places) {
+    const cards = places.map((p, i) => {
+      const a = placeArt(p.image);
+      const n = Number(p.hotel_count) || 0;
+      return '<a class="ds-media-card' + (a ? '' : ' ds-media-card--noimg') + '" role="listitem" href="' + esc(placeHref(dest, p)) + '" data-ds-reveal="scale" aria-label="Explore ' + esc(p.name) + '">'
+        + imgTag(a, '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 58vw', p.name, 'ds-media-card__img')
+        + '<span class="ds-media-card__num" aria-hidden="true">' + String(i + 1).padStart(2, '0') + '</span>'
+        + '<span class="ds-media-card__body">'
+        +   '<span class="ds-media-card__title">' + esc(p.name) + '</span>'
+        +   '<span class="ds-media-card__meta">' + (n ? n + (n === 1 ? ' hotel nearby' : ' hotels nearby') : 'Famous place') + '</span>'
+        +   (p.description ? '<span class="ds-media-card__teaser">' + esc(p.description) + '</span>' : '')
+        +   '<span class="ds-media-card__go">Explore' + ARROW + '</span>'
+        + '</span></a>';
+    }).join('');
+    return '<section class="ds-section" id="places" aria-labelledby="dlPlHead" style="padding-top:0"><div class="ds-container">'
+      + head('Famous places', 'The places <em>worth the journey.</em>', 'The landmarks travellers come to ' + esc(dest.name) + ' to see &mdash; each with its own page and the hotels closest to it.', 'dlPlHead')
+      + '<div class="ds-edgrid" role="list" data-ds-stagger=".07">' + cards + '</div>'
+      + '</div></section>';
+  }
+
+  function staySection(dest, places) {
+    const withHotels = places.filter(p => Number(p.hotel_count) > 0);
+    const list = withHotels.map(p => {
+      const n = Number(p.hotel_count);
+      return '<li data-ds-reveal><a href="' + esc(hotelsHref(dest, p)) + '"><b>' + esc(p.name) + '</b>'
+        + '<span>' + n + (n === 1 ? ' hotel' : ' hotels') + ' nearby' + (p.area_name ? ' &middot; ' + esc(p.area_name) : '') + '</span>'
+        + ARROW + '</a></li>';
+    }).join('');
+    return '<section class="ds-section dl-stay ds-on-dark" id="hotels" aria-labelledby="dlStHead"><div class="ds-container">'
+      + head('Hotels', 'Stay close to <em>the sights.</em>', 'Every hotel is filed under the area it stands in; these are the areas nearest each famous place.', 'dlStHead')
+      + (list ? '<ul class="dl-staylist" data-ds-stagger>' + list + '</ul>'
+        : '<div id="dlStayEmpty"></div>')
+      + '</div></section>';
+  }
+
+  function toursSection(dest, tours) {
+    const cards = tours.map(t => {
+      const a = placeArt(t.image);
+      const hl = Array.isArray(t.highlights) ? t.highlights.slice(0, 3).join(' · ') : (t.blurb || '');
+      const nights = Number(t.nights) || 0, days = Number(t.days) || 0;
+      return '<a class="dl-tour" href="package/' + encodeURIComponent(t.id) + '" data-ds-reveal="scale">'
+        + '<span class="dl-tour__media">' + imgTag(a, '(max-width: 640px) 100vw, 33vw', t.name)
+        +   (days ? '<span class="ds-badge ds-badge--dark ds-badge--plain">' + days + 'D / ' + nights + 'N</span>' : '') + '</span>'
+        + '<span class="dl-tour__body">'
+        +   '<span class="dl-tour__name">' + esc(t.name) + '</span>'
+        +   (hl ? '<span class="dl-tour__hl">' + esc(hl) + '</span>' : '')
+        +   '<span class="dl-tour__foot">'
+        +     (Number(t.priceFrom) > 0 ? '<span class="ds-price"><span class="ds-price__from">From</span><span class="ds-price__amt">' + inr(t.priceFrom) + '</span><span class="ds-price__per">per person</span></span>' : '<span></span>')
+        +     '<span class="dl-tour__go">View' + ARROW + '</span>'
+        +   '</span>'
+        + '</span></a>';
+    }).join('');
+    return '<section class="ds-section" id="tours" aria-labelledby="dlToHead"><div class="ds-container">'
+      + head('Tour packages', 'Journeys to ' + esc(dest.name) + ', <em>already planned.</em>', tours.length ? 'Hotels, transfers and sightseeing arranged as one price.' : '', 'dlToHead')
+      + (cards ? '<div class="dl-tours" data-ds-stagger>' + cards + '</div>' : '<div id="dlToursEmpty"></div>')
+      + '</div></section>';
+  }
+
+  function flySection(dest) {
+    const a = destArt(dest.image);
+    return '<section class="ds-section dl-fly" id="flights" aria-labelledby="dlFlHead">'
+      + (a ? '<div class="dl-fly__media" data-ds-parallax="0.12">' + imgTag(a, '100vw', '', '') + '</div>' : '')
+      + '<div class="ds-container dl-fly__row">'
+      +   '<div><p class="ds-eyebrow is-light" data-ds-reveal>Flights</p>'
+      +   '<h2 class="ds-display" id="dlFlHead" data-ds-reveal>Fly to <em>' + esc(dest.name) + '.</em></h2></div>'
+      +   '<div class="dl-fly__cta" data-ds-reveal>'
+      +     '<a class="ds-btn ds-btn--primary ds-btn--lg" href="flights.html">Search flights' + ARROW + '</a>'
+      +     '<a class="ds-btn ds-btn--ghost ds-btn--lg" href="hotels.html">Search hotels</a>'
+      +   '</div>'
+      + '</div></section>';
+  }
+
+  /* --------------------------------------------------------- the sub-nav */
+  function bindSubnav() {
+    if (!subnav) return;
+    subnav.hidden = false;
+    const links = Array.from(subnav.querySelectorAll('a'));
+    const ind = subnav.querySelector('.dl-subnav__ind');
+    const place = a => { if (!ind || !a) return; ind.style.width = a.offsetWidth + 'px'; ind.style.transform = 'translateX(' + a.offsetLeft + 'px)'; };
+    const mark = id => links.forEach(a => { const on = a.getAttribute('href') === '#' + id; a.classList.toggle('is-on', on); if (on) { a.setAttribute('aria-current', 'true'); place(a); } else a.removeAttribute('aria-current'); });
+    links.forEach(a => { const sec = document.getElementById(a.getAttribute('href').slice(1)); if (!sec) a.remove(); });
+    let ticking = false;
+    const spy = () => {
+      ticking = false;
+      let cur = null;
+      links.forEach(a => { const s = document.getElementById(a.getAttribute('href').slice(1)); if (s && s.getBoundingClientRect().top < 200) cur = s.id; });
+      if (cur) mark(cur);
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }, { passive: true });
+    window.addEventListener('resize', spy);
+    mark('overview'); spy();
+  }
+
+  /* ----------------------------------------------------------------- load */
   function notFound() {
-    if (countEl) countEl.textContent = '';
-    titleEl.textContent = 'Destination not found';
-    leadEl.textContent = '';
+    titleEl.textContent = 'Not found';
+    if (crumbEl) crumbEl.textContent = 'Not found';
     countryEl.textContent = '';
-    message('We could not find that destination.', false);
+    leadEl.textContent = '';
+    document.title = 'Destination not found — JackPots World Tours & Travels';
+    body.removeAttribute('aria-busy');
+    DS.state(body, { kind: 'notfound', title: 'We couldn’t find that destination', body: 'It may have moved, or the link may be mistyped.',
+      actions: [{ label: 'All destinations', href: 'destinations.html' }, { label: 'Back home', href: 'index.html' }] });
   }
 
   async function load() {
-    grid.setAttribute('aria-busy', 'true');
-    statusEl.textContent = 'Loading places to visit…';
+    DS.skeleton(body, 'text', 2);
+    let all, places, packs;
     try {
-      const [all, locations] = await Promise.all([
+      [all, places, packs] = await Promise.all([
         getJson('/api/customer/destinations'),
         getJson('/api/customer/destinations/' + encodeURIComponent(slug) + '/attractions'),
+        getJson('/api/customer/packages').catch(() => []),
       ]);
-      const dest = (Array.isArray(all) ? all : []).find(d => d && d.id === slug)
-        /* The locations route folds case ("Goa" == "goa"); match the same way
-           so a hand-typed URL is not a not-found on a technicality. */
-        || (Array.isArray(all) ? all : []).find(d => d && String(d.id).toLowerCase() === slug.toLowerCase());
-      if (!dest) { notFound(); return; }
-
-      titleEl.textContent = 'Explore ' + dest.name;
-      countryEl.textContent = dest.country || '';
-      /* Remember this visit for the landing page's Recommended shelf. Kept
-         locally, guarded so a page without jw-interest.js just skips it. */
-      if (typeof JWInterest !== 'undefined') JWInterest.record(dest);
-      leadEl.textContent = 'Discover the most iconic and photographic places in '
-        + dest.name + ' - and the hotels closest to each one.';
-      document.title = dest.name + ' — JackPots World Tours & Travels';
-
-      /* THE CITY'S OWN PHOTOGRAPH, behind its name. It comes from the
-         destination shelf's manifest - the one the homepage already ships -
-         so nothing new is downloaded and no stock image is invented. The
-         header is designed to work without it: the gradient is the design and
-         the picture is a layer on top of it. */
-      const heroArt = destArtFor(dest.image);
-      if (heroArt) {
-        const img = document.createElement('img');
-        img.className = 'dl-hero-img';
-        img.src = heroArt.src;
-        img.srcset = heroArt.small + ' 480w, ' + heroArt.src + ' 960w';
-        img.sizes = '100vw';
-        img.alt = '';                 /* decorative: the name is right beside it */
-        img.decoding = 'async';
-        /* Eager, and only this one: it is the first thing on the page. */
-        img.fetchPriority = 'high';
-        img.addEventListener('error', () => img.remove());
-        hero.insertBefore(img, hero.firstChild);
-      }
-      hero.classList.add('disc-in');
-
-      const rows = Array.isArray(locations) ? locations.filter(l => l && l.slug && l.name) : [];
-      if (!rows.length) {
-        message('No places to visit are listed for ' + dest.name + ' yet.', false);
-        return;
-      }
-      grid.innerHTML = rows.map(l => cardHtml(l, dest)).join('');
-      /* IMAGES ONLY, NO CARD ENTRANCE. This page already has one: the
-         `.disc-in` fade on its body (discover.css). A second entrance per
-         card would be two animations saying the same thing. */
-      if (typeof JWMotion !== 'undefined') JWMotion.developAll(grid);
-      grid.setAttribute('aria-busy', 'false');
-      grid.classList.add('disc-in');
-      /* The count is a label above the grid, not a status message: it is a
-         fact about the page rather than a report on the request, and a live
-         region that keeps announcing "7 places to visit" is noise. */
-      countEl.textContent = rows.length + (rows.length === 1 ? ' place to visit' : ' places to visit');
-      statusEl.textContent = '';
-      if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(grid);
     } catch (err) {
       console.warn('[destination] failed:', err && err.message);
-      if (err && err.status === 404) notFound();
-      else message('Unable to load this destination right now.', true);
+      if (err && err.status === 404) { notFound(); return; }
+      body.removeAttribute('aria-busy');
+      DS.state(body, { kind: navigator.onLine === false ? 'offline' : 'error', title: 'We couldn’t load this destination',
+        actions: [{ label: 'Try again', onClick: load }, { label: 'All destinations', href: 'destinations.html' }] });
+      return;
     }
+    const list = Array.isArray(all) ? all : [];
+    /* The attractions route folds case ("Goa" == "goa"); match the same way
+       so a hand-typed URL is not a not-found on a technicality. */
+    const dest = list.find(d => d && d.id === slug) || list.find(d => d && String(d.id).toLowerCase() === slug.toLowerCase());
+    if (!dest) { notFound(); return; }
+    if (typeof JWInterest !== 'undefined') JWInterest.record(dest);
+
+    const rows = (Array.isArray(places) ? places : []).filter(p => p && p.slug && p.name);
+    const pkgRows = Array.isArray(packs) ? packs : (packs && Array.isArray(packs.items) ? packs.items : []);
+    const tours = pkgRows.filter(t => t && t.destination && String(t.destination).toLowerCase() === String(dest.name).toLowerCase());
+    const hotels = rows.reduce((n, p) => n + (Number(p.hotel_count) || 0), 0);
+
+    /* The hero. */
+    document.title = dest.name + ' — Famous Places, Hotels & Tours | JackPots World Tours & Travels';
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', 'Explore ' + dest.name + (dest.country ? ', ' + dest.country : '') + ': ' + rows.length + ' famous places, the hotels closest to them and tour packages, with JackPots World Tours & Travels.');
+    titleEl.textContent = dest.name;
+    if (crumbEl) crumbEl.textContent = dest.name;
+    countryEl.textContent = dest.country || '';
+    leadEl.textContent = 'Explore the extraordinary — the famous places that make ' + dest.name + ' worth the journey, and the hotels closest to each.';
+    const stats = [[rows.length, rows.length === 1 ? 'Famous place' : 'Famous places'], [hotels, 'Hotels nearby'], [tours.length, tours.length === 1 ? 'Tour package' : 'Tour packages']];
+    statsEl.innerHTML = stats.map(s => '<span class="dl-stat"><b>' + s[0] + '</b><span>' + s[1] + '</span></span>').join('');
+    const a = destArt(dest.image);
+    if (a && heroMedia) heroMedia.innerHTML = imgTag(a, '100vw', '', '', true);
+    const heroEl = document.getElementById('dlHero');
+    heroEl.classList.add('ds-hero--dest');
+    /* The photograph's attribution — CC BY / BY-SA require it, and the hero
+       is the one place on this page the photograph is shown full size. */
+    const cr = a && typeof DESTINATION_IMAGE_CREDITS === 'object' && DESTINATION_IMAGE_CREDITS
+      ? DESTINATION_IMAGE_CREDITS[dest.image] : null;
+    if (cr && cr.artist && !heroEl.querySelector('.ds-hero__credit')) {
+      const who = String(cr.artist).replace(/^https?:\/\/pixabay\.com\/users\/([^/-]+).*$/, '$1 (Pixabay)');
+      const p = document.createElement('p');
+      p.className = 'ds-hero__credit';
+      p.textContent = 'Photo: ' + (who.length > 48 ? who.slice(0, 46) + '…' : who) + (cr.licence ? ' · ' + cr.licence : '');
+      heroEl.appendChild(p);
+    }
+
+    /* The body. */
+    body.innerHTML = overview(dest, rows, hotels, tours)
+      + (rows.length ? placesSection(dest, rows) : '')
+      + staySection(dest, rows)
+      + toursSection(dest, tours)
+      + flySection(dest);
+    body.removeAttribute('aria-busy');
+
+    const stayEmpty = document.getElementById('dlStayEmpty');
+    if (stayEmpty) DS.state(stayEmpty, { kind: 'empty', title: 'No hotels listed here yet', body: 'We are adding hotels near ' + dest.name + '’s famous places. Our team can still arrange a stay.',
+      actions: [{ label: 'Search hotels', href: 'hotels.html', variant: 'gold' }, { label: 'Ask our team', href: 'contact-us.html', variant: 'ghost' }] });
+    const toursEmpty = document.getElementById('dlToursEmpty');
+    if (toursEmpty) DS.state(toursEmpty, { kind: 'empty', title: 'No packages for ' + dest.name + ' yet', body: 'Tell us your dates and who is travelling, and a travel expert will plan the trip.',
+      actions: [{ label: 'Plan a tailored trip', href: 'contact-us.html' }, { label: 'All tour packages', href: 'packages.html' }] });
+
+    DS.reveal(document); DS.develop(document);
+    motion();
+    bindSubnav();
   }
 
-  /* -------------------------------------------------------------------------
-     THE SPOTLIGHT — one card is picked out and the rest step back.
-
-     WHY THIS IS SCRIPT AND NOT `:hover`. A phone has no hover and a keyboard
-     has no pointer, and the brief asks for the same effect from all three. So
-     one delegated listener per input method sets the same two classes -
-     `is-engaged` on the grid, `is-active` on the card - and the stylesheet
-     describes what those mean. Nothing here decides how anything looks.
-
-     DELEGATED, so it costs one listener rather than one per card and keeps
-     working after the grid is re-rendered.
-
-     A TAP MUST NOT SWALLOW THE TAP. `pointerdown` marks the card and the
-     click continues to the link underneath, so the first tap both highlights
-     and navigates - a card that needs two taps to open is a card that feels
-     broken. */
-  let active = null;
-
-  function setActive(card) {
-    if (active === card) return;
-    if (active) active.classList.remove('is-active');
-    active = card;
-    if (card) card.classList.add('is-active');
-    grid.classList.toggle('is-engaged', !!card);
+  /* Scroll depth, from the system's one engine (loaded on demand). */
+  function motion() {
+    DS.gsap().then(g => {
+      if (!g) return;
+      const k = DS.small ? 0.5 : 1;
+      document.querySelectorAll('#places .ds-media-card').forEach((c, i) => {
+        const im = c.querySelector('.ds-media-card__img'), b = c.querySelector('.ds-media-card__body');
+        const r = ((i % 3) * 2 + 5) * k;
+        const tl = g.timeline({ defaults: { ease: 'none' }, scrollTrigger: { trigger: c, start: 'top bottom', end: 'bottom top', scrub: 0.8 } });
+        if (im) tl.fromTo(im, { yPercent: -6, scale: 1.14 }, { yPercent: 6, scale: 1.14 }, 0);
+        if (b) tl.fromTo(b, { y: r * 2 }, { y: -r * 2 }, 0);
+      });
+      const fly = document.querySelector('.dl-fly__media');
+      if (fly) g.fromTo(fly, { yPercent: -8 }, { yPercent: 8, ease: 'none', scrollTrigger: { trigger: fly.parentElement, start: 'top bottom', end: 'bottom top', scrub: true } });
+      /* The hero's own parallax and route are jw-system.js's (bound to the
+         media container, which exists before the photograph arrives). */
+      g.delayedCall(0.1, () => window.ScrollTrigger && window.ScrollTrigger.refresh());
+    });
   }
-
-  function cardOf(node) {
-    return node && node.closest ? node.closest('.dl-card') : null;
-  }
-
-  /* Pointer: `pointerover`/`pointerout` rather than enter/leave so one
-     delegated pair covers every card, and moving between two cards swaps the
-     highlight instead of clearing it. */
-  grid.addEventListener('pointerover', e => {
-    const card = cardOf(e.target);
-    if (card) setActive(card);
-  });
-  grid.addEventListener('pointerout', e => {
-    /* Only when the pointer has actually left the grid, not on the way from
-       one card to the next. */
-    if (!e.relatedTarget || !grid.contains(e.relatedTarget)) setActive(null);
-  });
-
-  /* Touch: the card under the finger becomes active and stays active while
-     the browser follows the link. */
-  grid.addEventListener('pointerdown', e => {
-    const card = cardOf(e.target);
-    if (card) setActive(card);
-  });
-
-  /* Keyboard: tabbing to a card's link is the same state. focusin/out bubble,
-     which focus/blur do not. */
-  grid.addEventListener('focusin', e => setActive(cardOf(e.target)));
-  grid.addEventListener('focusout', e => {
-    if (!e.relatedTarget || !grid.contains(e.relatedTarget)) setActive(null);
-  });
 
   if (!slug) { notFound(); return; }
   load();

@@ -90,65 +90,140 @@ const MyBookings = (function () {
     });
   }
 
-  function card(b) {
-    const cancelled = b.status === 'Cancelled';
-    return `<article class="mb-card ${cancelled ? 'is-cancelled' : ''}">
-      <div class="mb-kind">${icon(b.icon || 'flights')}<span>${esc(b.kindLabel || b.kind)}</span></div>
+  /* =====================================================================
+     THE COMMAND CENTRE
+     =====================================================================
+     SERVER BOOKINGS ONLY. BookingStore.list() also returns local demo rows
+     (localStorage) for products that were not live when they were made;
+     this page lists what the server holds — a reference someone can quote
+     to support — and nothing else. The Account Center's own list is
+     unchanged.
 
-      <div class="mb-main">
-        <h3>${esc(b.title || '—')}</h3>
-        <p>${esc(b.subtitle || '')}</p>
-        <div class="mb-facts">
-          <span><b>${esc(b.id)}</b> booking ID</span>
-          ${b.pnr ? `<span><b>${esc(b.pnr)}</b> PNR</span>` : ''}
-          <span><b>${esc(fmt(b.travelDate))}</b> travel date</span>
-          <span><b>${esc((b.passengers || []).length || 1)}</b> traveller(s)</span>
-        </div>
+     Every count, the next trip and each card's status tone come from the
+     rows' own fields: `status` (the server's), `travelDate`, `payments`.
+     ===================================================================== */
+  const today = () => new Date().toISOString().slice(0, 10);
+  const isCancelled = b => /^cancel/i.test(String(b.status || ''));
+  const isPast = b => !!b.travelDate && String(b.travelDate).slice(0, 10) < today();
+  const needsPay = b => payable(b);
+  const isUpcoming = b => !isCancelled(b) && !isPast(b);
+
+  /* status -> the tone a traveller should read it in. Pending is gold
+     (waiting), confirmed and completed green, cancelled grey. It used to be
+     green for everything that was not cancelled, Pending included. */
+  function tone(b) {
+    const s = String(b.status || '').toLowerCase();
+    if (isCancelled(b)) return 'cancelled';
+    if (s === 'confirmed' || s === 'completed' || s === 'ticketed') return 'ok';
+    return 'wait';
+  }
+
+  const SEGMENTS = [
+    ['all', 'All', () => true],
+    ['upcoming', 'Upcoming', isUpcoming],
+    ['pay', 'Awaiting payment', needsPay],
+    ['past', 'Past', b => isPast(b) && !isCancelled(b)],
+    ['cancelled', 'Cancelled', isCancelled],
+  ];
+  let segment = 'all';
+
+  function daysUntil(iso) {
+    if (!iso) return null;
+    const d = new Date(String(iso).slice(0, 10) + 'T00:00:00'), t = new Date(today() + 'T00:00:00');
+    return Math.round((d - t) / 86400000);
+  }
+  function whenWord(n) {
+    if (n == null || n < 0) return '';
+    return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : 'In ' + n + ' days';
+  }
+
+  function card(b) {
+    const t = tone(b);
+    const cancelled = isCancelled(b);
+    const when = cancelled ? '' : whenWord(daysUntil(b.travelDate));
+    return `<article class="mb-card mbc is-${t}">
+      <div class="mbc-kind">${icon(b.icon || 'flights')}<span>${esc(b.kindLabel || b.kind)}</span></div>
+
+      <div class="mbc-main">
+        ${when ? `<p class="mbc-when">${esc(when)}</p>` : ''}
+        <h3 class="mbc-title">${esc(b.title || '—')}</h3>
+        ${b.subtitle ? `<p class="mbc-sub">${esc(b.subtitle)}</p>` : ''}
+        <dl class="mbc-facts">
+          <div><dt>Reference</dt><dd>${esc(b.ref || b.id)}</dd></div>
+          ${b.pnr ? `<div><dt>PNR</dt><dd>${esc(b.pnr)}</dd></div>` : ''}
+          <div><dt>Travel date</dt><dd>${esc(fmt(b.travelDate))}</dd></div>
+          <div><dt>Travellers</dt><dd>${esc((b.passengers || []).length || 1)}</dd></div>
+          ${b.bookedAt ? `<div><dt>Booked</dt><dd>${esc(fmt(b.bookedAt))}</dd></div>` : ''}
+        </dl>
       </div>
 
-      <div class="mb-right">
-        <span class="mb-status is-${cancelled ? 'cancelled' : 'confirmed'}">${esc(b.status)}</span>
-        <b class="mb-total">${esc(money(b.total))}</b>
-        <div class="mb-actions">
+      <div class="mbc-folio">
+        <span class="mbc-status is-${t}">${esc(b.status)}</span>
+        <b class="mbc-total">${esc(money(b.total))}</b>
+        <div class="mbc-actions">
           ${payable(b)
-            ? `<button type="button" class="tx-btn tx-btn-primary" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>`
-            : (unpayableReason(b)
-                ? `<span class="mb-unpayable">${esc(unpayableReason(b))}</span>` : '')}
-          <button type="button" class="tx-btn tx-btn-ghost" data-mb="view" data-id="${esc(b.id)}">View</button>
-          <button type="button" class="tx-btn tx-btn-ghost" data-mb="ticket" data-id="${esc(b.id)}">Ticket</button>
-          ${cancelled ? '' :
-            `<button type="button" class="tx-btn tx-btn-ghost is-danger" data-mb="cancel" data-id="${esc(b.id)}">Cancel</button>`}
+            ? `<button type="button" class="ds-btn ds-btn--primary ds-btn--sm" data-mb="pay" data-id="${esc(b.id)}">Pay now</button>`
+            : (unpayableReason(b) ? `<span class="mb-unpayable">${esc(unpayableReason(b))}</span>` : '')}
+          <button type="button" class="mbc-link" data-mb="view" data-id="${esc(b.id)}">Details</button>
+          <button type="button" class="mbc-link" data-mb="ticket" data-id="${esc(b.id)}">Ticket</button>
+          ${cancelled ? '' : `<button type="button" class="mbc-link is-danger" data-mb="cancel" data-id="${esc(b.id)}">Cancel</button>`}
         </div>
       </div>
     </article>`;
   }
 
-  function emptyState() {
-    return `<div class="mb-empty">
-        <div class="mb-empty-mark">${typeof JPIcon !== 'undefined' ? JPIcon.html('packages', { size: 'xl' }) : ''}</div>
-        <h2>No bookings yet</h2>
-        <p>Once you book a flight, hotel, cruise or tour it will appear here with
-           its reference, ticket and cancellation options.</p>
-        <div class="mb-empty-cta">
-          <a class="tx-btn tx-btn-primary" href="flights.html">Search flights</a>
-          <a class="tx-btn tx-btn-ghost" href="packages.html">Browse packages</a>
-        </div>
-      </div>`;
+  function state(host, opts) {
+    if (typeof DS !== 'undefined') { DS.state(host, opts); return; }
+    host.innerHTML = `<div class="mb-empty"><h2>${esc(opts.title)}</h2><p>${esc(opts.body || '')}</p></div>`;
+  }
+
+  function emptyState(host) {
+    state(host, { kind: 'empty', kicker: 'Nothing booked yet', title: 'No bookings yet',
+      body: 'Once you book a flight, a hotel or a tour it appears here with its reference, its ticket and its cancellation options.',
+      actions: [{ label: 'Search flights', href: 'flights.html' }, { label: 'Browse hotels', href: 'hotels.html' }] });
+  }
+
+  function paintHero() {
+    const stats = document.getElementById('mbStats');
+    const next = document.getElementById('mbNext');
+    if (!stats || !next) return;
+    const counts = [
+      ['Upcoming', rows.filter(isUpcoming).length],
+      ['Awaiting payment', rows.filter(needsPay).length],
+      ['Past', rows.filter(b => isPast(b) && !isCancelled(b)).length],
+      ['Cancelled', rows.filter(isCancelled).length],
+    ];
+    stats.innerHTML = counts.map(c => `<div><dt>${c[0]}</dt><dd>${c[1]}</dd></div>`).join('');
+    stats.hidden = !rows.length;
+
+    const up = rows.filter(isUpcoming).filter(b => b.travelDate)
+      .sort((x, y) => String(x.travelDate).localeCompare(String(y.travelDate)))[0];
+    if (up) {
+      const w = whenWord(daysUntil(up.travelDate));
+      next.innerHTML = `<span class="mb-next-k">Next trip</span>
+        <b class="mb-next-t">${esc(up.title || up.id)}</b>
+        <span class="mb-next-d">${esc(fmt(up.travelDate))}${w ? ' · ' + esc(w.toLowerCase()) : ''} · ${esc(up.status)}</span>`;
+      next.hidden = false;
+    } else next.hidden = true;
   }
 
   function render() {
     const host = document.getElementById('mbList');
     if (!host) return;
-    const shown = filter === 'all' ? rows : rows.filter(b => b.kind === filter);
+    host.removeAttribute('aria-busy');
+    const segFn = (SEGMENTS.find(x => x[0] === segment) || SEGMENTS[0])[2];
+    const shown = rows.filter(segFn).filter(b => filter === 'all' || b.kind === filter);
 
     document.getElementById('mbCount').textContent = rows.length
       ? `${shown.length} of ${rows.length} booking${rows.length === 1 ? '' : 's'}` : '';
 
-    if (!rows.length) { host.innerHTML = emptyState(); armIcons(host); return; }
-    host.innerHTML = shown.length
-      ? shown.map(card).join('')
-      : `<div class="mb-empty"><h2>Nothing in this category</h2>
-           <p>Try another filter to see your other bookings.</p></div>`;
+    if (!rows.length) { emptyState(host); armIcons(host); return; }
+    if (!shown.length) {
+      state(host, { kind: 'empty', kicker: 'Nothing here', title: 'Nothing in this view',
+        body: 'Try another filter to see your other bookings.' });
+      return;
+    }
+    host.innerHTML = shown.map(card).join('');
     armIcons(host);
   }
 
@@ -156,18 +231,34 @@ const MyBookings = (function () {
     if (typeof JPIcon !== 'undefined') JPIcon.mount(scope || document);
   }
 
+  function renderSegments() {
+    const host = document.getElementById('mbSeg');
+    if (!host) return;
+    host.innerHTML = SEGMENTS.map(([k, label, fn]) => {
+      const n = rows.filter(fn).length;
+      if (k !== 'all' && !n) return '';
+      return `<button type="button" class="ds-tab" data-seg="${esc(k)}" aria-selected="${segment === k}">${esc(label)} <span class="mb-seg-n">${n}</span></button>`;
+    }).join('');
+    host.hidden = !rows.length;
+    delete host.dataset.dsTabs;
+    if (typeof DS !== 'undefined') DS.tabs(host, t => { segment = t.dataset.seg; render(); });
+    else host.querySelectorAll('[data-seg]').forEach(b => b.addEventListener('click', () => { segment = b.dataset.seg; renderSegments(); render(); }));
+  }
+
   function renderTabs() {
     const host = document.getElementById('mbTabs');
     if (!host) return;
-    const kinds = [['all', 'All']].concat(
+    const kinds = [['all', 'All products']].concat(
       Object.entries(BookingStore.KINDS).map(([k, v]) => [k, v.label + 's']));
-    host.innerHTML = kinds.map(([k, label]) => {
+    const chips = kinds.map(([k, label]) => {
       const n = k === 'all' ? rows.length : rows.filter(b => b.kind === k).length;
       /* A filter that can only ever show nothing is noise — hide empty ones. */
       if (k !== 'all' && !n) return '';
-      return `<button type="button" class="mb-tab ${filter === k ? 'is-on' : ''}" data-kind="${esc(k)}">
-        ${esc(label)}<span>${n}</span></button>`;
-    }).join('');
+      return `<button type="button" class="ds-chip mb-tab" aria-pressed="${filter === k}" data-kind="${esc(k)}">
+        ${esc(label)}<span class="ds-chip__count">${n}</span></button>`;
+    }).filter(Boolean);
+    /* One product only: a single chip beside "All" is not a choice. */
+    host.innerHTML = chips.length > 2 ? chips.join('') : '';
     host.querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => {
       filter = b.dataset.kind;
       renderTabs(); render();
@@ -175,12 +266,26 @@ const MyBookings = (function () {
   }
 
   async function refresh() {
-    rows = await BookingStore.list();
-    /* Flights are real server bookings now; the other four products are still
-       local demo rows. Label the list only when it actually contains one,
-       rather than calling a booking with a real reference a demo. */
-    const badge = document.getElementById('mbDemoBadge');
-    if (badge) badge.hidden = !rows.some(b => b.demo !== false);
+    const host = document.getElementById('mbList');
+    const signedIn = typeof BookingApi !== 'undefined' && BookingApi.isSignedIn();
+    if (!signedIn) {
+      rows = [];
+      paintHero(); renderSegments(); renderTabs();
+      if (host) state(host, { kind: 'expired', kicker: 'Signed out', title: 'Sign in to see your bookings',
+        body: 'Your bookings are kept with your account, so they are the same on every device.',
+        actions: [{ label: 'Sign in', href: 'login.html' }] });
+      return;
+    }
+    if (host && typeof DS !== 'undefined' && !rows.length) DS.skeleton(host, 'row', 3);
+    try {
+      rows = (await BookingStore.list()).filter(b => b.demo === false);
+    } catch (err) {
+      if (host) state(host, { kind: navigator.onLine === false ? 'offline' : 'error', title: 'We could not load your bookings',
+        actions: [{ label: 'Try again', onClick: () => refresh() }] });
+      return;
+    }
+    paintHero();
+    renderSegments();
     renderTabs();
     render();
   }
@@ -248,11 +353,16 @@ const MyBookings = (function () {
       if (act === 'view') return openDetail(b);
       if (act === 'ticket') return BookingTicket.handle('download', b);
       if (act === 'cancel') {
-        /* Demo cancellation is still destructive from the user's point of
-           view — it flips the row to Cancelled and hides the ticket path. */
-        if (!window.confirm(`Cancel booking ${b.id}? This cannot be undone in the demo.`)) return;
-        await BookingStore.cancel(b.id);
-        showToast(`${b.id} cancelled. A refund would be processed to the original payment method.`);
+        /* A server booking: the server cancels it and says what state it is
+           in. No refund is promised here — whether one is due is the fare's
+           and the policy's answer, not this button's. */
+        if (!window.confirm(`Cancel booking ${b.ref || b.id}? This cannot be undone.`)) return;
+        try {
+          await BookingStore.cancel(b.id);
+          showToast(`${b.ref || b.id} is cancelled.`);
+        } catch (err) {
+          showToast((err && err.message) || 'We could not cancel this booking. Please try again or contact support.');
+        }
         await refresh();
       }
     });

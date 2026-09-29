@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="assets/css/jw-motion.css?v=20260926mo3">
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/booking-card.css?v=20260919b2c3">
-<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
 <link rel="stylesheet" href="assets/css/hotel.css?v=20260925ui1">
 <link rel="stylesheet" href="assets/css/discover.css?v=20260925ui1">
@@ -42,21 +42,31 @@
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
 <script src="shared/formatters.js"></script>
 <script src="assets/js/jp-icons.js?v=20260923lp2"></script>
-<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
+<script src="assets/js/jw-motion.js?v=0928224009"></script>
 <script src="assets/js/auth.js?v=20260922gs1"></script>
 <!-- A package's image_key is a destination slug (0083 set it only where
      artwork shipped), so the cities' manifest is what resolves a card's
      photograph. A key with no file leaves the card on its tint. -->
-<script src="assets/js/destination-images.js?v=20260923im2"></script>
+<script src="assets/js/destination-images.js?v=0928221731"></script>
 <!-- AND the landmark photographs: a package's image_key names a city ("goa")
      or a particular place in it ("goa__fort-aguada"), so both manifests are
      consulted in that order. A heritage tour shows a fort rather than the
      same coastline as every other trip. -->
-<script src="assets/js/location-images.js?v=20260923im2"></script>
+<script src="assets/js/location-images.js?v=20260928im4"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260925ui1"></script>
+<script src="assets/js/hero-shell.js?v=20260928hd1"></script>
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=0928234819">
+<script src="assets/js/jw-products.js?v=0928222443" defer></script>
+<script src="components/focus-trap.js"></script>
 </head>
-<body class="sp-continuation disc pk" data-sp-service="packages" data-live-chat>
+<body class="sp-continuation disc pk jw-prod" data-sp-service="packages" data-live-chat>
 <a href="#pklMain" class="skip-link">Skip to content</a>
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -74,17 +84,29 @@
      Flights / Hotels / Tour Packages / Gaming Packages, which is what the
      strip's tabs were for. -->
 <main id="pklMain" class="dh-main disc-main pkl-main">
-  <div class="wrap">
-    <!-- A DIV, NOT A <header>. main.css makes every `header` element
-         position:fixed - that rule is for the site bar, and a page-heading
-         block written as <header> silently pinned itself over the results. -->
-    <div class="pkl-head">
-      <p class="pkl-eyebrow">Tour packages</p>
-      <h1>Trips we have already worked out</h1>
-      <p class="pkl-sub">Hotels, transfers and sightseeing arranged as one price. Choose a shelf,
-        then a trip — every filter below is applied to what we actually sell.</p>
+  <!-- THE HERO: a real destination this business sells packages to
+       (assets/destinations/CREDITS.md), full bleed, with the route drawn
+       across it. The heading is the page's H1. -->
+  <section class="ds-hero ds-hero--compact pkl-hero" aria-labelledby="pklTitle">
+    <!-- Tanah Lot, Bali. It was the "Maldives" destination file, which is a
+         photograph of one resort (Anantara Kihavah) — a specific property
+         used as generic scenery, which this site does not do. -->
+    <div class="ds-hero__media"><img class="ds-dev" src="assets/destinations/bali-1600.webp" alt="" fetchpriority="high"></div>
+    <p class="ds-hero__credit">Tanah Lot, Bali · Photo: CEphoto, Uwe Aranas · CC BY-SA 3.0</p>
+    <div class="ds-hero__shade"></div>
+    <svg class="ds-hero__route" viewBox="0 0 1440 500" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="ghost" d="M-20 420 C 280 380, 420 150, 760 190 S 1180 430, 1460 110"/>
+      <path d="M-20 420 C 280 380, 420 150, 760 190 S 1180 430, 1460 110"/>
+    </svg>
+    <div class="ds-grain" aria-hidden="true"></div>
+    <div class="ds-container ds-hero__inner">
+      <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li aria-current="page">Tour packages</li></ol>
+      <p class="ds-eyebrow is-light" data-ds-reveal>Tour packages</p>
+      <h1 class="ds-display" id="pklTitle" data-ds-reveal>Journeys, <em>already planned.</em></h1>
+      <p class="ds-lede" data-ds-reveal style="--ds-delay:.12s">Hotels, transfers and sightseeing arranged as one price. Choose a shelf, then a trip &mdash; every filter below is applied to what we actually sell.</p>
     </div>
-
+  </section>
+  <div class="wrap">
     <!-- The three shelves. Counts are live, including the zero. -->
     <div class="pkl-tiles" id="pklTiles" role="group" aria-label="Package categories"></div>
 

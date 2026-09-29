@@ -80,7 +80,14 @@
        when the picture does. An older manifest whose values are `true` yields
        no query and behaves exactly as before. */
     const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
-    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
+    /* `large` is the 1600w file the editorial layout's featured cards want on
+       a 2x screen. Every slug in the regenerated manifest ships it; the
+       srcset lets the browser pick, so a phone never fetches it. */
+    return {
+      src: dir + key + '.webp' + v,
+      small: dir + key + '-480.webp' + v,
+      large: dir + key + '-1600.webp' + v,
+    };
   };
 
   const esc = s => String(s == null ? '' : s)
@@ -107,7 +114,7 @@
   /* -------------------------------------------------------------------------
      The shelf
      ---------------------------------------------------------------------- */
-  function cardHtml(d) {
+  function cardHtml(d, i) {
     /* WHAT IS ON A CARD IS WHAT THE API SENT. `image` is a key, not a URL —
        the same keys the hotel and package catalogues use — and when it is null
        the card keeps the tinted ground rather than borrowing a photograph of
@@ -131,8 +138,10 @@
        fallback a destination with no art at all gets. */
     const picture = art
       ? '<img class="jw-dest-img" src="' + esc(art.src) + '"'
-        + ' srcset="' + esc(art.small) + ' 480w, ' + esc(art.src) + ' 960w"'
-        + ' sizes="(max-width: 520px) 50vw, (max-width: 900px) 33vw, 25vw"'
+        + ' srcset="' + esc(art.small) + ' 480w, ' + esc(art.src) + ' 960w, ' + esc(art.large) + ' 1600w"'
+        /* The editorial grid: a featured card is ~58% of the content width
+           on a desktop, a small one ~42%; below 1024 they are half or full. */
+        + ' sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 58vw"'
         + ' alt="' + esc(d.name) + '" loading="lazy" decoding="async"'
         + ' onerror="this.remove()">'
       : '';
@@ -150,23 +159,38 @@
        working card and a working page with no change to this file. */
     const href = 'destination/' + encodeURIComponent(d.id);
 
+    /* The numeral and the arrow are the editorial layout's furniture: a
+       running count down the shelf and a "go" mark that moves on hover. Both
+       are decoration — the aria-label already names the card — so both are
+       aria-hidden. The count is the card's position, not anything the API
+       says about the place. */
+    const num = String(i + 1).padStart(2, '0');
+
     return '<a role="listitem" class="jw-dest-card"'
       + ' href="' + esc(href) + '"'
       + ' data-dest-id="' + esc(d.id) + '"'
       + ' aria-label="Explore ' + esc(d.name) + '">'
       + '<span class="jw-dest-art">' + picture + '<span class="jw-dest-scrim"></span></span>'
+      + '<span class="jw-dest-num" aria-hidden="true">' + num + '</span>'
       + '<span class="jw-dest-body">'
       + '<span class="jw-dest-name">' + esc(d.name) + '</span>'
       + (meta.length ? '<span class="jw-dest-meta">' + esc(meta.join(' · ')) + '</span>' : '')
+      + '<span class="jw-dest-go" aria-hidden="true">Explore'
+      + '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>'
       + '</span></a>';
   }
 
   function paintShelf() {
     const shown = expanded ? destinations : destinations.slice(0, FIRST_SHOWN);
     grid.innerHTML = shown.map(cardHtml).join('');
-    /* The site's one reveal observer and one image-develop, from
-       jw-motion.js. Guarded so a page that has not loaded it still renders. */
-    if (typeof JWMotion !== 'undefined') JWMotion.grid(grid);
+    /* THE ENTRANCE BELONGS TO ONE ENGINE. On the homepage home-cinema.js
+       owns the cards' arrival, depth and photograph develop (GSAP); handing
+       them to JWMotion as well would put a CSS transition and a GSAP tween
+       on the same transform. HomeCinema.cards() answers false when it cannot
+       run (script missing, reduced motion is handled inside it), and the
+       site's own reveal takes over — so the cards are never left hidden. */
+    const cinema = typeof HomeCinema !== 'undefined' && HomeCinema.cards(grid);
+    if (!cinema && typeof JWMotion !== 'undefined') JWMotion.grid(grid);
     grid.setAttribute('aria-busy', 'false');
 
     const rest = destinations.length - shown.length;

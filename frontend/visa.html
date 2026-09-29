@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,7 +17,7 @@
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -25,8 +25,15 @@
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
-<script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>try{var t=localStorage.getItem('jpc_theme');if(t&&!document.documentElement.hasAttribute('data-theme-lock'))document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
 </head>
 <body data-sp-service="visa" data-live-chat>
 <a href="#spMain" class="skip-link">Skip to content</a>
@@ -85,7 +92,7 @@
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260925ui1"></script>
-<script src="assets/js/service-shell.js?v=20260919b2c1"></script>
+<script src="assets/js/service-shell.js?v=0928220609"></script>
 <script>HeroShell.mountHeader('visa.html');</script>
 <script src="assets/js/jw-loader.js?v=20260926ld1"></script>
 <script src="assets/js/payment-screen.js?v=20260926ld1"></script>

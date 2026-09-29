@@ -367,8 +367,18 @@ const HotelResults = (function () {
    *  hidden — without unpicking six call sites for a component that may yet
    *  come back. Each screen's Back link is what tells the traveller where they
    *  are relative to where they were. */
-  function stepperHtml() {
-    return '';
+  /* IT IS BACK, in the design system's stepper (jw-system.css §3.14:
+     horizontal, compact, never a vertical timeline). Six booking steps, from
+     the moment a property is opened; Results is browsing and gets none. The
+     indices are the ones the six screens already pass (Details 2 … Confirm 7). */
+  /* 'Confirmation' names the SCREEN; 'Confirmed' would claim a status the
+     booking may not have — a pending booking lands here too. */
+  const JOURNEY = ['Hotel', 'Room', 'Guests', 'Review', 'Payment', 'Confirmation'];
+  function stepperHtml(i) {
+    const cur = Number(i) - 2;
+    if (!(cur >= 0 && cur < JOURNEY.length)) return '';
+    return `<ol class="ds-stepper hr-journey" aria-label="Booking progress">${JOURNEY.map((s, k) =>
+      `<li class="ds-step${k < cur ? ' is-done' : ''}"${k === cur ? ' aria-current="step"' : ''}>${s}</li>`).join('')}</ol>`;
   }
 
   /* ---------------------------------------------------------------------
@@ -400,68 +410,97 @@ const HotelResults = (function () {
     return (typeof Wishlist !== 'undefined') ? Wishlist.button('hotel', h.id, h.name) : '';
   }
 
-  function cardHtml(h) {
+  /** "Banjara Hills, Hyderabad" -> "Hyderabad". */
+  function cityOf(h) {
+    const parts = String(h.location || '').split(',').map(s => s.trim()).filter(Boolean);
+    return parts.length > 1 ? parts[parts.length - 1] : '';
+  }
+
+  /* ---------------------------------------------------------------------
+     THE HOTEL CARD — three zones.
+
+       PHOTOGRAPH  THE shared resolver's answer (hotel-image-map.js): this
+                   property's verified photo, a city photo labelled on the
+                   picture as not the hotel, or the honest placeholder. It
+                   develops (blur -> sharp) through the design system.
+       IDENTITY    area · city, the name, stars and the guest score, then the
+                   facts that decide a stay — every one a column or a server
+                   derivation (meal_plans, free_cancellation), never a claim.
+       FOLIO       the lowest nightly rate as the anchor, the tax preview and
+                   the stay total beneath it, and the one decision: View rooms.
+                   Select keeps the card in the summary without leaving.
+     --------------------------------------------------------------------- */
+  function cardHtml(h, i) {
     const cost = stayCost(h);
+    const plans = Array.isArray(h.mealPlans) ? h.mealPlans.filter(Boolean) : [];
     const meal = headlineMeal(h);
     const n = nights();
-    const img = (typeof hotelImageTag === 'function')
-      ? hotelImageTag(h)
-      : `<img src="${esc(imageSrc(h))}" alt="${esc(h.name)}" loading="lazy">`;
+    const rooms = roomCount();
+    const picked = selectedId === String(h.id);
+    const area = areaOf(h);
+    const city = cityOf(h);
+    const media = (typeof HotelPhoto !== 'undefined')
+      ? HotelPhoto.html(h, { surface: 'card', eager: i < 2, sizes: '(max-width: 760px) 100vw, 380px' })
+      : '';
+    const stars = h.stars && typeof JPIcon !== 'undefined'
+      ? `<span class="hr-stars" role="img" aria-label="${esc(h.stars)}-star hotel">${JPIcon.stars(h.stars, h.stars)}</span>` : '';
+
+    /* Meal plans as the property actually offers them. The first is what the
+       headline rate includes (plans arrive ordered by room price), so it is
+       the one marked; the rest cost more and are listed, not promised. */
+    const mealFact = meal ? `
+      <li class="hc-fact ${isInclusion(meal) ? 'is-good' : ''}">
+        <span class="hc-fact-k">At this rate</span>${esc(meal)}
+      </li>` : '';
+    const otherPlans = plans.slice(1);
+    const cancelFact = h.freeCancellation === true
+      ? `<li class="hc-fact is-good"><span class="hc-fact-k">Cancellation</span>Free cancellation</li>`
+      : '';   // not free: the policy text below says what it is, in its own words
+    const distFact = h.distanceKm != null
+      ? `<li class="hc-fact"><span class="hc-fact-k">Airport</span>${esc(h.distanceKm)} km</li>` : '';
 
     return `
-      <article class="hr-card ${selectedId === String(h.id) ? 'is-selected' : ''}"
-               data-hotel="${esc(h.id)}">
-        <div class="hr-card-media">
-          ${img}
-          ${h.distanceKm != null
-            ? `<span class="hr-card-badge">${esc(h.distanceKm)} km from airport</span>` : ''}
+      <article class="hr-card hc ${picked ? 'is-selected' : ''}" data-hotel="${esc(h.id)}">
+        <div class="hc-media">
+          ${media}
           ${saveButton(h)}
-          ${photoCredit(h)}
         </div>
-        <div class="hr-card-body">
-          <div class="hr-card-top">
-            <div class="hr-card-main">
-              <div class="hr-name-row">
-                <h3 class="hr-name">${esc(h.name)}</h3>
-                ${h.stars ? `<span class="hr-stars">${typeof JPIcon !== 'undefined'
-                   ? JPIcon.stars(h.stars, h.stars)
-                   : ''}</span>` : ''}
-              </div>
-              <p class="hr-loc">${icon('pin')} ${esc(h.location)}</p>
-              ${h.guestRating != null ? `
-                <div class="hr-rating-row">
-                  <span class="hr-rating">${esc(Number(h.guestRating).toFixed(1))}</span>
-                  <span class="hr-rating-word">${esc(ratingWord(h.guestRating))}</span>
-                </div>` : ''}
-              ${(h.amenities || []).length ? `
-                <div class="hr-amenities">${h.amenities.slice(0, 5).map(a =>
-                  `<span class="hr-amenity">${icon('check')} ${esc(a)}</span>`).join('')}
-                </div>` : ''}
-              <div class="hr-notes">
-                ${meal ? (isInclusion(meal)
-                  ? `<span class="hr-note-ok">${icon('check')} ${esc(meal)}</span>`
-                  /* "Room only" is what the cheapest rate IS, not something it
-                     throws in — so it is stated plainly rather than ticked
-                     green like an inclusion. */
-                  : `<span class="hr-note-plain">${esc(meal)}</span>`) : ''}
-                ${h.freeCancellation === true
-                  ? `<span class="hr-note-ok">${icon('check')} Free cancellation</span>` : ''}
-                ${h.cancellationPolicy
-                  ? `<span class="hr-note-plain">${esc(h.cancellationPolicy)}</span>` : ''}
-              </div>
-            </div>
 
-            <div class="hr-card-price">
-              <span class="hr-price-main">${esc(rupees(h.pricePerNight))}</span>
-              <span class="hr-price-for">per night</span>
-              <span class="hr-price-tax">+ ${esc(rupees(cost.tax))} taxes &amp; fees</span>
-              <span class="hr-price-for">${esc(rupees(cost.total))} for ${n} night${n > 1 ? 's' : ''}</span>
-              <div class="hr-card-cta">
-                <button type="button" class="hr-btn hr-btn-primary" data-view-rooms="${esc(h.id)}">
-                  View Rooms
-                </button>
-              </div>
-            </div>
+        <div class="hc-body">
+          ${area || city ? `<p class="hc-kicker">${esc(area)}${area && city ? '<i aria-hidden="true">·</i>' : ''}${esc(city)}</p>` : ''}
+          <h3 class="hr-name hc-name">${esc(h.name)}</h3>
+          ${stars || h.guestRating != null ? `
+            <div class="hc-meta">
+              ${stars}
+              ${h.guestRating != null ? `
+                <span class="hc-score"><b>${esc(Number(h.guestRating).toFixed(1))}</b>${esc(ratingWord(h.guestRating))}
+                  <span class="hr-sr">guest rating out of 5</span></span>` : ''}
+            </div>` : ''}
+          ${mealFact || cancelFact || distFact ? `<ul class="hc-facts">${mealFact}${cancelFact}${distFact}</ul>` : ''}
+          ${otherPlans.length ? `<p class="hc-line"><span>Also offered</span> ${otherPlans.map(esc).join(' · ')}</p>` : ''}
+          ${h.cancellationPolicy ? `<p class="hc-line hc-policy">${esc(h.cancellationPolicy)}</p>` : ''}
+          ${(h.amenities || []).length ? `
+            <p class="hc-amen">${h.amenities.slice(0, 5).map(a => `<span>${esc(a)}</span>`).join('')}</p>` : ''}
+        </div>
+
+        <div class="hc-folio">
+          <div class="hc-rate">
+            <span class="hc-from">Lowest nightly rate</span>
+            <span class="hc-amt">${esc(rupees(h.pricePerNight))}</span>
+            <span class="hc-per">per room, per night</span>
+          </div>
+          <dl class="hc-sum">
+            <div><dt>Taxes &amp; fees</dt><dd>+ ${esc(rupees(cost.tax))}</dd></div>
+            <div class="hc-sum-total"><dt>${n} night${n > 1 ? 's' : ''}${rooms > 1 ? ` · ${rooms} rooms` : ''}</dt><dd>${esc(rupees(cost.total))}</dd></div>
+          </dl>
+          <div class="hc-acts">
+            <button type="button" class="hr-btn hr-btn-primary hc-cta" data-view-rooms="${esc(h.id)}">
+              View rooms
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+            <button type="button" class="hc-select" aria-pressed="${picked}">
+              ${picked ? 'Selected' : 'Select'}
+            </button>
           </div>
         </div>
       </article>`;
@@ -477,34 +516,10 @@ const HotelResults = (function () {
     return 'Pleasant';
   }
 
-  /** The photographer credit overlay.
-   *
-   *  NOT OPTIONAL. Every photograph in assets/hotels/ is a Wikimedia Commons
-   *  file under CC BY or CC BY-SA, and those licences require visible
-   *  attribution. assets/hotels/CREDITS.md says so explicitly, and says that
-   *  if the overlay is ever removed the attribution has to be reproduced
-   *  somewhere the user can reach. It was missing from this card — and from
-   *  the grid this screen replaced — so it is restored here. */
-  function photoCredit(h) {
-    const credits = typeof HOTEL_IMAGE_CREDITS !== 'undefined' ? HOTEL_IMAGE_CREDITS : {};
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    const slug = (h.imageKey && known[h.imageKey]) ? h.imageKey
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-    const c = credits[slug];
-    if (!c) return '';
-    return `<span class="hr-card-credit">Photo: ${esc(c.artist)} · ${esc(c.licence)}</span>`;
-  }
-
-  /** Falls back to the shared photography map when travel-explore's own
-   *  helper is not reachable from here. */
-  function imageSrc(h) {
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    const known = typeof HOTEL_IMAGE_FILES === 'object' && HOTEL_IMAGE_FILES
-      && h.imageKey && HOTEL_IMAGE_FILES[h.imageKey];
-    const slug = known ? h.imageKey
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-    return `${dir}${slug}.webp`;
-  }
+  /* The photographer credit and the image path used to be worked out here from
+     the API's image key. Both belong to HotelPhoto now: the credit rides on
+     the figure it describes (CC BY / BY-SA attribution is still on every
+     photograph), and the key is no longer trusted as the hotel's identity. */
 
   /* ---------------------------------------------------------------------
      Render — booking summary
@@ -539,7 +554,7 @@ const HotelResults = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(imageSrc(picked))}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(picked)}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(picked.name)}</p>
               ${picked.stars ? `<span class="hr-stars">${typeof JPIcon !== 'undefined'
@@ -618,7 +633,7 @@ const HotelResults = (function () {
         <div class="hr-ab-cta">
           <button type="button" class="hr-btn hr-btn-primary hr-btn-lg" id="hrContinue"
                   ${picked ? '' : 'disabled'}>
-            Continue to Hotel Details
+            Continue<span class="hr-ab-long"> to Hotel Details</span>
           </button>
           <span>${picked ? 'You can select your room next' : 'Choose a hotel to continue'}</span>
         </div>
@@ -635,20 +650,35 @@ const HotelResults = (function () {
     if (count) {
       count.textContent = `${list.length} hotel${list.length === 1 ? '' : 's'} found`;
     }
+    paintFilterBadge();
     if (!el) return;
+    el.removeAttribute('aria-busy');
 
     if (!list.length) {
-      el.innerHTML = `
-        <div class="hr-empty">
-          <b>No hotels match these filters</b>
-          <p>Try a wider price range, fewer star categories, or another destination.</p>
-          <button type="button" class="hr-btn hr-btn-primary" id="hrResetEmpty">Clear filters</button>
-        </div>`;
-      const btn = $('hrResetEmpty');
-      if (btn) btn.addEventListener('click', clearAll);
+      /* The design system's one empty composition. Two different emptinesses:
+         filters that ruled everything out (clear them), and a search that
+         returned nothing to filter (change the search). */
+      const filtered = rows.length > 0;
+      const opts = filtered
+        ? { kind: 'empty', kicker: 'No matches', title: 'No hotels match these filters',
+            body: 'Try a wider price range, fewer star categories, or another area.',
+            actions: [{ label: 'Clear filters', onClick: clearAll }] }
+        : { kind: 'empty', kicker: 'Nothing here yet', title: shell && shell.dest ? `No hotels in ${shell.dest} yet` : 'No hotels to show',
+            body: 'Try another destination from the search above.',
+            actions: [{ label: 'Show all hotels', href: location.pathname }] };
+      if (typeof DS !== 'undefined') DS.state(el, opts);
+      else {
+        const a = opts.actions[0];
+        el.innerHTML = `<div class="hr-empty"><b>${esc(opts.title)}</b><p>${esc(opts.body)}</p>
+          ${a.href ? `<a class="hr-btn hr-btn-primary" href="${esc(a.href)}">${esc(a.label)}</a>`
+                   : `<button type="button" class="hr-btn hr-btn-primary" id="hrResetEmpty">${esc(a.label)}</button>`}</div>`;
+        const btn = $('hrResetEmpty');
+        if (btn && a.onClick) btn.addEventListener('click', a.onClick);
+      }
       return;
     }
     el.innerHTML = list.map(cardHtml).join('');
+    if (typeof HotelPhoto !== 'undefined') HotelPhoto.develop(el);
     /* The cards were just replaced, so their hearts are freshly built from
        whatever Wishlist knew at the time. Repaint in case the saved set landed
        after this render — it is fetched in parallel, not awaited. */
@@ -673,7 +703,12 @@ const HotelResults = (function () {
   }
   function paintActionbar() {
     const el = $('hrActionbar');
-    if (el) el.innerHTML = actionbarHtml();
+    if (el) {
+      el.innerHTML = actionbarHtml();
+      /* Nothing chosen yet: on a phone the bar is only a disabled button
+         over the list, and every card already carries its own View rooms. */
+      el.classList.toggle('is-idle', !rows.some(h => String(h.id) === String(selectedId)));
+    }
   }
 
   /** Everything that depends on the filter state. Filters repaint too, because
@@ -718,6 +753,17 @@ const HotelResults = (function () {
     }
 
     root.addEventListener('click', e => {
+      const chip = e.target.closest('[data-hr-sort]');
+      if (chip) {
+        const sel = $('hrSort');
+        if (sel && sel.value !== chip.dataset.hrSort) {
+          sel.value = chip.dataset.hrSort;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return;
+      }
+      if (e.target.closest('#hrFilterOpen')) { openFilterSheet(); return; }
+
       const view = e.target.closest('[data-view-rooms]');
       if (view) { select(view.getAttribute('data-view-rooms'), true); return; }
 
@@ -736,6 +782,7 @@ const HotelResults = (function () {
       /* Sorting never touches the filters — a different order of the same
          results. Only the list is repainted. */
       writeUrl(true);
+      paintSortChips();
       paintResults();
     });
 
@@ -754,7 +801,14 @@ const HotelResults = (function () {
 
   function select(id, andContinue) {
     selectedId = String(id);
-    paintResults();
+    /* In place, not a repaint: rebuilding the list would replay every card's
+       arrival and re-develop every photograph for a change to one flag. */
+    document.querySelectorAll('#hrCards [data-hotel]').forEach(card => {
+      const on = card.getAttribute('data-hotel') === selectedId;
+      card.classList.toggle('is-selected', on);
+      const b = card.querySelector('.hc-select');
+      if (b) { b.setAttribute('aria-pressed', String(on)); b.textContent = on ? 'Selected' : 'Select'; }
+    });
     paintSummary();
     paintActionbar();
     if (andContinue) continueToDetails();
@@ -804,18 +858,42 @@ const HotelResults = (function () {
    *  hotel results and travel-explore should not render its grid. */
   function owns() { return !!document.getElementById('hrRoot'); }
 
+  /** Skeletons shaped like the card that is coming — photograph, words,
+   *  folio — not a spinner and not grey bars of the wrong proportion. */
   function skeleton() {
     const el = $('hrCards');
-    if (el) el.innerHTML = Array.from({ length: 4 },
-      () => '<div class="hr-skeleton"></div>').join('');
+    if (!el) return;
+    el.setAttribute('aria-busy', 'true');
+    el.innerHTML = '<span class="hr-sr" role="status">Loading hotels</span>' + Array.from({ length: 3 }, () => `
+      <div class="hr-card hc hc-skel" aria-hidden="true">
+        <div class="hc-media"><div class="hp hp--card"><div class="hp-ph"></div></div></div>
+        <div class="hc-body">
+          <span class="ds-skel ds-skel--line w-40"></span>
+          <span class="ds-skel ds-skel--title"></span>
+          <span class="ds-skel ds-skel--line w-60"></span>
+          <span class="ds-skel ds-skel--line w-80"></span>
+        </div>
+        <div class="hc-folio"><span class="ds-skel ds-skel--title"></span><span class="ds-skel ds-skel--pill"></span></div>
+      </div>`).join('');
   }
 
   function error() {
     const el = $('hrCards');
-    if (el) el.innerHTML = `
+    if (!el) return;
+    const shellEl = $('hrRoot');
+    if (shellEl) shellEl.hidden = false;
+    el.removeAttribute('aria-busy');
+    const opts = {
+      kind: navigator.onLine === false ? 'offline' : 'error',
+      title: "We couldn't load hotel availability",
+      body: 'Something went wrong at our end. Please try again in a moment.',
+      actions: [{ label: 'Try again', onClick: () => location.reload() }],
+    };
+    if (typeof DS !== 'undefined') { DS.state(el, opts); return; }
+    el.innerHTML = `
       <div class="hr-error">
-        <b>We couldn't load hotel availability</b>
-        <p>Something went wrong at our end. Please try again in a moment.</p>
+        <b>${esc(opts.title)}</b>
+        <p>${esc(opts.body)}</p>
         <button type="button" class="hr-btn hr-btn-primary" onclick="location.reload()">Try again</button>
       </div>`;
   }
@@ -914,7 +992,17 @@ const HotelResults = (function () {
     /* A stay with no dates cannot be priced, and the flow used to discover
        that four screens later. Filled in here, before anything renders, and
        shown in the editable bar where they can be changed. */
-    if (ensureStayDates()) writeStayUrl();
+    /* Always written, not only when this second pass fills something: the
+       first pass above may already have supplied the default dates, and the
+       stay hero (and a refresh, and a shared link) read the stay from the URL. */
+    ensureStayDates();
+    writeStayUrl();
+    /* THE ROW MUST SAY WHAT WILL BE PRICED. The strip draws first, with its
+       own default (today); the stay just settled on tomorrow. Without this the
+       strip showed one check-in and the summary priced another. */
+    if (typeof SearchStrip !== 'undefined' && SearchStrip.seed) {
+      SearchStrip.seed({ dest: shell.dest || '', checkIn: shell.checkIn, checkOut: shell.checkOut });
+    }
     bindSearchbar();
 
     /* Before the first paint, so the rail renders already holding whatever the
@@ -1037,6 +1125,9 @@ const HotelResults = (function () {
        showing the search, so the hero would only be repeating it. */
     const onBooking = !!(step || (wanted && hotel));
     document.body.classList.toggle('hr-booking', onBooking);
+    /* A receipt is not a search: the strip's criteria are not this booking's
+       dates, so on Confirmation the strip is not shown at all. */
+    document.body.classList.toggle('hr-confirm', step === 'confirmation');
 
     const ref = q.get('ref');
     if (step === 'confirmation' && ref && typeof HotelConfirm !== 'undefined') {
@@ -1230,7 +1321,61 @@ const HotelResults = (function () {
     sel.innerHTML = opts.map(o =>
       `<option value="${esc(o.id)}"${o.id === rail().sort ? ' selected' : ''}>${esc(o.label)}</option>`
     ).join('');
+    paintSortChips(opts);
   }
+
+  /** The sort, as chips. They DRIVE the select above rather than holding a
+   *  state of their own: a click sets its value and fires its `change`, and
+   *  the one handler that already sorts, writes the URL and repaints does
+   *  the rest. The select stays for assistive tech and as the fallback. */
+  function paintSortChips(opts) {
+    const box = $('hrSortChips');
+    if (!box || !rail()) return;
+    box.innerHTML = (opts || rail().availableSorts()).map(o =>
+      `<button type="button" class="ds-chip hr-sortchip" data-hr-sort="${esc(o.id)}"
+         aria-pressed="${o.id === rail().sort}">${esc(o.label)}</button>`).join('');
+  }
+
+  /** How many filters are on, on the phone's Filters button. */
+  function paintFilterBadge() {
+    const b = $('hrFilterOpen');
+    if (!b || !rail() || typeof rail().activeCount !== 'function') return;
+    const n = rail().activeCount();
+    const c = b.querySelector('[data-count]');
+    if (c) c.textContent = n ? String(n) : '';
+    b.classList.toggle('has-count', n > 0);
+  }
+
+  /* ---------------------------------------------------------------------
+     The filter rail on a phone or tablet: the design system's bottom sheet.
+     The SAME element — #hrFilters, mounted once, handlers intact — is lifted
+     over the page with DS.open (scrim, focus trap, Escape, scroll lock) and
+     put back with DS.close. On a desktop it is the rail it always was.
+     --------------------------------------------------------------------- */
+  const SHEET_MQ = window.matchMedia('(max-width: 900px)');
+  function openFilterSheet() {
+    const el = $('hrFilters');
+    if (!el || typeof DS === 'undefined') return;
+    el.classList.add('hr-sheet');
+    if (!el.querySelector('.hr-sheet-foot')) {
+      const foot = document.createElement('div');
+      foot.className = 'hr-sheet-foot';
+      foot.innerHTML = '<button type="button" class="ds-btn ds-btn--primary ds-btn--block" data-ds-close>Show hotels</button>';
+      el.appendChild(foot);
+    }
+    DS.open(el);
+  }
+  function closeFilterSheet() {
+    const el = $('hrFilters');
+    if (el && typeof DS !== 'undefined') DS.close(el);
+  }
+  SHEET_MQ.addEventListener && SHEET_MQ.addEventListener('change', e => {
+    if (!e.matches) {
+      closeFilterSheet();
+      const el = $('hrFilters');
+      if (el) { el.classList.remove('hr-sheet'); el.removeAttribute('aria-modal'); el.removeAttribute('role'); }
+    }
+  });
 
   /* ---------------------------------------------------------------------
      URL state

@@ -118,13 +118,13 @@ const HotelConfirm = (function () {
     return isNaN(d) ? '—' : d.toLocaleDateString('en-IN',
       { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
   }
-  function heroSlug() {
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-    const key = hotel && hotel.image;
-    return (key && known[key]) ? key
-      : (typeof HOTEL_IMAGE_DEFAULT === 'string' ? HOTEL_IMAGE_DEFAULT : 'default-hotel');
-  }
-  const imgDir = () => (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
+  /* The booking's own name and address are the identity; the catalogue row
+     (when it loaded) only adds stars. The photograph rule is the shared
+     resolver's: this property's verified photo, or the honest placeholder. */
+  const stayIdentity = () => ({
+    name: booking.hotel_name || (hotel && hotel.name) || '',
+    location: booking.hotel_location || (hotel && hotel.location) || '',
+  });
 
   /** Rooms as the server recorded them. Falls back to the parent row's single
    *  room for bookings made before per-room selections existed. */
@@ -200,8 +200,7 @@ const HotelConfirm = (function () {
   function hotelSection() {
     return section('hotel', 'Booking Details', `
       <div class="hr-rv-hotel">
-        <img class="hr-rv-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}"
-             alt="${esc(booking.hotel_name)}" loading="lazy">
+        <div class="hr-rv-thumb">${HotelPhoto.thumb(stayIdentity())}</div>
         <div class="hr-rv-hotel-body">
           <div class="hr-name-row">
             <h3 class="hr-rv-name">${esc(booking.hotel_name)}</h3>
@@ -390,7 +389,7 @@ const HotelConfirm = (function () {
         <div class="hr-sum-head"><h2>Booking Summary</h2></div>
         <div class="hr-sum-body">
           <div class="hr-sum-hotel">
-            <img class="hr-sum-thumb" src="${esc(imgDir() + heroSlug() + '-480.webp')}" alt="" loading="lazy">
+            <div class="hr-sum-thumb">${HotelPhoto.thumb(stayIdentity())}</div>
             <div>
               <p class="hr-sum-hotel-name">${esc(booking.hotel_name)}</p>
               ${hotel && hotel.stars ? `<span class="hr-stars" role="img"

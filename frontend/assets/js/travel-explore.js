@@ -125,15 +125,14 @@ const TravelExplore = (function () {
     return `<span class="tx-logo">${fallback}</span>`;
   }
 
-  /** Real photograph for a hotel slug, with the 480px variant for small cards. */
+  /** The hotel's picture, from THE shared resolver (hotel-image-map.js):
+   *  its verified property photo, a labelled city photo, or the honest
+   *  placeholder. The API's image key is not proof of identity and is not
+   *  read here. */
   function hotelImage(h) {
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    const known = typeof HOTEL_IMAGE_FILES !== 'undefined' && HOTEL_IMAGE_FILES[h.imageKey];
-    const slug = known ? h.imageKey : 'default-hotel';
-    return `<img src="${esc(dir + slug + '.webp')}"
-      srcset="${esc(dir + slug + '-480.webp')} 480w, ${esc(dir + slug + '.webp')} 1024w"
-      sizes="(max-width: 760px) 90vw, 280px"
-      alt="${esc(h.name)}" loading="lazy" decoding="async">`;
+    return (typeof HotelPhoto !== 'undefined')
+      ? HotelPhoto.html(h, { surface: 'card', sizes: '(max-width: 760px) 90vw, 280px' })
+      : '';
   }
 
   /* Cruises and packages have no photo library, so they get a drawn scene
@@ -233,62 +232,105 @@ const TravelExplore = (function () {
     return state.depart || (f && f.date) || '';
   }
 
-  function flightCard(f) {
-    const arrival = f.arrival
-      ? `<div class="tx-time">${esc(f.arrival)}</div>`
-      /* Table 1 of the source has no arrival times. Saying so beats printing a
-         guessed one next to a real flight number. */
-      : `<div class="tx-time tx-tbd">Arrival TBA</div>`;
+  /* THE ROUTE, DRAWN. One quadratic arc from origin to destination in a fixed
+     240x56 box, so the card can scale it without the aeroplane leaving the
+     line. A stop is a node ON the arc at its share of the journey — drawn from
+     f.stops, never from a guessed airport. The aeroplane's flight along the
+     arc is SMIL (animateMotion), paused at render and released by
+     jw-products.js when the card is first seen; with no script it simply
+     never flies and the arc is drawn in full. */
+  const ARC = { x0: 14, y0: 46, cx: 120, cy: -2, x1: 226, y1: 46 };
+  const ARC_D = `M${ARC.x0} ${ARC.y0} Q${ARC.cx} ${ARC.cy} ${ARC.x1} ${ARC.y1}`;
+  function arcPoint(t) {
+    const u = 1 - t;
+    return {
+      x: u * u * ARC.x0 + 2 * u * t * ARC.cx + t * t * ARC.x1,
+      y: u * u * ARC.y0 + 2 * u * t * ARC.cy + t * t * ARC.y1,
+    };
+  }
+  function routeSvg(f) {
+    const n = f.nonStop ? 0 : Math.max(0, Math.min(3, Number(f.stops) || 0));
+    const stops = Array.from({ length: n }, (_, i) => {
+      const p = arcPoint((i + 1) / (n + 1));
+      return `<circle class="jf-stop" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6"/>`;
+    }).join('');
+    return `<svg class="jf-svg" viewBox="0 0 240 56" aria-hidden="true" focusable="false">
+        <path class="jf-ghost" d="${ARC_D}"/>
+        <path class="jf-draw" d="${ARC_D}" pathLength="1"/>
+        <circle class="jf-node" cx="${ARC.x0}" cy="${ARC.y0}" r="4"/>
+        <circle class="jf-node jf-node--to" cx="${ARC.x1}" cy="${ARC.y1}" r="4"/>
+        <circle class="jf-halo" cx="${ARC.x1}" cy="${ARC.y1}" r="9"/>
+        ${stops}
+        <g class="jf-plane">
+          <path d="M9 0 3 -1.3 -1 -7.5 -3.2 -7.5 -.6 -1.4 -5 -1.3 -7 -3.8 -8.6 -3.8 -7.3 0 -8.6 3.8 -7 3.8 -5 1.3 -.6 1.4 -3.2 7.5 -1 7.5 3 1.3Z"/>
+          <animateMotion dur="1.5s" begin="0s" fill="freeze" rotate="auto" calcMode="spline"
+            keyPoints="0;0.5" keyTimes="0;1" keySplines=".22 1 .36 1" path="${ARC_D}"/>
+        </g>
+      </svg>`;
+  }
 
-    const dur = f.durationLabel
-      ? `<div class="tx-dur">${esc(f.durationLabel)}</div>`
-      : `<div class="tx-dur">Non-stop</div>`;
+  function flightCard(f) {
+    /* Table 1 of the source has no arrival times. Saying so beats printing a
+       guessed one next to a real flight number. */
+    const arrival = f.arrival
+      ? `<b class="jf-time">${esc(f.arrival)}</b>`
+      : `<b class="jf-time jf-time--tba">TBA</b>`;
+
+    const stopsLabel = f.nonStop ? 'Non-stop' : esc(f.stops + (Number(f.stops) === 1 ? ' stop' : ' stops'));
 
     const fare = f.fare == null
-      ? `<div class="tx-fare">Fare on request</div>`
-      : `<div class="tx-fare"><span>from</span><b>${esc(money(f.total))}</b><i>incl. taxes</i></div>`;
+      ? `<div class="jf-fare"><span class="jf-from">Fare</span><b class="jf-amt jf-amt--req">On request</b></div>`
+      : `<div class="jf-fare"><span class="jf-from">from</span><b class="jf-amt">${esc(money(f.total))}</b><span class="jf-tax">incl. taxes</span></div>`;
 
     /* The commercial line every booking site carries: what it costs to change
        your mind, what you may bring, and how much is left. */
     const facts = f.fare == null ? '' : `
-      <div class="tx-facts">
-        <span class="tx-fact ${f.refundable ? 'is-good' : ''}">${esc(f.fareType)}</span>
-        <span class="tx-fact">Cabin ${esc(f.baggage.cabin)}</span>
-        <span class="tx-fact">Check-in ${esc(f.baggage.checkIn)}</span>
-        <span class="tx-fact ${f.seatsLow ? 'is-warn' : ''}">${esc(f.seatsLeft)} seat${f.seatsLeft === 1 ? '' : 's'} left</span>
-      </div>`;
+      <ul class="jf-facts" aria-label="Fare facts">
+        <li class="jf-fact ${f.refundable ? 'is-good' : ''}">${esc(f.fareType)}</li>
+        <li class="jf-fact"><span>Cabin</span> ${esc(f.baggage.cabin)}</li>
+        <li class="jf-fact"><span>Check-in</span> ${esc(f.baggage.checkIn)}</li>
+        <li class="jf-fact ${f.seatsLow ? 'is-warn' : ''}">${esc(f.seatsLeft)} seat${f.seatsLeft === 1 ? '' : 's'} left</li>
+      </ul>`;
 
-    return `<article class="tx-flight" data-flight="${esc(f.id)}">
-      <div class="tx-carrier">
-        ${airlineLogo(f)}
-        <div>
-          <div class="tx-carrier-name">${esc(f.airline)}</div>
-          <div class="tx-carrier-no">${esc(f.flightNumber)} · ${esc(fmtDate(shownDate(f)))}</div>
-        </div>
-      </div>
+    const label = `${f.airline} ${f.flightNumber}, ${f.origin.city} to ${f.destination.city}, departs ${f.departure}`;
 
-      <div class="tx-leg">
-        <div>
-          <div class="tx-time">${esc(f.departure)}</div>
-          <div class="tx-place">${esc(f.origin.city)} (${esc(f.origin.code)})</div>
+    return `<article class="tx-flight jf" data-flight="${esc(f.id)}" aria-label="${esc(label)}">
+      <div class="jf-main">
+        <div class="jf-carrier">
+          ${airlineLogo(f)}
+          <div class="jf-carrier-txt">
+            <span class="jf-airline">${esc(f.airline)}</span>
+            <span class="jf-no">${esc(f.flightNumber)} · ${esc(fmtDate(shownDate(f)))}</span>
+          </div>
+          <span class="jf-status">${esc(f.status)}</span>
         </div>
-        <div class="tx-path">
-          ${dur}
-          <div class="tx-line">${typeof JPIcon !== 'undefined' ? JPIcon.html('flights') : ''}</div>
-          <div class="tx-stops">${f.nonStop ? 'Non-stop' : esc(f.stops + ' stop')}</div>
-        </div>
-        <div class="tx-leg-end">
-          ${arrival}
-          <div class="tx-place">${esc(f.destination.city)} (${esc(f.destination.code)})</div>
+
+        <div class="jf-route">
+          <div class="jf-end">
+            <b class="jf-time">${esc(f.departure)}</b>
+            <span class="jf-code">${esc(f.origin.code)}</span>
+            <span class="jf-city">${esc(f.origin.city)}</span>
+          </div>
+          <div class="jf-arc">
+            <span class="jf-dur">${esc(f.durationLabel || 'Duration not published')}</span>
+            ${routeSvg(f)}
+            <span class="jf-stops${f.nonStop ? '' : ' has-stops'}">${stopsLabel}</span>
+          </div>
+          <div class="jf-end jf-end--to">
+            ${arrival}
+            <span class="jf-code">${esc(f.destination.code)}</span>
+            <span class="jf-city">${esc(f.destination.city)}</span>
+          </div>
         </div>
         ${facts}
       </div>
 
-      <div class="tx-act">
+      <div class="jf-stub">
         ${fare}
-        <span class="tx-status">${esc(f.status)}</span>
-        <button type="button" class="tx-btn tx-btn-ghost" data-tx-details="${esc(f.id)}">View Details</button>
-        <button type="button" class="tx-btn tx-btn-primary" data-tx-book="${esc(f.id)}">Select</button>
+        <div class="jf-acts">
+          <button type="button" class="ds-btn ds-btn--primary ds-btn--sm jf-select" data-tx-book="${esc(f.id)}">Select<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <button type="button" class="jf-more" data-tx-details="${esc(f.id)}">View Details</button>
+        </div>
       </div>
     </article>`;
   }
@@ -591,7 +633,9 @@ const TravelExplore = (function () {
   let railFlightId = null;
 
   function railFlight() {
-    const shown = flights.filter(f => f.fare != null);
+    /* searchable(), not the whole schedule: the rail is labelled "Lowest fare
+       on this route", and the cheapest departure to somewhere else is not. */
+    const shown = searchable().filter(f => f.fare != null);
     if (railFlightId) {
       const hit = shown.find(f => String(f.id) === String(railFlightId));
       if (hit) return { flight: hit, chosen: true };
@@ -674,7 +718,8 @@ const TravelExplore = (function () {
         </div>
         <ul class="tx-trust">
           <li>${tick}Secure payment</li>
-          <li>${tick}Best price guarantee</li>
+          <!-- "Best price guarantee" was here; no policy or mechanism in
+               this application backs it, so it is not claimed. -->
           <li>${tick}24&times;7 support</li>
         </ul>
       </div>`;
@@ -693,9 +738,20 @@ const TravelExplore = (function () {
         : '';
     }
 
+    /* TWO DIFFERENT EMPTINESSES, and only one of them is the filters' fault.
+       If the search itself returned nothing for this route, blaming "the
+       filters currently on" — when none are — sends the traveller to a Clear
+       button that can change nothing. Which case it is comes from the same
+       two sets the list is built from: `searchable()` (the query alone) and
+       `found` (query + filters). Nothing about what is fetched or filtered
+       changes. */
+    const filtersActive = typeof FlightFilters !== 'undefined'
+      && typeof FlightFilters.activeCount === 'function' && FlightFilters.activeCount() > 0;
+    const byFilters = searchable().length > 0 && filtersActive;
     list.innerHTML = page.length
       ? page.map(flightCard).join('')
-      : `<div class="tx-empty">
+      : (byFilters
+        ? `<div class="tx-empty">
            <b>No flights match those filters</b>
            Every result was ruled out by the filters currently on. Clear them to
            see the full list again, or change the route and dates above.
@@ -703,7 +759,16 @@ const TravelExplore = (function () {
              <button type="button" class="tx-btn tx-btn-primary" data-tx-clear>Clear filters</button>
              <button type="button" class="tx-btn tx-btn-ghost" data-tx-modify>Modify search</button>
            </div>
-         </div>`;
+         </div>`
+        : `<div class="tx-empty">
+           <b>No flights found for this route</b>
+           There are no departures listed for ${esc(state.from || 'this origin')} to
+           ${esc(state.to || 'this destination')} right now. Try another destination
+           or date from the search above.
+           <div class="tx-empty-acts">
+             <button type="button" class="tx-btn tx-btn-primary" data-tx-modify>Modify search</button>
+           </div>
+         </div>`);
 
     /* Written on every render, so a filter, a sort and a "show more" all leave
        a URL that reproduces exactly what is on screen. */
@@ -1228,12 +1293,38 @@ const TravelExplore = (function () {
     if (btn && h && !card.querySelector('.tx-hotel-details')) openHotelDetails(card, btn, h);
   }
 
+  /* THE CRUISE'S OWN ITINERARY, DRAWN. The rows carry no photograph, and a
+     stock picture of "a ship" or of one port would be the card claiming
+     something the data does not say. What the row DOES carry is its route —
+     "Dubai · Abu Dhabi · Doha" — so the card draws exactly that: one node per
+     port in the order sailed, joined by an arc, on the night. The port names
+     are the row's own strings; nothing is looked up or invented. */
+  function cruiseRoute(c) {
+    const ports = String(c.route || '').split(/\s*[·•,→]\s*/).map(x => x.trim()).filter(Boolean).slice(0, 5);
+    if (ports.length < 2) return sceneSvg('cruise', c.name);
+    const W = 320, H = 190, pad = 36, n = ports.length;
+    const pts = ports.map((p, i) => {
+      const x = pad + (W - 2 * pad) * (n === 1 ? .5 : i / (n - 1));
+      const y = 118 - Math.sin(Math.PI * (n === 1 ? .5 : i / (n - 1))) * 46 + (i % 2 ? 10 : -4);
+      return [x, y];
+    });
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < n; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      d += ` Q ${(x0 + x1) / 2} ${Math.min(y0, y1) - 28} ${x1} ${y1}`;
+    }
+    const nodes = pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === 0 || i === n - 1 ? 5 : 3.5}" class="${i === 0 || i === n - 1 ? 'end' : ''}"/>`
+      + `<text x="${x}" y="${y + 22}" text-anchor="middle">${esc(ports[i])}</text>`).join('');
+    return `<svg class="tx-route-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route: ${esc(ports.join(', '))}">
+      <path class="ghost" d="${d}"/><path class="line" d="${d}" pathLength="1"/>${nodes}</svg>`;
+  }
+
   function renderCruises(rows) {
     const el = $('txCruiseGrid');
     if (!el) return;
     catalogue.cruise = rows;
-    el.innerHTML = rows.map(c => `<article class="tx-card">
-      <div class="tx-media">${sceneSvg('cruise', c.name)}
+    el.innerHTML = rows.map(c => `<article class="tx-card tx-cruise">
+      <div class="tx-media tx-cruise-map">${cruiseRoute(c)}
         <span class="tx-badge">${esc(c.nights)} nights</span>
       </div>
       <div class="tx-body">
@@ -1804,6 +1895,12 @@ const TravelExplore = (function () {
   /** How many results the current selection yields — the number on the footer
    *  button, recomputed whenever the panel changes. */
   function sheetCount() {
+    /* Flights too: the button was blank there, which left the sheet's only
+       way out an empty red bar. */
+    if (document.body.dataset.spService === 'flights') {
+      const n = flights.filter(matches).length;
+      return n === 1 ? 'Show 1 flight' : `Show ${n} flights`;
+    }
     if (document.body.dataset.spService !== 'hotels') return '';
     const found = (typeof HotelFilters !== 'undefined')
       ? HotelFilters.apply(hotelsFiltered(allHotels)) : (allHotels || []);
@@ -2363,32 +2460,24 @@ const TravelExplore = (function () {
   /** One placeholder flight: logo, airline, both times, duration, fare, button
    *  — every element the real card carries, in its place. */
   function flightSkeletonCard() {
-    return `<article class="tx-flight tx-sk-flight" aria-hidden="true">
-      <div class="tx-carrier">
-        <div class="tx-sk-logo"></div>
-        <div class="tx-sk-col">
-          <div class="tx-sk-line w80"></div>
-          <div class="tx-sk-line w50"></div>
+    /* The ticket's own zones (.jf-main / .jf-route / .jf-stub), filled with
+       the design system's shimmer bars, so the placeholder is the card's shape
+       to the pixel and nothing moves when the real one replaces it. */
+    return `<article class="tx-flight jf tx-sk-flight" aria-hidden="true">
+      <div class="jf-main">
+        <div class="jf-carrier">
+          <span class="ds-skel jf-sk-logo"></span>
+          <div class="jf-carrier-txt"><span class="ds-skel ds-skel--line" style="width:120px"></span><span class="ds-skel ds-skel--line" style="width:90px"></span></div>
+        </div>
+        <div class="jf-route">
+          <div class="jf-end"><span class="ds-skel jf-sk-time"></span><span class="ds-skel ds-skel--line" style="width:70px"></span></div>
+          <div class="jf-arc"><svg class="jf-svg" viewBox="0 0 240 56" aria-hidden="true"><path class="jf-ghost" d="${ARC_D}"/></svg></div>
+          <div class="jf-end jf-end--to"><span class="ds-skel jf-sk-time"></span><span class="ds-skel ds-skel--line" style="width:70px"></span></div>
         </div>
       </div>
-      <div class="tx-leg">
-        <div class="tx-sk-col">
-          <div class="tx-sk-line tx-sk-time"></div>
-          <div class="tx-sk-line w70"></div>
-        </div>
-        <div class="tx-path tx-sk-col">
-          <div class="tx-sk-line tx-sk-dur"></div>
-          <div class="tx-sk-rule"></div>
-          <div class="tx-sk-line tx-sk-stops"></div>
-        </div>
-        <div class="tx-leg-end tx-sk-col">
-          <div class="tx-sk-line tx-sk-time"></div>
-          <div class="tx-sk-line w70"></div>
-        </div>
-      </div>
-      <div class="tx-act tx-sk-col">
-        <div class="tx-sk-line tx-sk-fare"></div>
-        <div class="tx-sk-btn"></div>
+      <div class="jf-stub">
+        <div class="jf-fare"><span class="ds-skel ds-skel--line" style="width:40px"></span><span class="ds-skel jf-sk-amt"></span></div>
+        <span class="ds-skel ds-skel--pill" style="width:100%"></span>
       </div>
     </article>`;
   }
@@ -2476,6 +2565,19 @@ const TravelExplore = (function () {
     if ($('txFlightList')) { showFlightSkeleton(rows); return; }
 
     const hotelGrid = $('txHotelGrid');
+    /* The Hotels page's Results screen draws its own skeletons, shaped like
+       its own cards, in its own column — not the Explore grid's above it. */
+    if (hotelGrid && typeof HotelResults !== 'undefined' && HotelResults.owns()) {
+      hotelGrid.innerHTML = '';
+      const root = $('hrRoot');
+      if (root) root.hidden = false;
+      /* The Explore band's chrome belongs to a grid this screen replaces —
+         collapsed now, while loading, not only once the rows arrive. */
+      const section = document.querySelector('.tx-scope .tx-section');
+      if (section) section.classList.add('hr-collapsed');
+      HotelResults.skeleton();
+      return;
+    }
     if (hotelGrid) {
       /* Into the grid itself, not a wrapper: .tx-grid is what lays the cards
          out in columns, and a <div> in between would put every placeholder in
@@ -2709,6 +2811,13 @@ const TravelExplore = (function () {
   }
 
   function showLoadError(err, service) {
+    if (service === 'hotels' && typeof HotelResults !== 'undefined' && HotelResults.owns()) {
+      const grid = $('txHotelGrid');
+      if (grid) grid.innerHTML = '';
+      HotelResults.error();
+      console.error('[explore] load failed', service, err);
+      return;
+    }
     const host = $('txFlightList') || $('txHotelGrid') || $('txCruiseGrid') || $('txPackageGrid');
     /* Offline is worth trusting over the thrown kind: a browser that knows it
        has no network says so more reliably than a failed fetch can. */

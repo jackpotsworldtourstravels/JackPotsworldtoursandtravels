@@ -666,7 +666,10 @@ const SearchStrip = (function () {
     return root;
   }
 
-  return { render, criteria, prettyDay, closeModify };
+  /* `seed` so a screen that settles the criteria AFTER the row was drawn —
+     Hotel Results fills in default dates — can make the row say what will
+     actually be priced, instead of the row keeping its own default. */
+  return { render, criteria, prettyDay, closeModify, seed: v => { if (root) seedRow(v); } };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SearchStrip;

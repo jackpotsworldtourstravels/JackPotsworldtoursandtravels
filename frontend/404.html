@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-theme-lock="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- THE NOT-FOUND PAGE. Starlette's StaticFiles (html=True, app/main.py's
+     frontend mount) serves this file with a 404 status for any path that
+     matches no file, at any depth — hence <base href="/">, so its assets and
+     links resolve from /a/b/c exactly as from /. -->
+<base href="/">
+<meta name="robots" content="noindex">
+<title>Page not found — JackPots World Tours &amp; Travels</title>
+<meta name="description" content="The page you were looking for could not be found.">
+<link rel="icon" type="image/png" href="assets/images/favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
+<link rel="stylesheet" href="assets/css/site-footer.css?v=20260928ft2">
+<script src="assets/js/jp-icons.js?v=20260911ic7"></script>
+<script src="assets/js/site-footer.js?v=20260928ft2"></script>
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="components/focus-trap.js"></script>
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<style>
+  .nf { min-height: 100vh; min-height: 100svh; display: flex; align-items: center; }
+  .nf .ds-hero__inner { max-width: 780px; }
+  .nf-code { font-family: var(--ds-display); font-style: italic; font-size: clamp(90px, 18vw, 240px); line-height: .8;
+    color: transparent; -webkit-text-stroke: 1px rgba(217, 178, 111, .55); margin: 0 0 12px; letter-spacing: -.04em; }
+  .nf-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+</style>
+</head>
+<body style="background:var(--ds-night)">
+<a href="#main" class="skip-link">Skip to content</a>
+<header id="siteHeader"></header>
+<script>JWHeader.mount(document.getElementById('siteHeader'), '');</script>
+
+<main id="main">
+  <section class="ds-hero nf" aria-labelledby="nfTitle">
+    <div class="ds-hero__media"><img class="ds-dev" src="assets/images/hero-dubai-1600.webp" alt="" style="opacity:.35"></div>
+    <div class="ds-hero__shade"></div>
+    <svg class="ds-hero__route" viewBox="0 0 1440 800" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="ghost" d="M-20 680 C 300 640, 420 300, 760 340 S 1160 660, 1460 220"/>
+      <path d="M-20 680 C 300 640, 420 300, 620 318"/>
+    </svg>
+    <div class="ds-grain" aria-hidden="true"></div>
+    <div class="ds-container ds-hero__inner">
+      <p class="nf-code" aria-hidden="true" data-ds-reveal="fade">404</p>
+      <p class="ds-eyebrow is-light" data-ds-reveal>Off the map</p>
+      <h1 class="ds-display" id="nfTitle" data-ds-reveal>We couldn&rsquo;t <em>find that page.</em></h1>
+      <p class="ds-lede" data-ds-reveal style="--ds-delay:.1s">The link may be mistyped, or the page may have moved. Every journey we plan is still one step away.</p>
+      <div class="nf-actions" data-ds-reveal style="--ds-delay:.18s">
+        <a class="ds-btn ds-btn--primary ds-btn--lg" href="index.html">Back home <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="ds-btn ds-btn--ghost ds-btn--lg" href="destinations.html">Explore destinations</a>
+        <a class="ds-btn ds-btn--ghost ds-btn--lg" href="contact-us.html">Contact us</a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer data-site-footer></footer>
+</body>
+</html>

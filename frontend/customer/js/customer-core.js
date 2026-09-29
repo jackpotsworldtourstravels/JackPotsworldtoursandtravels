@@ -180,9 +180,11 @@ const CX_ICONS = {
 };
 const cxIco = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${CX_ICONS[name] || ''}</svg>`;
 
+/* What the business sells — the header's products. "Holidays" and "Visa &
+   More" used to sit here; neither is sold (tests/verify_footer.py keeps them
+   off every public page), and a sign-in screen is a public page. */
 const CX_SERVICES = [
-  ['plane', 'Flights'], ['hotel', 'Hotels'], ['ship', 'Cruises'],
-  ['bag', 'Holidays'], ['globe', 'Visa &amp; More'],
+  ['plane', 'Flights'], ['hotel', 'Hotels'], ['bag', 'Tour Packages'], ['ship', 'Cruises'],
 ];
 
 /* --------------------------------------------------------------- shell --- */
@@ -203,7 +205,7 @@ function cxAuthShell(cardHtml, { heading, headingAccent, tagline } = {}) {
   <div class="cx-art-copy">
     <h1>${heading || 'Your next journey'}<span>${headingAccent || 'starts here.'}</span></h1>
     <div class="cx-rule"></div>
-    <p>${tagline || 'Book flights, hotels, cruises and holidays &mdash; and keep every trip, traveller and document in one place.'}</p>
+    <p>${tagline || 'Book flights, hotels, tour packages and cruises &mdash; and keep every trip, traveller and document in one place.'}</p>
     <div class="cx-services">
       ${CX_SERVICES.map(([i, l]) => `<span class="cx-service">${cxIco(i)}${l}</span>`).join('')}
     </div>

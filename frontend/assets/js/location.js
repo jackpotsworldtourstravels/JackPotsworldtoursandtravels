@@ -94,13 +94,12 @@
      own manifest and directory, written by scripts/fetch_hotel_images.py; the
      same contract as the other two - a key the API sent, present here, or no
      picture. */
-  const hotelArtFor = key => {
-    if (!key || typeof HOTEL_IMAGE_FILES !== 'object' || !HOTEL_IMAGE_FILES) return null;
-    const stamp = HOTEL_IMAGE_FILES[key];
-    if (!stamp) return null;
-    const dir = (typeof HOTEL_IMAGE_DIR === 'string') ? HOTEL_IMAGE_DIR : 'assets/hotels/';
-    const v = (typeof stamp === 'string') ? '?v=' + stamp : '';
-    return { src: dir + key + '.webp' + v, small: dir + key + '-480.webp' + v };
+  const verifiedHotelArt = (name, place) => {
+    if (!name || typeof HotelPhoto === 'undefined') return null;
+    const r = HotelPhoto.resolve({ name, city: place && (place.destination_name || place.city) },
+      { allowDestination: false });
+    if (r.kind !== 'property') return null;
+    return { src: r.src, small: r.srcset.split(' ')[0] };
   };
 
   /* The CITY's artwork, for the packages card: a picture of the destination is
@@ -140,7 +139,16 @@
   /* ======================================================================
      THE HERO
      ====================================================================== */
-  function renderHero(a, shots, art) {
+  /** Attribution for a landmark photograph, from the location manifest. */
+  function placeCredit(key) {
+    const c = key && typeof LOCATION_IMAGE_CREDITS === 'object' && LOCATION_IMAGE_CREDITS ? LOCATION_IMAGE_CREDITS[key] : null;
+    if (!c || !c.artist) return '';
+    const who = String(c.artist).replace(/\s+/g, ' ').trim();
+    return 'Photo: ' + (who.length > 48 ? who.slice(0, 46).replace(/[ ,.(]+\S*$/, '') + '…' : who)
+      + (c.licence ? ' · ' + c.licence : '');
+  }
+
+  function renderHero(a, shots, art, isCity) {
     document.getElementById('lpTitle').textContent = a.name;
 
     /* The trail the traveller came down, so a page entered from a search
@@ -194,6 +202,14 @@
       img.fetchPriority = 'high';
       img.addEventListener('error', () => img.remove());
       hero.insertBefore(img, hero.firstChild);
+      /* What the photograph shows and whose it is — and, when it is the
+         city's, that it is not the place. Never silent. */
+      const cap = document.createElement('p');
+      cap.className = 'lp-hero-cap' + (isCity ? ' is-city' : '');
+      cap.textContent = isCity
+        ? `${a.destination_name} — a destination photo, not ${a.name}`
+        : [a.name, placeCredit(shots[0] && shots[0].key)].filter(Boolean).join(' · ');
+      hero.appendChild(cap);
       /* The hero gets the slower beat - it is the subject of the page. */
       if (typeof JWMotion !== 'undefined') JWMotion.develop(img, { hero: true });
     } else {
@@ -309,7 +325,9 @@
         href: 'flights.html', cta: 'Search flights',
       }),
       fareCard({
-        art: hotelArtFor(f.hotel_image) || here, mark: 'bedDouble', label: 'Hotels from',
+        /* The hotel's OWN verified photograph, or this place's picture — never
+           the file the API's image key names, which is a chain stand-in. */
+        art: verifiedHotelArt(f.hotel_name, a) || here, mark: 'bedDouble', label: 'Hotels from',
         value: f.hotel_from, suffix: ' / night', href: hotelsHref, cta: 'View hotels',
         /* Named, because the photograph is of a particular hotel and the
            price is that hotel's - the card should say whose. */
@@ -367,7 +385,7 @@
   /* ======================================================================
      ABOUT — the long read, with the facts beside it
      ====================================================================== */
-  function renderAbout(a, shots) {
+  function renderAbout(a, shots, heroArt, city) {
     const text = a.long_description || a.description;
     const facts = [];
     const where = [a.destination_name, a.country].filter(Boolean).join(', ');
@@ -403,19 +421,21 @@
       show(document.getElementById('lpFacts'), true);
     }
 
-    /* THE LANDMARK'S OWN PHOTOGRAPH GOES HERE. The hero is the wide view of
-       the city, so this column is where the thing the article is about
-       actually appears - close, tall, beside the paragraphs describing it. It
-       falls back to the city's picture only when no photograph of the
-       landmark shipped, and to nothing at all when neither did: the grid is
-       one column then and the article simply fills it. */
-    const aside = (shots.length ? shots[0].art : null)
-      || destArtFor(a.destination_image);
+    /* BESIDE THE ARTICLE: a SECOND photograph of the place when one shipped
+       (the hero has the first), otherwise the city's picture — labelled as
+       the destination, with an alt that says so — and only when the hero is
+       not already showing it. No photograph appears twice, and none is
+       passed off as the place when it is not. */
+    const second = shots.length > 1 ? shots[1].art : null;
+    const cityHere = !second && city && (!heroArt || city.src !== heroArt.src) ? city : null;
+    const aside = second || cityHere;
     if (aside) {
       document.getElementById('lpAboutArt').innerHTML =
         `<img src="${esc(aside.small)}" srcset="${esc(aside.small)} 480w, ${esc(aside.src)} 960w"
-              sizes="(max-width: 900px) 92vw, 430px" alt="${esc(a.name)}"
-              loading="lazy" decoding="async" onerror="this.closest('figure').remove()">`;
+              sizes="(max-width: 900px) 92vw, 430px"
+              alt="${esc(cityHere ? a.destination_name + ' — the destination, not ' + a.name : a.name)}"
+              loading="lazy" decoding="async" onerror="this.closest('figure').remove()">
+         ${cityHere ? `<figcaption class="lp-about-cap">Destination photo · ${esc(a.destination_name)}</figcaption>` : ''}`;
       show(document.getElementById('lpAboutArt'), true);
       if (typeof JWMotion !== 'undefined') JWMotion.developAll(document.getElementById('lpAboutArt'));
     }
@@ -519,12 +539,21 @@
        the city's photograph where one shipped, the landmark's where it did
        not - and the panels below it are told what it took so that no two of
        them show the same picture. */
-    const heroArt = destArtFor(a.destination_image) || (shots.length ? shots[0].art : null);
+    /* THE PLACE'S OWN PHOTOGRAPH IS THE HERO. It used to be the CITY's —
+       a page titled "Fort Aguada" opened on Palolem Beach, because the city
+       shot crops better wide. A page about a place shows that place; the
+       city's picture is the fallback only when no photograph of the place
+       shipped, and then the hero says, on the picture, that it is the
+       destination and not the place. */
+    const own = shots.length ? shots[0].art : null;
+    const city = destArtFor(a.destination_image);
+    const heroArt = own || city;
+    const heroIsCity = !own && !!city;
 
-    renderHero(a, shots, heroArt);
+    renderHero(a, shots, heroArt, heroIsCity);
     renderFares(a, shots, heroArt);
     renderQuick(a);
-    renderAbout(a, shots);
+    renderAbout(a, shots, heroArt, city);
 
     /* --- hotels nearby ----------------------------------------------- */
     const n = Number(a.hotel_count) || 0;
@@ -571,15 +600,12 @@
       const rows = (page && page.hotels) || [];
       if (!rows.length) { box.innerHTML = ''; return; }
       box.innerHTML = rows.map(h => {
-        const hart = hotelArtFor(h.image);
+        const photo = (typeof HotelPhoto !== 'undefined')
+          ? HotelPhoto.html(h, { surface: 'tile', sizes: '(max-width: 640px) 100vw, 260px' }) : '';
         const price = h.price_per_night != null
           ? `<p class="lp-hotel-price">${esc(money(h.price_per_night))} <span>/ night</span></p>` : '';
         return `<article class="lp-hotel">
-          <div class="lp-hotel-art">${hart
-            ? `<img src="${esc(hart.small)}" srcset="${esc(hart.small)} 480w, ${esc(hart.src)} 960w"
-                   sizes="(max-width: 640px) 100vw, 260px" alt="${esc(h.name || '')}"
-                   loading="lazy" decoding="async" onerror="this.remove()">`
-            : `<span class="lp-hero-pin">${icon('hotels', 22)}</span>`}</div>
+          <div class="lp-hotel-art">${photo || `<span class="lp-hero-pin">${icon('hotels', 22)}</span>`}</div>
           <div class="lp-hotel-body">
             <h3 class="lp-hotel-name">${esc(h.name || '')}</h3>
             <p class="lp-hotel-where">${esc(h.location || h.location_name || '')}</p>
@@ -588,6 +614,7 @@
         </article>`;
       }).join('');
       if (typeof JPIcon !== 'undefined' && JPIcon.mount) JPIcon.mount(box);
+      if (typeof HotelPhoto !== 'undefined') HotelPhoto.develop(box);
       if (typeof JWMotion !== 'undefined') JWMotion.developAll(box);
     } catch {
       box.innerHTML = '';

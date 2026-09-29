@@ -1,249 +1,370 @@
 'use strict';
-/* Hotel name -> local photograph. The single place any surface resolves an image.
-   ---------------------------------------------------------------------------
-   The photographs live in frontend/assets/hotels/ as real, freely licensed files
-   vendored by scripts/fetch_hotel_images.py; hotel-images.js (generated) is the
-   manifest and must load before this file. Nothing here builds a remote URL —
-   a blocked or rate-limited upload.wikimedia.org must never be able to turn a
-   result card into a broken image. Same rule as the airline logos.
+/* ===========================================================================
+   hotel-image-map.js — THE hotel photograph resolver. `window.HotelPhoto`.
+   ===========================================================================
+   Every surface that shows a picture for a hotel — results cards, the details
+   gallery, the room / guest / review / payment / confirmation summaries, the
+   destination and location shelves, package itineraries, the merchant and
+   partner portals — asks this file, and only this file, what to show.
 
-   Resolution is tiered, and which tier fired is reported back as `matched`
-   because the tiers do not mean the same thing:
+   THE RULE, NON-NEGOTIABLE: never show an image of a different hotel as though
+   it represents the requested hotel. So there are exactly three answers, and
+   the caller is always told which one it got (`kind`):
 
-     'property'  the photograph is of THIS hotel.
-     'brand'     the photograph is of a DIFFERENT property of the same chain
-                 ("Taj Coromandel" has no free photograph, so it lands on the Taj
-                 Mahal Palace). Honest enough for a thumbnail, but the caller
-                 gets told so it can label or suppress it.
-     'default'   no match at all — default-hotel.webp, never a broken <img>,
-                 never an empty box.
+     'property'     a photograph VERIFIED to be of this property — same name,
+                    same city, same area. Verified means a person looked at the
+                    file and wrote the property down in VERIFIED_PROPERTIES
+                    below. Nothing is inferred from a chain name.
+     'destination'  no verified photo of the property exists, so a verified
+                    photograph of the CITY is offered instead. It is never
+                    silent: `label`/`note` say it is the destination and not the
+                    hotel, and html() puts that on the picture itself. Surfaces
+                    that must not show one (booking-summary thumbnails) pass
+                    `allowDestination: false`.
+     'placeholder'  neither exists. An honest branded panel saying a verified
+                    hotel photo is unavailable — never default-hotel.webp, which
+                    is a photograph of a real building in Pattaya.
 
-   Matching is case-insensitive and tolerant of the variations a hotel feed
-   actually produces: punctuation, diacritics, "&" vs "and", a leading "The",
-   and trailing noise like "Hotel", "Resort & Spa", "Bengaluru". */
+   WHAT IS DELIBERATELY GONE. The old resolver had a 'brand' tier: "Taj
+   anything" became the Taj Mahal Palace in Mumbai, "Hyatt anything" the Hyatt
+   Regency in London, "Radisson" the Radisson Blu in Cologne, "Marriott" the
+   Marriott Marquis in Washington, and "Novotel Hyderabad" (HITEC City) the
+   Novotel at Hyderabad AIRPORT. It also trusted the API's `image` key, which
+   the seed data set to those same chain files. Both are removed: the API key
+   is not evidence of identity, and a chain is not a property.
 
-/* The portals sit one level below frontend/, the public site sits at its root,
-   so the generated manifest stores a root-relative directory and the prefix is
-   worked out here. Deliberately not reusing mh-visuals.js's MH_ASSET_PREFIX:
-   this module is loaded on surfaces that do not load mh-visuals.js. */
+   The city photographs are the curated destination set. That set used to
+   hold Anantara Kihavah for the Maldives and Marina Bay Sands for Singapore —
+   a resort and a hotel standing in for a place. Both slots now hold landmark
+   photographs (Malé's beach, the Merlion); this file names those landmark
+   files directly, so it never depended on the old ones.
+   =========================================================================== */
+
+/* The portals sit one level below frontend/, the public site at its root. */
 const HOTEL_ASSET_PREFIX =
   /\/(merchant|admin|super-admin)(\/|$)/.test(location.pathname) ? '../' : '';
 
-/* Words that carry no identity. Stripped only when something is left over, so a
-   hotel genuinely called "The Resort" doesn't normalise to the empty string. */
-const HOTEL_NOISE_WORDS = new Set([
-  'hotel', 'hotels', 'resort', 'resorts', 'spa', 'inn', 'suites', 'suite',
-  'lodge', 'residency', 'residences', 'towers', 'tower', 'the', 'a', 'an',
-  'by', 'and', 'at', 'de', 'international', 'group', 'ltd', 'pvt', 'limited',
-]);
+(function (global) {
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-/* City/region words that appear after a brand in the seeded catalogue. Removing
-   them is what lets "Novotel Bengaluru Outer Ring Road" reach "novotel bengaluru". */
-const HOTEL_TRAILING_NOISE = new Set([
-  'airport', 'city', 'centre', 'center', 'downtown', 'road', 'outer', 'ring',
-  'north', 'south', 'east', 'west', 'central', 'palace' /* only as a trailer */,
-]);
-
-/* "Le Royal Méridien" -> "le royal meridien", "Hotel & Spa" -> "hotel and spa". */
-function hotelNormalize(name) {
-  return String(name || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // strip diacritics
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/['’`]/g, '')                              // O'Brien -> obrien
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function hotelTokens(name) {
-  return hotelNormalize(name).split(' ').filter(Boolean);
-}
-
-/* Drops noise words; returns the original tokens if that would empty the name. */
-function hotelCoreTokens(name) {
-  const tokens = hotelTokens(name);
-  const core = tokens.filter(t => !HOTEL_NOISE_WORDS.has(t));
-  return core.length ? core : tokens;
-}
-
-function hotelSlugify(tokens) {
-  return tokens.join('-');
-}
-
-/* Every progressively-shorter candidate key for a name, longest first:
-   "novotel bengaluru outer ring road" -> that, then "novotel bengaluru outer
-   ring", ... , then "novotel". Longest-first matters: it must reach
-   "novotel-hyderabad" before it reaches the bare "novotel" brand. */
-function hotelCandidateKeys(name) {
-  const core = hotelCoreTokens(name);
-  const keys = [];
-  const full = hotelTokens(name);
-  if (full.length) keys.push(full.join(' '));
-  for (let end = core.length; end > 0; end--) {
-    const key = core.slice(0, end).join(' ');
-    if (!keys.includes(key)) keys.push(key);
+  /* ------------------------------------------------------------ normalising */
+  function norm(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/['’`]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .replace(/\s+/g, ' ');
   }
-  return keys;
-}
+  const NOISE = new Set(['the', 'hotel', 'hotels', 'and', 'by', 'a', 'an', 'at', 'resort', 'resorts', 'spa']);
 
-/* Resolve a hotel name (and optionally its city) to a slug + how we got there.
-   Returns { slug, matched }. Never returns null. */
-function hotelImageSlug(name, city) {
-  const known = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : {};
-  const aliases = typeof HOTEL_IMAGE_ALIASES !== 'undefined' ? HOTEL_IMAGE_ALIASES : {};
-  const brands = typeof HOTEL_IMAGE_BRANDS !== 'undefined' ? HOTEL_IMAGE_BRANDS : {};
-  const fallback = typeof HOTEL_IMAGE_DEFAULT !== 'undefined' ? HOTEL_IMAGE_DEFAULT : 'default-hotel';
-
-  const keys = hotelCandidateKeys(name);
-
-  /* 1. Curated property aliases, and 2. a name that already IS a slug
-        ("Marina Bay Sands" -> marina-bay-sands). Both are property-level, so
-        they are tried together longest-first rather than as separate passes —
-        otherwise a short alias could beat a longer exact slug. */
-  for (const key of keys) {
-    if (aliases[key] && known[aliases[key]]) return { slug: aliases[key], matched: 'property' };
-    const slug = hotelSlugify(key.split(' '));
-    if (known[slug]) return { slug, matched: 'property' };
-  }
-
-  /* 3. Brand + city, for a feed that names them separately
-        ("Novotel" in Hyderabad -> novotel-hyderabad). Still property-level:
-        it identifies this property, not just the chain. */
-  if (city) {
-    const cityTokens = hotelCoreTokens(city);
-    for (const key of keys) {
-      const slug = hotelSlugify(key.split(' ').concat(cityTokens));
-      if (known[slug]) return { slug, matched: 'property' };
-    }
-    /* ...and the first brand token plus the city, so "Taj Coromandel" in Chennai
-       would find a taj-chennai file if one were ever added. */
-    const first = hotelCoreTokens(name)[0];
-    if (first) {
-      const slug = hotelSlugify([first].concat(cityTokens));
-      if (known[slug]) return { slug, matched: 'property' };
-    }
-  }
-
-  /* 4. Chain token anywhere in the name. A photograph of the chain, not of this
-        property — reported as such. */
-  for (const token of hotelCoreTokens(name)) {
-    if (brands[token] && known[brands[token]]) return { slug: brands[token], matched: 'brand' };
-  }
-
-  return { slug: fallback, matched: 'default' };
-}
-
-/* Slugs listed as representative are a stand-in for the chain however they were
-   reached, so a tier-1 hit on one of them is still only a brand match. Without
-   this, "The Oberoi" normalises to the bare slug `oberoi` and would claim to be
-   a photograph of the New Delhi property, which it is not. */
-function hotelImageMatchLevel(slug, matched) {
-  if (matched === 'default') return matched;
-  const rep = typeof HOTEL_IMAGE_REPRESENTATIVE !== 'undefined' ? HOTEL_IMAGE_REPRESENTATIVE : [];
-  return rep.includes(slug) ? 'brand' : matched;
-}
-
-/* Full descriptor for a hotel image: paths, srcset, credit, and how it matched.
-   `city` is optional and only ever improves the match. */
-function hotelImage(name, city) {
-  const dir = (typeof HOTEL_IMAGE_DIR !== 'undefined' ? HOTEL_IMAGE_DIR : 'assets/hotels/');
-  const { slug, matched } = hotelImageSlug(name, city);
-  const base = `${HOTEL_ASSET_PREFIX}${dir}${slug}`;
-  const credits = typeof HOTEL_IMAGE_CREDITS !== 'undefined' ? HOTEL_IMAGE_CREDITS : {};
-  return {
-    slug,
-    matched: hotelImageMatchLevel(slug, matched),
-    src: `${base}.webp`,
-    srcset: `${base}-480.webp 480w, ${base}.webp 960w`,
-    credit: credits[slug] || null,
+  /* Spellings a feed actually uses -> the one key the tables below are in. */
+  const CITY_ALIASES = {
+    'bangalore': 'bengaluru', 'bengaluru': 'bengaluru',
+    'bombay': 'mumbai', 'mumbai': 'mumbai',
+    'new delhi': 'delhi', 'delhi': 'delhi',
+    'hyderabad': 'hyderabad', 'secunderabad': 'hyderabad',
+    'srinagar': 'kashmir', 'kashmir': 'kashmir',
+    'calcutta': 'kolkata', 'kolkata': 'kolkata',
+    'panaji': 'goa', 'panjim': 'goa', 'goa': 'goa',
+    'bangkok': 'bangkok', 'phuket': 'phuket',
+    'male': 'maldives', 'maldives': 'maldives',
+    'singapore': 'singapore', 'dubai': 'dubai', 'jaipur': 'jaipur',
+    'bali': 'bali', 'tirupati': 'tirupati', 'tirumala': 'tirupati',
+    'vijayawada': 'vijayawada', 'venice': 'venice', 'london': 'london',
+    'cologne': 'cologne', 'washington': 'washington dc', 'washington dc': 'washington dc',
+    'gurgaon': 'gurugram', 'gurugram': 'gurugram',
   };
-}
-
-/* The markup a card uses. One function so every surface gets the same lazy
-   loading, the same skeleton and the same fallback behaviour.
-
-   opts: { name, city, sizes, eager }
-
-   - The <figure> owns a fixed 4:3 box (CSS aspect-ratio + width/height on the
-     <img>), so the row reserves its space before the file arrives and nothing
-     reflows as photographs land. This is also what makes loading="lazy" work:
-     an auto-sized box measures 0x0 before load, the lazy loader never sees it
-     approach the viewport, and the image silently never loads. That exact bug
-     cost an afternoon on the airline logos — do not remove the fixed box.
-   - `eager` opts the first card or two out of lazy loading; below the fold,
-     lazy is the default.
-   - alt names the hotel. A decorative empty alt would be wrong: for a screen
-     reader the picture is the only confirmation that the row is a hotel. */
-function hotelImageHtml(opts = {}) {
-  const name = opts.name || 'Hotel';
-  const img = hotelImage(name, opts.city);
-  const sizes = opts.sizes || '(max-width: 720px) 100vw, 224px';
-  const loading = opts.eager ? 'eager' : 'lazy';
-
-  /* CC BY / CC BY-SA oblige us to name the photographer somewhere the user can
-     reach. It rides on the figure as a small overlay rather than a separate
-     credits page so the obligation travels with the image. */
-  const credit = img.credit && img.credit.artist
-    ? `<figcaption class="mh-hotel-credit">Photo: ${escapeHtml(img.credit.artist)}` +
-      `${img.credit.licence ? ` · ${escapeHtml(img.credit.licence)}` : ''}</figcaption>`
-    : '';
-
-  return `<figure class="mh-hotel-media is-loading" data-hotel-slug="${escapeHtml(img.slug)}"
-    data-hotel-match="${escapeHtml(img.matched)}">
-    <img class="mh-hotel-img" src="${escapeHtml(img.src)}"
-         srcset="${escapeHtml(img.srcset)}" sizes="${escapeHtml(sizes)}"
-         width="960" height="720" loading="${loading}" decoding="async"
-         alt="${escapeHtml(name)}">
-    ${credit}
-  </figure>`;
-}
-
-/* Two things this has to survive:
-
-   1. A file that 404s (bad deploy, deleted asset) must fall back to
-      default-hotel.webp, never a browser's broken-image glyph. `error` on <img>
-      does not bubble, hence capture phase.
-   2. The skeleton must come off even when the image finished loading BEFORE
-      this listener existed — a cached photograph decodes faster than the script
-      that would have watched it. Hence the `.complete` sweep, which is also
-      re-run after every render.
-
-   The default itself is guarded by data-fallback so a missing default cannot
-   loop the error handler. */
-function hotelImageSettle(scope) {
-  (scope || document).querySelectorAll('.mh-hotel-img').forEach(img => {
-    if (img.complete && img.naturalWidth > 0) {
-      img.closest('.mh-hotel-media')?.classList.remove('is-loading');
+  function cityKey(s) {
+    const n = norm(s);
+    if (!n) return '';
+    if (CITY_ALIASES[n]) return CITY_ALIASES[n];
+    /* "Hyderabad, Telangana" and "HITEC City Hyderabad" both carry the city
+       as a word; take the first known one. */
+    for (const k of Object.keys(CITY_ALIASES)) {
+      if ((' ' + n + ' ').includes(' ' + k + ' ')) return CITY_ALIASES[k];
     }
-  });
-}
+    return n;
+  }
 
-function hotelImageInit() {
-  if (document.body.dataset.hotelImages) return;
-  document.body.dataset.hotelImages = '1';
+  /** The facts about a hotel this file is allowed to use: its name and where
+   *  it is. Accepts every shape the app has — the normalised results row, the
+   *  raw API row, a package's itinerary row, a merchant ticket. */
+  function identity(h) {
+    h = h || {};
+    const name = h.name || h.hotel_name || h.hotelName || '';
+    const location = h.location || h.address || h.location_name || '';
+    const parts = String(location).split(',').map(s => s.trim()).filter(Boolean);
+    const city = cityKey(h.city || parts[parts.length - 1] || '') || cityKey(name);
+    return { name, location, city, cityLabel: h.city || parts[parts.length - 1] || '' };
+  }
 
-  document.addEventListener('load', e => {
-    const img = e.target;
-    if (!img || img.tagName !== 'IMG' || !img.classList.contains('mh-hotel-img')) return;
-    img.closest('.mh-hotel-media')?.classList.remove('is-loading');
-  }, true);
+  /* --------------------------------------------------- verified properties
+     One row per photograph in assets/hotels/ that is of a known property.
+     A hotel matches only when ALL of these hold:
+       - its name, with the city, area and filler words taken out, is one of
+         `names` (so "Novotel Bengaluru" -> "novotel");
+       - its city is `city`;
+       - one of `areas` appears in its name or its address.
+     Anything less — a chain, a city, a guess — is not this property. */
+  const VERIFIED_PROPERTIES = [
+    { slug: 'novotel-bengaluru', subject: 'Novotel Bengaluru Outer Ring Road',
+      names: ['novotel'], city: 'bengaluru', areas: ['outer ring road', 'orr'] },
+    { slug: 'novotel-hyderabad', subject: 'Novotel Hyderabad Airport',
+      names: ['novotel'], city: 'hyderabad', areas: ['airport', 'shamshabad', 'rgia'] },
+    { slug: 'taj-palace', subject: 'The Taj Mahal Palace, Mumbai',
+      names: ['taj mahal palace', 'taj mahal'], city: 'mumbai', areas: ['colaba', 'apollo bunder'], unique: true },
+    { slug: 'hyatt-regency', subject: 'Hyatt Regency London – The Churchill',
+      names: ['hyatt regency', 'hyatt regency churchill', 'hyatt regency london churchill'], city: 'london', areas: ['portman square', 'churchill'] },
+    { slug: 'radisson', subject: 'Radisson Blu Hotel, Cologne',
+      names: ['radisson blu', 'radisson'], city: 'cologne', areas: ['messe', 'deutz', 'cologne'] },
+    { slug: 'marriott', subject: 'Washington Marriott Marquis',
+      names: ['marriott marquis', 'washington marriott marquis'], city: 'washington dc', areas: ['mount vernon'], unique: true },
+    { slug: 'hilton', subject: 'Hilton Molino Stucky Venice',
+      names: ['hilton molino stucky', 'hilton molino stucky venice'], city: 'venice', areas: ['giudecca'], unique: true },
+    { slug: 'oberoi', subject: 'The Oberoi, Gurgaon',
+      names: ['oberoi', 'oberoi gurgaon', 'oberoi gurugram'], city: 'gurugram', areas: ['nh 8', 'nh8'], unique: true },
+    { slug: 'atlantis-the-palm', subject: 'Atlantis The Palm, Dubai',
+      names: ['atlantis palm', 'atlantis'], city: 'dubai', areas: ['palm'], unique: true },
+    { slug: 'marina-bay-sands', subject: 'Marina Bay Sands, Singapore',
+      names: ['marina bay sands'], city: 'singapore', areas: ['bayfront'], unique: true },
+  ];
 
-  document.addEventListener('error', e => {
-    const img = e.target;
-    if (!img || img.tagName !== 'IMG' || !img.classList.contains('mh-hotel-img')) return;
-    const fig = img.closest('.mh-hotel-media');
-    if (img.dataset.fallback) {              // the default failed too — stop here
-      fig?.classList.remove('is-loading');
-      fig?.classList.add('is-blank');
-      return;
+  const HOTEL_CREDITS_FALLBACK = {};   // filled from hotel-images.js when loaded
+  function hotelCredit(slug) {
+    const c = (typeof HOTEL_IMAGE_CREDITS !== 'undefined' && HOTEL_IMAGE_CREDITS[slug]) || HOTEL_CREDITS_FALLBACK[slug];
+    return c ? { artist: c.artist, licence: c.licence, source: c.source || '' } : null;
+  }
+  function hotelStamp(slug) {
+    const f = typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : null;
+    const v = f && f[slug];
+    return typeof v === 'string' ? '?v=' + v : '';
+  }
+
+  function verifiedProperty(id) {
+    const hay = ' ' + norm(id.name + ' ' + id.location) + ' ';
+    for (const p of VERIFIED_PROPERTIES) {
+      if (p.city !== id.city) continue;
+      /* `unique`: a name only one building in the world carries (there is
+         one Taj Mahal Palace, one Marina Bay Sands) needs no area to prove
+         it. Everything else must name its area. */
+      if (!p.unique && !p.areas.some(a => hay.includes(' ' + a + ' '))) continue;
+      /* The name with the city (every spelling of it), the area words and
+         the filler removed: "Novotel Bangalore Outer Ring Road" -> "novotel". */
+      const cityWords = new Set([...Object.keys(CITY_ALIASES).filter(k => CITY_ALIASES[k] === p.city).join(' ').split(' '), ...NOISE]);
+      const areaWords = new Set(p.areas.join(' ').split(' '));
+      const withArea = norm(id.name).split(' ').filter(t => t && !cityWords.has(t));
+      const core = withArea.filter(t => !areaWords.has(t));
+      if (p.names.includes(withArea.join(' ')) || p.names.includes(core.join(' '))) return p;
     }
-    img.dataset.fallback = '1';
-    const dir = (typeof HOTEL_IMAGE_DIR !== 'undefined' ? HOTEL_IMAGE_DIR : 'assets/hotels/');
-    const slug = typeof HOTEL_IMAGE_DEFAULT !== 'undefined' ? HOTEL_IMAGE_DEFAULT : 'default-hotel';
-    const base = `${HOTEL_ASSET_PREFIX}${dir}${slug}`;
-    img.srcset = `${base}-480.webp 480w, ${base}.webp 960w`;
-    img.src = `${base}.webp`;
-    if (fig) fig.dataset.hotelMatch = 'default';
-  }, true);
-}
+    return null;
+  }
+
+  /* ------------------------------------------------------- city photographs
+     Verified photographs OF THE CITY, each a landmark or a street, never a
+     hotel. `subject` is what is in the frame, so the label can say it. */
+  const D = 'assets/destinations/', L = 'assets/locations/';
+  const CITY_PHOTOS = {
+    hyderabad:  { dir: D, file: 'hyderabad',  big: true, subject: 'Charminar, Hyderabad', city: 'Hyderabad', credit: ['Tarunsamanta', 'CC BY-SA 4.0'], v: 'a90e4bc2' },
+    bengaluru:  { dir: D, file: 'bengaluru',  big: true, subject: 'Vidhana Soudha, Bengaluru', city: 'Bengaluru', credit: ['DeepanjanGhosh', 'CC BY-SA 4.0'], v: '92672edb' },
+    delhi:      { dir: D, file: 'delhi',      big: true, subject: 'Humayun’s Tomb, Delhi', city: 'Delhi', credit: ['Jakub Hałun', 'CC BY-SA 4.0'], v: '1889a5aa' },
+    dubai:      { dir: D, file: 'dubai',      big: true, subject: 'Downtown Dubai', city: 'Dubai', credit: ['bulletrain743 (Pixabay)', 'CC0'], v: 'a1c41c5a' },
+    goa:        { dir: D, file: 'goa',        big: true, subject: 'Palolem Beach, Goa', city: 'Goa', credit: ['Nico Crisafulli', 'CC BY 2.0'], v: 'bbc2f3b2' },
+    jaipur:     { dir: D, file: 'jaipur',     big: true, subject: 'Hawa Mahal, Jaipur', city: 'Jaipur', credit: ['Rupeshsarkar', 'CC BY-SA 4.0'], v: '2a1d5af6' },
+    kashmir:    { dir: D, file: 'kashmir',    big: true, subject: 'Dal Lake, Srinagar', city: 'Srinagar', credit: ['Suhail Skindar Sofi', 'CC BY-SA 4.0'], v: '7c05c70e' },
+    kolkata:    { dir: D, file: 'kolkata',    big: true, subject: 'Victoria Memorial, Kolkata', city: 'Kolkata', credit: ['Subhrajyoti07', 'CC BY-SA 4.0'], v: '33fb003c' },
+    mumbai:     { dir: D, file: 'mumbai',     big: true, subject: 'Gateway of India, Mumbai', city: 'Mumbai', credit: ['SriSriChinmaya', 'CC BY-SA 4.0'], v: '46f2196c' },
+    bali:       { dir: D, file: 'bali',       big: true, subject: 'Tanah Lot, Bali', city: 'Bali', credit: ['CEphoto, Uwe Aranas', 'CC BY-SA 3.0'], v: '33a6ca59' },
+    bangkok:    { dir: D, file: 'thailand',   big: true, subject: 'Wat Arun, Bangkok', city: 'Bangkok', credit: ['miketnorton', 'CC BY 2.0'], v: '2bf204a5' },
+    tirupati:   { dir: D, file: 'tirupati',   big: true, subject: 'Tirumala, Tirupati', city: 'Tirupati', credit: ['Nikhilb239', 'CC BY-SA 4.0'], v: 'f8e0d8c9' },
+    vijayawada: { dir: D, file: 'vijayawada', big: true, subject: 'Prakasam Barrage, Vijayawada', city: 'Vijayawada', credit: ['Krishna Chaitanya Velaga', 'CC BY-SA 4.0'], v: '7fbbf111' },
+    /* The destination set's own files for these two are hotels. */
+    singapore:  { dir: L, file: 'singapore__merlion-park', subject: 'Merlion Park, Singapore', city: 'Singapore', credit: ['Supanut Arunoprayote', 'CC BY 4.0'], v: 'e05cb052' },
+    maldives:   { dir: L, file: 'maldives__artificial-beach', subject: 'Artificial Beach, Malé', city: 'Maldives', credit: ['Adam Jones', 'CC BY-SA 2.0'], v: '9c36a4b1' },
+  };
+
+  /* ---------------------------------------------------------------- resolve */
+  /**
+   * @param hotel  any hotel-shaped object (see identity()).
+   * @param opts   { allowDestination = true }
+   * @returns {{kind, src, srcset, srcBig, credit, subject, label, note, alt,
+   *            slug, city, cityLabel, name}}
+   */
+  function resolve(hotel, opts) {
+    const o = Object.assign({ allowDestination: true }, opts || {});
+    const id = identity(hotel);
+    const name = id.name || 'This hotel';
+
+    const p = verifiedProperty(id);
+    if (p) {
+      const base = HOTEL_ASSET_PREFIX + 'assets/hotels/' + p.slug, v = hotelStamp(p.slug);
+      return {
+        kind: 'property', slug: p.slug, name, city: id.city, cityLabel: id.cityLabel,
+        src: base + '.webp' + v, srcset: base + '-480.webp' + v + ' 480w, ' + base + '.webp' + v + ' 960w',
+        srcBig: base + '.webp' + v,
+        credit: hotelCredit(p.slug), subject: p.subject,
+        label: 'Property photo', note: '', alt: name + ' — photograph of the property',
+      };
+    }
+
+    const c = o.allowDestination ? CITY_PHOTOS[id.city] : null;
+    if (c) {
+      const base = HOTEL_ASSET_PREFIX + c.dir + c.file, v = '?v=' + c.v;
+      return {
+        kind: 'destination', slug: c.file, name, city: id.city, cityLabel: c.city,
+        src: base + '.webp' + v,
+        srcset: base + '-480.webp' + v + ' 480w, ' + base + '.webp' + v + ' 960w'
+          + (c.big ? ', ' + base + '-1600.webp' + v + ' 1600w' : ''),
+        srcBig: base + (c.big ? '-1600' : '') + '.webp' + v,
+        credit: { artist: c.credit[0], licence: c.credit[1], source: '' }, subject: c.subject,
+        label: 'Destination photo', note: 'Not a photo of this hotel',
+        alt: c.subject + ' — a photograph of the destination, not of ' + name,
+      };
+    }
+
+    return {
+      kind: 'placeholder', slug: '', name, city: id.city, cityLabel: id.cityLabel,
+      src: '', srcset: '', srcBig: '', credit: null, subject: '',
+      label: 'Verified hotel photo unavailable', note: '',
+      alt: 'No verified photograph of ' + name + ' is available',
+    };
+  }
+
+  /* ------------------------------------------------------------------ markup */
+  const MARK = '<svg class="hp-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">'
+    + '<path d="M12 54V24l20-12 20 12v30"/><path d="M6 54h52"/><path d="M26 54V40h12v14"/>'
+    + '<path d="M20 30h4M40 30h4M20 38h4M40 38h4"/></svg>';
+
+  /**
+   * The one figure every surface renders. The lifecycle is the design
+   * system's: the branded panel is always underneath (placeholder), the
+   * photograph arrives as `img.ds-dev` (faint + blurred), DS.develop sharpens
+   * it once loaded and on screen, and `.is-settled` drops the transitions
+   * (stable). Without jw-system.js the image is simply shown.
+   *
+   * opts: { surface: 'card'|'hero'|'gallery'|'thumb'|'tile', sizes, eager,
+   *         allowDestination, className, credit (default true), photo }
+   *   `photo` — a resolve() result, when the caller already has one.
+   */
+  function html(hotel, opts) {
+    const o = Object.assign({ surface: 'card', credit: true }, opts || {});
+    if (o.surface === 'thumb') o.allowDestination = false;
+    const r = o.photo || resolve(hotel, o);
+    const cls = ['hp', 'hp--' + r.kind, 'hp--' + o.surface, o.className || ''].join(' ').trim();
+    const sizes = o.sizes || (o.surface === 'hero' ? '100vw' : o.surface === 'thumb' ? '96px' : '(max-width: 760px) 100vw, 420px');
+
+    const ph = '<div class="hp-ph" aria-hidden="true">' + MARK
+      + (o.surface === 'thumb' ? '' : '<span class="hp-ph-t">' + (r.kind === 'placeholder' ? 'Verified hotel photo unavailable' : '') + '</span>')
+      + '</div>';
+
+    if (r.kind === 'placeholder') {
+      return '<figure class="' + esc(cls) + '" data-photo-kind="placeholder" role="img" aria-label="' + esc(r.alt) + '">'
+        + ph + '</figure>';
+    }
+
+    const img = '<img class="hp-img ds-dev" src="' + esc(r.src) + '" srcset="' + esc(r.srcset) + '" sizes="' + esc(sizes) + '"'
+      + ' width="960" height="720" loading="' + (o.eager ? 'eager' : 'lazy') + '" decoding="async" alt="' + esc(r.alt) + '">';
+
+    const tag = r.kind === 'destination' && o.surface !== 'thumb'
+      ? '<span class="hp-tag"><b>' + esc(r.label) + '</b>' + esc(r.note) + '</span>' : '';
+
+    const credit = o.credit && r.credit
+      ? '<figcaption class="hp-credit">' + (r.kind === 'destination' ? esc(r.subject) + ' · ' : '')
+        + 'Photo: ' + esc(r.credit.artist) + (r.credit.licence ? ' · ' + esc(r.credit.licence) : '') + '</figcaption>'
+      : '';
+
+    return '<figure class="' + esc(cls) + '" data-photo-kind="' + esc(r.kind) + '" data-photo-slug="' + esc(r.slug) + '">'
+      + ph + img + tag + credit + '</figure>';
+  }
+
+  /** Develop every hotel photograph inside `scope` through the design
+   *  system's one observer, and make a failed file fall back to the branded
+   *  panel rather than a broken-image glyph. Safe to call after every render. */
+  function develop(scope) {
+    const root = scope || document;
+    const fresh = root.querySelectorAll('.hp .hp-img:not([data-hp-bound])');
+    if (!fresh.length) return;
+    const ds = global.DS && typeof global.DS.develop === 'function' ? global.DS : null;
+    fresh.forEach(img => {
+      img.dataset.hpBound = '1';
+      /* A file that fails becomes the honest placeholder — and loses the
+         label and credit that described a photograph no longer there. */
+      const fail = () => {
+        const fig = img.closest('.hp');
+        if (fig) {
+          fig.classList.remove('hp--property', 'hp--destination');
+          fig.classList.add('hp--placeholder', 'is-failed');
+          fig.dataset.photoKind = 'placeholder';
+          fig.querySelectorAll('.hp-tag, .hp-credit').forEach(n => n.remove());
+          const t = fig.querySelector('.hp-ph-t');
+          if (t) t.textContent = 'Verified hotel photo unavailable';
+        }
+        img.remove();
+      };
+      if (img.complete && img.naturalWidth === 0 && img.currentSrc) fail();
+      else img.addEventListener('error', fail, { once: true });
+      /* One image at a time, so the design system's observer registers each
+         exactly once however often this runs. */
+      if (ds) ds.develop(img);
+      else img.classList.add('is-dev', 'is-settled');
+    });
+  }
+
+  /* Watch any container that re-renders hotel figures and develop what
+     arrives, so no caller can forget to. */
+  function watch(el) {
+    if (!el || el.dataset.hpWatched) return;
+    el.dataset.hpWatched = '1';
+    develop(el);
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(() => develop(el)).observe(el, { childList: true, subtree: true });
+    }
+  }
+
+  /** A booking-summary thumbnail. The property's own verified photograph or
+   *  the honest placeholder — NEVER a city photograph: at the size of a
+   *  summary thumbnail there is no room for a label, so a city picture there
+   *  would be read as the hotel. */
+  function thumb(hotel) {
+    return html(hotel, { surface: 'thumb', allowDestination: false, credit: false });
+  }
+
+  global.HotelPhoto = { resolve, html, thumb, develop, watch, identity, VERIFIED_PROPERTIES, CITY_PHOTOS };
+
+  /* Every surface renders these figures with innerHTML, many of them on each
+     repaint (summary rails, galleries, shelves). One watcher on the body
+     develops whatever arrives, batched to a frame, so no screen can forget —
+     develop() only touches figures it has not bound yet. */
+  let queued = false;
+  const flush = () => { queued = false; develop(document); };
+  const boot = () => {
+    develop(document);
+    if (typeof MutationObserver === 'undefined') return;
+    new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(flush); } })
+      .observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else if (document.body) boot();
+
+  /* =====================================================================
+     LEGACY NAMES — the merchant and partner portals and the destination
+     shelves still call these. They now go through resolve(), so they obey
+     the same rule; the brand tier they used to reach is gone.
+     ===================================================================== */
+  /** @deprecated use HotelPhoto.resolve */
+  global.hotelImage = function (name, city) {
+    const r = resolve({ name, city });
+    return { slug: r.slug, matched: r.kind, kind: r.kind, src: r.src, srcset: r.srcset, credit: r.credit };
+  };
+  /** @deprecated use HotelPhoto.html */
+  global.hotelImageHtml = function (opts) {
+    const o = opts || {};
+    return html({ name: o.name, city: o.city, location: o.location }, { surface: 'card', sizes: o.sizes, eager: o.eager });
+  };
+  global.hotelImageSettle = function (scope) { develop(scope); };
+  global.hotelImageInit = function () { develop(document); };
+})(window);

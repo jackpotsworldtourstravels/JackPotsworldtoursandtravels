@@ -123,6 +123,12 @@ const HeroShell = (function () {
   }
 
   function headerHtml(active) {
+    /* THE ONE HEADER. jw-header.js owns the markup for every page now; this
+       file keeps only what the header DOES on the product pages (the card's
+       tab switching, aria-current, the account openers — all delegated, so
+       they bind to that markup unchanged). The builder below is the fallback
+       for a page that has not loaded jw-header.js. */
+    if (typeof JWHeader !== 'undefined') return JWHeader.html(active);
     return '<nav class="wrap">'
       + '<a href="index.html" class="logo">'
       + '<img class="logo-mark-img" src="assets/images/jackpots-logo-full.png"'
@@ -483,6 +489,10 @@ const HeroShell = (function () {
   function bindScrollFade() {
     const header = document.getElementById('siteHeader');
     if (!header) return;
+    /* jw-header.js paints the bar's three states itself (clear over a
+       photograph, navy, compact glass). Inline styles written here on every
+       scroll would override them. */
+    if (typeof JWHeader !== 'undefined') { header.classList.remove('is-solid'); JWHeader.bind(header); return; }
 
     /* THE FADE ONLY MAKES SENSE OVER THE VIDEO HERO.
        It starts the bar fully transparent so the film shows through, which is

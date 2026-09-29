@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -75,6 +75,13 @@ a{color:inherit; text-decoration:none;}
   body{display:block; padding:24px 16px;}
 }
 </style>
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
 </head>
 <body>
 <div class="auth-card">

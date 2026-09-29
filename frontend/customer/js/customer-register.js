@@ -64,7 +64,7 @@ cxRedirectIfSignedIn();
 document.getElementById('cxShell').innerHTML = cxAuthShell(cxrCard(), {
   heading: 'Travel made',
   headingAccent: 'simple.',
-  tagline: 'Create an account to book flights, hotels and holidays &mdash; and keep every trip in one place.',
+  tagline: 'Create an account to book flights, hotels and tour packages &mdash; and keep every trip in one place.',
 });
 document.querySelector('#' + CXR.step2).dataset.stepNo = '2';
 cxBindEyes();

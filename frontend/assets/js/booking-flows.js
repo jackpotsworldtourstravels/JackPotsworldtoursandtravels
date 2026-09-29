@@ -199,6 +199,11 @@ const BookingFlows = (function () {
               </div>
               <div>
                 ${tip}
+                ${/* The map comes from BookingData's local generator until the
+                     airline seat map is connected: which seats show as taken
+                     is simulated, so the screen says so. */
+                  (BookingData.config && BookingData.config.useLiveApi && BookingData.config.useLiveApi.seatMap)
+                    ? '' : '<p class="bk-sample-note">Sample seat map — shown until the airline’s live seat availability is connected.</p>'}
                 <div class="bkf-cabin">
                   <div class="bkf-plane">
                     <div class="bkf-nose"><span></span></div>
@@ -599,13 +604,21 @@ const BookingFlows = (function () {
             <b>${esc(c.name)}</b>
             <span class="bk-choice-meta">${esc(c.size)} · sleeps ${esc(c.occupancy)}</span>
             <span class="bk-chips">${c.perks.map(p => `<i>${esc(p)}</i>`).join('')}</span>
-            ${c.left <= 3 ? `<span class="bk-scarce">Only ${esc(c.left)} left</span>` : ''}
+            ${/* NO "Only N left" HERE. While cabins come from the local
+                 generator (BookingData config: cabins not live) `left` is a
+                 seeded random number, not inventory — showing it as scarcity
+                 would be inventing urgency. It returns when a live cabin
+                 feed supplies a real count. */
+              (c.left <= 3 && BookingData.config && BookingData.config.useLiveApi && BookingData.config.useLiveApi.cabins)
+                ? `<span class="bk-scarce">Only ${esc(c.left)} left</span>` : ''}
           </span>
           <span class="bk-choice-price"><b>${esc(money(c.price))}</b><span>per person</span></span>
         </label>`).join('');
+      const live = !!(BookingData.config && BookingData.config.useLiveApi && BookingData.config.useLiveApi.cabins);
       return `<div class="bk-step">
           <h2 class="bk-step-title">Choose a cabin</h2>
           <p class="bk-step-sub">${esc(ctx.item.route)} · ${esc(ctx.item.nights)} nights</p>
+          ${live ? '' : '<p class="bk-step-sub bk-sample-note">Sample cabin fares — shown until the cruise line’s live availability is connected.</p>'}
           <div class="bk-choices">${cards}</div>
         </div>`;
     },
@@ -655,8 +668,26 @@ const BookingFlows = (function () {
   const departureStep = {
     id: 'departure',
     label: 'Departure',
-    async load(ctx) { ctx.departures = await BookingData.departures(ctx.item); },
+    async load(ctx) {
+      /* NEVER A DATE THAT HAS ALREADY LEFT. /packages/departures returns every
+         active row, past ones included, while the package page and the
+         catalogue both keep only `date >= today` — so this step offered
+         departures from last month beside the "next departure" the page had
+         just quoted. Same rule as the page, so the two cannot disagree. */
+      const today = new Date().toISOString().slice(0, 10);
+      ctx.departures = (await BookingData.departures(ctx.item)).filter(d => d.date >= today);
+      if (ctx.departure && ctx.departure.date < today) ctx.departure = null;
+    },
     render(ctx) {
+      if (!ctx.departures.length) {
+        return `<div class="bk-step">
+            <h2 class="bk-step-title">No departures are scheduled</h2>
+            <p class="bk-step-sub">Every date on this trip has already left. Tell us when you want to travel and we will price it.</p>
+            <a class="bk-btn bk-btn-primary" href="contact-us.html?package=${encodeURIComponent(ctx.item.name || '')}">Enquire about dates</a>
+          </div>`;
+      }
+      /* Said only when it is true of the dates on offer. */
+      const allSat = ctx.departures.every(d => new Date(d.date + 'T00:00:00').getDay() === 6);
       const cards = ctx.departures.map(d => `
         <label class="bk-choice ${ctx.departure && ctx.departure.date === d.date ? 'is-on' : ''}">
           <input type="radio" name="bkDep" value="${esc(d.date)}" ${ctx.departure && ctx.departure.date === d.date ? 'checked' : ''}>
@@ -669,7 +700,7 @@ const BookingFlows = (function () {
         </label>`).join('');
       return `<div class="bk-step">
           <h2 class="bk-step-title">When would you like to travel?</h2>
-          <p class="bk-step-sub">Group departures leave on Saturdays.</p>
+          ${allSat ? '<p class="bk-step-sub">Group departures leave on Saturdays.</p>' : ''}
           <div class="bk-choices">${cards}</div>
           <div class="bk-inline">
             ${P.field({ id: 'bkPax', label: 'Travellers', type: 'select', required: true,

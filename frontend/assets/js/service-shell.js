@@ -49,7 +49,14 @@ const ServiceShell = (function () {
   function storedTheme() {
     try { return localStorage.getItem(THEME_KEY); } catch { return null; }
   }
+  /* A page drawn in the design system (jw-system.css) is light by
+     construction — ivory grounds, white cards — and declares so with
+     `data-theme-lock="light"`. Honouring a stored or OS dark choice there
+     left the older sheets' dark palettes painting near-white text on those
+     white cards (cruise titles and fares were invisible). */
+  const LOCK = document.documentElement.getAttribute('data-theme-lock');
   function applyTheme(mode) {
+    if (LOCK) mode = LOCK;
     if (mode === 'light' || mode === 'dark') document.documentElement.setAttribute('data-theme', mode);
     else document.documentElement.removeAttribute('data-theme');
   }
@@ -67,6 +74,7 @@ const ServiceShell = (function () {
   function paintThemeButton() {
     const btn = document.getElementById('spTheme');
     if (!btn) return;
+    if (LOCK) { btn.hidden = true; return; }   // nothing to switch on a locked page
     const dark = effectiveTheme() === 'dark';
     btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
     /* Rendered, not a placeholder. This runs again on every theme toggle, long
@@ -92,6 +100,12 @@ const ServiceShell = (function () {
   }
 
   function headerHtml(active) {
+    /* THE ONE HEADER — jw-header.js's, the same markup every page renders.
+       The content pages name their service by id; the header by href. */
+    if (typeof JWHeader !== 'undefined') {
+      const hit = SERVICES.find(s => s.id === active);
+      return JWHeader.html(hit ? hit.href : (active === 'bookings' ? 'my-bookings.html' : ''));
+    }
     /* data-jpi-hover puts the animation on the whole link, so pointing at the
        word plays the icon — hovering a 14px glyph exactly is not a target
        anyone should have to hit. */
@@ -149,7 +163,8 @@ const ServiceShell = (function () {
    *  renders the chip AND the dropdown now, identically on every page, and this
    *  shell only says where it goes. */
   function renderAuth() {
-    const slot = document.getElementById('spAuth');
+    /* #shellAuth is the system header's slot; #spAuth the old header's. */
+    const slot = document.getElementById('shellAuth') || document.getElementById('spAuth');
     if (!slot) return;
     if (typeof ProfileMenu === 'undefined') {
       /* A page that has not adopted the component still gets a way in —
@@ -165,7 +180,7 @@ const ServiceShell = (function () {
       document.documentElement.classList.toggle('jp-customer', signedIn);
       const href = signedIn ? 'index.html?account=profile' : 'index.html?signin=1';
       const label = signedIn ? 'My Account' : 'Login / Create';
-      slot.innerHTML = `<a class="sp-login" href="${href}">
+      slot.innerHTML = `<a class="sp-login jw-hdr__login" href="${href}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1.2-3.8 4.2-5.7 7.5-5.7s6.3 1.9 7.5 5.7"/></svg>
         <span>${label}</span>
         <svg class="sp-login-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -183,7 +198,16 @@ const ServiceShell = (function () {
     const active = document.body.dataset.spService || '';
     const header = document.getElementById('spHeader');
     const footer = document.getElementById('spFooter');
-    if (header) header.innerHTML = headerHtml(active);
+    if (header) {
+      header.innerHTML = headerHtml(active);
+      if (typeof JWHeader !== 'undefined') {
+        /* This header used to sit in the flow; the system's is fixed, so the
+           page takes its height back as top padding. */
+        document.documentElement.classList.add('jw-hdr-inflow');
+        header.classList.remove('sp-header');
+        JWHeader.bind(header);
+      }
+    }
     if (footer) mountFooter(footer);
 
     /* jp-icons.js mounts on DOMContentLoaded, and it loads BEFORE this file —

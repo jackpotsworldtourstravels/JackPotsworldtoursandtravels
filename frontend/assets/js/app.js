@@ -124,17 +124,27 @@ document.querySelectorAll('.btn').forEach(btn => {
   btn.addEventListener('click', function (e) { createRipple(e, this); });
 });
 
-/* Scroll reveal */
-const revealItems = document.querySelectorAll('.reveal, .reveal-zoom');
-const revealObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-      revealObserver.unobserve(entry.target);
-    }
-  });
-}, { threshold: 0.15 });
-revealItems.forEach(el => revealObserver.observe(el));
+/* Scroll reveal.
+   ONE OBSERVER PER PAGE. Where jw-motion.js is loaded (index.html loads it),
+   JWMotion.scan() already hands every `.reveal` to the design system's
+   shared observer (DS.observe); a second IntersectionObserver here watched
+   the same elements twice. This one remains only as the fallback. */
+if (typeof JWMotion !== 'undefined' && JWMotion.scan) {
+  JWMotion.scan();
+} else if (typeof IntersectionObserver !== 'undefined') {
+  const revealItems = document.querySelectorAll('.reveal, .reveal-zoom');
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  revealItems.forEach(el => revealObserver.observe(el));
+} else {
+  document.querySelectorAll('.reveal, .reveal-zoom').forEach(el => el.classList.add('visible'));
+}
 
 /* THREE BLOCKS WERE REMOVED HERE WITH THE SECTIONS THEY DROVE.
 

@@ -45,6 +45,11 @@ const SiteFooter = (function () {
       ['Flights',           'flights.html'],
       ['Hotels',            'hotels.html'],
       ['Tour Packages',     'packages.html'],
+      /* The header's other two products and the one it moved off the bar.
+         All three are live pages. */
+      ['Destinations',      'destinations.html'],
+      ['Cruises',           'cruises.html'],
+      ['Gaming Packages',   'gaming-packages.html'],
     ],
     legal: [
       ['Privacy Policy',                'privacy-policy.html'],
@@ -158,9 +163,25 @@ const SiteFooter = (function () {
       + '</span></div></div>';
   }
 
+  /* THE BAND. The footer opens with the brand's own line and the two things a
+     visitor finishing a page most often wants next, over a route drawn across
+     the width. The route is decoration (aria-hidden); the two links are real
+     pages and are part of the link set tests/verify_footer.py compares. */
+  function band() {
+    return '<div class="jw-f-band"><div class="jw-f-wrap jw-f-band-row">'
+      + '<svg class="jw-f-route" viewBox="0 0 1200 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">'
+      + '<path d="M-10 130 C 220 120, 300 30, 560 50 S 900 150, 1210 26"/></svg>'
+      + '<div class="jw-f-band-copy"><p class="jw-f-kicker">JackPots World &middot; Tours &amp; Travels</p>'
+      + '<p class="jw-f-statement">The world <em>awaits.</em></p></div>'
+      + '<div class="jw-f-band-cta">'
+      + '<a class="jw-f-cta jw-f-cta--solid" href="contact-us.html">Plan your journey</a>'
+      + '<a class="jw-f-cta" href="destinations.html">Explore destinations</a>'
+      + '</div></div></div>';
+  }
+
   /** The footer's inner markup. The caller owns the <footer> element itself. */
   function html() {
-    return '<div class="jw-f-wrap"><div class="jw-f-grid">'
+    return band() + '<div class="jw-f-wrap"><div class="jw-f-grid">'
       + brandColumn()
       + column('jwFCompany', 'Company', LINKS.company)
       + column('jwFTravel',  'Travel',  LINKS.travel)

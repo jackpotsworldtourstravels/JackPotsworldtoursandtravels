@@ -1,0 +1,86 @@
+/* ===========================================================================
+   hotel-photo.css — the one hotel photograph figure (HotelPhoto.html()).
+   ===========================================================================
+   Three honest states, one frame:
+
+     .hp--property     the property's own verified photograph.
+     .hp--destination  a verified photograph of the CITY, labelled on the
+                       picture as not being the hotel.
+     .hp--placeholder  the branded panel: no verified photograph exists.
+
+   The branded panel (.hp-ph) is always underneath, so the lifecycle reads
+   placeholder -> blur -> develop -> sharp -> stable: the design system's
+   `img.ds-dev` arrives faint and blurred over the panel, DS.develop()
+   sharpens it once it is loaded AND on screen, and `.is-settled` removes the
+   transitions. Tokens fall back to literals so the merchant and partner
+   portals, which do not load jw-system.css, render the same figure.
+   =========================================================================== */
+.hp {
+  position: relative; margin: 0; overflow: hidden; isolation: isolate;
+  width: 100%; height: 100%; min-height: inherit;
+  background: var(--ds-navy-900, #0a1120);
+}
+.hp-img {
+  position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
+/* --- the branded panel ---------------------------------------------------- */
+.hp-ph {
+  position: absolute; inset: 0; z-index: 0;
+  display: grid; place-content: center; justify-items: center; gap: 12px; padding: 16px; text-align: center;
+  color: var(--ds-gold, #d9b26f);
+  background:
+    radial-gradient(ellipse 80% 70% at 85% 0%, rgba(217, 178, 111, .16), transparent 70%),
+    radial-gradient(ellipse 60% 60% at 0% 100%, rgba(201, 72, 47, .10), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .028) 0 1px, transparent 1px 14px),
+    linear-gradient(160deg, var(--ds-navy-800, #0f1b2e), var(--ds-night, #060a12));
+}
+.hp-mark { width: clamp(34px, 18%, 56px); height: auto; fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
+.hp-ph-t { max-width: 22ch; font: 700 10.5px/1.4 var(--ds-sans, 'Montserrat', system-ui, sans-serif);
+  letter-spacing: .2em; text-transform: uppercase; color: rgba(255, 255, 255, .72); }
+.hp-ph-t:empty { display: none; }
+/* Behind a photograph the panel is only a loading ground: no words. */
+.hp--property .hp-ph-t, .hp--destination .hp-ph-t { display: none; }
+.hp--property .hp-mark, .hp--destination .hp-mark { opacity: .35; }
+/* While the file is on its way, a slow gold sheen crosses the panel. */
+.hp:not(.hp--placeholder) .hp-ph::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(240, 217, 166, .12) 50%, transparent 70%);
+  background-size: 250% 100%; animation: hp-sheen 1.8s ease-in-out infinite;
+}
+.hp .hp-img.is-settled ~ .hp-ph::after, .hp:has(.hp-img.is-settled) .hp-ph::after { animation: none; opacity: 0; }
+@keyframes hp-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* --- the label on a city photograph: never silent -------------------------- */
+.hp-tag {
+  position: absolute; z-index: 3; left: 12px; top: 12px; max-width: calc(100% - 24px);
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  padding: 6px 12px; border-radius: 999px;
+  background: rgba(6, 10, 18, .72); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(217, 178, 111, .45);
+  font: 500 11px/1.3 var(--ds-sans, 'Montserrat', system-ui, sans-serif); color: rgba(255, 255, 255, .85);
+}
+.hp-tag b { font-weight: 700; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-gold-lt, #f0d9a6); }
+
+/* --- attribution (CC BY / BY-SA require it) -------------------------------- */
+.hp-credit {
+  position: absolute; z-index: 3; right: 0; bottom: 0; max-width: 100%;
+  padding: 4px 10px; border-top-left-radius: 8px;
+  background: rgba(6, 10, 18, .55); color: rgba(255, 255, 255, .78);
+  font: 500 9.5px/1.3 var(--ds-sans, 'Montserrat', system-ui, sans-serif); letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- surfaces -------------------------------------------------------------- */
+.hp--thumb { border-radius: inherit; }
+.hp--thumb .hp-mark { width: 44%; }
+.hp--thumb .hp-credit { display: none; }
+.hp--hero .hp-tag { top: auto; bottom: 16px; left: 16px; }
+.hp--tile .hp-tag { left: 8px; top: 8px; padding: 4px 9px; font-size: 10px; }
+.hp--tile .hp-tag b { font-size: 9px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hp .hp-ph::after { animation: none !important; }
+}

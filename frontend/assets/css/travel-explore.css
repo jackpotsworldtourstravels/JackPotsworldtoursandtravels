@@ -86,7 +86,7 @@
 .tx-section + .tx-section { padding-top: 8px; }
 
 .tx-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-.tx-head h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 0 0 6px; color: var(--tx-ink); }
+.tx-head h1, .tx-head h2 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 0 0 6px; color: var(--tx-ink); }
 .tx-head p { margin: 0; color: var(--tx-muted); font-size: 14.5px; }
 
 /* Says plainly that the content is demo data, so nobody mistakes a sample

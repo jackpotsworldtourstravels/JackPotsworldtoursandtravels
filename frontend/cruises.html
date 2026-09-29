@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,9 +17,9 @@
      live here and service-page.css reads them. -->
 <link rel="stylesheet" href="assets/css/booking-shell.css?v=20260923bk1">
 <link rel="stylesheet" href="assets/css/service-page.css?v=20260923bk1">
-<link rel="stylesheet" href="assets/css/account-center.css?v=20260911ic7">
+<link rel="stylesheet" href="assets/css/account-center.css?v=0928222755">
 <link rel="stylesheet" href="assets/css/booking.css?v=20260926ck1">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260926fr1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260928h1">
 <!-- The profile chip + dropdown, shared by every page with a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -27,28 +27,42 @@
 <!-- CR-9 live chat. Self-contained stylesheet (its own --lc-* tokens), so it
      renders the same on this page and inside the Account Center. -->
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
-<script>try{var t=localStorage.getItem('jpc_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<script>try{var t=localStorage.getItem('jpc_theme');if(t&&!document.documentElement.hasAttribute('data-theme-lock'))document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=0928234819">
 </head>
-<body data-sp-service="cruises" data-live-chat>
+<body class="jw-cruise jw-prod" data-sp-service="cruises" data-live-chat>
 <a href="#spMain" class="skip-link">Skip to content</a>
 
 <!-- The landing page's navigation bar, same as index.html and flights.html.
      Built by hero-shell.js; see that file for why the markup lives there. -->
 <header id="siteHeader"></header>
 
-<div class="sp-hero">
-  <div class="sp-wrap">
-    <div class="sp-crumb"><a href="index.html">Home</a> &nbsp;›&nbsp; Cruises</div>
-    <div class="sp-hero-row">
-      <div>
-        <h1>Cruises</h1>
-        <p>All-inclusive sailings from the Arabian Gulf to the Mediterranean.</p>
-      </div>
-    </div>
+<!-- THE DESIGN SYSTEM'S HERO. No photograph: there is no verified cruise
+     photography in this project, and a stock ship would be a picture of some
+     other line's vessel. The night, and a voyage drawn port to port across it,
+     is the honest image. The route draws itself once (jw-system.js depth()). -->
+<section class="ds-hero ds-hero--compact ds-hero--plain cr-hero" aria-labelledby="crTitle">
+  <svg class="ds-hero__route" viewBox="0 0 1440 500" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <path class="ghost" d="M-20 360 C 220 300, 360 420, 600 330 S 980 150, 1180 250 S 1380 330, 1460 190"/>
+    <path d="M-20 360 C 220 300, 360 420, 600 330 S 980 150, 1180 250 S 1380 330, 1460 190"/>
+    <circle cx="600" cy="330" r="4"/><circle cx="1180" cy="250" r="4"/>
+  </svg>
+  <div class="ds-grain" aria-hidden="true"></div>
+  <div class="ds-container ds-hero__inner">
+    <ol class="ds-crumbs"><li><a href="index.html">Home</a></li><li aria-current="page">Cruises</li></ol>
+    <p class="ds-eyebrow is-light" data-ds-reveal>Cruises</p>
+    <h1 class="ds-h1" id="crTitle" data-ds-reveal>Port to port, <em>by sea.</em></h1>
+    <p class="ds-lede" data-ds-reveal>All-inclusive sailings from the Arabian Gulf to the Mediterranean.</p>
   </div>
-</div>
-
+</section>
 <main id="spMain" class="tx-scope">
   <section class="tx-section" aria-labelledby="txCruisesHead">
     <div class="tx-head">
@@ -95,12 +109,12 @@
 <script src="assets/js/booking-flow.js?v=20260926ck1"></script>
 <script src="assets/js/booking-products.js?v=20260926ck1"></script>
 <script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
-<script src="assets/js/booking-flows.js?v=20260911ic7"></script>
-<script src="assets/js/travel-explore.js?v=20260911ic7"></script>
+<script src="assets/js/booking-flows.js?v=0928221040"></script>
+<script src="assets/js/travel-explore.js?v=0928232502"></script>
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
 <script src="assets/js/hero-shell.js?v=20260925ui1"></script>
-<script src="assets/js/service-shell.js?v=20260919b2c1"></script>
+<script src="assets/js/service-shell.js?v=0928220609"></script>
 <script>HeroShell.mountHeader('cruises.html');</script>
 <script src="assets/js/jw-loader.js?v=20260926ld1"></script>
 <script src="assets/js/payment-screen.js?v=20260926ld1"></script>

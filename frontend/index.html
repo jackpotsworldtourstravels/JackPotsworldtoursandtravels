@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,18 +13,32 @@
 <link rel="apple-touch-icon" href="assets/images/favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- THE HERO PHOTOGRAPH IS THIS PAGE'S LARGEST PAINT, and it is reached from a
-     CSS custom property inside home-ref.css — so the browser cannot see it
-     until the stylesheet has been fetched AND parsed. Preloading it here starts
-     the download with the stylesheet rather than after it. The `type` is what
-     stops a browser with no WebP support from fetching a file it cannot use. -->
-<link rel="preload" as="image" type="image/webp" href="assets/images/hero-sunset.webp">
-<!-- Montserrat is the UI face for the whole site. The landing page adds two
-     more, and ONLY for the hero headline: Playfair Display for "Travel More"
-     and Yellowtail for "Worry Less". Four weights between them, not the full
-     families - Playfair at 600/700 because the headline is the only thing
-     that uses it, Yellowtail at its single 400. One request, same as before. -->
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700&family=Yellowtail&display=swap" rel="stylesheet">
+<!-- THE HERO PHOTOGRAPH IS THIS PAGE'S LARGEST PAINT. It is an <img> with a
+     srcset now (the cinematic hero), so the preload carries the same set and
+     the browser fetches exactly the width it will then use. -->
+<link rel="preload" as="image" type="image/webp" href="assets/images/hero-dubai-1600.webp"
+      imagesrcset="assets/images/hero-dubai-960.webp 960w, assets/images/hero-dubai-1600.webp 1600w, assets/images/hero-dubai-2560.webp 2560w"
+      imagesizes="100vw" fetchpriority="high">
+<!-- THE OPENING SEQUENCE'S STARTING FRAME. With motion allowed, the hero's
+     parts start hidden (html.cine-pre in home-cinema.css) so the timeline in
+     home-cinema.js can bring them in one beat at a time instead of the page
+     painting everything and then snatching it away. FAIL-OPEN: the class is
+     removed by that script as soon as its timeline owns the frame, and by the
+     timer below if the script never arrives — nothing stays hidden. -->
+<script>
+  (function (d) {
+    try {
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      d.classList.add('cine-pre');
+      setTimeout(function () { d.classList.remove('cine-pre'); }, 4000);
+    } catch (e) {}
+  })(document.documentElement);
+</script>
+<!-- Montserrat is the UI face for the whole site. The landing page adds
+     Playfair Display for its editorial display type — the hero headline, the
+     section titles and the italic accents in them. Yellowtail went with the
+     old "Worry Less" headline. One request, same as before. -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/jp-icons.css?v=20260911ic7">
 <link rel="stylesheet" href="assets/css/main.css?v=20260926ui3">
 <!-- The photograph-arrival layer. It EXTENDS the reveal system in main.css
@@ -52,6 +66,10 @@
      kept its own row layout and the call to action stayed 450px right of
      centre. Same arrangement flights-ref.css has on flights.html. -->
 <link rel="stylesheet" href="assets/css/home-ref.css?v=20260922fp3">
+<!-- THE CINEMATIC LAYER, after home-ref.css because it re-dresses the hero,
+     the header, the search card and every section below them on this page
+     only (every rule is scoped to body.home-cine). -->
+<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260928cn2">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -65,7 +83,7 @@
      foot of the page - so JPIcon did not exist yet and the tabs came out as
      bare words. Every other page already loads it ahead of the card. -->
 <script src="assets/js/jp-icons.js?v=20260911ic7"></script>
-<script src="assets/js/jw-motion.js?v=20260926mo3"></script>
+<script src="assets/js/jw-motion.js?v=0928224009"></script>
 <!-- The wider city/airport reference. BEFORE airports.js, which reads it for
      the cities its own table does not carry and for the airports' proper
      names, and before the inline BookingCard.render() below — the card paints
@@ -92,6 +110,13 @@
 <!-- Explore band (flights/hotels/cruises/packages). Its own file and its own
      `tx-` namespace — main.css is untouched by that feature. -->
 <link rel="stylesheet" href="assets/css/payment.css?v=20260911ic7">
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
 </head>
 <!-- data-jw-home-search: THIS is the page with the booking card in it, so the
      footer's Travel links scroll to that card and open the matching tab instead
@@ -102,220 +127,77 @@
      bubble. The chat still exists here — Profile > Support Center docks the
      same panel — it simply is not advertised in the corner of the landing
      page. See LiveChat.autoMount(). -->
-<body class="home-ref" data-jw-home-search>
+<body class="home-ref home-cine" data-jw-home-search>
 <a href="#main" class="skip-link">Skip to content</a>
 
-<!-- THIS NAV BAR EXISTS TWICE, AND THE OTHER COPY IS hero-shell.js.
-
-     The Flights page is this page continued rather than a separate layout, so
-     it wears exactly this header — but it builds it in JS, while this one stays
-     static HTML on purpose: this is the marketing front door, and its nav links
-     and hero heading should be in the document a crawler is served rather than
-     assembled afterwards.
-
-     CHANGE ONE, CHANGE THE OTHER. Styling is main.css's and is shared, so only
-     the link list, the logo and the account controls live in both places. -->
-<header id="siteHeader">
-  <nav class="wrap">
-    <a href="#home" class="logo">
-      <img class="logo-mark-img" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels">
-    </a>
-    <!-- The service words are real links now, one page each. "Packages" used to
-         be an in-page #packages anchor; it is "Tour Packages" -> packages.html
-         so there are not two nav items with near-identical names. The landing
-         page's own packages section is untouched and still scrolls to. -->
-    <!-- ICON OVER LABEL, per the supplied reference. This is the hand-written
-         copy of the nav that hero-shell.js also builds (see its LINKS) — the
-         duplication is deliberate, so a crawler reads the links out of the
-         served document. CHANGE ONE, CHANGE THE OTHER — and booking-card.js's
-         TABS is the third copy.
-
-         FOUR PRODUCTS, NOT TEN. Villas & Homestays, Trains, Buses and Cabs
-         pointed at the contact form for want of a backend; Visa and Cruise had
-         pages but are not being sold. Six of the ten cells were advertising,
-         above the fold, things a traveller could not buy — which is what
-         tests/verify_footer.py's NOT_OFFERED list guards further down the page
-         and could never see up here. Gaming Packages is a real shelf of
-         customer_packages (migration 0069) with a page of its own. -->
-    <div class="navlinks">
-      <a href="flights.html" title="Flights"><i data-jp-icon="flights" class="jpi-nav"></i><span>Flights</span></a>
-      <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" class="jpi-nav"></i><span>Hotels</span></a>
-      <a href="packages.html" title="Tour Packages"><i data-jp-icon="packages" class="jpi-nav"></i><span>Tour Packages</span></a>
-      <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" class="jpi-nav"></i><span>Gaming Packages</span></a>
-      <a href="index.html#jwFContact" title="Contact"><i data-jp-icon="phone" class="jpi-nav"></i><span>Contact</span></a>
-    </div>
-    <div class="nav-actions">
-      <button type="button" class="hr-wish jpi-row" data-nav-acct="wishlist" title="Wishlist">
-        <i data-jp-icon="heart" class="jpi-btn"></i>
-        <span>Wishlist</span>
-      </button>
-      <!-- B2B door. It goes straight to the Merchant login and asks nothing:
-           the role menu that used to sit behind this link named the Admin,
-           Manager and Super Admin portals on a public page. Those are internal
-           URLs now and are not advertised here. -->
-      <!-- OFF ON THE LANDING PAGE, AND ONLY HERE. The B2B door is a live link
-           on every other page (hero-shell.js builds those headers); this one
-           copy is marked closed. `aria-disabled` + `tabindex="-1"` is what
-           actually takes it out of the tab order and tells a screen reader; the
-           grey and the dead pointer are home-ref.css, keyed on the attribute so
-           the markup and the styling cannot disagree about which state it is
-           in. `href` is left in place deliberately — removing it would turn the
-           element into a non-link and change how it is announced. -->
-      <a href="partner-login.html" class="nav-partner-mark" id="navPartnerLink">
-        <i data-jp-icon="handshake" class="npm-mark"></i>
-        <span>My Partner</span>
-      </a>
-      <!-- My Bookings and Notifications. NOT a second copy of the profile menu's
-         entries: same two destinations, reached as icons for the two things a
-         traveller checks mid-journey without wanting the whole account panel.
-         Both open the Account Center on that tab, so there is one
-         implementation of each screen. -->
-      <button type="button" class="nav-icon-btn" data-nav-acct="bookings" title="My Bookings" aria-label="My Bookings"><i data-jp-icon="receipt" class="jpi-btn"></i></button>
-      <button type="button" class="nav-icon-btn" data-nav-acct="notifications" title="Notifications" aria-label="Notifications"><i data-jp-icon="bell" class="jpi-btn"></i></button>
-      <!-- THE ONLY AUTHENTICATION CONTROLS ON THIS PAGE.
-           profile-menu.js renders Login + Sign Up when signed out and the chip
-           + dropdown when signed in, so exactly one set exists at a time and
-           the same component serves every other page.
-
-           A static `navLoginLink`/`navSignupLink` pair used to sit here as
-           well. Once the component started rendering its own, the header
-           carried BOTH — the duplicate Login/Sign Up. Removed rather than
-           hidden: two implementations IS the bug, and a `display:none` would
-           have left the second pair in the DOM, in the tab order, and still
-           wired to app.js's click handler. -->
-      <div class="pm-slot" data-profile-menu></div>
-      <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
-    </div>
-  </nav>
-  <!-- THE SAME PRODUCTS AS THE BAR ABOVE, and hero-shell.js builds this
-       drawer from the same LINKS list for every other page — so this is the
-       third copy of that list and it is the one that drifted once already: it
-       read Home / Flights / Hotels / Tour Packages / Contact from before the
-       nav grew, which nobody saw while the icon strip stayed visible on a
-       phone and covered for it. The strip is hidden below 860px now, so the
-       drawer IS the navigation there and has to carry everything.
-       CHANGE THIS, THE BAR ABOVE, AND hero-shell.js's LINKS. -->
-  <div class="mobile-nav" id="mobileNav">
-    <a href="flights.html" title="Flights"><i data-jp-icon="flights" class="jpi-nav"></i><span>Flights</span></a>
-    <a href="hotels.html" title="Hotels"><i data-jp-icon="hotels" class="jpi-nav"></i><span>Hotels</span></a>
-    <a href="packages.html" title="Tour Packages"><i data-jp-icon="packages" class="jpi-nav"></i><span>Tour Packages</span></a>
-    <a href="gaming-packages.html" title="Gaming Packages"><i data-jp-icon="gaming" class="jpi-nav"></i><span>Gaming Packages</span></a>
-    <a href="index.html#jwFContact" title="Contact"><i data-jp-icon="phone" class="jpi-nav"></i><span>Contact</span></a>
-    <!-- The drawer's own Login/Sign Up pair and its nine account links are
-         gone. They were a THIRD and FOURTH copy of the same controls, kept in
-         step by hand in renderAuthNav(), and they are not needed: .nav-actions
-         stays visible at every width, so the chip (avatar-only under 560px)
-         and the signed-out buttons are already reachable in the header on a
-         phone. The drawer is the page LINKS; the account is the header. -->
-    <!-- The drawer's copy of the same door, closed for the same reason. -->
-    <a href="partner-login.html" class="mobile-partner-mark">
-      <i data-jp-icon="handshake" class="npm-mark"></i>
-      My Partner
-    </a>
-  </div>
+<!-- THE SITE HEADER — a STATIC COPY of JWHeader.html('') (assets/js/jw-header.js).
+     Every other page renders the same markup from that function; this page
+     keeps it in the served document so a crawler reads the navigation links.
+     CHANGE jw-header.js, REGENERATE THIS. hero-shell.js binds its behaviour
+     (initBehaviour -> JWHeader.bind) exactly as it does on the built pages. -->
+<header id="siteHeader" class="jw-hdr">
+  <div class="jw-hdr__bar"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="JackPots World Tours &amp; Travels" width="152" height="150"></a><nav class="jw-hdr__nav navlinks" aria-label="Primary"><a href="flights.html"><span>Flights</span></a><a href="hotels.html"><span>Hotels</span></a><a href="packages.html"><span>Tours</span></a><a href="cruises.html"><span>Cruises</span></a><a href="destinations.html"><span>Destinations</span></a><span class="jw-hdr__ind" aria-hidden="true"></span></nav><div class="jw-hdr__actions"><button type="button" class="jw-hdr__icon" data-nav-acct="wishlist" aria-label="Wishlist" data-ds-tip="Wishlist"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="bookings" aria-label="My trips" data-ds-tip="My trips"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2M4 12h16"/></svg></button><button type="button" class="jw-hdr__icon jw-hdr__acct" data-nav-acct="notifications" aria-label="Notifications" data-ds-tip="Notifications"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><a class="jw-hdr__partner" href="partner-login.html"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 17l2 2a1 1 0 1 0 3-3"/><path d="M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5.8 5.8 0 0 1 7.1-.8l.5.3a2 2 0 0 0 1.4.3L21 4"/><path d="M21 3l1 11h-2M3 3L2 14l6.5 6.5a1 1 0 1 0 3-3M3 4h8"/></svg><span>Partners</span></a><div class="pm-slot" id="shellAuth" data-profile-menu></div><button type="button" class="jw-hdr__burger" aria-label="Open menu" aria-expanded="false" aria-controls="jwDrawer"><span></span><span></span></button></div></div>
+  <div class="jw-drawer" id="jwDrawer" role="dialog" aria-modal="true" aria-label="Menu" hidden><div class="jw-drawer__top"><a class="jw-hdr__logo" href="index.html" aria-label="JackPots World Tours &amp; Travels, home"><img class="jw-hdr__mark" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150"></a><button type="button" class="jw-drawer__close" aria-label="Close menu"><svg class="jw-hdr__svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><nav class="jw-drawer__nav" aria-label="Menu"><a class="jw-drawer__big" href="flights.html"><i>01</i><span>Flights</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="hotels.html"><i>02</i><span>Hotels</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="packages.html"><i>03</i><span>Tours</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="cruises.html"><i>04</i><span>Cruises</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a><a class="jw-drawer__big" href="destinations.html"><i>05</i><span>Destinations</span><svg class="jw-drawer__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a></nav><div class="jw-drawer__more"><a href="gaming-packages.html">Gaming packages</a><a href="my-bookings.html">My trips</a><a href="partner-login.html">Partner sign in</a><a href="contact-us.html">Contact us</a></div><div class="jw-drawer__foot"><a href="tel:+919177847799">+91 91778 47799</a><a href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></div></div>
 </header>
 
 <main id="main">
-<section class="hero" id="home">
-  <div class="hero-bg" id="heroBg"></div>
-  <div class="hero-video-layer" id="heroVideoLayer">
-    <video class="active" data-video="flights" src="assets/videos/flight.mp4" muted loop playsinline autoplay preload="auto" aria-hidden="true"></video>
-    <video data-video="hotels" data-src="assets/videos/hotel.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-    <!-- No cruises clip. switchHeroVideo() in booking-card.js only ever asks for
-         the key of an open tab, and TABS there is flights/hotels/packages — so
-         this element could not be reached, and the copy above no longer offers
-         the product it was the backdrop for. hero-shell.js's HERO_VIDEOS is the
-         other copy of this list and dropped it at the same time.
-         assets/videos/cruise.mp4 is left on disk; nothing references it. -->
-    <video data-video="packages" data-src="https://assets.mixkit.co/videos/14834/14834-720.mp4" muted loop playsinline preload="none" aria-hidden="true"></video>
-  </div>
-  <div class="hero-overlay"></div>
-  <div class="wrap hero-inner">
-    <!-- THREE SERVICES, AND THIS LIST IS THE PROMISE THE REST OF THE SITE KEEPS.
-         It read "Flights · Hotels · Cruises · Tour Packages" and the sub-line
-         offered cruises, holiday packages and "unforgettable experiences" — four
-         products beyond the three that are sold, on the first screen of the
-         site. The nav, the search card's TABS and the footer had all been
-         reduced to flights/hotels/packages already; this copy was the last
-         place the withdrawn ones survived.
-         hero-shell.js's HERO_EYEBROW is the other copy of this string.
-         CHANGE ONE, CHANGE THE OTHER. (HERO_SUB was the third of this pair and
-         is gone — the sub-line below was removed with it.) -->
-    <div class="eyebrow">Explore &middot; Discover &middot; Travel &middot; Repeat</div>
-    <!-- THE HOUSE LINE, ON ONE LINE. "Your next adventure / starts here" was
-         the reference's headline and set the accent half on its own row
-         (`.accent { display: block }`). This is the business's own phrase, it
-         is meant to read as one breath, so the accent is inline and only the
-         colour separates the halves — no comma, no slash, nothing between them
-         that would make it two statements.
+<!-- ===================================================================
+     THE CINEMATIC HERO — home-cinema.css / home-cinema.js
+     ===================================================================
+     Four layers, back to front: the photograph (Downtown Dubai at blue
+     hour, CC0 — see assets/images/CREDITS.md), the globe canvas with the
+     route drawn across it, the shade + grain, and the copy and search card.
 
-         The words were already in this stylesheet: `.hr-script` styles a
-         "Travel More / Worry Less" script mark for the top right corner that
-         no markup has ever rendered. Those rules are gone now; the phrase is
-         the headline instead of a decoration beside one.
+     NO #heroBg AND NO VIDEO LAYER, on purpose. hero-shell.js keys its
+     scroll fade and parallax off #heroBg; with none here it does neither,
+     and home-cinema.js owns the header's transformation and the hero's
+     scroll motion instead — one engine, not two writing the same style.
+     switchHeroVideo() in booking-card.js finds no <video> and no-ops.
 
-         hero-shell.js's HERO_TITLE is the other copy of this string.
-         CHANGE ONE, CHANGE THE OTHER. -->
-    <h1>Travel More <span class="hr-accent-wrap"><span class="accent">Worry Less</span><!--
-      THE FLIGHT PATH. Decoration, so aria-hidden: the heading still reads
-      "Travel More Worry Less" to a screen reader and to a crawler.
-
-      IT IS ANCHORED TO THE END OF "LESS" AND COSTS NO LAYOUT. The wrapper is
-      the positioning context and the svg is absolute inside it, so the path
-      begins where the script ends at any width without the headline shifting
-      left to make room for it — which is what an inline svg of this size did.
-
-      ONE PATH, ONE LOOP. The `d` below is generated, not hand-tuned: the loop
-      is a real circle traced as four cubic quarter-arcs, entered and left at
-      the same point with the same tangent, which is what stops a 360 reading
-      as a kink. The plane rides that same path via offset-path, so the curve
-      and the aircraft cannot disagree about where the route goes.
-   --><svg class="hr-flightpath" viewBox="0 0 412 226" aria-hidden="true" focusable="false">
-        <path class="hr-fp-line" pathLength="100" d="M 6 198 C 60 214, 120 214, 176 196 C 216 190, 229.5 171.2, 264.8 157.2 C 285.3 149, 295.3 125.7, 287.2 105.2 C 279 84.7, 255.7 74.7, 235.2 82.8 C 214.7 91, 204.7 114.3, 212.8 134.8 C 221 155.3, 244.3 165.3, 264.8 157.2 C 318.7 135.7, 328.8 90.4, 388 46"/>
-        <g class="hr-fp-plane"><path d="M16 0c0-1.6-1.4-3-3.2-3H6.4L-2-12.6c-.4-.4-1-.6-1.6-.6H-6c-.8 0-1.2.8-.9 1.5L-3-3h-6.4l-3-4c-.3-.4-.7-.6-1.2-.6h-1.6c-.8 0-1.3.8-1 1.5L-14.4 0l-1.8 6.1c-.3.7.2 1.5 1 1.5h1.6c.5 0 .9-.2 1.2-.6l3-4H-3l-3.9 8.7c-.3.7.1 1.5.9 1.5h2.4c.6 0 1.2-.2 1.6-.6L6.4 3h6.4c1.8 0 3.2-1.4 3.2-3z"/></g>
-      </svg></span></h1>
-    <!-- THE SUB-LINE IS GONE. "Book flights, hotels and tour packages — all in
-         one place" restated the four product tabs sitting directly beneath it,
-         in a sentence, and cost the search card 50px of the first screen to do
-         it. The card is what this page is for; the tabs already say what can be
-         booked. hero-shell.js's HERO_SUB went with it — see the note there. -->
-
-    <!-- THE TRUST ROW IS GONE. Best Price Guarantee, 24/7 Customer Support and
-         Secure Payments each cost a line of the first screen to repeat a claim
-         this page already makes twice below the fold (the Why Choose Us tiles)
-         and once more inside every booking (the fare rail's benefits list).
-         Nothing was lost with it, and the search card came up by what it
-         occupied — which is the point: the card is what the page is for. -->
+     The stage is aria-hidden: it is photograph and decoration. The heading
+     and the search card are the content, and they stay in the document
+     for a crawler exactly as before. -->
+<section class="hero cine-hero" id="home">
+  <div class="cine-stage" id="cineStage" aria-hidden="true">
+    <div class="cine-media">
+      <img class="cine-photo" src="assets/images/hero-dubai-1600.webp"
+           srcset="assets/images/hero-dubai-960.webp 960w, assets/images/hero-dubai-1600.webp 1600w, assets/images/hero-dubai-2560.webp 2560w"
+           sizes="100vw" alt="" fetchpriority="high" decoding="async">
+    </div>
+    <canvas class="cine-globe" id="cineGlobe"></canvas>
+    <div class="cine-shade"></div>
+    <div class="cine-grain"></div>
   </div>
 
-
+  <div class="wrap cine-copy" id="cineCopy">
+    <p class="cine-eyebrow"><span class="cine-rule"></span>JackPots World &middot; Tours &amp; Travels</p>
+    <!-- THE HEADLINE IS TWO MASKED LINES so each can rise on its own beat.
+         It still reads "The World Awaits You." as one heading.
+         hero-shell.js's HERO_TITLE is the Flights page's own line and is
+         deliberately NOT changed with this one. -->
+    <h1 class="cine-title">
+      <span class="cine-line"><span>The World</span></span>
+      <span class="cine-line"><span><em>Awaits</em> You.</span></span>
+    </h1>
+    <div class="cine-cta-row">
+      <a class="cine-cta" href="#destinations" id="cineExplore">
+        <span>Explore destinations</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <p class="cine-route-caption" aria-hidden="true"><b>HYD</b><i></i><b>DXB</b><i></i><b>MLE</b><i></i><b>DPS</b></p>
+    </div>
+  </div>
 
   <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
-       Flights page mounts the same module — the two pages share one control
-       instead of two copies of a form that would have drifted apart.
-       Rendered inline and synchronously, so this DOM exists before app.js runs
-       at the bottom of the page and its handlers still find .search-panel,
-       .search-go and the field ids exactly where they were. -->
-  <div class="wrap search-dock" id="heroSearchDock"></div>
+       Flights page mounts the same module. Rendered inline and synchronously,
+       so this DOM exists before app.js runs at the bottom of the page and its
+       handlers still find .search-panel, .search-go and the field ids.
+       Everything cinematic about it is home-cinema.css dressing the SAME
+       card — nothing here changes what it searches or how. -->
+  <div class="wrap search-dock cine-dock" id="heroSearchDock"></div>
   <script>BookingCard.render('heroSearchDock');</script>
 
-  <!-- "Discover / New Horizons", in the gutter beside the card.
-
-       POSITIONED, NOT A FLEX SIBLING OF THE CARD, because the card stays
-       CENTRED. In the supplied design the card is centred on the page and this
-       sits outside it on the right; a flex row would have pushed the card left
-       by the width of this label and broken that symmetry.
-
-       It is real text, not decoration, so it is not aria-hidden — but it is
-       only shown once the viewport is wide enough to have a gutter at all
-       (see home-ref.css). Below that the card takes the full width and this
-       would have nowhere to go. -->
-  <aside class="hr-discover">
-    <b>Discover</b>
-    <span>New Horizons</span>
-  </aside>
-
-  <div class="hero-scroll-cue">Scroll<i data-jp-icon="chevronDown" class="jpi-meta"></i></div>
+  <a class="cine-scroll-cue" href="#destinations" aria-label="Scroll to destinations"><span>Scroll</span><i></i></a>
 </section>
 
 <!-- The search-results panel lived here. Nothing could ever open it: it was filled only
@@ -384,20 +266,42 @@
   </div>
 </section>
 
-<section class="jw-dest" id="destinations" aria-labelledby="jwDestHead">
+<section class="jw-dest cine-dest" id="destinations" aria-labelledby="jwDestHead">
+  <!-- THE BRIDGE. The hero hands over to this section rather than ending:
+       the dusk layer fades to ivory as it scrolls in, and the route continues
+       out of the hero through four real stops before the heading arrives.
+       Drawn by home-cinema.js (the path is built to the section's own width,
+       so it is re-laid on resize). Decoration, so aria-hidden; the four
+       places are destinations the shelf below actually lists. -->
+  <div class="cine-dusk" aria-hidden="true"></div>
+  <div class="cine-bridge" id="cineBridge" aria-hidden="true">
+    <svg class="cine-bridge-svg" id="cineBridgeSvg">
+      <path class="cine-bridge-ghost"/>
+      <path class="cine-bridge-line"/>
+      <g class="cine-plane"><path d="M13 0c0-1.3-1.1-2.4-2.6-2.4H5.2L-1.6-10.2c-.3-.3-.8-.5-1.3-.5H-4.9c-.6 0-1 .6-.7 1.2L-2.4-2.4h-5.2l-2.4-3.2c-.2-.3-.6-.5-1-.5h-1.3c-.6 0-1.1.6-.8 1.2L-11.7 0l-1.5 4.9c-.2.6.2 1.2.8 1.2h1.3c.4 0 .8-.2 1-.5l2.4-3.2h5.2L-5.6 9.5c-.3.6.1 1.2.7 1.2h2c.5 0 1-.2 1.3-.5L5.2 2.4h5.2C11.9 2.4 13 1.3 13 0z"/></g>
+    </svg>
+    <div class="cine-stop" data-stop="0"><i></i><b>Hyderabad</b><span>HYD &middot; 17.38&deg;N 78.48&deg;E</span></div>
+    <div class="cine-stop" data-stop="1"><i></i><b>Dubai</b><span>DXB &middot; 25.20&deg;N 55.27&deg;E</span></div>
+    <div class="cine-stop" data-stop="2"><i></i><b>Maldives</b><span>MLE &middot; 4.17&deg;N 73.51&deg;E</span></div>
+    <div class="cine-stop" data-stop="3"><i></i><b>Bali</b><span>DPS &middot; 8.34&deg;S 115.09&deg;E</span></div>
+  </div>
+
   <div class="wrap">
-    <div class="section-head reveal">
-      <div>
-        <div class="eyebrow">Where we can take you</div>
-        <h2 id="jwDestHead">Destinations</h2>
-      </div>
-      <p>Explore destinations and discover new places.</p>
-    </div>
+    <header class="cine-head" id="cineDestHead">
+      <p class="cine-kicker"><span class="cine-rule"></span>Where we can take you</p>
+      <h2 id="jwDestHead" class="cine-h2">
+        <span class="cine-line"><span>Destinations,</span></span>
+        <span class="cine-line"><span><em>chosen with care.</em></span></span>
+      </h2>
+      <p class="cine-lede">Explore destinations and discover new places &mdash; from the old city of Hyderabad to the atolls of the Indian Ocean.</p>
+    </header>
 
     <!-- Filled by home-destinations.js. `aria-busy` is set while the first fetch
          is in flight and the status line below carries the announcement, so a
-         screen reader is told the shelf is loading rather than told nothing. -->
-    <div class="jw-dest-grid" id="jwDestGrid" role="list" aria-busy="true"></div>
+         screen reader is told the shelf is loading rather than told nothing.
+         `cine-grid` is the editorial layout (home-cinema.css): a large card and
+         two small ones, then mirrored, for as many cards as the API sends. -->
+    <div class="jw-dest-grid cine-grid" id="jwDestGrid" role="list" aria-busy="true"></div>
     <p class="jw-dest-status" id="jwDestStatus" role="status"></p>
 
     <!-- The locations panel that used to sit here is gone. A card now links to
@@ -407,64 +311,107 @@
   </div>
 </section>
 
-<section class="why-section" aria-labelledby="whyHead">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <div><div class="eyebrow">The JackPots World promise</div><h2 id="whyHead">Why choose us</h2></div>
-      <p>Eight reasons two million travellers stopped comparing tabs and just booked here.</p>
-    </div>
-    <div class="why-grid">
-      <div class="why-card reveal"><div class="why-icon"><i data-jp-icon="zap"></i></div><h4>Instant Booking</h4><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div>
-      <div class="why-card reveal delay-1"><div class="why-icon"><i data-jp-icon="circleCheck"></i></div><h4>Best Price Guarantee</h4><p>Find it cheaper elsewhere and we refund the difference.</p></div>
-      <div class="why-card reveal delay-2"><div class="why-icon"><i data-jp-icon="lock"></i></div><h4>Secure Payments</h4><p>Bank-grade encryption on every transaction, every time.</p></div>
-      <div class="why-card reveal delay-3"><div class="why-icon"><i data-jp-icon="bedDouble"></i></div><h4>Verified Hotels</h4><p>Every property physically inspected before it's listed.</p></div>
-      <div class="why-card reveal"><div class="why-icon"><i data-jp-icon="clock3"></i></div><h4>24×7 Customer Support</h4><p>Real humans on chat and call, any hour, any day.</p></div>
-      <div class="why-card reveal delay-1"><div class="why-icon"><i data-jp-icon="circleX"></i></div><h4>Free Cancellation</h4><p>Plans change — cancel most bookings at zero cost.</p></div>
-      <div class="why-card reveal delay-2"><div class="why-icon"><i data-jp-icon="rotateCcw"></i></div><h4>Easy Refunds</h4><p>Refunds processed to source within 24 hours.</p></div>
-      <div class="why-card reveal delay-3"><div class="why-icon"><i data-jp-icon="usersRound"></i></div><h4>Trusted by Millions</h4><p>2 million+ travellers and counting, every single month.</p></div>
+<!-- ===================================================================
+     WHY US — an editorial statement, not a grid of tiles.
+     The panel opens out of the ivory page as it arrives (a scale, not a
+     cut); the statement fills line by line while the eight promises come
+     in one at a time along a route line on the right. Same eight claims,
+     same words, as the tiles they replace.
+     =================================================================== -->
+<section class="why-section cine-why" aria-labelledby="whyHead">
+  <div class="cine-why-panel" id="cineWhyPanel">
+    <svg class="cine-why-arcs" viewBox="0 0 800 800" aria-hidden="true" focusable="false">
+      <circle cx="400" cy="400" r="380"/><circle cx="400" cy="400" r="300"/><circle cx="400" cy="400" r="220"/>
+      <ellipse cx="400" cy="400" rx="380" ry="120"/><ellipse cx="400" cy="400" rx="120" ry="380"/>
+      <ellipse cx="400" cy="400" rx="260" ry="380"/>
+    </svg>
+    <div class="wrap cine-why-grid">
+      <div class="cine-why-lead">
+        <p class="cine-kicker"><span class="cine-rule"></span>The JackPots World promise</p>
+        <h2 id="whyHead" class="cine-statement" aria-label="Travel without limits.">
+          <span class="cine-fill" data-text="Travel" aria-hidden="true">Travel</span>
+          <span class="cine-fill cine-fill-em" data-text="without" aria-hidden="true">without</span>
+          <span class="cine-fill" data-text="limits." aria-hidden="true">limits.</span>
+        </h2>
+        <p class="cine-why-sub">Eight reasons two million travellers stopped comparing tabs and just booked here.</p>
+      </div>
+      <div class="cine-why-track">
+      <span class="cine-why-rail" aria-hidden="true"><i id="cineWhyRailFill"></i></span>
+      <ol class="cine-why-list" id="cineWhyList">
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="zap"></i></span><div><h3>Instant Booking</h3><p>Confirmed tickets in under 30 seconds, no waiting on hold.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleCheck"></i></span><div><h3>Best Price Guarantee</h3><p>Find it cheaper elsewhere and we refund the difference.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="lock"></i></span><div><h3>Secure Payments</h3><p>Bank-grade encryption on every transaction, every time.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="bedDouble"></i></span><div><h3>Verified Hotels</h3><p>Every property physically inspected before it's listed.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="clock3"></i></span><div><h3>24&times;7 Customer Support</h3><p>Real humans on chat and call, any hour, any day.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="circleX"></i></span><div><h3>Free Cancellation</h3><p>Plans change &mdash; cancel most bookings at zero cost.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="rotateCcw"></i></span><div><h3>Easy Refunds</h3><p>Refunds processed to source within 24 hours.</p></div></li>
+        <li class="cine-benefit"><span class="cine-benefit-icon"><i data-jp-icon="usersRound"></i></span><div><h3>Trusted by Millions</h3><p>2 million+ travellers and counting, every single month.</p></div></li>
+      </ol>
+      </div>
     </div>
   </div>
 </section>
 
-
-
-
-
-
-
-
-
-
-<section class="newsletter-section" id="newsletter" aria-labelledby="newsHead">
-  <div class="wrap reveal">
-    <h2 id="newsHead">Never miss amazing travel deals</h2>
-    <p>One email a week. Fares, flash sales, and visa updates — nothing else.</p>
-    <form class="newsletter-form" id="newsletterForm">
-      <label for="newsEmail" class="sr-only">Email address</label>
-      <input type="email" id="newsEmail" placeholder="you@example.com" required>
-      <button type="submit" class="btn btn-navy">Subscribe</button>
-    </form>
-    <div class="newsletter-msg" id="newsletterMsg">You're subscribed! Watch your inbox for deals.</div>
+<!-- ===================================================================
+     THE CLOSING SCENE — "Ready to go?"
+     One scene instead of two bands: the call to action, the contact form
+     (id="contact" — index.html#contact is linked from four other pages)
+     and the newsletter, over a photograph that opens out of the Why panel
+     through a circular mask. "Plan your journey" takes the traveller to the
+     form beside it. Every id app.js binds (newsletterForm, newsEmail,
+     newsletterMsg, contactForm, cName, cEmail, cSubject, cMessage,
+     contactMsg) is unchanged, and so is what they submit.
+     =================================================================== -->
+<section class="cine-finale" id="newsletter" aria-labelledby="finaleHead">
+  <div class="cine-finale-media" id="cineFinaleMedia" aria-hidden="true">
+    <!-- Dal Lake, Srinagar. Not the "Maldives" destination file: that is a
+         photograph of one resort (Anantara Kihavah), not of a place. -->
+    <img src="assets/destinations/kashmir-1600.webp" alt="" loading="lazy" decoding="async">
+    <div class="cine-finale-shade"></div>
+    <svg class="cine-finale-route" viewBox="0 0 1440 900" preserveAspectRatio="none" focusable="false">
+      <path id="cineFinalePath" pathLength="1" d="M-40 780 C 240 720, 330 430, 620 480 S 1010 780, 1180 440 S 1380 150, 1500 110"/>
+    </svg>
   </div>
-</section>
-
-<section class="contact-section" id="contact" aria-labelledby="contactHead">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <div><div class="eyebrow">We usually reply within a few hours</div><h2 id="contactHead">Get in touch</h2></div>
-      <p>Questions about a booking, a refund, or just want to plan something big? Send us a message.</p>
+  <p class="ds-hero__credit">Dal Lake, Srinagar · Photo: Suhail Skindar Sofi · CC BY-SA 4.0</p>
+  <div class="wrap cine-finale-grid">
+    <div class="cine-finale-copy">
+      <p class="cine-kicker"><span class="cine-rule"></span>Your next chapter</p>
+      <h2 id="finaleHead" class="cine-finale-title">
+        <span class="cine-line"><span>Ready</span></span>
+        <span class="cine-line"><span><em>to go?</em></span></span>
+      </h2>
+      <p class="cine-lede">Tell us where, when and who with. A travel expert plans the rest &mdash; usually within a few hours.</p>
+      <a class="cine-cta cine-cta-solid" href="#contact" id="cinePlanBtn">
+        <span>Plan your journey</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <div class="cine-news">
+        <h3 id="newsHead">Never miss amazing travel deals</h3>
+        <p>One email a week. Fares, flash sales, and visa updates &mdash; nothing else.</p>
+        <form class="newsletter-form" id="newsletterForm">
+          <label for="newsEmail" class="sr-only">Email address</label>
+          <input type="email" id="newsEmail" placeholder="you@example.com" required>
+          <button type="submit" class="btn btn-navy">Subscribe</button>
+        </form>
+        <div class="newsletter-msg" id="newsletterMsg">You're subscribed! Watch your inbox for deals.</div>
+      </div>
     </div>
-    <div class="contact-form-card reveal">
-      <form id="contactForm" novalidate>
-        <div class="form-row">
-          <div class="modal-field"><label for="cName">Full Name</label><input id="cName" type="text" autocomplete="name" required placeholder="Your name"></div>
-          <div class="modal-field"><label for="cEmail">Email Address</label><input id="cEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
-        </div>
-        <div class="modal-field"><label for="cSubject">Subject</label><input id="cSubject" type="text" placeholder="What's this about?"></div>
-        <div class="modal-field"><label for="cMessage">Message</label><textarea id="cMessage" required placeholder="Tell us more..."></textarea></div>
-        <button type="submit" class="btn btn-coral">Send Message</button>
-        <div class="modal-msg" id="contactMsg"></div>
-      </form>
+
+    <div class="contact-section cine-contact" id="contact" aria-labelledby="contactHead">
+      <div class="contact-form-card">
+        <h3 id="contactHead">Get in touch</h3>
+        <p class="cine-contact-sub">Questions about a booking, a refund, or planning something big? Send us a message.</p>
+        <form id="contactForm" novalidate>
+          <div class="form-row">
+            <div class="modal-field"><label for="cName">Full Name</label><input id="cName" type="text" autocomplete="name" required placeholder="Your name"></div>
+            <div class="modal-field"><label for="cEmail">Email Address</label><input id="cEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div>
+          </div>
+          <div class="modal-field"><label for="cSubject">Subject</label><input id="cSubject" type="text" placeholder="What's this about?"></div>
+          <div class="modal-field"><label for="cMessage">Message</label><textarea id="cMessage" required placeholder="Tell us more..."></textarea></div>
+          <button type="submit" class="btn btn-coral cine-send"><span>Send Message</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <div class="modal-msg" id="contactMsg"></div>
+        </form>
+      </div>
     </div>
   </div>
 </section>
@@ -488,92 +435,7 @@
      to a page that exists.
      ========================================================================= -->
 <footer class="jw-footer" role="contentinfo">
-  <div class="jw-f-wrap">
-    <div class="jw-f-grid">
-
-      <div class="jw-f-brand">
-        <a class="jw-f-logo" href="index.html">
-          <img src="assets/images/jackpots-logo-full.png" width="320" height="96" alt="JackpotsWorld Tours &amp; Travels" loading="lazy" decoding="async">
-        </a>
-        <p class="jw-f-about">Book flights, hotels and tour packages with confidence. Your trusted travel partner for memorable journeys.</p>
-        <!-- No "Follow us" heading and no social icons: removed on request, and
-             .jw-f-about's bottom margin went with them (site-footer.css) so the
-             brand column ends at the tagline instead of holding 26px of the gap
-             that used to separate it from the row of icons. site-footer.js's
-             brandColumn() is the other copy of this block. -->
-      </div>
-
-      <nav class="jw-f-col" aria-labelledby="jwFCompany">
-        <h3 id="jwFCompany">Company</h3>
-        <ul>
-          <li><a class="jw-f-link" href="about.html">About Us</a></li>
-          <li><a class="jw-f-link" href="contact-us.html">Contact Us</a></li>
-          <li><a class="jw-f-link" href="customer-support.html">Customer Support</a></li>
-          <li><a class="jw-f-link" href="faqs.html">FAQs</a></li>
-        </ul>
-      </nav>
-
-      <nav class="jw-f-col" aria-labelledby="jwFTravel">
-        <h3 id="jwFTravel">Travel</h3>
-        <ul>
-          <li><a class="jw-f-link" href="flights.html">Flights</a></li>
-          <li><a class="jw-f-link" href="hotels.html">Hotels</a></li>
-          <li><a class="jw-f-link" href="packages.html">Tour Packages</a></li>
-        </ul>
-      </nav>
-
-      <nav class="jw-f-col" aria-labelledby="jwFLegal">
-        <h3 id="jwFLegal">Legal</h3>
-        <ul>
-          <li><a class="jw-f-link" href="privacy-policy.html">Privacy Policy</a></li>
-          <li><a class="jw-f-link" href="terms-and-conditions.html">Website Terms &amp; Conditions</a></li>
-          <li><a class="jw-f-link" href="cancellation-refund-policy.html">Cancellation &amp; Refund Policy</a></li>
-          <li><a class="jw-f-link" href="cookie-policy.html">Cookie Policy</a></li>
-          <li><a class="jw-f-link" href="payment-security.html">Payment Security</a></li>
-          <li><a class="jw-f-link" href="disclaimer.html">Disclaimer</a></li>
-        </ul>
-      </nav>
-
-      <div class="jw-f-col">
-        <h3 id="jwFContact">Contact</h3>
-        <ul class="jw-f-contact" aria-labelledby="jwFContact">
-          <li>
-            <i data-jp-icon="phone" class="jpi-meta"></i>
-            <span><span class="jw-f-ct-label">Phone</span><a class="jw-f-link jw-f-ct-value" href="tel:+919177847799">+91 9177847799</a></span>
-          </li>
-          <li>
-            <i data-jp-icon="mail" class="jpi-meta"></i>
-            <span><span class="jw-f-ct-label">Email</span><a class="jw-f-link jw-f-ct-value" href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></span>
-          </li>
-          <li>
-            <i data-jp-icon="mapPin" class="jpi-meta"></i>
-            <span><span class="jw-f-ct-label">Address</span><address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span>
-          </li>
-          <li>
-            <i data-jp-icon="clock3" class="jpi-meta"></i>
-            <!-- Same clock icon, same label, same classes — one line of value
-                 instead of two. The staffed hours (Mon–Sat, 9:00 AM – 8:00 PM
-                 IST) still appear on Contact Us, Customer Support, the FAQs and
-                 the policy pages. -->
-            <span><span class="jw-f-ct-label">Business hours</span><span class="jw-f-ct-value">24/7 Support</span></span>
-          </li>
-        </ul>
-      </div>
-
-    </div>
-  </div>
-
-  <div class="jw-f-bottom">
-    <div class="jw-f-wrap jw-f-bottom-row">
-      <span>&copy; 2026 JackpotsWorld Tours &amp; Travels. All Rights Reserved.</span>
-      <span class="jw-f-tagline">Designed for every journey.</span>
-      <span class="jw-f-badges">
-        <span class="jw-f-badge"><i data-jp-icon="lock" class="jpi-meta"></i>SSL Secured</span>
-        <span class="jw-f-badge"><i data-jp-icon="shieldCheck" class="jpi-meta"></i>Privacy Protected</span>
-        <span class="jw-f-badge"><i data-jp-icon="creditCard" class="jpi-meta"></i>Secure Payments</span>
-      </span>
-    </div>
-  </div>
+<div class="jw-f-band"><div class="jw-f-wrap jw-f-band-row"><svg class="jw-f-route" viewBox="0 0 1200 160" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M-10 130 C 220 120, 300 30, 560 50 S 900 150, 1210 26"/></svg><div class="jw-f-band-copy"><p class="jw-f-kicker">JackPots World &middot; Tours &amp; Travels</p><p class="jw-f-statement">The world <em>awaits.</em></p></div><div class="jw-f-band-cta"><a class="jw-f-cta jw-f-cta--solid" href="contact-us.html">Plan your journey</a><a class="jw-f-cta" href="destinations.html">Explore destinations</a></div></div></div><div class="jw-f-wrap"><div class="jw-f-grid"><div class="jw-f-brand"><a class="jw-f-logo" href="index.html"><img src="assets/images/jackpots-logo-full.png" width="320" height="96" alt="JackpotsWorld Tours &amp; Travels" loading="lazy" decoding="async"></a><p class="jw-f-about">Book flights, hotels and tour packages with confidence. Your trusted travel partner for memorable journeys.</p></div><nav class="jw-f-col" aria-labelledby="jwFCompany"><h3 id="jwFCompany">Company</h3><ul><li><a class="jw-f-link" href="about.html">About Us</a></li><li><a class="jw-f-link" href="contact-us.html">Contact Us</a></li><li><a class="jw-f-link" href="customer-support.html">Customer Support</a></li><li><a class="jw-f-link" href="faqs.html">FAQs</a></li></ul></nav><nav class="jw-f-col" aria-labelledby="jwFTravel"><h3 id="jwFTravel">Travel</h3><ul><li><a class="jw-f-link" href="flights.html">Flights</a></li><li><a class="jw-f-link" href="hotels.html">Hotels</a></li><li><a class="jw-f-link" href="packages.html">Tour Packages</a></li><li><a class="jw-f-link" href="destinations.html">Destinations</a></li><li><a class="jw-f-link" href="cruises.html">Cruises</a></li><li><a class="jw-f-link" href="gaming-packages.html">Gaming Packages</a></li></ul></nav><nav class="jw-f-col" aria-labelledby="jwFLegal"><h3 id="jwFLegal">Legal</h3><ul><li><a class="jw-f-link" href="privacy-policy.html">Privacy Policy</a></li><li><a class="jw-f-link" href="terms-and-conditions.html">Website Terms &amp; Conditions</a></li><li><a class="jw-f-link" href="cancellation-refund-policy.html">Cancellation &amp; Refund Policy</a></li><li><a class="jw-f-link" href="cookie-policy.html">Cookie Policy</a></li><li><a class="jw-f-link" href="payment-security.html">Payment Security</a></li><li><a class="jw-f-link" href="disclaimer.html">Disclaimer</a></li></ul></nav><div class="jw-f-col"><h3 id="jwFContact">Contact</h3><ul class="jw-f-contact" aria-labelledby="jwFContact"><li><i data-jp-icon="phone" class="jpi-meta"></i><span><span class="jw-f-ct-label">Phone</span><a class="jw-f-link jw-f-ct-value" href="tel:+919177847799">+91 9177847799</a></span></li><li><i data-jp-icon="mail" class="jpi-meta"></i><span><span class="jw-f-ct-label">Email</span><a class="jw-f-link jw-f-ct-value" href="mailto:support@jackpotsworldtours.com">support@jackpotsworldtours.com</a></span></li><li><i data-jp-icon="mapPin" class="jpi-meta"></i><span><span class="jw-f-ct-label">Address</span><address class="jw-f-ct-value">Hyderabad,<br>Telangana,<br>India</address></span></li><li><i data-jp-icon="clock3" class="jpi-meta"></i><span><span class="jw-f-ct-label">Business hours</span><span class="jw-f-ct-value">24/7 Support</span></span></li></ul></div></div></div><div class="jw-f-bottom"><div class="jw-f-wrap jw-f-bottom-row"><span>&copy; 2026 JackpotsWorld Tours &amp; Travels. All Rights Reserved.</span><span class="jw-f-tagline">Designed for every journey.</span><span class="jw-f-badges"><span class="jw-f-badge"><i data-jp-icon="lock" class="jpi-meta"></i>SSL Secured</span><span class="jw-f-badge"><i data-jp-icon="shieldCheck" class="jpi-meta"></i>Privacy Protected</span><span class="jw-f-badge"><i data-jp-icon="creditCard" class="jpi-meta"></i>Secure Payments</span></span></div></div>
 </footer>
 
 <div class="fab-menu" id="fabMenu">
@@ -752,33 +614,31 @@
          heading and nothing in it can be operated — the four services are a
          picture of what the account is for, not links out of a half-finished
          sign-in. -->
-    <aside class="auth-visual" aria-hidden="true">
-      <div class="auth-visual-head">
-        <img class="auth-visual-logo" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150" decoding="async">
-        <p class="auth-visual-kicker">Explore <i>&middot;</i> Book <i>&middot;</i> Travel <i>&middot;</i> Repeat</p>
-        <p class="auth-visual-title"><span>Discover</span> <span class="is-gold">a Brighter</span> <span>Tomorrow</span></p>
-        <span class="auth-visual-rule"></span>
-        <p class="auth-visual-sub">Your next destination<br>starts here</p>
+    <!-- THE ACCOUNT PANEL, in the design system. It replaces the collage and
+         "Discover a Brighter Tomorrow": the night, the site's own verified
+         Dubai skyline (assets/images/CREDITS.md, CC0) developing under it, the
+         brand's route drawing itself across, and one sentence saying what an
+         account actually holds. aria-hidden, as before: nothing in it can be
+         operated, and the dialog's own heading carries the words. -->
+    <aside class="auth-visual jw-auth-visual" aria-hidden="true">
+      <img class="jw-auth-photo ds-dev" src="assets/images/hero-dubai-960.webp"
+           srcset="assets/images/hero-dubai-960.webp 960w, assets/images/hero-dubai-1600.webp 1600w"
+           sizes="(max-width: 900px) 100vw, 560px" alt="" decoding="async">
+      <svg class="jw-auth-route" viewBox="0 0 400 640" preserveAspectRatio="none" focusable="false">
+        <path class="g" d="M-10 560 C 90 520, 120 380, 220 360 S 360 250, 420 120"/>
+        <path class="d" pathLength="1" d="M-10 560 C 90 520, 120 380, 220 360 S 360 250, 420 120"/>
+        <circle cx="220" cy="360" r="4"/>
+      </svg>
+      <div class="jw-auth-copy">
+        <img class="jw-auth-logo" src="assets/images/jackpots-logo-full.png" alt="" width="152" height="150" decoding="async">
+        <p class="jw-auth-kicker">JackPots World &middot; Your account</p>
+        <p class="jw-auth-title">Every journey, <em>in one place.</em></p>
+        <p class="jw-auth-sub">Your bookings and tickets, saved trips, payments and messages &mdash; one sign-in, on every device.</p>
       </div>
-      <p class="auth-visual-script">More journeys<br><span>More memories</span></p>
-      <ul class="auth-services">
-        <li>
-          <svg viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
-          <span>Flights</span>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24"><path d="M2 20V6M2 10h20v10M2 16h20M6 10V8a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2"/><circle cx="7" cy="8" r="0.5"/></svg>
-          <span>Hotels</span>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3.5"/><path d="M8 17h8M10.5 10h3M12 8.5v3"/></svg>
-          <span>Tour Packages</span>
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
-          <span>Global Destinations</span>
-        </li>
+      <ul class="jw-auth-products">
+        <li>Flights</li><li>Hotels</li><li>Tours</li><li>Cruises</li>
       </ul>
+      <p class="jw-auth-credit">Dubai &middot; Photo: Robert Bock &middot; CC0</p>
     </aside>
 
     <div class="auth-panel">
@@ -1230,11 +1090,20 @@
      destination image_key to the art that shipped for it; the files live in
      assets/destinations/ and both are written by
      scripts/fetch_destination_images.py. -->
-<script src="assets/js/destination-images.js?v=20260923im2"></script>
+<!-- THE CINEMATIC LAYER. GSAP + ScrollTrigger are vendored (3.13.0, the
+     no-charge standard licence) rather than loaded from a CDN, so the page's
+     motion cannot be taken down by a third party. BEFORE home-destinations.js,
+     whose shelf hands its cards to HomeCinema.cards() the moment the API
+     answers - which can be before the rest of this list has loaded. The
+     page-level setup inside waits for DOMContentLoaded, i.e. for app.js. -->
+<script src="assets/js/vendor/gsap.min.js?v=3.13.0"></script>
+<script src="assets/js/vendor/ScrollTrigger.min.js?v=3.13.0"></script>
+<script src="assets/js/home-cinema.js?v=20260928cn2"></script>
+<script src="assets/js/destination-images.js?v=0928221731"></script>
 <script src="assets/js/jw-interest.js?v=20260926pz1"></script>
-<script src="assets/js/home-destinations.js?v=20260926mo1"></script>
+<script src="assets/js/home-destinations.js?v=20260928cn2"></script>
 <script src="assets/js/jw-foryou.js?v=20260926pz1"></script>
-<script src="assets/js/app.js?v=20260922fp3"></script>
+<script src="assets/js/app.js?v=0928224009"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,
      travel-explore.js and the two vendored asset maps belong to the service
      pages (flights/hotels/cruises/packages), which are the only places that

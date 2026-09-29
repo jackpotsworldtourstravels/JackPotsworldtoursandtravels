@@ -7,7 +7,7 @@
      "light"])` precisely so a page like this can opt out: without it a visitor
      on a dark OS got a light header, a light hero, one dark results band and a
      light footer, which is worse than no dark mode. -->
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-theme-lock="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -38,7 +38,7 @@
      inside is scoped to .bk-sheet.is-flight, so the other four products keep
      booking.css exactly as it is. -->
 <link rel="stylesheet" href="assets/css/booking-ref.css?v=20260911ic7">
-<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260926fr1">
+<link rel="stylesheet" href="assets/css/travel-explore.css?v=20260928h1">
 <!-- The results-page search strip. A separate component from the landing
      page's booking card; index.html loads neither of these two files. -->
 <link rel="stylesheet" href="assets/css/search-strip.css?v=20260911ic7">
@@ -54,7 +54,7 @@
      them. Every rule inside is scoped to body[data-sp-service="flights"], so
      hotels.html and packages.html (which share these same stylesheets) are
      untouched. -->
-<link rel="stylesheet" href="assets/css/flights-ref.css?v=20260923bk1">
+<link rel="stylesheet" href="assets/css/flights-ref.css?v=20260928h1">
 <!-- The profile chip + dropdown, shared by every page that shows a header. -->
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <!-- The company footer, one stylesheet for every page that renders it. -->
@@ -78,9 +78,18 @@
 <script src="assets/js/pax-selector.js?v=20260911ic7"></script>
 <script src="assets/js/booking-card.js?v=20260921ta5"></script>
 <script src="assets/js/site-footer.js?v=20260911ic7"></script>
-<script src="assets/js/hero-shell.js?v=20260925ui1"></script>
+<script src="assets/js/hero-shell.js?v=20260928hd1"></script>
+<!-- THE DESIGN SYSTEM, last in <head>: its token bridge repoints the older
+     palettes this page's own sheets declare, and its components (.ds-*) are
+     the site's one visual language. jw-system.js is small and runs first so
+     the reveal pre-states are set before the first paint. -->
+<link rel="stylesheet" href="assets/css/jw-system.css?v=0928234819">
+<script src="assets/js/jw-system.js?v=0928224009"></script>
+<script src="assets/js/jw-header.js?v=20260928hd1"></script>
+<link rel="stylesheet" href="assets/css/jw-products.css?v=0928234819">
+<script src="assets/js/jw-products.js?v=0928222443" defer></script>
 </head>
-<body class="sp-continuation" data-sp-service="flights" data-live-chat>
+<body class="sp-continuation jw-prod" data-sp-service="flights" data-live-chat>
 <a href="#txResults" class="skip-link">Skip to results</a>
 
 <!-- The Account Center, so the profile chip opens it HERE instead of navigating
@@ -119,7 +128,7 @@
   <section class="tx-section" aria-labelledby="txFlightsHead">
     <div class="tx-head">
       <div>
-        <h2 id="txFlightsHead">Departures</h2>
+        <h1 id="txFlightsHead">Departures</h1>
         <!-- Written by the renderer from the criteria and the data's own date;
              typing it here produced "Fri, 08 Aug" against cards that said Sat. -->
         <p id="txFlightsSub">Non-stop services across India, the Gulf and South-East Asia.</p>
@@ -181,7 +190,7 @@
              is invent a discount. See renderOffers(). -->
         <div id="fxOffers"></div>
         <p class="tx-count-line" id="txCount"></p>
-        <div id="txFlightList"></div>
+        <div id="txFlightList" data-ds-results></div>
         <button type="button" class="tx-more" id="txMore" style="display:none;"></button>
       </div>
       <aside class="tx-summary-rail" id="txSummary" aria-label="Booking summary"></aside>
@@ -208,9 +217,9 @@
 <script src="assets/js/booking-flow.js?v=20260926ck1"></script>
 <script src="assets/js/jw-loader.js?v=20260926ld1"></script>
 <script src="assets/js/payment-screen.js?v=20260926ld1"></script>
-<script src="assets/js/booking-products.js?v=20260926ck1"></script>
+<script src="assets/js/booking-products.js?v=0928212229"></script>
 <script src="assets/js/booking-ticket.js?v=20260911ic7"></script>
-<script src="assets/js/booking-flows.js?v=20260911ic7"></script>
+<script src="assets/js/booking-flows.js?v=0928221040"></script>
 <!-- No search panel is loaded down here: the hero card IS this page's search
      panel, so a second set of criteria controls below the fold would be two
      places to type the same trip into. search-widgets.js is loaded in <head>,
@@ -227,7 +236,7 @@
 <script src="assets/js/filter-engine.js?v=20260911ic7"></script>
 <script src="assets/js/flight-filters.js?v=20260911ic7"></script>
 <script src="assets/js/search-strip.js?v=20260912qt1"></script>
-<script src="assets/js/travel-explore.js?v=20260911ic7"></script>
+<script src="assets/js/travel-explore.js?v=0928232502"></script>
 <!-- The booking footer: Back, copyright, Privacy Policy, Terms. The
      landing page's contact footer is not rendered on these pages. -->
 <footer id="bookingFooter"></footer>

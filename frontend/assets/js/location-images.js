@@ -10,86 +10,132 @@
    Author, licence and source for each are in assets/locations/CREDITS.md. */
 const LOCATION_IMAGE_DIR = 'assets/locations/';
 const LOCATION_IMAGE_FILES = {
-  "bali__mount-batur": true,
-  "bali__tegallalang-rice-terraces": true,
-  "bengaluru__bangalore-palace": true,
-  "bengaluru__cubbon-park": true,
-  "bengaluru__iskcon-temple": true,
-  "bengaluru__lalbagh-botanical-garden": true,
-  "bengaluru__tipu-sultans-summer-palace": true,
-  "bengaluru__vidhana-soudha": true,
-  "delhi__akshardham-temple": true,
-  "delhi__india-gate": true,
-  "delhi__jama-masjid": true,
-  "delhi__lotus-temple": true,
-  "delhi__red-fort": true,
-  "dubai__atlantis-the-palm": true,
-  "dubai__burj-al-arab": true,
-  "dubai__burj-khalifa": true,
-  "dubai__dubai-frame": true,
-  "dubai__the-dubai-mall": true,
-  "goa__baga-beach": true,
-  "goa__calangute-beach": true,
-  "goa__chapora-fort": true,
-  "goa__dudhsagar-falls": true,
-  "goa__fort-aguada": true,
-  "goa__palolem-beach": true,
-  "hyderabad__birla-mandir": true,
-  "hyderabad__charminar": true,
-  "hyderabad__chowmahalla-palace": true,
-  "hyderabad__golconda-fort": true,
-  "hyderabad__hussain-sagar-lake": true,
-  "hyderabad__ramoji-film-city": true,
-  "hyderabad__salar-jung-museum": true,
-  "jaipur__hawa-mahal": true,
-  "jaipur__jal-mahal": true,
-  "jaipur__nahargarh-fort": true,
-  "kashmir__betaab-valley": true,
-  "kashmir__dal-lake": true,
-  "kashmir__gulmarg-gondola": true,
-  "kashmir__nishat-bagh": true,
-  "kashmir__shalimar-bagh": true,
-  "kashmir__thajiwas-glacier": true,
-  "kolkata__dakshineswar-kali-temple": true,
-  "kolkata__eco-park": true,
-  "kolkata__howrah-bridge": true,
-  "kolkata__indian-museum": true,
-  "kolkata__victoria-memorial": true,
-  "maldives__hukuru-miskiy": true,
-  "mumbai__bandra-worli-sea-link": true,
-  "mumbai__chhatrapati-shivaji-maharaj-terminus": true,
-  "mumbai__elephanta-caves": true,
-  "mumbai__gateway-of-india": true,
-  "mumbai__juhu-beach": true,
-  "mumbai__siddhivinayak-temple": true,
-  "singapore__buddha-tooth-relic-temple": true,
-  "singapore__gardens-by-the-bay": true,
-  "singapore__marina-bay-sands": true,
-  "singapore__merlion-park": true,
-  "singapore__singapore-botanic-gardens": true,
-  "singapore__universal-studios-singapore": true,
-  "thailand__big-buddha-phuket": true,
-  "thailand__doi-suthep": true,
-  "thailand__sanctuary-of-truth": true,
-  "thailand__wat-arun": true,
-  "tirupati__sri-venkateswara-temple": true,
-  "vijayawada__bhavani-island": true,
-  "vijayawada__kanaka-durga-temple": true,
-  "vijayawada__prakasam-barrage": true,
-  "vijayawada__undavalli-caves": true
+  "bali__mount-batur": "0fcd2b06",
+  "bali__sacred-monkey-forest-sanctuary": "b0839dca",
+  "bali__tanah-lot-temple": "ccd2425b",
+  "bali__tegallalang-rice-terraces": "70f410b6",
+  "bali__ubud-palace": "6bc6f9c9",
+  "bali__uluwatu-temple": "a380a4ab",
+  "bengaluru__bangalore-palace": "c3279b37",
+  "bengaluru__cubbon-park": "8dbfeee0",
+  "bengaluru__iskcon-temple": "42b27bc3",
+  "bengaluru__lalbagh-botanical-garden": "038daeda",
+  "bengaluru__tipu-sultans-summer-palace": "bd9b8387",
+  "bengaluru__vidhana-soudha": "f6a6aa08",
+  "delhi__akshardham-temple": "4c2b751a",
+  "delhi__humayuns-tomb": "a4cef200",
+  "delhi__india-gate": "c9720dac",
+  "delhi__jama-masjid": "3daf53ba",
+  "delhi__lotus-temple": "f6cacbe3",
+  "delhi__qutub-minar": "000207d0",
+  "delhi__red-fort": "4216bf2c",
+  "dubai__al-fahidi-historical-district": "e35d7924",
+  "dubai__atlantis-the-palm": "fcd0f940",
+  "dubai__burj-al-arab": "d1d76740",
+  "dubai__burj-khalifa": "a2ed5e18",
+  "dubai__dubai-fountain": "cc547913",
+  "dubai__dubai-frame": "61956ba6",
+  "dubai__gold-souk": "73519549",
+  "dubai__the-dubai-mall": "6d4946b2",
+  "goa__baga-beach": "a411e072",
+  "goa__basilica-of-bom-jesus": "0cd90f9c",
+  "goa__calangute-beach": "31384e85",
+  "goa__chapora-fort": "b655847b",
+  "goa__dudhsagar-falls": "07dd001c",
+  "goa__fort-aguada": "6056584c",
+  "goa__palolem-beach": "3c160ce3",
+  "hyderabad__birla-mandir": "40eb6b45",
+  "hyderabad__charminar": "26fcdf12",
+  "hyderabad__chowmahalla-palace": "d3c8c717",
+  "hyderabad__golconda-fort": "feac58ce",
+  "hyderabad__hussain-sagar-lake": "48c41d5e",
+  "hyderabad__ramoji-film-city": "2d46f03a",
+  "hyderabad__salar-jung-museum": "859abf62",
+  "jaipur__amer-fort": "870ce694",
+  "jaipur__city-palace": "7dfa1141",
+  "jaipur__hawa-mahal": "83478c4b",
+  "jaipur__jal-mahal": "7b7cacf8",
+  "jaipur__jantar-mantar": "b8300356",
+  "jaipur__nahargarh-fort": "4d028bc5",
+  "kashmir__betaab-valley": "70bba613",
+  "kashmir__dal-lake": "b4f36ab7",
+  "kashmir__gulmarg-gondola": "c2f821c3",
+  "kashmir__nishat-bagh": "3171d385",
+  "kashmir__shalimar-bagh": "530df915",
+  "kashmir__thajiwas-glacier": "d825b6dd",
+  "kolkata__dakshineswar-kali-temple": "2bcbf94c",
+  "kolkata__eco-park": "9b59c559",
+  "kolkata__howrah-bridge": "1766e8df",
+  "kolkata__indian-museum": "133e15d4",
+  "kolkata__st-pauls-cathedral": "4a2f7129",
+  "kolkata__victoria-memorial": "38816b53",
+  "maldives__artificial-beach": "9c36a4b1",
+  "maldives__hukuru-miskiy": "a8d2695d",
+  "mumbai__bandra-worli-sea-link": "2cdf3122",
+  "mumbai__chhatrapati-shivaji-maharaj-terminus": "3bfdf64e",
+  "mumbai__elephanta-caves": "498fa5ee",
+  "mumbai__gateway-of-india": "efdd3063",
+  "mumbai__juhu-beach": "2e27ce39",
+  "mumbai__marine-drive": "be4700be",
+  "mumbai__siddhivinayak-temple": "fa3e1910",
+  "singapore__buddha-tooth-relic-temple": "9735ea7e",
+  "singapore__gardens-by-the-bay": "716423ce",
+  "singapore__marina-bay-sands": "5e8c01fd",
+  "singapore__merlion-park": "e05cb052",
+  "singapore__singapore-botanic-gardens": "1c08885e",
+  "singapore__universal-studios-singapore": "2c4a3586",
+  "thailand__big-buddha-phuket": "469e999a",
+  "thailand__doi-suthep": "4b142868",
+  "thailand__grand-palace": "52ac42b2",
+  "thailand__phi-phi-islands": "1b3375a2",
+  "thailand__railay-beach": "4479a3ca",
+  "thailand__sanctuary-of-truth": "34605ea4",
+  "thailand__wat-arun": "d82d3b1d",
+  "tirupati__silathoranam": "0c71ffe2",
+  "tirupati__sri-padmavathi-ammavari-temple": "36861fd7",
+  "tirupati__sri-venkateswara-temple": "985a06a4",
+  "tirupati__talakona-waterfall": "be324ae4",
+  "vijayawada__bhavani-island": "178d5189",
+  "vijayawada__kanaka-durga-temple": "017d69d8",
+  "vijayawada__prakasam-barrage": "643f2bcd",
+  "vijayawada__undavalli-caves": "b89bfab4"
 };
 const LOCATION_IMAGE_CREDITS = {
   "bali__mount-batur": {
-    "artist": "Christophe95",
+    "artist": "Denny Octora",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Crater_of_Mount_Batur_1.jpg",
-    "title": "File:Crater of Mount Batur 1.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Gunung_Batur_Kintamani.jpg",
+    "title": "File:Gunung Batur Kintamani.jpg"
+  },
+  "bali__sacred-monkey-forest-sanctuary": {
+    "artist": "ZiemowitJ",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Crab-eating_macaque_-_Ubud_Monkey_Forest_2017-08-21_01.jpg",
+    "title": "File:Crab-eating macaque - Ubud Monkey Forest 2017-08-21 01.jpg"
+  },
+  "bali__tanah-lot-temple": {
+    "artist": "Jakub Ha\u0142un",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Bali_-_Pura_Tanah_Lot,_20220827_0958_1114.jpg",
+    "title": "File:Bali - Pura Tanah Lot, 20220827 0958 1114.jpg"
   },
   "bali__tegallalang-rice-terraces": {
     "artist": "Stefan Fussan",
     "licence": "CC BY-SA 4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Tegallalang_rice_terraces_SF0002.jpg",
     "title": "File:Tegallalang rice terraces SF0002.jpg"
+  },
+  "bali__ubud-palace": {
+    "artist": "Jorge Franganillo from Barcelona, Spain",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Puri_Saren_Agung_(33172644978).jpg",
+    "title": "File:Puri Saren Agung (33172644978).jpg"
+  },
+  "bali__uluwatu-temple": {
+    "artist": "CEphoto, Uwe Aranas",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kuta_Bali_Indonesia_Pura-Luhur-Uluwatu-03.jpg",
+    "title": "File:Kuta Bali Indonesia Pura-Luhur-Uluwatu-03.jpg"
   },
   "bengaluru__bangalore-palace": {
     "artist": "Saswata Naha",
@@ -98,22 +144,22 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Bangalore palace with garden.jpg"
   },
   "bengaluru__cubbon-park": {
-    "artist": "Yercaud-elango",
+    "artist": "Srinu.rn3",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Ceiba_speciosa-1-cubbon_park-bangalore-India.jpg",
-    "title": "File:Ceiba speciosa-1-cubbon park-bangalore-India.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Sheshadri_Iyer_Memorial_Hall_(STATE_CENTRAL_LIBRARY).jpg",
+    "title": "File:Sheshadri Iyer Memorial Hall (STATE CENTRAL LIBRARY).jpg"
   },
   "bengaluru__iskcon-temple": {
-    "artist": "ISKCONSJMBLR",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:JBSBangalore.jpg",
-    "title": "File:JBSBangalore.jpg"
+    "artist": "Ashwin Kumar from Bangalore, India",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:ISKCON_Temple_Bangalore_(3475538274).jpg",
+    "title": "File:ISKCON Temple Bangalore (3475538274).jpg"
   },
   "bengaluru__lalbagh-botanical-garden": {
-    "artist": "Yercaud-elango",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Albizia_richardiana-2-botanical_garden-lalbagh-bangaluru-India.jpg",
-    "title": "File:Albizia richardiana-2-botanical garden-lalbagh-bangaluru-India.jpg"
+    "artist": "Rameshng",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Lalbagh_glass_house_during_flower_show_Jan_2012_1443.jpg",
+    "title": "File:Lalbagh glass house during flower show Jan 2012 1443.jpg"
   },
   "bengaluru__tipu-sultans-summer-palace": {
     "artist": "Ibrahim Husain Meraj",
@@ -128,10 +174,16 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Vidhan sauda of bengaluru.jpg"
   },
   "delhi__akshardham-temple": {
-    "artist": "rajaraman sundaram",
-    "licence": "CC BY 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Akshardham_temple,delhi_-_panoramio_(1).jpg",
-    "title": "File:Akshardham temple,delhi - panoramio (1).jpg"
+    "artist": "Balurbala",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Delhi_Akshardham_Temple.JPG",
+    "title": "File:Delhi Akshardham Temple.JPG"
+  },
+  "delhi__humayuns-tomb": {
+    "artist": "Slyronit",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Humayun%E2%80%99s_Tomb,_Delhi_4.jpg",
+    "title": "File:Humayun\u2019s Tomb, Delhi 4.jpg"
   },
   "delhi__india-gate": {
     "artist": "Kavali Chandrakanth KCK",
@@ -151,11 +203,23 @@ const LOCATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Lotus_Temple_.jpg",
     "title": "File:Lotus Temple .jpg"
   },
-  "delhi__red-fort": {
-    "artist": "Hussan.ghazali",
+  "delhi__qutub-minar": {
+    "artist": "Slyronit",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Fountain_inside_the_red_fourt.jpg",
-    "title": "File:Fountain inside the red fourt.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Qutub_Minar,_Delhi_3.jpg",
+    "title": "File:Qutub Minar, Delhi 3.jpg"
+  },
+  "delhi__red-fort": {
+    "artist": "Shagil Kannur",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:The_Red_Fort_of_Delhi,_India_(12).jpg",
+    "title": "File:The Red Fort of Delhi, India (12).jpg"
+  },
+  "dubai__al-fahidi-historical-district": {
+    "artist": "Ankur Panchbudhe",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Al_Fahidi_Historical_Neighbourhood_(Bastakiya).jpg",
+    "title": "File:Al Fahidi Historical Neighbourhood (Bastakiya).jpg"
   },
   "dubai__atlantis-the-palm": {
     "artist": "giggel",
@@ -164,22 +228,34 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Vereinigte Arabische Emirate - Atlantis on Palm Jumeirah - \u0623\u062a\u0644\u0627\u0646\u062a\u064a\u0633 \u0641\u064a \u0646\u062e\u0644\u0629 \u062c\u0645\u064a\u0631\u0627 - panoramio.jpg"
   },
   "dubai__burj-al-arab": {
-    "artist": "Leon petrosyan",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Hotel_Burj_al_Arab_in_Dubay_2.jpg",
-    "title": "File:Hotel Burj al Arab in Dubay 2.jpg"
+    "artist": "Yacine Hary",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Burj_Al_Arab_and_Jumeirah_Beach_(9601659067).jpg",
+    "title": "File:Burj Al Arab and Jumeirah Beach (9601659067).jpg"
   },
   "dubai__burj-khalifa": {
-    "artist": "Ank Kumar",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:The_making_of_Burj_Khalifa,_Dubai_(Ank_Kumar)_09.jpg",
-    "title": "File:The making of Burj Khalifa, Dubai (Ank Kumar) 09.jpg"
+    "artist": "Laika ac",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Burj_Khalifa_(16260269606).jpg",
+    "title": "File:Burj Khalifa (16260269606).jpg"
+  },
+  "dubai__dubai-fountain": {
+    "artist": "Nealt",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dubai_Fountain_7.JPG",
+    "title": "File:Dubai Fountain 7.JPG"
   },
   "dubai__dubai-frame": {
     "artist": "Richard N Horne",
     "licence": "CC BY-SA 4.0",
     "source": "https://commons.wikimedia.org/wiki/File:The_Dubai_Frame_Observation_Deck_in_Dubai,_United_Arab_Emirates.jpg",
     "title": "File:The Dubai Frame Observation Deck in Dubai, United Arab Emirates.jpg"
+  },
+  "dubai__gold-souk": {
+    "artist": "giggel",
+    "licence": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dubai_-_City_of_Gold_%E2%80%93_Gold_Souk_-_%D9%85%D8%AF%D9%8A%D9%86%D8%A9_%D8%A7%D9%84%D8%B0%D9%87%D8%A8_-_panoramio.jpg",
+    "title": "File:Dubai - City of Gold \u2013 Gold Souk - \u0645\u062f\u064a\u0646\u0629 \u0627\u0644\u0630\u0647\u0628 - panoramio.jpg"
   },
   "dubai__the-dubai-mall": {
     "artist": "giggel",
@@ -188,10 +264,16 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Dubai - Dubai Mall - \u062f\u0628\u064a \u0645\u0648\u0644 - panoramio (1).jpg"
   },
   "goa__baga-beach": {
-    "artist": "Nabanita Bhandary",
+    "artist": "Saaremees",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:BAGA_BEACH.jpg",
-    "title": "File:BAGA BEACH.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Baga_Beach-Goa_India-Andres_Larin.jpg",
+    "title": "File:Baga Beach-Goa India-Andres Larin.jpg"
+  },
+  "goa__basilica-of-bom-jesus": {
+    "artist": "Aviatorjk",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Basilica_of_Bom_Jesus_4_(Old_Goa).jpg",
+    "title": "File:Basilica of Bom Jesus 4 (Old Goa).jpg"
   },
   "goa__calangute-beach": {
     "artist": "Divya suresh",
@@ -254,16 +336,28 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Hussain Sagar Lake 4.jpg"
   },
   "hyderabad__ramoji-film-city": {
-    "artist": "Pratish Khedekar",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Name_of_Ramoji_Film_City_01.jpg",
-    "title": "File:Name of Ramoji Film City 01.jpg"
+    "artist": "Vinayaraj",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ramoji_Film_City,_Hyderabad_-_views_from_Ramoji_Film_City_(40).JPG",
+    "title": "File:Ramoji Film City, Hyderabad - views from Ramoji Film City (40).JPG"
   },
   "hyderabad__salar-jung-museum": {
-    "artist": "Adbh266",
-    "licence": "CC0",
-    "source": "https://commons.wikimedia.org/wiki/File:Fire_Tender_Vehicle.jpg",
-    "title": "File:Fire Tender Vehicle.jpg"
+    "artist": "Wasiul Bahar",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Salar_Jung_Museum_Hyderabad,_India_01.jpg",
+    "title": "File:Salar Jung Museum Hyderabad, India 01.jpg"
+  },
+  "jaipur__amer-fort": {
+    "artist": "Virusism",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Amer_Fort_or_Amber_Fort_-_Jaipur_6.jpg",
+    "title": "File:Amer Fort or Amber Fort - Jaipur 6.jpg"
+  },
+  "jaipur__city-palace": {
+    "artist": "This image was taken by Vyacheslav Argenberg If you have any questions, comments or queries, please contact me.",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Jaipur,_India,_City_Palace,_Diwan-i_Khas.jpg",
+    "title": "File:Jaipur, India, City Palace, Diwan-i Khas.jpg"
   },
   "jaipur__hawa-mahal": {
     "artist": "Vssun",
@@ -272,16 +366,22 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Courtyards of Hawa Mahal.jpg"
   },
   "jaipur__jal-mahal": {
-    "artist": "Rafatalam100",
+    "artist": "Jakub Ha\u0142un",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Birds_Of_Jalmahal_Jaipur._03.jpg",
-    "title": "File:Birds Of Jalmahal Jaipur. 03.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:20191218_Jal_Mahal_Palace_in_Jaipur_1429_9234.jpg",
+    "title": "File:20191218 Jal Mahal Palace in Jaipur 1429 9234.jpg"
+  },
+  "jaipur__jantar-mantar": {
+    "artist": "Jakub Ha\u0142un",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:20191218_Jantar_Mantar,_Jaipur_0906_8983_DxO.jpg",
+    "title": "File:20191218 Jantar Mantar, Jaipur 0906 8983 DxO.jpg"
   },
   "jaipur__nahargarh-fort": {
-    "artist": "The enigma28",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Indian_Monkey_in_Rajasthan.jpg",
-    "title": "File:Indian Monkey in Rajasthan.jpg"
+    "artist": "Harshil s mehta",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Jaipur_City_and_Nahargarh_fort.jpg",
+    "title": "File:Jaipur City and Nahargarh fort.jpg"
   },
   "kashmir__betaab-valley": {
     "artist": "Akshey25",
@@ -290,28 +390,28 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Lidder river in Betaab Valley.jpg"
   },
   "kashmir__dal-lake": {
-    "artist": "Star Dust H",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:A_view_of_Dal_Lake_with_Chinar_islands.jpg",
-    "title": "File:A view of Dal Lake with Chinar islands.jpg"
+    "artist": "Slyronit",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dal_Lake_at_sunset,_Srinagar.jpg",
+    "title": "File:Dal Lake at sunset, Srinagar.jpg"
   },
   "kashmir__gulmarg-gondola": {
-    "artist": "Hidden macy",
-    "licence": "CC BY 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Gulmarg_gondola_base_station.jpg",
-    "title": "File:Gulmarg gondola base station.jpg"
+    "artist": "Dr.himshree",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Gulmarg_Gondola_Kashmir_2.jpg",
+    "title": "File:Gulmarg Gondola Kashmir 2.jpg"
   },
   "kashmir__nishat-bagh": {
-    "artist": "Piyushbafna051",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Kashmir_trip9.jpg",
-    "title": "File:Kashmir trip9.jpg"
+    "artist": "Adam Jones from Kelowna, BC, Canada",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nishat_Bagh_Garden_-_Srinagar_-_Jammu_%26_Kashmir_-_India_(26237439274).jpg",
+    "title": "File:Nishat Bagh Garden - Srinagar - Jammu & Kashmir - India (26237439274).jpg"
   },
   "kashmir__shalimar-bagh": {
-    "artist": "Ramanathan",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:ChinarTreeInShalimarBagh.jpg",
-    "title": "File:ChinarTreeInShalimarBagh.jpg"
+    "artist": "Adam Jones from Kelowna, BC, Canada",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Garden_Scene_-_Shalimar_Bagh_Garden_-_Srinagar_-_Jammu_%26_Kashmir_-_India_-_03_(26237591094).jpg",
+    "title": "File:Garden Scene - Shalimar Bagh Garden - Srinagar - Jammu & Kashmir - India - 03 (26237591094).jpg"
   },
   "kashmir__thajiwas-glacier": {
     "artist": "Pranav Joshi",
@@ -326,22 +426,28 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Side View of Dakshineswar Kali Mandir.jpg"
   },
   "kolkata__eco-park": {
-    "artist": "Soumitra Biswas (WB)",
+    "artist": "Yercaud-elango",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Indian_Pied_Starling_by_Soumitra_Biswas_-_01.jpg",
-    "title": "File:Indian Pied Starling by Soumitra Biswas - 01.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Eco_park-13-new_town_smart_city-kolkata-India.jpg",
+    "title": "File:Eco park-13-new town smart city-kolkata-India.jpg"
   },
   "kolkata__howrah-bridge": {
-    "artist": "Sumita Roy Dutta",
+    "artist": "Arghamallick5151",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Devotional_procession_on_Howrah_Bridge_Kolkata_during_Holi_18.jpg",
-    "title": "File:Devotional procession on Howrah Bridge Kolkata during Holi 18.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Howrah_Bridge_Kolkata_Photography_by_Argha_Mallick_01.jpg",
+    "title": "File:Howrah Bridge Kolkata Photography by Argha Mallick 01.jpg"
   },
   "kolkata__indian-museum": {
-    "artist": "Anandajoti",
+    "artist": "Vyacheslav Argenberg",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Indian_Museum,_Courtyard,_Kolkata,_India.jpg",
+    "title": "File:Indian Museum, Courtyard, Kolkata, India.jpg"
+  },
+  "kolkata__st-pauls-cathedral": {
+    "artist": "Pinakpani",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:003_The_Only_Surviving_Torana.jpg",
-    "title": "File:003 The Only Surviving Torana.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:St._Paul%27s_Cathedral,_Cathedral_Road_in_Kolkata_23.jpg",
+    "title": "File:St. Paul's Cathedral, Cathedral Road in Kolkata 23.jpg"
   },
   "kolkata__victoria-memorial": {
     "artist": "Yooktashree barai",
@@ -349,23 +455,29 @@ const LOCATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:Victoria_Memorial_-_illuminated.jpg",
     "title": "File:Victoria Memorial - illuminated.jpg"
   },
+  "maldives__artificial-beach": {
+    "artist": "Adam Jones from Kelowna, BC, Canada",
+    "licence": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Beach_Scene_-_Male_-_Maldives_-_01_(14064527178).jpg",
+    "title": "File:Beach Scene - Male - Maldives - 01 (14064527178).jpg"
+  },
   "maldives__hukuru-miskiy": {
-    "artist": "Sammyslife",
+    "artist": "Zairon",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Taraweeh_at_Mal%C3%A8_Friday_Mosque.jpg",
-    "title": "File:Taraweeh at Mal\u00e8 Friday Mosque.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Male%27_Hukuru_Miskiy_3.jpg",
+    "title": "File:Male' Hukuru Miskiy 3.jpg"
   },
   "mumbai__bandra-worli-sea-link": {
-    "artist": "Rudolph.A.furtado",
-    "licence": "CC0",
-    "source": "https://commons.wikimedia.org/wiki/File:%27SELFIE%27_on_a_fishing_canoe..JPG",
-    "title": "File:'SELFIE' on a fishing canoe..JPG"
+    "artist": "Vworlikar",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Sealink_worli_view.jpg",
+    "title": "File:Sealink worli view.jpg"
   },
   "mumbai__chhatrapati-shivaji-maharaj-terminus": {
-    "artist": "Yagyaansh",
+    "artist": "Shishirdasika",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Chhatrapati_Shivaji_Terminus_30.jpg",
-    "title": "File:Chhatrapati Shivaji Terminus 30.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Mumbai_Chatrapati_Shivaji_Maharaj_Terminus.jpg",
+    "title": "File:Mumbai Chatrapati Shivaji Maharaj Terminus.jpg"
   },
   "mumbai__elephanta-caves": {
     "artist": "StonesThatRemember",
@@ -380,16 +492,22 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Gate way of India, Mumbai structure.jpg"
   },
   "mumbai__juhu-beach": {
-    "artist": "Ray Swi-hymn from Sijhih-Taipei, Taiwan",
-    "licence": "CC BY-SA 2.0",
-    "source": "https://commons.wikimedia.org/wiki/File:20170810_Juhu_5351_(37876991211).jpg",
-    "title": "File:20170810 Juhu 5351 (37876991211).jpg"
+    "artist": "lensnmatter",
+    "licence": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Juhu,_bombay!_(47187395891).jpg",
+    "title": "File:Juhu, bombay! (47187395891).jpg"
+  },
+  "mumbai__marine-drive": {
+    "artist": "Dr Vikramjit Kakati",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Marine_Lines_Mumbai_2021.jpg",
+    "title": "File:Marine Lines Mumbai 2021.jpg"
   },
   "mumbai__siddhivinayak-temple": {
-    "artist": "Madhusudana_reddy_Singana",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Siddivinayak_temple_decorations,_Mumbai.jpg",
-    "title": "File:Siddivinayak temple decorations, Mumbai.jpg"
+    "artist": "User:L1CENSET0K1LL",
+    "licence": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Shree_Siddhivinayak_Mandir.jpg",
+    "title": "File:Shree Siddhivinayak Mandir.jpg"
   },
   "singapore__buddha-tooth-relic-temple": {
     "artist": "LN9267",
@@ -404,22 +522,22 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Figurklippta buskar, Gardens by the Bay, Singapore.jpg"
   },
   "singapore__marina-bay-sands": {
-    "artist": "Cun Cun",
+    "artist": "Basile Morin",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Gedung_Marina_Sands_Bay_di_Singapura.jpg",
-    "title": "File:Gedung Marina Sands Bay di Singapura.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Cricket_match_and_Marina_Bay_Sands_Hotel_in_Singapore.jpg",
+    "title": "File:Cricket match and Marina Bay Sands Hotel in Singapore.jpg"
   },
   "singapore__merlion-park": {
-    "artist": "LN9267",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Merlion_Park_12-05-2024(2).jpg",
-    "title": "File:Merlion Park 12-05-2024(2).jpg"
+    "artist": "This Photo was taken by Supanut Arunoprayote. Feel free to use any of my images, but please mention me as the author and may send me a message. (\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e43\u0e0a\u0e49\u0e20\u0e32\u0e1e\u0e44\u0e14\u0e49\u0e2d\u0e34\u0e2a\u0e23\u0e30 \u0e41\u0e15\u0e48\u0e01\u0e23\u0e38\u0e13\u0e32\u0e43\u0e2a\u0e48\u0e40\u0e04\u0e23\u0e14\u0e34\u0e15\u0e1c\u0e39\u0e49\u0e16\u0e48\u0e32\u0e22\u0e41\u0e25\u0e30\u0e2d\u0e32\u0e08\u0e2a\u0e48\u0e07\u0e02\u0e49\u0e2d\u0e04\u0e27\u0e32\u0e21\u0e1a\u0e2d\u0e01\u0e01\u0e25\u0e48\u0e32\u0e27\u0e14\u0e49\u0e27\u0e22) Please do not upload an updated image here without consultation with the Author. The author would like to make corrections only at his own source. This ensures that the changes are preserved.Please if you think that any changes should be required, please inform the author.Otherwise you can upload a new image with a new name. Please use one of the templates derivative or extract.",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Merlion_(I).jpg",
+    "title": "File:Merlion (I).jpg"
   },
   "singapore__singapore-botanic-gardens": {
-    "artist": "NoPhysicist",
-    "licence": "CC0",
-    "source": "https://commons.wikimedia.org/wiki/File:6._Tanglin_Gate.jpg",
-    "title": "File:6. Tanglin Gate.jpg"
+    "artist": "Elisa.rolle",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Swan_Lake_(Singapore).jpg",
+    "title": "File:Swan Lake (Singapore).jpg"
   },
   "singapore__universal-studios-singapore": {
     "artist": "Hong Da Hyeon",
@@ -434,10 +552,28 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Big Buddha seen from Wat Chalong.jpg"
   },
   "thailand__doi-suthep": {
-    "artist": "ManoiCMU",
+    "artist": "\u0e1c\u0e39\u0e49\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e2a\u0e23\u0e23\u0e04\u0e4c\u0e1c\u0e25\u0e07\u0e32\u0e19/\u0e2a\u0e48\u0e07\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e40\u0e01\u0e47\u0e1a\u0e43\u0e19\u0e04\u0e25\u0e31\u0e07\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e40\u0e2a\u0e23\u0e35\u0e27\u0e34\u0e01\u0e34\u0e21\u0e35\u0e40\u0e14\u0e35\u0e22\u0e04\u0e2d\u0e21\u0e21\u0e2d\u0e19\u0e2a\u0e4c - \u0e40\u0e17\u0e27\u0e1b\u0e23\u0e30\u0e20\u0e32\u0e2a \u0e21\u0e32\u0e01\u0e04\u0e25\u0e49\u0e32\u0e22",
+    "licence": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Phra_That_Doi_Suthep_01.jpg",
+    "title": "File:Phra That Doi Suthep 01.jpg"
+  },
+  "thailand__grand-palace": {
+    "artist": "Slyronit",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Modern_inscription_of_San_Ku_Temple_ruins.jpg",
-    "title": "File:Modern inscription of San Ku Temple ruins.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Grand_Palace,_Bangkok_3.jpg",
+    "title": "File:Grand Palace, Bangkok 3.jpg"
+  },
+  "thailand__phi-phi-islands": {
+    "artist": "Diego Delso",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Isla_Ko_Phi_Phi_Don,_Tailandia,_2013-08-19,_DD_12.JPG",
+    "title": "File:Isla Ko Phi Phi Don, Tailandia, 2013-08-19, DD 12.JPG"
+  },
+  "thailand__railay-beach": {
+    "artist": "Vyacheslav Argenberg",
+    "licence": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Railay,_Krabi,_Thailand.jpg",
+    "title": "File:Railay, Krabi, Thailand.jpg"
   },
   "thailand__sanctuary-of-truth": {
     "artist": "\u0412\u043b\u0430\u0434\u0438\u043c\u0438\u0440 \u041a\u043e\u0447\u0430\u0434\u044b\u043a\u043e\u0432",
@@ -451,23 +587,41 @@ const LOCATION_IMAGE_CREDITS = {
     "source": "https://commons.wikimedia.org/wiki/File:(2019)_%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%AD%E0%B8%A3%E0%B8%B8%E0%B8%93%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%A7%E0%B8%A3%E0%B8%B2%E0%B8%A3%E0%B8%B2%E0%B8%A1%E0%B8%A3%E0%B8%B2%E0%B8%8A%E0%B8%A7%E0%B8%A3%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%A7%E0%B8%B4%E0%B8%AB%E0%B8%B2%E0%B8%A3_%E0%B9%80%E0%B8%82%E0%B8%95%E0%B8%9A%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%AD%E0%B8%81%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88_%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%99%E0%B8%84%E0%B8%A3_(5).jpg",
     "title": "File:(2019) \u0e27\u0e31\u0e14\u0e2d\u0e23\u0e38\u0e13\u0e23\u0e32\u0e0a\u0e27\u0e23\u0e32\u0e23\u0e32\u0e21\u0e23\u0e32\u0e0a\u0e27\u0e23\u0e21\u0e2b\u0e32\u0e27\u0e34\u0e2b\u0e32\u0e23 \u0e40\u0e02\u0e15\u0e1a\u0e32\u0e07\u0e01\u0e2d\u0e01\u0e43\u0e2b\u0e0d\u0e48 \u0e01\u0e23\u0e38\u0e07\u0e40\u0e17\u0e1e\u0e21\u0e2b\u0e32\u0e19\u0e04\u0e23 (5).jpg"
   },
+  "tirupati__silathoranam": {
+    "artist": "Surya Kumar 93",
+    "licence": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Silathoranam_Tirupati.jpg",
+    "title": "File:Silathoranam Tirupati.jpg"
+  },
+  "tirupati__sri-padmavathi-ammavari-temple": {
+    "artist": "Malyadri",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tiruchanur_09.JPG",
+    "title": "File:Tiruchanur 09.JPG"
+  },
   "tirupati__sri-venkateswara-temple": {
     "artist": "Maksym Kozlenko",
     "licence": "CC BY-SA 3.0",
     "source": "https://commons.wikimedia.org/wiki/File:Hindu_Temple_-_panoramio.jpg",
     "title": "File:Hindu Temple - panoramio.jpg"
   },
+  "tirupati__talakona-waterfall": {
+    "artist": "K A UDAY",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Talakona_Fall.jpg",
+    "title": "File:Talakona Fall.jpg"
+  },
   "vijayawada__bhavani-island": {
     "artist": "Saisumanth532",
     "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Bhavani_Island_0011.jpg",
-    "title": "File:Bhavani Island 0011.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Bhavani_island_sunset.jpg",
+    "title": "File:Bhavani island sunset.jpg"
   },
   "vijayawada__kanaka-durga-temple": {
-    "artist": "\u0c30\u0c39\u0c4d\u0c2e\u0c3e\u0c28\u0c41\u0c26\u0c4d\u0c26\u0c40\u0c28\u0c4d",
-    "licence": "CC BY-SA 3.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Vijayawada_durga_temple_hillmark.JPG",
-    "title": "File:Vijayawada durga temple hillmark.JPG"
+    "artist": "Sushumnarao",
+    "licence": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Vijayawada_Kanakadurga_Temple_on_Indrakeeladri.jpg",
+    "title": "File:Vijayawada Kanakadurga Temple on Indrakeeladri.jpg"
   },
   "vijayawada__prakasam-barrage": {
     "artist": "Kalyan Kanuri",
@@ -476,9 +630,9 @@ const LOCATION_IMAGE_CREDITS = {
     "title": "File:Krishna river near Vijayawada Prakasam Barrage.jpg"
   },
   "vijayawada__undavalli-caves": {
-    "artist": "IM3847",
-    "licence": "CC BY-SA 4.0",
-    "source": "https://commons.wikimedia.org/wiki/File:Undavalli_caves_board.jpg",
-    "title": "File:Undavalli caves board.jpg"
+    "artist": "Jayadeep Rajan",
+    "licence": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Undavalli_Caves,_Vijayawada.JPG",
+    "title": "File:Undavalli Caves, Vijayawada.JPG"
   }
 };

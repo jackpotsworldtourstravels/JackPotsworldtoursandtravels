@@ -175,6 +175,32 @@ const BookingProducts = (function () {
     }];
   }
 
+  /** The fare the traveller has actually chosen (or the only one there is). */
+  function selectedFare(ctx) {
+    const opts = fareOptions(ctx);
+    return opts.find(o => o.id === (ctx && ctx.fareOptionId)) || opts[0] || null;
+  }
+
+  /** THE CANCELLATION PANEL, BOUND TO THE FARE.
+   *
+   *  It used to be a constant: "Free Cancellation — Cancel within 24 hours of
+   *  booking", on every fare, refundable or not, beside a "Best Price
+   *  Guarantee" nothing in this application backs. No 24-hour window exists in
+   *  the backend either. It now says what the chosen fare's restriction says —
+   *  the same `refundable` field and the same rule sentence the results page's
+   *  View Details and the fare card use — and says nothing when the fare does
+   *  not say. */
+  function bkfCancelHtml(ctx) {
+    const fare = selectedFare(ctx);
+    if (!fare || typeof fare.refundable !== 'boolean') return '';
+    const rule = fare.rules || fareRuleText({ refundable: fare.refundable });
+    return `
+      <div class="bkf-assure ${fare.refundable ? 'is-good' : 'is-plain'}">
+        ${svg('refresh')}
+        <div><b>${fare.refundable ? 'Refundable fare' : 'Non-refundable fare'}</b><span>${esc(rule)}</span></div>
+      </div>`;
+  }
+
   /** One inclusion row. `tone` decides the mark: a tick for what the fare
    *  carries, a cross for what it does not, a dot for something decided at a
    *  later step rather than by the fare. */
@@ -1382,12 +1408,8 @@ const BookingProducts = (function () {
               ${p.noteIsError ? 'role="alert"' : ''}>${esc(p.note)}</p>` : ''}
         </div>
       </div>
-      <div class="bkf-assure">
-        ${svg('refresh')}
-        <div><b>Free Cancellation</b><span>Cancel within 24 hours of booking</span></div>
-      </div>
+      ${bkfCancelHtml(ctx)}
       <ul class="bkf-benefits">
-        <li>${svg('tag')}<div><b>Best Price Guarantee</b><span>We promise you the lowest price</span></div></li>
         <li>${svg('shieldCheck')}<div><b>Secure Booking</b><span>Your data is 100% protected</span></div></li>
         <li>${svg('support')}<div><b>24/7 Customer Support</b><span>We're here to help you anytime</span></div></li>
       </ul>`;
@@ -2090,9 +2112,9 @@ const BookingProducts = (function () {
       </section>`;
   }
 
-  /* The app's own rules, not invented ones: the six-month passport rule and
-     the 24-hour cancellation window are both enforced elsewhere in this
-     codebase, and the fare-rules line restates what the add-ons step says. */
+  /* The app's own rules, not invented ones. The cancellation line is the
+     CHOSEN FARE's rule (see bkfCancelHtml) — it used to promise a 24-hour
+     cancellation window "for eligible fares" that nothing enforces. */
   function bkfRvInfoHtml(ctx) {
     const intl = ctx.item && typeof BookingApi !== 'undefined' && BookingApi.isInternational
       ? BookingApi.isInternational(ctx.item) : false;
@@ -2101,7 +2123,10 @@ const BookingProducts = (function () {
       'Check-in baggage allowance and fare rules vary by airline.',
     ];
     if (intl) items.push('Passports must be valid for at least six months from the date of travel.');
-    items.push('You can cancel within 24 hours of booking for eligible fares.');
+    const fare = selectedFare(ctx);
+    if (fare && typeof fare.refundable === 'boolean') {
+      items.push(esc(fare.rules || fareRuleText({ refundable: fare.refundable })));
+    }
     items.push('By continuing, you agree to our <a href="#" data-bkf-terms="terms">Terms &amp; Conditions</a> and <a href="#" data-bkf-terms="privacy">Privacy Policy</a>.');
     return `
       <section class="bkf-card bkf-rvcard">

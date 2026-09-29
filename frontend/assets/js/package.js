@@ -83,9 +83,6 @@
   const placeArt = key => fromManifest(
     key, typeof LOCATION_IMAGE_FILES !== 'undefined' ? LOCATION_IMAGE_FILES : null,
     typeof LOCATION_IMAGE_DIR !== 'undefined' ? LOCATION_IMAGE_DIR : null, 'assets/locations/');
-  const hotelArt = key => fromManifest(
-    key, typeof HOTEL_IMAGE_FILES !== 'undefined' ? HOTEL_IMAGE_FILES : null,
-    typeof HOTEL_IMAGE_DIR !== 'undefined' ? HOTEL_IMAGE_DIR : null, 'assets/hotels/');
 
   const money = n => {
     if (n == null) return null;
@@ -326,7 +323,11 @@
       : `${rows.length} propert${rows.length === 1 ? 'y' : 'ies'} on this itinerary.`;
 
     document.getElementById('pkHotels').innerHTML = rows.map(h => {
-      const art = hotelArt(h.image);
+      /* The itinerary names the property and its city; the shared resolver
+         decides what may honestly be shown for it. */
+      const photo = (typeof HotelPhoto !== 'undefined')
+        ? HotelPhoto.html({ name: h.hotel_name, city: h.city }, { surface: 'tile', sizes: '(max-width: 640px) 100vw, 280px' })
+        : '';
       /* THE STARS ARE THE OPERATOR'S CLAIM ABOUT THE PROPERTY and are shown
          only where the row states one. A missing star rating is not four. */
       const stars = h.star_rating
@@ -334,11 +335,7 @@
       const bits = [h.city, h.room_type, h.nights ? `${h.nights} night${h.nights === 1 ? '' : 's'}` : null]
         .filter(Boolean).map(esc).join(' · ');
       return `<article class="lp-hotel pk-hotel" role="listitem">
-        <div class="lp-hotel-art">${art
-          ? `<img src="${esc(art.small)}" srcset="${esc(art.small)} 480w, ${esc(art.src)} 960w"
-                 sizes="(max-width: 640px) 100vw, 280px" alt="${esc(h.hotel_name)}"
-                 loading="lazy" decoding="async" onerror="this.remove()">`
-          : `<span class="lp-hero-pin">${icon('bedDouble', 22)}</span>`}</div>
+        <div class="lp-hotel-art">${photo || `<span class="lp-hero-pin">${icon('bedDouble', 22)}</span>`}</div>
         <div class="lp-hotel-body">
           <h3 class="lp-hotel-name">${esc(h.hotel_name)}</h3>
           ${stars}
@@ -346,6 +343,7 @@
         </div>
       </article>`;
     }).join('');
+    if (typeof HotelPhoto !== 'undefined') HotelPhoto.develop(document.getElementById('pkHotels'));
     show(document.getElementById('pkHotelsSec'), true);
   }
 
@@ -527,6 +525,51 @@
     }
   }
 
+  /* ======================================================================
+     THE BOOKING FOLIO — the column beside the trip.
+
+     Everything on it is already on the hero, read from the same fields by
+     the same rules (the next departure's price where there is one, nights
+     from the column, a date only if one is scheduled). Its button is not a
+     second booking path: it presses the hero's, which is either Book now
+     (opens BookingFlows) or, with no departures, the enquiry link — so the
+     folio can never offer a booking the hero would not.
+     ====================================================================== */
+  function renderFolio(p) {
+    const folio = document.getElementById('pkFolio');
+    const top = document.getElementById('pkBookTop');
+    if (!folio || !top) return;
+    const price = (p.price_next != null) ? p.price_next : p.priceFrom;
+    const upcoming = (p.departures || []).filter(d => d.date >= new Date().toISOString().slice(0, 10));
+    const facts = [
+      p.days ? ['Duration', `${esc(p.days)} days${p.nights != null ? ' · ' + esc(p.nights) + ' nights' : ''}`] : null,
+      p.destination ? ['Destination', esc(p.destination)] : null,
+      p.hotel_category ? ['Hotels', `${esc(p.hotel_category)}-star`] : null,
+      p.next_departure ? ['Next departure', esc(longDate(p.next_departure))] : null,
+      upcoming.length ? ['Scheduled dates', String(upcoming.length)] : null,
+    ].filter(Boolean);
+    const isLink = top.tagName === 'A';
+    folio.innerHTML = `
+      <p class="pk-folio-k">Your trip</p>
+      ${price != null ? `
+        <div class="pk-folio-price">
+          <span>${p.price_next != null ? 'Next departure from' : 'Starting from'}</span>
+          <b>${esc(money(price))}</b>
+          <span>per person</span>
+        </div>` : ''}
+      ${facts.length ? `<dl class="pk-folio-facts">${facts.map(f => `<div><dt>${f[0]}</dt><dd>${f[1]}</dd></div>`).join('')}</dl>` : ''}
+      ${isLink
+        ? `<a class="ds-btn ds-btn--primary ds-btn--block" href="${esc(top.getAttribute('href'))}">Enquire about dates
+             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+           <p class="pk-folio-note">No departures are scheduled yet. Tell us when you want to travel and we will price those dates.</p>`
+        : `<button type="button" class="ds-btn ds-btn--primary ds-btn--block" id="pkBookSide">Book now
+             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+           <p class="pk-folio-note">You choose the departure and travellers on the next step. Nothing is charged until payment.</p>`}`;
+    const side = document.getElementById('pkBookSide');
+    if (side) side.addEventListener('click', () => document.getElementById('pkBookTop').click());
+    folio.hidden = price == null && !facts.length;
+  }
+
   /* ====================================================================== */
   function render(p) {
     renderHero(p);
@@ -538,6 +581,7 @@
     renderDates(p);
     renderPolicies(p);
     wireBooking(p);
+    renderFolio(p);
     /* Not awaited: the page is complete without it and a second catalogue
        query should not hold up the trip somebody is already reading. */
     renderMore(p);

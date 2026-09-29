@@ -1,0 +1,1142 @@
+/* ===========================================================================
+   jw-system.css — the JackPotsWorld design system.
+   ===========================================================================
+   ONE visual language for every customer page. Three layers, in this order:
+
+     1. TOKENS      `--ds-*` on :root — colour, type, space, radius, shadow,
+                    glass, motion. Nothing below this file may invent a value
+                    these tokens already name.
+     2. THE BRIDGE  the older token families (main.css's --navy/--coral/--bg,
+                    service-page.css's --sp-*, booking-shell.css's
+                    --booking-*, discover.css's --disc-*, the footer's
+                    --jwf-*) repointed at the tokens. That is what lets a page
+                    that has not been redesigned yet still wear the brand's
+                    palette instead of the teal-and-coral it was built in.
+     3. COMPONENTS  `.ds-*`: type, buttons, fields, cards, badges, chips,
+                    tabs, modal, drawer / bottom sheet, tooltip, alert,
+                    skeleton, state (loading / empty / error / offline /
+                    expired / not found), page hero, stepper, price.
+
+   LOAD ORDER. Last of a page's stylesheets, so the bridge wins the tie on
+   `:root` against main.css and service-page.css. It never uses !important;
+   a component that needs more weight gets it from its own class.
+
+   MOTION lives in jw-system.js (reveals, image develop, tabs, drawers) and,
+   for scroll choreography, GSAP + ScrollTrigger — the same single engine the
+   homepage uses. Everything here degrades to a still, fully visible page
+   under prefers-reduced-motion.
+   =========================================================================== */
+
+/* ==========================================================================
+   1. TOKENS
+   ========================================================================== */
+:root {
+  /* --- colour: the night, the navies, the paper, the metal, the accent --- */
+  --ds-night:      #060a12;
+  --ds-navy-900:   #0a1120;
+  --ds-navy-800:   #0f1b2e;
+  --ds-navy-700:   #16263f;
+  --ds-navy-600:   #22375a;
+  --ds-ivory:      #f5f0e8;
+  --ds-sand:       #ebe3d6;
+  --ds-paper:      #fdfbf8;
+  --ds-white:      #ffffff;
+  --ds-ink:        #151b27;
+  --ds-ink-2:      #3b4252;
+  --ds-muted:      #686459;   /* 5.4:1 on ivory, 6:1 on white */
+  --ds-line:       rgba(21, 27, 39, .12);
+  --ds-line-2:     rgba(21, 27, 39, .2);
+  --ds-line-dark:  rgba(255, 255, 255, .12);
+  --ds-gold:       #d9b26f;
+  --ds-gold-lt:    #f0d9a6;
+  --ds-gold-ink:   #85602a;   /* gold that can carry text on ivory: 4.9:1 */
+  --ds-coral:      #c9482f;   /* fills with white text: 4.7:1 */
+  --ds-coral-dk:   #a63a24;
+  --ds-coral-lt:   #e8604c;
+  --ds-coral-soft: #fbebe6;
+  --ds-on-dark:    rgba(255, 255, 255, .92);
+  --ds-on-dark-2:  rgba(255, 255, 255, .66);
+
+  --ds-success: #1d7550;  --ds-success-soft: #e3f2ea;
+  --ds-warning: #95600f;  --ds-warning-soft: #fbf0dc;
+  --ds-danger:  #a3302a;  --ds-danger-soft:  #f9e5e3;
+  --ds-info:    #27578a;  --ds-info-soft:    #e4edf7;
+
+  /* --- type --- */
+  --ds-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --ds-sans:    'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ds-fs-2xs: 11px;
+  --ds-fs-xs:  12px;
+  --ds-fs-sm:  13.5px;
+  --ds-fs-md:  15px;
+  --ds-fs-lg:  17px;
+  --ds-fs-xl:  20px;
+  --ds-fs-2xl: clamp(22px, 2vw, 28px);
+  --ds-fs-3xl: clamp(28px, 3vw, 40px);
+  --ds-fs-4xl: clamp(36px, 5vw, 64px);
+  --ds-fs-5xl: clamp(44px, 7.4vw, 112px);
+  --ds-track-caps: .28em;
+
+  /* --- space (4px base) --- */
+  --ds-s1: 4px;  --ds-s2: 8px;  --ds-s3: 12px; --ds-s4: 16px; --ds-s5: 20px;
+  --ds-s6: 24px; --ds-s7: 32px; --ds-s8: 40px; --ds-s9: 56px; --ds-s10: 80px;
+  --ds-section: clamp(64px, 9vw, 140px);
+  --ds-gutter:  clamp(16px, 3vw, 32px);
+  --ds-max:     1280px;
+
+  /* --- radius --- */
+  --ds-r-sm: 8px; --ds-r-md: 14px; --ds-r-lg: 20px; --ds-r-xl: 28px; --ds-r-pill: 999px;
+
+  /* --- elevation (navy-tinted, never grey) --- */
+  --ds-sh-1: 0 1px 2px rgba(10, 17, 32, .06), 0 4px 12px -6px rgba(10, 17, 32, .12);
+  --ds-sh-2: 0 2px 6px rgba(10, 17, 32, .06), 0 18px 40px -22px rgba(10, 17, 32, .35);
+  --ds-sh-3: 0 4px 12px rgba(10, 17, 32, .08), 0 34px 70px -34px rgba(10, 17, 32, .55);
+  --ds-sh-4: 0 60px 110px -50px rgba(0, 0, 0, .85), 0 24px 48px -28px rgba(0, 0, 0, .55);
+  --ds-ring: 0 0 0 3px rgba(217, 178, 111, .45);
+
+  /* --- glass --- */
+  --ds-glass-dark:  rgba(10, 16, 28, .62);
+  --ds-glass-light: rgba(255, 255, 255, .78);
+  --ds-blur:        blur(18px) saturate(150%);
+
+  /* --- motion --- */
+  --ds-ease:     cubic-bezier(.22, 1, .36, 1);
+  --ds-ease-in:  cubic-bezier(.55, 0, .75, .2);
+  --ds-t-fast:   .2s;
+  --ds-t:        .35s;
+  --ds-t-slow:   .7s;
+  --ds-t-reveal: .9s;
+}
+
+/* ==========================================================================
+   2. THE BRIDGE — older token families, pointed at the tokens
+   ========================================================================== */
+:root {
+  /* main.css */
+  --navy: var(--ds-navy-800);
+  --navy-2: var(--ds-navy-700);
+  --navy-3: var(--ds-navy-600);
+  --coral: var(--ds-coral);
+  --coral-light: var(--ds-coral-lt);
+  --coral-dark: var(--ds-coral-dk);
+  --coral-hover: var(--ds-coral-soft);
+  --bg: var(--ds-ivory);
+  --ink: var(--ds-ink);
+  --muted: var(--ds-muted);
+  --line: #e4dccd;
+  --emerald: var(--ds-success);
+  --danger: var(--ds-danger);
+  --danger-soft: var(--ds-danger-soft);
+  --shadow-sm: var(--ds-sh-1);
+  --shadow-lg: var(--ds-sh-3);
+  /* service-page.css */
+  --sp-bg: var(--ds-ivory);
+  --sp-surface: var(--ds-white);
+  --sp-surface-2: #f6f1e9;
+  --sp-ink: var(--ds-ink);
+  --sp-muted: var(--ds-muted);
+  --sp-line: #e4dccd;
+  --sp-accent: var(--ds-coral);
+  --sp-accent-dk: var(--ds-coral-dk);
+  --sp-header: var(--ds-navy-900);
+  --sp-gold: var(--ds-gold);
+  --sp-emerald: var(--ds-success);
+  /* booking-shell.css */
+  --booking-header-bg: var(--ds-navy-900);
+  --booking-page-bg: var(--ds-ivory);
+  --booking-text: var(--ds-ink);
+  --booking-muted: var(--ds-muted);
+}
+/* discover.css declares its family on `.disc`, so the bridge meets it there. */
+.disc {
+  --disc-bg: var(--ds-ivory);
+  --disc-bg-2: var(--ds-sand);
+  --disc-ink: var(--ds-ink);
+  --disc-mute: var(--ds-muted);
+  --disc-accent: var(--ds-navy-800);
+  --disc-accent-deep: var(--ds-night);
+  --disc-accent-soft: rgba(15, 27, 46, .06);
+  --disc-accent-line: rgba(15, 27, 46, .28);
+  --disc-line: var(--ds-line);
+  --disc-sky-1: var(--ds-paper);
+  --disc-sky-2: var(--ds-ivory);
+  --disc-sky-3: var(--ds-sand);
+}
+/* The footer's own family (site-footer.css, on `.jw-footer`). */
+.jw-footer {
+  --jwf-navy: var(--ds-navy-900);
+  --jwf-navy-deep: var(--ds-night);
+  --jwf-gold: var(--ds-gold);
+}
+
+/* ==========================================================================
+   3. COMPONENTS
+   ========================================================================== */
+
+/* Every component sizes border-box, whether or not the page's own sheet
+   says so (main.css does; the auth and content pages do not). */
+[class^="ds-"], [class*=" ds-"], [class^="ds-"]::before, [class^="ds-"]::after { box-sizing: border-box; }
+
+/* --- 3.1 type ---------------------------------------------------------- */
+.ds-eyebrow {
+  display: inline-flex; align-items: center; gap: 14px; margin: 0 0 var(--ds-s5);
+  font-family: var(--ds-sans); font-size: var(--ds-fs-2xs); font-weight: 600;
+  letter-spacing: var(--ds-track-caps); text-transform: uppercase; color: var(--ds-gold-ink);
+}
+.ds-eyebrow::before {
+  content: ''; width: 40px; height: 1px; background: currentColor; opacity: .8; flex: none;
+}
+.ds-on-dark .ds-eyebrow, .ds-eyebrow.is-light { color: var(--ds-gold); }
+.ds-display, .ds-h1, .ds-h2, .ds-h3 {
+  font-family: var(--ds-display); font-weight: 500; letter-spacing: -.02em; color: inherit; margin: 0;
+}
+.ds-display { font-size: var(--ds-fs-5xl); line-height: .92; text-transform: uppercase; }
+.ds-h1 { font-size: var(--ds-fs-4xl); line-height: .98; }
+.ds-h2 { font-size: var(--ds-fs-3xl); line-height: 1.05; }
+.ds-h3 { font-size: var(--ds-fs-2xl); line-height: 1.15; letter-spacing: -.01em; }
+.ds-display em, .ds-h1 em, .ds-h2 em, .ds-h3 em { font-style: italic; color: var(--ds-gold-ink); }
+.ds-on-dark .ds-display em, .ds-on-dark .ds-h1 em, .ds-on-dark .ds-h2 em, .ds-on-dark .ds-h3 em,
+.ds-hero .ds-display em, .ds-hero .ds-h1 em, .ds-hero .ds-h2 em {
+  background: linear-gradient(100deg, var(--ds-gold-lt), var(--ds-gold) 55%, #c08b3e);
+  -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .04em;
+}
+.ds-lede { font-size: clamp(15px, 1.2vw, 17.5px); line-height: 1.7; color: var(--ds-muted); max-width: 52ch; margin: 0; }
+.ds-on-dark .ds-lede { color: var(--ds-on-dark-2); }
+.ds-caps { font-size: var(--ds-fs-2xs); font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+.ds-on-dark { color: var(--ds-on-dark); }
+
+/* --- 3.2 layout --------------------------------------------------------- */
+.ds-container { width: 100%; max-width: var(--ds-max); margin: 0 auto; padding: 0 var(--ds-gutter); }
+.ds-section { padding: var(--ds-section) 0; }
+.ds-section--ivory { background: var(--ds-ivory); }
+.ds-section--paper { background: var(--ds-paper); }
+.ds-section--night { background: var(--ds-night); color: var(--ds-on-dark); }
+.ds-stack > * + * { margin-top: var(--ds-s4); }
+
+/* --- 3.3 buttons -------------------------------------------------------
+   Hover lifts 2px, an arrow travels 4px, the ground shifts. Every variant
+   has a visible gold focus ring. */
+.ds-btn {
+  /* --btn-sh is a transparent zero shadow, NOT `none`: it is combined with the
+     focus ring as `var(--btn-sh), var(--ds-ring)`, and a list containing
+     `none` is invalid — the whole declaration was dropped, so every outline,
+     ghost and link button showed no focus ring at all. */
+  --btn-bg: var(--ds-navy-800); --btn-fg: #fff; --btn-bd: transparent; --btn-sh: 0 0 0 0 transparent;
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 46px; padding: 0 24px; border-radius: var(--ds-r-pill);
+  border: 1px solid var(--btn-bd); background: var(--btn-bg); color: var(--btn-fg);
+  font-family: var(--ds-sans); font-size: 12.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+  box-shadow: var(--btn-sh); cursor: pointer;
+  transition: transform var(--ds-t) var(--ds-ease), background-color var(--ds-t) ease,
+              border-color var(--ds-t) ease, color var(--ds-t) ease, box-shadow var(--ds-t) ease;
+}
+.ds-btn svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform var(--ds-t) var(--ds-ease); }
+.ds-btn:hover { transform: translateY(-2px); }
+.ds-btn:hover svg:last-child { transform: translateX(4px); }
+.ds-btn:active { transform: translateY(0) scale(.985); }
+.ds-btn:focus-visible { outline: none; box-shadow: var(--btn-sh), var(--ds-ring); }
+.ds-btn[disabled], .ds-btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.ds-btn--primary { --btn-bg: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); --btn-sh: 0 14px 30px -14px rgba(201, 72, 47, .75); }
+.ds-btn--primary:hover { --btn-sh: 0 20px 38px -14px rgba(201, 72, 47, .85); }
+.ds-btn--dark:hover { --btn-bg: var(--ds-navy-700); }
+.ds-btn--gold { --btn-bg: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); --btn-fg: var(--ds-ink); }
+.ds-btn--outline { --btn-bg: transparent; --btn-fg: var(--ds-ink); --btn-bd: var(--ds-line-2); }
+.ds-btn--outline:hover { --btn-bg: var(--ds-ink); --btn-fg: #fff; --btn-bd: var(--ds-ink); }
+.ds-btn--ghost { --btn-bg: rgba(255, 255, 255, .07); --btn-fg: #fff; --btn-bd: rgba(255, 255, 255, .32);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ds-btn--ghost:hover { --btn-bg: rgba(255, 255, 255, .15); --btn-bd: var(--ds-gold); }
+.ds-btn--link { --btn-bg: transparent; --btn-fg: var(--ds-ink); min-height: 0; padding: 4px 0;
+  border-radius: 0; border-bottom: 1px solid var(--ds-gold); }
+.ds-btn--link:hover { transform: none; }
+.ds-btn--sm { min-height: 38px; padding: 0 18px; font-size: 11.5px; }
+.ds-btn--lg { min-height: 56px; padding: 0 32px; font-size: 13px; }
+.ds-btn--block { width: 100%; }
+/* The sheen across a primary button on hover. */
+.ds-btn--primary::before {
+  content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -70%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .38), transparent);
+  transform: skewX(-20deg); transition: left .8s var(--ds-ease);
+}
+.ds-btn--primary:hover::before { left: 130%; }
+.ds-btn.is-busy { pointer-events: none; color: transparent; }
+.ds-btn.is-busy::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: ds-spin .8s linear infinite;
+}
+.ds-btn--outline.is-busy::after { border-color: var(--ds-line-2); border-top-color: var(--ds-ink); }
+
+/* --- 3.4 fields --------------------------------------------------------
+   A visible label, always. A ground that turns white on focus with a gold
+   rule drawn along its foot. Errors say so in words, not only in red. */
+.ds-field { display: grid; gap: 7px; min-width: 0; align-content: start; }
+.ds-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ds-ink-2); }
+.ds-label .ds-req { color: var(--ds-coral); margin-left: 2px; }
+.ds-control { position: relative; }
+.ds-input, .ds-select, .ds-textarea {
+  width: 100%; min-height: 50px; padding: 13px 16px; border-radius: var(--ds-r-md);
+  border: 1px solid var(--ds-line-2); background: var(--ds-paper); color: var(--ds-ink);
+  font: 500 15px/1.4 var(--ds-sans); outline: none; appearance: none; -webkit-appearance: none;
+  transition: border-color var(--ds-t) ease, background-color var(--ds-t) ease, box-shadow var(--ds-t) ease;
+}
+.ds-textarea { min-height: 120px; resize: vertical; }
+.ds-select {
+  padding-right: 42px; cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23151b27' stroke-width='2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+}
+.ds-input::placeholder, .ds-textarea::placeholder { color: #9a958b; }
+.ds-input:hover, .ds-select:hover, .ds-textarea:hover { border-color: rgba(21, 27, 39, .32); }
+.ds-input:focus, .ds-select:focus, .ds-textarea:focus {
+  border-color: var(--ds-gold); background: #fff; box-shadow: var(--ds-ring);
+}
+.ds-control::after {
+  content: ''; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--ds-gold), var(--ds-coral-lt));
+  transform: scaleX(0); transform-origin: 0 50%; transition: transform .5s var(--ds-ease); pointer-events: none;
+}
+.ds-control:focus-within::after { transform: scaleX(1); }
+.ds-hint { font-size: 12.5px; color: var(--ds-muted); line-height: 1.5; }
+.ds-error { display: flex; align-items: flex-start; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ds-danger); line-height: 1.45; }
+.ds-error:empty { display: none; }
+.ds-error::before { content: '!'; flex: none; display: grid; place-items: center; width: 16px; height: 16px;
+  margin-top: 1px; border-radius: 50%; background: var(--ds-danger); color: #fff; font-size: 11px; font-weight: 800; }
+.ds-field.is-invalid .ds-input, .ds-field.is-invalid .ds-select, .ds-field.is-invalid .ds-textarea,
+.ds-input[aria-invalid="true"] { border-color: var(--ds-danger); background: #fff; }
+.ds-check { display: inline-flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--ds-ink); cursor: pointer; line-height: 1.45; }
+.ds-check input { flex: none; width: 18px; height: 18px; margin-top: 1px; accent-color: var(--ds-navy-800); }
+/* Dark surfaces (the finale, glass cards). */
+.ds-on-dark .ds-label { color: var(--ds-on-dark-2); }
+.ds-on-dark .ds-input, .ds-on-dark .ds-select, .ds-on-dark .ds-textarea {
+  background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .18); color: #fff;
+}
+.ds-on-dark .ds-input::placeholder, .ds-on-dark .ds-textarea::placeholder { color: rgba(255, 255, 255, .4); }
+.ds-on-dark .ds-input:focus, .ds-on-dark .ds-textarea:focus { background: rgba(255, 255, 255, .1); }
+.ds-on-dark .ds-hint { color: var(--ds-on-dark-2); }
+.ds-on-dark .ds-error { color: #ffb4a8; }
+
+/* --- 3.5 cards ---------------------------------------------------------- */
+.ds-card {
+  position: relative; border-radius: var(--ds-r-lg); background: var(--ds-white);
+  border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-2);
+  transition: box-shadow .45s ease, transform .45s var(--ds-ease);
+}
+.ds-card--pad { padding: clamp(20px, 2.4vw, 32px); }
+.ds-card--hover:hover { transform: translateY(-4px); box-shadow: var(--ds-sh-3); }
+.ds-card--dark { background: linear-gradient(180deg, var(--ds-navy-800), var(--ds-navy-900)); color: var(--ds-on-dark); border-color: var(--ds-line-dark); }
+.ds-card--glass {
+  background: var(--ds-glass-dark); color: #fff; border-color: rgba(255, 255, 255, .14);
+  -webkit-backdrop-filter: var(--ds-blur); backdrop-filter: var(--ds-blur); box-shadow: var(--ds-sh-4);
+}
+/* The photograph card: the image is the card, the words sit on a scrim. */
+.ds-media-card {
+  position: relative; display: block; overflow: hidden; isolation: isolate;
+  border-radius: var(--ds-r-lg); background: var(--ds-navy-800); color: #fff; text-decoration: none;
+  aspect-ratio: 4 / 3; box-shadow: var(--ds-sh-2); transition: box-shadow .45s ease;
+}
+.ds-media-card:hover { box-shadow: var(--ds-sh-3); }
+.ds-media-card__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2;
+  transition: scale .9s var(--ds-ease); }
+.ds-media-card:hover .ds-media-card__img { scale: 1.04; }
+.ds-media-card::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(to top, rgba(5, 8, 15, .86), rgba(5, 8, 15, .45) 32%, rgba(5, 8, 15, 0) 62%); }
+.ds-media-card__body { position: absolute; left: 0; right: 0; bottom: 0; padding: clamp(18px, 2vw, 28px);
+  transition: translate .5s var(--ds-ease); }
+.ds-media-card:hover .ds-media-card__body { translate: 0 -4px; }
+.ds-media-card__title { display: block; font-family: var(--ds-display); font-weight: 500; font-size: clamp(22px, 2.2vw, 34px); line-height: 1.05; margin: 0; }
+.ds-media-card__meta { display: block; margin-top: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .24em; text-transform: uppercase; color: var(--ds-gold-lt); }
+.ds-media-card__go { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 11px; font-weight: 700;
+  letter-spacing: .2em; text-transform: uppercase; }
+.ds-media-card__go svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; transition: transform .45s var(--ds-ease); }
+.ds-media-card:hover .ds-media-card__go svg { transform: translateX(5px); }
+.ds-media-card:focus-visible { outline: none; box-shadow: var(--ds-sh-2), var(--ds-ring); }
+
+/* --- 3.6 badges and chips ------------------------------------------------ */
+.ds-badge {
+  --b-bg: var(--ds-sand); --b-fg: var(--ds-ink-2);
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--ds-r-pill);
+  background: var(--b-bg); color: var(--b-fg); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; line-height: 1.4;
+}
+.ds-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8; }
+.ds-badge--plain::before { display: none; }
+.ds-badge--success { --b-bg: var(--ds-success-soft); --b-fg: var(--ds-success); }
+.ds-badge--warning { --b-bg: var(--ds-warning-soft); --b-fg: var(--ds-warning); }
+.ds-badge--danger  { --b-bg: var(--ds-danger-soft);  --b-fg: var(--ds-danger); }
+.ds-badge--info    { --b-bg: var(--ds-info-soft);    --b-fg: var(--ds-info); }
+.ds-badge--gold    { --b-bg: rgba(217, 178, 111, .18); --b-fg: var(--ds-gold-ink); }
+.ds-badge--dark    { --b-bg: var(--ds-navy-800); --b-fg: var(--ds-gold-lt); }
+
+.ds-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 16px;
+  border-radius: var(--ds-r-pill); border: 1px solid var(--ds-line-2); background: var(--ds-paper);
+  color: var(--ds-ink-2); font: 600 13px var(--ds-sans); cursor: pointer; white-space: nowrap;
+  transition: background-color var(--ds-t) ease, color var(--ds-t) ease, border-color var(--ds-t) ease, transform var(--ds-t) var(--ds-ease);
+}
+.ds-chip:hover { border-color: var(--ds-ink); color: var(--ds-ink); }
+.ds-chip[aria-pressed="true"], .ds-chip.is-on { background: var(--ds-navy-800); border-color: var(--ds-navy-800); color: #fff; }
+.ds-chip[aria-pressed="true"] .ds-chip__x, .ds-chip.is-on .ds-chip__x { opacity: .7; }
+.ds-chip:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.ds-chip__count { font-size: 11px; opacity: .6; }
+
+/* --- 3.7 tabs: a pill that slides (jw-system.js places .ds-tabs__ind) ---- */
+.ds-tabs { position: relative; display: inline-flex; gap: 4px; padding: 5px; border-radius: var(--ds-r-pill);
+  background: rgba(21, 27, 39, .06); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.ds-tabs::-webkit-scrollbar { display: none; }
+.ds-tab { position: relative; z-index: 1; min-height: 38px; padding: 0 18px; border: 0; border-radius: var(--ds-r-pill);
+  background: none; color: var(--ds-ink-2); font: 600 13px var(--ds-sans); cursor: pointer; white-space: nowrap;
+  transition: color .4s var(--ds-ease); }
+.ds-tab:hover { color: var(--ds-ink); }
+.ds-tab[aria-selected="true"] { color: #fff; }
+.ds-tab:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.ds-tabs__ind { position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: var(--ds-r-pill);
+  background: linear-gradient(135deg, var(--ds-navy-700), var(--ds-navy-900)); box-shadow: 0 8px 18px -10px rgba(8, 12, 22, .9);
+  transition: transform .55s var(--ds-ease), width .55s var(--ds-ease); pointer-events: none; }
+.ds-on-dark .ds-tabs { background: rgba(255, 255, 255, .08); }
+.ds-on-dark .ds-tab { color: var(--ds-on-dark-2); }
+.ds-on-dark .ds-tab[aria-selected="true"] { color: var(--ds-ink); }
+.ds-on-dark .ds-tabs__ind { background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); }
+
+/* --- 3.8 modal, drawer, bottom sheet ------------------------------------ */
+.ds-scrim {
+  position: fixed; inset: 0; z-index: 1000; background: rgba(4, 7, 14, .6);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0; visibility: hidden; transition: opacity .4s ease, visibility 0s linear .4s;
+}
+.ds-scrim.is-open { opacity: 1; visibility: visible; transition: opacity .4s ease; }
+.ds-modal {
+  position: fixed; z-index: 1001; left: 50%; top: 50%; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  overflow: auto; border-radius: var(--ds-r-xl); background: var(--ds-paper); color: var(--ds-ink); box-shadow: var(--ds-sh-4);
+  padding: clamp(24px, 3vw, 40px);
+  opacity: 0; visibility: hidden; transform: translate(-50%, -46%) scale(.97);
+  transition: opacity .4s ease, transform .55s var(--ds-ease), visibility 0s linear .55s;
+}
+.ds-modal.is-open { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); transition: opacity .4s ease, transform .55s var(--ds-ease); }
+.ds-drawer {
+  position: fixed; z-index: 1001; top: 0; bottom: 0; right: 0; width: min(440px, 92vw); overflow: auto;
+  background: var(--ds-paper); color: var(--ds-ink); box-shadow: var(--ds-sh-4);
+  transform: translateX(104%); visibility: hidden;
+  transition: transform .6s var(--ds-ease), visibility 0s linear .6s;
+}
+.ds-drawer--left { right: auto; left: 0; transform: translateX(-104%); }
+.ds-drawer.is-open { transform: none; visibility: visible; transition: transform .6s var(--ds-ease); }
+.ds-drawer__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 22px; background: inherit; border-bottom: 1px solid var(--ds-line); }
+.ds-drawer__title { font-family: var(--ds-display); font-size: 22px; font-weight: 500; margin: 0; }
+.ds-drawer__body { padding: 22px; }
+.ds-drawer__foot { position: sticky; bottom: 0; display: flex; gap: 10px; padding: 16px 22px; background: inherit; border-top: 1px solid var(--ds-line); }
+.ds-close { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--ds-line-2);
+  background: transparent; color: var(--ds-ink); cursor: pointer; transition: background-color var(--ds-t) ease, transform var(--ds-t) var(--ds-ease); }
+.ds-close:hover { background: var(--ds-ink); color: #fff; transform: rotate(90deg); }
+.ds-close svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.ds-close:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+/* On a phone a drawer is a bottom sheet with a grab handle. */
+@media (max-width: 720px) {
+  .ds-drawer, .ds-drawer--left {
+    top: auto; left: 0; right: 0; width: 100%; max-height: 88vh; border-radius: var(--ds-r-xl) var(--ds-r-xl) 0 0;
+    transform: translateY(104%);
+  }
+  .ds-drawer::before { content: ''; display: block; width: 44px; height: 4px; margin: 10px auto 0; border-radius: 4px; background: var(--ds-line-2); }
+  .ds-drawer.is-open { transform: none; }
+  .ds-modal { top: auto; bottom: 0; left: 0; width: 100%; max-height: 92vh; border-radius: var(--ds-r-xl) var(--ds-r-xl) 0 0;
+    transform: translateY(40px); }
+  .ds-modal.is-open { transform: none; }
+}
+html.ds-locked { overflow: hidden; }
+
+/* --- 3.9 tooltip: [data-ds-tip] ----------------------------------------- */
+[data-ds-tip] { position: relative; }
+[data-ds-tip]::after {
+  content: attr(data-ds-tip); position: absolute; z-index: 50; left: 50%; bottom: calc(100% + 10px);
+  padding: 7px 11px; border-radius: 8px; background: var(--ds-navy-900); color: #fff;
+  font: 600 11.5px/1.3 var(--ds-sans); letter-spacing: .02em; white-space: nowrap; pointer-events: none;
+  opacity: 0; transform: translate(-50%, 4px); transition: opacity .25s ease, transform .35s var(--ds-ease);
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .6);
+}
+[data-ds-tip]:hover::after, [data-ds-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+
+/* --- 3.10 alerts ---------------------------------------------------------- */
+.ds-alert {
+  --a-bg: var(--ds-info-soft); --a-fg: var(--ds-info);
+  display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start;
+  padding: 14px 18px; border-radius: var(--ds-r-md); background: var(--a-bg); color: var(--ds-ink);
+  border-left: 3px solid var(--a-fg); font-size: 14px; line-height: 1.55;
+}
+.ds-alert__icon { width: 20px; height: 20px; color: var(--a-fg); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ds-alert__title { display: block; font-weight: 700; color: var(--a-fg); margin-bottom: 2px; }
+.ds-alert--success { --a-bg: var(--ds-success-soft); --a-fg: var(--ds-success); }
+.ds-alert--warning { --a-bg: var(--ds-warning-soft); --a-fg: var(--ds-warning); }
+.ds-alert--danger  { --a-bg: var(--ds-danger-soft);  --a-fg: var(--ds-danger); }
+
+/* --- 3.11 skeletons: shaped like what is coming, not a spinner ------------ */
+.ds-skel {
+  position: relative; overflow: hidden; border-radius: var(--ds-r-sm);
+  background: rgba(21, 27, 39, .07);
+}
+.ds-skel::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  animation: ds-shimmer 1.6s var(--ds-ease) infinite;
+}
+.ds-on-dark .ds-skel { background: rgba(255, 255, 255, .07); }
+.ds-on-dark .ds-skel::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .08), transparent); }
+.ds-skel--line { height: 12px; margin: 8px 0; }
+.ds-skel--line.w-40 { width: 40%; } .ds-skel--line.w-60 { width: 60%; } .ds-skel--line.w-80 { width: 80%; }
+.ds-skel--title { height: 26px; width: 55%; margin-bottom: 14px; border-radius: 6px; }
+.ds-skel--media { aspect-ratio: 4 / 3; border-radius: var(--ds-r-lg); }
+.ds-skel--pill { height: 34px; width: 110px; border-radius: var(--ds-r-pill); }
+.ds-skel-card { border-radius: var(--ds-r-lg); background: var(--ds-white); padding: 16px; box-shadow: var(--ds-sh-1); }
+.ds-skel-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 18px; align-items: center; padding: 18px;
+  border-radius: var(--ds-r-lg); background: var(--ds-white); box-shadow: var(--ds-sh-1); }
+.ds-skel-row .ds-skel--media { aspect-ratio: 1; border-radius: var(--ds-r-md); }
+@keyframes ds-shimmer { to { transform: translateX(100%); } }
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* --- 3.12 states: loading / empty / error / offline / expired / not found --
+   One composition for all of them: a small route drawing (two nodes and an
+   arc, the brand's motif) whose line style says the mood — drawing for
+   loading, dashed and broken for an error — a display-face title, one
+   sentence, and at most two actions. Rendered by DS.state(). */
+.ds-state {
+  display: grid; justify-items: center; text-align: center; gap: 14px;
+  padding: clamp(40px, 7vw, 88px) var(--ds-s5); max-width: 560px; margin: 0 auto;
+}
+.ds-state__art { width: 180px; height: 72px; margin-bottom: 6px; overflow: visible; }
+.ds-state__art .n { fill: var(--ds-gold); }
+.ds-state__art .n2 { fill: none; stroke: var(--ds-gold); stroke-width: 1.5; }
+.ds-state__art .arc { fill: none; stroke: var(--ds-gold); stroke-width: 1.8; stroke-linecap: round; }
+.ds-state__art .ghost { fill: none; stroke: var(--ds-line-2); stroke-width: 1.2; stroke-dasharray: 2 6; stroke-linecap: round; }
+.ds-state--loading .ds-state__art .arc { stroke-dasharray: 60 200; animation: ds-draw 1.8s var(--ds-ease) infinite; }
+.ds-state--error .ds-state__art .arc, .ds-state--offline .ds-state__art .arc { stroke: var(--ds-coral-lt); stroke-dasharray: 10 8; }
+.ds-state--error .ds-state__art .n, .ds-state--offline .ds-state__art .n { fill: var(--ds-coral-lt); }
+.ds-state__kicker { font-size: var(--ds-fs-2xs); font-weight: 700; letter-spacing: var(--ds-track-caps); text-transform: uppercase; color: var(--ds-gold-ink); }
+.ds-state__title { margin: 0; font-family: var(--ds-display); font-weight: 500; font-size: clamp(26px, 3.2vw, 40px);
+  line-height: 1.05; letter-spacing: -.015em; text-transform: uppercase; color: var(--ds-ink); }
+.ds-state__body { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ds-muted); max-width: 46ch; }
+.ds-state__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 10px; }
+.ds-on-dark .ds-state__title { color: #fff; }
+.ds-on-dark .ds-state__body { color: var(--ds-on-dark-2); }
+.ds-on-dark .ds-state__kicker { color: var(--ds-gold); }
+@keyframes ds-draw { 0% { stroke-dashoffset: 260; } 100% { stroke-dashoffset: 0; } }
+
+/* --- 3.13 page hero: every inner page opens the same way ----------------
+   A full-bleed photograph (or, with no photograph, the night with a route
+   drawn across it), a shade, grain, a breadcrumb, an eyebrow, a display H1
+   and a lede. `--compact` for the product pages, where the search is the
+   point and the hero should hand over quickly. */
+.ds-hero {
+  position: relative; isolation: isolate; overflow: hidden; color: #fff; background: var(--ds-night);
+  min-height: clamp(460px, 72vh, 760px); display: flex; align-items: flex-end;
+  padding: calc(var(--ds-header-h, 92px) + 40px) 0 clamp(44px, 6vw, 84px);
+}
+.ds-hero--compact { min-height: clamp(300px, 44vh, 440px); }
+.ds-hero--short { min-height: 0; padding-top: calc(var(--ds-header-h, 92px) + 56px); padding-bottom: clamp(36px, 5vw, 64px); }
+.ds-hero__media { position: absolute; inset: -6% 0; z-index: -3; will-change: transform; }
+.ds-hero__media img { width: 100%; height: 100%; object-fit: cover; max-width: none; }
+.ds-hero__shade { position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(4, 7, 14, .7) 0%, rgba(4, 7, 14, .12) 28%, rgba(4, 7, 14, .1) 50%, rgba(4, 7, 14, .78) 100%),
+    linear-gradient(90deg, rgba(4, 7, 14, .6) 0%, rgba(4, 7, 14, 0) 60%); }
+.ds-hero--plain { background:
+    radial-gradient(ellipse 60% 70% at 85% 10%, rgba(217, 178, 111, .16), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 0% 100%, rgba(201, 72, 47, .12), transparent 70%),
+    linear-gradient(180deg, var(--ds-navy-800), var(--ds-night)); }
+.ds-hero__route { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.ds-hero__route path { fill: none; stroke: rgba(217, 178, 111, .5); stroke-width: 1.4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.ds-hero__route .ghost { stroke: rgba(255, 255, 255, .1); stroke-dasharray: 2 8; }
+.ds-hero__route circle { fill: var(--ds-gold); }
+.ds-grain { position: absolute; inset: -60%; z-index: -1; pointer-events: none; opacity: .09; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: ds-grain 1.1s steps(5) infinite; }
+@keyframes ds-grain { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-6%,4%); } 40% { transform: translate(5%,-7%); }
+  60% { transform: translate(-3%,9%); } 80% { transform: translate(8%,2%); } }
+.ds-hero__inner { position: relative; width: 100%; }
+/* The photograph's attribution (CC BY / BY-SA require it), and what it shows. */
+.ds-hero__credit { position: absolute; z-index: 2; right: var(--ds-gutter); bottom: 10px; margin: 0; max-width: 70%;
+  font-size: 10px; letter-spacing: .04em; color: rgba(255, 255, 255, .62); text-align: right; pointer-events: none; }
+.ds-hero .ds-h1, .ds-hero .ds-display { color: #fff; text-shadow: 0 10px 50px rgba(0, 0, 0, .35); }
+.ds-hero .ds-lede { color: var(--ds-on-dark); margin-top: var(--ds-s5); }
+.ds-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 var(--ds-s6); padding: 0; list-style: none;
+  font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--ds-on-dark-2); }
+.ds-crumbs a { color: inherit; text-decoration: none; transition: color var(--ds-t) ease; }
+.ds-crumbs a:hover { color: #fff; }
+.ds-crumbs li + li::before { content: '/'; margin-right: 8px; opacity: .45; }
+.ds-crumbs [aria-current] { color: var(--ds-gold-lt); }
+
+/* --- 3.14 stepper: horizontal, compact, never a vertical timeline -------- */
+.ds-stepper { display: flex; align-items: center; gap: 0; margin: 0; padding: 0; list-style: none; counter-reset: ds-step; overflow-x: auto; scrollbar-width: none; }
+.ds-stepper::-webkit-scrollbar { display: none; }
+.ds-step { display: flex; align-items: center; gap: 10px; flex: none; counter-increment: ds-step;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ds-muted); }
+.ds-step::before { content: counter(ds-step); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--ds-line-2); font-size: 12px; letter-spacing: 0; transition: background-color .4s ease, color .4s ease, border-color .4s ease; }
+.ds-step + .ds-step { margin-left: 14px; }
+.ds-step + .ds-step::after { order: -1; content: ''; width: clamp(18px, 4vw, 56px); height: 1px; background: var(--ds-line-2); margin-right: 4px; }
+.ds-step.is-done { color: var(--ds-ink-2); }
+.ds-step.is-done::before { content: '\2713'; background: var(--ds-gold); border-color: var(--ds-gold); color: var(--ds-ink); }
+.ds-step.is-done + .ds-step::after { background: var(--ds-gold); }
+.ds-step[aria-current="step"] { color: var(--ds-ink); }
+.ds-step[aria-current="step"]::before { background: var(--ds-navy-800); border-color: var(--ds-navy-800); color: #fff; box-shadow: 0 0 0 5px rgba(217, 178, 111, .25); }
+
+/* --- 3.15 price ----------------------------------------------------------- */
+.ds-price { display: inline-grid; justify-items: end; line-height: 1.1; }
+.ds-price__from { font-size: 10.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+.ds-price__amt { font-family: var(--ds-display); font-weight: 600; font-size: clamp(24px, 2.2vw, 32px); color: var(--ds-ink); letter-spacing: -.01em; }
+.ds-price__per { font-size: 12px; color: var(--ds-muted); }
+
+/* --- 3.16 reveal + image develop (driven by jw-system.js) -----------------
+   FAIL-OPEN: the hidden starting states apply only under html.ds-motion,
+   which jw-system.js sets after it has created the observer that will
+   reveal them. No script, no hidden content. */
+html.ds-motion [data-ds-reveal] { opacity: 0; transform: translateY(46px); }
+html.ds-motion [data-ds-reveal="fade"] { transform: none; }
+html.ds-motion [data-ds-reveal="scale"] { transform: translateY(60px) scale(.95); }
+html.ds-motion [data-ds-reveal].is-in {
+  opacity: 1; transform: none;
+  transition: opacity .9s var(--ds-ease) var(--ds-delay, 0s), transform 1.1s var(--ds-ease) var(--ds-delay, 0s);
+}
+html.ds-motion .ds-dev { opacity: .2; filter: blur(18px); transform: scale(1.08); }
+html.ds-motion .ds-dev.is-dev {
+  opacity: 1; filter: none; transform: none;
+  transition: opacity .9s var(--ds-ease), filter .9s var(--ds-ease), transform 1.1s var(--ds-ease);
+}
+/* A developed image hands `transform` back so hover scale and parallax own it. */
+html.ds-motion .ds-dev.is-settled { transition: none; }
+/* The subject of a page (a place's hero) develops one beat slower — the beat
+   jw-motion.js's `jw-dev-hero` had, now on the one lifecycle. */
+html.ds-motion .ds-dev--hero.is-dev:not(.is-settled) { transition-duration: 1.4s, 1.4s, 1.8s; }
+/* A phone: less blur and almost no scale — cheaper to paint, and a small
+   screen does not need the drama (jw-motion.css's phone tuning, carried). */
+@media (max-width: 720px) {
+  html.ds-motion .ds-dev:not(.is-dev) { filter: blur(10px); transform: scale(1.03); }
+}
+
+/* --- 3.17 page transitions (cross-document View Transitions) -------------
+   Chrome and Edge animate between same-origin pages with no script at all:
+   the old page darkens away, the new one develops in. ~450ms. Browsers
+   without support simply navigate. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: ds-vt-out .28s var(--ds-ease-in) both; }
+::view-transition-new(root) { animation: ds-vt-in .45s var(--ds-ease) both; }
+@keyframes ds-vt-out { to { opacity: 0; filter: brightness(.35); } }
+@keyframes ds-vt-in { from { opacity: 0; filter: blur(6px) brightness(.6); transform: scale(1.015); } }
+
+/* --- 3.18 accessibility helpers ------------------------------------------ */
+.ds-sr { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+:focus-visible { outline-color: var(--ds-gold); }
+
+/* ==========================================================================
+   REDUCED MOTION — the composition, still and complete
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  html.ds-motion [data-ds-reveal], html.ds-motion .ds-dev { opacity: 1; transform: none; filter: none; }
+  .ds-grain, .ds-skel::after, .ds-state--loading .ds-state__art .arc { animation: none; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  .ds-btn:hover, .ds-card--hover:hover { transform: none; }
+}
+
+/* ==========================================================================
+   4. CHROME — the one header (jw-header.js) and its mobile drawer
+   --------------------------------------------------------------------------
+   Selectors carry .jw-hdr twice or pair it with the older hooks because
+   main.css, home-ref.css and service-page.css all style header, nav.wrap
+   and .navlinks for the three headers this one replaces; these rules must
+   win without !important.
+   ========================================================================== */
+:root { --ds-header-h: 88px; }
+header.jw-hdr, .jw-hdr.jw-hdr {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  color: #fff; background: transparent; border-bottom: 1px solid transparent;
+  padding: 0; min-height: 0; box-shadow: none;
+  transition: background-color .55s var(--ds-ease), border-color .55s ease, box-shadow .55s ease,
+              -webkit-backdrop-filter .55s ease, backdrop-filter .55s ease;
+}
+/* Over a photograph: a soft scrim so white nav reads against bright sky. */
+.jw-hdr.jw-hdr::before {
+  content: ''; position: absolute; inset: 0 0 -44px; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 7, 14, .62), rgba(4, 7, 14, 0));
+  transition: opacity .55s ease;
+}
+.jw-hdr.jw-hdr--solid { background: var(--ds-navy-900); border-bottom-color: rgba(255, 255, 255, .06); }
+.jw-hdr.jw-hdr--solid::before { opacity: 0; }
+.jw-hdr.jw-hdr.is-compact {
+  background: rgba(8, 12, 22, .76); border-bottom-color: rgba(255, 255, 255, .08);
+  -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 14px 40px -24px rgba(0, 0, 0, .8);
+}
+.jw-hdr.jw-hdr.is-compact::before { opacity: 0; }
+/* The navy bar is the height the older solid bar was (76px), because the
+   product and account pages under it reserve exactly that much room. */
+.jw-hdr.jw-hdr--solid .jw-hdr__bar { height: 76px; }
+.jw-hdr.jw-hdr--solid .jw-hdr__mark { height: 54px; }
+
+.jw-hdr .jw-hdr__bar {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px;
+  max-width: calc(var(--ds-max) + 2 * var(--ds-gutter)); margin: 0 auto; padding: 0 var(--ds-gutter);
+  height: var(--ds-header-h); transition: height .55s var(--ds-ease);
+}
+.jw-hdr.is-compact .jw-hdr__bar { height: 64px; }
+.jw-hdr .jw-hdr__logo { justify-self: start; display: flex; align-items: center; margin: 0; }
+.jw-hdr .jw-hdr__mark { height: 62px; width: auto; max-width: none; object-fit: contain; transition: height .55s var(--ds-ease); }
+.jw-hdr.is-compact .jw-hdr__mark { height: 44px; }
+
+.jw-hdr .jw-hdr__nav.navlinks {
+  position: relative; display: flex; align-items: center; gap: clamp(6px, 1.4vw, 22px);
+  justify-self: center; margin: 0; overflow: visible; font-size: inherit;
+}
+.jw-hdr .jw-hdr__nav.navlinks a {
+  position: relative; display: block; padding: 10px 4px; margin: 0; border-radius: 0; background: none;
+  color: var(--ds-on-dark); font: 600 12px var(--ds-sans); letter-spacing: .2em; text-transform: uppercase;
+  white-space: nowrap; transition: color var(--ds-t) ease;
+}
+.jw-hdr .jw-hdr__nav.navlinks a::before, .jw-hdr .jw-hdr__nav.navlinks a::after { display: none; }
+.jw-hdr .jw-hdr__nav.navlinks a:hover, .jw-hdr .jw-hdr__nav.navlinks a[aria-current="page"] { color: #fff; background: none; }
+.jw-hdr .jw-hdr__nav.navlinks a:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 6px; }
+.jw-hdr .jw-hdr__ind {
+  position: absolute; left: 0; bottom: 2px; height: 2px; width: 0; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--ds-gold-lt), var(--ds-gold)); opacity: 0;
+  transition: transform .5s var(--ds-ease), width .5s var(--ds-ease), opacity .3s ease;
+}
+.jw-hdr .jw-hdr__ind.is-on { opacity: 1; }
+
+.jw-hdr .jw-hdr__actions { justify-self: end; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.jw-hdr .jw-hdr__icon {
+  display: grid; place-items: center; width: 40px; height: 40px; flex: none; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .04); color: #fff; cursor: pointer;
+  transition: background-color var(--ds-t) ease, border-color var(--ds-t) ease, transform var(--ds-t) var(--ds-ease);
+}
+.jw-hdr .jw-hdr__icon:hover { border-color: var(--ds-gold); background: rgba(255, 255, 255, .1); transform: translateY(-2px); }
+.jw-hdr .jw-hdr__icon:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.jw-hdr .jw-hdr__svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.jw-hdr [data-ds-tip]::after { bottom: auto; top: calc(100% + 10px); }
+/* My trips and Notifications are account controls: shown once signed in
+   (profile-menu.js sets html.jp-signed-in), exactly as the homepage had it. */
+.jw-hdr .jw-hdr__acct { display: none; }
+html.jp-signed-in .jw-hdr .jw-hdr__acct { display: grid; }
+.jw-hdr .jw-hdr__partner {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: var(--ds-r-pill);
+  border: 1px solid rgba(255, 255, 255, .2); color: var(--ds-on-dark); text-decoration: none;
+  font: 600 11px var(--ds-sans); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+  transition: border-color var(--ds-t) ease, background-color var(--ds-t) ease;
+}
+.jw-hdr .jw-hdr__partner:hover { border-color: var(--ds-gold); background: rgba(255, 255, 255, .08); }
+.jw-hdr .jw-hdr__partner .jw-hdr__svg { width: 16px; height: 16px; }
+/* The account chip (profile-menu.js) and the signed-out link, in the bar's voice. */
+.jw-hdr .pm-slot { display: flex; align-items: center; }
+header.jw-hdr.jw-hdr .pm-slot .pm-login, .jw-hdr .jw-hdr__login {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: var(--ds-r-pill);
+  background: #fff; color: var(--ds-ink); border: 0; font: 700 11.5px var(--ds-sans); letter-spacing: .12em;
+  text-transform: uppercase; text-decoration: none; white-space: nowrap;
+  transition: background-color var(--ds-t) ease, transform var(--ds-t) var(--ds-ease);
+}
+header.jw-hdr.jw-hdr .pm-slot .pm-login:hover, .jw-hdr .jw-hdr__login:hover { background: var(--ds-gold-lt); transform: translateY(-2px); }
+header.jw-hdr.jw-hdr .pm-slot .pm-login .jpi, header.jw-hdr.jw-hdr .pm-slot .pm-login svg { color: var(--ds-ink); }
+
+.jw-hdr .jw-hdr__burger {
+  display: none; position: relative; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .24); background: rgba(255, 255, 255, .04); cursor: pointer;
+}
+.jw-hdr .jw-hdr__burger span {
+  position: absolute; left: 13px; right: 13px; height: 1.5px; border-radius: 2px; background: #fff;
+  transition: transform .45s var(--ds-ease);
+}
+.jw-hdr .jw-hdr__burger span:first-child { top: 17px; }
+.jw-hdr .jw-hdr__burger span:last-child { top: 25px; right: 18px; }
+.jw-hdr .jw-hdr__burger:hover span:last-child { transform: translateX(5px); }
+.jw-hdr .jw-hdr__burger:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+
+/* Content pages had an in-flow header; the fixed bar needs its room back. */
+html.jw-hdr-inflow body { padding-top: var(--ds-header-h); }
+
+@media (max-width: 1360px) {
+  .jw-hdr .jw-hdr__partner span { display: none; }
+  .jw-hdr .jw-hdr__partner { width: 40px; padding: 0; justify-content: center; }
+}
+@media (max-width: 1100px) {
+  .jw-hdr .jw-hdr__actions { grid-column: 3; }
+  .jw-hdr .jw-hdr__nav.navlinks { display: none; }
+  .jw-hdr .jw-hdr__burger { display: block; }
+}
+@media (max-width: 640px) {
+  :root { --ds-header-h: 70px; }
+  .jw-hdr .jw-hdr__mark { height: 48px; }
+  .jw-hdr.is-compact .jw-hdr__bar { height: 60px; }
+  .jw-hdr.is-compact .jw-hdr__mark { height: 40px; }
+  .jw-hdr .jw-hdr__partner, .jw-hdr .jw-hdr__acct, html.jp-signed-in .jw-hdr .jw-hdr__acct { display: none; }
+  .jw-hdr .jw-hdr__actions { gap: 6px; }
+  header.jw-hdr.jw-hdr .pm-slot .pm-login, .jw-hdr .jw-hdr__login { padding: 0 14px; font-size: 10.5px; }
+}
+
+/* --- the drawer: the whole screen, the night, five big words ------------ */
+.jw-drawer {
+  position: fixed; inset: 0; z-index: 1200; display: flex; flex-direction: column; overflow-y: auto;
+  padding: 0 var(--ds-gutter) 28px; color: #fff;
+  background:
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(217, 178, 111, .16), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(201, 72, 47, .14), transparent 70%),
+    var(--ds-night);
+  clip-path: circle(0% at calc(100% - 44px) 44px);
+  transition: clip-path .7s var(--ds-ease);
+}
+.jw-drawer.is-open { clip-path: circle(150% at calc(100% - 44px) 44px); }
+.jw-drawer[hidden] { display: none; }
+.jw-drawer__top { display: flex; align-items: center; justify-content: space-between; height: var(--ds-header-h); flex: none; }
+.jw-drawer .jw-hdr__mark { height: 48px; width: auto; }
+.jw-drawer__close {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; padding: 0;
+  border: 1px solid rgba(255, 255, 255, .24); background: transparent; color: #fff; cursor: pointer;
+  transition: transform .4s var(--ds-ease), border-color .3s ease;
+}
+.jw-drawer__close:hover { transform: rotate(90deg); border-color: var(--ds-gold); }
+.jw-drawer__close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.jw-drawer__nav { display: grid; margin: clamp(18px, 5vh, 48px) 0 28px; border-top: 1px solid rgba(255, 255, 255, .1); }
+.jw-drawer__big {
+  display: flex; align-items: baseline; gap: 18px; padding: clamp(14px, 2.4vh, 22px) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .1); color: #fff; text-decoration: none;
+  font-family: var(--ds-display); font-weight: 500; font-size: clamp(30px, 8.5vw, 52px); line-height: 1; letter-spacing: -.02em;
+  opacity: 0; transform: translateY(26px);
+  transition: opacity .5s ease, transform .7s var(--ds-ease), color .3s ease;
+}
+.jw-drawer__big i { font: italic 500 14px var(--ds-display); color: var(--ds-gold); min-width: 26px; }
+.jw-drawer__big span { flex: 1; }
+.jw-drawer__arrow { width: 22px; height: 22px; fill: none; stroke: var(--ds-gold); stroke-width: 1.6; align-self: center;
+  transition: transform .45s var(--ds-ease); }
+.jw-drawer__big:hover .jw-drawer__arrow, .jw-drawer__big:focus-visible .jw-drawer__arrow { transform: translateX(6px); }
+.jw-drawer__big[aria-current="page"] span { color: var(--ds-gold-lt); font-style: italic; }
+.jw-drawer.is-open .jw-drawer__big { opacity: 1; transform: none; }
+.jw-drawer.is-open .jw-drawer__big:nth-child(1) { transition-delay: .12s; }
+.jw-drawer.is-open .jw-drawer__big:nth-child(2) { transition-delay: .17s; }
+.jw-drawer.is-open .jw-drawer__big:nth-child(3) { transition-delay: .22s; }
+.jw-drawer.is-open .jw-drawer__big:nth-child(4) { transition-delay: .27s; }
+.jw-drawer.is-open .jw-drawer__big:nth-child(5) { transition-delay: .32s; }
+.jw-drawer__more { display: flex; flex-wrap: wrap; gap: 10px; opacity: 0; transition: opacity .6s ease .4s; }
+.jw-drawer.is-open .jw-drawer__more { opacity: 1; }
+.jw-drawer__more a {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--ds-r-pill);
+  border: 1px solid rgba(255, 255, 255, .2); color: var(--ds-on-dark); text-decoration: none;
+  font: 600 12px var(--ds-sans); letter-spacing: .08em;
+}
+.jw-drawer__more a:hover { border-color: var(--ds-gold); color: #fff; }
+.jw-drawer__foot { margin-top: auto; padding-top: 32px; display: grid; gap: 6px; font-size: 13px; }
+.jw-drawer__foot a { color: var(--ds-on-dark-2); text-decoration: none; }
+.jw-drawer a:focus-visible, .jw-drawer button:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 8px; }
+@media (min-width: 720px) {
+  .jw-drawer { padding-left: max(var(--ds-gutter), 6vw); padding-right: max(var(--ds-gutter), 6vw); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jw-drawer, .jw-drawer.is-open { clip-path: none; transition: none; }
+  .jw-drawer__big, .jw-drawer__more { opacity: 1; transform: none; transition: none; }
+}
+
+/* During an in-page booking, booking-ref.css and main.css paint the bar white
+   with !important. The system's bar stays the brand navy instead — every
+   control in it is drawn for a dark ground. Equal weight, later file. */
+body.bk-inpage header#siteHeader.jw-hdr {
+  background-color: var(--ds-navy-900) !important; color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .06) !important;
+}
+body.bk-inpage header#siteHeader.jw-hdr .jw-hdr__nav.navlinks a { color: var(--ds-on-dark); }
+body.bk-inpage header#siteHeader.jw-hdr .jw-hdr__nav.navlinks a:hover { color: #fff; }
+/* flights-ref.css colours the login link by id (for its old dark bar);
+   the system's pill is white, so its ink has to match that weight. */
+body #siteHeader.jw-hdr.jw-hdr .pm-slot .pm-login { color: var(--ds-ink); }
+
+/* ==========================================================================
+   5. THE EDITORIAL GRID — .ds-edgrid
+   --------------------------------------------------------------------------
+   The discovery pages' one layout (destinations, famous places, packages,
+   cruises): a large card and two small ones stacked beside it, then the
+   same mirrored, for as many cards as the data holds. Desktop is a 12-column
+   grid with explicit columns and `dense` flow; a tablet is two columns with
+   every third card full width; a phone is a tall feature then a pair of
+   portrait cards, repeating. The tail rules cover counts that are not a
+   multiple of three. Children are .ds-media-card.
+   ========================================================================== */
+.ds-edgrid { display: grid; gap: clamp(12px, 1.6vw, 24px); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ds-edgrid > .ds-media-card { aspect-ratio: 4 / 3; }
+.ds-edgrid > .ds-media-card:nth-child(3n+1) { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+.ds-edgrid > .ds-media-card:nth-child(3n+1) .ds-media-card__title { font-size: clamp(30px, 3.6vw, 56px); }
+@media (min-width: 1025px) {
+  .ds-edgrid { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: clamp(200px, 18vw, 290px); grid-auto-flow: row dense; }
+  .ds-edgrid > .ds-media-card { aspect-ratio: auto; grid-column: span 5; }
+  .ds-edgrid > .ds-media-card:nth-child(6n+1) { grid-column: 1 / span 7; grid-row: span 2; aspect-ratio: auto; }
+  .ds-edgrid > .ds-media-card:nth-child(6n+2), .ds-edgrid > .ds-media-card:nth-child(6n+3) { grid-column: 8 / span 5; }
+  .ds-edgrid > .ds-media-card:nth-child(6n+4), .ds-edgrid > .ds-media-card:nth-child(6n+5) { grid-column: 1 / span 5; }
+  .ds-edgrid > .ds-media-card:nth-child(6n) { grid-column: 6 / span 7; grid-row: span 2; }
+  .ds-edgrid > .ds-media-card:nth-child(6n+4) .ds-media-card__title { font-size: clamp(22px, 2.2vw, 34px); }
+  .ds-edgrid > .ds-media-card:nth-child(6n) .ds-media-card__title { font-size: clamp(30px, 3.6vw, 56px); }
+  .ds-edgrid > .ds-media-card:nth-child(3n+1):last-child { grid-column: 1 / -1; grid-row: span 2; }
+  .ds-edgrid > .ds-media-card:nth-child(3n+1):nth-last-child(2) { grid-column: 1 / span 6; grid-row: span 2; }
+  .ds-edgrid > .ds-media-card:nth-child(3n+1):nth-last-child(2) + .ds-media-card { grid-column: 7 / span 6; grid-row: span 2; }
+}
+@media (max-width: 640px) {
+  .ds-edgrid > .ds-media-card { aspect-ratio: 3 / 4; border-radius: var(--ds-r-md); }
+  .ds-edgrid > .ds-media-card:nth-child(3n+1) { aspect-ratio: 4 / 5; }
+  .ds-edgrid > .ds-media-card:nth-child(3n+1):nth-last-child(2),
+  .ds-edgrid > .ds-media-card:nth-child(3n+1):nth-last-child(2) + .ds-media-card { grid-column: auto; aspect-ratio: 3 / 4; }
+  .ds-edgrid > .ds-media-card:not(:nth-child(3n+1)) .ds-media-card__body { padding: 14px; }
+  .ds-edgrid > .ds-media-card:not(:nth-child(3n+1)) .ds-media-card__title { font-size: 19px; }
+  .ds-edgrid > .ds-media-card:not(:nth-child(3n+1)) .ds-media-card__meta { font-size: 9px; letter-spacing: .16em; }
+  .ds-edgrid > .ds-media-card:not(:nth-child(3n+1)) .ds-media-card__go,
+  .ds-edgrid > .ds-media-card:not(:nth-child(3n+1)) .ds-media-card__teaser { display: none; }
+}
+/* Media-card furniture the discovery pages use. */
+.ds-media-card__num {
+  position: absolute; top: clamp(14px, 1.8vw, 24px); right: clamp(16px, 2vw, 26px); z-index: 1;
+  display: flex; align-items: center; gap: 10px;
+  font: italic 500 16px var(--ds-display); color: rgba(255, 255, 255, .85);
+}
+.ds-media-card__num::before { content: ''; width: 24px; height: 1px; background: rgba(255, 255, 255, .5); }
+.ds-media-card__teaser {
+  display: block; margin-top: 10px; max-width: 46ch; font-size: 13px; line-height: 1.55; color: rgba(255, 255, 255, .78);
+  min-height: 1.55em;
+}
+.ds-media-card__teaser:empty { min-height: 0; margin: 0; }
+.ds-media-card--noimg { background:
+  radial-gradient(ellipse 70% 60% at 80% 10%, rgba(217, 178, 111, .22), transparent 70%),
+  linear-gradient(160deg, var(--ds-navy-700), var(--ds-night)); }
+
+/* ==========================================================================
+   6. THE SERVICE-PAGE HERO (.sp-hero) — about, contact, support, FAQs, the
+   legal pages, cruises, visa, activities, my bookings. Their markup is
+   service-page.css's; the system gives it the night, a drawn route, and a
+   display-face title that is actually visible (the h1 inherited main.css's
+   navy heading colour on a navy band).
+   ========================================================================== */
+.sp-hero {
+  position: relative; overflow: hidden; isolation: isolate;
+  padding: clamp(72px, 10vw, 128px) 0 clamp(48px, 6vw, 80px);
+  background:
+    radial-gradient(ellipse 60% 90% at 88% 0%, rgba(217, 178, 111, .18), transparent 70%),
+    radial-gradient(ellipse 50% 80% at 0% 100%, rgba(201, 72, 47, .14), transparent 70%),
+    linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
+}
+html.jw-hdr-inflow .sp-hero { padding-top: clamp(56px, 8vw, 104px); }
+.sp-hero::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .55;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 400' preserveAspectRatio='none'><path d='M-20 360 C 300 330, 420 110, 760 150 S 1180 380, 1460 70' fill='none' stroke='%23d9b26f' stroke-opacity='.45' stroke-width='1.4'/><path d='M-20 380 C 300 350, 420 130, 760 170 S 1180 400, 1460 90' fill='none' stroke='%23ffffff' stroke-opacity='.08' stroke-width='1' stroke-dasharray='2 8'/></svg>") center / 100% 100% no-repeat;
+}
+.sp-hero::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(217, 178, 111, .6), transparent);
+}
+.sp-hero h1 {
+  color: #fff; font-family: var(--ds-display); font-weight: 500;
+  font-size: clamp(38px, 6vw, 84px); line-height: .96; letter-spacing: -.02em; margin: 0 0 16px;
+}
+.sp-hero p { color: var(--ds-on-dark-2); font-size: clamp(15px, 1.2vw, 17px); }
+.sp-hero .sp-crumbs, .sp-hero nav[aria-label="Breadcrumb"] { color: var(--ds-on-dark-2); }
+.sp-hero .sp-crumbs a, .sp-hero nav[aria-label="Breadcrumb"] a { color: var(--ds-on-dark-2); }
+.sp-hero .sp-wrap > *, .sp-hero > * > * { animation: ds-rise .9s var(--ds-ease) both; }
+.sp-hero .sp-wrap > *:nth-child(2), .sp-hero > * > *:nth-child(2) { animation-delay: .08s; }
+.sp-hero .sp-wrap > *:nth-child(3), .sp-hero > * > *:nth-child(3) { animation-delay: .16s; }
+@keyframes ds-rise { from { opacity: 0; transform: translateY(28px); } }
+@media (prefers-reduced-motion: reduce) { .sp-hero .sp-wrap > *, .sp-hero > * > * { animation: none; } }
+
+/* ==========================================================================
+   THE ACCOUNT SUITE — account-center.js's modal (#accountModalOverlay),
+   everywhere it opens. Profile, My Trips, Wishlist, Payments, Notifications,
+   Support, Reviews, Settings.
+   A night sidebar holds who you are and where you are; an ivory pane holds
+   the panel, titled in the display face, with the system's fields, rows and
+   buttons. Only presentation: every id, tab and form account-center.js
+   binds is the same element.
+   ========================================================================== */
+#accountModalOverlay.modal-overlay { background: rgba(4, 7, 14, .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+#accountModalOverlay .modal-card {
+  display: grid; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+  width: min(1080px, 100%); max-width: 1080px; height: min(760px, 92vh); max-height: 92vh; padding: 0; overflow: hidden;
+  border-radius: var(--ds-r-xl); background: var(--ds-ivory); box-shadow: var(--ds-sh-4); border: 1px solid rgba(255, 255, 255, .08);
+}
+#accountModalOverlay.open .modal-card { animation: acct-in .6s var(--ds-ease) both; }
+@keyframes acct-in { from { opacity: 0; transform: translateY(24px) scale(.98); } }
+/* The sidebar is the header and the tab list together, on the night. */
+#accountModalOverlay .acct-header {
+  grid-column: 1; grid-row: 1; display: grid; justify-items: start; gap: 12px; padding: 28px 24px 18px; border: 0;
+  background: radial-gradient(ellipse 120% 80% at 0% 0%, rgba(217, 178, 111, .18), transparent 70%), var(--ds-navy-900); color: #fff;
+}
+#accountModalOverlay .acct-header-avatar { width: 60px; height: 60px; font-size: 20px; color: var(--ds-ink);
+  background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); box-shadow: 0 0 0 4px rgba(217, 178, 111, .2); }
+#accountModalOverlay .acct-header-name { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: #fff; line-height: 1.15; }
+#accountModalOverlay .acct-header-email { font-size: 12px; color: var(--ds-on-dark-2); word-break: break-all; }
+#accountModalOverlay .acct-body { display: contents; }
+#accountModalOverlay .acct-tabs {
+  grid-column: 1; grid-row: 2; display: block; width: auto; padding: 8px 14px 20px; overflow-y: auto; border: 0;
+  background: var(--ds-navy-900); border-top: 1px solid var(--ds-line-dark);
+}
+#accountModalOverlay .acct-tab {
+  position: relative; display: flex; align-items: center; gap: 12px; margin: 2px 0; padding: 12px 14px; border-radius: var(--ds-r-md);
+  font: 600 13px var(--ds-sans); letter-spacing: .02em; color: var(--ds-on-dark-2); cursor: pointer; white-space: nowrap;
+  transition: background-color .3s ease, color .3s ease, padding-left .35s var(--ds-ease);
+}
+#accountModalOverlay .acct-tab:hover { background: rgba(255, 255, 255, .06); color: #fff; padding-left: 18px; }
+#accountModalOverlay .acct-tab.active { background: rgba(217, 178, 111, .14); color: var(--ds-gold-lt); }
+#accountModalOverlay .acct-tab.active::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--ds-gold); }
+#accountModalOverlay .acct-tab .dd-icon { width: 18px; height: 18px; color: inherit; }
+#accountModalOverlay .acct-panels { grid-column: 2; grid-row: 1 / span 2; padding: clamp(24px, 3vw, 40px); overflow-y: auto; background: var(--ds-ivory); }
+#accountModalOverlay .acct-panel.active { animation: acct-panel .45s var(--ds-ease) both; }
+@keyframes acct-panel { from { opacity: 0; transform: translateY(-8px); } }
+#accountModalOverlay .acct-panel h2 { margin: 0 0 22px; font-family: var(--ds-display); font-weight: 500; font-size: clamp(28px, 2.8vw, 38px); letter-spacing: -.015em; color: var(--ds-ink); }
+#accountModalOverlay .modal-close { z-index: 5; top: 18px; right: 18px; width: 40px; height: 40px; border: 1px solid var(--ds-line-2); background: var(--ds-white); color: var(--ds-ink);
+  transition: transform .35s var(--ds-ease), background-color .3s ease; }
+#accountModalOverlay .modal-close:hover { transform: rotate(90deg); background: var(--ds-ink); color: #fff; }
+#accountModalOverlay .modal-close:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+
+/* Fields, the system's. */
+#accountModalOverlay .acct-form-grid { gap: 0 18px; max-width: 680px; }
+#accountModalOverlay .acct-form-field label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; color: var(--ds-ink-2); }
+#accountModalOverlay .acct-form-field input, #accountModalOverlay .acct-form-field select, #accountModalOverlay .acct-form-field textarea {
+  min-height: 48px; border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2); background-color: var(--ds-paper); color: var(--ds-ink);
+  font: 500 15px var(--ds-sans); transition: border-color .3s ease, background-color .3s ease, box-shadow .3s ease;
+}
+#accountModalOverlay .acct-form-field :is(input, select, textarea):focus { border-color: var(--ds-gold); background-color: #fff; box-shadow: var(--ds-ring); }
+#accountModalOverlay .acct-form-field input[readonly], #accountModalOverlay .acct-form-field input:disabled { background-color: var(--ds-sand); color: var(--ds-muted); }
+#accountModalOverlay .btn { min-height: 46px; padding: 0 24px; border-radius: var(--ds-r-pill); border: 0; font: 700 11.5px var(--ds-sans); letter-spacing: .14em; text-transform: uppercase;
+  transition: transform .35s var(--ds-ease), box-shadow .3s ease, background-color .3s ease; cursor: pointer; }
+#accountModalOverlay .btn:hover { transform: translateY(-2px); }
+#accountModalOverlay .btn-coral { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .85); }
+#accountModalOverlay .btn-navy { background: var(--ds-navy-800); color: #fff; }
+#accountModalOverlay .btn-danger { background: transparent; color: var(--ds-danger); border: 1px solid rgba(163, 48, 42, .35); }
+#accountModalOverlay .btn-sm { min-height: 38px; padding: 0 16px; font-size: 10.5px; }
+#accountModalOverlay .btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+#accountModalOverlay .acct-msg { font-size: 13px; color: var(--ds-success); }
+#accountModalOverlay .acct-msg.error { color: var(--ds-danger); }
+
+/* Rows (trips, wishlist, payments, reviews): cards in the system. */
+#accountModalOverlay .acct-row { gap: 16px; padding: 16px 18px; border-radius: var(--ds-r-lg); background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07);
+  box-shadow: var(--ds-sh-1); transition: translate .45s var(--ds-ease), box-shadow .45s ease, border-color .35s ease; }
+#accountModalOverlay .acct-row:hover { translate: 0 -2px; box-shadow: var(--ds-sh-2); border-color: rgba(217, 178, 111, .5); }
+#accountModalOverlay .acct-row .ar-icon { border-radius: var(--ds-r-md); background: var(--ds-navy-800); color: var(--ds-gold); }
+#accountModalOverlay .acct-row .ar-title { font-family: var(--ds-display); font-weight: 500; font-size: 18px; text-transform: none; color: var(--ds-ink); }
+#accountModalOverlay .acct-row .ar-sub { color: var(--ds-muted); }
+#accountModalOverlay .acct-row .ar-amount { font-family: var(--ds-display); font-weight: 600; font-size: 20px; color: var(--ds-ink); }
+#accountModalOverlay .acct-table-wrap { border-radius: var(--ds-r-lg); background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
+#accountModalOverlay .acct-table th { padding: 14px 16px; font-size: 9.5px; font-weight: 700; letter-spacing: .18em; color: var(--ds-muted); border-bottom: 1px solid var(--ds-line); }
+#accountModalOverlay .acct-table td { padding: 14px 16px; border-bottom: 1px solid var(--ds-line); color: var(--ds-ink); }
+#accountModalOverlay .acct-notif-item { padding: 16px 18px; border-radius: var(--ds-r-md); background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); }
+#accountModalOverlay .acct-notif-item.unread { border-color: rgba(217, 178, 111, .5); background: #fffdf8; box-shadow: inset 3px 0 0 var(--ds-gold); }
+#accountModalOverlay .acct-notif-item .nt { color: var(--ds-ink); }
+#accountModalOverlay .acct-notif-clearbar { background: linear-gradient(rgba(245, 240, 232, 0), var(--ds-ivory) 45%); }
+#accountModalOverlay .acct-empty { padding: 40px 20px; border-radius: var(--ds-r-lg); border: 1px dashed var(--ds-line-2); color: var(--ds-muted); font-size: 14px; }
+#accountModalOverlay .acct-star-input span.active { color: var(--ds-gold); }
+
+/* Phones: the sidebar folds to a scrolling strip above the pane. */
+@media (max-width: 760px) {
+  #accountModalOverlay .modal-card { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); height: 94vh; border-radius: var(--ds-r-lg); }
+  #accountModalOverlay .acct-header { grid-template-columns: auto 1fr; align-items: center; padding: 18px 18px 12px; }
+  #accountModalOverlay .acct-header-avatar { width: 46px; height: 46px; font-size: 16px; }
+  #accountModalOverlay .acct-tabs { grid-row: 2; display: flex; gap: 6px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; }
+  #accountModalOverlay .acct-tabs::-webkit-scrollbar { display: none; }
+  #accountModalOverlay .acct-tab { margin: 0; padding: 10px 14px; }
+  #accountModalOverlay .acct-tab:hover { padding-left: 14px; }
+  #accountModalOverlay .acct-tab.active::before { left: 12px; right: 12px; top: auto; bottom: 4px; width: auto; height: 2px; }
+  #accountModalOverlay .acct-panels { grid-column: 1; grid-row: 3; padding: 20px 16px; }
+  #accountModalOverlay .acct-form-grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #accountModalOverlay.open .modal-card, #accountModalOverlay .acct-panel.active { animation: none; }
+}
+
+/* ==========================================================================
+   THE SIGN-IN DIALOG (index.html #authModal .auth-split) — its left panel in
+   the design system. The form on the right keeps every id and handler; it
+   takes the system's type and its one primary action.
+   ========================================================================== */
+.auth-split .jw-auth-visual {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
+  padding: clamp(28px, 3vw, 44px); background: var(--ds-night); background-image: none; color: #fff;
+}
+.jw-auth-photo { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; object-fit: cover; object-position: 55% 45%;
+  filter: brightness(1.18) saturate(1.1); }
+.jw-auth-visual::before { content: ''; position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, .86) 0%, rgba(6, 10, 18, .7) 30%, rgba(6, 10, 18, .18) 50%, rgba(6, 10, 18, .12) 66%, rgba(6, 10, 18, .92) 100%),
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(217, 178, 111, .18), transparent 70%); }
+.jw-auth-route { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.jw-auth-route .g { fill: none; stroke: rgba(255, 255, 255, .16); stroke-width: 1.2; stroke-dasharray: 2 7; vector-effect: non-scaling-stroke; }
+/* No vector-effect on the drawn line: with non-scaling-stroke the dash is
+   measured in screen pixels and pathLength="1" no longer means "the whole
+   path" — the line drew a sliver and stopped. */
+.jw-auth-route .d { fill: none; stroke: var(--ds-gold); stroke-width: 1.8; stroke-linecap: round;
+  stroke-dasharray: 1; stroke-dashoffset: 0; filter: drop-shadow(0 0 6px rgba(217, 178, 111, .5)); }
+.jw-auth-route circle { fill: var(--ds-gold); }
+html.ds-motion .modal-overlay.open .jw-auth-route .d { animation: jw-auth-draw 2.2s var(--ds-ease) .35s both; }
+@keyframes jw-auth-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.jw-auth-logo { width: 116px; height: auto; margin: 0 0 22px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, .45)); }
+.jw-auth-kicker { margin: 0 0 14px; font: 600 11px var(--ds-sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ds-gold); }
+.jw-auth-title { margin: 0; font-family: var(--ds-display); font-weight: 500; font-size: clamp(34px, 3.6vw, 52px); line-height: 1; letter-spacing: -.02em;
+  color: #fff; text-shadow: 0 12px 40px rgba(0, 0, 0, .45); }
+.jw-auth-title em { font-style: italic; color: var(--ds-gold-lt); }
+.jw-auth-sub { margin: 16px 0 0; max-width: 34ch; font-size: 14.5px; line-height: 1.65; color: var(--ds-on-dark); }
+html.ds-motion .modal-overlay.open .jw-auth-copy > * { animation: acct-panel-rise .9s var(--ds-ease) both; }
+html.ds-motion .modal-overlay.open .jw-auth-copy > :nth-child(2) { animation-delay: .08s; }
+html.ds-motion .modal-overlay.open .jw-auth-copy > :nth-child(3) { animation-delay: .16s; }
+html.ds-motion .modal-overlay.open .jw-auth-copy > :nth-child(4) { animation-delay: .24s; }
+@keyframes acct-panel-rise { from { opacity: 0; transform: translateY(18px); } }
+.jw-auth-products { display: flex; gap: 0; margin: 0; padding: 16px 0 0; list-style: none; border-top: 1px solid var(--ds-line-dark); }
+.jw-auth-products li { flex: 1; font: 700 10.5px var(--ds-sans); letter-spacing: .2em; text-transform: uppercase; color: var(--ds-on-dark-2); text-align: center; }
+.jw-auth-products li + li { border-left: 1px solid var(--ds-line-dark); }
+.jw-auth-credit { position: absolute; right: 14px; bottom: 6px; margin: 0; font-size: 9.5px; color: rgba(255, 255, 255, .5); letter-spacing: .03em; }
+
+/* The form side: ivory, the display face, the coral decision. */
+.auth-split .auth-panel { background: var(--ds-ivory); }
+.auth-split h2 { font-family: var(--ds-display); font-weight: 500; font-size: clamp(34px, 3.2vw, 46px); letter-spacing: -.02em; color: var(--ds-ink); }
+.auth-split .modal-sub { color: var(--ds-muted); }
+.auth-split .auth-btn { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; font-size: 12.5px; letter-spacing: .16em;
+  text-transform: uppercase; box-shadow: 0 16px 30px -16px rgba(201, 72, 47, .85); transition: transform .35s var(--ds-ease), box-shadow .3s ease, filter .3s ease; }
+.auth-split .auth-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+.auth-split .auth-btn:disabled { background: var(--ds-sand); color: var(--ds-muted); box-shadow: none; }
+.auth-split .auth-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+.auth-split .modal-field input, .auth-split .auth-phone { border-radius: var(--ds-r-md); }
+.auth-split .modal-field input:focus { border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
+.auth-split .auth-close { background: var(--ds-white); border: 1px solid var(--ds-line-2); transition: transform .35s var(--ds-ease), background-color .3s ease; }
+.auth-split .auth-close:hover { transform: rotate(90deg); background: var(--ds-ink); color: #fff; }
+/* A phone: the panel becomes a banner above the form, as main.css makes the
+   old one — the logo beside the title, the rest folded away. Held sideways
+   there is no height for it at all. */
+@media (max-width: 760px) {
+  .auth-split .jw-auth-visual { min-height: 0; padding: 18px 64px 18px 18px; justify-content: center; }
+  .jw-auth-copy { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0 14px; }
+  .jw-auth-logo { width: 52px; margin: 0; grid-row: span 2; }
+  .jw-auth-kicker { margin: 0 0 4px; font-size: 9.5px; letter-spacing: .22em; }
+  .jw-auth-title { font-size: 24px; }
+  .jw-auth-sub, .jw-auth-products, .jw-auth-credit, .jw-auth-route { display: none; }
+}
+@media (max-width: 760px) and (max-height: 560px) { .auth-split .jw-auth-visual { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html.ds-motion .modal-overlay.open .jw-auth-route .d, html.ds-motion .modal-overlay.open .jw-auth-copy > * { animation: none; }
+}
+
+/* ==========================================================================
+   ONE STATE LANGUAGE for the discovery pages' status line (.dh-status on
+   package, packages, destination, place and destination-hotels). Their
+   scripts write a sentence into it — "Loading this package…", "We could
+   not load this place just now." — and add a Retry button (.dh-retry).
+   Rather than a second state system, the line takes DS.state()'s
+   composition: the route drawing (moving while it loads), the sentence in
+   the display face, the retry as the system's button. Words and logic are
+   the scripts' own.
+   ========================================================================== */
+.disc .dh-status:not([hidden]):not(:empty) {
+  display: grid; justify-items: center; gap: 12px; margin: clamp(32px, 6vw, 72px) auto; max-width: 560px; text-align: center;
+  font-family: var(--ds-display); font-weight: 500; font-size: clamp(22px, 2.4vw, 30px); line-height: 1.2; color: var(--ds-ink);
+}
+.disc .dh-status:not([hidden]):not(:empty)::before {
+  content: ''; width: 180px; height: 72px;
+  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 72'><path d='M14 58 C 60 -6, 120 -6, 166 58' fill='none' stroke='%23d9b26f' stroke-width='1.8' stroke-dasharray='3 7' stroke-linecap='round'/><circle cx='14' cy='58' r='5' fill='%23d9b26f'/><circle cx='166' cy='58' r='5' fill='%23d9b26f'/></svg>") center / contain no-repeat;
+}
+html.ds-motion .disc .dh-status:not([hidden]):not(:empty)::before { animation: ds-status-breathe 1.8s var(--ds-ease) infinite alternate; }
+@keyframes ds-status-breathe { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.disc .dh-retry { display: flex; width: fit-content; align-items: center; justify-content: center; min-height: 46px; margin: 0 auto 40px; padding: 0 26px;
+  border: 0; border-radius: var(--ds-r-pill); background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff; cursor: pointer;
+  font: 700 11.5px var(--ds-sans); letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .85); }
+.disc .dh-retry:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+@media (prefers-reduced-motion: reduce) { html.ds-motion .disc .dh-status::before { animation: none; } }
+
+/* The landing page's search card (booking-card.js): its inputs clear their
+   own outline, and nothing drew one on the field around them, so a keyboard
+   user tabbing through From / To / dates saw no focus at all. The field
+   carries the system's gold rule and ring while anything inside it has
+   keyboard focus. */
+.search-card .field:has(:focus-visible) { box-shadow: inset 0 -2px 0 var(--ds-gold), var(--ds-ring); border-radius: var(--ds-r-sm); }

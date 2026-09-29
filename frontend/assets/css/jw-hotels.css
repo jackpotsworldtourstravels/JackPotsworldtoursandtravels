@@ -1,0 +1,636 @@
+/* ===========================================================================
+   jw-hotels.css — the hotel journey in the design system's voice.
+   ===========================================================================
+   Loaded LAST on hotels.html, after hotel.css (structure, `hr-*`) and
+   jw-products.css (the product-page shell). It recomposes — it does not
+   rewire: every id, data attribute and handler hook hotel-results.js and the
+   booking screens use is the same element in the same place.
+
+     1  the stay hero         (built by jw-products.js stayHero)
+     2  the results toolbar   (count, sort chips, the phone's Filters button)
+     3  the hotel card        (photograph · identity · folio)
+     4  the rails             (filters; the summary as a dark folio)
+     5  the action bar
+     6  phones and tablets    (filters as a bottom sheet, the card stacked)
+
+   Scoped to body.jw-prod, which only the product pages carry.
+   =========================================================================== */
+
+body.jw-prod .hr-scope {
+  --hr-ground: var(--ds-ivory); --hr-surface: var(--ds-white); --hr-surface-2: var(--ds-sand);
+  --hr-ink: var(--ds-ink); --hr-ink-2: var(--ds-ink-2); --hr-ink-3: var(--ds-muted);
+  --hr-line: var(--ds-line); --hr-line-soft: rgba(21, 27, 39, .07);
+  --hr-accent: var(--ds-coral); --hr-accent-dk: var(--ds-coral-dk);
+  --hr-ok: var(--ds-success); --hr-ok-fill: var(--ds-success); --hr-ok-soft: var(--ds-success-soft);
+  --hr-star: var(--ds-gold); --hr-radius: var(--ds-r-lg); --hr-radius-sm: var(--ds-r-md);
+  --hr-shadow: var(--ds-sh-1); --hr-shadow-lg: var(--ds-sh-3);
+}
+body.jw-prod .hr-wrap { max-width: 1440px; padding: 0 var(--ds-gutter); }
+body.jw-prod #hrRoot .hr-wrap { padding-top: clamp(22px, 3vw, 40px); }
+
+/* ==========================================================================
+   1  THE STAY HERO
+   ========================================================================== */
+body.jw-prod .jp-sh .hr-results-head { display: block; margin: 0; }
+body.jw-prod .jp-sh .hr-results-title {
+  margin: 0; color: #fff; font-family: var(--ds-display); font-weight: 500;
+  font-size: clamp(36px, 5vw, 72px); line-height: .98; letter-spacing: -.02em;
+  text-shadow: 0 12px 50px rgba(0, 0, 0, .45);
+}
+body.jw-prod .jp-sh .hr-results-title::before {
+  content: 'Where you\2019 ll stay'; display: flex; margin-bottom: 14px;
+  font: 600 11px var(--ds-sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ds-gold);
+}
+.jp-sh__stay { margin: 14px 0 0; color: var(--ds-on-dark); font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+body.jw-prod .jp-sh .tx-sample { display: inline-block; margin-top: 14px; background: rgba(217, 178, 111, .16); color: var(--ds-gold-lt); padding: 5px 12px; }
+
+/* The nights: the arc from check-in to check-out, one moon per night. */
+.jp-sh__nights { order: 2; width: 100%; height: auto; overflow: visible; }
+.jp-sh__nights .g { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.4; stroke-dasharray: 2 8; stroke-linecap: round; }
+.jp-sh__nights .d { fill: none; stroke: var(--ds-gold); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(217, 178, 111, .55)); }
+.jp-sh__nights .n { fill: var(--ds-night); stroke: var(--ds-gold); stroke-width: 2.5; }
+.jp-sh__nights .n--to { fill: var(--ds-gold); }
+.jp-sh__nights .c { fill: #fff; font: 600 24px var(--ds-display); letter-spacing: .08em; }
+.jp-sh__nights .c--to { fill: var(--ds-gold-lt); }
+.jp-sh__nights .w { fill: var(--ds-on-dark-2); font: 700 10px var(--ds-sans); letter-spacing: .24em; }
+.jp-sh__nights .k { fill: var(--ds-gold-lt); font: 700 12px var(--ds-sans); letter-spacing: .3em; }
+.jp-sh__nights .mo circle { fill: var(--ds-gold-lt); }
+.jp-sh__nights .mo .cut { fill: #0b1322; }
+html.ds-motion .jp-sh__nights .d { stroke-dasharray: 1; stroke-dashoffset: 1; }
+html.ds-motion .jp-sh__nights .mo { opacity: 0; }
+html.ds-motion .jp-sh__nights .k { opacity: 0; }
+html.ds-motion .jp-sh__band.is-drawn .jp-sh__nights .d { stroke-dashoffset: 0; transition: stroke-dashoffset 1.8s var(--ds-ease) .2s; }
+html.ds-motion .jp-sh__band.is-drawn .jp-sh__nights .mo { animation: sh-moon .6s var(--ds-ease) both; animation-delay: calc(.6s + var(--i, 0) * .12s); }
+html.ds-motion .jp-sh__band.is-drawn .jp-sh__nights .k { opacity: 1; transition: opacity .8s ease 1.2s; }
+@keyframes sh-moon { from { opacity: 0; transform: translateY(8px) scale(.4); } to { opacity: 1; } }
+/* The moon's own transform is its position; the animation moves an inner copy. */
+.jp-sh__nights .mo { transform-box: fill-box; transform-origin: center; }
+
+/* The photograph's caption: what the city picture shows, whose it is, and
+   that it is the destination — not a hotel. */
+.jp-sh__cap { position: relative; z-index: 3; margin: 0 auto; padding-bottom: 12px; text-align: right;
+  font-size: 10.5px; letter-spacing: .04em; color: rgba(255, 255, 255, .6); }
+.jp-sh__cap:empty { display: none; }
+
+/* On the booking screens the band folds away; the strip stays. */
+body.hr-booking .jp-sh .jp-jh__band, body.hr-booking .jp-sh .jp-sh__cap { display: none; }
+body.jw-prod.hr-booking .hero.is-compact.jp-sh { min-height: 0; padding-bottom: 26px; }
+body.hr-confirm .jp-sh .search-dock, body.hr-confirm .jp-sh .jp-jh__sum { display: none; }
+
+@media (max-width: 900px) {
+  .jp-sh__nights { order: -1; max-width: 420px; margin: 0 auto; }
+  body.jw-prod .jp-sh .hr-results-title { font-size: clamp(32px, 9vw, 48px); }
+  .jp-sh__cap { text-align: left; }
+}
+@media (max-width: 720px) { .jp-sh__nights { max-width: 300px; } }
+
+/* ==========================================================================
+   2  THE TOOLBAR
+   ========================================================================== */
+body.jw-prod .hr-toolbar {
+  display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-bottom: clamp(16px, 2vw, 22px);
+}
+body.jw-prod .hr-results-count { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-muted); }
+.hr-sortchips { display: flex; gap: 8px; margin-left: auto; overflow-x: auto; scrollbar-width: none; max-width: 100%; min-width: 0; }
+/* A desktop results column is narrower than seven sort chips: they wrap onto
+   their own row under the count rather than running under the summary rail
+   (Distance and Best value were drawn beneath its header). Phones keep the
+   one-line swipe strip (section 6). */
+@media (min-width: 901px) {
+  .hr-sortchips { order: 3; flex: 1 1 100%; flex-wrap: wrap; margin-left: 0; overflow: visible; }
+}
+.hr-sortchips::-webkit-scrollbar { display: none; }
+.hr-sortchips .ds-chip { min-height: 36px; padding: 0 14px; font-size: 12.5px; }
+/* The select is the state; the chips drive it. Kept for assistive tech. */
+body.jw-prod .hr-toolbar .hr-sortbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); margin: 0; padding: 0; border: 0; }
+.hr-filter-open { display: none; }
+
+/* ==========================================================================
+   3  THE HOTEL CARD — photograph · identity · folio
+   ========================================================================== */
+body.jw-prod .hr-cards { container: hcards / inline-size; display: flex; flex-direction: column; gap: clamp(16px, 1.8vw, 22px); }
+
+body.jw-prod .hr-card.hc {
+  position: relative; display: grid; isolation: isolate;
+  grid-template-columns: clamp(220px, 34%, 340px) minmax(0, 1fr) clamp(190px, 24%, 224px);
+  gap: 0; padding: 0; overflow: hidden; cursor: pointer;
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white);
+  box-shadow: var(--ds-sh-1);
+  transition: box-shadow .5s ease, border-color .4s ease, translate .5s var(--ds-ease);
+}
+/* A gold rule draws across the top of each card as it arrives. */
+body.jw-prod .hr-card.hc::before {
+  content: ''; position: absolute; z-index: 4; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, var(--ds-gold), var(--ds-coral-lt) 60%, transparent);
+  transform-origin: 0 50%; transform: scaleX(0); transition: transform 1.2s var(--ds-ease) calc(var(--ds-delay, 0s) + .35s);
+}
+body.jw-prod .hr-card.hc.is-in::before, html:not(.ds-motion) body.jw-prod .hr-card.hc::before { transform: scaleX(1); }
+body.jw-prod .hr-card.hc:hover { translate: 0 -4px; box-shadow: var(--ds-sh-3); border-color: rgba(217, 178, 111, .55); }
+body.jw-prod .hr-card.hc.is-selected { border-color: var(--ds-gold); box-shadow: 0 0 0 2px var(--ds-gold), var(--ds-sh-2); }
+body.jw-prod .hr-card.hc:focus-within { border-color: rgba(217, 178, 111, .6); }
+
+/* --- the photograph --- */
+.hc-media { position: relative; min-height: 250px; overflow: hidden; background: var(--ds-navy-900); }
+.hc-media .hp { position: absolute; inset: 0; }
+.hc-media .hp-img.is-settled { transition: scale 1s var(--ds-ease); }
+.hr-card.hc:hover .hc-media .hp-img.is-settled { scale: 1.05; }
+/* The save heart sits over the photograph, top right, in glass. */
+body.jw-prod .hc-media .wl-btn {
+  position: absolute; z-index: 5; top: 12px; right: 12px; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35); background: rgba(6, 10, 18, .45); color: #fff;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: transform .35s var(--ds-ease), background-color .3s ease;
+}
+body.jw-prod .hc-media .wl-btn:hover { transform: scale(1.08); background: rgba(6, 10, 18, .65); }
+body.jw-prod .hc-media .wl-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; }
+body.jw-prod .hc-media .wl-btn.is-on svg { fill: var(--ds-coral-lt); stroke: var(--ds-coral-lt); }
+/* A destination tag needs the top-left; the heart keeps the right. */
+.hc-media .hp-tag { max-width: calc(100% - 76px); }
+
+/* --- identity --- */
+.hc-body { min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: clamp(18px, 2vw, 26px) clamp(18px, 2vw, 28px); }
+.hc-kicker { margin: 0; display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--ds-gold-ink); }
+.hc-kicker i { font-style: normal; color: var(--ds-line-2); }
+body.jw-prod .hc-name { margin: 0; font-family: var(--ds-display); font-weight: 500; font-size: clamp(24px, 2.2vw, 32px); line-height: 1.05; letter-spacing: -.015em; color: var(--ds-ink); }
+.hc-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+body.jw-prod .hc-meta .hr-stars { color: var(--ds-gold); }
+.hc-score { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--ds-ink-2); }
+.hc-score b { display: inline-grid; place-items: center; min-width: 38px; height: 26px; padding: 0 8px; border-radius: 8px;
+  background: var(--ds-navy-800); color: #fff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hc-facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.hc-fact { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: var(--ds-r-pill);
+  background: var(--ds-ivory); font-size: 12px; font-weight: 600; color: var(--ds-ink); }
+.hc-fact-k { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-muted); }
+.hc-fact.is-good { background: var(--ds-success-soft); color: var(--ds-success); }
+.hc-fact.is-good .hc-fact-k { color: color-mix(in srgb, var(--ds-success) 70%, transparent); }
+.hc-line { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--ds-muted); }
+.hc-line span { font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink-2); margin-right: 4px; }
+.hc-policy { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hc-amen { display: flex; flex-wrap: wrap; gap: 4px 0; margin: auto 0 0; padding-top: 12px; border-top: 1px solid var(--ds-line); font-size: 12px; color: var(--ds-ink-2); }
+.hc-amen span + span::before { content: '·'; margin: 0 9px; color: var(--ds-gold); font-weight: 700; }
+
+/* --- the folio: the rate, the stay, the decision --- */
+.hc-folio { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 16px;
+  padding: clamp(18px, 2vw, 26px) clamp(16px, 1.8vw, 24px);
+  background: #fbf8f2; border-left: 2px dashed rgba(21, 27, 39, .12); }
+.hc-folio::before, .hc-folio::after { content: ''; position: absolute; left: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--ds-ivory); }
+.hc-folio::before { top: -12px; }
+.hc-folio::after { bottom: -12px; }
+.hc-rate { display: grid; justify-items: end; text-align: right; line-height: 1.1; }
+.hc-from { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+.hc-amt { margin: 4px 0 2px; font-family: var(--ds-display); font-weight: 600; font-size: clamp(28px, 2.4vw, 36px); letter-spacing: -.01em; color: var(--ds-ink); font-variant-numeric: tabular-nums; }
+.hc-per { font-size: 11.5px; color: var(--ds-muted); }
+.hc-sum { margin: 0; display: grid; gap: 6px; padding: 12px 0 0; border-top: 1px solid var(--ds-line); }
+.hc-sum div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ds-muted); }
+.hc-sum dt, .hc-sum dd { margin: 0; }
+.hc-sum dd { font-variant-numeric: tabular-nums; color: var(--ds-ink-2); font-weight: 600; }
+.hc-sum-total dt { font-weight: 700; color: var(--ds-ink-2); }
+.hc-sum-total dd { font-weight: 800; color: var(--ds-ink); font-size: 13.5px; }
+.hc-acts { display: grid; gap: 8px; }
+body.jw-prod .hc .hc-cta {
+  width: 100%; min-height: 46px; gap: 10px; border-radius: var(--ds-r-pill); border: 0;
+  background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); color: #fff;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .8);
+  transition: transform .35s var(--ds-ease), box-shadow .3s ease;
+}
+.hc .hc-cta svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .35s var(--ds-ease); }
+body.jw-prod .hc .hc-cta:hover { transform: translateY(-2px); box-shadow: 0 18px 30px -14px rgba(201, 72, 47, .9); }
+.hc .hc-cta:hover svg { transform: translateX(4px); }
+.hc-select { justify-self: center; padding: 6px 2px; border: 0; background: none; cursor: pointer;
+  font: 700 11px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink-2);
+  border-bottom: 1px solid var(--ds-gold); transition: color .3s ease, border-color .3s ease; }
+.hc-select:hover { color: var(--ds-ink); border-color: var(--ds-coral); }
+.hc-select[aria-pressed="true"] { color: var(--ds-success); border-color: var(--ds-success); }
+.hc-select[aria-pressed="true"]::before { content: '\2713'; margin-right: 6px; }
+.hc-select:focus-visible, body.jw-prod .hc .hc-cta:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+
+/* --- skeleton: the card's own shape --- */
+.hc-skel { cursor: default; pointer-events: none; }
+.hc-skel .hc-body, .hc-skel .hc-folio { gap: 10px; }
+.hc-skel .hc-folio .ds-skel--title { width: 70%; align-self: flex-end; }
+.hc-skel .hc-folio .ds-skel--pill { width: 100%; height: 46px; }
+
+/* --- the column narrows: tablet, or the three-column desktop squeezed --- */
+@container hcards (max-width: 760px) {
+  body.jw-prod .hr-card.hc { grid-template-columns: minmax(200px, 40%) minmax(0, 1fr); }
+  .hc-folio { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    border-left: 0; border-top: 2px dashed rgba(21, 27, 39, .12); }
+  .hc-folio::before { left: -12px; top: -12px; }
+  .hc-folio::after { left: auto; right: -12px; top: -12px; bottom: auto; }
+  .hc-rate { justify-items: start; text-align: left; }
+  .hc-sum { border-top: 0; padding: 0; min-width: 170px; }
+  .hc-acts { grid-auto-flow: column; align-items: center; gap: 16px; }
+  body.jw-prod .hc .hc-cta { width: auto; padding: 0 24px; }
+}
+@container hcards (max-width: 520px) {
+  body.jw-prod .hr-card.hc { grid-template-columns: 1fr; }
+  .hc-media { min-height: 0; aspect-ratio: 16 / 10; }
+  .hc-folio { flex-direction: column; align-items: stretch; }
+  .hc-rate { grid-template-columns: 1fr auto; align-items: baseline; }
+  .hc-from { grid-column: 1 / -1; }
+  .hc-per { justify-self: end; }
+  .hc-sum { min-width: 0; }
+  .hc-acts { grid-auto-flow: row; }
+  body.jw-prod .hc .hc-cta { width: 100%; }
+}
+
+/* ==========================================================================
+   4  THE RAILS
+   ========================================================================== */
+body.jw-prod .hr-layout { gap: clamp(16px, 1.6vw, 24px); }
+body.jw-prod .hr-rail { top: calc(var(--ds-header-h, 88px) + 12px); }
+body.jw-prod .hr-rail-filters { max-height: calc(100vh - var(--ds-header-h, 88px) - 24px); }
+body.jw-prod .hr-rail-filters > *:not(.hr-sheet-foot) {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); background: var(--ds-white);
+}
+body.jw-prod .hr-rail-filters .ff-heading { font-family: var(--ds-display); font-size: 22px; font-weight: 500; letter-spacing: -.01em; text-transform: none; }
+body.jw-prod .hr-rail-filters .ff-toggle, body.jw-prod .hr-rail-filters .ff-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-ink-2);
+}
+body.jw-prod .hr-rail-filters .ff-opt input { accent-color: var(--ds-navy-800); }
+body.jw-prod .hr-rail-filters .ff-range-fill { background: var(--ds-gold); }
+body.jw-prod .hr-rail-filters .ff-range-track input[type="range"]::-webkit-slider-thumb { border-color: var(--ds-gold); }
+body.jw-prod .hr-rail-filters .ff-search input { border-radius: var(--ds-r-pill); }
+body.jw-prod .hr-rail-filters .ff-search input:focus { border-color: var(--ds-gold); box-shadow: var(--ds-ring); }
+.hr-sheet-foot { display: none; }
+
+/* The Booking Summary — the stay as a dark folio, the same ticket Flights uses. */
+body.jw-prod .hr-summary {
+  border-radius: var(--ds-r-lg); overflow: hidden; border: 1px solid var(--ds-line-dark); color: var(--ds-on-dark);
+  background:
+    radial-gradient(ellipse 90% 60% at 100% 0%, rgba(217, 178, 111, .14), transparent 70%),
+    linear-gradient(180deg, var(--ds-navy-800), var(--ds-night));
+  box-shadow: var(--ds-sh-3);
+}
+body.jw-prod .hr-summary * { border-color: var(--ds-line-dark); }
+body.jw-prod .hr-sum-head { border-bottom: 1px solid var(--ds-line-dark); padding: 18px 20px 14px; }
+body.jw-prod .hr-sum-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: #fff; }
+body.jw-prod .hr-sum-body { padding: 18px 20px; gap: 12px; }
+body.jw-prod .hr-sum-hotel { gap: 14px; align-items: center; }
+body.jw-prod .hr-sum-thumb { position: relative; width: 64px; height: 64px; flex: none; border-radius: 14px; overflow: hidden; background: var(--ds-navy-900); }
+body.jw-prod .hr-sum-thumb .hp { position: absolute; inset: 0; }
+body.jw-prod .hr-sum-hotel-name { font-family: var(--ds-display); font-size: 18px; font-weight: 500; color: #fff; line-height: 1.15; }
+body.jw-prod .hr-sum-hotel-loc, body.jw-prod .hr-sum-meta, body.jw-prod .hr-sum-dates, body.jw-prod .hr-sum-note,
+body.jw-prod .hr-sum-line, body.jw-prod .hr-sum-placeholder { color: var(--ds-on-dark-2); }
+body.jw-prod .hr-sum-dest { font-family: var(--ds-display); font-weight: 500; font-size: 22px; color: #fff; }
+body.jw-prod .hr-sum-line b { color: #fff; }
+body.jw-prod .hr-sum-sec-title { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-gold); }
+body.jw-prod .hr-sum-rule { background: var(--ds-line-dark); }
+body.jw-prod .hr-sum-total { border-top: 1px solid var(--ds-line-dark); padding-top: 14px; }
+body.jw-prod .hr-sum-total-label { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-on-dark); }
+body.jw-prod .hr-sum-total-value { font-family: var(--ds-display); font-size: 30px; font-weight: 600; color: var(--ds-gold-lt); }
+body.jw-prod .hr-sum-callout { background: rgba(29, 117, 80, .18); border: 1px solid rgba(119, 211, 166, .28); }
+body.jw-prod .hr-sum-callout b { color: #9fe3c0; }
+body.jw-prod .hr-sum-callout span { color: var(--ds-on-dark-2); }
+body.jw-prod .hr-summary .hr-stars { color: var(--ds-gold); }
+body.jw-prod .hr-summary svg { color: var(--ds-gold); }
+body.jw-prod .hr-trust { padding: 16px 20px 20px; border-top: 1px solid var(--ds-line-dark); }
+body.jw-prod .hr-trust-row b { color: #fff; }
+body.jw-prod .hr-trust-row span { color: var(--ds-on-dark-2); }
+body.jw-prod .hr-sum-pending { color: var(--ds-gold-lt); }
+body.jw-prod .hr-sum-error { color: #ffb4a8; }
+
+/* ==========================================================================
+   5  THE ACTION BAR
+   ========================================================================== */
+body.jw-prod .hr-actionbar {
+  background: rgba(253, 251, 248, .94); border-top: 1px solid rgba(217, 178, 111, .45);
+  box-shadow: 0 -18px 40px -24px rgba(10, 17, 32, .45);
+}
+body.jw-prod .hr-actionbar-inner { max-width: 1440px; padding: 12px var(--ds-gutter); }
+body.jw-prod .hr-ab-item svg { color: var(--ds-gold-ink); }
+body.jw-prod .hr-ab-total b { font-family: var(--ds-display); font-size: 26px; font-weight: 600; color: var(--ds-ink); }
+body.jw-prod .hr-ab-total span, body.jw-prod .hr-ab-cta span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+
+
+/* The live-chat launcher rides above the action bar instead of sitting on
+   its call to action. */
+body.jw-prod:has(.hr-actionbar:not([hidden]):not(.is-idle)) .lc-launcher { bottom: 96px; transition: bottom .4s var(--ds-ease); }
+@media (max-width: 720px) {
+  body.jw-prod:has(.hr-actionbar:not([hidden]):not(.is-idle)) .lc-launcher { bottom: 84px; }
+  body.jw-prod .hr-ab-cta .hr-btn { min-height: 48px; padding: 0 14px; font-size: 11px; letter-spacing: .08em;
+    overflow: hidden; text-overflow: ellipsis; display: block; line-height: 48px; text-align: center; }
+  /* "Continue" is enough on a phone — the progress rail says to where. */
+}
+
+/* The phone-hideable half of a Continue label is part of the button's text,
+   not the caption `.hr-ab-cta span` styles under it (small, block, muted) —
+   which is how "Continue" and "to Hotel Details" came apart on desktop. */
+#hrActionbar .hr-ab-cta .hr-btn .hr-ab-long { display: inline; margin: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+
+/* Every hotel-journey button, in the system's voice. */
+body.jw-prod .hr-btn {
+  border-radius: var(--ds-r-pill); min-height: 46px; padding: 0 24px; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  transition: transform .35s var(--ds-ease), box-shadow .3s ease, background-color .3s ease, color .3s ease, border-color .3s ease;
+}
+body.jw-prod .hr-btn:hover:not(:disabled) { transform: translateY(-2px); }
+body.jw-prod .hr-btn-primary { background: linear-gradient(135deg, var(--ds-coral), var(--ds-coral-dk)); border: 0; color: #fff; box-shadow: 0 12px 24px -14px rgba(201, 72, 47, .8); }
+body.jw-prod .hr-btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, var(--ds-coral-lt), var(--ds-coral)); }
+body.jw-prod .hr-btn-primary:disabled { background: var(--ds-sand); color: var(--ds-muted); box-shadow: none; opacity: 1; }
+body.jw-prod .hr-btn-ghost { background: transparent; color: var(--ds-ink); border: 1px solid var(--ds-line-2); }
+body.jw-prod .hr-btn-ghost:hover { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body.jw-prod .hr-btn:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+body.jw-prod .hr-scope .ds-state { background: var(--ds-white); border-radius: var(--ds-r-lg); box-shadow: var(--ds-sh-1); max-width: none; }
+
+/* ==========================================================================
+   6  PHONES AND TABLETS
+   ========================================================================== */
+@media (max-width: 900px) {
+  /* The rail leaves the page and becomes a bottom sheet (DS.open): parked
+     below the screen, it rises when opened and sinks when closed. */
+  body.jw-prod .hr-rail-filters {
+    display: block; position: fixed; z-index: 1001; left: 0; right: 0; bottom: 0; top: auto; max-height: 86vh; overflow: auto;
+    background: var(--ds-paper); border-radius: var(--ds-r-xl) var(--ds-r-xl) 0 0; box-shadow: var(--ds-sh-4);
+    transform: translateY(104%); visibility: hidden; transition: transform .6s var(--ds-ease), visibility 0s linear .6s;
+  }
+  body.jw-prod .hr-rail-filters.is-open { transform: none; visibility: visible; transition: transform .6s var(--ds-ease); }
+  body.jw-prod .hr-rail-filters::before { content: ''; display: block; width: 44px; height: 4px; margin: 10px auto 4px; border-radius: 4px; background: var(--ds-line-2); }
+  body.jw-prod .hr-rail-filters > *:not(.hr-sheet-foot) { box-shadow: none; border: 0; border-radius: 0; background: transparent; }
+  .hr-sheet .hr-sheet-foot { display: block; position: sticky; bottom: 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); background: var(--ds-paper); border-top: 1px solid var(--ds-line); }
+
+  .hr-filter-open {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: var(--ds-r-pill);
+    border: 1px solid rgba(217, 178, 111, .55); background: var(--ds-navy-900); color: #fff; cursor: pointer;
+    font: 700 11.5px var(--ds-sans); letter-spacing: .12em; text-transform: uppercase;
+  }
+  .hr-filter-open svg { width: 16px; height: 16px; fill: none; stroke: var(--ds-gold); stroke-width: 2; stroke-linecap: round; }
+  .hr-filter-n:empty { display: none; }
+  .hr-filter-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--ds-gold); color: var(--ds-ink); font-size: 11px; letter-spacing: 0; }
+  .hr-filter-open:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+  body.jw-prod .hr-toolbar { gap: 10px; }
+  .hr-sortchips { order: 3; flex-basis: 100%; margin-left: 0; }
+  body.jw-prod .hr-results-count { margin-right: auto; }
+}
+@media (max-width: 720px) {
+  /* The fold summary already carries the stay on a phone. */
+  .jp-sh__stay { display: none; }
+  /* Results with nothing chosen: no bar — each card has its own View rooms. */
+  body.jw-prod:not(.hr-booking) .hr-actionbar.is-idle { display: none; }
+  body.jw-prod:not(.hr-booking) #hrRoot { padding-bottom: 32px; }
+  body.jw-prod .hr-actionbar-inner { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  body.jw-prod .hr-ab-total b { font-size: 22px; }
+  body.jw-prod .hr-card.hc:hover { translate: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.jw-prod .hr-card.hc:hover { translate: none; }
+  body.jw-prod .hr-card.hc::before { transform: scaleX(1); transition: none; }
+  .jp-sh__nights .mo, .jp-sh__nights .k { opacity: 1 !important; animation: none !important; }
+}
+
+/* ==========================================================================
+   7  THE BOOKING SCREENS — shared frame
+   Details → Room → Guests → Review → Payment → Confirmed. One measure, one
+   progress rail, one back link, one dark folio on the right.
+   ========================================================================== */
+body.jw-prod.hr-booking .hr-scope > .hr-wrap { padding-top: clamp(18px, 2.4vw, 30px); }
+body.jw-prod .hr-journey { margin: 0 0 clamp(18px, 2.4vw, 28px); padding: 14px 18px; border-radius: var(--ds-r-pill);
+  background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); width: fit-content; max-width: 100%; }
+body.jw-prod .hr-journey .ds-step { font-size: 11px; }
+body.jw-prod .hr-hd-layout { grid-template-columns: minmax(0, 7fr) minmax(320px, 3fr); gap: clamp(18px, 2vw, 28px); }
+body.jw-prod .hr-hd-layout > div:first-child { min-width: 0; }
+body.jw-prod .hr-backlink {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 6px 0; border: 0; background: none; cursor: pointer;
+  font: 700 11px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink-2);
+  border-bottom: 1px solid var(--ds-gold); transition: color .3s ease, gap .35s var(--ds-ease);
+}
+body.jw-prod .hr-backlink:hover { color: var(--ds-ink); gap: 12px; text-decoration: none; }
+body.jw-prod .hr-backlink:focus-visible { outline: none; box-shadow: var(--ds-ring); border-radius: 4px; }
+
+/* Section cards used by every booking screen (Review, Payment, Confirm). */
+body.jw-prod .hr-rvsec, body.jw-prod .hr-roomgroup, body.jw-prod .hr-panel, body.jw-prod .hr-cf-status {
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+}
+body.jw-prod .hr-rvsec { margin-bottom: clamp(14px, 1.6vw, 20px); }
+/* main.css pads every <section> 110px for the landing page's bands; these
+   sections are cards, and the hero carries its own padding. */
+body.jw-prod .hr-scope section.hr-rvsec, body.jw-prod .hr-scope section.hd-hero { padding: 0; }
+body.jw-prod .hr-rvsec-head { padding: 18px 22px 14px; background: transparent; border-bottom: 1px solid var(--ds-line); }
+body.jw-prod .hr-rvsec-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; letter-spacing: -.01em; color: var(--ds-ink); }
+body.jw-prod .hr-rvsec-body { padding: 18px 22px 22px; }
+body.jw-prod .hr-editbtn { border: 0; border-bottom: 1px solid var(--ds-gold); border-radius: 0; background: none; padding: 4px 0;
+  font: 700 10.5px var(--ds-sans); letter-spacing: .16em; text-transform: uppercase; color: var(--ds-ink-2); }
+body.jw-prod .hr-editbtn:hover { color: var(--ds-ink); border-color: var(--ds-coral); }
+
+/* Fields: the design system's (ds-input look), on the hotel classes. */
+body.jw-prod .hr-label { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ds-ink-2); }
+body.jw-prod .hr-label i { color: var(--ds-coral); }
+body.jw-prod .hr-input {
+  min-height: 48px; padding: 12px 14px; border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2);
+  background-color: var(--ds-paper); color: var(--ds-ink); font: 500 15px/1.4 var(--ds-sans);
+  transition: border-color .3s ease, background-color .3s ease, box-shadow .3s ease;
+}
+body.jw-prod .hr-input:hover { border-color: rgba(21, 27, 39, .32); }
+body.jw-prod .hr-input:focus { border-color: var(--ds-gold); background-color: #fff; box-shadow: var(--ds-ring); }
+body.jw-prod .hr-textarea { min-height: 96px; }
+body.jw-prod .hr-field.has-error .hr-input { border-color: var(--ds-danger); background-color: #fff; }
+body.jw-prod .hr-err { font-size: 12px; font-weight: 600; color: var(--ds-danger); }
+body.jw-prod .hr-hint { font-size: 12px; color: var(--ds-muted); }
+body.jw-prod .hr-fieldgrid { gap: 14px 16px; }
+
+
+/* Every booking screen's title block (.hr-hd-head > h1.hr-hd-name): the
+   display face, with the step's own eyebrow above it. */
+body.jw-prod .hr-hd-head { gap: 10px; margin-bottom: clamp(16px, 2vw, 24px); }
+body.jw-prod .hr-hd-head .hr-hd-name { font-family: var(--ds-display); font-weight: 500; font-size: clamp(32px, 3.6vw, 52px);
+  line-height: 1; letter-spacing: -.02em; color: var(--ds-ink); }
+body.jw-prod .hr-hd-head .hr-hd-name::before { display: block; margin-bottom: 12px;
+  font: 600 11px var(--ds-sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ds-gold-ink); }
+body.jw-prod #hrmRoot .hr-hd-name::before { content: 'Your room'; }
+body.jw-prod #hgRoot .hr-hd-name::before { content: 'Who9 s staying'; }
+body.jw-prod #hvRoot .hr-hd-name::before { content: 'Before you pay'; }
+body.jw-prod #hpRoot .hr-hd-name::before { content: 'Secure payment'; }
+body.jw-prod .hr-hd-head .hr-loc { font-size: 13px; color: var(--ds-muted); letter-spacing: .02em; }
+html.ds-motion body.jw-prod .hr-hd-head { animation: hd-rise .9s var(--ds-ease) backwards; }
+
+/* ==========================================================================
+   8  HOTEL DETAILS — the property, cinematic
+   ========================================================================== */
+.hd-hero { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--ds-r-xl); min-height: clamp(300px, 42vw, 520px);
+  display: flex; align-items: flex-end; background: var(--ds-navy-900); box-shadow: var(--ds-sh-3); }
+.hd-hero-media { position: absolute; inset: 0; z-index: -2; }
+.hd-hero-media .hp { position: absolute; inset: 0; }
+/* The words sit on a scrim at the foot; the city label moves to the top so
+   the two never collide. */
+.hd-hero::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(to top, rgba(5, 8, 15, .92) 0%, rgba(5, 8, 15, .55) 34%, rgba(5, 8, 15, 0) 64%); }
+.hd-hero .hp--hero .hp-tag { top: 16px; bottom: auto; left: 16px; }
+.hd-hero .hp--placeholder .hp-ph { place-content: start center; padding-top: clamp(28px, 6vw, 64px); }
+.hd-hero-body { position: relative; z-index: 2; width: 100%; padding: clamp(22px, 3vw, 40px) clamp(22px, 3vw, 40px) clamp(30px, 3.4vw, 44px); color: #fff; }
+.hd-hero-body .hc-kicker { color: var(--ds-gold-lt); }
+.hd-hero-body .hc-kicker i { color: rgba(255, 255, 255, .35); }
+body.jw-prod .hd-hero .hr-hd-name { margin: 10px 0 14px; color: #fff; font-family: var(--ds-display); font-weight: 500;
+  font-size: clamp(36px, 5vw, 68px); line-height: .98; letter-spacing: -.02em; text-shadow: 0 12px 50px rgba(0, 0, 0, .45); }
+.hd-hero .hr-stars { color: var(--ds-gold); }
+.hd-hero .hc-score { color: var(--ds-on-dark); }
+.hd-hero .hc-score b { background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .25); }
+html.ds-motion .hd-hero-body > * { animation: hd-rise 1s var(--ds-ease) backwards; }
+html.ds-motion .hd-hero-body > :nth-child(2) { animation-delay: .1s; }
+html.ds-motion .hd-hero-body > :nth-child(3) { animation-delay: .2s; }
+@keyframes hd-rise { from { opacity: 0; transform: translateY(24px); } }
+
+/* The glance strip: five facts, one line, display-face values. */
+.hd-glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); margin: clamp(14px, 1.6vw, 20px) 0 0; padding: 0;
+  border-radius: var(--ds-r-lg); background: var(--ds-white); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); overflow: hidden; }
+.hd-glance > div { padding: 16px 20px; border-right: 1px solid var(--ds-line); min-width: 0; }
+.hd-glance > div:last-child { border-right: 0; }
+.hd-glance dt { font-size: 9.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--ds-muted); }
+.hd-glance dd { margin: 6px 0 0; font-family: var(--ds-display); font-weight: 600; font-size: clamp(19px, 1.6vw, 24px); color: var(--ds-ink); line-height: 1.1; }
+.hd-glance dd small { font-family: var(--ds-sans); font-size: 11px; font-weight: 600; color: var(--ds-muted); margin-left: 4px; }
+.hd-glance .is-good dd { color: var(--ds-success); }
+
+/* Tabs: the system's pill. */
+body.jw-prod .hr-tabs { gap: 4px; margin: clamp(22px, 2.6vw, 34px) 0 14px; padding: 5px; width: fit-content; max-width: 100%;
+  border: 0; border-radius: var(--ds-r-pill); background: rgba(21, 27, 39, .06); }
+body.jw-prod .hr-tab { min-height: 40px; padding: 0 18px; margin: 0; border: 0; border-radius: var(--ds-r-pill);
+  font: 600 13px var(--ds-sans); color: var(--ds-ink-2); transition: color .35s ease, background-color .35s ease, box-shadow .35s ease; }
+body.jw-prod .hr-tab:hover { color: var(--ds-ink); }
+body.jw-prod .hr-tab.is-on { color: #fff; background: linear-gradient(135deg, var(--ds-navy-700), var(--ds-navy-900)); box-shadow: 0 8px 18px -10px rgba(8, 12, 22, .9); }
+body.jw-prod .hr-tab:focus-visible { outline: none; box-shadow: var(--ds-ring); }
+body.jw-prod .hr-panel { border-top: 1px solid rgba(21, 27, 39, .07); padding: clamp(20px, 2.4vw, 32px); animation: jf-open .5s var(--ds-ease) both; }
+body.jw-prod .hr-panel-title { font-family: var(--ds-display); font-weight: 500; font-size: 22px; letter-spacing: -.01em; margin: 0 0 12px; }
+body.jw-prod .hr-prose { font-size: 15px; line-height: 1.75; color: var(--ds-ink-2); }
+body.jw-prod .hr-amenity-grid li { font-size: 14px; color: var(--ds-ink-2); }
+body.jw-prod .hr-amenity-grid li svg { color: var(--ds-gold-ink); }
+body.jw-prod .hr-panel-note { color: var(--ds-muted); }
+body.jw-prod .hr-roomrow { border-radius: var(--ds-r-md); border: 1px solid var(--ds-line); padding: 16px 18px; transition: border-color .3s ease; }
+body.jw-prod .hr-roomrow:hover { border-color: rgba(217, 178, 111, .6); }
+body.jw-prod .hr-roomrow-main > b { font-family: var(--ds-display); font-weight: 500; font-size: 19px; }
+body.jw-prod .hr-roomrow-perks i, body.jw-prod .hr-roomcard-perks i { background: var(--ds-ivory); border-radius: var(--ds-r-pill); padding: 4px 10px; font-size: 11.5px; color: var(--ds-ink-2); }
+body.jw-prod .hr-roomrow-price b { font-family: var(--ds-display); font-weight: 600; font-size: 24px; }
+body.jw-prod .hr-mapslot { border-radius: var(--ds-r-md); }
+
+/* ==========================================================================
+   9  ROOM SELECTION
+   ========================================================================== */
+body.jw-prod .hr-roomtabs { gap: 10px; margin: 0 0 16px; }
+body.jw-prod .hr-roomtab { border-radius: var(--ds-r-md); border: 1px solid var(--ds-line); background: var(--ds-white); padding: 14px 16px;
+  transition: border-color .3s ease, box-shadow .3s ease, transform .35s var(--ds-ease); }
+body.jw-prod .hr-roomtab:hover { transform: translateY(-2px); border-color: rgba(217, 178, 111, .55); }
+body.jw-prod .hr-roomtab.is-on { border-color: var(--ds-navy-800); box-shadow: 0 0 0 1px var(--ds-navy-800), var(--ds-sh-2); }
+body.jw-prod .hr-roomtab-title { font-family: var(--ds-display); font-weight: 500; font-size: 18px; }
+body.jw-prod .hr-roomtab-party { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ds-muted); }
+body.jw-prod .hr-roomtab-state.is-set { color: var(--ds-success); }
+body.jw-prod .hr-roomcards { gap: clamp(14px, 1.6vw, 20px); }
+body.jw-prod .hr-roomcard { position: relative; overflow: hidden; grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 240px); gap: 0; padding: 0;
+  border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); background: var(--ds-white); box-shadow: var(--ds-sh-1);
+  transition: box-shadow .5s ease, border-color .4s ease, translate .5s var(--ds-ease); }
+body.jw-prod .hr-roomcard:hover:not(.is-unavailable) { translate: 0 -3px; box-shadow: var(--ds-sh-3); border-color: rgba(217, 178, 111, .55); }
+body.jw-prod .hr-roomcard.is-selected { border-color: var(--ds-gold); box-shadow: 0 0 0 2px var(--ds-gold), var(--ds-sh-2); }
+body.jw-prod .hr-roomcard-main { padding: clamp(18px, 2vw, 26px); gap: 10px; }
+body.jw-prod .hr-roomcard-name { font-family: var(--ds-display); font-weight: 500; font-size: clamp(22px, 2vw, 28px); letter-spacing: -.01em; }
+body.jw-prod .hr-roomcard-desc { font-size: 14px; line-height: 1.7; color: var(--ds-ink-2); }
+body.jw-prod .hr-roomcard-meta { font-size: 13px; color: var(--ds-ink-2); }
+body.jw-prod .hr-roomcard-meta svg { color: var(--ds-gold-ink); }
+body.jw-prod .hr-chip-selected { border: 0; border-radius: var(--ds-r-pill); padding: 4px 10px; background: var(--ds-success-soft); color: var(--ds-success);
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+/* The rate side is the card's folio: perforated, ivory, the decision last. */
+body.jw-prod .hr-roomcard-side { justify-content: center; gap: 4px; padding: clamp(18px, 2vw, 24px); border-left: 2px dashed rgba(21, 27, 39, .12); background: #fbf8f2; }
+body.jw-prod .hr-roomcard-rate { font-family: var(--ds-display); font-weight: 600; font-size: clamp(26px, 2.2vw, 32px); }
+body.jw-prod .hr-roomcard-per, body.jw-prod .hr-roomcard-tax { font-size: 11.5px; color: var(--ds-muted); }
+body.jw-prod .hr-roomcard-stay { font-size: 12.5px; font-weight: 700; color: var(--ds-ink-2); }
+body.jw-prod .hr-roomcard-why { color: var(--ds-muted); }
+
+/* ==========================================================================
+   10  GUEST DETAILS
+   ========================================================================== */
+body.jw-prod .hr-roomgroup { padding: 0; margin-bottom: clamp(14px, 1.6vw, 20px); overflow: hidden; }
+body.jw-prod .hr-roomgroup-head { padding: 18px 22px 14px; margin: 0; border-bottom: 1px solid var(--ds-line); }
+body.jw-prod .hr-roomgroup-head h2 { font-family: var(--ds-display); font-weight: 500; font-size: 22px; }
+body.jw-prod .hr-roomgroup-meta { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+body.jw-prod .hr-roomgroup > :not(.hr-roomgroup-head) { padding-left: 22px; padding-right: 22px; }
+body.jw-prod .hr-guest { padding-top: 16px; padding-bottom: 18px; border-bottom: 1px dashed var(--ds-line); }
+body.jw-prod .hr-guest-head b { font-size: 14px; }
+body.jw-prod .hr-chip-lead, body.jw-prod .hr-chip-age { border: 0; border-radius: var(--ds-r-pill); padding: 3px 10px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+body.jw-prod .hr-chip-lead { background: rgba(217, 178, 111, .2); color: var(--ds-gold-ink); }
+body.jw-prod .hr-chip-age { background: var(--ds-ivory); color: var(--ds-ink-2); }
+
+/* ==========================================================================
+   11  REVIEW — extras and coupon
+   ========================================================================== */
+body.jw-prod .hr-rv-hotel { grid-template-columns: 168px minmax(0, 1fr); gap: 20px; align-items: start; }
+body.jw-prod .hr-rv-thumb { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--ds-r-md); overflow: hidden; background: var(--ds-navy-900); }
+body.jw-prod .hr-rv-thumb .hp { position: absolute; inset: 0; }
+body.jw-prod .hr-rv-name { font-family: var(--ds-display); font-weight: 500; font-size: 26px; letter-spacing: -.01em; }
+body.jw-prod .hr-rv-facts dt { font-size: 9.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+body.jw-prod .hr-rv-facts dd { font-size: 14px; }
+body.jw-prod .hr-rv-room-type { color: var(--ds-gold-ink); }
+body.jw-prod .hr-extra, body.jw-prod .hr-pay { border-radius: var(--ds-r-md); border: 1px solid var(--ds-line-2); padding: 14px 16px; background: var(--ds-paper);
+  transition: border-color .3s ease, background-color .3s ease, transform .35s var(--ds-ease), box-shadow .3s ease; }
+body.jw-prod .hr-extra:hover, body.jw-prod .hr-pay:hover { border-color: rgba(217, 178, 111, .7); transform: translateY(-1px); }
+body.jw-prod .hr-extra.is-on, body.jw-prod .hr-pay.is-on { border-color: var(--ds-navy-800); background: #fff; box-shadow: 0 0 0 1px var(--ds-navy-800), var(--ds-sh-1); }
+body.jw-prod .hr-extra input, body.jw-prod .hr-pay input { accent-color: var(--ds-navy-800); }
+body.jw-prod .hr-extra-price { font-family: var(--ds-display); font-weight: 600; font-size: 17px; }
+body.jw-prod .hr-coupon .hr-input { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
+body.jw-prod .hr-coupon-on { border-radius: var(--ds-r-md); background: var(--ds-success-soft); border: 1px dashed rgba(29, 117, 80, .45); }
+body.jw-prod .hr-pricechange, body.jw-prod .hr-paynotice { border-radius: var(--ds-r-md); border: 0; border-left: 3px solid var(--ds-info); background: var(--ds-info-soft); }
+body.jw-prod .hr-pricechange { border-left-color: var(--ds-warning); background: var(--ds-warning-soft); }
+body.jw-prod .hr-pricechange b { color: var(--ds-warning); }
+body.jw-prod .hr-paynotice.is-warn { border-left-color: var(--ds-coral); background: var(--ds-coral-soft); }
+body.jw-prod .hr-paynotice.is-done { border-left-color: var(--ds-success); background: var(--ds-success-soft); }
+
+/* ==========================================================================
+   12  CONFIRMATION — the stay, issued
+   The banner is a ticket: the reference as its anchor. It celebrates only
+   when the server says confirmed (.is-ok); a received booking (.is-wait)
+   is gold, patient, and says so.
+   ========================================================================== */
+body.jw-prod .hr-cf-banner { position: relative; overflow: hidden; isolation: isolate; padding: clamp(24px, 3vw, 40px); gap: clamp(16px, 2vw, 28px);
+  border-radius: var(--ds-r-xl); border: 1px solid var(--ds-line-dark); color: #fff;
+  background: radial-gradient(ellipse 70% 90% at 100% 0%, rgba(217, 178, 111, .2), transparent 70%), linear-gradient(160deg, var(--ds-navy-800), var(--ds-night));
+  box-shadow: var(--ds-sh-3); margin-bottom: clamp(14px, 1.6vw, 20px); }
+body.jw-prod .hr-cf-banner.is-ok, body.jw-prod .hr-cf-banner.is-wait { border-color: var(--ds-line-dark); }
+body.jw-prod .hr-cf-title { color: #fff; font-family: var(--ds-display); font-weight: 500; font-size: clamp(26px, 3vw, 40px); line-height: 1.05; }
+body.jw-prod .hr-cf-banner p { color: var(--ds-on-dark-2); font-size: 14px; }
+body.jw-prod .hr-cf-mark { width: 60px; height: 60px; }
+body.jw-prod .hr-cf-banner.is-ok .hr-cf-mark { background: linear-gradient(135deg, var(--ds-gold-lt), var(--ds-gold)); color: var(--ds-ink); box-shadow: 0 0 0 8px rgba(217, 178, 111, .16); }
+body.jw-prod .hr-cf-banner.is-wait .hr-cf-mark { background: rgba(255, 255, 255, .08); color: var(--ds-gold-lt); border: 1px solid rgba(217, 178, 111, .45); }
+html.ds-motion body.jw-prod .hr-cf-banner.is-ok .hr-cf-mark { animation: cf-pop .9s var(--ds-ease) .2s both; }
+@keyframes cf-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: none; } }
+body.jw-prod .hr-cf-ref { border-left: 2px dashed rgba(255, 255, 255, .18); padding-left: clamp(16px, 2vw, 28px); }
+body.jw-prod .hr-cf-ref span { color: var(--ds-gold); font-size: 10px; font-weight: 700; letter-spacing: .24em; }
+body.jw-prod .hr-cf-ref b { color: #fff; font-family: var(--ds-display); font-weight: 600; font-size: clamp(24px, 2.6vw, 34px); letter-spacing: .04em; }
+body.jw-prod .hr-cf-status { padding: 18px 22px; }
+body.jw-prod .hr-cf-stat > span { font-size: 9.5px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--ds-muted); }
+body.jw-prod .hr-pill { border: 0; padding: 4px 12px; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; }
+body.jw-prod .hr-pill.is-wait { background: var(--ds-warning-soft); color: var(--ds-warning); text-transform: uppercase; }
+body.jw-prod .hr-pill.is-ok { background: var(--ds-success-soft); color: var(--ds-success); }
+body.jw-prod .hr-cf-steps { counter-reset: cf; list-style: none; padding: 0; }
+body.jw-prod .hr-cf-steps li { counter-increment: cf; position: relative; padding-left: 44px; margin-bottom: 14px; }
+body.jw-prod .hr-cf-steps li::before { content: counter(cf); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--ds-gold); color: var(--ds-gold-ink); font: 600 14px var(--ds-display); }
+body.jw-prod .hr-cf-cancel { border-radius: var(--ds-r-md); border: 0; background: var(--ds-ivory); }
+
+/* ==========================================================================
+   13  BOOKING SCREENS — phones and tablets
+   ========================================================================== */
+@media (max-width: 1024px) {
+  body.jw-prod .hr-hd-layout { grid-template-columns: minmax(0, 1fr); }
+  body.jw-prod .hr-hd-layout .hr-rail-summary { position: static; }
+}
+@media (max-width: 720px) {
+  body.jw-prod .hr-journey { padding: 10px 14px; border-radius: var(--ds-r-md); width: 100%; }
+  body.jw-prod .hr-journey .ds-step { font-size: 0; gap: 0; }
+  body.jw-prod .hr-journey .ds-step[aria-current="step"] { font-size: 11px; gap: 10px; }
+  body.jw-prod .hr-journey .ds-step + .ds-step { margin-left: 6px; }
+  body.jw-prod .hr-journey .ds-step + .ds-step::after { width: 12px; }
+  .hd-hero { border-radius: var(--ds-r-lg); min-height: 420px; }
+  .hd-glance { grid-template-columns: 1fr 1fr; }
+  .hd-glance > div { border-bottom: 1px solid var(--ds-line); }
+  .hd-glance > div:nth-child(2n) { border-right: 0; }
+  body.jw-prod .hr-tabs { width: 100%; }
+  body.jw-prod .hr-roomcard { grid-template-columns: 1fr; }
+  body.jw-prod .hr-roomcard-side { border-left: 0; border-top: 2px dashed rgba(21, 27, 39, .12); align-items: stretch; text-align: left; }
+  body.jw-prod .hr-rv-hotel { grid-template-columns: 1fr; }
+  body.jw-prod .hr-rv-thumb { max-width: 180px; }
+  body.jw-prod .hr-cf-ref { border-left: 0; border-top: 2px dashed rgba(255, 255, 255, .18); padding-left: 0; }
+  body.jw-prod .hr-roomgroup-head, body.jw-prod .hr-rvsec-head, body.jw-prod .hr-rvsec-body { padding-left: 16px; padding-right: 16px; }
+  body.jw-prod .hr-roomgroup > :not(.hr-roomgroup-head) { padding-left: 16px; padding-right: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.ds-motion .hd-hero-body > * { animation: none; }
+  body.jw-prod .hr-roomcard:hover { translate: none; }
+}
+
+/* LAST, so it outranks the inline rule above: on a phone the Continue label
+   is just "Continue" — the progress rail says to where. */
+@media (max-width: 720px) { #hrActionbar .hr-ab-cta .hr-btn .hr-ab-long { display: none; } }
