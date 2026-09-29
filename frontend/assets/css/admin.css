@@ -182,12 +182,17 @@ body.jp-admin{--sidebar-w:308px;}
    toggle mechanics as above, indented to read as a child of the group rather
    than a sibling of Hotels/Tour Packages/Destinations beside it. */
 .nav-subtoggle{width:calc(100% - 24px); border:0; background:none; cursor:pointer; font-family:inherit;}
-/* The badge sits between the label and the chevron on this one item (Gaming
-   Tour Packages carries its queue's badge even while collapsed) — it must
-   NOT also claim the auto margin .nav-badge normally uses to reach the row's
-   right edge, or the two auto margins would fight over the same free space. */
+/* Gaming Tour Packages' label wraps to two lines ("Gaming Tour" / "Packages"
+   at the sidebar's width), and a wrapped label is not full-width on its own —
+   without this, the badge sat hard against the text instead of at the row's
+   right edge, reading as misaligned against every other badge in the rail.
+   flex:1 makes the label's box claim the full remaining row width regardless
+   of how much of it the text actually uses, so the badge (sitting right
+   after that box) always lands at the true right edge, with the chevron
+   immediately beside it — the same edge every other nav-item badge sits on. */
+.nav-subtoggle .nav-label{flex:1;}
 .nav-subtoggle .nav-badge{margin-left:0;}
-.nav-subtoggle .nav-chevron{margin-left:auto; opacity:.6; transition:transform .18s ease;}
+.nav-subtoggle .nav-chevron{margin-left:6px; opacity:.6; transition:transform .18s ease;}
 .nav-subtoggle[aria-expanded="true"] .nav-chevron{transform:rotate(90deg);}
 .nav-subgroup[hidden]{display:none;}
 .nav-subgroup .nav-item{padding-left:44px;}
