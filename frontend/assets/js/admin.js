@@ -117,7 +117,8 @@ const sectionTitles = {
   payments: 'Payment Management', 'live-support': 'Live Support',
   'partner-requests': 'Approval Queue', 'service-requests-mgmt': 'Service Request Management',
   'ticket-enquiries': 'Booking Enquiries',
-  'gaming-tour-enquiries': 'Gaming Tour Enquiries',
+  /* 'gaming-tour-enquiries' itself is no longer a nav target — see the four
+     'gaming-*' bucket entries and SECTION_ALIAS further down. */
   'booking-ops': 'Booking Operations',
   notifications: 'Communication', profile: 'Profile',
   /* Moved here from the Super Admin Portal; see assets/js/admin-logs.js. */
@@ -138,6 +139,27 @@ const sectionTitles = {
      direct-booking path rather than the enquiry-led one. */
   'manual-enquiry': 'Manual Enquiry',
   'manual-request': 'Manual Booking',
+  /* ---- B2C Management (2026-09-29) ---- */
+  'b2c-customers': 'Customers', 'b2c-bookings': 'Bookings',
+  'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
+  'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
+  'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
+  'b2c-cat-destinations': 'Destinations',
+  'b2c-reports': 'B2C Reports', 'b2c-analytics': 'B2C Analytics',
+  /* Four buckets of one queue — see SECTION_ALIAS below and the header of
+     admin-gaming-enquiries.js. Each gets its own topbar title even though
+     all four share section-gaming-tour-enquiries. */
+  'gaming-new': 'Gaming Enquiries', 'gaming-requests': 'Customer Requests',
+  'gaming-converted': 'Converted Bookings', 'gaming-closed': 'Closed Requests',
+};
+/* A data-section with no section of its own name — it shares another one's
+   markup, distinguished only by which nav item is highlighted and what
+   loadSection does for it. Currently just the Gaming Packages split (four
+   nav items, one table, filtered by status bucket): see GT_BUCKETS in
+   admin-gaming-enquiries.js. Everything else maps to itself, as before. */
+const SECTION_ALIAS = {
+  'gaming-new': 'gaming-tour-enquiries', 'gaming-requests': 'gaming-tour-enquiries',
+  'gaming-converted': 'gaming-tour-enquiries', 'gaming-closed': 'gaming-tour-enquiries',
 };
 const loadedSections = new Set();
 
@@ -146,11 +168,17 @@ const loadedSections = new Set();
    apply a filter/scroll without duplicating loadSection's logic. */
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
-  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${name}`));
+  const sectionId = SECTION_ALIAS[name] || name;
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${sectionId}`));
   /* `|| ''` so a section added to the markup without a title here empties the
      heading rather than writing the string "undefined" into it. */
   document.getElementById('pageTitle').textContent = sectionTitles[name] || '';
-  if (!loadedSections.has(name)) {
+  /* An aliased name shares its markup with its siblings (the four Gaming
+     Packages buckets share one table), so the loadedSections cache below
+     would skip re-rendering on a second visit and leave whatever the LAST
+     bucket drew on screen. Those always reload; everything else keeps the
+     load-once behaviour this cache has always had. */
+  if (SECTION_ALIAS[name] || !loadedSections.has(name)) {
     loadedSections.add(name);
     Promise.resolve(loadSection(name)).then(() => onArrive?.());
   } else {
@@ -197,8 +225,12 @@ function loadSection(name) {
   if (name === 'partner-requests') return loadApprovalQueue();
   if (name === 'service-requests-mgmt') return loadServiceRequestManagement();
   if (name === 'ticket-enquiries') return loadTicketEnquiries();
-  /* Defined in admin-gaming-enquiries.js, loaded after this file. */
-  if (name === 'gaming-tour-enquiries') return loadGamingTourEnquiries();
+  /* Defined in admin-gaming-enquiries.js, loaded after this file. Each of
+     the four Gaming Packages nav items passes its own bucket key; the
+     function reads GT_BUCKETS[name] to decide which statuses it shows. */
+  if (['gaming-new', 'gaming-requests', 'gaming-converted', 'gaming-closed'].includes(name)) {
+    return loadGamingTourEnquiries(1, name);
+  }
   if (name === 'booking-ops') return loadBookingOps();
   /* 0039. Defined in admin-providers.js, loaded after this file. */
   if (name === 'providers') return loadProviders();
@@ -208,6 +240,27 @@ function loadSection(name) {
   /* No 'change-requests' case: cancellations and reschedules are rows on
      Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();
+  /* ---- B2C Management placeholders (Phase 0) ----
+     Each is built out in its own later phase; see the plan this was scoped
+     from. initComingSoon() just names the module so the section is never
+     blank, and calls no endpoint. */
+  const B2C_SOON = {
+    'b2c-customers': 'Customers', 'b2c-bookings': 'Bookings',
+    'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
+    'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
+    'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
+    'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',
+    'b2c-analytics': 'B2C Analytics',
+  };
+  if (name in B2C_SOON) return initComingSoon(name, B2C_SOON[name]);
+}
+
+function initComingSoon(name, label) {
+  const body = document.querySelector(`#section-${name} .b2c-soon-body`);
+  if (body) {
+    body.innerHTML = `<p class="empty-state">${escapeHtml(label)} is part of the B2C Admin Portal
+      extension and is being built in a later phase. Nothing to load here yet.</p>`;
+  }
 }
 
 /* ---------- Loading skeletons ---------- */

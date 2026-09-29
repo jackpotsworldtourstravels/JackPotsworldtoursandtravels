@@ -28,11 +28,50 @@ const GT_STATUS_BADGE = {
 };
 const gtStatusLabel = s => GT_STATUS_LABELS[s] || s;
 
+/* The Gaming Packages nav-group (2026-09-29): four sidebar items sharing this
+   one table and this one pair of endpoints, split by `status` rather than by
+   a new query capability. GT_BUCKETS is the only place that mapping lives —
+   admin.js's loadSection just passes the data-section name straight through. */
+const GT_BUCKETS = {
+  'gaming-new': ['NEW'],
+  'gaming-requests': ['ASSIGNED', 'CONTACTED', 'QUOTE_PREPARED', 'CUSTOMER_CONFIRMED'],
+  'gaming-converted': ['BOOKING_CREATED'],
+  'gaming-closed': ['COMPLETED', 'CANCELLED'],
+};
+const GT_BUCKET_LABELS = {
+  'gaming-new': 'Gaming Enquiries', 'gaming-requests': 'Customer Requests',
+  'gaming-converted': 'Converted Bookings', 'gaming-closed': 'Closed Requests',
+};
+
 let gtPage = 1;
+let gtBucket = 'gaming-new';
 let gtSearchTimer = null;
 let gtFiltersWired = false;
 
+/* Called only when the bucket actually changes (a different nav item was
+   clicked), never on a plain refresh/search/page-change within one. Rebuilds
+   the status dropdown to the bucket's own statuses plus a "whole bucket"
+   option, and resets the transient filters so switching buckets never
+   carries a stale search term or a status from the PREVIOUS bucket that this
+   one does not even have. */
+function gtApplyBucket(bucket) {
+  const statuses = GT_BUCKETS[bucket] || Object.keys(GT_STATUS_LABELS);
+  const label = GT_BUCKET_LABELS[bucket] || 'Gaming Tour Enquiries';
+  const sel = document.getElementById('gtStatusFilter');
+  const allOption = statuses.length > 1 ? `All (${label})` : 'All';
+  sel.innerHTML = `<option value="">${escapeHtml(allOption)}</option>` +
+    statuses.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(gtStatusLabel(s))}</option>`).join('');
+  sel.value = '';
+  document.getElementById('gtSearch').value = '';
+  const heading = document.querySelector('#section-gaming-tour-enquiries .panel-head h2');
+  if (heading) heading.textContent = label;
+}
+
 function updateGamingTourNavBadge(count) {
+  /* Sits on the "Gaming Enquiries" (NEW-status) item — the one of the four
+     that means "needs a first look" — even though `count` is the dashboard's
+     broader "open" figure (server-computed, not just NEW). Unchanged from
+     before this queue had four nav items; only which item carries it moved. */
   const badge = document.getElementById('gtNavBadge');
   if (!badge) return;
   badge.textContent = count > 99 ? '99+' : String(count);
@@ -58,21 +97,57 @@ function wireGtFilters() {
   });
 }
 
-async function loadGamingTourEnquiries(page = gtPage) {
+async function loadGamingTourEnquiries(page = gtPage, bucket = gtBucket) {
+  if (bucket !== gtBucket || !gtFiltersWired) {
+    gtBucket = bucket;
+    gtApplyBucket(bucket);
+    page = 1;
+  }
   wireGtFilters();
   gtPage = page;
   const tbody = document.querySelector('#gtTable tbody');
   tbody.innerHTML = `<tr><td colspan="10">${rowsSkeleton(5)}</td></tr>`;
-  const status = document.getElementById('gtStatusFilter').value;
+  const selected = document.getElementById('gtStatusFilter').value;
   const search = document.getElementById('gtSearch').value;
+  const bucketStatuses = GT_BUCKETS[gtBucket] || null;
+  /* One status to ask for — either the dropdown's own choice, or the
+     bucket's single status (Gaming Enquiries and Converted Bookings are
+     both one-status buckets, so this is the common case). The multi-status
+     case (the dropdown left on "All (Customer Requests)" / "All (Closed
+     Requests)") is handled separately below, because the list endpoint only
+     ever matches one `status` value at a time — see gaming_tour_enquiry_
+     service.list_enquiries — and combining several is a client concern, not
+     a reason to add an `IN` filter to that endpoint for this alone. */
+  const statuses = selected ? [selected] : (bucketStatuses || [null]);
   try {
-    const { data } = await axios.get(`${API_BASE}/api/admin/gaming-tour-enquiries`, {
-      headers: authHeaders(),
-      params: { status: status || undefined, search: search || undefined, page, page_size: PAGE_SIZE },
-    });
+    let items, total, totalPages;
+    if (statuses.length === 1) {
+      const { data } = await axios.get(`${API_BASE}/api/admin/gaming-tour-enquiries`, {
+        headers: authHeaders(),
+        params: { status: statuses[0] || undefined, search: search || undefined, page, page_size: PAGE_SIZE },
+      });
+      items = data.items; total = data.total; totalPages = data.total_pages;
+    } else {
+      /* Merged client-side across the bucket's several statuses. Each leg is
+         asked for up to 100 rows (the endpoint's own cap) rather than paged
+         individually — a gaming-enquiry queue is small enough that this is
+         exact in practice, and a bucket that ever grows past ~100 rows in ONE
+         of its statuses is a real capacity problem this screen should not
+         paper over with a client-side page count that quietly stops growing. */
+      const results = await Promise.all(statuses.map(s => axios.get(
+        `${API_BASE}/api/admin/gaming-tour-enquiries`,
+        { headers: authHeaders(), params: { status: s, search: search || undefined, page: 1, page_size: 100 } },
+      )));
+      const merged = results.flatMap(r => r.data.items);
+      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      total = merged.length;
+      totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      items = merged.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    }
+    const data = { items, total, page, total_pages: totalPages };
     document.getElementById('gtQueueSummary').textContent =
-      `${data.total} enquir${data.total === 1 ? 'y' : 'ies'}`;
-    if (!data.items.length) {
+      `${total} enquir${total === 1 ? 'y' : 'ies'}`;
+    if (!items.length) {
       tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No gaming tour enquiries match this filter.</td></tr>`;
     } else {
       tbody.innerHTML = data.items.map(r => `
