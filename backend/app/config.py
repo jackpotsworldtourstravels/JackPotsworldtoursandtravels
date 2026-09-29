@@ -542,6 +542,28 @@ class Settings(BaseSettings):
     #: sends Duffel's own default rather than asserting one.
     duffel_supplier_timeout_ms: int = 20000
 
+    # ------------------------------------------------- GOOGLE SIGN-IN -------
+    # "Continue with Google" for the customer portal, an ADDITIONAL method
+    # beside OTP — never a replacement. The frontend uses Google Identity
+    # Services to obtain an ID token; the backend verifies that token
+    # (issuer, audience, expiry, signature via Google's JWKS) before it will
+    # authenticate anyone. The client id is public and is exposed to the
+    # browser on purpose; absent, the feature simply stays off and the button
+    # is not shown.
+    #
+    # THE CLIENT SECRET IS NOT USED BY THE ID-TOKEN FLOW. It is kept here only
+    # because the same Google OAuth client carries one and a future
+    # authorization-code flow would need it; it must never reach a browser and
+    # is never logged. Leave it blank for the current flow.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    #: Accepted issuers for a Google ID token, per Google's OIDC discovery.
+    google_allowed_issuers: str = "https://accounts.google.com,accounts.google.com"
+    #: How long the short-lived "finish sign-up" token (carrying the verified
+    #: Google subject while the new customer supplies the one field Google does
+    #: not provide — a mobile number) stays valid.
+    google_pending_signup_ttl_minutes: int = 20
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---------------------------------------------------------------- CR-9 --

@@ -46,14 +46,22 @@ from app.schemas.customer import (
     CustomerTokenResponse,
     CustomerVerifyOtpRequest,
 )
+from app.schemas.customer_google import (
+    GoogleAuthResponse,
+    GoogleCompleteSignupRequest,
+    GoogleConfigResponse,
+    GoogleLoginRequest,
+)
 from app.services import (
     activity_service,
     customer_audit_service,
     customer_auth_service,
+    customer_google_auth_service,
     customer_guest_service,
     customer_otp_service,
     customer_session_service,
     email_service,
+    google_identity_service,
 )
 
 router = APIRouter(prefix="/api/customer/auth", tags=["customer-auth"])
@@ -535,3 +543,108 @@ def change_password(
 )
 def me(customer: Customer = Depends(get_current_customer)):
     return customer_response(customer)
+
+
+# ---------------------------------------------------------------------------
+# Continue with Google — an ADDITIONAL method beside OTP, never a replacement.
+# The browser sends only a Google-minted ID token (or, for a brand-new user, a
+# signed pending token plus a mobile). The server verifies the token and, on
+# success, issues THE SAME access/refresh session the OTP flow issues.
+# ---------------------------------------------------------------------------
+def _issue_customer_session(db: Session, customer: Customer, request: Request, how: str):
+    """The one post-auth ritual, identical to the OTP path: audit, record the
+    login (a no-op when there is no password row), start a session, mint tokens."""
+    meta = activity_service.request_context(request)
+    customer_audit_service.log(
+        db, customer, "Login", module="Auth",
+        description=f"{customer.full_name} signed in via {how}", meta=meta,
+    )
+    customer_auth_service.record_login(db, customer)
+    customer_session_service.start_session(db, customer, meta)
+    return customer_auth_service.issue_tokens(customer)
+
+
+@router.get(
+    "/google/config",
+    response_model=GoogleConfigResponse,
+    summary="Public config for the Google button",
+    description="Returns whether Google sign-in is enabled and the PUBLIC client id the button needs.",
+)
+def google_config():
+    client_id = (settings.google_client_id or "").strip() or None
+    return GoogleConfigResponse(enabled=bool(client_id), client_id=client_id)
+
+
+@router.post(
+    "/google",
+    response_model=GoogleAuthResponse,
+    summary="Sign in with a verified Google identity",
+    description=(
+        "Public. Verifies the Google ID token server-side (issuer, audience, expiry, signature) "
+        "and either signs the customer in (existing or linked-by-verified-email) or, for a new "
+        "user, returns a short-lived token to finish sign-up with a mobile number. The request "
+        "email is never trusted — identity comes only from the verified token."
+    ),
+)
+@limiter.limit("10/minute")
+def google_login(request: Request, payload: GoogleLoginRequest, db: Session = Depends(get_db)):
+    try:
+        claims = google_identity_service.verify_id_token(payload.credential)
+    except google_identity_service.GoogleNotConfigured:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Google sign-in is not available.")
+    except google_identity_service.GoogleAuthError:
+        # Do not leak why; an attacker learns nothing from a specific reason.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Could not verify Google sign-in.")
+
+    try:
+        result = customer_google_auth_service.resolve(db, claims)
+    except customer_google_auth_service.GoogleLinkNotAllowed as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc))
+    except customer_google_auth_service.GoogleAuthError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+
+    if result.status == "needs_signup":
+        return GoogleAuthResponse(
+            status="needs_signup", pending_token=result.pending_token, prefill=result.prefill,
+        )
+
+    customer = result.customer
+    if not customer.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account is not active.")
+    access_token, refresh_token = _issue_customer_session(db, customer, request, "Google")
+    return GoogleAuthResponse(
+        status="authenticated", access_token=access_token, refresh_token=refresh_token,
+        customer=customer_response(customer), linked=result.linked,
+    )
+
+
+@router.post(
+    "/google/complete",
+    response_model=CustomerTokenResponse,
+    summary="Finish Google sign-up with a mobile number",
+    description=(
+        "Public. Spends the pending token from POST /google (which carries the VERIFIED Google "
+        "subject) plus a mobile number, creates the customer and links the identity, then returns "
+        "the same session tokens as any other successful sign-in."
+    ),
+)
+@limiter.limit("10/minute")
+def google_complete(request: Request, payload: GoogleCompleteSignupRequest, db: Session = Depends(get_db)):
+    try:
+        customer = customer_google_auth_service.complete_signup(
+            db, pending_token=payload.pending_token,
+            full_name=payload.full_name, mobile=payload.mobile,
+        )
+    except customer_google_auth_service.GoogleAuthError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+
+    customer_audit_service.log(
+        db, customer, "Signup", module="Auth",
+        description=f"{customer.full_name} registered via Google as {customer.customer_code}",
+        meta=activity_service.request_context(request),
+    )
+    access_token, refresh_token = _issue_customer_session(db, customer, request, "Google")
+    return CustomerTokenResponse(
+        access_token=access_token, refresh_token=refresh_token,
+        customer=customer_response(customer),
+    )

@@ -173,6 +173,46 @@ class CustomerAuth(Base):
     customer: Mapped["Customer"] = relationship(back_populates="auth")
 
 
+class CustomerIdentity(Base):
+    """A federated sign-in linked to a customer (migration 0087).
+
+    ADDITIVE, NOT A SECOND USER TABLE. The customer stays the ``customers`` row
+    with its own ``customer_id``; this only records "this Google subject is that
+    customer" so the same person signing in again lands on the same account and
+    never a duplicate. A customer may have several rows here (one per provider)
+    or none — an OTP-only customer has none, and nothing here is required to
+    sign in the existing way.
+
+    WHAT IT DELIBERATELY DOES NOT STORE: no access token, no refresh token, no
+    id token. Google's ``sub`` (an opaque, stable per-user id) is the identity;
+    the verified email is kept only to show which Google account is linked. The
+    UNIQUE(provider, provider_user_id) index is what makes a repeat sign-in
+    resolve to one customer instead of creating another.
+    """
+
+    __tablename__ = "customer_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_customer_identities_provider_sub"),
+    )
+
+    customer_identity_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    #: e.g. "google". Kept as text so a second provider needs no migration.
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: The provider's stable subject id — Google's ``sub``. NEVER the email.
+    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: The provider-verified email at link time, for display only.
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+
 class CustomerProfile(Base):
     """What they told us about themselves."""
 
