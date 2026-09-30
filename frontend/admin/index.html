@@ -1298,12 +1298,91 @@
       </div>
     </section>
     <section class="section" id="section-b2c-communication">
-      <div class="panel"><div class="panel-head"><h2>Communication</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Communication</h2>
+          <span class="ops-sub">A read-only record of what customers have been sent and have said. Chats are answered on Live Support.</span>
+        </div>
+        <div class="ops-tabs" id="comTabs" role="tablist"></div>
+
+        <div id="comPane-notifications">
+          <div class="detail-grid" id="comNotifSummary" style="margin-top:0;"></div>
+          <p class="cell-sub" style="margin:6px 0 0;">Notifications are written by the event they describe (a booking, a cancellation, a payment) — they are not composed by hand.</p>
+          <div class="filter-bar" style="margin:12px 0 16px;">
+            <input type="text" id="comNSearch" placeholder="Search customer, title, message or reference…" aria-label="Search notifications">
+            <select id="comNType" class="status-select" aria-label="Filter by type"></select>
+            <select id="comNRead" class="status-select" aria-label="Filter by read state">
+              <option value="">Read &amp; unread</option><option value="read">Read</option><option value="unread">Unread</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table id="comNotifTable"><thead><tr>
+            <th>Sent</th><th>Customer</th><th>Type</th><th>Message</th><th>Reference</th><th>Status</th>
+          </tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="comNotifPagination"></div>
+        </div>
+
+        <div id="comPane-tickets" hidden>
+          <p class="cp-readonly-note" style="margin-top:0;">History only. The customer site's Support Center is now live chat, so tickets are no longer created and cannot be answered from here.</p>
+          <div class="filter-bar" style="margin:12px 0 16px;">
+            <input type="text" id="comTSearch" placeholder="Search customer or subject…" aria-label="Search tickets">
+            <select id="comTStatus" class="status-select" aria-label="Filter by status">
+              <option value="">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option>
+              <option value="resolved">Resolved</option><option value="closed">Closed</option>
+            </select>
+            <select id="comTPriority" class="status-select" aria-label="Filter by priority">
+              <option value="">All priorities</option><option value="low">Low</option><option value="normal">Normal</option>
+              <option value="high">High</option><option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table id="comTicketTable"><thead><tr>
+            <th>Ticket</th><th>Customer</th><th>Subject</th><th>Priority</th><th>Status</th><th class="num">Messages</th><th></th>
+          </tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="comTicketPagination"></div>
+        </div>
+
+        <div id="comPane-chat" hidden><div id="comChatBody"></div></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-activity">
-      <div class="panel"><div class="panel-head"><h2>User Activity</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>User Activity</h2>
+          <span class="ops-sub" id="actLogCount"></span>
+        </div>
+        <div id="actSummary" style="margin-bottom:18px;"></div>
+        <div class="ops-tabs" id="actTabs" role="tablist"></div>
+
+        <div id="actPane-logs">
+          <div class="filter-bar" style="margin:0 0 16px;">
+            <input type="text" id="actSearch" placeholder="Search customer, action, description or IP…" aria-label="Search activity">
+            <select id="actModule" class="status-select" aria-label="Filter by module"><option value="">All modules</option></select>
+            <select id="actStatus" class="status-select" aria-label="Filter by outcome">
+              <option value="">Any outcome</option><option value="success">Success</option><option value="failed">Failed</option>
+            </select>
+            <input type="date" id="actFrom" title="From date" aria-label="From date">
+            <input type="date" id="actTo" title="To date" aria-label="To date">
+          </div>
+          <div class="table-wrap"><table id="actLogTable"><thead><tr>
+            <th>When</th><th>Customer</th><th>Module</th><th>Action</th><th>Outcome</th><th>IP</th><th>Device</th>
+          </tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="actLogPagination"></div>
+        </div>
+
+        <div id="actPane-sessions" hidden>
+          <p class="ops-sub">Active = seen recently and not signed out. Idle = never signed out but gone quiet (e.g. a closed tab).</p>
+          <div class="filter-bar" style="margin:0 0 16px;">
+            <input type="text" id="actSSearch" placeholder="Search customer, IP or browser…" aria-label="Search sessions">
+            <select id="actState" class="status-select" aria-label="Filter by state">
+              <option value="">All sessions</option><option value="active">Active</option>
+              <option value="idle">Idle</option><option value="ended">Ended</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table id="actSessionTable"><thead><tr>
+            <th>Customer</th><th>Signed in</th><th>Last seen</th><th>Signed out</th><th>State</th><th>IP</th><th>Device</th>
+          </tr></thead><tbody></tbody></table></div>
+          <div class="pagination" id="actSessionPagination"></div>
+        </div>
+      </div>
     </section>
     <section class="section" id="section-b2c-cat-flights">
       <div class="panel">
@@ -1786,7 +1865,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p6a"></script>
+<script src="../assets/js/admin.js?v=0930p7a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1852,6 +1931,10 @@
 <!-- Phase 6 — Reviews & Ratings. Reuses the catalogue-common modal/fields above,
      so it must come after it. -->
 <script src="../assets/js/admin-b2c-reviews.js?v=0930p6a"></script>
+<!-- Phase 7 — Communication and User Activity (both read-only). Reuse the
+     catalogue-common modal/helpers, so they come after it. -->
+<script src="../assets/js/admin-b2c-communication.js?v=0930p7a"></script>
+<script src="../assets/js/admin-b2c-activity.js?v=0930p7a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
