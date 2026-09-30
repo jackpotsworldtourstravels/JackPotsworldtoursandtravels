@@ -69,7 +69,7 @@
 <!-- THE CINEMATIC LAYER, after home-ref.css because it re-dresses the hero,
      the header, the search card and every section below them on this page
      only (every rule is scoped to body.home-cine). -->
-<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260928cn2">
+<link rel="stylesheet" href="assets/css/home-cinema.css?v=20260930lp1">
 <!-- All of these are needed BEFORE the inline BookingCard.render() call in the
      hero, so they are in <head> rather than at the foot with the rest.
 
@@ -164,13 +164,11 @@
            srcset="assets/images/hero-dubai-960.webp 960w, assets/images/hero-dubai-1600.webp 1600w, assets/images/hero-dubai-2560.webp 2560w"
            sizes="100vw" alt="" fetchpriority="high" decoding="async">
     </div>
-    <canvas class="cine-globe" id="cineGlobe"></canvas>
     <div class="cine-shade"></div>
     <div class="cine-grain"></div>
   </div>
 
   <div class="wrap cine-copy" id="cineCopy">
-    <p class="cine-eyebrow"><span class="cine-rule"></span>JackPots World &middot; Tours &amp; Travels</p>
     <!-- THE HEADLINE IS TWO MASKED LINES so each can rise on its own beat.
          It still reads "The World Awaits You." as one heading.
          hero-shell.js's HERO_TITLE is the Flights page's own line and is
@@ -179,13 +177,6 @@
       <span class="cine-line"><span>The World</span></span>
       <span class="cine-line"><span><em>Awaits</em> You.</span></span>
     </h1>
-    <div class="cine-cta-row">
-      <a class="cine-cta" href="#destinations" id="cineExplore">
-        <span>Explore destinations</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </a>
-      <p class="cine-route-caption" aria-hidden="true"><b>HYD</b><i></i><b>DXB</b><i></i><b>MLE</b><i></i><b>DPS</b></p>
-    </div>
   </div>
 
   <!-- THE CARD IS NOT MARKUP ANY MORE. booking-card.js renders it, and the
@@ -1135,10 +1126,10 @@
      page-level setup inside waits for DOMContentLoaded, i.e. for app.js. -->
 <script src="assets/js/vendor/gsap.min.js?v=3.13.0"></script>
 <script src="assets/js/vendor/ScrollTrigger.min.js?v=3.13.0"></script>
-<script src="assets/js/home-cinema.js?v=20260928cn2"></script>
+<script src="assets/js/home-cinema.js?v=20260930lp1"></script>
 <script src="assets/js/destination-images.js?v=0928221731"></script>
 <script src="assets/js/jw-interest.js?v=20260928rc1"></script>
-<script src="assets/js/home-destinations.js?v=20260928cn2"></script>
+<script src="assets/js/home-destinations.js?v=20260930lp1"></script>
 <script src="assets/js/jw-foryou.js?v=20260928rc1"></script>
 <script src="assets/js/app.js?v=0928224009"></script>
 <!-- The explore assets are NOT loaded here any more. travel-data.js,

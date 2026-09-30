@@ -114,7 +114,7 @@
   /* -------------------------------------------------------------------------
      The shelf
      ---------------------------------------------------------------------- */
-  function cardHtml(d, i) {
+  function cardHtml(d, i, eager) {
     /* WHAT IS ON A CARD IS WHAT THE API SENT. `image` is a key, not a URL —
        the same keys the hotel and package catalogues use — and when it is null
        the card keeps the tinted ground rather than borrowing a photograph of
@@ -136,13 +136,22 @@
        card must never show is the browser's broken-image glyph. Removing the
        <img> uncovers the tinted ground underneath it, which is the same
        fallback a destination with no art at all gets. */
+    /* `loading` IS DECIDED BY WHY THE CARD IS BEING DRAWN. On first paint the
+       shelf is nine cards and the lower ones are lazy, so a phone never fetches
+       art it will not see. But "View all" re-renders the whole grid, and a card
+       that is added below the fold and left lazy never loads until it is
+       scrolled to — so its <img> sits empty (naturalWidth 0) behind the reveal
+       animation, which is exactly the "images not showing after View all" bug.
+       When the traveller has asked to see everything, every card loads eagerly
+       so none of them is a blank frame waiting for a scroll that may not come. */
+    const loading = eager ? 'eager' : 'lazy';
     const picture = art
       ? '<img class="jw-dest-img" src="' + esc(art.src) + '"'
         + ' srcset="' + esc(art.small) + ' 480w, ' + esc(art.src) + ' 960w, ' + esc(art.large) + ' 1600w"'
         /* The editorial grid: a featured card is ~58% of the content width
            on a desktop, a small one ~42%; below 1024 they are half or full. */
         + ' sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 58vw"'
-        + ' alt="' + esc(d.name) + '" loading="lazy" decoding="async"'
+        + ' alt="' + esc(d.name) + '" loading="' + loading + '" decoding="async"'
         + ' onerror="this.remove()">'
       : '';
 
@@ -182,7 +191,10 @@
 
   function paintShelf() {
     const shown = expanded ? destinations : destinations.slice(0, FIRST_SHOWN);
-    grid.innerHTML = shown.map(cardHtml).join('');
+    /* Eager once the shelf is expanded: the traveller pressed "View all", so
+       every card's photograph should load now rather than wait to be scrolled
+       past. On the first, collapsed paint the lower cards stay lazy. */
+    grid.innerHTML = shown.map((d, i) => cardHtml(d, i, expanded)).join('');
     /* THE ENTRANCE BELONGS TO ONE ENGINE. On the homepage home-cinema.js
        owns the cards' arrival, depth and photograph develop (GSAP); handing
        them to JWMotion as well would put a CSS transition and a GSAP tween

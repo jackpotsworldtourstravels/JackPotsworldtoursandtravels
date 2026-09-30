@@ -104,10 +104,10 @@ body.home-cine .cine-hero {
   overflow: visible; background: var(--cn-night);
 }
 
-/* The stage clips the photograph and the globe; the section does not clip,
-   so nothing the card opens is ever cut. Bottom corners are rounded: at rest
-   they sit on the same night colour and read as nothing, and as the stage
-   recedes on scroll they become the edge of a frame. */
+/* The stage clips the photograph; the section does not clip, so nothing the
+   card opens is ever cut. Bottom corners are rounded: at rest they sit on the
+   same night colour and read as nothing, and as the stage recedes on scroll
+   they become the edge of a frame. */
 body.home-cine .cine-stage {
   position: absolute; inset: 0; z-index: 0; overflow: hidden;
   border-radius: 0 0 var(--cn-r) var(--cn-r);
@@ -118,14 +118,6 @@ body.home-cine .cine-media { position: absolute; inset: -8% 0; will-change: tran
 body.home-cine .cine-photo {
   width: 100%; height: 100%; object-fit: cover; object-position: 54% 44%;
   max-width: none; transform-origin: 54% 44%;
-}
-/* The globe sits right of the headline, centred a little above the middle
-   of the frame. Placed with margins, not a transform: the transform is the
-   script's (arrival and scroll drift). */
-body.home-cine .cine-globe {
-  position: absolute; z-index: 1; pointer-events: none;
-  width: min(56vw, 880px); height: min(56vw, 880px);
-  right: max(-9vw, -130px); top: 40%; margin-top: max(-28vw, -440px);
 }
 body.home-cine .cine-shade {
   position: absolute; inset: 0; z-index: 2; pointer-events: none;
@@ -153,12 +145,6 @@ body.home-cine .cine-grain {
 
 /* --- the copy --------------------------------------------------------- */
 body.home-cine .cine-copy { position: relative; z-index: 3; width: 100%; color: #fff; }
-body.home-cine .cine-eyebrow {
-  display: flex; align-items: center; gap: 16px; margin: 0 0 clamp(18px, 2.4vh, 28px);
-  font-size: 11.5px; font-weight: 600; letter-spacing: .34em; text-transform: uppercase;
-  color: rgba(255,255,255,.82);
-}
-body.home-cine .cine-eyebrow .cine-rule { background: var(--cn-gold); opacity: 1; }
 /* h1 AND the class: home-ref.css sizes `body.home-ref .hero h1`, which
    would otherwise out-rank a single class here. */
 body.home-cine .cine-hero h1.cine-title {
@@ -174,31 +160,6 @@ body.home-cine .cine-hero h1.cine-title em {
   -webkit-background-clip: text; background-clip: text; color: transparent;
   padding-right: .04em;
 }
-body.home-cine .cine-cta-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 18px 34px;
-  margin-top: clamp(22px, 3.4vh, 38px);
-}
-/* Desktop: the CTA and the route codes ride the eyebrow's row on the
-   right, so the headline and the card keep the whole first screen. */
-@media (min-width: 1025px) {
-  body.home-cine .cine-copy {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 40px;
-  }
-  body.home-cine .cine-eyebrow { grid-column: 1; grid-row: 1; }
-  body.home-cine .cine-hero h1.cine-title { grid-column: 1 / -1; grid-row: 2; }
-  body.home-cine .cine-cta-row {
-    grid-column: 2; grid-row: 1; margin: 0 0 clamp(18px, 2.4vh, 28px);
-  }
-}
-body.home-cine .cine-route-caption {
-  display: flex; align-items: center; gap: 12px; margin: 0;
-  font-size: 11px; letter-spacing: .26em; color: rgba(255,255,255,.62);
-}
-body.home-cine .cine-route-caption b { font-weight: 600; }
-body.home-cine .cine-route-caption i {
-  width: 30px; height: 1px; background: linear-gradient(90deg, rgba(217,178,111,.2), var(--cn-gold));
-}
-
 /* --- the dock --------------------------------------------------------- */
 body.home-cine .cine-dock {
   position: relative; z-index: 4; margin-top: clamp(28px, 5.5vh, 64px); max-width: var(--max, 1280px);
@@ -235,9 +196,6 @@ body.home-cine .cine-scroll-cue i::after {
 
 /* --- the opening frame (see the inline script in <head>) -------------- */
 html.cine-pre body.home-cine .cine-photo,
-html.cine-pre body.home-cine .cine-globe,
-html.cine-pre body.home-cine .cine-eyebrow,
-html.cine-pre body.home-cine .cine-cta-row,
 html.cine-pre body.home-cine .cine-dock,
 html.cine-pre body.home-cine .cine-scroll-cue,
 html.cine-pre body.home-cine #siteHeader .jw-hdr__bar { opacity: 0; }
@@ -700,28 +658,26 @@ body.home-cine .cine-contact .modal-msg.show {
 }
 
 /* ==========================================================================
-   8. FOOTER — the route's last line, drawn across the top of it
+   8. FOOTER
    ========================================================================== */
-/* No gap: the finale's night runs straight into the footer's navy, and the
-   rule below is the seam between them. */
+/* No gap: the finale's night runs straight into the footer's navy. */
 body.home-cine .jw-footer { position: relative; margin-top: 0; }
-body.home-cine .jw-footer::before {
-  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 1;
-  background: linear-gradient(90deg, transparent, var(--cn-gold) 20%, var(--cn-gold-lt) 50%, var(--cn-gold) 80%, transparent);
-  transform-origin: 0 50%; transform: scaleX(var(--cn-rule, 1));
-  box-shadow: 0 0 12px rgba(217,178,111,.5);
-}
 
 /* The rest of the page, set on the ivory so nothing reads as a leftover. */
 body.home-cine .upcoming-section,
 body.home-cine .jw-foryou { background: var(--cn-ivory); }
 
+/* RECOMMENDED FOR YOU — the heading ("Because you explored …"), its strapline
+   and the quick-link chips make one block; the property cards below it need
+   room to read as a separate shelf rather than crowding the line above. The
+   gap scales with the viewport so it stays proportional on phone and desktop.
+   `.jw-fy-links` (rendered by jw-foryou.js) keeps its own tight gap under the
+   heading; this only opens the space before the cards themselves. */
+body.home-cine .jw-foryou .jw-dest-grid { margin-top: clamp(28px, 4vw, 48px); }
+
 /* ==========================================================================
    RESPONSIVE
    ========================================================================== */
-@media (max-width: 1180px) {
-  body.home-cine .cine-route-caption { display: none; }
-}
 @media (max-width: 1024px) {
   body.home-cine .cine-head { grid-template-columns: 1fr; }
   body.home-cine .cine-why-grid { grid-template-columns: 1fr; }
@@ -731,16 +687,11 @@ body.home-cine .jw-foryou { background: var(--cn-ivory); }
 }
 @media (max-width: 900px) {
   body.home-cine .cine-hero { padding-top: 104px; padding-bottom: 72px; }
-  /* A phone keeps the globe as a still, larger and further back: part of
-     the sky, not a second subject. */
-  body.home-cine .cine-globe { width: 128vw; height: 128vw; right: -58vw; top: 2vh; margin-top: 0; opacity: .6; }
   body.home-cine .cine-photo { object-position: 56% 50%; }
   body.home-cine .cine-dock::before { left: 5%; right: 5%; }
 }
 @media (max-width: 640px) {
   body.home-cine .cine-hero h1.cine-title { font-size: clamp(36px, 14.2vw, 76px); line-height: .92; }
-  body.home-cine .cine-eyebrow { font-size: 10px; letter-spacing: .26em; gap: 10px; }
-  body.home-cine .cine-eyebrow .cine-rule { width: 26px; }
   body.home-cine .cine-cta { padding: 13px 18px 13px 20px; font-size: 11px; }
   body.home-cine .cine-dock { margin-top: 26px; }
   body.home-cine .cine-dock .search-card { border-radius: 18px; }
