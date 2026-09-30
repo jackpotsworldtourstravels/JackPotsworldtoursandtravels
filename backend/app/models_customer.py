@@ -783,6 +783,7 @@ class CustomerReview(Base):
     __table_args__ = (
         UniqueConstraint("customer_id", "item_type", "item_id", name="uq_customer_review_item"),
         CheckConstraint("rating >= 1 AND rating <= 5", name="ck_customer_review_rating"),
+        CheckConstraint("status IN ('pending', 'approved', 'rejected')", name="ck_customer_review_status"),
     )
 
     customer_review_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -799,6 +800,15 @@ class CustomerReview(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
     )
+
+    # -- Moderation (0090) ---------------------------------------------------
+    #: 'pending' | 'approved' | 'rejected'. The public review list serves only
+    #: 'approved'; a customer editing their review resets it to 'pending'.
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    #: The desk's one public reply to this review. Shown only while approved.
+    admin_reply: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    replied_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    moderated_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CustomerSupportTicket(Base):

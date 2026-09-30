@@ -45,13 +45,16 @@ def blank_to_none(value: str | None) -> str | None:
 
 def log_change(
     db: Session, request: Request, user: User, *, action: str, description: str,
-    reference_id: int | None = None,
+    reference_id: int | None = None, module: str = "B2CCatalogue",
 ) -> None:
-    """Record one catalogue change. Adds to the session; the router commits."""
+    """Record one admin change. Adds to the session; the router commits.
+
+    ``module`` defaults to the catalogue screens this was written for; the
+    Phase 6 review desk passes its own, so the two stay separable in the log."""
     meta = activity_service.request_context(request)
     activity_service.log_activity(
         db, user.user_id, action, meta["ip_address"],
-        activity_type="Update", module="B2CCatalogue", description=description,
+        activity_type="Update", module=module, description=description,
         reference_id=reference_id, browser=meta["browser"], device=meta["device"],
         merchant_id=getattr(user, "merchant_id", None),
     )

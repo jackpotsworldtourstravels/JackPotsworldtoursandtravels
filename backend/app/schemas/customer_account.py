@@ -93,6 +93,10 @@ class ReviewResponse(BaseModel):
     rating: int
     comment: str | None
     created_at: dt.datetime
+    #: Moderation state and the desk's reply (0090). Additive: a client that
+    #: never read them is unaffected.
+    status: str | None = None
+    admin_reply: str | None = None
 
 
 # ---------------------------------------------------------------------------

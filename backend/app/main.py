@@ -32,6 +32,7 @@ from app.routers import (
     admin_catalogue_packages,
     admin_customer_bookings,
     admin_reconciliation,
+    admin_reviews,
     customer_admin,
     customer_cancellations,
     customer_assistant,
@@ -329,6 +330,8 @@ app.include_router(admin_customer_bookings.router)
 app.include_router(admin_cancellations.router)
 app.include_router(customer_cancellations.router)
 app.include_router(admin_reconciliation.router)
+# B2C Reviews & Ratings (Phase 6): moderation, admin reply, rating analytics.
+app.include_router(admin_reviews.router)
 # B2C Catalogue Management (Phase 5): flights supplier status, hotels, tour
 # packages, destinations. Gated on catalog.manage (admin only).
 app.include_router(admin_catalogue.router)

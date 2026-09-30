@@ -195,6 +195,7 @@ def post_review(
         id=row.customer_review_id, user_id=customer.customer_id, user_name=customer.full_name,
         item_type=row.item_type, item_id=row.item_id, rating=row.rating,
         comment=row.comment, created_at=row.created_at,
+        status=row.status, admin_reply=row.admin_reply,
     )
 
 
@@ -219,6 +220,7 @@ def put_review(
         id=row.customer_review_id, user_id=customer.customer_id, user_name=customer.full_name,
         item_type=row.item_type, item_id=row.item_id, rating=row.rating,
         comment=row.comment, created_at=row.created_at,
+        status=row.status, admin_reply=row.admin_reply,
     )
 
 

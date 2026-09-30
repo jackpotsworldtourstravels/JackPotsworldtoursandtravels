@@ -149,10 +149,16 @@ def clear_read(db: Session, customer: Customer) -> None:
 # Reviews
 # ---------------------------------------------------------------------------
 def list_reviews_for_item(db: Session, item_type: str, item_id: int) -> list[dict]:
+    """The PUBLIC list for one item: approved reviews only (0090). A pending or
+    rejected review is visible to its author on ``/reviews/mine`` and to the
+    admin desk, and to nobody else."""
     rows = db.execute(
         select(CustomerReview, Customer.customer_id, Customer.full_name)
         .join(Customer, Customer.customer_id == CustomerReview.customer_id)
-        .where(CustomerReview.item_type == item_type, CustomerReview.item_id == item_id)
+        .where(
+            CustomerReview.item_type == item_type, CustomerReview.item_id == item_id,
+            CustomerReview.status == "approved",
+        )
         .order_by(CustomerReview.created_at.desc())
     ).all()
     return [
@@ -160,6 +166,7 @@ def list_reviews_for_item(db: Session, item_type: str, item_id: int) -> list[dic
             "id": review.customer_review_id, "user_id": customer_id, "user_name": full_name,
             "item_type": review.item_type, "item_id": review.item_id,
             "rating": review.rating, "comment": review.comment, "created_at": review.created_at,
+            "status": review.status, "admin_reply": review.admin_reply,
         }
         for review, customer_id, full_name in rows
     ]
@@ -189,6 +196,7 @@ def upsert_review(
     if existing:
         existing.rating = rating
         existing.comment = comment
+        existing.status = "pending"   # an edited review is read again (0090)
         db.flush()
         return existing
     row = CustomerReview(
@@ -212,6 +220,7 @@ def get_owned_review(db: Session, customer: Customer, review_id: int) -> Custome
 def update_review(db: Session, row: CustomerReview, rating: int, comment: str | None) -> CustomerReview:
     row.rating = rating
     row.comment = comment
+    row.status = "pending"            # an edited review is read again (0090)
     db.flush()
     return row
 

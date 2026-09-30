@@ -294,12 +294,13 @@ function loadSection(name) {
   if (name === 'b2c-cat-hotels') return initB2CHotels();
   if (name === 'b2c-cat-packages') return initB2CPackages();
   if (name === 'b2c-cat-destinations') return initB2CDestinations();
+  /* Phase 6. Defined in admin-b2c-reviews.js, loaded after this file. */
+  if (name === 'b2c-reviews') return initB2CReviews();
   /* ---- B2C Management placeholders (Phase 0) ----
      Each is built out in its own later phase; see the plan this was scoped
      from. initComingSoon() just names the module so the section is never
      blank, and calls no endpoint. */
   const B2C_SOON = {
-    'b2c-reviews': 'Reviews & Ratings',
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
     'b2c-reports': 'B2C Reports',
     'b2c-analytics': 'B2C Analytics',

@@ -1274,8 +1274,28 @@
       </div>
     </section>
     <section class="section" id="section-b2c-reviews">
-      <div class="panel"><div class="panel-head"><h2>Reviews &amp; Ratings</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Reviews &amp; Ratings</h2>
+          <span class="ops-sub">Approving publishes a review to customers; rejecting hides it. Your reply is shown with it. Customers' own words and ratings are never editable.</span>
+        </div>
+        <div id="rvwAnalytics" style="margin-bottom:22px;"></div>
+        <div class="ops-tabs" id="rvwTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="rvwSearch" placeholder="Search customer, email or review text…" aria-label="Search reviews">
+          <select id="rvwProductFilter" class="status-select" aria-label="Filter by product"></select>
+          <select id="rvwRatingFilter" class="status-select" aria-label="Filter by rating">
+            <option value="">All ratings</option>
+            <option value="5">5 stars</option><option value="4">4 stars</option><option value="3">3 stars</option>
+            <option value="2">2 stars</option><option value="1">1 star</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="rvwTable"><thead><tr>
+          <th>Customer</th><th>Product</th><th>Item</th><th>Rating</th><th>Review</th>
+          <th>Status</th><th>Date</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="rvwPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-communication">
       <div class="panel"><div class="panel-head"><h2>Communication</h2></div>
@@ -1766,7 +1786,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p5a"></script>
+<script src="../assets/js/admin.js?v=0930p6a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1829,6 +1849,9 @@
 <script src="../assets/js/admin-b2c-hotels.js?v=0930p5a"></script>
 <script src="../assets/js/admin-b2c-packages.js?v=0930p5a"></script>
 <script src="../assets/js/admin-b2c-destinations.js?v=0930p5a"></script>
+<!-- Phase 6 — Reviews & Ratings. Reuses the catalogue-common modal/fields above,
+     so it must come after it. -->
+<script src="../assets/js/admin-b2c-reviews.js?v=0930p6a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
