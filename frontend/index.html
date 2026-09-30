@@ -698,10 +698,15 @@
         <div class="modal-msg" id="authEmailMsg" role="status"></div>
       </form>
 
-      <!-- NO "OR CONTINUE WITH" ROW. There is no Google sign-in in this
-           project — no OAuth client, no endpoint, no column to hang a Google
-           id on — and an Email button would only repeat the selector above.
-           A row of buttons that do nothing new is worse than none. -->
+      <!-- CONTINUE WITH GOOGLE — an ADDITIONAL method beside the OTP flow
+           above, never a replacement. The button is Google's own, rendered by
+           Google Identity Services for brand compliance; it stays hidden until
+           app.js confirms a client id is configured (GET /google/config), so a
+           deployment without Google simply shows nothing here. The browser only
+           ever holds the Google-minted credential — the server verifies it. -->
+      <div class="auth-or" id="googleOr" hidden><span>or</span></div>
+      <div class="auth-google" id="googleBtnMount" hidden></div>
+      <div class="modal-msg" id="googleMsg" role="status"></div>
 
       <div class="auth-signup">
         <p>New to JackPots World?</p>
@@ -719,6 +724,38 @@
       <p class="auth-legal">By continuing, you agree to our
         <a href="privacy-policy.html">Privacy Policy</a> and
         <a href="terms-and-conditions.html">Terms &amp; Conditions</a>.</p>
+    </div>
+
+    <!-- GOOGLE FINISH SIGN-UP — shown only when POST /google returns
+         needs_signup for a brand-new user. Google gives us a verified email and
+         a name but not a mobile, which the customer model requires, so we ask
+         for the one missing field and then create the account. -->
+    <div class="auth-view" id="authStepGoogleMobile" hidden>
+      <h2 id="authGoogleTitle">One last thing</h2>
+      <p class="modal-sub" id="googleFinishSub">Confirm your details to finish creating your account.</p>
+      <form id="googleFinishForm" novalidate>
+        <!-- We already have the verified email and name from Google, so we do
+             NOT ask for the email again. The name is shown pre-filled but
+             editable; the mobile is the one required field Google does not
+             provide. -->
+        <div class="modal-field">
+          <label for="gName">Full Name <span aria-hidden="true">*</span></label>
+          <input id="gName" type="text" autocomplete="name" required
+                 placeholder="Your full name" aria-describedby="gNameErr">
+          <p class="field-error" id="gNameErr" role="alert"></p>
+        </div>
+        <div class="modal-field">
+          <label for="gMobile">Mobile Number <span aria-hidden="true">*</span></label>
+          <input id="gMobile" type="tel" inputmode="numeric" autocomplete="tel"
+                 placeholder="Include country code, e.g. +91 98765 43210" aria-describedby="gMobileErr">
+          <p class="field-error" id="gMobileErr" role="alert"></p>
+        </div>
+        <button type="submit" class="auth-btn" id="googleFinishBtn">
+          Create account <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <div class="modal-msg" id="googleFinishMsg" role="status"></div>
+      </form>
+      <div class="auth-signup"><p><a href="#" data-step="email">&larr; Back to sign in</a></p></div>
     </div>
 
     <!-- STEP 2 — new traveller ------------------------------------------------

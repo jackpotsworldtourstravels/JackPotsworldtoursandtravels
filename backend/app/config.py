@@ -521,6 +521,49 @@ class Settings(BaseSettings):
     #: configured here rather than guessed.
     invoice_terms: str = ""
 
+    # ---------------------------------------------------------- DUFFEL ------
+    # The flight SUPPLIER switch. "demo" (the default) is the seeded sample
+    # provider the site runs on today — the frontend serves it client-side and
+    # never calls the supplier. "duffel" activates the adapter under
+    # integrations/duffel/, and ONLY then is a token read.
+    #
+    # THE TOKEN IS TEST-MODE ONLY. The client refuses to start unless it begins
+    # with "duffel_test_", so this configuration cannot reach production; going
+    # live is a deliberate code change, never a stray env var. The token is
+    # strictly server-side — it must never reach a browser — and is never
+    # logged. Absent token is not an error: it simply means Duffel is
+    # unavailable and the demo provider stays in force.
+    flight_supplier: str = "demo"
+    duffel_access_token: str | None = None
+    duffel_api_base_url: str = "https://api.duffel.com"
+    duffel_api_version: str = "v2"
+    duffel_timeout_seconds: float = 30.0
+    #: Milliseconds Duffel waits for airline searches (2000–60000). Empty/0
+    #: sends Duffel's own default rather than asserting one.
+    duffel_supplier_timeout_ms: int = 20000
+
+    # ------------------------------------------------- GOOGLE SIGN-IN -------
+    # "Continue with Google" for the customer portal, an ADDITIONAL method
+    # beside OTP — never a replacement. The frontend uses Google Identity
+    # Services to obtain an ID token; the backend verifies that token
+    # (issuer, audience, expiry, signature via Google's JWKS) before it will
+    # authenticate anyone. The client id is public and is exposed to the
+    # browser on purpose; absent, the feature simply stays off and the button
+    # is not shown.
+    #
+    # THE CLIENT SECRET IS NOT USED BY THE ID-TOKEN FLOW. It is kept here only
+    # because the same Google OAuth client carries one and a future
+    # authorization-code flow would need it; it must never reach a browser and
+    # is never logged. Leave it blank for the current flow.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    #: Accepted issuers for a Google ID token, per Google's OIDC discovery.
+    google_allowed_issuers: str = "https://accounts.google.com,accounts.google.com"
+    #: How long the short-lived "finish sign-up" token (carrying the verified
+    #: Google subject while the new customer supplies the one field Google does
+    #: not provide — a mobile number) stays valid.
+    google_pending_signup_ttl_minutes: int = 20
+
     model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # ---------------------------------------------------------------- CR-9 --

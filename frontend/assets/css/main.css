@@ -2477,3 +2477,22 @@ html.jp-customer .mobile-partner-mark { display: none; }
   .va-mic.is-listening .va-ring{ opacity:.75; }
   .ta-typing span{ animation:none; opacity:.6; }
 }
+
+/* --- Continue with Google -------------------------------------------------
+   The divider and the mount for Google's own button in the auth modal. The
+   button itself is styled by Google Identity Services (brand compliance), so
+   nothing here touches its look; these only place it and draw the "or" rule.
+   Both stay display:none until app.js confirms Google is configured. */
+.auth-or {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 2px 14px; color: var(--muted, #8a7a5c);
+  font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+}
+.auth-or::before, .auth-or::after {
+  content: ""; flex: 1; height: 1px; background: currentColor; opacity: .25;
+}
+.auth-google { display: flex; justify-content: center; min-height: 40px; }
+.auth-google[hidden], .auth-or[hidden] { display: none; }
+
+/* Small muted note under a read-only field (e.g. "Verified by Google."). */
+.field-hint { margin: 6px 2px 0; font-size: 12px; color: var(--muted, #8a7a5c); }

@@ -173,6 +173,46 @@ class CustomerAuth(Base):
     customer: Mapped["Customer"] = relationship(back_populates="auth")
 
 
+class CustomerIdentity(Base):
+    """A federated sign-in linked to a customer (migration 0087).
+
+    ADDITIVE, NOT A SECOND USER TABLE. The customer stays the ``customers`` row
+    with its own ``customer_id``; this only records "this Google subject is that
+    customer" so the same person signing in again lands on the same account and
+    never a duplicate. A customer may have several rows here (one per provider)
+    or none — an OTP-only customer has none, and nothing here is required to
+    sign in the existing way.
+
+    WHAT IT DELIBERATELY DOES NOT STORE: no access token, no refresh token, no
+    id token. Google's ``sub`` (an opaque, stable per-user id) is the identity;
+    the verified email is kept only to show which Google account is linked. The
+    UNIQUE(provider, provider_user_id) index is what makes a repeat sign-in
+    resolve to one customer instead of creating another.
+    """
+
+    __tablename__ = "customer_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_customer_identities_provider_sub"),
+    )
+
+    customer_identity_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    #: e.g. "google". Kept as text so a second provider needs no migration.
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    #: The provider's stable subject id — Google's ``sub``. NEVER the email.
+    provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: The provider-verified email at link time, for display only.
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+
 class CustomerProfile(Base):
     """What they told us about themselves."""
 
@@ -467,6 +507,23 @@ class CustomerBooking(Base):
     #: Unique per customer; NULL for bookings made before it existed.
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
+    # ---- supplier references (migration 0086) ---------------------------- #
+    # All NULL for a demo-provider booking, which is every booking today. They
+    # carry a real supplier's own identifiers and price so a confirmed booking
+    # can be traced to the order the supplier issued. The airline's PNR still
+    # lands in ``pnr`` above, not here, and the supplier's price is stored
+    # verbatim in its own currency — never converted into ``total_amount``.
+    supplier: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    supplier_offer_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    supplier_order_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    supplier_total_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    supplier_currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    supplier_status: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    supplier_order_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    supplier_payment_required_by: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     cancelled_at: Mapped[Optional[dt.datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
@@ -501,6 +558,10 @@ class CustomerBookingPassenger(Base):
         nullable=False,
     )
     passenger_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: The supplier's own passenger id for this traveller (migration 0086).
+    #: NULL for a demo booking; set only when a supplier order is created and
+    #: needed to echo the right ids back to the supplier at booking time.
+    supplier_passenger_id: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     traveller_type: Mapped[str] = mapped_column(
         _TRAVELLER_TYPE, nullable=False, default=CustomerTravellerType.ADULT.value,
     )

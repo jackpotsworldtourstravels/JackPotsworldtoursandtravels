@@ -813,9 +813,10 @@ const authCloseBtn = document.getElementById('authCloseBtn');
 
 /** step name -> the element that is its view. */
 const AUTH_STEPS = {
-  email:    'authStepEmail',
-  signup:   'authStepSignup',
-  otp:      'loginStepOtp',
+  email:       'authStepEmail',
+  signup:      'authStepSignup',
+  otp:         'loginStepOtp',
+  googleMobile: 'authStepGoogleMobile',
 };
 
 /** Where focus was before the modal took it, so it can be handed back. */
@@ -1804,3 +1805,138 @@ AccountCenter.configure({
 
 function openAccountCenter(tab)   { return AccountCenter.open(tab); }
 function loadUpcomingJourney()    { return AccountCenter.loadUpcomingJourney(); }
+
+/* ===========================================================================
+   CONTINUE WITH GOOGLE — an additional method beside OTP, never a replacement.
+   ===========================================================================
+   The button is Google's own (Google Identity Services), so it follows Google's
+   branding, focus and reduced-motion behaviour without us re-implementing any
+   of it. It appears ONLY when the backend reports a configured client id, so a
+   deployment without Google shows nothing broken.
+
+   The browser holds exactly one Google artefact: the ID-token "credential" the
+   button hands us. We POST it to /api/customer/auth/google; the server verifies
+   it and either returns the same session a successful OTP returns, or asks for
+   a mobile number to finish creating a brand-new account. We never send, or
+   trust, an email address of our own. */
+let googlePendingToken = null;
+let gsiLoading = false, gsiReady = false;
+
+function gEl(id) { return document.getElementById(id); }
+
+function loadGsiScript(cb) {
+  if (gsiReady) { cb(); return; }
+  if (gsiLoading) {
+    const t = setInterval(() => { if (gsiReady) { clearInterval(t); cb(); } }, 60);
+    return;
+  }
+  gsiLoading = true;
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.async = true; s.defer = true;
+  s.onload = () => { gsiReady = true; cb(); };
+  s.onerror = () => { gsiLoading = false; };   /* blocked/offline -> Google stays off */
+  document.head.appendChild(s);
+}
+
+async function initGoogleSignIn() {
+  const mount = gEl('googleBtnMount');
+  if (!mount) return;                 /* modal not on this page */
+  let cfg;
+  try {
+    const { data } = await axios.get(`${API_BASE}/api/customer/auth/google/config`);
+    cfg = data;
+  } catch { return; }                 /* config unreachable -> leave Google off */
+  if (!cfg || !cfg.enabled || !cfg.client_id) return;
+
+  loadGsiScript(() => {
+    if (!(window.google && google.accounts && google.accounts.id)) return;
+    google.accounts.id.initialize({
+      client_id: cfg.client_id,
+      callback: onGoogleCredential,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+    google.accounts.id.renderButton(mount, {
+      type: 'standard', theme: 'outline', size: 'large',
+      text: 'continue_with', shape: 'pill', logo_alignment: 'left', width: 320,
+    });
+    mount.hidden = false;
+    const or = gEl('googleOr'); if (or) or.hidden = false;
+  });
+}
+
+async function onGoogleCredential(resp) {
+  const msg = gEl('googleMsg');
+  if (msg) setModalMsg(msg, '', 'muted');
+  if (!resp || !resp.credential) return;   /* user dismissed -> nothing to do */
+  try {
+    const { data } = await axios.post(`${API_BASE}/api/customer/auth/google`,
+      { credential: resp.credential });
+    if (data.status === 'authenticated') { completeCustomerSignIn(data); return; }
+    if (data.status === 'needs_signup') {
+      googlePendingToken = data.pending_token;
+      const prefill = data.prefill || {};
+      /* Google already gave us the verified email, so we never ask for it
+         again. The name is pre-filled but editable; the mobile is all that is
+         genuinely missing. */
+      const nameEl = gEl('gName');
+      if (nameEl) nameEl.value = prefill.name || '';
+      const sub = gEl('googleFinishSub');
+      if (sub) sub.textContent = prefill.name
+        ? `Welcome, ${prefill.name}. Confirm your details to finish creating your account.`
+        : 'Confirm your details to finish creating your account.';
+      showStep('googleMobile');
+      /* Name is filled, so send the caret to the field that still needs it. */
+      const m = gEl('gMobile'); if (m) setTimeout(() => m.focus(), 60);
+    }
+  } catch (err) {
+    /* 409 is the "email already has an account, link it deliberately" case. */
+    const text = err?.response?.status === 409
+      ? (err.response.data?.detail
+         || 'This email already has an account. Sign in the usual way and link Google from your account settings.')
+      : authErrorFor(err, 'We could not complete Google sign-in. Please try again.');
+    if (msg) setModalMsg(msg, text, 'error');
+  }
+}
+
+(function wireGoogleFinish() {
+  const form = gEl('googleFinishForm');
+  if (!form) return;
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = gEl('googleFinishBtn');
+    const msg = gEl('googleFinishMsg');
+    if (isBusy(btn)) return;
+    setModalMsg(msg, '', 'muted');
+    const fullName = (gEl('gName')?.value || '').trim();
+    const mobile = (gEl('gMobile').value || '').trim();
+    if (fullName.length < 2) {
+      setModalMsg(msg, 'Enter your full name.', 'error');
+      gEl('gName')?.focus();
+      return;
+    }
+    if (mobile.replace(/\D/g, '').length < 6) {
+      setModalMsg(msg, 'Enter a valid mobile number, including the country code.', 'error');
+      return;
+    }
+    if (!googlePendingToken) {
+      setModalMsg(msg, 'Your sign-up session expired. Please try Google again.', 'error');
+      showStep('email');
+      return;
+    }
+    setBusy(btn, true, 'Creating…');
+    try {
+      const { data } = await axios.post(`${API_BASE}/api/customer/auth/google/complete`,
+        { pending_token: googlePendingToken, mobile, full_name: fullName });
+      googlePendingToken = null;
+      completeCustomerSignIn(data);
+    } catch (err) {
+      setModalMsg(msg, authErrorFor(err, 'We could not finish creating your account. Please try again.'), 'error');
+    } finally {
+      setBusy(btn, false);
+    }
+  });
+})();
+
+initGoogleSignIn();

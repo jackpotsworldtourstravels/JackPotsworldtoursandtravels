@@ -28,6 +28,31 @@
    FAIL-OPEN. Hidden starting states in the stylesheet apply only under
    `html.ds-motion`, which is set here, after the observer exists. Reduced
    motion never sets it.
+
+   THE FIVE MOTION FAMILIES, AND WHERE EACH ONE ALREADY LIVES. There is ONE
+   motion system — this file and jw-system.css — and every animation on the
+   site is one of five families. This is the map, not a new layer: nothing
+   below re-implements these, they name what is already here.
+
+     DEVELOP  a photograph arriving: placeholder -> blur -> sharp -> settled.
+              `img.ds-dev` + DS.develop (jw-system.css §"develop"). The image
+              lifecycle, unchanged.
+     RISE     a card or section entering the viewport, once, with an optional
+              parent stagger. `[data-ds-reveal]` / `data-ds-stagger`, via the
+              one shared observer; JWMotion.grid arms API-rendered grids.
+     ROUTE    a travel line drawing itself across a frame. `ds-draw` on
+              `.ds-hero__route` and on the `.ds-state__art` arc — the brand
+              motif used for the hero and for loading/empty states alike.
+     MORPH    a set of results or a stepper changing: skeleton -> rows is the
+              RISE entrance replayed on the new list (DS.skeleton then
+              JWMotion.grid); a stepper advancing adds the small check-pop /
+              ring-settle beat (jw-system.css §3.14). Never a layout jump.
+     REVEAL   a page or hero opening: the shade, grain, breadcrumb, eyebrow
+              and display H1 of `.ds-hero`, plus DS.gsap choreography loaded
+              on demand. The page's single entrance.
+
+   Reduced motion collapses all five to their settled state — no draw, no
+   stagger, no continuous shimmer — because `html.ds-motion` is never set.
    =========================================================================== */
 (function (global) {
   const doc = document, root = doc.documentElement;
