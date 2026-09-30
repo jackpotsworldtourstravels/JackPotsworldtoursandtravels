@@ -85,7 +85,7 @@ def _booking_pk_value(row) -> int:
     raise ValueError(f"No primary key on {type(row).__name__}")
 
 
-def _destination(product: str, row) -> str:
+def destination(product: str, row) -> str:
     if product == "flight":
         origin = row.origin_city or row.origin_code or "?"
         dest = row.destination_city or row.destination_code or "?"
@@ -116,6 +116,17 @@ def _find_product(db: Session, booking_ref: str):
         if row is not None:
             return (product, label, book_model, pay_model, pay_fk, trav_model, trav_fk), row
     return None, None
+
+
+def find_booking(db: Session, booking_ref: str) -> tuple[str, object] | tuple[None, None]:
+    """Public wrapper on ``_find_product`` for other modules — Phase 3's
+    cancellation service uses this to resolve a ``booking_ref`` to its
+    product and row without a second implementation of the same lookup.
+    Returns ``(product, booking_row)`` or ``(None, None)``."""
+    spec, row = _find_product(db, booking_ref)
+    if spec is None:
+        return None, None
+    return spec[0], row
 
 
 def _latest_payment(db: Session, pay_model, fk_col, booking_pk_value):
@@ -183,7 +194,7 @@ def list_bookings(
                     "email": customer.email,
                 },
                 "service_type": label,
-                "destination": _destination(product, booking),
+                "destination": destination(product, booking),
                 "travel_date": _travel_date(product, booking),
                 "amount": Decimal(str(booking.total_amount or 0)),
                 "payment_status": (payment.status.upper() if payment else "NO_PAYMENT"),
@@ -237,7 +248,7 @@ def get_booking(db: Session, booking_ref: str) -> dict[str, Any] | None:
             "mobile": customer.mobile,
         },
         "service_type": label,
-        "destination": _destination(product, booking),
+        "destination": destination(product, booking),
         "travel_date": _travel_date(product, booking),
         "passengers": traveller_names,
         "amount": Decimal(str(booking.total_amount or 0)),

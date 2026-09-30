@@ -660,6 +660,47 @@ class CustomerBookingPayment(Base):
     booking: Mapped["CustomerBooking"] = relationship(back_populates="payments")
 
 
+class CustomerCancellationRequest(Base):
+    """A customer's request to cancel a booking, and the admin desk's answer —
+    Phase 3 of the B2C Admin Portal build-out (migration 0089).
+
+    POLYMORPHIC BY ``product`` + ``booking_ref``, deliberately not an FK to any
+    one of the three booking tables — see the migration's own docstring for
+    why. ``customer_booking_admin_service.find_booking()`` (Phase 2) resolves
+    it the same way that module already reads across all three.
+
+    NO ``decided_by`` COLUMN. Recording which admin approved/rejected a
+    request would need a foreign key across this module's Base into
+    ``models_v2``'s ``users.user_id`` — the separation this file's own header
+    calls structural rather than remembered. Every admin action here is
+    recorded in the existing, portal-wide ``activity_service`` audit log
+    instead, the same as Phase 1 and Phase 2's actions already are.
+    """
+
+    __tablename__ = "customer_cancellation_requests"
+
+    cancellation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cancellation_ref: Mapped[str] = mapped_column(String(40), nullable=False)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("customers.customer_id", ondelete="CASCADE"), nullable=False,
+    )
+    product: Mapped[str] = mapped_column(String(20), nullable=False)
+    booking_ref: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="requested")
+    #: NULL until an admin sets it on approval — the amount actually refunded
+    #: may differ from the booking's own total (a partial refund), so this is
+    #: its own field rather than a lookup of the booking at read time.
+    refund_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(),
+    )
+
+
 class CustomerCoupon(Base):
     """A discount the site actually offers. Seeded from the landing page."""
 

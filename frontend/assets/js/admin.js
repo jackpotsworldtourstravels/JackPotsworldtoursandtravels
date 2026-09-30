@@ -281,12 +281,15 @@ function loadSection(name) {
   /* Phase 2. Defined in admin-b2c-bookings.js, loaded after this file.
      Read + one write (status). */
   if (name === 'b2c-bookings') return initB2CBookings();
+  /* Phase 3. Defined in admin-b2c-refunds.js, loaded after this file.
+     Read + the approve/reject/refund state machine. */
+  if (name === 'b2c-refunds') return initB2CRefunds();
   /* ---- B2C Management placeholders (Phase 0) ----
      Each is built out in its own later phase; see the plan this was scoped
      from. initComingSoon() just names the module so the section is never
      blank, and calls no endpoint. */
   const B2C_SOON = {
-    'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
+    'b2c-reviews': 'Reviews & Ratings',
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
     'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
     'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',

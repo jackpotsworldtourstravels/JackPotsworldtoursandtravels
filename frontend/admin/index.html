@@ -1235,8 +1235,23 @@
       </div>
     </section>
     <section class="section" id="section-b2c-refunds">
-      <div class="panel"><div class="panel-head"><h2>Cancellations &amp; Refunds</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Cancellations &amp; Refunds</h2>
+          <span class="ops-sub" id="cxlSummary"></span>
+        </div>
+        <div class="ops-tabs" id="cxlTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="cxlSearch"
+                 placeholder="Search request ID, booking ID, customer or email…"
+                 aria-label="Search cancellation requests">
+        </div>
+        <div class="table-wrap"><table id="cxlTable"><thead><tr>
+          <th>Cancellation ID</th><th>Booking ID</th><th>Customer</th><th>Service</th>
+          <th>Reason</th><th>Requested</th><th>Status</th><th class="num">Refund Amount</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="cxlPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-reviews">
       <div class="panel"><div class="panel-head"><h2>Reviews &amp; Ratings</h2></div>
@@ -1463,6 +1478,12 @@
   <div class="modal-card modal-lg" id="bkgModalBody"></div>
 </div>
 
+<!-- B2C Cancellations & Refunds (Phase 3). Approve/Reject/Start Refund/
+     Complete Refund — see admin-b2c-refunds.js. -->
+<div class="modal-overlay" id="cxlModalOverlay">
+  <div class="modal-card modal-lg" id="cxlModalBody"></div>
+</div>
+
 <!-- Settle a cancellation or reschedule: quote the amounts, then approve or
      reject. Rendered by admin-change-requests.js, opened from a row on Service
      Request Management. -->
@@ -1661,7 +1682,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p2a"></script>
+<script src="../assets/js/admin.js?v=0930p3a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1715,6 +1736,7 @@
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
 <script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
+<script src="../assets/js/admin-b2c-refunds.js?v=0930p3a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
