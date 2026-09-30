@@ -1186,8 +1186,23 @@
          here calls an endpoint yet, so there is nothing to break by adding
          it. initComingSoon() in admin.js fills the `.b2c-soon-body` div. -->
     <section class="section" id="section-b2c-customers">
-      <div class="panel"><div class="panel-head"><h2>Customers</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Customers</h2>
+          <span class="ops-sub" id="custSummary"></span>
+        </div>
+        <div class="ops-tabs" id="custTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="custSearch"
+                 placeholder="Search name, email, mobile or customer code…"
+                 aria-label="Search customers">
+        </div>
+        <div class="table-wrap"><table id="custTable"><thead><tr>
+          <th>Customer ID</th><th>Name</th><th>Email</th><th>Mobile</th>
+          <th>Registered</th><th>Status</th><th class="num">Bookings</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="custPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-reconciliation">
       <div class="panel"><div class="panel-head"><h2>Payment Reconciliation</h2></div>
@@ -1412,6 +1427,12 @@
 
 <div class="modal-overlay" id="gtModalOverlay">
   <div class="modal-card modal-lg" id="gtModalBody"></div>
+</div>
+
+<!-- B2C Customers (Phase 1). Profile + Booking History + Payment History +
+     Reviews, read-only — see admin-b2c-customers.js. -->
+<div class="modal-overlay" id="custModalOverlay">
+  <div class="modal-card modal-lg" id="custModalBody"></div>
 </div>
 
 <!-- Settle a cancellation or reschedule: quote the amounts, then approve or
@@ -1664,6 +1685,7 @@
 <script src="../assets/js/admin-enquiries.js?v=20260820ui1"></script>
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
+<script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

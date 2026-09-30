@@ -121,13 +121,15 @@ def _pk(payment) -> int:
 
 
 def _base_query(db: Session, product_spec, *, status=None, provider=None,
-                search=None, date_from=None, date_to=None):
+                search=None, date_from=None, date_to=None, customer_id=None):
     product, pay_model, book_model, fk, title_col, travel_col = product_spec
     q = (
         select(pay_model, book_model, Customer, title_col, travel_col)
         .join(book_model, fk == _booking_pk(book_model))
         .join(Customer, Customer.customer_id == book_model.customer_id)
     )
+    if customer_id is not None:
+        q = q.where(book_model.customer_id == customer_id)
     if status:
         q = q.where(pay_model.status == status)
     if provider:
@@ -167,6 +169,7 @@ def list_payments(
     db: Session, *, page: int = 1, page_size: int = 25, product: str | None = None,
     status: str | None = None, provider: str | None = None, search: str | None = None,
     date_from: dt.date | None = None, date_to: dt.date | None = None,
+    customer_id: int | None = None,
 ) -> dict[str, Any]:
     """Every B2C payment matching the filters, newest first.
 
@@ -176,13 +179,17 @@ def list_payments(
     that drifts the moment one of them gains a field. The volumes here are a
     customer-portal's worth of payments, not a ledger's; correctness over a
     join that has to be right three times.
+
+    ``customer_id`` narrows to one customer's payments across all three
+    products — the Customer Details screen's Payment History section reuses
+    this rather than a second, parallel query (see customer_admin_service.py).
     """
     rows: list[dict[str, Any]] = []
     for spec in _PRODUCTS:
         if product and spec[0] != product:
             continue
         q = _base_query(db, spec, status=status, provider=provider, search=search,
-                        date_from=date_from, date_to=date_to)
+                        date_from=date_from, date_to=date_to, customer_id=customer_id)
         for payment, booking, customer, title, travel in db.execute(q).all():
             rows.append(_row(spec[0], payment, booking, customer, title, travel))
 

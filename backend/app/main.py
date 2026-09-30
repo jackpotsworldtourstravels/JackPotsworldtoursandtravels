@@ -25,6 +25,7 @@ from app.routers import (
     booking_ops,
     change_requests,
     customer_account,
+    customer_admin,
     customer_assistant,
     customer_auth,
     customer_bookings,
@@ -315,6 +316,7 @@ app.include_router(payment_admin.router)
 # B2C customer payments, read-only, gated on payment.verify (admin only).
 # Separate from payment_admin above, which is the MERCHANT wallet desk.
 app.include_router(customer_payment_admin.router)
+app.include_router(customer_admin.router)
 # M5 — message delivery seen by staff. Gated on notification.send, which only
 # the Admin role holds: notification.view is every merchant's own bell.
 app.include_router(messages.router)

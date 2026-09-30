@@ -275,12 +275,15 @@ function loadSection(name) {
   /* No 'change-requests' case: cancellations and reschedules are rows on
      Service Request Management, which opens the settle dialog by row type. */
   if (name === 'profile') return loadAdminProfile();
+  /* Phase 1 of the B2C Admin Portal build-out. Defined in
+     admin-b2c-customers.js, loaded after this file. Read-only. */
+  if (name === 'b2c-customers') return initB2CCustomers();
   /* ---- B2C Management placeholders (Phase 0) ----
      Each is built out in its own later phase; see the plan this was scoped
      from. initComingSoon() just names the module so the section is never
      blank, and calls no endpoint. */
   const B2C_SOON = {
-    'b2c-customers': 'Customers', 'b2c-bookings': 'Bookings',
+    'b2c-bookings': 'Bookings',
     'b2c-refunds': 'Cancellations & Refunds', 'b2c-reviews': 'Reviews & Ratings',
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
     'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',

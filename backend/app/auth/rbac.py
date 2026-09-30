@@ -150,6 +150,13 @@ class P:
     DOCUMENT_UPLOAD = "document.upload"
     DOCUMENT_VERIFY = "document.verify"
 
+    # B2C — direct customers (models_customer.py), not merchants. Admin-only,
+    # the same footing as PAYMENT_VERIFY on the B2C payments desk: reading a
+    # member of the public's own data is operations work, not something a
+    # merchant-side role or the Super Admin's account-administration remit
+    # extends to.
+    CUSTOMER_VIEW = "customer.view"
+
     # Cross-cutting
     PROFILE_MANAGE = "profile.manage"
     NOTIFICATION_VIEW = "notification.view"
@@ -203,6 +210,7 @@ _ADMIN: frozenset[str] = frozenset({
     P.PROFILE_MANAGE,
     P.NOTIFICATION_VIEW, P.NOTIFICATION_SEND,
     P.SYSTEM_ACTIVITY_VIEW, P.AUDIT_VIEW,
+    P.CUSTOMER_VIEW,
 })
 
 # The Manager (CR-2) exists to do exactly one thing: read a submitted Booking
