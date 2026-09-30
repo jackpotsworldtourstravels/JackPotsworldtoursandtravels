@@ -1209,8 +1209,30 @@
         <div class="b2c-soon-body"></div></div>
     </section>
     <section class="section" id="section-b2c-bookings">
-      <div class="panel"><div class="panel-head"><h2>Bookings</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Bookings</h2>
+          <span class="ops-sub" id="bkgSummary"></span>
+        </div>
+        <div class="ops-tabs" id="bkgServiceTabs" role="tablist"></div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="bkgSearch"
+                 placeholder="Search booking ID, customer, email or destination…"
+                 aria-label="Search bookings">
+          <select id="bkgStatusFilter" class="status-select" aria-label="Filter by booking status">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="bkgTable"><thead><tr>
+          <th>Booking ID</th><th>Customer</th><th>Service</th><th>Destination</th>
+          <th>Travel Date</th><th class="num">Amount</th><th>Payment</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="bkgPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-refunds">
       <div class="panel"><div class="panel-head"><h2>Cancellations &amp; Refunds</h2></div>
@@ -1435,6 +1457,12 @@
   <div class="modal-card modal-lg" id="custModalBody"></div>
 </div>
 
+<!-- B2C Bookings (Phase 2). Customer + Trip + Payment, plus the one write
+     this module has — status — see admin-b2c-bookings.js. -->
+<div class="modal-overlay" id="bkgModalOverlay">
+  <div class="modal-card modal-lg" id="bkgModalBody"></div>
+</div>
+
 <!-- Settle a cancellation or reschedule: quote the amounts, then approve or
      reject. Rendered by admin-change-requests.js, opened from a row on Service
      Request Management. -->
@@ -1633,7 +1661,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0929nav3"></script>
+<script src="../assets/js/admin.js?v=0930p2a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1686,6 +1714,7 @@
 <!-- Gaming Tour Enquiries queue. Also after admin.js, same reused helpers. -->
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
+<script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged
