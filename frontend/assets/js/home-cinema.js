@@ -317,19 +317,18 @@ const HomeCinema = (function () {
     });
     shelfTriggers.push(...batch);
 
-    /* DRIFT: every card at its own rate — the large ones slower, the small
-       ones quicker — the photograph moving inside its frame against the
-       card, and the words moving against both. */
-    list.forEach((c, i) => {
-      const big = c.matches(':nth-child(3n+1)');
-      const rate = small ? (big ? 3 : 5) : (big ? 5 : 9) + (i % 3) * 2;
+    /* DRIFT: only the photograph moves inside its frame — a gentle parallax
+       within each card. The cards themselves stay put: the per-card vertical
+       drift and 3D tilt that used to move each one by its own amount left the
+       grid looking tilted and misaligned once it expanded to every card, so
+       they are gone. The cards sit flat and aligned; the life is in the
+       photographs shifting behind their fixed frames. */
+    list.forEach((c) => {
       const art = $('.jw-dest-art', c), body = $('.jw-dest-body', c);
       const tl = gsap.timeline({
         defaults: { ease: 'none' },
         scrollTrigger: { trigger: c, start: 'top bottom', end: 'bottom top', scrub: 0.8 },
       });
-      tl.fromTo(c, { yPercent: rate }, { yPercent: -rate }, 0);
-      if (!small) tl.fromTo(c, { rotationX: 7, transformPerspective: 1600 }, { rotationX: -5 }, 0);
       if (art) tl.fromTo(art, { yPercent: -7 }, { yPercent: 7 }, 0);
       if (body) tl.fromTo(body, { y: small ? 10 : 26 }, { y: small ? -10 : -26 }, 0);
       shelfTriggers.push(tl.scrollTrigger);
