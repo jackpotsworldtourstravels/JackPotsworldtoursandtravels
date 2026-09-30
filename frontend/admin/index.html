@@ -1205,8 +1205,29 @@
       </div>
     </section>
     <section class="section" id="section-b2c-reconciliation">
-      <div class="panel"><div class="panel-head"><h2>Payment Reconciliation</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Payment Reconciliation</h2>
+          <span class="ops-sub">Verifies a captured payment against its own gateway, on demand. Read-only — Customer Payments is the record of truth.</span>
+        </div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="rcnSearch"
+                 placeholder="Search booking reference, customer or provider ID…"
+                 aria-label="Search payments">
+          <select id="rcnProductFilter" class="status-select" aria-label="Filter by product">
+            <option value="">All products</option>
+            <option value="package">Packages</option>
+            <option value="hotel">Hotels</option>
+            <option value="flight">Flights</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="rcnTable"><thead><tr>
+          <th>Transaction ID</th><th>Booking ID</th><th>Customer</th><th>Service</th>
+          <th class="num">Expected Amount</th><th class="num">Gateway Amount</th>
+          <th>Payment Status</th><th>Reconciliation Status</th><th>Action</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="rcnPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-bookings">
       <div class="panel">
@@ -1682,7 +1703,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p3a"></script>
+<script src="../assets/js/admin.js?v=0930p4a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1737,6 +1758,7 @@
 <script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
 <script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=0930p3a"></script>
+<script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

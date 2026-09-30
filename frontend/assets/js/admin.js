@@ -284,6 +284,9 @@ function loadSection(name) {
   /* Phase 3. Defined in admin-b2c-refunds.js, loaded after this file.
      Read + the approve/reject/refund state machine. */
   if (name === 'b2c-refunds') return initB2CRefunds();
+  /* Phase 4. Defined in admin-b2c-reconciliation.js, loaded after this file.
+     Read + one live, unstored action (Verify). */
+  if (name === 'b2c-reconciliation') return initB2CReconciliation();
   /* ---- B2C Management placeholders (Phase 0) ----
      Each is built out in its own later phase; see the plan this was scoped
      from. initComingSoon() just names the module so the section is never
@@ -293,7 +296,7 @@ function loadSection(name) {
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
     'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
     'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',
-    'b2c-analytics': 'B2C Analytics', 'b2c-reconciliation': 'Payment Reconciliation',
+    'b2c-analytics': 'B2C Analytics',
   };
   if (name in B2C_SOON) return initComingSoon(name, B2C_SOON[name]);
 }

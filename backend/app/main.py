@@ -27,6 +27,7 @@ from app.routers import (
     customer_account,
     admin_cancellations,
     admin_customer_bookings,
+    admin_reconciliation,
     customer_admin,
     customer_cancellations,
     customer_assistant,
@@ -323,6 +324,7 @@ app.include_router(customer_admin.router)
 app.include_router(admin_customer_bookings.router)
 app.include_router(admin_cancellations.router)
 app.include_router(customer_cancellations.router)
+app.include_router(admin_reconciliation.router)
 # M5 — message delivery seen by staff. Gated on notification.send, which only
 # the Admin role holds: notification.view is every merchant's own bell.
 app.include_router(messages.router)
