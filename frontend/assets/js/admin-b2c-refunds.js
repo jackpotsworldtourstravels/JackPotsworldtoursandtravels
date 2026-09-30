@@ -228,6 +228,12 @@ async function cxlDecide(cancellationId, action) {
   if (amountEl && amountEl.value !== '') payload.refund_amount = Number(amountEl.value);
 
   msg.textContent = ''; msg.className = 'msg';
+  /* One request at a time: a double-click must not send the action twice. The
+     server's state machine would refuse the second, but the refusal would then
+     be shown over the first one's success. A success re-renders the modal (fresh
+     buttons); a failure re-enables these so the desk can retry. */
+  const buttons = document.querySelectorAll('#cxlModalBody .modal-actions button');
+  buttons.forEach(b => { b.disabled = true; });
   try {
     const { data } = await axios.patch(
       `${API_BASE}/api/admin/cancellations/${encodeURIComponent(cancellationId)}`,
@@ -239,6 +245,7 @@ async function cxlDecide(cancellationId, action) {
   } catch (err) {
     msg.textContent = (err.response && err.response.data && err.response.data.detail) || 'Could not save this change.';
     msg.className = 'msg error';
+    buttons.forEach(b => { b.disabled = false; });
   }
 }
 

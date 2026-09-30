@@ -76,6 +76,11 @@ function catModalShell(title, bodyHtml) {
 
 const catE = v => escapeHtml(v == null ? '' : String(v));
 
+/* Display formatters the Phase 5-8 screens share (one definition each). */
+const catCap = s => String(s).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+const catWhen = v => v ? new Date(v).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+const catDate = v => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
 function catField(label, controlHtml, hint) {
   return `<div class="form-field" style="max-width:none;"><label>${escapeHtml(label)}</label>${controlHtml}${
     hint ? `<div class="cell-sub" style="margin-top:4px;">${escapeHtml(hint)}</div>` : ''}</div>`;

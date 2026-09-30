@@ -24,7 +24,6 @@ const COM_TYPE_LABEL = {
   booking_cancelled: 'Booking cancelled', booking_payment: 'Payment', general: 'General',
 };
 const COM_TICKET_TONE = { open: 'pending', in_progress: 'refunded', resolved: 'confirmed', closed: 'inactive' };
-const comLabel = s => String(s).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
 
 const comState = { tab: 'notifications', nPage: 1, nType: '', nRead: '', nSearch: '', tPage: 1, tStatus: '', tPriority: '', tSearch: '' };
 let comWired = false;
@@ -33,7 +32,6 @@ async function comApi(path, params) {
   const res = await axios.get(`${API_BASE}/api/admin/communication${path}`, { headers: authHeaders(), params });
   return res.data;
 }
-const comWhen = v => v ? new Date(v).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 const comWho = c => `${escapeHtml(c.name)}<div class="cell-sub">${escapeHtml(c.email)}</div>`;
 
 async function initB2CCommunication() {
@@ -92,15 +90,15 @@ async function comLoadNotifications(page = comState.nPage) {
     document.getElementById('comNotifSummary').innerHTML = `
       <div class="detail-item"><span class="detail-label">Sent</span><span class="detail-value">${s.total}</span></div>
       <div class="detail-item"><span class="detail-label">Read</span><span class="detail-value">${readPct}% <span class="cell-sub">(${s.total - s.unread} of ${s.total})</span></span></div>
-      ${Object.entries(s.by_type).map(([t, n]) => `<div class="detail-item"><span class="detail-label">${escapeHtml(COM_TYPE_LABEL[t] || comLabel(t))}</span><span class="detail-value">${n}</span></div>`).join('')}`;
+      ${Object.entries(s.by_type).map(([t, n]) => `<div class="detail-item"><span class="detail-label">${escapeHtml(COM_TYPE_LABEL[t] || catCap(t))}</span><span class="detail-value">${n}</span></div>`).join('')}`;
     tbody.innerHTML = d.items.length ? d.items.map(n => `
       <tr>
-        <td>${comWhen(n.created_at)}</td>
+        <td>${catWhen(n.created_at)}</td>
         <td>${comWho(n.customer)}</td>
-        <td>${escapeHtml(COM_TYPE_LABEL[n.notification_type] || comLabel(n.notification_type))}</td>
+        <td>${escapeHtml(COM_TYPE_LABEL[n.notification_type] || catCap(n.notification_type))}</td>
         <td><strong>${escapeHtml(n.title)}</strong><div class="cell-sub">${escapeHtml(n.message)}</div></td>
         <td>${n.related_ref ? `<span class="mono">${escapeHtml(n.related_ref)}</span>` : '—'}</td>
-        <td>${n.is_read ? `<span class="badge confirmed">Read</span><div class="cell-sub">${comWhen(n.read_at)}</div>` : '<span class="badge pending">Unread</span>'}</td>
+        <td>${n.is_read ? `<span class="badge confirmed">Read</span><div class="cell-sub">${catWhen(n.read_at)}</div>` : '<span class="badge pending">Unread</span>'}</td>
       </tr>`).join('') : `<tr><td colspan="6" class="empty-state">No notifications match this filter.</td></tr>`;
     renderPagination('comNotifPagination', d.page, d.total_pages, d.total, comLoadNotifications);
   } catch (err) {
@@ -124,8 +122,8 @@ async function comLoadTickets(page = comState.tPage) {
         <td class="mono">#${t.ticket_id}</td>
         <td>${comWho(t.customer)}</td>
         <td>${escapeHtml(t.subject)}</td>
-        <td>${escapeHtml(comLabel(t.priority))}</td>
-        <td><span class="badge ${COM_TICKET_TONE[t.status] || 'pending'}">${escapeHtml(comLabel(t.status))}</span></td>
+        <td>${escapeHtml(catCap(t.priority))}</td>
+        <td><span class="badge ${COM_TICKET_TONE[t.status] || 'pending'}">${escapeHtml(catCap(t.status))}</span></td>
         <td class="num">${t.message_count}</td>
         <td><button type="button" class="btn btn-ghost btn-sm" data-com-ticket="${t.ticket_id}">View</button></td>
       </tr>`).join('') : `<tr><td colspan="7" class="empty-state">No tickets match this filter.</td></tr>`;
@@ -141,18 +139,18 @@ async function comOpenTicket(id) {
     const t = await comApi(`/tickets/${encodeURIComponent(id)}`);
     catOpenModal(`
       <div class="ops-modal-head"><h2>#${t.ticket_id} ${escapeHtml(t.subject)}
-        <span class="badge ${COM_TICKET_TONE[t.status] || 'pending'}">${escapeHtml(comLabel(t.status))}</span></h2>
+        <span class="badge ${COM_TICKET_TONE[t.status] || 'pending'}">${escapeHtml(catCap(t.status))}</span></h2>
         <button type="button" class="ops-modal-close" data-cat-close aria-label="Close">&times;</button></div>
       <div class="ops-modal-body">
         <div class="detail-grid">
           <div class="detail-item"><span class="detail-label">Customer</span><span class="detail-value">${comWho(t.customer)}</span></div>
-          <div class="detail-item"><span class="detail-label">Priority</span><span class="detail-value">${escapeHtml(comLabel(t.priority))}</span></div>
-          <div class="detail-item"><span class="detail-label">Opened</span><span class="detail-value">${comWhen(t.created_at)}</span></div>
+          <div class="detail-item"><span class="detail-label">Priority</span><span class="detail-value">${escapeHtml(catCap(t.priority))}</span></div>
+          <div class="detail-item"><span class="detail-label">Opened</span><span class="detail-value">${catWhen(t.created_at)}</span></div>
         </div>
         <p class="cp-readonly-note">History only. The customer site now uses live chat, so this ticket can no longer be answered from here — continue the conversation on Live Support.</p>
         <div>${t.messages.map(m => `
           <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
-            <div class="cell-sub"><strong>${escapeHtml(m.author_name || 'Customer')}</strong>${m.is_staff ? ' · staff' : ''} · ${comWhen(m.created_at)}</div>
+            <div class="cell-sub"><strong>${escapeHtml(m.author_name || 'Customer')}</strong>${m.is_staff ? ' · staff' : ''} · ${catWhen(m.created_at)}</div>
             <div style="white-space:pre-wrap; margin-top:3px;">${escapeHtml(m.message)}</div></div>`).join('')}</div>
       </div>`);
   } catch (err) {
@@ -176,7 +174,7 @@ async function comLoadChat() {
         ${card('Unread by agents', c.admin_unread, 'Customer messages not yet read')}
         ${card('Messages', c.messages_total)}
         ${card('Voice calls', c.calls_total, Object.entries(c.calls_by_status).map(([k, n]) => `${n} ${k}`).join(' · '))}
-        ${card('Longest wait since', c.oldest_waiting_at ? comWhen(c.oldest_waiting_at) : '—', 'Oldest conversation still waiting')}
+        ${card('Longest wait since', c.oldest_waiting_at ? catWhen(c.oldest_waiting_at) : '—', 'Oldest conversation still waiting')}
       </div>
       <p class="cp-readonly-note" style="margin-top:14px;">Chats and calls are answered on the Live Support desk — this is only a summary.</p>
       <div class="cat-actions" style="justify-content:flex-start;">

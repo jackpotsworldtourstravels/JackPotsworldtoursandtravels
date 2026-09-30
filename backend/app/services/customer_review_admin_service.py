@@ -231,3 +231,10 @@ def analytics(db: Session) -> dict:
         "distribution": [{"rating": r, "count": dist.get(r, 0)} for r in (5, 4, 3, 2, 1)],
         "by_product": by_product, "top_items": top, "lowest_items": lowest, "monthly": monthly,
     }
+
+
+def item_names(db: Session, keys: set[tuple[str, int]]) -> dict[tuple[str, int], tuple[str, str]]:
+    """Public wrapper on ``_names`` for other modules (Phase 8's report export
+    resolves review items the same way instead of a second implementation).
+    ``(item_type, item_id)`` -> ``(display name, product)``."""
+    return _names(db, keys)

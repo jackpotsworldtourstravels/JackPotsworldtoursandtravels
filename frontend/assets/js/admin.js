@@ -167,6 +167,18 @@ const loadedSections = new Set();
 /* Shared by the sidebar nav clicks and any programmatic jump (Quick Actions, global search results) —
    `onArrive` runs after the section is loaded (or immediately if it was already loaded), so callers can
    apply a filter/scroll without duplicating loadSection's logic. */
+/* B2C data screens refetch on EVERY visit rather than once per page load. They
+   are operational queues and dashboards (refunds to approve, reviews to moderate,
+   notifications, activity, analytics): with the load-once cache below, a new
+   cancellation request or a review approved on another screen would not show
+   until the browser was reloaded. Each of their init functions is guarded by its
+   own "wired" flag, so calling one again only refetches. (Customer Payments is
+   left on load-once: its init re-attaches its own handlers on every call.) */
+const B2C_RELOAD_ON_VISIT = new Set([
+  'b2c-customers', 'b2c-bookings', 'b2c-refunds', 'b2c-reconciliation', 'b2c-reviews',
+  'b2c-communication', 'b2c-activity', 'b2c-cat-flights', 'b2c-cat-hotels', 'b2c-cat-packages',
+  'b2c-cat-destinations', 'b2c-reports', 'b2c-analytics',
+]);
 function navigateToSection(name, onArrive) {
   document.querySelectorAll('.nav-item[data-section]').forEach(l => l.classList.toggle('active', l.dataset.section === name));
   const sectionId = SECTION_ALIAS[name] || name;
@@ -179,7 +191,7 @@ function navigateToSection(name, onArrive) {
      would skip re-rendering on a second visit and leave whatever the LAST
      bucket drew on screen. Those always reload; everything else keeps the
      load-once behaviour this cache has always had. */
-  if (SECTION_ALIAS[name] || !loadedSections.has(name)) {
+  if (SECTION_ALIAS[name] || B2C_RELOAD_ON_VISIT.has(name) || !loadedSections.has(name)) {
     loadedSections.add(name);
     Promise.resolve(loadSection(name)).then(() => onArrive?.());
   } else {
@@ -300,23 +312,12 @@ function loadSection(name) {
      loaded after this file. Both read-only. */
   if (name === 'b2c-communication') return initB2CCommunication();
   if (name === 'b2c-activity') return initB2CActivity();
-  /* ---- B2C Management placeholders (Phase 0) ----
-     Each is built out in its own later phase; see the plan this was scoped
-     from. initComingSoon() just names the module so the section is never
-     blank, and calls no endpoint. */
-  const B2C_SOON = {
-    'b2c-reports': 'B2C Reports',
-    'b2c-analytics': 'B2C Analytics',
-  };
-  if (name in B2C_SOON) return initComingSoon(name, B2C_SOON[name]);
-}
-
-function initComingSoon(name, label) {
-  const body = document.querySelector(`#section-${name} .b2c-soon-body`);
-  if (body) {
-    body.innerHTML = `<p class="empty-state">${escapeHtml(label)} is part of the B2C Admin Portal
-      extension and is being built in a later phase. Nothing to load here yet.</p>`;
-  }
+  /* Phase 8. Defined in admin-b2c-reports.js / admin-b2c-analytics.js, loaded
+     after this file. */
+  if (name === 'b2c-reports') return initB2CReports();
+  if (name === 'b2c-analytics') return initB2CAnalytics();
+  /* Every module in the B2C Management tree has its own screen; there are no
+     placeholder screens left to route. */
 }
 
 /* ---------- Loading skeletons ---------- */

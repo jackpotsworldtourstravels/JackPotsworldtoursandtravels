@@ -1635,3 +1635,64 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
    bars on top of each other in a tabbed editor where every tab has its own
    Save. Right-aligned like the standard, and it stays where it is written. */
 .cat-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin:16px 0 4px;}
+
+/* ---------- B2C Analytics charts (Phase 8) ----------
+   Hand-drawn SVG against theme tokens. The three product series are the first
+   three slots of the validated categorical palette, in fixed order (blue,
+   orange, aqua); each has its own light and dark step, so the charts re-theme
+   with the portal instead of flipping one set of colours. Everything else is a
+   single hue (slot 1) or the portal's own text/border tokens. */
+.b2ca-tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px;}
+.b2ca-tile{display:flex; flex-direction:column; gap:3px; padding:14px 16px; border:1px solid var(--border-color);
+  border-radius:12px; background:var(--card-bg); min-width:0;}
+.b2ca-hero{font-size:21px; font-weight:800; color:var(--text-primary); white-space:nowrap;}
+.b2ca-grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px; margin-top:18px;}
+.b2ca-card{border:1px solid var(--border-color); border-radius:12px; padding:16px; background:var(--card-bg); min-width:0;}
+.b2ca-card h3{margin:0 0 2px; font-size:14px;}
+.b2ca-card > .cell-sub{margin:0 0 10px;}
+.b2ca-svg{width:100%; height:auto; display:block;}
+.b2ca-grid{stroke:var(--border-color); stroke-width:1;}
+.b2ca-axis{fill:var(--text-muted); font-size:10.5px; font-weight:600;}
+.b2ca-bar{stroke:var(--card-bg); stroke-width:2; paint-order:stroke; transition:opacity .12s;}
+.b2ca-bar:hover{opacity:.78;}
+.b2ca-legend{display:flex; gap:14px; flex-wrap:wrap; margin:4px 0 6px; font-size:12px; font-weight:600; color:var(--text-primary);}
+.b2ca-swatch{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px;}
+.b2ca{--s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;}
+:root[data-theme="dark"] .b2ca{--s1:#3987e5; --s2:#d95926; --s3:#199e70;}
+.b2ca-bar.s1, .b2ca-swatch.s1, .b2ca-hfill{fill:var(--s1); background:var(--s1);}
+.b2ca-bar.s2, .b2ca-swatch.s2{fill:var(--s2); background:var(--s2);}
+.b2ca-bar.s3, .b2ca-swatch.s3{fill:var(--s3); background:var(--s3);}
+.b2ca-table summary{cursor:pointer; font-size:12px; font-weight:700; color:var(--text-muted); margin-top:8px;}
+.b2ca-hbars{display:flex; flex-direction:column; gap:8px; margin:6px 0 10px;}
+.b2ca-hrow{display:grid; grid-template-columns:minmax(90px,150px) 1fr auto; gap:10px; align-items:center; font-size:12.5px; font-weight:600;}
+.b2ca-htrack{height:10px; border-radius:6px; background:var(--hover-bg); overflow:hidden;}
+.b2ca-hfill{display:block; height:100%; border-radius:6px;}
+.b2ca-hvalue{min-width:28px; text-align:right;}
+
+/* ---------- Phase 1-3 detail modals: header/body/close (audit fix) ----------
+   The Customers, Bookings and Cancellations & Refunds detail modals were written
+   with `.modal-head` / `.modal-body` / `.modal-close`, which nothing in the admin
+   stylesheets defines (`.modal-close` is styled only in the public site's
+   main.css, which this page does not load), so their header rendered as bare
+   text with the close "×" underneath. These give them exactly the look of the
+   portal's own `.ops-modal-head` / `.ops-modal-body` — sticky header, close
+   button top right, body padding — without touching their markup or behaviour. */
+.modal-card.modal-lg > .modal-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+  position:sticky; top:0; background:var(--card-bg); z-index:2; padding:24px 30px 16px; border-bottom:1px solid var(--border-color);}
+.modal-card.modal-lg > .modal-head h3{margin:0; font-size:19px; display:flex; align-items:center; gap:9px; flex-wrap:wrap;}
+.modal-card.modal-lg > .modal-head .modal-close{width:34px; height:34px; border-radius:10px; background:var(--hover-bg); border:none;
+  cursor:pointer; font-size:20px; line-height:1; color:var(--text-muted); flex-shrink:0; font-family:inherit; position:static;}
+.modal-card.modal-lg > .modal-head .modal-close:hover{color:var(--text-primary);}
+.modal-card.modal-lg > .modal-head .modal-close:focus-visible{outline:2px solid var(--coral); outline-offset:2px;}
+.modal-card.modal-lg > .modal-body{padding:4px 30px 30px;}
+@media (max-width:640px){
+  .modal-card.modal-lg > .modal-head{padding:20px 20px 14px;}
+  .modal-card.modal-lg > .modal-body{padding:4px 20px 24px;}
+}
+.b2ca-hlabel{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+/* Same audit fix: the Phase 1-3 modals build their fields as `.info-item`
+   (label + value) inside `.detail-grid`; only `.info-grid .info-item` was styled,
+   so these labels rendered as plain body text. Matches `.detail-label`/`.detail-value`. */
+.detail-grid .info-item{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.detail-grid .info-item label{display:block; font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted);}
+.detail-grid .info-item > div{font-size:13.5px; font-weight:600; color:var(--text-primary); overflow-wrap:anywhere;}

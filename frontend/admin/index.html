@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=0930p5a">
+<link rel="stylesheet" href="../assets/css/admin.css?v=0930p8b">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -304,8 +304,8 @@
           <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
           <span class="nav-label">Customer Payments</span>
         </a>
-        <!-- Placeholder (Phase 0 of the B2C build-out) — no screen or endpoint
-             behind it yet; see initComingSoon() in admin.js. -->
+        <!-- Verifies a captured payment against its own gateway, on demand
+             (Phase 4) — see admin-b2c-reconciliation.js. -->
         <a href="#" class="nav-item" data-section="b2c-reconciliation">
           <svg class="icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           <span class="nav-label">Payment Reconciliation</span>
@@ -1178,12 +1178,11 @@
       </div>
     </section>
 
-    <!-- ============== B2C MANAGEMENT — placeholder screens ==============
-         Phase 0 of the B2C Management build-out: sidebar shape and routing
-         only. Each panel below is replaced with its real screen in the phase
-         that builds it (see the B2C Admin Portal Extension plan); nothing
-         here calls an endpoint yet, so there is nothing to break by adding
-         it. initComingSoon() in admin.js fills the `.b2c-soon-body` div. -->
+    <!-- ============== B2C MANAGEMENT screens ==============
+         Customers, Bookings, Cancellations & Refunds, Payment Reconciliation,
+         Catalogue (Flights/Hotels/Packages/Destinations), Reviews & Ratings,
+         Communication, User Activity, Reports and Analytics. Gaming Tour
+         Packages is the existing enquiry queue further up. -->
     <section class="section" id="section-b2c-customers">
       <div class="panel">
         <div class="panel-head">
@@ -1459,12 +1458,43 @@
       </div>
     </section>
     <section class="section" id="section-b2c-reports">
-      <div class="panel"><div class="panel-head"><h2>B2C Reports</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>B2C Reports</h2>
+          <span class="ops-sub">Choose a report, narrow it, check what it contains, then download it. The preview and the file are built by the same code.</span>
+        </div>
+        <div class="filter-bar" style="margin:12px 0 4px;">
+          <select id="rprType" class="status-select" aria-label="Report"></select>
+          <input type="date" id="rprFrom" title="From date" aria-label="From date">
+          <input type="date" id="rprTo" title="To date" aria-label="To date">
+          <select id="rprStatus" class="status-select" aria-label="Filter by status"></select>
+          <span id="rprProductField"><select id="rprProduct" class="status-select" aria-label="Filter by service"></select></span>
+        </div>
+        <p class="cell-sub" id="rprDateLabel" style="margin:4px 0 12px;"></p>
+        <div class="cat-actions" style="justify-content:flex-start; margin:0 0 14px;">
+          <button type="button" class="btn btn-navy btn-sm" id="rprCsv">Download CSV</button>
+          <button type="button" class="btn btn-navy btn-sm" id="rprXlsx">Download Excel</button>
+          <button type="button" class="btn btn-navy btn-sm" id="rprPdf">Download PDF</button>
+        </div>
+        <div class="msg" id="rprMsg"></div>
+        <div id="rprPreview"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-analytics">
-      <div class="panel"><div class="panel-head"><h2>B2C Analytics</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>B2C Analytics</h2>
+          <span class="ops-sub">Every figure is computed by the server and reproducible by a direct database query.</span>
+        </div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <label class="cell-sub" for="b2caMonths" style="margin:0;">Period</label>
+          <select id="b2caMonths" class="status-select" aria-label="Period">
+            <option value="3">Last 3 months</option><option value="6" selected>Last 6 months</option>
+            <option value="12">Last 12 months</option><option value="24">Last 24 months</option>
+          </select>
+        </div>
+        <div id="b2caBody" class="b2ca"></div>
+      </div>
     </section>
 
     <!-- ============== Audit Logs (moved here from Super Admin) ============== -->
@@ -1865,7 +1895,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p7a"></script>
+<script src="../assets/js/admin.js?v=0930p8b"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1919,7 +1949,7 @@
 <script src="../assets/js/admin-gaming-enquiries.js?v=0929nav3"></script>
 <script src="../assets/js/admin-b2c-customers.js?v=0930p1a"></script>
 <script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
-<script src="../assets/js/admin-b2c-refunds.js?v=0930p3a"></script>
+<script src="../assets/js/admin-b2c-refunds.js?v=0930p3b"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
 <!-- Phase 5 — Catalogue Management. The common file must precede the four
      screens that use it. -->
@@ -1935,6 +1965,9 @@
      catalogue-common modal/helpers, so they come after it. -->
 <script src="../assets/js/admin-b2c-communication.js?v=0930p7a"></script>
 <script src="../assets/js/admin-b2c-activity.js?v=0930p7a"></script>
+<!-- Phase 8 — Reports and Analytics. Reuse catalogue-common's helpers. -->
+<script src="../assets/js/admin-b2c-reports.js?v=0930p8a"></script>
+<script src="../assets/js/admin-b2c-analytics.js?v=0930p8a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

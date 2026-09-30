@@ -26,6 +26,7 @@ from app.routers import (
     change_requests,
     customer_account,
     admin_cancellations,
+    admin_b2c_reports,
     admin_catalogue,
     admin_catalogue_destinations,
     admin_catalogue_hotels,
@@ -338,6 +339,9 @@ app.include_router(admin_reviews.router)
 # customer notification, ticket, chat, audit-log and session tables.
 app.include_router(admin_communication.router)
 app.include_router(admin_user_activity.router)
+# B2C Reports + Analytics (Phase 8): exports and SQL-reproducible figures.
+app.include_router(admin_b2c_reports.router)
+app.include_router(admin_b2c_reports.analytics_router)
 # B2C Catalogue Management (Phase 5): flights supplier status, hotels, tour
 # packages, destinations. Gated on catalog.manage (admin only).
 app.include_router(admin_catalogue.router)

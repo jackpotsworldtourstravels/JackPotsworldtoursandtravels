@@ -38,7 +38,6 @@ async function rvwApi(method, path = '', { params, data } = {}) {
 
 const rvwStars = n => `<span title="${n} out of 5" style="color:#e6a100; letter-spacing:1px;">${'★'.repeat(n)}<span style="color:rgba(10,37,64,.2)">${'★'.repeat(5 - n)}</span></span>`;
 const rvwPill = s => `<span class="badge ${RVW_TONE[s] || 'pending'}">${escapeHtml(s[0].toUpperCase() + s.slice(1))}</span>`;
-const rvwDate = v => v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 async function initB2CReviews() {
   if (!rvwWired) {
@@ -131,7 +130,7 @@ async function loadB2CReviews(page = rvwState.page) {
         <td class="jp-truncate" title="${catE(r.comment)}">${r.comment ? escapeHtml(r.comment) : '<span class="cell-sub">No comment</span>'}
           ${r.admin_reply ? '<div class="cell-sub">Replied</div>' : ''}</td>
         <td>${rvwPill(r.status)}</td>
-        <td>${rvwDate(r.created_at)}</td>
+        <td>${catDate(r.created_at)}</td>
         <td><button type="button" class="btn btn-ghost btn-sm" data-rvw-open="${r.review_id}">Review</button></td>
       </tr>`).join('') : `<tr><td colspan="8" class="empty-state">No reviews match this filter.</td></tr>`;
     renderPagination('rvwPagination', data.page, data.total_pages, data.total, loadB2CReviews);
@@ -167,15 +166,15 @@ function renderReview() {
           <span class="cell-sub">${escapeHtml(r.customer.email)}</span></div>
         <div class="detail-item"><span class="detail-label">${escapeHtml(RVW_PRODUCT_LABEL[r.product] || r.product)}</span>
           <span class="detail-value">${escapeHtml(r.item_name)}</span></div>
-        <div class="detail-item"><span class="detail-label">Written</span><span class="detail-value">${rvwDate(r.created_at)}</span>
-          ${r.updated_at !== r.created_at ? `<span class="cell-sub">Edited ${rvwDate(r.updated_at)}</span>` : ''}</div>
+        <div class="detail-item"><span class="detail-label">Written</span><span class="detail-value">${catDate(r.created_at)}</span>
+          ${r.updated_at !== r.created_at ? `<span class="cell-sub">Edited ${catDate(r.updated_at)}</span>` : ''}</div>
       </div>
       <div class="detail-item" style="margin-top:14px;"><span class="detail-label">Their review</span>
         <span class="detail-value" style="white-space:pre-wrap;">${r.comment ? escapeHtml(r.comment) : '—'}</span></div>
       <p class="cp-readonly-note">${escapeHtml(publicNote)} You can moderate and reply; the customer's rating and words are never editable.</p>
       <div class="msg" id="catMsg"></div>
       ${catField('Your public reply', catTextarea('rvwReply', r.admin_reply || '', 4),
-        `Shown under the review while it is approved. Up to 1000 characters. Save it empty to remove.${r.replied_at ? ` Last replied ${rvwDate(r.replied_at)}.` : ''}`)}
+        `Shown under the review while it is approved. Up to 1000 characters. Save it empty to remove.${r.replied_at ? ` Last replied ${catDate(r.replied_at)}.` : ''}`)}
       <div class="cat-actions">
         <button type="button" class="btn btn-ghost" id="rvwSaveReply">Save reply</button>
         ${r.status !== 'rejected' ? '<button type="button" class="btn btn-ghost" id="rvwReject">Reject</button>' : ''}

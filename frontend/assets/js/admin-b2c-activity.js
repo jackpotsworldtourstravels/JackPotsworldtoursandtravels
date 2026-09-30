@@ -28,8 +28,6 @@ async function actApi(path, params) {
   const res = await axios.get(`${API_BASE}/api/admin/user-activity${path}`, { headers: authHeaders(), params });
   return res.data;
 }
-const actWhen = v => v ? new Date(v).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-const actCap = s => String(s).replace(/^./, c => c.toUpperCase());
 const actDevice = r => [r.browser, r.device].filter(Boolean).map(escapeHtml).join(' · ') || '—';
 
 async function initB2CActivity() {
@@ -96,13 +94,13 @@ async function actLoadLogs(page = actState.lPage) {
     document.getElementById('actLogCount').textContent = `${d.total} event${d.total === 1 ? '' : 's'}`;
     tbody.innerHTML = d.items.length ? d.items.map(r => `
       <tr>
-        <td>${actWhen(r.at)}</td>
+        <td>${catWhen(r.at)}</td>
         <td>${r.customer.id
           ? `${escapeHtml(r.customer.name)}<div class="cell-sub">${escapeHtml(r.customer.email)}${r.customer.code ? ` · ${escapeHtml(r.customer.code)}` : ''}</div>`
           : `<span class="cell-sub">No matching account</span>${r.customer.code ? `<div class="cell-sub">${escapeHtml(r.customer.code)}</div>` : ''}`}</td>
         <td>${escapeHtml(r.module || '—')}</td>
         <td><strong>${escapeHtml(r.action)}</strong>${r.description ? `<div class="cell-sub">${escapeHtml(r.description)}</div>` : ''}</td>
-        <td><span class="badge ${r.status === 'success' ? 'confirmed' : 'cancelled'}">${escapeHtml(actCap(r.status))}</span></td>
+        <td><span class="badge ${r.status === 'success' ? 'confirmed' : 'cancelled'}">${escapeHtml(catCap(r.status))}</span></td>
         <td class="mono">${escapeHtml(r.ip_address || '—')}</td>
         <td>${actDevice(r)}</td>
       </tr>`).join('') : `<tr><td colspan="7" class="empty-state">No activity matches this filter.</td></tr>`;
@@ -124,10 +122,10 @@ async function actLoadSessions(page = actState.sPage) {
     tbody.innerHTML = d.items.length ? d.items.map(s => `
       <tr>
         <td>${escapeHtml(s.customer_name)}<div class="cell-sub">${escapeHtml(s.customer_email)}</div></td>
-        <td>${actWhen(s.login_at)}</td>
-        <td>${actWhen(s.last_seen_at)}</td>
-        <td>${s.logout_at ? actWhen(s.logout_at) : '<span class="cell-sub">Not signed out</span>'}</td>
-        <td><span class="badge ${ACT_STATE_TONE[s.state] || 'pending'}">${escapeHtml(actCap(s.state))}</span></td>
+        <td>${catWhen(s.login_at)}</td>
+        <td>${catWhen(s.last_seen_at)}</td>
+        <td>${s.logout_at ? catWhen(s.logout_at) : '<span class="cell-sub">Not signed out</span>'}</td>
+        <td><span class="badge ${ACT_STATE_TONE[s.state] || 'pending'}">${escapeHtml(catCap(s.state))}</span></td>
         <td class="mono">${escapeHtml(s.ip_address || '—')}</td>
         <td>${actDevice(s)}</td>
       </tr>`).join('') : `<tr><td colspan="7" class="empty-state">No sessions match this filter.</td></tr>`;
