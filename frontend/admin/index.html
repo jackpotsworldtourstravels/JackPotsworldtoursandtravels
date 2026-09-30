@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/admin.css?v=0929nav2">
+<link rel="stylesheet" href="../assets/css/admin.css?v=0930p5a">
 <!-- Shared design system. MUST stay last: it re-points admin.css's own tokens
      (--card-bg, --coral, --radius, …) at the JackPots palette, and those are
      :root rules of equal specificity, so source order is what decides them. -->
@@ -322,11 +322,10 @@
 
       <div class="nav-group">
         <div class="nav-group-label">Catalogue Management</div>
-        <!-- Flights: placeholder, same treatment as the other not-yet-built
-             catalogue screens below — see initComingSoon() in admin.js. No
-             supplier integration exists yet (docs/tektravels spec is design
-             only), so there is no live inventory behind this link either;
-             it is here because the owner's tree now asks for the nav item. -->
+        <!-- Flights: a read-only SUPPLIER STATUS screen, not a CRUD one (Phase 5).
+             Flights are searched live from a supplier and never stored, so
+             there is no inventory to edit — see admin-b2c-flights.js. TBO is
+             the chosen supplier and has no adapter yet; the screen says so. -->
         <a href="#" class="nav-item" data-section="b2c-cat-flights">
           <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5a2.1 2.1 0 0 0-3-3L13 8 4.8 6.2a.5.5 0 0 0-.5.8l3.5 4-2 2-2.4-.6a.5.5 0 0 0-.5.8L5 16l1.8 2.6a.5.5 0 0 0 .8-.5l-.6-2.4 2-2 4 3.5a.5.5 0 0 0 .8-.5Z"/></svg>
           <span class="nav-label">Flights</span>
@@ -1287,20 +1286,78 @@
         <div class="b2c-soon-body"></div></div>
     </section>
     <section class="section" id="section-b2c-cat-flights">
-      <div class="panel"><div class="panel-head"><h2>Flights</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Flights</h2>
+          <span class="ops-sub">Supplier-driven. Flights are searched live and never stocked, so there is nothing to create or edit here.</span>
+        </div>
+        <div id="catFlightsBody"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-cat-hotels">
-      <div class="panel"><div class="panel-head"><h2>Hotels</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Hotels</h2>
+          <span class="ops-sub" id="htlSummary"></span>
+        </div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="htlSearch" placeholder="Search hotel name, location or city…" aria-label="Search hotels">
+          <select id="htlStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All hotels</option>
+            <option value="active">Active</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="htlTable"><thead><tr>
+          <th>Hotel</th><th>Location</th><th>Stars</th><th class="num">From / night</th>
+          <th class="num">Rooms active</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="htlPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-cat-packages">
-      <div class="panel"><div class="panel-head"><h2>Tour Packages</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Tour Packages</h2>
+          <span class="ops-sub" id="pkgSummary"></span>
+        </div>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <input type="text" id="pkgSearch" placeholder="Search package or destination…" aria-label="Search packages">
+          <select id="pkgTripFilter" class="status-select" aria-label="Filter by trip type">
+            <option value="">All trip types</option>
+            <option value="domestic">Domestic</option>
+            <option value="pilgrimage">Pilgrimage</option>
+            <option value="international">International</option>
+          </select>
+          <select id="pkgStatusFilter" class="status-select" aria-label="Filter by status">
+            <option value="">All packages</option>
+            <option value="active">Active</option>
+            <option value="disabled">Disabled</option>
+          </select>
+          <button type="button" class="btn btn-navy btn-sm" id="pkgNewBtn">New package</button>
+        </div>
+        <div class="table-wrap"><table id="pkgTable"><thead><tr>
+          <th>Package</th><th>Trip type</th><th class="num">Days</th><th class="num">From price</th>
+          <th>Departures</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="pagination" id="pkgPagination"></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-cat-destinations">
-      <div class="panel"><div class="panel-head"><h2>Destinations</h2></div>
-        <div class="b2c-soon-body"></div></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Destinations</h2>
+          <span class="ops-sub" id="dstSummary"></span>
+        </div>
+        <p class="ops-sub">“Popular” destinations are the first ones in this order — they are the ones shown on the homepage. Use the arrows to change it.</p>
+        <div class="filter-bar" style="margin:12px 0 16px;">
+          <button type="button" class="btn btn-navy btn-sm" id="dstNewBtn">Add destination</button>
+        </div>
+        <div class="table-wrap"><table id="dstTable"><thead><tr>
+          <th class="num">Order</th><th>Destination</th><th>Homepage</th><th class="num">Locations</th>
+          <th class="num">Active hotels</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
     </section>
     <section class="section" id="section-b2c-reports">
       <div class="panel"><div class="panel-head"><h2>B2C Reports</h2></div>
@@ -1497,6 +1554,12 @@
      this module has — status — see admin-b2c-bookings.js. -->
 <div class="modal-overlay" id="bkgModalOverlay">
   <div class="modal-card modal-lg" id="bkgModalBody"></div>
+</div>
+
+<!-- B2C Catalogue Management (Phase 5). One modal shared by the Hotels, Tour
+     Packages and Destinations editors — see admin-b2c-catalogue-common.js. -->
+<div class="modal-overlay" id="catModalOverlay">
+  <div class="modal-card modal-lg" id="catModalBody"></div>
 </div>
 
 <!-- B2C Cancellations & Refunds (Phase 3). Approve/Reject/Start Refund/
@@ -1703,7 +1766,7 @@
 <!-- The enquiry rules and payload contract, shared with the Merchant Portal.
      MUST precede admin-manual-booking.js. -->
 <script src="../shared/booking-enquiry-core.js?v=20260915mb3"></script>
-<script src="../assets/js/admin.js?v=0930p4a"></script>
+<script src="../assets/js/admin.js?v=0930p5a"></script>
 <!-- Manual Booking. Needs BookingEnquiryCore (loaded above) for the rules
      and the payload, and admin.js for API_BASE/authHeaders. -->
 <!-- MANUAL ENQUIRY MOUNTS THE MERCHANT PORTAL'S FORM. Order matters:
@@ -1759,6 +1822,13 @@
 <script src="../assets/js/admin-b2c-bookings.js?v=0930p2a"></script>
 <script src="../assets/js/admin-b2c-refunds.js?v=0930p3a"></script>
 <script src="../assets/js/admin-b2c-reconciliation.js?v=0930p4a"></script>
+<!-- Phase 5 — Catalogue Management. The common file must precede the four
+     screens that use it. -->
+<script src="../assets/js/admin-b2c-catalogue-common.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-flights.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-hotels.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-packages.js?v=0930p5a"></script>
+<script src="../assets/js/admin-b2c-destinations.js?v=0930p5a"></script>
 <!-- Booking review + document verification (Phase 3). Also after admin.js. -->
 <script src="../assets/js/admin-bookings.js?v=20260815svc2"></script>
 <!-- The cancellation/reschedule settle dialog (M3). Its own screen was merged

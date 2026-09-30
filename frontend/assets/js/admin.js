@@ -287,6 +287,13 @@ function loadSection(name) {
   /* Phase 4. Defined in admin-b2c-reconciliation.js, loaded after this file.
      Read + one live, unstored action (Verify). */
   if (name === 'b2c-reconciliation') return initB2CReconciliation();
+  /* Phase 5. Defined in admin-b2c-{flights,hotels,packages,destinations}.js,
+     loaded after this file. Gaming Tour Packages is not here: it is the
+     existing enquiry queue (the four 'gaming-*' entries above). */
+  if (name === 'b2c-cat-flights') return initB2CFlights();
+  if (name === 'b2c-cat-hotels') return initB2CHotels();
+  if (name === 'b2c-cat-packages') return initB2CPackages();
+  if (name === 'b2c-cat-destinations') return initB2CDestinations();
   /* ---- B2C Management placeholders (Phase 0) ----
      Each is built out in its own later phase; see the plan this was scoped
      from. initComingSoon() just names the module so the section is never
@@ -294,8 +301,7 @@ function loadSection(name) {
   const B2C_SOON = {
     'b2c-reviews': 'Reviews & Ratings',
     'b2c-communication': 'Communication', 'b2c-activity': 'User Activity',
-    'b2c-cat-flights': 'Flights', 'b2c-cat-hotels': 'Hotels', 'b2c-cat-packages': 'Tour Packages',
-    'b2c-cat-destinations': 'Destinations', 'b2c-reports': 'B2C Reports',
+    'b2c-reports': 'B2C Reports',
     'b2c-analytics': 'B2C Analytics',
   };
   if (name in B2C_SOON) return initComingSoon(name, B2C_SOON[name]);

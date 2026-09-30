@@ -157,6 +157,14 @@ class P:
     # extends to.
     CUSTOMER_VIEW = "customer.view"
 
+    # B2C Catalogue Management (Phase 5) — hotels, tour packages and
+    # destinations the customer site sells from. One code for read AND write,
+    # Admin only: what the public site offers and at what price is a
+    # merchandising decision, not something a merchant-side role or the Super
+    # Admin's account-administration remit extends to. Same one-code-per-desk
+    # shape as CUSTOMER_VIEW above.
+    CATALOG_MANAGE = "catalog.manage"
+
     # Cross-cutting
     PROFILE_MANAGE = "profile.manage"
     NOTIFICATION_VIEW = "notification.view"
@@ -211,6 +219,7 @@ _ADMIN: frozenset[str] = frozenset({
     P.NOTIFICATION_VIEW, P.NOTIFICATION_SEND,
     P.SYSTEM_ACTIVITY_VIEW, P.AUDIT_VIEW,
     P.CUSTOMER_VIEW,
+    P.CATALOG_MANAGE,
 })
 
 # The Manager (CR-2) exists to do exactly one thing: read a submitted Booking

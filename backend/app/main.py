@@ -26,6 +26,10 @@ from app.routers import (
     change_requests,
     customer_account,
     admin_cancellations,
+    admin_catalogue,
+    admin_catalogue_destinations,
+    admin_catalogue_hotels,
+    admin_catalogue_packages,
     admin_customer_bookings,
     admin_reconciliation,
     customer_admin,
@@ -325,6 +329,12 @@ app.include_router(admin_customer_bookings.router)
 app.include_router(admin_cancellations.router)
 app.include_router(customer_cancellations.router)
 app.include_router(admin_reconciliation.router)
+# B2C Catalogue Management (Phase 5): flights supplier status, hotels, tour
+# packages, destinations. Gated on catalog.manage (admin only).
+app.include_router(admin_catalogue.router)
+app.include_router(admin_catalogue_hotels.router)
+app.include_router(admin_catalogue_packages.router)
+app.include_router(admin_catalogue_destinations.router)
 # M5 — message delivery seen by staff. Gated on notification.send, which only
 # the Admin role holds: notification.view is every merchant's own bell.
 app.include_router(messages.router)

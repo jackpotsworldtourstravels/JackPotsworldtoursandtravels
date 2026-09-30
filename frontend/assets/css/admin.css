@@ -1627,3 +1627,11 @@ input[type="checkbox"].mm-row-check{width:16px; height:16px; cursor:pointer; acc
 @media (max-width:640px){
   .cp-detail-grid{grid-template-columns:1fr;}
 }
+
+/* ---------- B2C Catalogue Management (Phase 5) ----------
+   An in-flow action row for the catalogue editors. Deliberately NOT
+   `.modal-actions`: the portal's dialog standard pins that as a sticky footer
+   of the card, which is right for a one-form dialog but stacks several pinned
+   bars on top of each other in a tabbed editor where every tab has its own
+   Save. Right-aligned like the standard, and it stays where it is written. */
+.cat-actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin:16px 0 4px;}
