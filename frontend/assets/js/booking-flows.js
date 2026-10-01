@@ -683,7 +683,7 @@ const BookingFlows = (function () {
         return `<div class="bk-step">
             <h2 class="bk-step-title">No departures are scheduled</h2>
             <p class="bk-step-sub">Every date on this trip has already left. Tell us when you want to travel and we will price it.</p>
-            <a class="bk-btn bk-btn-primary" href="contact-us.html?package=${encodeURIComponent(ctx.item.name || '')}">Enquire about dates</a>
+            <a class="bk-btn bk-btn-primary" href="contact-us.html?package=${encodeURIComponent(ctx.item.name || '')}&package_id=${encodeURIComponent(ctx.item.id || '')}">Enquire about dates</a>
           </div>`;
       }
       /* Said only when it is true of the dates on offer. */
