@@ -1,3 +1,4 @@
+import datetime
 import html
 import logging
 import smtplib
@@ -210,6 +211,67 @@ def send_gaming_tour_enquiry_email(reference: str, enquiry) -> bool:
         {row('Email', enquiry.email)}
         {row('Mobile', enquiry.mobile)}
       </table>
+    </div>
+    """
+    return _send_with_reply_to(CONTACT_FORM_RECIPIENT, subject, text_body, html_body,
+                               reply_to=str(enquiry.email))
+
+
+def send_tour_package_enquiry_email(reference: str, enquiry) -> bool:
+    """A heads-up to the business inbox when a Tour Package enquiry lands.
+
+    UNLIKE `send_hotel_group_enquiry_email`, this is not the enquiry's only
+    record — tour_package_enquiry_service.create() has already committed the
+    row before this is called, so a failed send never loses the enquiry. The
+    stored row is the reliable copy; this is a courtesy on top of it, which is
+    why the router does not fail the request over its return value."""
+    subject = f"New Tour Package Enquiry – {enquiry.package_name}"
+    date_str = enquiry.preferred_travel_date.isoformat() if enquiry.preferred_travel_date else "not decided yet"
+    travellers = str(enquiry.number_of_travellers) if enquiry.number_of_travellers else "not specified"
+    lines = [
+        "NEW TOUR PACKAGE ENQUIRY",
+        "-" * 32,
+        "",
+        f"Customer Name: {enquiry.name}",
+        f"Email: {enquiry.email}",
+        f"Mobile: {enquiry.mobile}",
+        "",
+        f"Tour Package: {enquiry.package_name}",
+        f"Preferred Travel Date: {date_str}",
+        f"Number of Travellers: {travellers}",
+        "",
+        "Customer Message:",
+        enquiry.message,
+        "",
+        "-" * 32,
+        "Source: B2C Website",
+        "Enquiry Type: Tour Package – Enquire About Dates",
+        f"Reference: {reference}",
+        f"Received At: {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        "",
+        "Please contact the customer regarding availability, pricing and booking details.",
+    ]
+    text_body = "\n".join(lines)
+
+    def row(label, value):
+        return (f'<tr><td style="padding:4px 14px 4px 0; color:#666;">{html.escape(label)}</td>'
+                f'<td style="padding:4px 0;"><strong>{html.escape(str(value))}</strong></td></tr>')
+
+    html_body = f"""
+    <div style="font-family:Arial,sans-serif; max-width:560px; margin:0 auto; color:#0A2540;">
+      <h2 style="color:#0A2540;">New Tour Package Enquiry — {html.escape(reference)}</h2>
+      <table style="border-collapse:collapse; font-size:14px;">
+        {row('Tour Package', enquiry.package_name)}
+        {row('Preferred Travel Date', date_str)}
+        {row('Number of Travellers', travellers)}
+        {row('Name', enquiry.name)}
+        {row('Email', enquiry.email)}
+        {row('Mobile', enquiry.mobile)}
+      </table>
+      <p style="white-space:pre-wrap; border-left:3px solid #FF4D4D; padding-left:12px; margin-top:20px;">
+        {html.escape(enquiry.message)}
+      </p>
+      <p style="color:#666; font-size:12px; margin-top:20px;">Source: B2C Website &middot; Enquiry Type: Tour Package</p>
     </div>
     """
     return _send_with_reply_to(CONTACT_FORM_RECIPIENT, subject, text_body, html_body,

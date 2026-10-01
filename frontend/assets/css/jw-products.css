@@ -744,7 +744,50 @@ html.ds-motion body.jw-prod.pk .pk-folio { animation: hd-rise .9s var(--ds-ease)
 /* The sections: display-face headings with a gold rule, cards in the system. */
 body.jw-prod.pk .pk-flow .disc-h2 { font-family: var(--ds-display); font-weight: 500; font-size: clamp(26px, 2.6vw, 36px); letter-spacing: -.015em; }
 body.jw-prod.pk .pk-flow .lp-card { border-radius: var(--ds-r-lg); border: 1px solid rgba(21, 27, 39, .07); box-shadow: var(--ds-sh-1); }
-body.jw-prod.pk .pk-includes { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 1.6vw, 20px); }
+
+/* THE INFORMATION CARDS, PAIRED TWO-TO-A-ROW rather than stacked full width
+   one under the other — a lone "Overview" row next to nothing, then a
+   narrow "What's included" card adrift in the rest of the width, is what
+   read as uneven. Day-wise itinerary / Hotels included / Departure dates /
+   Traveller reviews keep the full width WHEN they have content — a `hidden`
+   section is removed from grid flow entirely, so on today's packages (whose
+   itinerary/hotels/dates ship empty, and which carry no reviews) the four
+   visible sections simply pack as Overview+Highlights, then
+   Includes+Policies, exactly as if they had been written in pairs; a
+   richer package gains a full-width row for whichever of the four is no
+   longer empty, rather than forcing it into half a column. */
+body.jw-prod.pk .pk-flow { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 2.4vw, 32px); align-items: start; }
+body.jw-prod.pk .pk-flow > #pkItinerarySec,
+body.jw-prod.pk .pk-flow > #pkHotelsSec,
+body.jw-prod.pk .pk-flow > #pkDatesSec,
+body.jw-prod.pk .pk-flow > #pkReviewsSec { grid-column: 1 / -1; }
+/* Overview's own description+"at a glance" split assumed the full content
+   column (discover.css collapses it at 900px of VIEWPORT width); paired
+   beside Highlights it only ever has half that, so it stacks unconditionally
+   here rather than waiting for a viewport breakpoint that no longer matches
+   the space actually available. */
+body.jw-prod.pk .lp-about-grid { grid-template-columns: minmax(0, 1fr); }
+body.jw-prod.pk .lp-about-side { order: -1; }
+
+/* HIGHLIGHTS STRETCHES TO MATCH OVERVIEW'S HEIGHT, not the whole grid row —
+   `align-self` is scoped to this one section so Includes/Policies (already
+   close in height to each other) are untouched. A package with only two or
+   three highlights is real, existing content; filling the row this way
+   shows it at a size that matches its neighbour instead of leaving dead
+   space below a handful of short lines, with no text invented to pad it. */
+body.jw-prod.pk .pk-flow > #pkHighlightsSec { align-self: stretch; }
+body.jw-prod.pk .pk-highlights-card { flex: 1; justify-content: center; }
+
+/* `1fr 1fr` (a fixed 2-column grid) was wrong whenever only Inclusions OR
+   only Exclusions has content (the common case — most packages carry no
+   exclusions): the empty second track still reserved its half of the width,
+   leaving the one real card at half-width with a blank column beside it
+   before Policies even started. `repeat(auto-fit, minmax(280px, 1fr))` is
+   the same rule packages.css already gives `.pk-policies` — an auto-fit
+   track collapses to 0 when nothing occupies it, so one card fills the
+   section's full width and two sit side by side only when both exist AND
+   the section is wide enough for both at their natural size. */
+body.jw-prod.pk .pk-includes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(12px, 1.6vw, 20px); }
 body.jw-prod.pk .pk-incl { border-top: 3px solid var(--ds-success); }
 body.jw-prod.pk .pk-excl { border-top: 3px solid var(--ds-line-2); }
 body.jw-prod.pk .pk-incl h3, body.jw-prod.pk .pk-excl h3 { font-family: var(--ds-display); font-weight: 500; font-size: 20px; }
@@ -755,7 +798,12 @@ body.jw-prod.pk .pk-book { border-radius: var(--ds-r-pill); min-height: 50px; pa
   body.jw-prod.pk .pk-layout { grid-template-columns: 1fr; }
   body.jw-prod.pk .pk-folio { position: static; }  /* after the trip: the hero already opens with the price */
 }
-@media (max-width: 640px) { body.jw-prod.pk .pk-includes { grid-template-columns: 1fr; } }
+/* MOBILE: the pairing stacks to one column, same breakpoint .pk-includes
+   already collapses at. */
+@media (max-width: 640px) {
+  body.jw-prod.pk .pk-flow { grid-template-columns: 1fr; }
+  body.jw-prod.pk .pk-includes { grid-template-columns: 1fr; }
+}
 
 /* ==========================================================================
    THE SHARED BOOKING SHEET (booking-flow.js, booking.css) — every product

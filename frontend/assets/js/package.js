@@ -210,7 +210,7 @@
     if (!(p.departures || []).some(d => d.date >= new Date().toISOString().slice(0, 10))) {
       const btn = document.getElementById('pkBookTop');
       btn.outerHTML = `<a class="disc-btn pk-book" id="pkBookTop"
-          href="contact-us.html?package=${encodeURIComponent(p.name)}">
+          href="contact-us.html?package=${encodeURIComponent(p.name)}&package_id=${encodeURIComponent(p.id || '')}">
           Enquire about dates ${icon('arrowRight', 15)}</a>`;
       const note = document.createElement('p');
       note.className = 'pk-dates-note';
@@ -271,7 +271,15 @@
     const items = p.highlights || [];
     if (!items.length) return;
     const grid = document.getElementById('pkHighlights');
-    grid.innerHTML = items.map(h => `<li class="pk-highlight lp-card">
+    /* ONE CARD, NOT N — a chip per highlight (each its own bordered,
+       shadowed .lp-card) is what left Highlights far shorter than Overview
+       whenever a package lists only two or three: the row's height follows
+       the taller neighbour, and the leftover space below a handful of small
+       chips read as a gap before the next section. Wrapping them in a
+       single .lp-card (package.html) and listing them here exactly as
+       Inclusions/Exclusions already list theirs keeps the group visually
+       one card, the same pattern every sibling section already uses. */
+    grid.innerHTML = items.map(h => `<li class="pk-highlight">
         <span class="pk-highlight-ic">${icon('sparkles', 20)}</span>
         <span class="pk-highlight-text">${esc(h)}</span>
       </li>`).join('');

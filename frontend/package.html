@@ -39,7 +39,7 @@
 <!-- The discovery sheet gives this page its palette, its hero and its cards;
      packages.css adds only what a trip needs that a place does not. -->
 <link rel="stylesheet" href="assets/css/discover.css?v=20260925ui1">
-<link rel="stylesheet" href="assets/css/packages.css?v=20260926pk5">
+<link rel="stylesheet" href="assets/css/packages.css?v=20261002pk7">
 <link rel="stylesheet" href="assets/css/profile-menu.css?v=20260922gb3">
 <link rel="stylesheet" href="assets/css/site-footer.css?v=20260912ct1">
 <link rel="stylesheet" href="assets/css/live-chat.css?v=20260909dg1">
@@ -67,7 +67,7 @@
 <link rel="stylesheet" href="assets/css/jw-system.css?v=20261001ux3">
 <!-- The product pages' shell: the booking sheet, the payment screen and the
      booking folio on this page are drawn in it (scoped to body.jw-prod). -->
-<link rel="stylesheet" href="assets/css/jw-products.css?v=0928234819">
+<link rel="stylesheet" href="assets/css/jw-products.css?v=20261002pk3">
 <script src="assets/js/jw-system.js?v=0928224009"></script>
 <script src="assets/js/jw-header.js?v=20261001ux3"></script>
 </head>
@@ -159,7 +159,9 @@
            to draw. -->
       <section class="lp-sec" id="pkHighlightsSec" hidden>
         <h2 class="disc-h2">Highlights</h2>
-        <ul class="pk-highlights" id="pkHighlights"></ul>
+        <div class="lp-card pk-highlights-card">
+          <ul class="pk-highlights" id="pkHighlights"></ul>
+        </div>
       </section>
 
       <!-- DAY BY DAY. Rows on customer_package_itinerary (0083), which ship
@@ -262,6 +264,6 @@
 <footer id="bookingFooter"></footer>
 <script>HeroShell.mountBookingFooter();</script>
 <script src="assets/js/jw-interest.js?v=20260928rc1"></script>
-<script src="assets/js/package.js?v=20260928rc1"></script>
+<script src="assets/js/package.js?v=20261002pk1"></script>
 </body>
 </html>
