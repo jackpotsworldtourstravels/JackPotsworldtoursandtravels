@@ -45,10 +45,9 @@ const SiteFooter = (function () {
       ['Flights',           'flights.html'],
       ['Hotels',            'hotels.html'],
       ['Tour Packages',     'packages.html'],
-      /* The header's other two products and the one it moved off the bar.
-         All three are live pages. */
+      /* The products the header moved off the bar. Both are live pages.
+         Cruises is NOT offered and was removed from the footer too. */
       ['Destinations',      'destinations.html'],
-      ['Cruises',           'cruises.html'],
       ['Gaming Packages',   'gaming-packages.html'],
     ],
     legal: [

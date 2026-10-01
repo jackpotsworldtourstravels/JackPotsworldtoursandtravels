@@ -478,7 +478,11 @@ function openDetailsModal(type, item) {
   const dateField = document.getElementById('detailsDateField');
   if (cfg.dateField) {
     dateField.style.display = 'block';
-    document.getElementById('detailsDate').value = cfg.dateField(item);
+    const dateInput = document.getElementById('detailsDate');
+    /* A travel date can never be in the past; floor the picker at today so a
+       past day is greyed out and manual entry is refused. */
+    dateInput.min = new Date().toISOString().slice(0, 10);
+    dateInput.value = cfg.dateField(item);
   } else {
     dateField.style.display = 'none';
   }

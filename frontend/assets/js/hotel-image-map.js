@@ -187,10 +187,60 @@ const HOTEL_ASSET_PREFIX =
     maldives:   { dir: L, file: 'maldives__artificial-beach', subject: 'Artificial Beach, Malé', city: 'Maldives', credit: ['Adam Jones', 'CC BY-SA 2.0'], v: '9c36a4b1' },
   };
 
+  /* ------------------------------------------------ provider photographs
+     A content provider (Hotelbeds today) returns photographs KEYED ON THE
+     PROPERTY'S OWN SUPPLIER ID, so they are property-verified by construction:
+     the supplier's code is the identity, never a name and never a city. The
+     backend hands them over as complete URLs in `provider_images` (see
+     customer_hotel_booking.py); nothing here builds a URL or holds a secret.
+
+     TRUST IS GATED ON A STABLE IDENTITY. A row is believed only when it
+     actually carries one — `source === 'hotelbeds'` or a `hotelbeds_code`. An
+     `images`/`provider_images` array on a row without that identity is ignored,
+     which is exactly what stops a seed row from borrowing supplier imagery. */
+  function hasProviderIdentity(h) {
+    if (!h) return false;
+    const code = h.hotelbeds_code != null ? h.hotelbeds_code : h.hotelbedsCode;
+    return h.source === 'hotelbeds' || (code != null && code !== '');
+  }
+  function providerList(h) {
+    const list = (h && (h.provider_images || h.providerImages)) || [];
+    return Array.isArray(list) ? list.filter(im => im && im.url) : [];
+  }
+  /** The provider photo to show, or null. When a room code is given, its own
+   *  tagged photo is preferred; absent that (the sync does not tag rooms yet)
+   *  it falls back to the property's primary photo — never another property's,
+   *  never another room's. */
+  function providerPhoto(id, hotel, opts) {
+    if (!hasProviderIdentity(hotel)) return null;
+    const imgs = providerList(hotel);
+    if (!imgs.length) return null;
+    const roomCode = opts && opts.roomCode;
+    let pick = null;
+    if (roomCode != null && roomCode !== '') {
+      pick = imgs.find(im => (im.room_code || im.roomCode) === roomCode) || null;
+    }
+    if (!pick) pick = imgs.find(im => im.is_primary || im.isPrimary) || imgs[0];
+    if (!pick || !pick.url) return null;
+    const thumb = pick.thumb || pick.url, large = pick.large || pick.url;
+    const name = id.name || 'This hotel';
+    return {
+      kind: 'property', slug: '', provider: pick.source || 'hotelbeds',
+      name, city: id.city, cityLabel: id.cityLabel,
+      src: large,
+      srcset: thumb + ' 480w, ' + pick.url + ' 960w, ' + large + ' 1600w',
+      srcBig: large,
+      credit: null, subject: name,
+      label: 'Property photo', note: '',
+      alt: name + ' — photograph of the property',
+      roomCode: pick.room_code || pick.roomCode || null,
+    };
+  }
+
   /* ---------------------------------------------------------------- resolve */
   /**
    * @param hotel  any hotel-shaped object (see identity()).
-   * @param opts   { allowDestination = true }
+   * @param opts   { allowDestination = true, roomCode }
    * @returns {{kind, src, srcset, srcBig, credit, subject, label, note, alt,
    *            slug, city, cityLabel, name}}
    */
@@ -198,6 +248,12 @@ const HOTEL_ASSET_PREFIX =
     const o = Object.assign({ allowDestination: true }, opts || {});
     const id = identity(hotel);
     const name = id.name || 'This hotel';
+
+    /* Priority 1: a provider photo of THIS property, when the row has a real
+       supplier identity. Property-verified, so it outranks the curated set and
+       is returned whatever `allowDestination` says. */
+    const prov = providerPhoto(id, hotel, o);
+    if (prov) return prov;
 
     const p = verifiedProperty(id);
     if (p) {

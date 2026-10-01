@@ -184,6 +184,29 @@ body.home-cine .cine-dock::before {
   box-shadow: 0 40px 80px -30px rgba(0,0,0,.8);
 }
 
+/* SHORT VIEWPORTS — keep the WHOLE search card above the fold on first load.
+   On laptops roughly 720–800px tall the card's last row (Search + trust strip)
+   slipped just under the fold. The hero's rhythm is already vh-driven; this
+   block only pulls in the fixed `min` floors that don't shrink on their own —
+   the top padding (title clears a transparent, overlaid header, so it is safe
+   to raise the title) and the title→card gap. Nothing here reduces a font or a
+   field; it reclaims empty space only. Scoped to >720px wide so phones, which
+   are meant to scroll, keep their own layout; and capped at 800px tall so full-
+   height desktops (900px, 1080p) never enter it and keep the editorial spacing. */
+@media (min-width: 721px) and (max-height: 800px) {
+  body.home-cine .cine-hero {
+    padding-top: clamp(52px, 7.5vh, 100px);
+    padding-bottom: clamp(28px, 4vh, 58px);
+  }
+  body.home-cine .cine-dock { margin-top: clamp(16px, 2.4vh, 40px); }
+  /* A gentle scale-down of the headline on short screens only — still the
+     cinematic display face, just enough to keep the trust strip above the fold.
+     Full-height desktops never reach this block, so the hero keeps its size. */
+  body.home-cine .cine-hero h1.cine-title {
+    font-size: clamp(34px, min(8.3vw, 12vh), 136px);
+  }
+}
+
 /* --- the scroll cue: a line with a bead running down it, which the
        bridge's route then continues from ------------------------------- */
 body.home-cine .cine-scroll-cue {

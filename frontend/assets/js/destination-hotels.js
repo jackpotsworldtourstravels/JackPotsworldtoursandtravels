@@ -98,7 +98,7 @@
     /* The existing hotel photograph system. `city` helps it disambiguate two
        properties of the same brand; both come from the API record. */
     const media = (typeof HotelPhoto !== 'undefined')
-      ? HotelPhoto.html(h, { surface: 'card', sizes: '(max-width: 720px) 100vw, 260px', eager: index < 2 })
+      ? HotelPhoto.html(h, { surface: 'card', allowDestination: false, sizes: '(max-width: 720px) 100vw, 260px', eager: index < 2 })
       : '';
 
     /* Every block below is conditional on the field actually being present.

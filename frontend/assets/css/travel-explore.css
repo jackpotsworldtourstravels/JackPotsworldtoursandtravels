@@ -75,14 +75,20 @@
 /* --------------------------------------------------------------------------
    Shell
    -------------------------------------------------------------------------- */
-.tx-scope { background: var(--tx-bg); color: var(--tx-ink); }
-/* #siteHeader is position:fixed and ~128px tall, so a section scrolled to
-   block:'start' lands UNDER it and loses its heading. scroll-margin-top is what
-   the nav links land against — without it "Flights" arrives on a decapitated
-   section. */
-/* scroll-margin-top matches the sticky offsets above: a static header leaves
-   nothing overhead for an anchored scroll to duck under. */
-.tx-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; scroll-margin-top: 16px; }
+.tx-scope {
+  background: var(--tx-bg); color: var(--tx-ink);
+  /* THE HEADER IS FIXED. header.jw-hdr (jw-system.css) is position:fixed at the
+     top on every page — 76px tall solid, 64px compact once scrolled. So every
+     sticky rail and every anchored section on these pages must clear it, or it
+     lands under the header. This one offset — the solid header height plus a
+     16px gap — is derived from that structure, not an arbitrary value, and is
+     reused by .tx-summary, .tx-filters and the section scroll anchor below. */
+  --tx-sticky-top: 92px;
+}
+/* #siteHeader is position:fixed, so a section scrolled to block:'start' would
+   land UNDER it and lose its heading. scroll-margin-top lets an anchored scroll
+   (the nav "Flights"/"Hotels" links) clear the header — see --tx-sticky-top. */
+.tx-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; scroll-margin-top: var(--tx-sticky-top); }
 .tx-section + .tx-section { padding-top: 8px; }
 
 .tx-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -244,12 +250,11 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 /* The panel sticks, not the column — the column is what gives it somewhere to
    stick.
 
-   16px, not 148px. The 148 was clearance for the landing page's FIXED
-   header; a results page paints `header.is-solid`, which is
-   `position:static` and scrolls away with the page — so a panel pinning
-   at 148 left that much empty viewport above it, under nothing. Same
-   phantom header as the band's old top padding. */
-.tx-summary { position: sticky; top: 16px; }
+   It pins BELOW the header. header.jw-hdr (including its --solid results-page
+   variant) is position:fixed, so a panel pinned at top:16px would slide its
+   "Booking Summary" heading under the 76px header and lose the top ~50px of it.
+   --tx-sticky-top clears the header; it is the header height, not a guess. */
+.tx-summary { position: sticky; top: var(--tx-sticky-top); }
 .tx-summary {
   background: var(--tx-surface); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); box-shadow: var(--tx-shadow); overflow: hidden;
@@ -320,13 +325,14 @@ body.sp-continuation .tx-section:has(.tx-layout-3) { max-width: 1360px; }
 .tx-filters {
   background: var(--tx-surface); border: 1px solid var(--tx-line);
   border-radius: var(--tx-radius); padding: 18px; box-shadow: var(--tx-shadow);
-  /* See the note on .tx-summary: the header on these pages is static, so
-     there is nothing overhead to clear. */
-  position: sticky; top: 16px;
+  /* See the note on .tx-summary: the header is position:fixed, so the panel
+     pins below it at --tx-sticky-top rather than sliding underneath. */
+  position: sticky; top: var(--tx-sticky-top);
   /* The panel scrolls INSIDE itself once it is taller than what is left of the
      viewport. Without this a long filter list simply runs off the bottom of a
-     sticky box and its last group cannot be reached at all. */
-  max-height: calc(100vh - 36px);
+     sticky box and its last group cannot be reached at all. The space left is
+     the viewport minus the header offset above and a 20px breathing gap below. */
+  max-height: calc(100vh - var(--tx-sticky-top) - 20px);
   overflow-y: auto; overscroll-behavior: contain;
 }
 /* A slim scrollbar, so the panel does not gain a chunky OS gutter that eats

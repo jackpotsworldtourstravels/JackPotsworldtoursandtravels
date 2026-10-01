@@ -423,6 +423,33 @@ body.bk-inpage { overflow-x: clip; overflow-y: visible; }
 }
 .bkf-ff-cta.is-on { background: var(--sp-accent); border-color: var(--sp-accent); color: var(--on-accent, #12253F); }
 
+/* --------------------------------------------------------------------------
+   Full-width main card + single-fare layout (brief Parts 11 & 12)
+
+   THE MAIN CARD FILLS ITS COLUMN. Every step's content container carries the
+   class .bk-step as well as .bkf-step, and booking.css's .bk-step rule (meant
+   for the progress-stepper dots) sets align-items:center — which shrank each
+   step's card to its content width and left a blank half-column beside it (the
+   "half-width / unexplained empty space" in Part 11). Scope the correction to
+   the booking content area (.bk-main) so the stepper dots are untouched; this
+   does for the other steps what .bkf-step.bk-rv already does for Review.
+   -------------------------------------------------------------------------- */
+.bk-main .bkf-step { align-items: stretch; }
+.bk-main .bkf-step > .bkf-card,
+.bk-main .bkf-step > .bkf-rv-head { width: 100%; }
+
+/* ONE FARE, WHOLE CARD. Duffel test mode returns a single fare, so is-single is
+   the usual case. The option fills the card and its inclusions flow across the
+   width, instead of a lone 420px column floating with empty space beside it. */
+.bkf-ff-grid.is-single { grid-template-columns: minmax(0, 1fr); }
+.bkf-ff-grid.is-single .bkf-ff-list {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); column-gap: 22px;
+}
+/* The "Selected" label is redundant when there is nothing else to choose: the
+   accent border and ring already show the fare is selected (Part 12). Hide only
+   the label — the tile stays the control and the selection STATE is unchanged. */
+.bkf-ff-grid.is-single .bkf-ff-cta { display: none; }
+
 /* ==========================================================================
    5. TRAVELLER DETAILS (step 2)
    ========================================================================== */

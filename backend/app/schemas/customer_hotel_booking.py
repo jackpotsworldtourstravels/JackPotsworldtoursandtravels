@@ -9,9 +9,74 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+
+from app.integrations.hotelbeds import image_url
 
 GUEST_TYPES = ("adult", "child")
+
+
+class ProviderImage(BaseModel):
+    """One property photograph from a content provider, as complete CDN URLs.
+
+    THE FRONTEND RECEIVES READY URLS, NEVER A RAW PROVIDER PATH. The hotel row
+    stores Hotelbeds' relative GIATA path (e.g. ``00/000112/000112a_hb_a_001.jpg``);
+    this turns it into displayable URLs at three sizes through the integration's
+    own :func:`image_url`, so the size decision lives in one place and nothing
+    below the API has to know the photo host. It carries no credential and is
+    built by pure string work — see :func:`_provider_images`.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    url: str            #: ~800px — the results card and the 960w srcset slot.
+    thumb: str          #: ~320px — booking-summary thumbnails and the 480w slot.
+    large: str          #: ~1024px — the details hero/gallery and the 1600w slot.
+    is_primary: bool = False
+    #: The provider room code this photo belongs to, when the provider tags it
+    #: to a room. ``None`` is a property-level photo. The sync does not yet
+    #: capture this tag, so it is ``None`` today; the field exists so room-level
+    #: imagery lights up without a schema change once the sync records it.
+    room_code: str | None = None
+    source: str = "hotelbeds"
+
+
+def _provider_images(
+    source: str | None, hotelbeds_code: int | None, paths: list[str] | None,
+) -> list[ProviderImage]:
+    """Complete provider image URLs for a provider-identified hotel; ``[]`` else.
+
+    A stored path only becomes a URL when the row carries a STABLE SUPPLIER
+    IDENTITY — ``source == 'hotelbeds'`` or a ``hotelbeds_code``. A seed row's
+    ``images`` hold a curated slug, never a supplier path, so returning ``[]``
+    for it is what stops a seed hotel from ever being dressed in supplier
+    imagery. Pure string building: it makes NO network call and so is safe on
+    every render — the catalogue sync is the only thing that talks to the
+    provider, and this reads what that already stored.
+    """
+    if source != "hotelbeds" and not hotelbeds_code:
+        return []
+    out: list[ProviderImage] = []
+    for raw in paths or []:
+        path = str(raw or "").strip()
+        if not path:
+            continue
+        out.append(ProviderImage(
+            url=image_url(path, "large"),
+            thumb=image_url(path, "standard"),
+            large=image_url(path, "xl"),
+            is_primary=(len(out) == 0),
+            room_code=None,
+        ))
+    return out
 
 
 class RoomOption(BaseModel):
@@ -55,11 +120,25 @@ class HotelSearchResult(BaseModel):
     #: every property's rooms to find out.
     meal_plans: list[str] = []
     free_cancellation: bool = False
+    # -- Provider identity + imagery (0072 fields; dormant until a sync runs) --
+    #: 'seed' | 'hotelbeds'. The frontend trusts provider imagery only when this
+    #: (or ``hotelbeds_code``) proves the row has a real supplier identity.
+    source: str = "seed"
+    hotelbeds_code: int | None = None
+    #: The raw stored paths, read but NEVER serialised (``exclude=True``), so a
+    #: GIATA path never reaches the browser — ``provider_images`` carries the
+    #: complete URLs instead.
+    images_raw: list[str] = Field(default=[], validation_alias="images", exclude=True)
 
     @field_validator("id", mode="before")
     @classmethod
     def _stringify(cls, v):
         return str(v)
+
+    @computed_field
+    @property
+    def provider_images(self) -> list[ProviderImage]:
+        return _provider_images(self.source, self.hotelbeds_code, self.images_raw)
 
 
 class HotelDetail(BaseModel):
@@ -71,7 +150,6 @@ class HotelDetail(BaseModel):
     name: str
     description: str | None
     image: str | None = Field(validation_alias="image_key")
-    images: list[str]
     stars: int = Field(validation_alias="star_rating")
     guest_rating: Decimal | None
     location: str
@@ -79,11 +157,22 @@ class HotelDetail(BaseModel):
     amenities: list[str]
     cancellation_policy: str | None
     rooms: list[RoomOption]
+    # -- Provider identity + imagery: see HotelSearchResult above. ``images``
+    #    (raw paths) is deliberately no longer serialised; the gallery reads
+    #    ``provider_images`` (complete URLs) and the curated tier on the client.
+    source: str = "seed"
+    hotelbeds_code: int | None = None
+    images_raw: list[str] = Field(default=[], validation_alias="images", exclude=True)
 
     @field_validator("id", mode="before")
     @classmethod
     def _stringify(cls, v):
         return str(v)
+
+    @computed_field
+    @property
+    def provider_images(self) -> list[ProviderImage]:
+        return _provider_images(self.source, self.hotelbeds_code, self.images_raw)
 
 
 class HotelAddonItem(BaseModel):

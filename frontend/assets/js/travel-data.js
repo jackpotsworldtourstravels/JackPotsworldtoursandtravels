@@ -337,6 +337,12 @@ const TravelData = (function () {
          "not known" and omits — it never guesses a meal plan. */
       mealPlans: Array.isArray(h.meal_plans) ? h.meal_plans.slice() : undefined,
       freeCancellation: typeof h.free_cancellation === 'boolean' ? h.free_cancellation : undefined,
+      /* Provider identity + imagery, forwarded verbatim for HotelPhoto's
+         provider tier (hotel-image-map.js). Undefined on the sample rows, so
+         the resolver simply falls through to the curated/placeholder tiers. */
+      source: h.source,
+      hotelbeds_code: h.hotelbeds_code,
+      provider_images: Array.isArray(h.provider_images) ? h.provider_images : undefined,
     };
   }
   function normaliseCruise(c) {

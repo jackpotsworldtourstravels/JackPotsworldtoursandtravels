@@ -138,7 +138,7 @@ const HotelDetails = (function () {
   function heroHtml() {
     const { area, city } = areaOf();
     const photo = (typeof HotelPhoto !== 'undefined')
-      ? HotelPhoto.html(detail, { surface: 'hero', eager: true, sizes: '(max-width: 900px) 100vw, 1100px' }) : '';
+      ? HotelPhoto.html(detail, { surface: 'hero', eager: true, allowDestination: false, sizes: '(max-width: 900px) 100vw, 1100px' }) : '';
     return `
       <section class="hd-hero" aria-labelledby="hdName">
         <div class="hd-hero-media">${photo}</div>

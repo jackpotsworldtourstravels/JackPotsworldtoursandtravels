@@ -148,9 +148,16 @@ const HotelGuests = (function () {
     errors = {};
     party.forEach((p, i) => {
       const v = values[i] || {};
-      if (!String(v.first || '').trim()) errors[`first-${i}`] = "Enter the guest's first name.";
-      if (!String(v.last || '').trim()) errors[`last-${i}`] = "Enter the guest's last name.";
+      const first = String(v.first || '').trim();
+      const last = String(v.last || '').trim();
       if (i === leadIndex()) {
+        /* The lead guest carries the booking contact and is the ONE guest the
+           server always requires (customer_hotel_booking_service._validate_guests
+           needs ≥1 adult and exactly one contact). So only the lead's name,
+           email and mobile are mandatory. */
+        if (!first) errors[`first-${i}`] = "Enter the guest's first name.";
+        if (!last) errors[`last-${i}`] = "Enter the guest's last name.";
+
         const email = String(v.email || '').trim();
         if (!email) errors[`email-${i}`] = 'Enter an email address for the booking.';
         else if (!EMAIL_RE.test(email)) errors[`email-${i}`] = 'Enter a valid email address.';
@@ -158,6 +165,14 @@ const HotelGuests = (function () {
         const mobile = String(v.mobile || '').replace(/[\s-]/g, '');
         if (!mobile) errors[`mobile-${i}`] = 'Enter a mobile number for the booking.';
         else if (!MOBILE_RE.test(mobile)) errors[`mobile-${i}`] = 'Enter a valid mobile number, digits only.';
+      } else {
+        /* Co-guests are OPTIONAL — one person can book a room searched for two,
+           and the server does not require the extra names. We only nudge a
+           HALF-filled name so a partial entry is finished or cleared; an all-blank
+           co-guest is simply not travelling and is dropped from the payload
+           (see payload()). */
+        if (first && !last) errors[`last-${i}`] = 'Add the last name too, or clear the first name.';
+        if (last && !first) errors[`first-${i}`] = 'Add the first name too, or clear the last name.';
       }
     });
     if (!markAll) {
@@ -218,17 +233,19 @@ const HotelGuests = (function () {
       <div class="hr-guest" data-guest="${i}">
         <div class="hr-guest-head">
           <b>${isChild ? 'Child' : 'Adult'} guest</b>
-          ${lead ? '<span class="hr-chip-lead">Lead guest</span>' : ''}
+          ${lead ? '<span class="hr-chip-lead">Lead guest</span>'
+                 : '<span class="hr-optional">Optional</span>'}
           ${isChild && p.age != null
             /* The age the search already captured — shown, not asked for. */
             ? `<span class="hr-chip-age">Age ${esc(p.age)}</span>` : ''}
         </div>
+        ${lead ? '' : '<p class="hr-guest-note">Add this guest only if you have their details — one person can complete the booking.</p>'}
         <div class="hr-fieldgrid">
           ${field({ id: `g${i}-title`, label: 'Title', type: 'select',
                     options: [''].concat(isChild ? ['Mstr', 'Miss'] : TITLES), value: v.title })}
-          ${field({ id: `g${i}-first`, label: 'First name', value: v.first, required: true,
+          ${field({ id: `g${i}-first`, label: 'First name', value: v.first, required: lead,
                     error: errors[`first-${i}`] })}
-          ${field({ id: `g${i}-last`, label: 'Last name', value: v.last, required: true,
+          ${field({ id: `g${i}-last`, label: 'Last name', value: v.last, required: lead,
                     error: errors[`last-${i}`] })}
           ${lead ? `
             ${field({ id: `g${i}-email`, label: 'Email', type: 'email', value: v.email, required: true,
@@ -386,14 +403,15 @@ const HotelGuests = (function () {
         </p>
       </div>
       ${Array.from({ length: roomCount() }, (_, r) => roomGroupHtml(r)).join('')}
-      <section class="hr-roomgroup">
-        <div class="hr-roomgroup-head">
-          <h2 id="hrReqHead">Special requests <span class="hr-optional">(optional)</span></h2>
+      <section class="hr-requests" aria-labelledby="hrReqHead">
+        <div class="hr-requests-head">
+          <h2 id="hrReqHead">Special requests</h2>
+          <span class="hr-optional">Optional</span>
         </div>
         <div class="hr-fieldgrid">
           ${field({ id: 'hgRequests', label: 'Anything the property should know', type: 'textarea',
                     value: requests, wide: true,
-                    placeholder: 'Late check-in around 10 PM',
+                    placeholder: 'e.g. Late check-in around 10 PM, high floor, extra pillows',
                     hint: 'Requests are passed to the property and are not guaranteed.' })}
         </div>
       </section>`;
@@ -502,8 +520,18 @@ const HotelGuests = (function () {
   /* ---------------------------------------------------------------------
      Payload
      --------------------------------------------------------------------- */
+  /* A guest is BOOKED if they are the lead or have both names filled. Blank
+     co-guests are optional (see validate()) and must not reach the payload —
+     the server rejects a guest with an empty name. */
+  const isBooked = i => {
+    if (i === leadIndex()) return true;
+    const v = values[i] || {};
+    return !!((v.first || '').trim() && (v.last || '').trim());
+  };
+
   function payload() {
-    const guests = party.map((p, i) => {
+    const booked = party.map((p, i) => ({ p, i })).filter(({ i }) => isBooked(i));
+    const guests = booked.map(({ p, i }) => {
       const v = values[i] || {};
       const g = {
         guest_type: p.kind,
@@ -523,8 +551,9 @@ const HotelGuests = (function () {
     });
     /* The same party in the shape the booking engine's own steps read
        (`ctx.passengers`), so Review renders it and the create payload maps it
-       without either needing to know a separate screen collected it. */
-    const passengers = party.map((p, i) => {
+       without either needing to know a separate screen collected it. Only the
+       booked guests are listed, so Review shows who is actually travelling. */
+    const passengers = booked.map(({ p, i }) => {
       const v = values[i] || {};
       return {
         kind: p.kind === 'child' ? 'child' : 'adult',
