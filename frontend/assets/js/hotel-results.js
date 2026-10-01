@@ -440,7 +440,7 @@ const HotelResults = (function () {
     const area = areaOf(h);
     const city = cityOf(h);
     const media = (typeof HotelPhoto !== 'undefined')
-      ? HotelPhoto.html(h, { surface: 'card', eager: i < 2, sizes: '(max-width: 760px) 100vw, 380px' })
+      ? HotelPhoto.html(h, { surface: 'card', eager: i < 2, allowDestination: false, sizes: '(max-width: 760px) 100vw, 380px' })
       : '';
     const stars = h.stars && typeof JPIcon !== 'undefined'
       ? `<span class="hr-stars" role="img" aria-label="${esc(h.stars)}-star hotel">${JPIcon.stars(h.stars, h.stars)}</span>` : '';

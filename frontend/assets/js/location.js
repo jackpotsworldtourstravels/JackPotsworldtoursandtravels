@@ -601,7 +601,7 @@
       if (!rows.length) { box.innerHTML = ''; return; }
       box.innerHTML = rows.map(h => {
         const photo = (typeof HotelPhoto !== 'undefined')
-          ? HotelPhoto.html(h, { surface: 'tile', sizes: '(max-width: 640px) 100vw, 260px' }) : '';
+          ? HotelPhoto.html(h, { surface: 'tile', allowDestination: false, sizes: '(max-width: 640px) 100vw, 260px' }) : '';
         const price = h.price_per_night != null
           ? `<p class="lp-hotel-price">${esc(money(h.price_per_night))} <span>/ night</span></p>` : '';
         return `<article class="lp-hotel">

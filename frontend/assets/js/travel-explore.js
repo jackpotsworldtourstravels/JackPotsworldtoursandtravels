@@ -131,7 +131,7 @@ const TravelExplore = (function () {
    *  read here. */
   function hotelImage(h) {
     return (typeof HotelPhoto !== 'undefined')
-      ? HotelPhoto.html(h, { surface: 'card', sizes: '(max-width: 760px) 90vw, 280px' })
+      ? HotelPhoto.html(h, { surface: 'card', allowDestination: false, sizes: '(max-width: 760px) 90vw, 280px' })
       : '';
   }
 
